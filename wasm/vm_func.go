@@ -89,26 +89,17 @@ func (n *NativeFunction) Call(vm *VirtualMachine) {
 		Locals:     locals,
 		LabelStack: NewVirtualMachineLabelStack(),
 	}
-	cnt++
 	vm.execNativeFunction()
 	vm.ActiveContext = prev
 }
 
-var cnt int
-
 func (vm *VirtualMachine) execNativeFunction() {
-	var total int
 	for ; int(vm.ActiveContext.PC) < len(vm.ActiveContext.Function.Body); vm.ActiveContext.PC++ {
-		total++
 		switch op := vm.ActiveContext.Function.Body[vm.ActiveContext.PC]; OptCode(op) {
 		case OptCodeReturn:
 			return
 		default:
 			virtualMachineInstructions[op](vm)
-		}
-
-		if total == 100000 {
-			break
 		}
 	}
 }
