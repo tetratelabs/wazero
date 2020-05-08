@@ -47,7 +47,7 @@ func NewVM(module *Module) (*VirtualMachine, error) {
 	vm.Functions = make([]VirtualMachineFunction, len(vm.InnerModule.IndexSpace.Function))
 	for i, f := range vm.InnerModule.IndexSpace.Function {
 		if hf, ok := f.(*HostFunction); ok {
-			hf.Func = hf.Generator(vm)
+			hf.function = hf.ClosureGenerator(vm)
 			vm.Functions[i] = hf
 		} else {
 			vm.Functions[i] = f

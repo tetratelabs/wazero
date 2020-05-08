@@ -1,26 +1,23 @@
-package main
+package examples
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"reflect"
+	"testing"
 
 	"github.com/mathetake/gasm/hostmodule"
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
+	"github.com/stretchr/testify/require"
 )
 
-func main() {
-	buf, err := ioutil.ReadFile("./host_func.wasm")
-	if err != nil {
-		panic(err)
-	}
+func Test_hostFunc(t *testing.T) {
+	buf, err := ioutil.ReadFile("wasm/host_func.wasm")
+	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	var cnt uint64
 	hostFunc := func(*wasm.VirtualMachine) reflect.Value {
@@ -31,23 +28,16 @@ func main() {
 
 	builder := hostmodule.NewBuilderWith(wasi.Modules)
 	builder.MustAddFunction("env", "host_func", hostFunc)
-	if err := mod.BuildIndexSpaces(builder.Done()); err != nil {
-		panic(err)
-	}
+	err = mod.BuildIndexSpaces(builder.Done())
+	require.NoError(t, err)
 
 	vm, err := wasm.NewVM(mod)
-	if err != nil {
-		panic(vm)
-	}
+	require.NoError(t, err)
 
 	for _, exp := range []uint64{5, 10, 15} {
 		_, _, err = vm.ExecExportedFunction("call_host_func", exp)
-		if err != nil {
-			panic(err)
-		}
-		if cnt != exp {
-			panic(fmt.Sprintf("want %d but got %d", exp, cnt))
-		}
+		require.NoError(t, err)
+		require.Equal(t, exp, cnt)
 		cnt = 0
 	}
 }

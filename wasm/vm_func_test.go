@@ -15,7 +15,7 @@ func TestHostFunction_Call(t *testing.T) {
 		return 1, 2, 3, 4
 	}
 	hf := &HostFunction{
-		Func: reflect.ValueOf(f),
+		function: reflect.ValueOf(f),
 		Signature: &FunctionType{
 			InputTypes:  []ValueType{ValueTypeI64},
 			ReturnTypes: []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64},

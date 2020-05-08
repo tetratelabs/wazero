@@ -1,5 +1,8 @@
 # gasm
 
+[![CircleCI](https://circleci.com/gh/mathetake/gasm.svg?style=shield&circle-token=89ec47a30847c650d215699c0a99c8732a2d538d	)](https://circleci.com/gh/mathetake/gasm)
+[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
+
 A minimal implementation of v1 WASM spec compatible virtual machine purely written in go.
 The vm can be embedded in your go program without any dependency like cgo, and enables Gophers to 
 write wasm host environments easily.
@@ -12,14 +15,15 @@ The implementation is quite straightforward and I hope this code would be a
 
 ## examples
 
+Full examples can be found at: https://github.com/mathetake/gasm/tree/master/examples
+
 ### call expoerted function from host
 
 ```golang
-
-func main() {
-	buf, _ := ioutil.ReadFile("./fib.wasm")
+func Test_fibonacci(t *testing.T) {
+	buf, _ := ioutil.ReadFile("wasm/fibonacci.wasm")
 	mod, _ := wasm.DecodeModule(bytes.NewBuffer(buf))
-	mod.BuildIndexSpaces(wasi.Modules) // fd_write must be injected
+	mod.BuildIndexSpaces(wasi.Modules)
 	vm, _ := wasm.NewVM(mod)
 
 	for _, c := range []struct {
@@ -30,9 +34,7 @@ func main() {
 		{in: 5, exp: 5},
 	} {
 		ret, _, _ := vm.ExecExportedFunction("fib", uint64(c.in))
-		if int32(ret[0]) != c.exp {
-			panic(fmt.Sprintf("result must be %d but got %d\n", c.exp, ret[0]))
-		}
+		require.Equal(t, c.exp, int32(ret[0]))
 	}
 }
 ```
@@ -41,11 +43,18 @@ func main() {
 ### call host function from WASM module
 
 ```golang
-func main() {
-	buf, _ := ioutil.ReadFile("./host_func.wasm")
-	mod, _ := wasm.DecodeModule(bytes.NewBuffer(buf))
 
-	var cnt uint64
+func Test_hostFunc(t *testing.T) {
+	buf, err := ioutil.ReadFile("wasm/host_func.wasm")
+	require.NoError(t, err)
+
+	mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
+	require.NoError(t, err)
+
+	var cnt uint64  // to be incremented as hostFunc is called
+
+	// host functions must be defined in the form of `Virtual Machine closure` generator
+	// in order to access VM state to get things done
 	hostFunc := func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func() {
 			cnt++
@@ -54,14 +63,15 @@ func main() {
 
 	builder := hostmodule.NewBuilderWith(wasi.Modules)
 	builder.MustAddFunction("env", "host_func", hostFunc)
-	mod.BuildIndexSpaces(builder.Done())
-	vm, _ := wasm.NewVM(mod)
+	err = mod.BuildIndexSpaces(builder.Done())
+	require.NoError(t, err)
+
+	vm, err := wasm.NewVM(mod)
+	require.NoError(t, err)
 
 	for _, exp := range []uint64{5, 10, 15} {
 		vm.ExecExportedFunction("call_host_func", exp)
-		if cnt != exp {
-			panic(fmt.Sprintf("want %d but got %d", exp, cnt))
-		}
+		require.Equal(t, exp, cnt)
 		cnt = 0
 	}
 }
