@@ -1,0 +1,17 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.14
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-{{ checksum "go.sum" }}
+      - run: go mod download
+      - run: go test $(go list ./... | grep -v "examples/wasm") -v -race
+      - save_cache:
+          key: v1-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod/cache

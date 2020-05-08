@@ -48,8 +48,8 @@ func (m *Builder) AddFunction(modName, funcName string, fn func(machine *wasm.Vi
 	}
 
 	mod.IndexSpace.Function = append(mod.IndexSpace.Function, &wasm.HostFunction{
-		Generator: fn,
-		Signature: sig,
+		ClosureGenerator: fn,
+		Signature:        sig,
 	})
 	return nil
 }
