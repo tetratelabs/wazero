@@ -23,8 +23,7 @@ Full examples can be found at: https://github.com/mathetake/gasm/tree/master/exa
 func Test_fibonacci(t *testing.T) {
 	buf, _ := ioutil.ReadFile("wasm/fibonacci.wasm")
 	mod, _ := wasm.DecodeModule(bytes.NewBuffer(buf))
-	mod.BuildIndexSpaces(wasi.Modules)
-	vm, _ := wasm.NewVM(mod)
+	vm, _ := wasm.NewVM(mod, wasi.Modules)
 
 	for _, c := range []struct {
 		in, exp int32
@@ -61,13 +60,9 @@ func Test_hostFunc(t *testing.T) {
 		})
 	}
 
-	builder := hostmodule.NewBuilderWith(wasi.Modules)
-	builder.MustAddFunction("env", "host_func", hostFunc)
-	err = mod.BuildIndexSpaces(builder.Done())
-	require.NoError(t, err)
-
-	vm, err := wasm.NewVM(mod)
-	require.NoError(t, err)
+	builder := hostfunc.NewModuleBuilderWith(wasi.Modules)
+	builder.MustSetFunction("env", "host_func", hostFunc)
+	vm, _ := wasm.NewVM(mod, builder.Done())
 
 	for _, exp := range []uint64{5, 10, 15} {
 		vm.ExecExportedFunction("call_host_func", exp)

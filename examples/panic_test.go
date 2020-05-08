@@ -17,10 +17,7 @@ func Test_panic(t *testing.T) {
 	mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
 	require.NoError(t, err)
 
-	err = mod.BuildIndexSpaces(wasi.Modules)
-	require.NoError(t, err)
-
-	vm, err := wasm.NewVM(mod)
+	vm, err := wasm.NewVM(mod, wasi.Modules)
 	require.NoError(t, err)
 
 	defer func() {

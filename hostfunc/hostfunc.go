@@ -1,4 +1,4 @@
-package hostmodule
+package hostfunc
 
 import (
 	"fmt"
@@ -7,27 +7,25 @@ import (
 	"github.com/mathetake/gasm/wasm"
 )
 
-type Builder struct {
+type ModuleBuilder struct {
 	modules map[string]*wasm.Module
 }
 
-func NewBuilder() *Builder {
-	return &Builder{modules: map[string]*wasm.Module{}}
+func NewModuleBuilder() *ModuleBuilder {
+	return &ModuleBuilder{modules: map[string]*wasm.Module{}}
 }
 
-func NewBuilderWith(in map[string]*wasm.Module) *Builder {
-	return &Builder{modules: in}
+func NewModuleBuilderWith(in map[string]*wasm.Module) *ModuleBuilder {
+	return &ModuleBuilder{modules: in}
 }
 
-// TODO: support other types
-
-func (m *Builder) MustAddFunction(modName, funcName string, fn func(machine *wasm.VirtualMachine) reflect.Value) {
-	if err := m.AddFunction(modName, funcName, fn); err != nil {
+func (m *ModuleBuilder) MustSetFunction(modName, funcName string, fn func(machine *wasm.VirtualMachine) reflect.Value) {
+	if err := m.SetFunction(modName, funcName, fn); err != nil {
 		panic(err)
 	}
 }
 
-func (m *Builder) AddFunction(modName, funcName string, fn func(machine *wasm.VirtualMachine) reflect.Value) error {
+func (m *ModuleBuilder) SetFunction(modName, funcName string, fn func(machine *wasm.VirtualMachine) reflect.Value) error {
 
 	mod, ok := m.modules[modName]
 	if !ok {
@@ -89,6 +87,6 @@ func getTypeOf(kind reflect.Kind) (wasm.ValueType, error) {
 	}
 }
 
-func (m *Builder) Done() map[string]*wasm.Module {
+func (m *ModuleBuilder) Done() map[string]*wasm.Module {
 	return m.modules
 }

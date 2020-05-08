@@ -30,7 +30,11 @@ type (
 	}
 )
 
-func NewVM(module *Module) (*VirtualMachine, error) {
+func NewVM(module *Module, externModules map[string]*Module) (*VirtualMachine, error) {
+	if err := module.buildIndexSpaces(externModules); err != nil {
+		return nil, fmt.Errorf("build index space: %w", err)
+	}
+
 	vm := &VirtualMachine{
 		InnerModule:  module,
 		OperandStack: NewVirtualMachineOperandStack(),

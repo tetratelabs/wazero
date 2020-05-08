@@ -79,8 +79,8 @@ func DecodeModule(r io.Reader) (*Module, error) {
 	return ret, nil
 }
 
-// BuildIndexSpaces build index spaces of the module with the given external modules
-func (m *Module) BuildIndexSpaces(externModules map[string]*Module) error {
+// buildIndexSpaces build index spaces of the module with the given external modules
+func (m *Module) buildIndexSpaces(externModules map[string]*Module) error {
 	m.IndexSpace = new(ModuleIndexSpace)
 
 	// resolve imports

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mathetake/gasm/hostmodule"
+	"github.com/mathetake/gasm/hostfunc"
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
 	"github.com/stretchr/testify/require"
@@ -26,12 +26,9 @@ func Test_hostFunc(t *testing.T) {
 		})
 	}
 
-	builder := hostmodule.NewBuilderWith(wasi.Modules)
-	builder.MustAddFunction("env", "host_func", hostFunc)
-	err = mod.BuildIndexSpaces(builder.Done())
-	require.NoError(t, err)
-
-	vm, err := wasm.NewVM(mod)
+	builder := hostfunc.NewModuleBuilderWith(wasi.Modules)
+	builder.MustSetFunction("env", "host_func", hostFunc)
+	vm, err := wasm.NewVM(mod, builder.Done())
 	require.NoError(t, err)
 
 	for _, exp := range []uint64{5, 10, 15} {
