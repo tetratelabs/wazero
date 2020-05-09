@@ -8,10 +8,6 @@ import (
 	"github.com/mathetake/gasm/wasm/leb128"
 )
 
-var (
-	ErrInvalidSectionID = errors.New("invalid section id")
-)
-
 type SectionID byte
 
 const (
@@ -31,7 +27,7 @@ const (
 
 func (m *Module) readSections(r io.Reader) error {
 	for {
-		if err := m.readSection(r); err == io.EOF {
+		if err := m.readSection(r); errors.Is(err, io.EOF) {
 			return nil
 		} else if err != nil {
 			return err
@@ -41,9 +37,7 @@ func (m *Module) readSections(r io.Reader) error {
 
 func (m *Module) readSection(r io.Reader) error {
 	b := make([]byte, 1)
-	if _, err := io.ReadFull(r, b); err == io.EOF {
-		return err
-	} else if err != nil {
+	if _, err := io.ReadFull(r, b); err != nil {
 		return fmt.Errorf("read section id: %w", err)
 	}
 
@@ -80,7 +74,7 @@ func (m *Module) readSection(r io.Reader) error {
 	case SectionIDData:
 		err = m.readSectionData(r)
 	default:
-		err = ErrInvalidSectionID
+		err = errors.New("invalid section id")
 	}
 
 	if err != nil {
