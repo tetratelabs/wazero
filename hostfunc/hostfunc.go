@@ -19,6 +19,10 @@ func NewModuleBuilderWith(in map[string]*wasm.Module) *ModuleBuilder {
 	return &ModuleBuilder{modules: in}
 }
 
+func (m *ModuleBuilder) Done() map[string]*wasm.Module {
+	return m.modules
+}
+
 func (m *ModuleBuilder) MustSetFunction(modName, funcName string, fn func(machine *wasm.VirtualMachine) reflect.Value) {
 	if err := m.SetFunction(modName, funcName, fn); err != nil {
 		panic(err)
@@ -34,6 +38,7 @@ func (m *ModuleBuilder) SetFunction(modName, funcName string, fn func(machine *w
 	}
 
 	mod.SecExports[funcName] = &wasm.ExportSegment{
+		Name: funcName,
 		Desc: &wasm.ExportDesc{
 			Kind:  wasm.ExportKindFunction,
 			Index: uint32(len(mod.IndexSpace.Function)),
@@ -81,12 +86,8 @@ func getTypeOf(kind reflect.Kind) (wasm.ValueType, error) {
 	case reflect.Int32, reflect.Uint32:
 		return wasm.ValueTypeI32, nil
 	case reflect.Int64, reflect.Uint64:
-		return wasm.ValueTypeI32, nil
+		return wasm.ValueTypeI64, nil
 	default:
 		return 0x00, fmt.Errorf("invalid type: %s", kind.String())
 	}
-}
-
-func (m *ModuleBuilder) Done() map[string]*wasm.Module {
-	return m.modules
 }
