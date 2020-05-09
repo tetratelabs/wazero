@@ -6,7 +6,7 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/mathetake/gasm/hostmodule"
+	"github.com/mathetake/gasm/hostfunc"
 	"github.com/mathetake/gasm/wasm"
 )
 
@@ -15,8 +15,8 @@ const wasiUnstableName = "wasi_unstable"
 var Modules map[string]*wasm.Module
 
 func init() {
-	b := hostmodule.NewBuilder()
-	b.MustAddFunction(wasiUnstableName, "fd_write", fd_write)
+	b := hostfunc.NewModuleBuilder()
+	b.MustSetFunction(wasiUnstableName, "fd_write", fd_write)
 	Modules = b.Done()
 }
 

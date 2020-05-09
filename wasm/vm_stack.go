@@ -1,6 +1,9 @@
 package wasm
 
-const initialStackHeight = 1024
+const (
+	initialOperandStackHeight = 1024
+	initialLabelStackHeight   = 10
+)
 
 func drop(vm *VirtualMachine) {
 	vm.OperandStack.Drop()
@@ -17,7 +20,7 @@ func selectOp(vm *VirtualMachine) {
 
 func NewVirtualMachineOperandStack() *VirtualMachineOperandStack {
 	return &VirtualMachineOperandStack{
-		Stack: make([]uint64, initialStackHeight),
+		Stack: make([]uint64, initialOperandStackHeight),
 		SP:    -1,
 	}
 }
@@ -71,7 +74,7 @@ type Label struct {
 
 func NewVirtualMachineLabelStack() *VirtualMachineLabelStack {
 	return &VirtualMachineLabelStack{
-		Stack: make([]*Label, initialStackHeight),
+		Stack: make([]*Label, initialLabelStackHeight),
 		SP:    -1,
 	}
 }

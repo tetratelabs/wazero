@@ -161,5 +161,9 @@ func Test_brIf(t *testing.T) {
 }
 
 func Test_brAt(t *testing.T) {
+	// fixme:
+}
 
+func Test_brTable(t *testing.T) {
+	// fixme:
 }
