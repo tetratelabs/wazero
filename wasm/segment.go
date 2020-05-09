@@ -118,10 +118,10 @@ type ExportDesc struct {
 }
 
 const (
-	ExportKindFunction = 0x00
-	ExportKindTable    = 0x01
-	ExportKindMem      = 0x02
-	ExportKindGlobal   = 0x03
+	ExportKindFunction byte = 0x00
+	ExportKindTable    byte = 0x01
+	ExportKindMem      byte = 0x02
+	ExportKindGlobal   byte = 0x03
 )
 
 func readExportDesc(r io.Reader) (*ExportDesc, error) {

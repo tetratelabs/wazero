@@ -97,11 +97,15 @@ func (vm *VirtualMachine) ExecExportedFunction(name string, args ...uint64) (ret
 		return nil, nil, fmt.Errorf("function index out of range")
 	}
 
+	f := vm.Functions[exp.Desc.Index]
+	if len(f.FunctionType().InputTypes) != len(args) {
+		return nil, nil, fmt.Errorf("invalid number of arguments")
+	}
+
 	for _, arg := range args {
 		vm.OperandStack.Push(arg)
 	}
 
-	f := vm.Functions[exp.Desc.Index]
 	f.Call(vm)
 
 	ret := make([]uint64, len(f.FunctionType().ReturnTypes))
