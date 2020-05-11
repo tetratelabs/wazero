@@ -404,17 +404,36 @@ func Test_memorySize(t *testing.T) {
 }
 
 func Test_memoryGrow(t *testing.T) {
-	vm := &VirtualMachine{
-		ActiveContext: &NativeFunctionContext{},
-		Memory:        make([]byte, vmPageSize*2),
-		OperandStack:  NewVirtualMachineOperandStack(),
-		InnerModule: &Module{
-			SecMemory: []*MemoryType{{}},
-		},
-	}
+	t.Run("ok", func(t *testing.T) {
+		vm := &VirtualMachine{
+			ActiveContext: &NativeFunctionContext{},
+			Memory:        make([]byte, vmPageSize*2),
+			OperandStack:  NewVirtualMachineOperandStack(),
+			InnerModule: &Module{
+				SecMemory: []*MemoryType{{}},
+			},
+		}
 
-	vm.OperandStack.Push(5)
-	memoryGrow(vm)
-	assert.Equal(t, uint64(0x2), vm.OperandStack.Pop())
-	assert.Equal(t, 7, len(vm.Memory)/vmPageSize)
+		vm.OperandStack.Push(5)
+		memoryGrow(vm)
+		assert.Equal(t, uint64(0x2), vm.OperandStack.Pop())
+		assert.Equal(t, 7, len(vm.Memory)/vmPageSize)
+	})
+
+	t.Run("oom", func(t *testing.T) {
+		vm := &VirtualMachine{
+			ActiveContext: &NativeFunctionContext{},
+			Memory:        make([]byte, vmPageSize*2),
+			OperandStack:  NewVirtualMachineOperandStack(),
+			InnerModule: &Module{
+				SecMemory: []*MemoryType{{Max: uint32Ptr(0)}},
+			},
+		}
+
+		exp := int32(-1)
+		vm.OperandStack.Push(5)
+		memoryGrow(vm)
+		assert.Equal(t, uint64(exp), vm.OperandStack.Pop())
+	})
+
 }

@@ -141,6 +141,7 @@ func memoryGrow(vm *VirtualMachine) {
 		uint64(n+uint32(len(vm.Memory)/vmPageSize)) > uint64(*(vm.InnerModule.SecMemory[0].Max)) {
 		v := int32(-1)
 		vm.OperandStack.Push(uint64(v))
+		return
 	}
 
 	vm.OperandStack.Push(uint64(len(vm.Memory)) / vmPageSize)

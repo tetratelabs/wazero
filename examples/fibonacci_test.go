@@ -27,7 +27,7 @@ func Test_fibonacci(t *testing.T) {
 		{in: 10, exp: 55},
 		{in: 5, exp: 5},
 	} {
-		ret, retTypes, err := vm.ExecExportedFunction("fib", uint64(c.in))
+		ret, retTypes, err := vm.ExecExportedFunction("fibonacci", uint64(c.in))
 		require.NoError(t, err)
 		require.Len(t, ret, len(retTypes))
 		require.Equal(t, wasm.ValueTypeI32, retTypes[0])

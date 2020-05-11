@@ -3,10 +3,10 @@ package main
 
 func main() {}
 
-//export fib
-func fib(in uint32) uint32 {
+//export fibonacci
+func fibonacci(in uint32) uint32 {
 	if in <= 1 {
 		return in
 	}
-	return fib(in-1) + fib(in-2)
+	return fibonacci(in-1) + fibonacci(in-2)
 }
