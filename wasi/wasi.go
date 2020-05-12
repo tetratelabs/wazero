@@ -23,6 +23,7 @@ func init() {
 func fd_write(vm *wasm.VirtualMachine) reflect.Value {
 	body := func(fd int32, iovsPtr int32, iovsLen int32, nwrittenPtr int32) (err int32) {
 		if fd != 1 {
+			// fixme: support any fd
 			panic(fmt.Errorf("invalid file descriptor: %d", fd))
 		}
 

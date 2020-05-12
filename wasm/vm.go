@@ -20,6 +20,8 @@ type (
 		Globals       []uint64
 
 		OperandStack *VirtualMachineOperandStack
+
+		Exited bool
 	}
 
 	NativeFunctionContext struct {

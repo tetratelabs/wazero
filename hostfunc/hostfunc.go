@@ -23,6 +23,12 @@ func (m *ModuleBuilder) Done() map[string]*wasm.Module {
 	return m.modules
 }
 
+func (m *ModuleBuilder) Merge(ms map[string]*wasm.Module) {
+	for n, mod := range ms {
+		m.modules[n] = mod
+	}
+}
+
 func (m *ModuleBuilder) MustSetFunction(modName, funcName string, fn func(machine *wasm.VirtualMachine) reflect.Value) {
 	if err := m.SetFunction(modName, funcName, fn); err != nil {
 		panic(err)

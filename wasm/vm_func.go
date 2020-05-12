@@ -101,5 +101,8 @@ func (vm *VirtualMachine) execNativeFunction() {
 		default:
 			virtualMachineInstructions[op](vm)
 		}
+		if vm.Exited {
+			return
+		}
 	}
 }
