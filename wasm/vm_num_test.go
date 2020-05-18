@@ -18,9 +18,18 @@ func (suite *NumTestSuite) SetupTest() {
 }
 
 func (suite *NumTestSuite) Testi32eqz() {
-	suite.vm.OperandStack.Push(0)
-	i32eqz(suite.vm)
-	suite.Equal(uint64(1), suite.vm.OperandStack.Pop())
+	var testTable = []struct {
+		input int
+		want  uint64
+	}{
+		{input: 0, want: 1},
+		{input: 1, want: 0},
+	}
+	for _, tt := range testTable {
+		suite.vm.OperandStack.Push(uint64(tt.input))
+		i32eqz(suite.vm)
+		suite.Equal(tt.want, suite.vm.OperandStack.Pop())
+	}
 }
 
 func (suite *NumTestSuite) Testi32ne() {
