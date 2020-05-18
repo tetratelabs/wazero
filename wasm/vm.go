@@ -20,6 +20,7 @@ type (
 		Globals       []uint64
 
 		OperandStack *VirtualMachineOperandStack
+		RuntimeData  interface{}
 	}
 
 	NativeFunctionContext struct {
