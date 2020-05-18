@@ -1,44 +1,94 @@
 package wasm
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestNumOps(t *testing.T) {
+type NumTestSuite struct {
+	suite.Suite
+	vm *VirtualMachine
+}
 
+func (suite *NumTestSuite) SetupTest() {
+	suite.vm = &VirtualMachine{
+		OperandStack: NewVirtualMachineOperandStack(),
+	}
+}
+
+func (suite *NumTestSuite) Testi32eqz() {
+	suite.vm.OperandStack.Push(0)
+	i32eqz(suite.vm)
+	suite.Equal(uint64(1), suite.vm.OperandStack.Pop())
+}
+
+func (suite *NumTestSuite) Testi32ne() {
 	var testTable = []struct {
-		input [2]int                // numbers to push on the stack
-		op    func(*VirtualMachine) // operation to apply
-		desc  string                // string description of the operation
-		want  uint32                // result should obtain
+		input [2]int
+		want  uint64
 	}{
-		{input: [2]int{0, 0}, op: i32eqz, desc: "i32eqz", want: 1},
-		{input: [2]int{3, 3}, op: i32eq, desc: "i32eq", want: 1},
-		{input: [2]int{3, 4}, op: i32ne, desc: "i32ne", want: 1},
-		{input: [2]int{3, 3}, op: i32ne, desc: "i32ne", want: 0},
-		{input: [2]int{-4, 1}, op: i32lts, desc: "i32lts", want: 1},
-		{input: [2]int{4, -1}, op: i32lts, desc: "i32lts", want: 0},
-		{input: [2]int{1, 4}, op: i32ltu, desc: "i32ltu", want: 1},
-		{input: [2]int{4, 1}, op: i32ltu, desc: "i32ltu", want: 0},
-		{input: [2]int{1, -4}, op: i32gts, desc: "i32gts", want: 1},
-		{input: [2]int{-4, 1}, op: i32gts, desc: "i32gts", want: 0},
+		{input: [2]int{3, 4}, want: 1},
+		{input: [2]int{3, 3}, want: 0},
 	}
-
-	var vm VirtualMachine
-	for id, tt := range testTable {
-		vm = VirtualMachine{
-			OperandStack: NewVirtualMachineOperandStack(),
-		}
-
-		vm.OperandStack.Push(uint64(tt.input[0]))
-		vm.OperandStack.Push(uint64(tt.input[1]))
-		tt.op(&vm)
-
-		assert.Equal(t, tt.want, uint32(vm.OperandStack.Pop()),
-			fmt.Sprintf("test #%d : %d %s %d should eq %d", id, tt.input[0], tt.desc, tt.input[1], tt.want))
+	for _, tt := range testTable {
+		suite.vm.OperandStack.Push(uint64(tt.input[0]))
+		suite.vm.OperandStack.Push(uint64(tt.input[1]))
+		i32ne(suite.vm)
+		suite.Equal(tt.want, suite.vm.OperandStack.Pop())
 	}
+}
 
+func (suite *NumTestSuite) Testi32lts() {
+	var testTable = []struct {
+		input [2]int
+		want  uint64
+	}{
+		{input: [2]int{-4, 1}, want: 1},
+		{input: [2]int{4, -1}, want: 0},
+	}
+	for _, tt := range testTable {
+		suite.vm.OperandStack.Push(uint64(tt.input[0]))
+		suite.vm.OperandStack.Push(uint64(tt.input[1]))
+		i32lts(suite.vm)
+		suite.Equal(tt.want, suite.vm.OperandStack.Pop())
+	}
+}
+
+func (suite *NumTestSuite) Testi32ltu() {
+	var testTable = []struct {
+		input [2]int
+		want  uint64
+	}{
+		{input: [2]int{1, 4}, want: 1},
+		{input: [2]int{4, 1}, want: 0},
+	}
+	for _, tt := range testTable {
+		suite.vm.OperandStack.Push(uint64(tt.input[0]))
+		suite.vm.OperandStack.Push(uint64(tt.input[1]))
+		i32ltu(suite.vm)
+		suite.Equal(tt.want, suite.vm.OperandStack.Pop())
+	}
+}
+
+func (suite *NumTestSuite) Testi32gts() {
+	var testTable = []struct {
+		input [2]int
+		want  uint64
+	}{
+		{input: [2]int{1, -4}, want: 1},
+		{input: [2]int{-4, 1}, want: 0},
+	}
+	for _, tt := range testTable {
+		suite.vm.OperandStack.Push(uint64(tt.input[0]))
+		suite.vm.OperandStack.Push(uint64(tt.input[1]))
+		i32gts(suite.vm)
+		suite.Equal(tt.want, suite.vm.OperandStack.Pop())
+	}
+}
+
+// In order for 'go test' to run this suite, we need to create
+// a normal test function and pass our suite to suite.Run
+func TestRunSuite(t *testing.T) {
+	suite.Run(t, new(NumTestSuite))
 }
