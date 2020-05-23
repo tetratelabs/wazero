@@ -17,6 +17,6 @@ func Test_goABI(t *testing.T) {
 	mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
 	require.NoError(t, err)
 
-	_, err = wasm.NewVM(mod, gojs.Modules)
+	_, err = wasm.NewVM(mod, gojs.New())
 	require.NoError(t, err)
 }
