@@ -17,7 +17,7 @@ The implementation is quite straightforward and I hope this code would be a
 
 Full examples can be found at: https://github.com/mathetake/gasm/tree/master/examples
 
-### call expoerted function from host
+### call exported function from host
 
 ```golang
 func Test_fibonacci(t *testing.T) {
@@ -49,8 +49,8 @@ func Test_hostFunc(t *testing.T) {
 
 	var cnt uint64  // to be incremented as hostFunc is called
 
-	// host functions must be defined in the form of `Virtual Machine closure` generator
-	// in order to access VM state to get things done
+	// host functions must be defined in the form of `Virtual Machine closure` generators
+	// in order to access the VM state to get things done
 	hostFunc := func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func() {
 			cnt++
