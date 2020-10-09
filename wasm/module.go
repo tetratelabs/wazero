@@ -37,7 +37,7 @@ type (
 	ModuleIndexSpace struct {
 		Function []VirtualMachineFunction
 		Globals  []*Global
-		Table    [][]*uint32
+		Table    [][]uint32
 		Memory   [][]byte
 	}
 
@@ -92,7 +92,7 @@ func (m *Module) buildIndexSpaces(externModules map[string]*Module) error {
 	// note: MVP restricts the size of memory index spaces to 1
 	if diff := len(m.SecTables) - len(m.IndexSpace.Table); diff > 0 {
 		for i := 0; i < diff; i++ {
-			m.IndexSpace.Table = append(m.IndexSpace.Table, []*uint32{})
+			m.IndexSpace.Table = append(m.IndexSpace.Table, []uint32{})
 		}
 	}
 
@@ -316,15 +316,15 @@ func (m *Module) buildTableIndexSpace() error {
 
 		table := m.IndexSpace.Table[elem.TableIndex]
 		if size > len(table) {
-			next := make([]*uint32, size)
+			next := make([]uint32, size)
 			copy(next, table)
 			for i, b := range elem.Init {
-				next[i+offset] = &b
+				next[i+offset] = b
 			}
 			m.IndexSpace.Table[elem.TableIndex] = next
 		} else {
 			for i, b := range elem.Init {
-				table[i+offset] = &b
+				table[i+offset] = b
 			}
 		}
 	}

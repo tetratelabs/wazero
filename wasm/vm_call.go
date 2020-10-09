@@ -18,11 +18,8 @@ func callIndirect(vm *VirtualMachine) {
 	}
 
 	te := vm.InnerModule.IndexSpace.Table[0][tableIndex]
-	if te == nil {
-		panic("table entry not initialized")
-	}
 
-	f := vm.Functions[*te]
+	f := vm.Functions[te]
 	ft := f.FunctionType()
 	if !hasSameSignature(ft.InputTypes, expType.InputTypes) ||
 		!hasSameSignature(ft.ReturnTypes, expType.ReturnTypes) {

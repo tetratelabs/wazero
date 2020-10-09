@@ -40,7 +40,7 @@ func Test_callIndirect(t *testing.T) {
 		InnerModule: &Module{
 			SecTypes: []*FunctionType{nil, {}},
 			IndexSpace: &ModuleIndexSpace{
-				Table: [][]*uint32{{nil, uint32Ptr(1)}},
+				Table: [][]uint32{{0, 1}},
 			},
 		},
 		OperandStack: NewVirtualMachineOperandStack(),

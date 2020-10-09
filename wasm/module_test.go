@@ -159,12 +159,12 @@ func TestModule_applyTableImport(t *testing.T) {
 
 		var exp uint32 = 10
 		em := &Module{
-			IndexSpace: &ModuleIndexSpace{Table: [][]*uint32{{&exp}}},
+			IndexSpace: &ModuleIndexSpace{Table: [][]uint32{{exp}}},
 		}
 		m := &Module{IndexSpace: new(ModuleIndexSpace)}
 		err := m.applyTableImport(em, es)
 		require.NoError(t, err)
-		assert.Equal(t, exp, *m.IndexSpace.Table[0][0])
+		assert.Equal(t, exp, m.IndexSpace.Table[0][0])
 	})
 }
 
@@ -407,12 +407,12 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 			},
 			{
 				SecElements: []*ElementSegment{{TableIndex: 0}},
-				IndexSpace:  &ModuleIndexSpace{Table: [][]*uint32{{}}},
+				IndexSpace:  &ModuleIndexSpace{Table: [][]uint32{{}}},
 			},
 			{
 				SecElements: []*ElementSegment{{TableIndex: 0, OffsetExpr: &ConstantExpression{}}},
 				SecTables:   []*TableType{{}},
-				IndexSpace:  &ModuleIndexSpace{Table: [][]*uint32{{}}},
+				IndexSpace:  &ModuleIndexSpace{Table: [][]uint32{{}}},
 			},
 			{
 				SecElements: []*ElementSegment{{
@@ -426,7 +426,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 				SecTables: []*TableType{{Limit: &LimitsType{
 					Max: uint32Ptr(1),
 				}}},
-				IndexSpace: &ModuleIndexSpace{Table: [][]*uint32{{}}},
+				IndexSpace: &ModuleIndexSpace{Table: [][]uint32{{}}},
 			},
 		} {
 			err := m.buildTableIndexSpace()
@@ -451,7 +451,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 						Init: []uint32{0x1, 0x1},
 					}},
 					SecTables:  []*TableType{{Limit: &LimitsType{}}},
-					IndexSpace: &ModuleIndexSpace{Table: [][]*uint32{{}}},
+					IndexSpace: &ModuleIndexSpace{Table: [][]uint32{{}}},
 				},
 				exp: [][]*uint32{{uint32Ptr(0x01), uint32Ptr(0x01)}},
 			},
@@ -467,7 +467,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					}},
 					SecTables: []*TableType{{Limit: &LimitsType{}}},
 					IndexSpace: &ModuleIndexSpace{
-						Table: [][]*uint32{{uint32Ptr(0x0), uint32Ptr(0x0)}},
+						Table: [][]uint32{{0, 0}},
 					},
 				},
 				exp: [][]*uint32{{uint32Ptr(0x01), uint32Ptr(0x01)}},
@@ -484,7 +484,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					}},
 					SecTables: []*TableType{{Limit: &LimitsType{}}},
 					IndexSpace: &ModuleIndexSpace{
-						Table: [][]*uint32{{nil, uint32Ptr(0x0), uint32Ptr(0x0)}},
+						Table: [][]uint32{{0, 0, 0}},
 					},
 				},
 				exp: [][]*uint32{{nil, uint32Ptr(0x01), uint32Ptr(0x01)}},
@@ -501,7 +501,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					}},
 					SecTables: []*TableType{{Limit: &LimitsType{}}},
 					IndexSpace: &ModuleIndexSpace{
-						Table: [][]*uint32{{nil, nil, nil}},
+						Table: [][]uint32{{0, 0, 0}},
 					},
 				},
 				exp: [][]*uint32{{nil, uint32Ptr(0x01), nil}},
@@ -516,7 +516,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					if exp == nil {
 						assert.Nil(t, actualTable[i])
 					} else {
-						assert.Equal(t, *exp, *actualTable[i])
+						assert.Equal(t, *exp, actualTable[i])
 					}
 				}
 			}
