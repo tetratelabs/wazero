@@ -121,40 +121,48 @@ func (m *Module) buildIndexSpaces(externModules map[string]*Module) error {
 
 func (m *Module) resolveImports(externModules map[string]*Module) error {
 	for _, is := range m.SecImports {
-		em, ok := externModules[is.Module]
-		if !ok {
-			return fmt.Errorf("failed to resolve import of module name %s", is.Module)
-		}
-
-		es, ok := em.SecExports[is.Name]
-		if !ok {
-			return fmt.Errorf("%s not exported in module %s", is.Name, is.Module)
-		}
-
-		if is.Desc.Kind != es.Desc.Kind {
-			return fmt.Errorf("type mismatch on export: got %#x but want %#x", es.Desc.Kind, is.Desc.Kind)
-		}
-		switch is.Desc.Kind {
-		case 0x00: // function
-			if err := m.applyFunctionImport(is, em, es); err != nil {
-				return fmt.Errorf("applyFunctionImport failed: %w", err)
-			}
-		case 0x01: // table
-			if err := m.applyTableImport(em, es); err != nil {
-				return fmt.Errorf("applyTableImport failed: %w", err)
-			}
-		case 0x02: // mem
-			if err := m.applyMemoryImport(em, es); err != nil {
-				return fmt.Errorf("applyMemoryImport: %w", err)
-			}
-		case 0x03: // global
-			if err := m.applyGlobalImport(em, es); err != nil {
-				return fmt.Errorf("applyGlobalImport: %w", err)
-			}
-		default:
-			return fmt.Errorf("invalid kind of import: %#x", is.Desc.Kind)
+		if err := m.resolveImport(is, externModules); err != nil {
+			return fmt.Errorf("%s: %w", is.Name, err)
 		}
 	}
+	return nil
+}
+
+func (m *Module) resolveImport(is *ImportSegment, externModules map[string]*Module) error {
+	em, ok := externModules[is.Module]
+	if !ok {
+		return fmt.Errorf("failed to resolve import of module name %s", is.Module)
+	}
+
+	es, ok := em.SecExports[is.Name]
+	if !ok {
+		return fmt.Errorf("not exported in module %s", is.Module)
+	}
+
+	if is.Desc.Kind != es.Desc.Kind {
+		return fmt.Errorf("type mismatch on export: got %#x but want %#x", es.Desc.Kind, is.Desc.Kind)
+	}
+	switch is.Desc.Kind {
+	case 0x00: // function
+		if err := m.applyFunctionImport(is, em, es); err != nil {
+			return fmt.Errorf("applyFunctionImport failed: %w", err)
+		}
+	case 0x01: // table
+		if err := m.applyTableImport(em, es); err != nil {
+			return fmt.Errorf("applyTableImport failed: %w", err)
+		}
+	case 0x02: // mem
+		if err := m.applyMemoryImport(em, es); err != nil {
+			return fmt.Errorf("applyMemoryImport: %w", err)
+		}
+	case 0x03: // global
+		if err := m.applyGlobalImport(em, es); err != nil {
+			return fmt.Errorf("applyGlobalImport: %w", err)
+		}
+	default:
+		return fmt.Errorf("invalid kind of import: %#x", is.Desc.Kind)
+	}
+
 	return nil
 }
 
