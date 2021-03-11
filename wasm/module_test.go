@@ -506,6 +506,23 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 				},
 				exp: [][]*uint32{{nil, uint32Ptr(0x01), nil}},
 			},
+			{
+				m: &Module{
+					SecElements: []*ElementSegment{{
+						TableIndex: 0,
+						OffsetExpr: &ConstantExpression{
+							optCode: OptCodeI32Const,
+							data:    []byte{0x0},
+						},
+						Init: []uint32{0x1, 0x2},
+					}},
+					SecTables: []*TableType{{Limit: &LimitsType{}}},
+					IndexSpace: &ModuleIndexSpace{
+						Table: [][]*uint32{{}},
+					},
+				},
+				exp: [][]*uint32{{uint32Ptr(0x01), uint32Ptr(0x02)}},
+			},
 		} {
 			require.NoError(t, c.m.buildTableIndexSpace())
 			require.Len(t, c.m.IndexSpace.Table, len(c.exp))
