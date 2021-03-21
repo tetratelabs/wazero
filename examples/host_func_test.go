@@ -26,7 +26,7 @@ func Test_hostFunc(t *testing.T) {
 		})
 	}
 
-	builder := hostfunc.NewModuleBuilderWith(wasi.Modules)
+	builder := hostfunc.NewModuleBuilderWith(wasi.New().Modules())
 	builder.MustSetFunction("env", "host_func", hostFunc)
 	vm, err := wasm.NewVM(mod, builder.Done())
 	require.NoError(t, err)
