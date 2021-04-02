@@ -17,7 +17,7 @@ func Test_fibonacci(t *testing.T) {
 	mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
 	require.NoError(t, err)
 
-	vm, err := wasm.NewVM(mod, wasi.Modules)
+	vm, err := wasm.NewVM(mod, wasi.New().Modules())
 	require.NoError(t, err)
 
 	for _, c := range []struct {

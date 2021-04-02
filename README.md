@@ -23,7 +23,7 @@ Full examples can be found at: https://github.com/mathetake/gasm/tree/master/exa
 func Test_fibonacci(t *testing.T) {
 	buf, _ := ioutil.ReadFile("wasm/fibonacci.wasm")
 	mod, _ := wasm.DecodeModule(bytes.NewBuffer(buf))
-	vm, _ := wasm.NewVM(mod, wasi.Modules)
+	vm, _ := wasm.NewVM(mod, wasi.New().Modules())
 
 	for _, c := range []struct {
 		in, exp int32
@@ -57,7 +57,7 @@ func Test_hostFunc(t *testing.T) {
 		})
 	}
 
-	builder := hostfunc.NewModuleBuilderWith(wasi.Modules)
+	builder := hostfunc.NewModuleBuilderWith(wasi.New().Modules())
 	builder.MustSetFunction("env", "host_func", hostFunc)
 	vm, _ := wasm.NewVM(mod, builder.Done())
 
@@ -71,10 +71,38 @@ func Test_hostFunc(t *testing.T) {
 
 ## 🚧 WASI support 🚧
 
-WebAssembly System Interface(WASI) will partly be supported in `wasi` package.
-Currently only `fd_write` is implemented and you can see it works in `examples/panic` example
-where the WASM module causes `panic` and the host prints the message through `fd_write` ABI. 
+WebAssembly System Interface (WASI) is partly supported in `wasi` package.
+Currently these methods are implemented:
+- `fd_write`
+- `fd_prestat_get`
+- `fd_prestat_dir_name`
+- `path_open`
+- `fd_read`
+- `fd_close`
+
+By default, WASI uses the host process's Stdin, Stdout and Stderr and doesn't
+preopen any directories, but that can be changed with functional options.
+
+```go
+vm, err := wasm.NewVM(mod, wasi.New(
+	wasi.Stdin(myReader),
+	wasi.Stdout(myWriter),
+	wasi.Stderr(myErrWriter),
+	wasi.Preopen(".", wasi.DirFS(".")),
+).Modules())
+if err != nil {
+	panic(err)
+}
+
+if err := vm.ExecExportedFunction("_start"); err != nil {
+	panic(err)
+}
+```
+
+If you want to provide an in-memory file system to the wasm binary, you can
+do so with `wasi.MemFS()`.
 
 ## references
 
-https://webassembly.github.io/spec/core/index.html
+- https://webassembly.github.io/spec/core/index.html
+- https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md
