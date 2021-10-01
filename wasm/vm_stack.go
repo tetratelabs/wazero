@@ -70,9 +70,9 @@ type VirtualMachineLabelStack struct {
 }
 
 type Label struct {
-	Arity                 int
-	ContinuationPC, EndPC uint64
-	OperandSP             int
+	Arity          int
+	ContinuationPC uint64
+	OperandSP      int
 }
 
 func NewVirtualMachineLabelStack() *VirtualMachineLabelStack {

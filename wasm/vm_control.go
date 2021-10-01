@@ -17,7 +17,6 @@ func block(vm *VirtualMachine) {
 	ctx.LabelStack.Push(&Label{
 		Arity:          len(block.BlockType.ReturnTypes),
 		ContinuationPC: block.EndAt + 1,
-		EndPC:          block.EndAt,
 		OperandSP:      vm.OperandStack.SP,
 	})
 	vm.ActiveContext.PC++
@@ -34,7 +33,6 @@ func loop(vm *VirtualMachine) {
 	ctx.LabelStack.Push(&Label{
 		Arity:          arity,
 		ContinuationPC: block.StartAt,
-		EndPC:          block.EndAt,
 		OperandSP:      vm.OperandStack.SP - arity,
 	})
 	vm.ActiveContext.PC++
@@ -56,7 +54,6 @@ func ifOp(vm *VirtualMachine) {
 	ctx.LabelStack.Push(&Label{
 		Arity:          arity,
 		ContinuationPC: block.EndAt + 1,
-		EndPC:          block.EndAt,
 		OperandSP:      vm.OperandStack.SP - arity,
 	})
 	vm.ActiveContext.PC++
@@ -64,7 +61,7 @@ func ifOp(vm *VirtualMachine) {
 
 func elseOp(vm *VirtualMachine) {
 	l := vm.ActiveContext.LabelStack.Pop()
-	vm.ActiveContext.PC = l.EndPC + 1
+	vm.ActiveContext.PC = l.ContinuationPC
 }
 
 func end(vm *VirtualMachine) {

@@ -94,7 +94,6 @@ func (n *NativeFunction) Call(vm *VirtualMachine) {
 	labelStack.Push(&Label{
 		Arity:          len(n.Signature.ReturnTypes),
 		ContinuationPC: uint64(len(n.Body)),
-		EndPC:          uint64(len(n.Body)),
 		OperandSP:      -1,
 	})
 	vm.ActiveContext = &NativeFunctionContext{

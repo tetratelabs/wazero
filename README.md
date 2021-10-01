@@ -1,17 +1,16 @@
-# gasm
+# Gasm
 
-A minimal implementation of v1 Wasm spec compatible virtual machine purely written in go.
-The VM can be embedded in your go program without any dependency like cgo, and enables Gophers to 
-write Wasm host environments easily.
+A minimal implementation of Wasm Virtual machine purely written in Go.
+The VM can be embedded in your Go program without any dependency like cgo, and enables Gophers to write Wasm host environments easily.
 
 The implementation is quite straightforward and I hope this code would be a
  good starting point for novices to learn Wasm spec.
 
-## examples
+## Examples
 
 Full examples can be found at: https://github.com/mathetake/gasm/tree/master/examples
 
-### call exported function from host
+### Call exported function from host
 
 ```golang
 func Test_fibonacci(t *testing.T) {
@@ -26,14 +25,14 @@ func Test_fibonacci(t *testing.T) {
 		{in: 10, exp: 55},
 		{in: 5, exp: 5},
 	} {
-		ret, _, _ := vm.ExecExportedFunction("fib", uint64(c.in))
+		ret, _, _ := vm.ExecExportedFunction("fibonacci", uint64(c.in))
 		require.Equal(t, c.exp, int32(ret[0]))
 	}
 }
 ```
 
 
-### call host function from Wasm module
+### Call host function from Wasm module
 
 ```golang
 
@@ -96,7 +95,7 @@ if err := vm.ExecExportedFunction("_start"); err != nil {
 If you want to provide an in-memory file system to the wasm binary, you can
 do so with `wasi.MemFS()`.
 
-## references
+## References
 
 - https://webassembly.github.io/spec/core/index.html
 - https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md

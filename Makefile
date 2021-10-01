@@ -11,7 +11,7 @@ build.spectest:
 
 .PHONY: test
 test:
-	@go test $$(eval go list ./... | grep -v "examples/wasm") -v -race
+	@go test $$(eval go list ./... | grep -v "examples/wasm")
 
 .PHONY: lint
 lint:
