@@ -64,7 +64,7 @@ func posixOpenFlags(oFlags uint32, fsRights uint64) (pFlags int) {
 
 func (dir dirFS) OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, fsRightsInheriting uint64, fdFlags uint32) (File, error) {
 	// I'm not sure how to use all these passed flags and rights yet
-	if !fs.ValidPath(path) || runtime.GOOS == "windows" && strings.IndexAny(path, `\:`) >= 0 {
+	if !fs.ValidPath(path) || runtime.GOOS == "windows" && strings.ContainsAny(path, `\:`) {
 		return nil, &os.PathError{Op: "open", Path: path, Err: os.ErrInvalid}
 	}
 	mode := fs.FileMode(0644)

@@ -21,13 +21,14 @@ func Test_block(t *testing.T) {
 		},
 		LabelStack: NewVirtualMachineLabelStack(),
 	}
-	block(&VirtualMachine{ActiveContext: ctx})
+	block(&VirtualMachine{ActiveContext: ctx, OperandStack: NewVirtualMachineOperandStack()})
 	assert.Equal(t, &Label{
 		Arity:          1,
-		ContinuationPC: 100,
+		ContinuationPC: 101,
 		EndPC:          100,
+		OperandSP:      -1,
 	}, ctx.LabelStack.Stack[ctx.LabelStack.SP])
-	assert.Equal(t, uint64(4), ctx.PC)
+	assert.Equal(t, uint64(5), ctx.PC)
 }
 
 func Test_loop(t *testing.T) {
@@ -45,13 +46,14 @@ func Test_loop(t *testing.T) {
 		},
 		LabelStack: NewVirtualMachineLabelStack(),
 	}
-	loop(&VirtualMachine{ActiveContext: ctx})
+	loop(&VirtualMachine{ActiveContext: ctx, OperandStack: NewVirtualMachineOperandStack()})
 	assert.Equal(t, &Label{
-		Arity:          1,
-		ContinuationPC: 0,
+		Arity:          0,
+		ContinuationPC: 1,
 		EndPC:          100,
+		OperandSP:      -1,
 	}, ctx.LabelStack.Stack[ctx.LabelStack.SP])
-	assert.Equal(t, uint64(4), ctx.PC)
+	assert.Equal(t, uint64(5), ctx.PC)
 }
 
 func Test_ifOp(t *testing.T) {
@@ -75,10 +77,11 @@ func Test_ifOp(t *testing.T) {
 		ifOp(vm)
 		assert.Equal(t, &Label{
 			Arity:          1,
-			ContinuationPC: 100,
+			ContinuationPC: 101,
 			EndPC:          100,
+			OperandSP:      -2,
 		}, ctx.LabelStack.Stack[ctx.LabelStack.SP])
-		assert.Equal(t, uint64(4), ctx.PC)
+		assert.Equal(t, uint64(5), ctx.PC)
 	})
 	t.Run("false", func(t *testing.T) {
 		ctx := &NativeFunctionContext{
@@ -101,10 +104,11 @@ func Test_ifOp(t *testing.T) {
 		ifOp(vm)
 		assert.Equal(t, &Label{
 			Arity:          1,
-			ContinuationPC: 100,
+			ContinuationPC: 101,
 			EndPC:          100,
+			OperandSP:      -2,
 		}, ctx.LabelStack.Stack[ctx.LabelStack.SP])
-		assert.Equal(t, uint64(50), ctx.PC)
+		assert.Equal(t, uint64(51), ctx.PC)
 	})
 }
 
@@ -112,7 +116,7 @@ func Test_elseOp(t *testing.T) {
 	ctx := &NativeFunctionContext{LabelStack: NewVirtualMachineLabelStack()}
 	ctx.LabelStack.Push(&Label{EndPC: 100000})
 	elseOp(&VirtualMachine{ActiveContext: ctx})
-	assert.Equal(t, uint64(100000), ctx.PC)
+	assert.Equal(t, uint64(100001), ctx.PC)
 }
 
 func Test_end(t *testing.T) {
@@ -142,10 +146,10 @@ func Test_brIf(t *testing.T) {
 		}
 		vm := &VirtualMachine{ActiveContext: ctx, OperandStack: NewVirtualMachineOperandStack()}
 		vm.OperandStack.Push(1)
-		ctx.LabelStack.Push(&Label{ContinuationPC: 5})
+		ctx.LabelStack.Push(&Label{ContinuationPC: 6})
 		ctx.LabelStack.Push(&Label{})
 		brIf(vm)
-		assert.Equal(t, uint64(5), ctx.PC)
+		assert.Equal(t, uint64(6), ctx.PC)
 	})
 
 	t.Run("false", func(t *testing.T) {
@@ -156,7 +160,7 @@ func Test_brIf(t *testing.T) {
 		vm := &VirtualMachine{ActiveContext: ctx, OperandStack: NewVirtualMachineOperandStack()}
 		vm.OperandStack.Push(0)
 		brIf(vm)
-		assert.Equal(t, uint64(1), ctx.PC)
+		assert.Equal(t, uint64(2), ctx.PC)
 	})
 }
 

@@ -1,8 +1,10 @@
 package wasm
 
 import (
+	"fmt"
 	"math"
 	"reflect"
+	"time"
 )
 
 type (
@@ -11,6 +13,7 @@ type (
 		FunctionType() *FunctionType
 	}
 	HostFunction struct {
+		Name             string
 		ClosureGenerator func(vm *VirtualMachine) reflect.Value
 		function         reflect.Value // should be set at the time of VM creation
 		Signature        *FunctionType
@@ -42,6 +45,9 @@ func (n *NativeFunction) FunctionType() *FunctionType {
 }
 
 func (h *HostFunction) Call(vm *VirtualMachine) {
+	if isDebugMode {
+		fmt.Printf("Call host function '%s'\n", h.Name)
+	}
 	tp := h.function.Type()
 	in := make([]reflect.Value, tp.NumIn())
 	for i := len(in) - 1; i >= 0; i-- {
@@ -84,22 +90,30 @@ func (n *NativeFunction) Call(vm *VirtualMachine) {
 	}
 
 	prev := vm.ActiveContext
+	labelStack := NewVirtualMachineLabelStack()
+	labelStack.Push(&Label{
+		Arity:          len(n.Signature.ReturnTypes),
+		ContinuationPC: uint64(len(n.Body)),
+		EndPC:          uint64(len(n.Body)),
+		OperandSP:      -1,
+	})
 	vm.ActiveContext = &NativeFunctionContext{
 		Function:   n,
 		Locals:     locals,
-		LabelStack: NewVirtualMachineLabelStack(),
+		LabelStack: labelStack,
 	}
 	vm.execNativeFunction()
 	vm.ActiveContext = prev
 }
 
 func (vm *VirtualMachine) execNativeFunction() {
-	for ; int(vm.ActiveContext.PC) < len(vm.ActiveContext.Function.Body); vm.ActiveContext.PC++ {
-		switch op := vm.ActiveContext.Function.Body[vm.ActiveContext.PC]; OptCode(op) {
-		case OptCodeReturn:
-			return
-		default:
-			virtualMachineInstructions[op](vm)
+	bl := len(vm.ActiveContext.Function.Body)
+	for int(vm.ActiveContext.PC) < bl && !vm.ActiveContext.Returned {
+		op := vm.ActiveContext.Function.Body[vm.ActiveContext.PC]
+		if isDebugMode {
+			fmt.Printf("0x%x: op=%s (Label SP=%d, Operand SP=%d) \n", vm.ActiveContext.PC, optcodeStrs[op], vm.ActiveContext.LabelStack.SP, vm.OperandStack.SP)
+			time.Sleep(time.Millisecond)
 		}
+		virtualMachineInstructions[op](vm)
 	}
 }

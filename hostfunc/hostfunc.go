@@ -51,6 +51,7 @@ func (m *ModuleBuilder) SetFunction(modName, funcName string, fn func(machine *w
 	}
 
 	mod.IndexSpace.Function = append(mod.IndexSpace.Function, &wasm.HostFunction{
+		Name:             fmt.Sprintf("%s.%s", modName, funcName),
 		ClosureGenerator: fn,
 		Signature:        sig,
 	})

@@ -1,17 +1,11 @@
 # gasm
 
-[![CircleCI](https://circleci.com/gh/mathetake/gasm.svg?style=shield&circle-token=89ec47a30847c650d215699c0a99c8732a2d538d	)](https://circleci.com/gh/mathetake/gasm)
-[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE)
-
-A minimal implementation of v1 WASM spec compatible virtual machine purely written in go.
-The vm can be embedded in your go program without any dependency like cgo, and enables Gophers to 
-write wasm host environments easily.
-
-The vm should be used only for providing _sandbox_ environments embedded in your Go program since
- we have not implemented [validation](https://webassembly.github.io/spec/core/valid/index.html) of wasm binary.
+A minimal implementation of v1 Wasm spec compatible virtual machine purely written in go.
+The VM can be embedded in your go program without any dependency like cgo, and enables Gophers to 
+write Wasm host environments easily.
 
 The implementation is quite straightforward and I hope this code would be a
- good starting point for novices to learn WASM spec.
+ good starting point for novices to learn Wasm spec.
 
 ## examples
 
@@ -39,7 +33,7 @@ func Test_fibonacci(t *testing.T) {
 ```
 
 
-### call host function from WASM module
+### call host function from Wasm module
 
 ```golang
 

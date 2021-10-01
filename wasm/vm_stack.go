@@ -7,6 +7,7 @@ const (
 
 func drop(vm *VirtualMachine) {
 	vm.OperandStack.Drop()
+	vm.ActiveContext.PC++
 }
 
 func selectOp(vm *VirtualMachine) {
@@ -16,6 +17,7 @@ func selectOp(vm *VirtualMachine) {
 		_ = vm.OperandStack.Pop()
 		vm.OperandStack.Push(v2)
 	}
+	vm.ActiveContext.PC++
 }
 
 func NewVirtualMachineOperandStack() *VirtualMachineOperandStack {
@@ -70,6 +72,7 @@ type VirtualMachineLabelStack struct {
 type Label struct {
 	Arity                 int
 	ContinuationPC, EndPC uint64
+	OperandSP             int
 }
 
 func NewVirtualMachineLabelStack() *VirtualMachineLabelStack {

@@ -120,6 +120,9 @@ func (m *Module) buildIndexSpaces(externModules map[string]*Module) error {
 }
 
 func (m *Module) resolveImports(externModules map[string]*Module) error {
+	if len(m.SecImports) > 0 && len(externModules) == 0 {
+		return fmt.Errorf("module requires imports but no extern modules given")
+	}
 	for _, is := range m.SecImports {
 		if err := m.resolveImport(is, externModules); err != nil {
 			return fmt.Errorf("%s: %w", is.Name, err)
@@ -248,11 +251,11 @@ func (m *Module) buildFunctionIndexSpace() error {
 			NumLocal:  m.SecCodes[codeIndex].NumLocals,
 		}
 
-		brs, err := m.parseBlocks(f.Body)
+		blocks, err := m.parseBlocks(f.Body)
 		if err != nil {
 			return fmt.Errorf("parse blocks: %w", err)
 		}
-		f.Blocks = brs
+		f.Blocks = blocks
 		m.IndexSpace.Function = append(m.IndexSpace.Function, f)
 	}
 	return nil
@@ -466,6 +469,11 @@ func (m *Module) parseBlocks(body []byte) (map[uint64]*NativeFunctionBlock, erro
 			stack = stack[:len(stack)-1]
 			bl.EndAt = pc
 			ret[bl.StartAt] = bl
+			if bl.ElseAt <= bl.StartAt {
+				// To handle if block without else properly,
+				// we set ElseAt to EndAt so we can just skip else.
+				bl.ElseAt = bl.EndAt - 1
+			}
 		}
 	}
 

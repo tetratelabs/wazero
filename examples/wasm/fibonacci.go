@@ -1,4 +1,3 @@
-//go:generate tinygo build -opt=s -o fibonacci.wasm -target wasm fibonacci.go
 package main
 
 func main() {}

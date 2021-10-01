@@ -576,6 +576,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          3,
+					ElseAt:         2,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -587,6 +588,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          5,
+					ElseAt:         4,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -598,6 +600,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          5,
+					ElseAt:         4,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -609,6 +612,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -620,6 +624,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -631,6 +636,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -642,6 +648,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -656,6 +663,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          7,
+					ElseAt:         6,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -670,6 +678,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          11,
+					ElseAt:         10,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -681,6 +690,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -692,6 +702,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -703,6 +714,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -714,6 +726,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -725,6 +738,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -736,6 +750,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          4,
+					ElseAt:         3,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -747,6 +762,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          5,
+					ElseAt:         4,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -760,6 +776,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				0: {
 					StartAt:        0,
 					EndAt:          8,
+					ElseAt:         7,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -776,6 +793,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				1: {
 					StartAt:        1,
 					EndAt:          6,
+					ElseAt:         5,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -800,6 +818,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				1: {
 					StartAt:        1,
 					EndAt:          6,
+					ElseAt:         5,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},
@@ -813,6 +832,7 @@ func TestModule_parseBlocks(t *testing.T) {
 				14: {
 					StartAt:        14,
 					EndAt:          18,
+					ElseAt:         17,
 					BlockType:      &FunctionType{},
 					BlockTypeBytes: 1,
 				},

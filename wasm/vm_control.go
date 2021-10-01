@@ -16,9 +16,11 @@ func block(vm *VirtualMachine) {
 	ctx.PC += block.BlockTypeBytes
 	ctx.LabelStack.Push(&Label{
 		Arity:          len(block.BlockType.ReturnTypes),
-		ContinuationPC: block.EndAt,
+		ContinuationPC: block.EndAt + 1,
 		EndPC:          block.EndAt,
+		OperandSP:      vm.OperandStack.SP,
 	})
+	vm.ActiveContext.PC++
 }
 
 func loop(vm *VirtualMachine) {
@@ -28,42 +30,46 @@ func loop(vm *VirtualMachine) {
 		panic("block not found")
 	}
 	ctx.PC += block.BlockTypeBytes
+	arity := len(block.BlockType.InputTypes)
 	ctx.LabelStack.Push(&Label{
-		Arity:          len(block.BlockType.ReturnTypes),
-		ContinuationPC: block.StartAt - 1,
+		Arity:          arity,
+		ContinuationPC: block.StartAt,
 		EndPC:          block.EndAt,
+		OperandSP:      vm.OperandStack.SP - arity,
 	})
+	vm.ActiveContext.PC++
 }
 
 func ifOp(vm *VirtualMachine) {
 	ctx := vm.ActiveContext
-	block, ok := ctx.Function.Blocks[vm.ActiveContext.PC]
+	block, ok := ctx.Function.Blocks[ctx.PC]
 	if !ok {
 		panic("block not initialized")
 	}
 	ctx.PC += block.BlockTypeBytes
 
 	if vm.OperandStack.Pop() == 0 {
-		// enter else
-		vm.ActiveContext.PC = block.ElseAt
+		ctx.PC = block.ElseAt
 	}
 
+	arity := len(block.BlockType.ReturnTypes)
 	ctx.LabelStack.Push(&Label{
-		Arity:          len(block.BlockType.ReturnTypes),
-		ContinuationPC: block.EndAt,
+		Arity:          arity,
+		ContinuationPC: block.EndAt + 1,
 		EndPC:          block.EndAt,
+		OperandSP:      vm.OperandStack.SP - arity,
 	})
+	vm.ActiveContext.PC++
 }
 
 func elseOp(vm *VirtualMachine) {
 	l := vm.ActiveContext.LabelStack.Pop()
-	vm.ActiveContext.PC = l.EndPC
+	vm.ActiveContext.PC = l.EndPC + 1
 }
 
 func end(vm *VirtualMachine) {
-	if vm.ActiveContext.LabelStack.SP > -1 {
-		_ = vm.ActiveContext.LabelStack.Pop()
-	}
+	_ = vm.ActiveContext.LabelStack.Pop()
+	vm.ActiveContext.PC++
 }
 
 func br(vm *VirtualMachine) {
@@ -78,6 +84,8 @@ func brIf(vm *VirtualMachine) {
 	c := vm.OperandStack.Pop()
 	if c != 0 {
 		brAt(vm, index)
+	} else {
+		vm.ActiveContext.PC++
 	}
 }
 
@@ -85,6 +93,16 @@ func brAt(vm *VirtualMachine, index uint32) {
 	var l *Label
 	for i := uint32(0); i < index+1; i++ {
 		l = vm.ActiveContext.LabelStack.Pop()
+	}
+
+	// TODO: can be optimized.
+	values := make([]uint64, 0, l.Arity)
+	for i := 0; i < l.Arity; i++ {
+		values = append(values, vm.OperandStack.Pop())
+	}
+	vm.OperandStack.SP = l.OperandSP
+	for _, v := range values {
+		vm.OperandStack.Push(v)
 	}
 	vm.ActiveContext.PC = l.ContinuationPC
 }

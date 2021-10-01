@@ -20,8 +20,6 @@ type (
 		Globals       []uint64
 
 		OperandStack *VirtualMachineOperandStack
-		// used to store runtime data per VirtualMachine
-		RuntimeData interface{}
 	}
 
 	NativeFunctionContext struct {
@@ -29,6 +27,7 @@ type (
 		Function   *NativeFunction
 		Locals     []uint64
 		LabelStack *VirtualMachineLabelStack
+		Returned   bool
 	}
 )
 
@@ -44,9 +43,11 @@ func NewVM(module *Module, externModules map[string]*Module) (*VirtualMachine, e
 
 	// initialize vm memory
 	// note: MVP restricts vm to have a single memory space
-	vm.Memory = vm.InnerModule.IndexSpace.Memory[0]
-	if diff := uint64(vm.InnerModule.SecMemory[0].Min)*vmPageSize - uint64(len(vm.Memory)); diff > 0 {
-		vm.Memory = append(vm.Memory, make([]byte, diff)...)
+	if len(vm.InnerModule.IndexSpace.Memory) > 0 {
+		vm.Memory = vm.InnerModule.IndexSpace.Memory[0]
+		if diff := uint64(vm.InnerModule.SecMemory[0].Min)*vmPageSize - uint64(len(vm.Memory)); diff > 0 {
+			vm.Memory = append(vm.Memory, make([]byte, diff)...)
+		}
 	}
 
 	// initialize functions
@@ -88,11 +89,11 @@ func NewVM(module *Module, externModules map[string]*Module) (*VirtualMachine, e
 func (vm *VirtualMachine) ExecExportedFunction(name string, args ...uint64) (returns []uint64, returnTypes []ValueType, err error) {
 	exp, ok := vm.InnerModule.SecExports[name]
 	if !ok {
-		return nil, nil, fmt.Errorf("exported func of name %s not found", name)
+		return nil, nil, fmt.Errorf("exported func of name '%s' not found", name)
 	}
 
 	if exp.Desc.Kind != ExportKindFunction {
-		return nil, nil, fmt.Errorf("exported elent of name %s is not functype", name)
+		return nil, nil, fmt.Errorf("exported elent of name '%s' is not functype", name)
 	}
 
 	if int(exp.Desc.Index) >= len(vm.Functions) {
@@ -163,7 +164,7 @@ func (vm *VirtualMachine) FetchFloat64() float64 {
 
 var virtualMachineInstructions = [256]func(vm *VirtualMachine){
 	OptCodeUnreachable:       func(vm *VirtualMachine) { panic("unreachable") },
-	OptCodeNop:               func(vm *VirtualMachine) {},
+	OptCodeNop:               func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
 	OptCodeBlock:             block,
 	OptCodeLoop:              loop,
 	OptCodeIf:                ifOp,
@@ -172,7 +173,7 @@ var virtualMachineInstructions = [256]func(vm *VirtualMachine){
 	OptCodeBr:                br,
 	OptCodeBrIf:              brIf,
 	OptCodeBrTable:           brTable,
-	OptCodeReturn:            func(vm *VirtualMachine) {},
+	OptCodeReturn:            func(vm *VirtualMachine) { vm.ActiveContext.PC++; vm.ActiveContext.Returned = true },
 	OptCodeCall:              call,
 	OptCodeCallIndirect:      callIndirect,
 	OptCodeDrop:              drop,
@@ -330,8 +331,8 @@ var virtualMachineInstructions = [256]func(vm *VirtualMachine){
 	OptCodeF64Converti64s:    f64converti64s,
 	OptCodeF64Converti64u:    f64converti64u,
 	OptCodeF64Promotef32:     f64promotef32,
-	OptCodeI32reinterpretf32: func(vm *VirtualMachine) {},
-	OptCodeI64reinterpretf64: func(vm *VirtualMachine) {},
-	OptCodeF32reinterpreti32: func(vm *VirtualMachine) {},
-	OptCodeF64reinterpreti64: func(vm *VirtualMachine) {},
+	OptCodeI32reinterpretf32: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
+	OptCodeI64reinterpretf64: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
+	OptCodeF32reinterpreti32: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
+	OptCodeF64reinterpreti64: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
 }

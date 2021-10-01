@@ -5,9 +5,10 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_panic(t *testing.T) {

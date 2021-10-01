@@ -4,6 +4,7 @@ func call(vm *VirtualMachine) {
 	vm.ActiveContext.PC++
 	index := vm.FetchUint32()
 	vm.Functions[index].Call(vm)
+	vm.ActiveContext.PC++
 }
 
 func callIndirect(vm *VirtualMachine) {
@@ -30,5 +31,6 @@ func callIndirect(vm *VirtualMachine) {
 	}
 	f.Call(vm)
 
-	vm.ActiveContext.PC++ // skip 0x00
+	vm.ActiveContext.PC++ // skip 0x00 (table index)
+	vm.ActiveContext.PC++
 }

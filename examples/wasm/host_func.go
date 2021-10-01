@@ -1,4 +1,3 @@
-//go:generate tinygo build -opt=s -o host_func.wasm -target wasm host_func.go
 package main
 
 func main() {}

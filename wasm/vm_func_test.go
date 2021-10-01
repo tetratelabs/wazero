@@ -71,7 +71,7 @@ func TestVirtualMachine_execNativeFunction(t *testing.T) {
 	}
 
 	vm.execNativeFunction()
-	assert.Equal(t, uint64(4), vm.ActiveContext.PC)
+	assert.Equal(t, uint64(5), vm.ActiveContext.PC)
 	assert.Equal(t, uint64(0x01), vm.OperandStack.Pop())
 	assert.Equal(t, uint64(0x05), vm.OperandStack.Pop())
 }
