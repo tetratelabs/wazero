@@ -1,0 +1,1 @@
+(global i32 (i32.const _100))

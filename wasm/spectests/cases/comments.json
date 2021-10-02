@@ -1,0 +1,6 @@
+{"source_filename": "./comments.wast",
+ "commands": [
+  {"type": "module", "line": 10, "filename": "comments.0.wasm"}, 
+  {"type": "module", "line": 52, "filename": "comments.1.wasm"}, 
+  {"type": "module", "line": 62, "filename": "comments.2.wasm"}, 
+  {"type": "module", "line": 71, "filename": "comments.3.wasm"}]}

@@ -5,9 +5,21 @@ golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 build.examples:
 	@find ./examples/wasm -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
 
-# TODO: implement wat to wasm and do it in tests when necessary.
+spectests_cases_dir := wasm/spectests/cases
+spec_version := wg-1.0
+
 build.spectest:
-	@find ./wasm/spectest -type f -name "*.wast" | xargs -Ip /bin/sh -c 'wat2wasm p -o $$(echo p | sed -e 's/\.wast/\.wasm/')'
+	@rm -rf $(spectests_cases_dir) && mkdir -p $(spectests_cases_dir)
+	@cd $(spectests_cases_dir) \
+		&& curl 'https://api.github.com/repos/WebAssembly/spec/contents/test/core?ref=$(spec_version)' | jq -r '.[]| .download_url' | grep -E ".wast"| xargs wget -q
+	@cd $(spectests_cases_dir) && for f in `find . -name '*.wast'`; do \
+		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"f32.demote_f64"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \(f32.const nan\)\)/g' $$f; \
+		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"f64\.promote_f32"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \(f64.const nan\)\)/g' $$f; \
+		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
+		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\s\([a-z0-9.\s+-:]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
+		perl -pi -e 's/\((assert_return_canonical_nan|assert_return_arithmetic_nan)\s(\(invoke\s"[a-z._0-9]+"\s\((f[0-9]{2})\.const\s[a-z0-9.+:-]+\)\))\)/\(assert_return $$2 \($$3.const nan\)\)/g' $$f; \
+		wast2json --debug-names $$f; \
+	done
 
 .PHONY: test
 test:
