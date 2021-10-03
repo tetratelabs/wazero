@@ -94,15 +94,15 @@ func TestReadTableType(t *testing.T) {
 		{
 			bytes: []byte{0x70, 0x00, 0xa},
 			exp: &TableType{
-				Elem:  0x70,
-				Limit: &LimitsType{Min: 10},
+				ElemType: 0x70,
+				Limit:    &LimitsType{Min: 10},
 			},
 		},
 		{
 			bytes: []byte{0x70, 0x01, 0x01, 0xa},
 			exp: &TableType{
-				Elem:  0x70,
-				Limit: &LimitsType{Min: 1, Max: uint32Ptr(10)},
+				ElemType: 0x70,
+				Limit:    &LimitsType{Min: 1, Max: uint32Ptr(10)},
 			},
 		},
 	} {

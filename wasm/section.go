@@ -203,13 +203,7 @@ func (m *Module) readSectionStart(r io.Reader) error {
 		return fmt.Errorf("get size of vector: %w", err)
 	}
 
-	m.SecStart = make([]uint32, vs)
-	for i := range m.SecStart {
-		m.SecStart[i], _, err = leb128.DecodeUint32(r)
-		if err != nil {
-			return fmt.Errorf("read function index: %w", err)
-		}
-	}
+	m.SecStart = &vs
 	return nil
 }
 

@@ -183,10 +183,6 @@ func readElementSegment(r io.Reader) (*ElementSegment, error) {
 		return nil, fmt.Errorf("read expr for offset: %w", err)
 	}
 
-	if expr.optCode != OptCodeI32Const {
-		return nil, fmt.Errorf("offset expression must be i32.const but go %#x", expr.optCode)
-	}
-
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -276,10 +272,6 @@ func readDataSegment(r io.Reader) (*DataSegment, error) {
 	expr, err := readConstantExpression(r)
 	if err != nil {
 		return nil, fmt.Errorf("read offset expression: %w", err)
-	}
-
-	if expr.optCode != OptCodeI32Const {
-		return nil, fmt.Errorf("offset expression must have i32.const optcode but go %#x", expr.optCode)
 	}
 
 	vs, _, err := leb128.DecodeUint32(r)

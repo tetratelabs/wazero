@@ -26,7 +26,7 @@ type (
 		SecMemory    []*MemoryType
 		SecGlobals   []*GlobalSegment
 		SecExports   map[string]*ExportSegment
-		SecStart     []uint32
+		SecStart     *uint32
 		SecElements  []*ElementSegment
 		SecCodes     []*CodeSegment
 		SecData      []*DataSegment
@@ -83,7 +83,6 @@ func DecodeModule(r io.Reader) (*Module, error) {
 func (m *Module) buildIndexSpaces(externModules map[string]*Module) error {
 	m.IndexSpace = new(ModuleIndexSpace)
 
-	// resolve imports
 	if err := m.resolveImports(externModules); err != nil {
 		return fmt.Errorf("resolve imports: %w", err)
 	}
@@ -105,16 +104,16 @@ func (m *Module) buildIndexSpaces(externModules map[string]*Module) error {
 	}
 
 	if err := m.buildGlobalIndexSpace(); err != nil {
-		return fmt.Errorf("build global index space: %w", err)
+		return fmt.Errorf("global index space: %w", err)
 	}
 	if err := m.buildFunctionIndexSpace(); err != nil {
-		return fmt.Errorf("build function index space: %w", err)
+		return fmt.Errorf("function index space: %w", err)
 	}
 	if err := m.buildTableIndexSpace(); err != nil {
-		return fmt.Errorf("build table index space: %w", err)
+		return fmt.Errorf("table index space: %w", err)
 	}
 	if err := m.buildMemoryIndexSpace(); err != nil {
-		return fmt.Errorf("build memory index space: %w", err)
+		return fmt.Errorf("memory index space: %w", err)
 	}
 	return nil
 }
@@ -194,8 +193,11 @@ func (m *Module) applyTableImport(em *Module, es *ExportSegment) error {
 		return fmt.Errorf("exported index out of range")
 	}
 
+	// TODO: verify the limit compatibility.
+
 	// note: MVP restricts the size of table index spaces to 1
 	m.IndexSpace.Table = append(m.IndexSpace.Table, em.IndexSpace.Table[es.Desc.Index])
+	m.SecTables = append(m.SecTables, em.SecTables[es.Desc.Index])
 	return nil
 }
 
@@ -204,8 +206,11 @@ func (m *Module) applyMemoryImport(em *Module, es *ExportSegment) error {
 		return fmt.Errorf("exported index out of range")
 	}
 
+	// TODO: verify the limit compatibility.
+
 	// note: MVP restricts the size of memory index spaces to 1
 	m.IndexSpace.Memory = append(m.IndexSpace.Memory, em.IndexSpace.Memory[es.Desc.Index])
+	m.SecMemory = append(m.SecMemory, em.SecMemory[es.Desc.Index])
 	return nil
 }
 
@@ -214,12 +219,7 @@ func (m *Module) applyGlobalImport(em *Module, es *ExportSegment) error {
 		return fmt.Errorf("exported index out of range")
 	}
 
-	gb := em.IndexSpace.Globals[es.Desc.Index]
-	if gb.Type.Mutable {
-		return fmt.Errorf("cannot import mutable global")
-	}
-
-	m.IndexSpace.Globals = append(em.IndexSpace.Globals, gb)
+	m.IndexSpace.Globals = append(em.IndexSpace.Globals, em.IndexSpace.Globals[es.Desc.Index])
 	return nil
 }
 
@@ -277,7 +277,7 @@ func (m *Module) buildMemoryIndexSpace() error {
 
 		offset, ok := rawOffset.(int32)
 		if !ok {
-			return fmt.Errorf("type assertion failed")
+			return fmt.Errorf("offset is not int32 but %T", rawOffset)
 		}
 
 		size := int(offset) + len(d.Init)
@@ -315,7 +315,7 @@ func (m *Module) buildTableIndexSpace() error {
 
 		offset32, ok := rawOffset.(int32)
 		if !ok {
-			return fmt.Errorf("type assertion failed")
+			return fmt.Errorf("offset is not int32 but %T", rawOffset)
 		}
 
 		offset := int(offset32)

@@ -160,6 +160,7 @@ func TestModule_applyTableImport(t *testing.T) {
 		var exp uint32 = 10
 		em := &Module{
 			IndexSpace: &ModuleIndexSpace{Table: [][]*uint32{{&exp}}},
+			SecTables:  []*TableType{{}},
 		}
 		m := &Module{IndexSpace: new(ModuleIndexSpace)}
 		err := m.applyTableImport(em, es)
@@ -180,6 +181,7 @@ func TestModule_applyMemoryImport(t *testing.T) {
 		es := &ExportSegment{Desc: &ExportDesc{}}
 		em := &Module{
 			IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{0x01}}},
+			SecMemory:  []*MemoryType{{}},
 		}
 		m := &Module{IndexSpace: new(ModuleIndexSpace)}
 		err := m.applyMemoryImport(em, es)
@@ -189,49 +191,26 @@ func TestModule_applyMemoryImport(t *testing.T) {
 }
 
 func TestModule_applyGlobalImport(t *testing.T) {
-	t.Run("error", func(t *testing.T) {
-		for _, c := range []struct {
-			exportedModule  *Module
-			exportedSegment *ExportSegment
-		}{
-			{
-				exportedModule:  &Module{IndexSpace: new(ModuleIndexSpace)},
-				exportedSegment: &ExportSegment{Desc: &ExportDesc{Index: 10}},
-			},
-			{
-				exportedModule: &Module{IndexSpace: &ModuleIndexSpace{Globals: []*Global{{Type: &GlobalType{
-					Mutable: true,
-				}}}}},
-				exportedSegment: &ExportSegment{Desc: &ExportDesc{}},
-			},
-		} {
-			m := Module{}
-			assert.Error(t, m.applyGlobalImport(c.exportedModule, c.exportedSegment))
-		}
-	})
+	m := Module{IndexSpace: new(ModuleIndexSpace)}
+	em := &Module{
+		IndexSpace: &ModuleIndexSpace{
+			Globals: []*Global{{Type: &GlobalType{}, Val: 1}},
+		},
+	}
+	es := &ExportSegment{Desc: &ExportDesc{}}
 
-	t.Run("ok", func(t *testing.T) {
-		m := Module{IndexSpace: new(ModuleIndexSpace)}
-		em := &Module{
-			IndexSpace: &ModuleIndexSpace{
-				Globals: []*Global{{Type: &GlobalType{}, Val: 1}},
-			},
-		}
-		es := &ExportSegment{Desc: &ExportDesc{}}
-
-		err := m.applyGlobalImport(em, es)
-		require.NoError(t, err)
-		assert.Equal(t, 1, m.IndexSpace.Globals[0].Val)
-	})
+	err := m.applyGlobalImport(em, es)
+	require.NoError(t, err)
+	assert.Equal(t, 1, m.IndexSpace.Globals[0].Val)
 }
 
 func TestModule_buildGlobalIndexSpace(t *testing.T) {
 	m := &Module{SecGlobals: []*GlobalSegment{{Type: nil, Init: &ConstantExpression{
-		optCode: OptCodeI64Const,
-		data:    []byte{0x01},
+		OptCode: OptCodeI64Const,
+		Data:    []byte{0x01},
 	}}}, IndexSpace: new(ModuleIndexSpace)}
 	require.NoError(t, m.buildGlobalIndexSpace())
-	assert.Equal(t, &Global{Type: nil, Val: int64(1)}, m.IndexSpace.Globals[0])
+	assert.Equal(t, &Global{Type: nil, Val: uint64(1)}, m.IndexSpace.Globals[0])
 }
 
 func TestModule_buildFunctionIndexSpace(t *testing.T) {
@@ -274,7 +253,7 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 				SecData: []*DataSegment{
 					{
 						OffsetExpression: &ConstantExpression{
-							optCode: OptCodeI32Const, data: []byte{0x01},
+							OptCode: OptCodeI32Const, Data: []byte{0x01},
 						},
 						Init: []byte{0x01, 0x02},
 					},
@@ -299,8 +278,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 					SecData: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
-								optCode: OptCodeI32Const,
-								data:    []byte{0x00},
+								OptCode: OptCodeI32Const,
+								Data:    []byte{0x00},
 							},
 							Init: []byte{0x01, 0x01},
 						},
@@ -315,8 +294,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 					SecData: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
-								optCode: OptCodeI32Const,
-								data:    []byte{0x00},
+								OptCode: OptCodeI32Const,
+								Data:    []byte{0x00},
 							},
 							Init: []byte{0x01, 0x01},
 						},
@@ -331,8 +310,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 					SecData: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
-								optCode: OptCodeI32Const,
-								data:    []byte{0x01},
+								OptCode: OptCodeI32Const,
+								Data:    []byte{0x01},
 							},
 							Init: []byte{0x01, 0x01},
 						},
@@ -347,8 +326,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 					SecData: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
-								optCode: OptCodeI32Const,
-								data:    []byte{0x02},
+								OptCode: OptCodeI32Const,
+								Data:    []byte{0x02},
 							},
 							Init: []byte{0x01, 0x01},
 						},
@@ -363,8 +342,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 					SecData: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
-								optCode: OptCodeI32Const,
-								data:    []byte{0x01},
+								OptCode: OptCodeI32Const,
+								Data:    []byte{0x01},
 							},
 							Init: []byte{0x01, 0x01},
 						},
@@ -379,8 +358,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 					SecData: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
-								optCode: OptCodeI32Const,
-								data:    []byte{0x01},
+								OptCode: OptCodeI32Const,
+								Data:    []byte{0x01},
 							},
 							Init:        []byte{0x01, 0x01},
 							MemoryIndex: 1,
@@ -418,8 +397,8 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 				SecElements: []*ElementSegment{{
 					TableIndex: 0,
 					OffsetExpr: &ConstantExpression{
-						optCode: OptCodeI32Const,
-						data:    []byte{0x0},
+						OptCode: OptCodeI32Const,
+						Data:    []byte{0x0},
 					},
 					Init: []uint32{0x0, 0x0},
 				}},
@@ -445,8 +424,8 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					SecElements: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
-							optCode: OptCodeI32Const,
-							data:    []byte{0x0},
+							OptCode: OptCodeI32Const,
+							Data:    []byte{0x0},
 						},
 						Init: []uint32{0x1, 0x1},
 					}},
@@ -460,8 +439,8 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					SecElements: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
-							optCode: OptCodeI32Const,
-							data:    []byte{0x0},
+							OptCode: OptCodeI32Const,
+							Data:    []byte{0x0},
 						},
 						Init: []uint32{0x1, 0x1},
 					}},
@@ -477,8 +456,8 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					SecElements: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
-							optCode: OptCodeI32Const,
-							data:    []byte{0x1},
+							OptCode: OptCodeI32Const,
+							Data:    []byte{0x1},
 						},
 						Init: []uint32{0x1, 0x1},
 					}},
@@ -494,8 +473,8 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					SecElements: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
-							optCode: OptCodeI32Const,
-							data:    []byte{0x1},
+							OptCode: OptCodeI32Const,
+							Data:    []byte{0x1},
 						},
 						Init: []uint32{0x1},
 					}},
@@ -511,8 +490,8 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					SecElements: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
-							optCode: OptCodeI32Const,
-							data:    []byte{0x0},
+							OptCode: OptCodeI32Const,
+							Data:    []byte{0x0},
 						},
 						Init: []uint32{0x1, 0x2},
 					}},

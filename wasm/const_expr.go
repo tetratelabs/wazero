@@ -11,22 +11,22 @@ import (
 )
 
 type ConstantExpression struct {
-	optCode OptCode
-	data    []byte
+	OptCode OptCode
+	Data    []byte
 }
 
 func (m *Module) executeConstExpression(expr *ConstantExpression) (v interface{}, err error) {
-	r := bytes.NewBuffer(expr.data)
-	switch expr.optCode {
+	r := bytes.NewBuffer(expr.Data)
+	switch expr.OptCode {
 	case OptCodeI32Const:
 		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read int32: %w", err)
+			return nil, fmt.Errorf("read uint32: %w", err)
 		}
 	case OptCodeI64Const:
-		v, _, err = leb128.DecodeInt64(r)
+		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read int64: %w", err)
+			return nil, fmt.Errorf("read uint64: %w", err)
 		}
 	case OptCodeF32Const:
 		v, err = readFloat32(r)
@@ -48,7 +48,7 @@ func (m *Module) executeConstExpression(expr *ConstantExpression) (v interface{}
 		}
 		v = m.IndexSpace.Globals[id].Val
 	default:
-		return nil, fmt.Errorf("invalid opt code: %#x", expr.optCode)
+		return nil, fmt.Errorf("invalid opt code: %#x", expr.OptCode)
 	}
 	return v, nil
 }
@@ -91,8 +91,8 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	}
 
 	return &ConstantExpression{
-		optCode: optCode,
-		data:    buf.Bytes(),
+		OptCode: optCode,
+		Data:    buf.Bytes(),
 	}, nil
 }
 

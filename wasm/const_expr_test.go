@@ -13,8 +13,8 @@ import (
 func TestModule_executeConstExpression(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		for _, expr := range []*ConstantExpression{
-			{optCode: 0xa},
-			{optCode: OptCodeGlobalGet, data: []byte{0x2}},
+			{OptCode: 0xa},
+			{OptCode: OptCodeGlobalGet, Data: []byte{0x2}},
 		} {
 			m := &Module{IndexSpace: new(ModuleIndexSpace)}
 			_, err := m.executeConstExpression(expr)
@@ -31,29 +31,29 @@ func TestModule_executeConstExpression(t *testing.T) {
 		}{
 			{
 				expr: &ConstantExpression{
-					optCode: OptCodeI64Const,
-					data:    []byte{0x5},
+					OptCode: OptCodeI64Const,
+					Data:    []byte{0x5},
 				},
-				val: int64(5),
+				val: uint64(5),
 			},
 			{
 				expr: &ConstantExpression{
-					optCode: OptCodeI32Const,
-					data:    []byte{0x5},
+					OptCode: OptCodeI32Const,
+					Data:    []byte{0x5},
 				},
-				val: int32(5),
+				val: uint32(5),
 			},
 			{
 				expr: &ConstantExpression{
-					optCode: OptCodeF32Const,
-					data:    []byte{0x40, 0xe1, 0x47, 0x40},
+					OptCode: OptCodeF32Const,
+					Data:    []byte{0x40, 0xe1, 0x47, 0x40},
 				},
 				val: float32(3.1231232),
 			},
 			{
 				expr: &ConstantExpression{
-					optCode: OptCodeF64Const,
-					data:    []byte{0x5e, 0xc4, 0xd8, 0xf9, 0x27, 0xfc, 0x08, 0x40},
+					OptCode: OptCodeF64Const,
+					Data:    []byte{0x5e, 0xc4, 0xd8, 0xf9, 0x27, 0xfc, 0x08, 0x40},
 				},
 				val: 3.1231231231,
 			},
@@ -84,15 +84,15 @@ func TestReadConstantExpression(t *testing.T) {
 		}{
 			{
 				bytes: []byte{0x42, 0x01, 0x0b},
-				exp:   &ConstantExpression{optCode: OptCodeI64Const, data: []byte{0x01}},
+				exp:   &ConstantExpression{OptCode: OptCodeI64Const, Data: []byte{0x01}},
 			},
 			{
 				bytes: []byte{0x43, 0x40, 0xe1, 0x47, 0x40, 0x0b},
-				exp:   &ConstantExpression{optCode: OptCodeF32Const, data: []byte{0x40, 0xe1, 0x47, 0x40}},
+				exp:   &ConstantExpression{OptCode: OptCodeF32Const, Data: []byte{0x40, 0xe1, 0x47, 0x40}},
 			},
 			{
 				bytes: []byte{0x23, 0x01, 0x0b},
-				exp:   &ConstantExpression{optCode: OptCodeGlobalGet, data: []byte{0x01}},
+				exp:   &ConstantExpression{OptCode: OptCodeGlobalGet, Data: []byte{0x01}},
 			},
 		} {
 			actual, err := readConstantExpression(bytes.NewBuffer(c.bytes))

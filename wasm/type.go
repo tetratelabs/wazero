@@ -88,8 +88,8 @@ func readLimitsType(r io.Reader) (*LimitsType, error) {
 }
 
 type TableType struct {
-	Elem  byte
-	Limit *LimitsType
+	ElemType byte
+	Limit    *LimitsType
 }
 
 func readTableType(r io.Reader) (*TableType, error) {
@@ -108,8 +108,8 @@ func readTableType(r io.Reader) (*TableType, error) {
 	}
 
 	return &TableType{
-		Elem:  0x70,
-		Limit: lm,
+		ElemType: 0x70, // funcref
+		Limit:    lm,
 	}, nil
 }
 

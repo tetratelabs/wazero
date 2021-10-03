@@ -33,7 +33,7 @@ type (
 
 func NewVM(module *Module, externModules map[string]*Module) (*VirtualMachine, error) {
 	if err := module.buildIndexSpaces(externModules); err != nil {
-		return nil, fmt.Errorf("build index space: %w", err)
+		return nil, fmt.Errorf("build index space failed: %w", err)
 	}
 
 	vm := &VirtualMachine{
@@ -45,8 +45,10 @@ func NewVM(module *Module, externModules map[string]*Module) (*VirtualMachine, e
 	// note: MVP restricts vm to have a single memory space
 	if len(vm.InnerModule.IndexSpace.Memory) > 0 {
 		vm.Memory = vm.InnerModule.IndexSpace.Memory[0]
-		if diff := uint64(vm.InnerModule.SecMemory[0].Min)*vmPageSize - uint64(len(vm.Memory)); diff > 0 {
-			vm.Memory = append(vm.Memory, make([]byte, diff)...)
+		if len(vm.InnerModule.SecMemory) > 0 {
+			if diff := uint64(vm.InnerModule.SecMemory[0].Min)*vmPageSize - uint64(len(vm.Memory)); diff > 0 {
+				vm.Memory = append(vm.Memory, make([]byte, diff)...)
+			}
 		}
 	}
 
@@ -77,12 +79,14 @@ func NewVM(module *Module, externModules map[string]*Module) (*VirtualMachine, e
 	}
 
 	// exec start functions
-	for _, id := range vm.InnerModule.SecStart {
+	if vm.InnerModule.SecStart != nil {
+		id := *vm.InnerModule.SecStart
 		if int(id) >= len(vm.Functions) {
 			return nil, fmt.Errorf("function index out of range")
 		}
 		vm.Functions[id].Call(vm)
 	}
+
 	return vm, nil
 }
 
