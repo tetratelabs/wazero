@@ -492,9 +492,22 @@ func f32trunc(vm *VirtualMachine) {
 }
 
 func f32nearest(vm *VirtualMachine) {
-	raw := math.Float32frombits(uint32(vm.OperandStack.Pop()))
-	v := math.Float64bits(float64(int32(raw + float32(math.Copysign(0.5, float64(raw))))))
-	vm.OperandStack.Push(v)
+	// Borrowed from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L77
+	f := math.Float32frombits(uint32(vm.OperandStack.Pop()))
+	f64 := float64(f)
+	if f != -0 && f != 0 {
+		u := float32(math.Ceil(f64))
+		d := float32(math.Floor(f64))
+		um := math.Abs(float64(f - u))
+		dm := math.Abs(float64(f - d))
+		h := u / 2.0
+		if um < dm || float32(math.Floor(float64(h))) == h {
+			f = u
+		} else {
+			f = d
+		}
+	}
+	vm.OperandStack.Push(uint64(math.Float32bits(f)))
 	vm.ActiveContext.PC++
 }
 
@@ -533,14 +546,14 @@ func f32div(vm *VirtualMachine) {
 func f32min(vm *VirtualMachine) {
 	v2 := math.Float32frombits(uint32(vm.OperandStack.Pop()))
 	v1 := math.Float32frombits(uint32(vm.OperandStack.Pop()))
-	vm.OperandStack.Push(uint64(math.Float32bits(float32(math.Min(float64(v1), float64(v2))))))
+	vm.OperandStack.Push(uint64(math.Float32bits(float32(min(float64(v1), float64(v2))))))
 	vm.ActiveContext.PC++
 }
 
 func f32max(vm *VirtualMachine) {
 	v2 := math.Float32frombits(uint32(vm.OperandStack.Pop()))
 	v1 := math.Float32frombits(uint32(vm.OperandStack.Pop()))
-	vm.OperandStack.Push(uint64(math.Float32bits(float32(math.Min(float64(v1), float64(v2))))))
+	vm.OperandStack.Push(uint64(math.Float32bits(float32(max(float64(v1), float64(v2))))))
 	vm.ActiveContext.PC++
 }
 
@@ -583,9 +596,22 @@ func f64trunc(vm *VirtualMachine) {
 }
 
 func f64nearest(vm *VirtualMachine) {
-	raw := math.Float64frombits(vm.OperandStack.Pop())
-	v := math.Float64bits(float64(int64(raw + math.Copysign(0.5, raw))))
-	vm.OperandStack.Push(v)
+	// Borrowed from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L77
+	f := math.Float64frombits(vm.OperandStack.Pop())
+	f64 := float64(f)
+	if f != -0 && f != 0 {
+		u := math.Ceil(f64)
+		d := math.Floor(f64)
+		um := math.Abs(f - u)
+		dm := math.Abs(f - d)
+		h := u / 2.0
+		if um < dm || math.Floor(float64(h)) == h {
+			f = u
+		} else {
+			f = d
+		}
+	}
+	vm.OperandStack.Push(math.Float64bits(f))
 	vm.ActiveContext.PC++
 }
 
@@ -621,17 +647,60 @@ func f64div(vm *VirtualMachine) {
 	vm.ActiveContext.PC++
 }
 
+// math.Min doen't comply with the Wasm spec, so we borrow from the original
+// with a change that either one of NaN results in NaN even if another is -Inf.
+// https://github.com/golang/go/blob/1d20a362d0ca4898d77865e314ef6f73582daef0/src/math/dim.go#L74-L91
+func min(x, y float64) float64 {
+	switch {
+	case math.IsNaN(x) || math.IsNaN(y):
+		return math.NaN()
+	case math.IsInf(x, -1) || math.IsInf(y, -1):
+		return math.Inf(-1)
+	case x == 0 && x == y:
+		if math.Signbit(x) {
+			return x
+		}
+		return y
+	}
+	if x < y {
+		return x
+	}
+	return y
+}
+
 func f64min(vm *VirtualMachine) {
 	v2 := math.Float64frombits(vm.OperandStack.Pop())
 	v1 := math.Float64frombits(vm.OperandStack.Pop())
-	vm.OperandStack.Push(math.Float64bits(math.Min(v1, v2)))
+	vm.OperandStack.Push(math.Float64bits(min(v1, v2)))
 	vm.ActiveContext.PC++
+}
+
+// math.Max doen't comply with the Wasm spec, so we borrow from the original
+// with a change that either one of NaN results in NaN even if another is Inf.
+// https://github.com/golang/go/blob/1d20a362d0ca4898d77865e314ef6f73582daef0/src/math/dim.go#L42-L59
+func max(x, y float64) float64 {
+	switch {
+	case math.IsNaN(x) || math.IsNaN(y):
+		return math.NaN()
+	case math.IsInf(x, 1) || math.IsInf(y, 1):
+		return math.Inf(1)
+
+	case x == 0 && x == y:
+		if math.Signbit(x) {
+			return y
+		}
+		return x
+	}
+	if x > y {
+		return x
+	}
+	return y
 }
 
 func f64max(vm *VirtualMachine) {
 	v2 := math.Float64frombits(vm.OperandStack.Pop())
 	v1 := math.Float64frombits(vm.OperandStack.Pop())
-	vm.OperandStack.Push(math.Float64bits(math.Min(v1, v2)))
+	vm.OperandStack.Push(math.Float64bits(max(v1, v2)))
 	vm.ActiveContext.PC++
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/mathetake/gasm/wasm"
 )
 
-// FIXME
 func Test_stdio(t *testing.T) {
 	buf, err := ioutil.ReadFile("wasm/stdio.wasm")
 	require.NoError(t, err)
