@@ -120,7 +120,7 @@ type ExportDesc struct {
 const (
 	ExportKindFunction byte = 0x00
 	ExportKindTable    byte = 0x01
-	ExportKindMem      byte = 0x02
+	ExportKindMemory   byte = 0x02
 	ExportKindGlobal   byte = 0x03
 )
 

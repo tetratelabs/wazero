@@ -15,7 +15,7 @@ type ConstantExpression struct {
 	Data    []byte
 }
 
-func (m *Module) executeConstExpression(expr *ConstantExpression) (v interface{}, err error) {
+func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExpression) (v interface{}, err error) {
 	r := bytes.NewBuffer(expr.Data)
 	switch expr.OptCode {
 	case OptCodeI32Const:
@@ -43,10 +43,20 @@ func (m *Module) executeConstExpression(expr *ConstantExpression) (v interface{}
 		if err != nil {
 			return nil, fmt.Errorf("read index of global: %w", err)
 		}
-		if uint32(len(m.IndexSpace.Globals)) <= id {
+		if uint32(len(target.GlobalsAddrs)) <= id {
 			return nil, fmt.Errorf("global index out of range")
 		}
-		v = m.IndexSpace.Globals[id].Val
+		g := s.Globals[target.GlobalsAddrs[id]]
+		switch g.Type.ValType {
+		case ValueTypeI32:
+			v = int32(g.Val)
+		case ValueTypeI64:
+			v = int64(g.Val)
+		case ValueTypeF32:
+			v = math.Float32frombits(uint32(g.Val))
+		case ValueTypeF64:
+			v = math.Float64frombits(uint64(g.Val))
+		}
 	default:
 		return nil, fmt.Errorf("invalid opt code: %#x", expr.OptCode)
 	}

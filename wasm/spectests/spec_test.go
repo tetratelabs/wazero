@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mathetake/gasm/hostfunc"
 	"github.com/mathetake/gasm/wasm"
 )
 
@@ -138,84 +137,55 @@ func (v commandActionVal) ToUint64(t *testing.T) uint64 {
 	}
 }
 
-func spectestModule() *wasm.Module {
-	builder := hostfunc.NewModuleBuilder()
-	builder.MustSetFunction("spectest", "print", func(*wasm.VirtualMachine) reflect.Value {
+func addSpectestModule(vm *wasm.VirtualMachine) {
+	// Add functions
+	vm.AddHostFunction("spectest", "print", func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func() {})
 	})
-	builder.MustSetFunction("spectest", "print_i32", func(*wasm.VirtualMachine) reflect.Value {
+	vm.AddHostFunction("spectest", "print_i32", func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func(v uint32) {})
 	})
-	builder.MustSetFunction("spectest", "print_f32", func(*wasm.VirtualMachine) reflect.Value {
+	vm.AddHostFunction("spectest", "print_f32", func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func(v float32) {})
 	})
-	builder.MustSetFunction("spectest", "print_i64", func(*wasm.VirtualMachine) reflect.Value {
+	vm.AddHostFunction("spectest", "print_i64", func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func(v uint64) {})
 	})
-	builder.MustSetFunction("spectest", "print_f64", func(*wasm.VirtualMachine) reflect.Value {
+	vm.AddHostFunction("spectest", "print_f64", func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func(v float64) {})
 	})
-	builder.MustSetFunction("spectest", "print_i32_f32", func(*wasm.VirtualMachine) reflect.Value {
+	vm.AddHostFunction("spectest", "print_i32_f32", func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func(v uint32, w float32) {})
 	})
-	builder.MustSetFunction("spectest", "print_f64_f64", func(*wasm.VirtualMachine) reflect.Value {
+	vm.AddHostFunction("spectest", "print_f64_f64", func(*wasm.VirtualMachine) reflect.Value {
 		return reflect.ValueOf(func(v, w float64) {})
 	})
-
-	m := builder.Done()["spectest"]
-
-	// Register globals export.
-	for i, g := range []struct {
+	// Register globals.
+	for _, g := range []struct {
 		name      string
 		valueType wasm.ValueType
-		value     interface{}
+		value     uint64
 	}{
-		{name: "global_i32", valueType: wasm.ValueTypeI32, value: int32(666)},
-		{name: "global_i64", valueType: wasm.ValueTypeI64, value: int64(666)},
-		{name: "global_f32", valueType: wasm.ValueTypeF32, value: math.Float32frombits(0x44268000)},
-		{name: "global_f64", valueType: wasm.ValueTypeF64, value: math.Float64frombits(0x4084d00000000000)},
+		{name: "global_i32", valueType: wasm.ValueTypeI32, value: uint64(int32(666))},
+		{name: "global_i64", valueType: wasm.ValueTypeI64, value: uint64(int64(666))},
+		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
+		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
 	} {
-		m.SecExports[g.name] = &wasm.ExportSegment{
-			Desc: &wasm.ExportDesc{Kind: wasm.ExportKindGlobal, Index: uint32(i)},
-		}
-		m.IndexSpace.Globals = append(m.IndexSpace.Globals, &wasm.Global{
-			Type: &wasm.GlobalType{Value: g.valueType},
-			Val:  g.value,
-		})
+		vm.AddGlobal("spectest", g.name, g.value, g.valueType, false)
 	}
 	// Register table export.
-	m.SecExports["table"] = &wasm.ExportSegment{
-		Desc: &wasm.ExportDesc{Kind: wasm.ExportKindTable, Index: uint32(0)},
-	}
 	tableLimitMax := uint32(20)
-	m.IndexSpace.Table = append(m.IndexSpace.Table, make([]*uint32, 10))
-	m.SecTables = append(m.SecTables, &wasm.TableType{ElemType: 0x70, Limit: &wasm.LimitsType{
-		Min: 10,
-		Max: &tableLimitMax,
-	}})
+	vm.AddTableInstance("spectest", "table", 0, &tableLimitMax)
 	// Register table export.
-	m.SecExports["memory"] = &wasm.ExportSegment{
-		Desc: &wasm.ExportDesc{Kind: wasm.ExportKindMem, Index: uint32(0)},
-	}
 	memoryLimitMax := uint32(2)
-	m.IndexSpace.Memory = append(m.IndexSpace.Memory, make([]byte, 1))
-	m.SecMemory = append(m.SecMemory, &wasm.MemoryType{
-		Min: 1,
-		Max: &memoryLimitMax,
-	})
-	return m
+	vm.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax)
 }
 
 func TestSpecification(t *testing.T) {
-	// (assert_return (invoke "max" (f64.const -0x0p+0) (f64.const -0x0.0000000000001p-1022)) (f64.const -0x0p+0))
-	v := float64(-0x0p+0)
-	w := float64(-0x0.0000000000001p-1022)
-	require.True(t, math.Max(v, w) == v, math.Max(v, w))
 	const caseDir = "./cases"
 	files, err := os.ReadDir(caseDir)
 	require.NoError(t, err)
 
-	spectestModule := spectestModule()
 	for _, f := range files {
 		if filepath.Ext(f.Name()) != ".json" {
 			continue
@@ -229,73 +199,72 @@ func TestSpecification(t *testing.T) {
 
 		wastName := filepath.Base(base.SourceFile)
 		t.Run(wastName, func(t *testing.T) {
-			// t.Parallel()
+			vm, err := wasm.NewVM()
+			require.NoError(t, err)
+			addSpectestModule(vm)
 
-			modules := map[string]*wasm.Module{}
-			linkableModules := map[string]*wasm.Module{"spectest": spectestModule}
-			vms := map[string]*wasm.VirtualMachine{}
-			var latestVM *wasm.VirtualMachine
-
+			var lastInstanceName string
 			for _, c := range base.Commands {
-				// fmt.Println(c)
-				msg := fmt.Sprintf("%s:%d", wastName, c.Line)
-				switch c.CommandType {
-				case "module":
-					buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
-					require.NoError(t, err, msg)
+				t.Run(fmt.Sprintf("%d", c.Line), func(t *testing.T) {
+					msg := fmt.Sprintf("%s:%d", wastName, c.Line)
+					switch c.CommandType {
+					case "module":
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
 
-					mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
-					require.NoError(t, err, msg)
-					modules[c.Name] = mod
+						mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
+						require.NoError(t, err, msg)
 
-					latestVM, err = wasm.NewVM(mod, linkableModules)
-					require.NoError(t, err, msg)
-					require.NotNil(t, latestVM, msg, msg)
-					vms[c.Name] = latestVM
-				case "register":
-					m, ok := modules[c.Name]
-					require.True(t, ok, msg)
-					linkableModules[c.As] = m
-				case "assert_return", "action":
-					vm := latestVM
-					if c.Action.Module != "" {
-						var ok bool
-						vm, ok = vms[c.Action.Module]
-						require.True(t, ok, msg)
-					}
-					require.NotNil(t, vm)
-					switch c.Action.ActionType {
-					case "invoke":
-						args, exps := c.getAssertReturnArgsExps(t)
-						msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
-						vals, types, err := vm.ExecExportedFunction(c.Action.Field, args...)
-						if assert.NoError(t, err, msg) &&
-							assert.Equal(t, len(exps), len(vals), msg) &&
-							assert.Equal(t, len(exps), len(types), msg) {
-							for i, exp := range exps {
-								assertValueEq(t, vals[i], exp, types[i], msg)
-							}
+						lastInstanceName = c.Name
+						if lastInstanceName == "" {
+							lastInstanceName = c.Filename
 						}
-					case "get":
+						err = vm.Instantiate(mod, lastInstanceName)
+						require.NoError(t, err)
+					case "register":
+						vm.Store.ModuleInstances[c.As] = vm.Store.ModuleInstances[c.Name]
+					case "assert_return", "action":
+						moduleName := lastInstanceName
+						if c.Action.Module != "" {
+							moduleName = c.Action.Module
+						}
+						require.NotNil(t, vm)
+						switch c.Action.ActionType {
+						case "invoke":
+							args, exps := c.getAssertReturnArgsExps(t)
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							vals, types, err := vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
+							if assert.NoError(t, err, msg) &&
+								assert.Equal(t, len(exps), len(vals), msg) &&
+								assert.Equal(t, len(exps), len(types), msg) {
+								for i, exp := range exps {
+									assertValueEq(t, vals[i], exp, types[i], msg)
+								}
+							}
+						case "get":
+							// TODO:
+						default:
+							t.Fatalf("unsupported action type type: %v", c)
+						}
+					case "assert_malformed":
+						// TODO:
+					case "assert_trap":
+						// TODO:
+					case "assert_invalid":
+						// TODO:
+					case "assert_exhaustion":
+						// TODO:
+					case "assert_unlinkable":
+						// TODO:
+					case "assert_uninstantiable":
 						// TODO:
 					default:
-						t.Fatalf("unsupported action type type: %v", c)
+						t.Fatalf("unsupported command type: %s", c)
 					}
-				case "assert_malformed":
-					// TODO:
-				case "assert_trap":
-					// TODO:
-				case "assert_invalid":
-					// TODO:
-				case "assert_exhaustion":
-					// TODO:
-				case "assert_unlinkable":
-					// TODO:
-				case "assert_uninstantiable":
-					// TODO:
-				default:
-					t.Fatalf("unsupported command type: %s", c)
-				}
+				})
 			}
 		})
 	}

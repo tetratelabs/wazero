@@ -120,7 +120,7 @@ func readMemoryType(r io.Reader) (*MemoryType, error) {
 }
 
 type GlobalType struct {
-	Value   ValueType
+	ValType ValueType
 	Mutable bool
 }
 
@@ -131,7 +131,7 @@ func readGlobalType(r io.Reader) (*GlobalType, error) {
 	}
 
 	ret := &GlobalType{
-		Value: vt[0],
+		ValType: vt[0],
 	}
 
 	b := make([]byte, 1)

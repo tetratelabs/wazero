@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/mathetake/gasm/wasm/leb128"
 )
@@ -13,13 +14,9 @@ const vmPageSize = 65536
 
 type (
 	VirtualMachine struct {
-		InnerModule   *Module
+		Store         *Store
 		ActiveContext *NativeFunctionContext
-		Functions     []VirtualMachineFunction
-		Memory        []byte
-		Globals       []uint64
-
-		OperandStack *VirtualMachineOperandStack
+		OperandStack  *VirtualMachineOperandStack
 	}
 
 	NativeFunctionContext struct {
@@ -31,80 +28,41 @@ type (
 	}
 )
 
-func NewVM(module *Module, externModules map[string]*Module) (*VirtualMachine, error) {
-	if err := module.buildIndexSpaces(externModules); err != nil {
-		return nil, fmt.Errorf("build index space failed: %w", err)
-	}
-
+func NewVM() (*VirtualMachine, error) {
 	vm := &VirtualMachine{
-		InnerModule:  module,
+		Store:        NewStore(),
 		OperandStack: NewVirtualMachineOperandStack(),
 	}
-
-	// initialize vm memory
-	// note: MVP restricts vm to have a single memory space
-	if len(vm.InnerModule.IndexSpace.Memory) > 0 {
-		vm.Memory = vm.InnerModule.IndexSpace.Memory[0]
-		if len(vm.InnerModule.SecMemory) > 0 {
-			if diff := uint64(vm.InnerModule.SecMemory[0].Min)*vmPageSize - uint64(len(vm.Memory)); diff > 0 {
-				vm.Memory = append(vm.Memory, make([]byte, diff)...)
-			}
-		}
-	}
-
-	// initialize functions
-	vm.Functions = make([]VirtualMachineFunction, len(vm.InnerModule.IndexSpace.Function))
-	for i, f := range vm.InnerModule.IndexSpace.Function {
-		if hf, ok := f.(*HostFunction); ok {
-			hf.function = hf.ClosureGenerator(vm)
-			vm.Functions[i] = hf
-		} else {
-			vm.Functions[i] = f
-		}
-	}
-
-	// initialize global
-	vm.Globals = make([]uint64, len(vm.InnerModule.IndexSpace.Globals))
-	for i, raw := range vm.InnerModule.IndexSpace.Globals {
-		switch v := raw.Val.(type) {
-		case int32:
-			vm.Globals[i] = uint64(v)
-		case int64:
-			vm.Globals[i] = uint64(v)
-		case float32:
-			vm.Globals[i] = uint64(math.Float32bits(v))
-		case float64:
-			vm.Globals[i] = math.Float64bits(v)
-		}
-	}
-
-	// exec start functions
-	if vm.InnerModule.SecStart != nil {
-		id := *vm.InnerModule.SecStart
-		if int(id) >= len(vm.Functions) {
-			return nil, fmt.Errorf("function index out of range")
-		}
-		vm.Functions[id].Call(vm)
-	}
-
 	return vm, nil
 }
 
-func (vm *VirtualMachine) ExecExportedFunction(name string, args ...uint64) (returns []uint64, returnTypes []ValueType, err error) {
-	exp, ok := vm.InnerModule.SecExports[name]
+func (vm *VirtualMachine) Instantiate(module *Module, name string) error {
+	inst, err := vm.Store.Instantiate(module, name)
+	if err != nil {
+		return err
+	}
+	if module.SecStart != nil {
+		vm.Store.Functions[inst.FunctionAddrs[*module.SecStart]].Call(vm)
+	}
+	return nil
+}
+
+func (vm *VirtualMachine) ExecExportedFunction(moduleName, funcName string, args ...uint64) (returns []uint64, returnTypes []ValueType, err error) {
+	m, ok := vm.Store.ModuleInstances[moduleName]
 	if !ok {
-		return nil, nil, fmt.Errorf("exported func of name '%s' not found", name)
+		return nil, nil, fmt.Errorf("module '%s' not instantiated", moduleName)
 	}
 
-	if exp.Desc.Kind != ExportKindFunction {
-		return nil, nil, fmt.Errorf("exported elent of name '%s' is not functype", name)
+	exp, ok := m.Exports[funcName]
+	if !ok {
+		return nil, nil, fmt.Errorf("exported func of name '%s' not found in '%s'", funcName, moduleName)
 	}
 
-	if int(exp.Desc.Index) >= len(vm.Functions) {
-		return nil, nil, fmt.Errorf("function index out of range")
+	if exp.Kind != ExportKindFunction {
+		return nil, nil, fmt.Errorf("'%s' is not functype", funcName)
 	}
 
-	f := vm.Functions[exp.Desc.Index]
+	f := vm.Store.Functions[exp.Addr]
 	if len(f.FunctionType().InputTypes) != len(args) {
 		return nil, nil, fmt.Errorf("invalid number of arguments")
 	}
@@ -120,6 +78,22 @@ func (vm *VirtualMachine) ExecExportedFunction(name string, args ...uint64) (ret
 		ret[len(ret)-1-i] = vm.OperandStack.Pop()
 	}
 	return ret, f.FunctionType().ReturnTypes, nil
+}
+
+func (vm *VirtualMachine) AddHostFunction(moduleName, funcName string, fn func(*VirtualMachine) reflect.Value) error {
+	return vm.Store.AddHostFunction(moduleName, funcName, fn)
+}
+
+func (vm *VirtualMachine) AddGlobal(moduleName, funcName string, value uint64, valueType ValueType, mutable bool) error {
+	return vm.Store.AddGlobal(moduleName, funcName, value, valueType, mutable)
+}
+
+func (vm *VirtualMachine) AddTableInstance(moduleName, funcName string, min uint32, max *uint32) error {
+	return vm.Store.AddTableInstance(moduleName, funcName, min, max)
+}
+
+func (vm *VirtualMachine) AddMemoryInstance(moduleName, funcName string, min uint32, max *uint32) error {
+	return vm.Store.AddMemoryInstance(moduleName, funcName, min, max)
 }
 
 func (vm *VirtualMachine) FetchInt32() int32 {

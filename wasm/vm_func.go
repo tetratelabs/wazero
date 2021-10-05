@@ -8,10 +8,6 @@ import (
 )
 
 type (
-	VirtualMachineFunction interface {
-		Call(vm *VirtualMachine)
-		FunctionType() *FunctionType
-	}
 	HostFunction struct {
 		Name             string
 		ClosureGenerator func(vm *VirtualMachine) reflect.Value
@@ -19,10 +15,11 @@ type (
 		Signature        *FunctionType
 	}
 	NativeFunction struct {
-		Signature *FunctionType
-		NumLocal  uint32
-		Body      []byte
-		Blocks    map[uint64]*NativeFunctionBlock
+		Signature      *FunctionType
+		NumLocal       uint32
+		Body           []byte
+		Blocks         map[uint64]*NativeFunctionBlock
+		ModuleInstance *ModuleInstance
 	}
 	NativeFunctionBlock struct {
 		StartAt, ElseAt, EndAt uint64
@@ -32,8 +29,8 @@ type (
 )
 
 var (
-	_ VirtualMachineFunction = &HostFunction{}
-	_ VirtualMachineFunction = &NativeFunction{}
+	_ FuncInstance = &HostFunction{}
+	_ FuncInstance = &NativeFunction{}
 )
 
 func (h *HostFunction) FunctionType() *FunctionType {
