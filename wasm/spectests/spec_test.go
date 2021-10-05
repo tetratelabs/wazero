@@ -256,13 +256,8 @@ func TestSpecification(t *testing.T) {
 						mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
 						require.NoError(t, err, msg)
 
-						require.Panics(t, func() {
-							// Either return error or exec "unreachable" in the start function,
-							// which results in panic.
-							if err := vm.Instantiate(mod, ""); err != nil {
-								panic(err)
-							}
-						})
+						err = vm.Instantiate(mod, "")
+						require.Error(t, err)
 					default:
 						t.Fatalf("unsupported command type: %s", c)
 					}

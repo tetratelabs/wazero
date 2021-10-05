@@ -29,18 +29,24 @@ type (
 )
 
 func NewVM() (*VirtualMachine, error) {
-	vm := &VirtualMachine{
+	return &VirtualMachine{
 		Store:        NewStore(),
 		OperandStack: NewVirtualMachineOperandStack(),
-	}
-	return vm, nil
+	}, nil
 }
 
-func (vm *VirtualMachine) Instantiate(module *Module, name string) error {
+func (vm *VirtualMachine) Instantiate(module *Module, name string) (errRet error) {
 	inst, err := vm.Store.Instantiate(module, name)
 	if err != nil {
 		return err
 	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			errRet = fmt.Errorf("calling start function failed: %v", err)
+		}
+	}()
+
 	if module.SecStart != nil {
 		vm.Store.Functions[inst.FunctionAddrs[*module.SecStart]].Call(vm)
 	}
