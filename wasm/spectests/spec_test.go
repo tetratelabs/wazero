@@ -30,7 +30,7 @@ type (
 		// type == "module" || "register"
 		Name string `json:"name,omitempty"`
 
-		// type == "module"
+		// type == "module" || "assert_uninstantiable"
 		Filename string `json:"filename,omitempty"`
 
 		// type == "register"
@@ -139,27 +139,13 @@ func (v commandActionVal) ToUint64(t *testing.T) uint64 {
 
 func addSpectestModule(vm *wasm.VirtualMachine) {
 	// Add functions
-	vm.AddHostFunction("spectest", "print", func(*wasm.VirtualMachine) reflect.Value {
-		return reflect.ValueOf(func() {})
-	})
-	vm.AddHostFunction("spectest", "print_i32", func(*wasm.VirtualMachine) reflect.Value {
-		return reflect.ValueOf(func(v uint32) {})
-	})
-	vm.AddHostFunction("spectest", "print_f32", func(*wasm.VirtualMachine) reflect.Value {
-		return reflect.ValueOf(func(v float32) {})
-	})
-	vm.AddHostFunction("spectest", "print_i64", func(*wasm.VirtualMachine) reflect.Value {
-		return reflect.ValueOf(func(v uint64) {})
-	})
-	vm.AddHostFunction("spectest", "print_f64", func(*wasm.VirtualMachine) reflect.Value {
-		return reflect.ValueOf(func(v float64) {})
-	})
-	vm.AddHostFunction("spectest", "print_i32_f32", func(*wasm.VirtualMachine) reflect.Value {
-		return reflect.ValueOf(func(v uint32, w float32) {})
-	})
-	vm.AddHostFunction("spectest", "print_f64_f64", func(*wasm.VirtualMachine) reflect.Value {
-		return reflect.ValueOf(func(v, w float64) {})
-	})
+	vm.AddHostFunction("spectest", "print", reflect.ValueOf(func(*wasm.VirtualMachine) {}))
+	vm.AddHostFunction("spectest", "print_i32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32) {}))
+	vm.AddHostFunction("spectest", "print_f32", reflect.ValueOf(func(*wasm.VirtualMachine, float32) {}))
+	vm.AddHostFunction("spectest", "print_i64", reflect.ValueOf(func(*wasm.VirtualMachine, uint64) {}))
+	vm.AddHostFunction("spectest", "print_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64) {}))
+	vm.AddHostFunction("spectest", "print_i32_f32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32, float32) {}))
+	vm.AddHostFunction("spectest", "print_f64_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64, float64) {}))
 	// Register globals.
 	for _, g := range []struct {
 		name      string
@@ -222,7 +208,11 @@ func TestSpecification(t *testing.T) {
 						err = vm.Instantiate(mod, lastInstanceName)
 						require.NoError(t, err)
 					case "register":
-						vm.Store.ModuleInstances[c.As] = vm.Store.ModuleInstances[c.Name]
+						name := lastInstanceName
+						if c.Name != "" {
+							name = c.Name
+						}
+						vm.Store.ModuleInstances[c.As] = vm.Store.ModuleInstances[name]
 					case "assert_return", "action":
 						moduleName := lastInstanceName
 						if c.Action.Module != "" {
@@ -260,7 +250,19 @@ func TestSpecification(t *testing.T) {
 					case "assert_unlinkable":
 						// TODO:
 					case "assert_uninstantiable":
-						// TODO:
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
+
+						mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
+						require.NoError(t, err, msg)
+
+						require.Panics(t, func() {
+							// Either return error or exec "unreachable" in the start function,
+							// which results in panic.
+							if err := vm.Instantiate(mod, ""); err != nil {
+								panic(err)
+							}
+						})
 					default:
 						t.Fatalf("unsupported command type: %s", c)
 					}

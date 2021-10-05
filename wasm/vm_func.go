@@ -9,10 +9,9 @@ import (
 
 type (
 	HostFunction struct {
-		Name             string
-		ClosureGenerator func(vm *VirtualMachine) reflect.Value
-		function         reflect.Value // should be set at the time of VM creation
-		Signature        *FunctionType
+		Name      string
+		Function  reflect.Value
+		Signature *FunctionType
 	}
 	NativeFunction struct {
 		Signature      *FunctionType
@@ -45,9 +44,9 @@ func (h *HostFunction) Call(vm *VirtualMachine) {
 	if isDebugMode {
 		fmt.Printf("Call host function '%s'\n", h.Name)
 	}
-	tp := h.function.Type()
+	tp := h.Function.Type()
 	in := make([]reflect.Value, tp.NumIn())
-	for i := len(in) - 1; i >= 0; i-- {
+	for i := len(in) - 1; i >= 1; i-- {
 		val := reflect.New(tp.In(i)).Elem()
 		raw := vm.OperandStack.Pop()
 		kind := tp.In(i).Kind()
@@ -64,8 +63,11 @@ func (h *HostFunction) Call(vm *VirtualMachine) {
 		}
 		in[i] = val
 	}
+	val := reflect.New(tp.In(0)).Elem()
+	val.Set(reflect.ValueOf(vm))
+	in[0] = val
 
-	for _, ret := range h.function.Call(in) {
+	for _, ret := range h.Function.Call(in) {
 		switch ret.Kind() {
 		case reflect.Float64, reflect.Float32:
 			vm.OperandStack.Push(math.Float64bits(ret.Float()))

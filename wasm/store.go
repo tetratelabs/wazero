@@ -228,7 +228,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) err
 	// Allocate memory instances.
 	for _, memSec := range module.SecMemory {
 		memInst := &MemoryInstance{
-			Memory: make([]byte, memSec.Min*vmPageSize),
+			Memory: make([]byte, uint64(memSec.Min)*PageSize),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
 		}
@@ -252,17 +252,17 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) err
 			return fmt.Errorf("offset is not int32 but %T", rawOffset)
 		}
 
-		size := int(offset) + len(d.Init)
-		max := uint32(math.MaxUint32)
+		size := uint64(offset) + uint64(len(d.Init))
+		max := uint64(math.MaxUint32)
 		if int(d.MemoryIndex) < len(module.SecMemory) && module.SecMemory[d.MemoryIndex].Max != nil {
-			max = *module.SecMemory[d.MemoryIndex].Max
+			max = uint64(*module.SecMemory[d.MemoryIndex].Max)
 		}
-		if uint32(size) > max*vmPageSize {
+		if size > max*PageSize {
 			return fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.SecMemory[d.MemoryIndex].Max)))
 		}
 
 		memoryInst := s.Memories[target.MemoryAddrs[d.MemoryIndex]]
-		if size > len(memoryInst.Memory) {
+		if size > uint64(len(memoryInst.Memory)) {
 			next := make([]byte, size)
 			copy(next, memoryInst.Memory)
 			copy(next[offset:], d.Init)
@@ -498,7 +498,7 @@ func readBlockType(module *Module, r io.Reader) (*BlockType, uint64, error) {
 	return ret, num, nil
 }
 
-func (s *Store) AddHostFunction(moduleName, funcName string, fn func(*VirtualMachine) reflect.Value) error {
+func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
 	getTypeOf := func(kind reflect.Kind) (ValueType, error) {
 		switch kind {
 		case reflect.Float64:
@@ -515,9 +515,12 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn func(*VirtualMac
 	}
 	getSignature := func(p reflect.Type) (*FunctionType, error) {
 		var err error
-		in := make([]ValueType, p.NumIn())
+		if p.NumIn() == 0 {
+			return nil, fmt.Errorf("host function must accept *VirtualMachine as the first param")
+		}
+		in := make([]ValueType, p.NumIn()-1)
 		for i := range in {
-			in[i], err = getTypeOf(p.In(i).Kind())
+			in[i], err = getTypeOf(p.In(i + 1).Kind())
 			if err != nil {
 				return nil, err
 			}
@@ -544,7 +547,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn func(*VirtualMac
 		return fmt.Errorf("name %s already exists in module %s", funcName, moduleName)
 	}
 
-	sig, err := getSignature(fn(&VirtualMachine{}).Type())
+	sig, err := getSignature(fn.Type())
 	if err != nil {
 		return fmt.Errorf("invalid signature: %w", err)
 	}
@@ -554,9 +557,9 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn func(*VirtualMac
 		Addr: len(s.Functions),
 	}
 	s.Functions = append(s.Functions, &HostFunction{
-		Name:             fmt.Sprintf("%s.%s", moduleName, funcName),
-		ClosureGenerator: fn,
-		Signature:        sig,
+		Name:      fmt.Sprintf("%s.%s", moduleName, funcName),
+		Function:  fn,
+		Signature: sig,
 	})
 	return nil
 }
@@ -625,7 +628,7 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 		Addr: len(s.Memories),
 	}
 	s.Memories = append(s.Memories, &MemoryInstance{
-		Memory: make([]byte, min),
+		Memory: make([]byte, uint64(min)*PageSize),
 		Min:    min,
 		Max:    max,
 	})

@@ -54,7 +54,7 @@ func ifOp(vm *VirtualMachine) {
 	ctx.LabelStack.Push(&Label{
 		Arity:          arity,
 		ContinuationPC: block.EndAt + 1,
-		OperandSP:      vm.OperandStack.SP - arity,
+		OperandSP:      vm.OperandStack.SP - len(block.BlockType.InputTypes),
 	})
 	vm.ActiveContext.PC++
 }

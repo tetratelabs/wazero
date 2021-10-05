@@ -10,7 +10,7 @@ import (
 	"github.com/mathetake/gasm/wasm/leb128"
 )
 
-const vmPageSize = 65536
+const PageSize uint64 = 65536
 
 type (
 	VirtualMachine struct {
@@ -80,7 +80,7 @@ func (vm *VirtualMachine) ExecExportedFunction(moduleName, funcName string, args
 	return ret, f.FunctionType().ReturnTypes, nil
 }
 
-func (vm *VirtualMachine) AddHostFunction(moduleName, funcName string, fn func(*VirtualMachine) reflect.Value) error {
+func (vm *VirtualMachine) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
 	return vm.Store.AddHostFunction(moduleName, funcName, fn)
 }
 

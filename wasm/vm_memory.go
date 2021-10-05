@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"encoding/binary"
+	"math"
 )
 
 func memoryBase(vm *VirtualMachine) uint64 {
@@ -38,12 +39,14 @@ func f64Load(vm *VirtualMachine) {
 
 func i32Load8s(vm *VirtualMachine) {
 	base := memoryBase(vm)
-	vm.OperandStack.Push(uint64(vm.CurrentMemory()[base]))
+	vm.OperandStack.Push(uint64(int8(vm.CurrentMemory()[base])))
 	vm.ActiveContext.PC++
 }
 
 func i32Load8u(vm *VirtualMachine) {
-	i32Load8s(vm)
+	base := memoryBase(vm)
+	vm.OperandStack.Push(uint64(uint8(vm.CurrentMemory()[base])))
+	vm.ActiveContext.PC++
 }
 
 func i32Load16s(vm *VirtualMachine) {
@@ -60,12 +63,14 @@ func i32Load16u(vm *VirtualMachine) {
 
 func i64Load8s(vm *VirtualMachine) {
 	base := memoryBase(vm)
-	vm.OperandStack.Push(uint64(vm.CurrentMemory()[base]))
+	vm.OperandStack.Push(uint64(int8(vm.CurrentMemory()[base])))
 	vm.ActiveContext.PC++
 }
 
 func i64Load8u(vm *VirtualMachine) {
-	i64Load8s(vm)
+	base := memoryBase(vm)
+	vm.OperandStack.Push(uint64(uint8(vm.CurrentMemory()[base])))
+	vm.ActiveContext.PC++
 }
 
 func i64Load16s(vm *VirtualMachine) {
@@ -156,26 +161,29 @@ func i64Store32(vm *VirtualMachine) {
 }
 
 func memorySize(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
-	vm.OperandStack.Push(uint64(int32(len(vm.CurrentMemory()) / vmPageSize)))
-	vm.ActiveContext.PC++
+	vm.OperandStack.Push(uint64(int32(uint64(len(vm.CurrentMemory())) / PageSize)))
+	vm.ActiveContext.PC += 2
 }
 
 func memoryGrow(vm *VirtualMachine) {
 	vm.ActiveContext.PC++
-	n := uint32(vm.OperandStack.Pop())
+	n := vm.OperandStack.Pop()
 
 	memoryAddr := vm.ActiveContext.Function.ModuleInstance.MemoryAddrs[0]
 	memoryInst := vm.Store.Memories[memoryAddr]
 
-	if memoryInst.Max != nil &&
-		uint64(n+uint32(len(memoryInst.Memory)/vmPageSize)) > uint64(*memoryInst.Max) {
+	max := uint64(math.MaxUint32)
+	if memoryInst.Max != nil {
+		max = uint64(*memoryInst.Max) * PageSize
+	}
+	if uint64(n*PageSize+uint64(len(memoryInst.Memory))) > max {
 		v := int32(-1)
 		vm.OperandStack.Push(uint64(v))
+		vm.ActiveContext.PC++
 		return
 	}
 
-	vm.OperandStack.Push(uint64(len(memoryInst.Memory)) / vmPageSize)
-	memoryInst.Memory = append(memoryInst.Memory, make([]byte, n*vmPageSize)...)
+	vm.OperandStack.Push(uint64(len(memoryInst.Memory)) / PageSize)
+	memoryInst.Memory = append(memoryInst.Memory, make([]byte, n*PageSize)...)
 	vm.ActiveContext.PC++
 }
