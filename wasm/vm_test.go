@@ -10,7 +10,7 @@ import (
 func TestVirtualMachine_ExecExportedFunction(t *testing.T) {
 	vm := &VirtualMachine{
 		InnerModule: &Module{
-			SecExports: map[string]*ExportSegment{
+			ExportSection: map[string]*ExportSegment{
 				"a": {Desc: &ExportDesc{Index: 0, Kind: ExportKindFunction}},
 				"b": {Desc: &ExportDesc{Index: 0, Kind: ExportKindGlobal}},
 				"c": {Desc: &ExportDesc{Index: 100, Kind: ExportKindFunction}},

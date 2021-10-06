@@ -1,7 +1,6 @@
 package spec
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -30,7 +29,7 @@ type (
 		// type == "module" || "register"
 		Name string `json:"name,omitempty"`
 
-		// type == "module" || "assert_uninstantiable"
+		// type == "module" || "assert_uninstantiable" || "assert_malformed"
 		Filename string `json:"filename,omitempty"`
 
 		// type == "register"
@@ -39,6 +38,9 @@ type (
 		// type == "assert_return" || "action"
 		Action commandAction      `json:"action,omitempty"`
 		Exps   []commandActionVal `json:"expected"`
+
+		// type == "assert_malformed"
+		ModuleType string `json:"module_type"`
 	}
 
 	commandAction struct {
@@ -195,10 +197,11 @@ func TestSpecification(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d", wastName, c.Line)
 					switch c.CommandType {
 					case "module":
+						t.Log(c.Filename)
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
 
-						mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
+						mod, err := wasm.DecodeModule(buf)
 						require.NoError(t, err, msg)
 
 						lastInstanceName = c.Name
@@ -240,7 +243,19 @@ func TestSpecification(t *testing.T) {
 							t.Fatalf("unsupported action type type: %v", c)
 						}
 					case "assert_malformed":
-						// TODO:
+						// t.Log(c.Filename)
+						// if c.ModuleType == "text" {
+						// 	// We don't support direct loading of wast yet.
+						// 	t.Skip()
+						// }
+						// buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						// require.NoError(t, err, msg)
+
+						// mod, err := wasm.DecodeModule(buf)
+						// if err == nil {
+						// 	err = vm.Instantiate(mod, "")
+						// }
+						// require.Error(t, err, msg)
 					case "assert_trap":
 						// TODO:
 					case "assert_invalid":
@@ -253,11 +268,11 @@ func TestSpecification(t *testing.T) {
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
 
-						mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
+						mod, err := wasm.DecodeModule(buf)
 						require.NoError(t, err, msg)
 
 						err = vm.Instantiate(mod, "")
-						require.Error(t, err)
+						require.Error(t, err, msg)
 					default:
 						t.Fatalf("unsupported command type: %s", c)
 					}

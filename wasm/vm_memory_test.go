@@ -410,7 +410,7 @@ func Test_memoryGrow(t *testing.T) {
 			Memory:        make([]byte, vmPageSize*2),
 			OperandStack:  NewVirtualMachineOperandStack(),
 			InnerModule: &Module{
-				SecMemory: []*MemoryType{{}},
+				MemorySection: []*MemoryType{{}},
 			},
 		}
 
@@ -426,7 +426,7 @@ func Test_memoryGrow(t *testing.T) {
 			Memory:        make([]byte, vmPageSize*2),
 			OperandStack:  NewVirtualMachineOperandStack(),
 			InnerModule: &Module{
-				SecMemory: []*MemoryType{{Max: uint32Ptr(0)}},
+				MemorySection: []*MemoryType{{Max: uint32Ptr(0)}},
 			},
 		}
 

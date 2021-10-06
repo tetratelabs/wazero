@@ -38,7 +38,7 @@ func Test_callIndirect(t *testing.T) {
 		},
 		Functions: []VirtualMachineFunction{nil, df},
 		InnerModule: &Module{
-			SecTypes: []*FunctionType{nil, {}},
+			TypeSection: []*FunctionType{nil, {}},
 			IndexSpace: &ModuleIndexSpace{
 				Table: [][]*uint32{{nil, uint32Ptr(1)}},
 			},

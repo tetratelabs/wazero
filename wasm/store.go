@@ -64,7 +64,7 @@ func NewStore() *Store {
 }
 
 func (s *Store) Instantiate(module *Module, name string) (*ModuleInstance, error) {
-	ret := &ModuleInstance{Types: module.SecTypes}
+	ret := &ModuleInstance{Types: module.TypeSection}
 	s.ModuleInstances[name] = ret
 
 	if err := s.resolveImports(module, ret); err != nil {
@@ -91,7 +91,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleInstance, error
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
-	for _, is := range module.SecImports {
+	for _, is := range module.ImportSection {
 		if err := s.resolveImport(target, is); err != nil {
 			return fmt.Errorf("%s: %w", is.Name, err)
 		}
@@ -173,7 +173,7 @@ func (s *Store) applyGlobalImport(target *ModuleInstance, externModuleExportIsnt
 }
 
 func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) error {
-	for _, gs := range module.SecGlobals {
+	for _, gs := range module.GlobalSection {
 		raw, err := s.executeConstExpression(target, gs.Init)
 		if err != nil {
 			return fmt.Errorf("execution failed: %w", err)
@@ -199,17 +199,17 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) err
 }
 
 func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) error {
-	for codeIndex, typeIndex := range module.SecFunctions {
-		if typeIndex >= uint32(len(module.SecTypes)) {
+	for codeIndex, typeIndex := range module.FunctionSection {
+		if typeIndex >= uint32(len(module.TypeSection)) {
 			return fmt.Errorf("function type index out of range")
-		} else if codeIndex >= len(module.SecCodes) {
+		} else if codeIndex >= len(module.CodeSection) {
 			return fmt.Errorf("code index out of range")
 		}
 
 		f := &NativeFunction{
-			Signature:      module.SecTypes[typeIndex],
-			Body:           module.SecCodes[codeIndex].Body,
-			NumLocal:       module.SecCodes[codeIndex].NumLocals,
+			Signature:      module.TypeSection[typeIndex],
+			Body:           module.CodeSection[codeIndex].Body,
+			NumLocal:       module.CodeSection[codeIndex].NumLocals,
 			ModuleInstance: target,
 		}
 
@@ -226,7 +226,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) e
 
 func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) error {
 	// Allocate memory instances.
-	for _, memSec := range module.SecMemory {
+	for _, memSec := range module.MemorySection {
 		memInst := &MemoryInstance{
 			Memory: make([]byte, uint64(memSec.Min)*PageSize),
 			Min:    memSec.Min,
@@ -237,7 +237,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) err
 	}
 
 	// Initialize the memory instance according to the Data section.
-	for _, d := range module.SecData {
+	for _, d := range module.DataSection {
 		if d.MemoryIndex >= uint32(len(target.MemoryAddrs)) {
 			return fmt.Errorf("index out of range of index space")
 		}
@@ -254,11 +254,11 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) err
 
 		size := uint64(offset) + uint64(len(d.Init))
 		max := uint64(math.MaxUint32)
-		if int(d.MemoryIndex) < len(module.SecMemory) && module.SecMemory[d.MemoryIndex].Max != nil {
-			max = uint64(*module.SecMemory[d.MemoryIndex].Max)
+		if int(d.MemoryIndex) < len(module.MemorySection) && module.MemorySection[d.MemoryIndex].Max != nil {
+			max = uint64(*module.MemorySection[d.MemoryIndex].Max)
 		}
 		if size > max*PageSize {
-			return fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.SecMemory[d.MemoryIndex].Max)))
+			return fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
 		}
 
 		memoryInst := s.Memories[target.MemoryAddrs[d.MemoryIndex]]
@@ -276,7 +276,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) err
 
 func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) error {
 	// Allocate table instances.
-	for _, tableSeg := range module.SecTables {
+	for _, tableSeg := range module.TableSection {
 		tableInst := &TableInstance{
 			Table:    make([]*uint32, tableSeg.Limit.Min),
 			Min:      tableSeg.Limit.Min,
@@ -288,7 +288,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) erro
 	}
 
 	// Initialize the table elements according to the Elements section.
-	for _, elem := range module.SecElements {
+	for _, elem := range module.ElementSection {
 		if elem.TableIndex >= uint32(len(target.TableAddrs)) {
 			return fmt.Errorf("index out of range of index space")
 		}
@@ -307,8 +307,8 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) erro
 		size := offset + len(elem.Init)
 
 		max := uint32(math.MaxUint32)
-		if int(elem.TableIndex) < len(module.SecTables) && module.SecTables[elem.TableIndex].Limit.Max != nil {
-			max = *module.SecTables[elem.TableIndex].Limit.Max
+		if int(elem.TableIndex) < len(module.TableSection) && module.TableSection[elem.TableIndex].Limit.Max != nil {
+			max = *module.TableSection[elem.TableIndex].Limit.Max
 		}
 
 		if size > int(max) {
@@ -335,8 +335,8 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) erro
 }
 
 func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) error {
-	target.Exports = make(map[string]*ExportInstance, len(module.SecExports))
-	for name, exp := range module.SecExports {
+	target.Exports = make(map[string]*ExportInstance, len(module.ExportSection))
+	for name, exp := range module.ExportSection {
 		var addr int
 		switch exp.Desc.Kind {
 		case ExportKindFunction:
@@ -374,7 +374,11 @@ func parseBlocks(module *Module, body []byte) (map[uint64]*NativeFunctionBlock, 
 			// offset
 			_, num, err = leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
 			if err != nil {
-				return nil, fmt.Errorf("read memory offset: %w", err)
+				var msg string
+				for i := 0; i < 5; i++ {
+					msg += fmt.Sprintf(", 0x%x", body[pc:][i])
+				}
+				return nil, fmt.Errorf("read memory offset: %w from: %s", err, msg[1:])
 			}
 			pc += num - 1
 			continue
@@ -490,10 +494,10 @@ func readBlockType(module *Module, r io.Reader) (*BlockType, uint64, error) {
 	case -4: // 0x7c in original byte = f64
 		ret = &BlockType{ReturnTypes: []ValueType{ValueTypeF64}}
 	default:
-		if raw < 0 || (raw >= int64(len(module.SecTypes))) {
+		if raw < 0 || (raw >= int64(len(module.TypeSection))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
 		}
-		ret = module.SecTypes[raw]
+		ret = module.TypeSection[raw]
 	}
 	return ret, num, nil
 }

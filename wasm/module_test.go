@@ -16,12 +16,12 @@ func TestModule_resolveImports(t *testing.T) {
 			externModules map[string]*Module
 		}{
 			{
-				module: &Module{SecImports: []*ImportSegment{
+				module: &Module{ImportSection: []*ImportSegment{
 					{Module: "a", Name: "b"},
 				}},
 			},
 			{
-				module: &Module{SecImports: []*ImportSegment{
+				module: &Module{ImportSection: []*ImportSegment{
 					{Module: "a", Name: "b"},
 				}},
 				externModules: map[string]*Module{
@@ -29,11 +29,11 @@ func TestModule_resolveImports(t *testing.T) {
 				},
 			},
 			{
-				module: &Module{SecImports: []*ImportSegment{
+				module: &Module{ImportSection: []*ImportSegment{
 					{Module: "a", Name: "b", Desc: &ImportDesc{}},
 				}},
 				externModules: map[string]*Module{
-					"a": {SecExports: map[string]*ExportSegment{
+					"a": {ExportSection: map[string]*ExportSegment{
 						"b": {
 							Name: "a",
 							Desc: &ExportDesc{Kind: 1},
@@ -50,14 +50,14 @@ func TestModule_resolveImports(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		m := &Module{
-			SecImports: []*ImportSegment{
+			ImportSection: []*ImportSegment{
 				{Module: "a", Name: "b", Desc: &ImportDesc{Kind: 0x03}},
 			},
 			IndexSpace: new(ModuleIndexSpace),
 		}
 		ems := map[string]*Module{
 			"a": {
-				SecExports: map[string]*ExportSegment{
+				ExportSection: map[string]*ExportSegment{
 					"b": {
 						Name: "a",
 						Desc: &ExportDesc{Kind: 0x03},
@@ -81,8 +81,8 @@ func TestModule_resolveImports(t *testing.T) {
 func TestModule_applyFunctionImport(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		m := Module{
-			SecTypes:   []*FunctionType{{ReturnTypes: []ValueType{ValueTypeF64}}},
-			IndexSpace: new(ModuleIndexSpace),
+			TypeSection: []*FunctionType{{ReturnTypes: []ValueType{ValueTypeF64}}},
+			IndexSpace:  new(ModuleIndexSpace),
 		}
 		is := &ImportSegment{Desc: &ImportDesc{TypeIndexPtr: uint32Ptr(0)}}
 		em := &Module{IndexSpace: &ModuleIndexSpace{Function: []VirtualMachineFunction{
@@ -113,19 +113,19 @@ func TestModule_applyFunctionImport(t *testing.T) {
 				exportedSegment: &ExportSegment{Desc: &ExportDesc{}},
 			},
 			{
-				module:          Module{SecTypes: []*FunctionType{{InputTypes: []ValueType{ValueTypeF64}}}},
+				module:          Module{TypeSection: []*FunctionType{{InputTypes: []ValueType{ValueTypeF64}}}},
 				importSegment:   &ImportSegment{Desc: &ImportDesc{TypeIndexPtr: uint32Ptr(0)}},
 				exportedModule:  &Module{IndexSpace: &ModuleIndexSpace{Function: []VirtualMachineFunction{&NativeFunction{Signature: &FunctionType{}}}}},
 				exportedSegment: &ExportSegment{Desc: &ExportDesc{}},
 			},
 			{
-				module:          Module{SecTypes: []*FunctionType{{ReturnTypes: []ValueType{ValueTypeF64}}}},
+				module:          Module{TypeSection: []*FunctionType{{ReturnTypes: []ValueType{ValueTypeF64}}}},
 				importSegment:   &ImportSegment{Desc: &ImportDesc{TypeIndexPtr: uint32Ptr(0)}},
 				exportedModule:  &Module{IndexSpace: &ModuleIndexSpace{Function: []VirtualMachineFunction{&NativeFunction{Signature: &FunctionType{}}}}},
 				exportedSegment: &ExportSegment{Desc: &ExportDesc{}},
 			},
 			{
-				module:        Module{SecTypes: []*FunctionType{{}}},
+				module:        Module{TypeSection: []*FunctionType{{}}},
 				importSegment: &ImportSegment{Desc: &ImportDesc{TypeIndexPtr: uint32Ptr(0)}},
 				exportedModule: &Module{IndexSpace: &ModuleIndexSpace{Function: []VirtualMachineFunction{&NativeFunction{
 					Signature: &FunctionType{InputTypes: []ValueType{ValueTypeF64}}}},
@@ -133,7 +133,7 @@ func TestModule_applyFunctionImport(t *testing.T) {
 				exportedSegment: &ExportSegment{Desc: &ExportDesc{}},
 			},
 			{
-				module:        Module{SecTypes: []*FunctionType{{}}},
+				module:        Module{TypeSection: []*FunctionType{{}}},
 				importSegment: &ImportSegment{Desc: &ImportDesc{TypeIndexPtr: uint32Ptr(0)}},
 				exportedModule: &Module{IndexSpace: &ModuleIndexSpace{Function: []VirtualMachineFunction{&NativeFunction{
 					Signature: &FunctionType{ReturnTypes: []ValueType{ValueTypeF64}}}},
@@ -159,8 +159,8 @@ func TestModule_applyTableImport(t *testing.T) {
 
 		var exp uint32 = 10
 		em := &Module{
-			IndexSpace: &ModuleIndexSpace{Table: [][]*uint32{{&exp}}},
-			SecTables:  []*TableType{{}},
+			IndexSpace:   &ModuleIndexSpace{Table: [][]*uint32{{&exp}}},
+			TableSection: []*TableType{{}},
 		}
 		m := &Module{IndexSpace: new(ModuleIndexSpace)}
 		err := m.applyTableImport(em, es)
@@ -180,8 +180,8 @@ func TestModule_applyMemoryImport(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		es := &ExportSegment{Desc: &ExportDesc{}}
 		em := &Module{
-			IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{0x01}}},
-			SecMemory:  []*MemoryType{{}},
+			IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{0x01}}},
+			MemorySection: []*MemoryType{{}},
 		}
 		m := &Module{IndexSpace: new(ModuleIndexSpace)}
 		err := m.applyMemoryImport(em, es)
@@ -205,7 +205,7 @@ func TestModule_applyGlobalImport(t *testing.T) {
 }
 
 func TestModule_buildGlobalIndexSpace(t *testing.T) {
-	m := &Module{SecGlobals: []*GlobalSegment{{Type: nil, Init: &ConstantExpression{
+	m := &Module{GlobalSection: []*GlobalSegment{{Type: nil, Init: &ConstantExpression{
 		OptCode: OptCodeI64Const,
 		Data:    []byte{0x01},
 	}}}, IndexSpace: new(ModuleIndexSpace)}
@@ -216,18 +216,18 @@ func TestModule_buildGlobalIndexSpace(t *testing.T) {
 func TestModule_buildFunctionIndexSpace(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		for _, m := range []*Module{
-			{SecFunctions: []uint32{1000}, IndexSpace: new(ModuleIndexSpace)},
-			{SecFunctions: []uint32{0}, SecTypes: []*FunctionType{{}}, IndexSpace: new(ModuleIndexSpace)},
+			{FunctionSection: []uint32{1000}, IndexSpace: new(ModuleIndexSpace)},
+			{FunctionSection: []uint32{0}, TypeSection: []*FunctionType{{}}, IndexSpace: new(ModuleIndexSpace)},
 		} {
 			assert.Error(t, m.buildFunctionIndexSpace())
 		}
 	})
 	t.Run("ok", func(t *testing.T) {
 		m := &Module{
-			SecTypes:     []*FunctionType{{ReturnTypes: []ValueType{ValueTypeF32}}},
-			SecFunctions: []uint32{0},
-			SecCodes:     []*CodeSegment{{Body: []byte{0x01}}},
-			IndexSpace:   new(ModuleIndexSpace),
+			TypeSection:     []*FunctionType{{ReturnTypes: []ValueType{ValueTypeF32}}},
+			FunctionSection: []uint32{0},
+			CodeSection:     []*CodeSegment{{Body: []byte{0x01}}},
+			IndexSpace:      new(ModuleIndexSpace),
 		}
 		assert.NoError(t, m.buildFunctionIndexSpace())
 		f := m.IndexSpace.Function[0].(*NativeFunction)
@@ -239,18 +239,18 @@ func TestModule_buildFunctionIndexSpace(t *testing.T) {
 func TestModule_buildMemoryIndexSpace(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		for _, m := range []*Module{
-			{SecData: []*DataSegment{{MemoryIndex: 1}}, IndexSpace: new(ModuleIndexSpace)},
-			{SecData: []*DataSegment{{MemoryIndex: 0}}, IndexSpace: &ModuleIndexSpace{
+			{DataSection: []*DataSegment{{MemoryIndex: 1}}, IndexSpace: new(ModuleIndexSpace)},
+			{DataSection: []*DataSegment{{MemoryIndex: 0}}, IndexSpace: &ModuleIndexSpace{
 				Memory: [][]byte{{}},
 			}},
 
 			{
-				SecData:    []*DataSegment{{OffsetExpression: &ConstantExpression{}}},
-				SecMemory:  []*MemoryType{{}},
-				IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{}}},
+				DataSection:   []*DataSegment{{OffsetExpression: &ConstantExpression{}}},
+				MemorySection: []*MemoryType{{}},
+				IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{}}},
 			},
 			{
-				SecData: []*DataSegment{
+				DataSection: []*DataSegment{
 					{
 						OffsetExpression: &ConstantExpression{
 							OptCode: OptCodeI32Const, Data: []byte{0x01},
@@ -258,8 +258,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 						Init: []byte{0x01, 0x02},
 					},
 				},
-				SecMemory:  []*MemoryType{{Max: uint32Ptr(0)}},
-				IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{}}},
+				MemorySection: []*MemoryType{{Max: uint32Ptr(0)}},
+				IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{}}},
 			},
 		} {
 			err := m.buildMemoryIndexSpace()
@@ -275,7 +275,7 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 		}{
 			{
 				m: &Module{
-					SecData: []*DataSegment{
+					DataSection: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
 								OptCode: OptCodeI32Const,
@@ -284,14 +284,14 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 							Init: []byte{0x01, 0x01},
 						},
 					},
-					SecMemory:  []*MemoryType{{}},
-					IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{}}},
+					MemorySection: []*MemoryType{{}},
+					IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{}}},
 				},
 				exp: [][]byte{{0x01, 0x01}},
 			},
 			{
 				m: &Module{
-					SecData: []*DataSegment{
+					DataSection: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
 								OptCode: OptCodeI32Const,
@@ -300,14 +300,14 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 							Init: []byte{0x01, 0x01},
 						},
 					},
-					SecMemory:  []*MemoryType{{}},
-					IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00}}},
+					MemorySection: []*MemoryType{{}},
+					IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00}}},
 				},
 				exp: [][]byte{{0x01, 0x01, 0x00}},
 			},
 			{
 				m: &Module{
-					SecData: []*DataSegment{
+					DataSection: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
 								OptCode: OptCodeI32Const,
@@ -316,14 +316,14 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 							Init: []byte{0x01, 0x01},
 						},
 					},
-					SecMemory:  []*MemoryType{{}},
-					IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00}}},
+					MemorySection: []*MemoryType{{}},
+					IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00}}},
 				},
 				exp: [][]byte{{0x00, 0x01, 0x01}},
 			},
 			{
 				m: &Module{
-					SecData: []*DataSegment{
+					DataSection: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
 								OptCode: OptCodeI32Const,
@@ -332,14 +332,14 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 							Init: []byte{0x01, 0x01},
 						},
 					},
-					SecMemory:  []*MemoryType{{}},
-					IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00}}},
+					MemorySection: []*MemoryType{{}},
+					IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00}}},
 				},
 				exp: [][]byte{{0x00, 0x00, 0x01, 0x01}},
 			},
 			{
 				m: &Module{
-					SecData: []*DataSegment{
+					DataSection: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
 								OptCode: OptCodeI32Const,
@@ -348,14 +348,14 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 							Init: []byte{0x01, 0x01},
 						},
 					},
-					SecMemory:  []*MemoryType{{}},
-					IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00, 0x00}}},
+					MemorySection: []*MemoryType{{}},
+					IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{0x00, 0x00, 0x00, 0x00}}},
 				},
 				exp: [][]byte{{0x00, 0x01, 0x01, 0x00}},
 			},
 			{
 				m: &Module{
-					SecData: []*DataSegment{
+					DataSection: []*DataSegment{
 						{
 							OffsetExpression: &ConstantExpression{
 								OptCode: OptCodeI32Const,
@@ -365,8 +365,8 @@ func TestModule_buildMemoryIndexSpace(t *testing.T) {
 							MemoryIndex: 1,
 						},
 					},
-					SecMemory:  []*MemoryType{{}, {}},
-					IndexSpace: &ModuleIndexSpace{Memory: [][]byte{{}, {0x00, 0x00, 0x00, 0x00}}},
+					MemorySection: []*MemoryType{{}, {}},
+					IndexSpace:    &ModuleIndexSpace{Memory: [][]byte{{}, {0x00, 0x00, 0x00, 0x00}}},
 				},
 				exp: [][]byte{{}, {0x00, 0x01, 0x01, 0x00}},
 			},
@@ -381,20 +381,20 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		for _, m := range []*Module{
 			{
-				SecElements: []*ElementSegment{{TableIndex: 10}},
-				IndexSpace:  new(ModuleIndexSpace),
+				ElementSection: []*ElementSegment{{TableIndex: 10}},
+				IndexSpace:     new(ModuleIndexSpace),
 			},
 			{
-				SecElements: []*ElementSegment{{TableIndex: 0}},
-				IndexSpace:  &ModuleIndexSpace{Table: [][]*uint32{{}}},
+				ElementSection: []*ElementSegment{{TableIndex: 0}},
+				IndexSpace:     &ModuleIndexSpace{Table: [][]*uint32{{}}},
 			},
 			{
-				SecElements: []*ElementSegment{{TableIndex: 0, OffsetExpr: &ConstantExpression{}}},
-				SecTables:   []*TableType{{}},
-				IndexSpace:  &ModuleIndexSpace{Table: [][]*uint32{{}}},
+				ElementSection: []*ElementSegment{{TableIndex: 0, OffsetExpr: &ConstantExpression{}}},
+				TableSection:   []*TableType{{}},
+				IndexSpace:     &ModuleIndexSpace{Table: [][]*uint32{{}}},
 			},
 			{
-				SecElements: []*ElementSegment{{
+				ElementSection: []*ElementSegment{{
 					TableIndex: 0,
 					OffsetExpr: &ConstantExpression{
 						OptCode: OptCodeI32Const,
@@ -402,7 +402,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 					},
 					Init: []uint32{0x0, 0x0},
 				}},
-				SecTables: []*TableType{{Limit: &LimitsType{
+				TableSection: []*TableType{{Limit: &LimitsType{
 					Max: uint32Ptr(1),
 				}}},
 				IndexSpace: &ModuleIndexSpace{Table: [][]*uint32{{}}},
@@ -421,7 +421,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 		}{
 			{
 				m: &Module{
-					SecElements: []*ElementSegment{{
+					ElementSection: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
 							OptCode: OptCodeI32Const,
@@ -429,14 +429,14 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 						},
 						Init: []uint32{0x1, 0x1},
 					}},
-					SecTables:  []*TableType{{Limit: &LimitsType{}}},
-					IndexSpace: &ModuleIndexSpace{Table: [][]*uint32{{}}},
+					TableSection: []*TableType{{Limit: &LimitsType{}}},
+					IndexSpace:   &ModuleIndexSpace{Table: [][]*uint32{{}}},
 				},
 				exp: [][]*uint32{{uint32Ptr(0x01), uint32Ptr(0x01)}},
 			},
 			{
 				m: &Module{
-					SecElements: []*ElementSegment{{
+					ElementSection: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
 							OptCode: OptCodeI32Const,
@@ -444,7 +444,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 						},
 						Init: []uint32{0x1, 0x1},
 					}},
-					SecTables: []*TableType{{Limit: &LimitsType{}}},
+					TableSection: []*TableType{{Limit: &LimitsType{}}},
 					IndexSpace: &ModuleIndexSpace{
 						Table: [][]*uint32{{uint32Ptr(0x0), uint32Ptr(0x0)}},
 					},
@@ -453,7 +453,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 			},
 			{
 				m: &Module{
-					SecElements: []*ElementSegment{{
+					ElementSection: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
 							OptCode: OptCodeI32Const,
@@ -461,7 +461,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 						},
 						Init: []uint32{0x1, 0x1},
 					}},
-					SecTables: []*TableType{{Limit: &LimitsType{}}},
+					TableSection: []*TableType{{Limit: &LimitsType{}}},
 					IndexSpace: &ModuleIndexSpace{
 						Table: [][]*uint32{{nil, uint32Ptr(0x0), uint32Ptr(0x0)}},
 					},
@@ -470,7 +470,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 			},
 			{
 				m: &Module{
-					SecElements: []*ElementSegment{{
+					ElementSection: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
 							OptCode: OptCodeI32Const,
@@ -478,7 +478,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 						},
 						Init: []uint32{0x1},
 					}},
-					SecTables: []*TableType{{Limit: &LimitsType{}}},
+					TableSection: []*TableType{{Limit: &LimitsType{}}},
 					IndexSpace: &ModuleIndexSpace{
 						Table: [][]*uint32{{nil, nil, nil}},
 					},
@@ -487,7 +487,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 			},
 			{
 				m: &Module{
-					SecElements: []*ElementSegment{{
+					ElementSection: []*ElementSegment{{
 						TableIndex: 0,
 						OffsetExpr: &ConstantExpression{
 							OptCode: OptCodeI32Const,
@@ -495,7 +495,7 @@ func TestModule_buildTableIndexSpace(t *testing.T) {
 						},
 						Init: []uint32{0x1, 0x2},
 					}},
-					SecTables: []*TableType{{Limit: &LimitsType{}}},
+					TableSection: []*TableType{{Limit: &LimitsType{}}},
 					IndexSpace: &ModuleIndexSpace{
 						Table: [][]*uint32{{}},
 					},
@@ -536,7 +536,7 @@ func TestModule_readBlockType(t *testing.T) {
 		assert.Equal(t, uint64(1), num)
 		assert.Equal(t, c.exp, actual)
 	}
-	m := &Module{SecTypes: []*FunctionType{{}, {InputTypes: []ValueType{ValueTypeI32}}}}
+	m := &Module{TypeSection: []*FunctionType{{}, {InputTypes: []ValueType{ValueTypeI32}}}}
 	actual, num, err := m.readBlockType(bytes.NewBuffer([]byte{0x01}))
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), num)
@@ -544,7 +544,7 @@ func TestModule_readBlockType(t *testing.T) {
 }
 
 func TestModule_parseBlocks(t *testing.T) {
-	m := &Module{SecTypes: []*FunctionType{{}, {}}}
+	m := &Module{TypeSection: []*FunctionType{{}, {}}}
 	for i, c := range []struct {
 		body []byte
 		exp  map[uint64]*NativeFunctionBlock

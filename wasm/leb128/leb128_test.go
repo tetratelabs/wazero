@@ -10,37 +10,50 @@ import (
 
 func TestDecodeUint32(t *testing.T) {
 	for _, c := range []struct {
-		bytes []byte
-		exp   uint32
+		bytes  []byte
+		exp    uint32
+		expErr bool
 	}{
+		{bytes: []byte{0x00}, exp: 0},
 		{bytes: []byte{0x04}, exp: 4},
+		{bytes: []byte{0x01}, exp: 1},
 		{bytes: []byte{0x80, 0x7f}, exp: 16256},
 		{bytes: []byte{0xe5, 0x8e, 0x26}, exp: 624485},
 		{bytes: []byte{0x80, 0x80, 0x80, 0x4f}, exp: 165675008},
-		{bytes: []byte{0x89, 0x80, 0x80, 0x80, 0x01}, exp: 268435465},
+		{bytes: []byte{0x83, 0x80, 0x80, 0x80, 0x80, 0x00}, expErr: true},
+		{bytes: []byte{0x82, 0x80, 0x80, 0x80, 0x70}, expErr: true},
 	} {
 		actual, num, err := DecodeUint32(bytes.NewReader(c.bytes))
-		require.NoError(t, err)
-		assert.Equal(t, c.exp, actual)
-		assert.Equal(t, uint64(len(c.bytes)), num)
+		if c.expErr {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			assert.Equal(t, c.exp, actual)
+			assert.Equal(t, uint64(len(c.bytes)), num)
+		}
 	}
 }
 
 func TestDecodeUint64(t *testing.T) {
 	for _, c := range []struct {
-		bytes []byte
-		exp   uint64
+		bytes  []byte
+		exp    uint64
+		expErr bool
 	}{
 		{bytes: []byte{0x04}, exp: 4},
 		{bytes: []byte{0x80, 0x7f}, exp: 16256},
 		{bytes: []byte{0xe5, 0x8e, 0x26}, exp: 624485},
 		{bytes: []byte{0x80, 0x80, 0x80, 0x4f}, exp: 165675008},
-		{bytes: []byte{0x89, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01}, exp: 9223372036854775817},
+		{bytes: []byte{0x89, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01}, expErr: true},
 	} {
 		actual, num, err := DecodeUint64(bytes.NewReader(c.bytes))
-		require.NoError(t, err)
-		assert.Equal(t, c.exp, actual)
-		assert.Equal(t, uint64(len(c.bytes)), num)
+		if c.expErr {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			assert.Equal(t, c.exp, actual)
+			assert.Equal(t, uint64(len(c.bytes)), num)
+		}
 	}
 }
 

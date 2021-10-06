@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -14,28 +15,45 @@ var (
 	ErrInvalidVersion     = errors.New("invalid version header")
 )
 
+type Reader struct {
+	binary []byte
+	read   int
+	buffer *bytes.Buffer
+}
+
+func (r *Reader) Read(p []byte) (n int, err error) {
+	n, err = r.buffer.Read(p)
+	r.read += n
+	return
+}
+
+var _ io.Reader = &Reader{}
+
 type (
 	// Static binary representations.
 	Module struct {
-		SecTypes     []*FunctionType
-		SecImports   []*ImportSegment
-		SecFunctions []uint32
-		SecTables    []*TableType
-		SecMemory    []*MemoryType
-		SecGlobals   []*GlobalSegment
-		SecExports   map[string]*ExportSegment
-		SecStart     *uint32
-		SecElements  []*ElementSegment
-		SecCodes     []*CodeSegment
-		SecData      []*DataSegment
+		TypeSection     []*FunctionType
+		ImportSection   []*ImportSegment
+		FunctionSection []uint32
+		TableSection    []*TableType
+		MemorySection   []*MemoryType
+		GlobalSection   []*GlobalSegment
+		ExportSection   map[string]*ExportSegment
+		StartSection    *uint32
+		ElementSection  []*ElementSegment
+		CodeSection     []*CodeSegment
+		DataSection     []*DataSegment
+		CustomSections  map[string][]byte
 	}
 )
 
 // DecodeModule decodes a `raw` module from io.Reader whose index spaces are yet to be initialized
-func DecodeModule(r io.Reader) (*Module, error) {
+func DecodeModule(binary []byte) (*Module, error) {
+	reader := &Reader{binary: binary, buffer: bytes.NewBuffer(binary)}
+
 	// Magic number.
 	buf := make([]byte, 4)
-	if n, err := io.ReadFull(r, buf); err != nil || n != 4 {
+	if n, err := io.ReadFull(reader, buf); err != nil || n != 4 {
 		return nil, ErrInvalidMagicNumber
 	}
 	for i := 0; i < 4; i++ {
@@ -45,8 +63,8 @@ func DecodeModule(r io.Reader) (*Module, error) {
 	}
 
 	// Version.
-	if n, err := io.ReadFull(r, buf); err != nil || n != 4 {
-		panic(err)
+	if n, err := io.ReadFull(reader, buf); err != nil || n != 4 {
+		return nil, ErrInvalidVersion
 	}
 	for i := 0; i < 4; i++ {
 		if buf[i] != version[i] {
@@ -54,8 +72,8 @@ func DecodeModule(r io.Reader) (*Module, error) {
 		}
 	}
 
-	ret := &Module{}
-	if err := ret.readSections(r); err != nil {
+	ret := &Module{CustomSections: map[string][]byte{}}
+	if err := ret.readSections(reader); err != nil {
 		return nil, fmt.Errorf("readSections failed: %w", err)
 	}
 

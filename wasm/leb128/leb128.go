@@ -22,6 +22,9 @@ func DecodeUint32(r io.Reader) (ret uint32, num uint64, err error) {
 			break
 		}
 	}
+	if num > 5 {
+		return 0, 0, fmt.Errorf("invalid number of bytes")
+	}
 	return
 }
 
@@ -40,6 +43,9 @@ func DecodeUint64(r io.Reader) (ret uint64, num uint64, err error) {
 		if b&uint64Mask == 0 {
 			break
 		}
+	}
+	if num > 10 {
+		return 0, 0, fmt.Errorf("invalid number of bytes")
 	}
 	return
 }
@@ -65,7 +71,9 @@ func DecodeInt32(r io.Reader) (ret int32, num uint64, err error) {
 			break
 		}
 	}
-
+	if num > 5 {
+		return 0, 0, fmt.Errorf("invalid number of bytes")
+	}
 	if shift < 32 && (b&int32Mask3) == int32Mask3 {
 		ret |= int32Mask4 << shift
 	}
@@ -130,7 +138,9 @@ func DecodeInt64(r io.Reader) (ret int64, num uint64, err error) {
 			break
 		}
 	}
-
+	if num > 10 {
+		return 0, 0, fmt.Errorf("invalid number of bytes")
+	}
 	if shift < 64 && (b&int64Mask3) == int64Mask3 {
 		ret |= int64Mask4 << shift
 	}

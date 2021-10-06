@@ -47,8 +47,8 @@ func (vm *VirtualMachine) Instantiate(module *Module, name string) (errRet error
 		}
 	}()
 
-	if module.SecStart != nil {
-		vm.Store.Functions[inst.FunctionAddrs[*module.SecStart]].Call(vm)
+	if module.StartSection != nil {
+		vm.Store.Functions[inst.FunctionAddrs[*module.StartSection]].Call(vm)
 	}
 	return nil
 }
