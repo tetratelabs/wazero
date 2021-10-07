@@ -1,7 +1,7 @@
 package examples
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +11,7 @@ import (
 )
 
 func Test_fibonacci(t *testing.T) {
-	buf, err := ioutil.ReadFile("wasm/fibonacci.wasm")
+	buf, err := os.ReadFile("wasm/fibonacci.wasm")
 	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule(buf)

@@ -2,7 +2,7 @@ package examples
 
 import (
 	"bytes"
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,7 +13,7 @@ import (
 )
 
 func Test_stdio(t *testing.T) {
-	buf, err := ioutil.ReadFile("wasm/stdio.wasm")
+	buf, err := os.ReadFile("wasm/stdio.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)

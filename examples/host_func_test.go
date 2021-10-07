@@ -1,7 +1,7 @@
 package examples
 
 import (
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func Test_hostFunc(t *testing.T) {
-	buf, err := ioutil.ReadFile("wasm/host_func.wasm")
+	buf, err := os.ReadFile("wasm/host_func.wasm")
 	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule((buf))

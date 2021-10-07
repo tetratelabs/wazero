@@ -3,7 +3,7 @@ package examples
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,7 +41,7 @@ func readFile(fs wasi.FS, path string) ([]byte, error) {
 }
 
 func Test_file_system(t *testing.T) {
-	buf, err := ioutil.ReadFile("wasm/file_system.wasm")
+	buf, err := os.ReadFile("wasm/file_system.wasm")
 	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule(buf)
