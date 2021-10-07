@@ -89,7 +89,7 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("read value: vw", err)
+		return nil, fmt.Errorf("read value: %v", err)
 	}
 
 	if _, err := io.ReadFull(r, b); err != nil {

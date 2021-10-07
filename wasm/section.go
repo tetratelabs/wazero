@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"unicode/utf8"
 
 	"github.com/mathetake/gasm/wasm/leb128"
 )
@@ -96,6 +97,9 @@ func (m *Module) readSectionCustom(r *Reader, sectionSize int) error {
 	_, err = io.ReadFull(r, nameBuf)
 	if err != nil {
 		return fmt.Errorf("cannot read custom section name")
+	}
+	if !utf8.Valid(nameBuf) {
+		return fmt.Errorf("custom section name must be valid utf8")
 	}
 	contentLen := int(sectionSize) - int(nameLenBytes) - int(nameLen)
 	if contentLen < 0 {

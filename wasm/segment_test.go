@@ -50,7 +50,7 @@ func TestReadImportDesc(t *testing.T) {
 			bytes: []byte{0x03, 0x7e, 0x01},
 			exp: &ImportDesc{
 				Kind:          3,
-				GlobalTypePtr: &GlobalType{Value: ValueTypeI64, Mutable: true},
+				GlobalTypePtr: &GlobalType{ValType: ValueTypeI64, Mutable: true},
 			},
 		},
 	} {
@@ -83,7 +83,7 @@ func TestReadImportSegment(t *testing.T) {
 
 func TestReadGlobalSegment(t *testing.T) {
 	exp := &GlobalSegment{
-		Type: &GlobalType{Value: ValueTypeI64, Mutable: false},
+		Type: &GlobalType{ValType: ValueTypeI64, Mutable: false},
 		Init: &ConstantExpression{
 			OptCode: OptCodeI64Const,
 			Data:    []byte{0x01},

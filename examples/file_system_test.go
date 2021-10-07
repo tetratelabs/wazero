@@ -44,17 +44,25 @@ func Test_file_system(t *testing.T) {
 	buf, err := ioutil.ReadFile("wasm/file_system.wasm")
 	require.NoError(t, err)
 
-	mod, err := wasm.DecodeModule(bytes.NewBuffer(buf))
+	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)
 
 	memFS := wasi.MemFS()
 	err = writeFile(memFS, "input.txt", []byte("Hello, file system!"))
 	require.NoError(t, err)
 
-	vm, err := wasm.NewVM(mod, wasi.New(wasi.Preopen(".", memFS)).Modules())
+	wasiEnv := wasi.NewEnvironment(wasi.Preopen(".", memFS))
+
+	vm, err := wasm.NewVM()
 	require.NoError(t, err)
 
-	_, _, err = vm.ExecExportedFunction("_start")
+	err = wasiEnv.RegisterToVirtualMachine(vm)
+	require.NoError(t, err)
+
+	err = vm.InstantiateModule(mod, "test")
+	require.NoError(t, err)
+
+	_, _, err = vm.ExecExportedFunction("test", "_start")
 	require.NoError(t, err)
 
 	out, err := readFile(memFS, "output.txt")

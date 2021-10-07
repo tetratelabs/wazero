@@ -35,7 +35,7 @@ func NewVM() (*VirtualMachine, error) {
 	}, nil
 }
 
-func (vm *VirtualMachine) Instantiate(module *Module, name string) (errRet error) {
+func (vm *VirtualMachine) InstantiateModule(module *Module, name string) (errRet error) {
 	inst, err := vm.Store.Instantiate(module, name)
 	if err != nil {
 		return err

@@ -139,15 +139,22 @@ func (v commandActionVal) ToUint64(t *testing.T) uint64 {
 	}
 }
 
-func addSpectestModule(vm *wasm.VirtualMachine) {
+func requireAddSpectestModule(t *testing.T, vm *wasm.VirtualMachine) {
 	// Add functions
-	vm.AddHostFunction("spectest", "print", reflect.ValueOf(func(*wasm.VirtualMachine) {}))
-	vm.AddHostFunction("spectest", "print_i32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32) {}))
-	vm.AddHostFunction("spectest", "print_f32", reflect.ValueOf(func(*wasm.VirtualMachine, float32) {}))
-	vm.AddHostFunction("spectest", "print_i64", reflect.ValueOf(func(*wasm.VirtualMachine, uint64) {}))
-	vm.AddHostFunction("spectest", "print_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64) {}))
-	vm.AddHostFunction("spectest", "print_i32_f32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32, float32) {}))
-	vm.AddHostFunction("spectest", "print_f64_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64, float64) {}))
+	err := vm.AddHostFunction("spectest", "print", reflect.ValueOf(func(*wasm.VirtualMachine) {}))
+	require.NoError(t, err)
+	err = vm.AddHostFunction("spectest", "print_i32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32) {}))
+	require.NoError(t, err)
+	err = vm.AddHostFunction("spectest", "print_f32", reflect.ValueOf(func(*wasm.VirtualMachine, float32) {}))
+	require.NoError(t, err)
+	err = vm.AddHostFunction("spectest", "print_i64", reflect.ValueOf(func(*wasm.VirtualMachine, uint64) {}))
+	require.NoError(t, err)
+	err = vm.AddHostFunction("spectest", "print_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64) {}))
+	require.NoError(t, err)
+	err = vm.AddHostFunction("spectest", "print_i32_f32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32, float32) {}))
+	require.NoError(t, err)
+	err = vm.AddHostFunction("spectest", "print_f64_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64, float64) {}))
+	require.NoError(t, err)
 	// Register globals.
 	for _, g := range []struct {
 		name      string
@@ -159,14 +166,17 @@ func addSpectestModule(vm *wasm.VirtualMachine) {
 		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
 		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
 	} {
-		vm.AddGlobal("spectest", g.name, g.value, g.valueType, false)
+		err = vm.AddGlobal("spectest", g.name, g.value, g.valueType, false)
+		require.NoError(t, err)
 	}
 	// Register table export.
 	tableLimitMax := uint32(20)
-	vm.AddTableInstance("spectest", "table", 0, &tableLimitMax)
+	err = vm.AddTableInstance("spectest", "table", 0, &tableLimitMax)
+	require.NoError(t, err)
 	// Register table export.
 	memoryLimitMax := uint32(2)
-	vm.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax)
+	err = vm.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax)
+	require.NoError(t, err)
 }
 
 func TestSpecification(t *testing.T) {
@@ -189,7 +199,7 @@ func TestSpecification(t *testing.T) {
 		t.Run(wastName, func(t *testing.T) {
 			vm, err := wasm.NewVM()
 			require.NoError(t, err)
-			addSpectestModule(vm)
+			requireAddSpectestModule(t, vm)
 
 			var lastInstanceName string
 			for _, c := range base.Commands {
@@ -208,7 +218,7 @@ func TestSpecification(t *testing.T) {
 						if lastInstanceName == "" {
 							lastInstanceName = c.Filename
 						}
-						err = vm.Instantiate(mod, lastInstanceName)
+						err = vm.InstantiateModule(mod, lastInstanceName)
 						require.NoError(t, err)
 					case "register":
 						name := lastInstanceName
@@ -253,7 +263,7 @@ func TestSpecification(t *testing.T) {
 
 						mod, err := wasm.DecodeModule(buf)
 						if err == nil {
-							err = vm.Instantiate(mod, "")
+							err = vm.InstantiateModule(mod, "")
 						}
 						require.Error(t, err, msg)
 					case "assert_trap":
@@ -271,7 +281,7 @@ func TestSpecification(t *testing.T) {
 						mod, err := wasm.DecodeModule(buf)
 						require.NoError(t, err, msg)
 
-						err = vm.Instantiate(mod, "")
+						err = vm.InstantiateModule(mod, "")
 						require.Error(t, err, msg)
 					default:
 						t.Fatalf("unsupported command type: %s", c)
