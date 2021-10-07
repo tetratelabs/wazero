@@ -1,0 +1,7 @@
+{"source_filename": "./type.wast",
+ "commands": [
+  {"type": "module", "line": 3, "filename": "type.0.wasm"}, 
+  {"type": "assert_malformed", "line": 44, "filename": "type.1.wat", "text": "result before parameter", "module_type": "text"}, 
+  {"type": "assert_malformed", "line": 48, "filename": "type.2.wat", "text": "unexpected token", "module_type": "text"}, 
+  {"type": "assert_invalid", "line": 53, "filename": "type.3.wasm", "text": "invalid result arity", "module_type": "binary"}, 
+  {"type": "assert_invalid", "line": 57, "filename": "type.4.wasm", "text": "invalid result arity", "module_type": "binary"}]}

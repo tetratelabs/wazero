@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 
 	"github.com/mathetake/gasm/wasm/leb128"
 )
@@ -20,14 +21,14 @@ type ImportDesc struct {
 func readImportDesc(r io.Reader) (*ImportDesc, error) {
 	b := make([]byte, 1)
 	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("read value kind: %w", err)
+		return nil, fmt.Errorf("read value kind: %v", err)
 	}
 
 	switch b[0] {
 	case 0x00:
 		tID, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read typeindex: %w", err)
+			return nil, fmt.Errorf("read typeindex: %v", err)
 		}
 		return &ImportDesc{
 			Kind:         0x00,
@@ -36,7 +37,7 @@ func readImportDesc(r io.Reader) (*ImportDesc, error) {
 	case 0x01:
 		tt, err := readTableType(r)
 		if err != nil {
-			return nil, fmt.Errorf("read table type: %w", err)
+			return nil, fmt.Errorf("read table type: %v", err)
 		}
 		return &ImportDesc{
 			Kind:         0x01,
@@ -45,7 +46,7 @@ func readImportDesc(r io.Reader) (*ImportDesc, error) {
 	case 0x02:
 		mt, err := readMemoryType(r)
 		if err != nil {
-			return nil, fmt.Errorf("read table type: %w", err)
+			return nil, fmt.Errorf("read table type: %v", err)
 		}
 		return &ImportDesc{
 			Kind:       0x02,
@@ -54,7 +55,7 @@ func readImportDesc(r io.Reader) (*ImportDesc, error) {
 	case 0x03:
 		gt, err := readGlobalType(r)
 		if err != nil {
-			return nil, fmt.Errorf("read global type: %w", err)
+			return nil, fmt.Errorf("read global type: %v", err)
 		}
 
 		return &ImportDesc{
@@ -74,17 +75,17 @@ type ImportSegment struct {
 func readImportSegment(r io.Reader) (*ImportSegment, error) {
 	mn, err := readNameValue(r)
 	if err != nil {
-		return nil, fmt.Errorf("read name of imported module: %w", err)
+		return nil, fmt.Errorf("read name of imported module: %v", err)
 	}
 
 	n, err := readNameValue(r)
 	if err != nil {
-		return nil, fmt.Errorf("read name of imported module component: %w", err)
+		return nil, fmt.Errorf("read name of imported module component: %v", err)
 	}
 
 	d, err := readImportDesc(r)
 	if err != nil {
-		return nil, fmt.Errorf("read import description : %w", err)
+		return nil, fmt.Errorf("read import description : %v", err)
 	}
 
 	return &ImportSegment{Module: mn, Name: n, Desc: d}, nil
@@ -98,12 +99,12 @@ type GlobalSegment struct {
 func readGlobalSegment(r io.Reader) (*GlobalSegment, error) {
 	gt, err := readGlobalType(r)
 	if err != nil {
-		return nil, fmt.Errorf("read global type: %w", err)
+		return nil, fmt.Errorf("read global type: %v", err)
 	}
 
 	init, err := readConstantExpression(r)
 	if err != nil {
-		return nil, fmt.Errorf("get init expression: %w", err)
+		return nil, fmt.Errorf("get init expression: %v", err)
 	}
 
 	return &GlobalSegment{
@@ -120,7 +121,7 @@ type ExportDesc struct {
 const (
 	ExportKindFunction byte = 0x00
 	ExportKindTable    byte = 0x01
-	ExportKindMem      byte = 0x02
+	ExportKindMemory   byte = 0x02
 	ExportKindGlobal   byte = 0x03
 )
 
@@ -183,10 +184,6 @@ func readElementSegment(r io.Reader) (*ElementSegment, error) {
 		return nil, fmt.Errorf("read expr for offset: %w", err)
 	}
 
-	if expr.optCode != OptCodeI32Const {
-		return nil, fmt.Errorf("offset expression must be i32.const but go %#x", expr.optCode)
-	}
-
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -227,18 +224,22 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 		return nil, fmt.Errorf("get the size locals: %w", err)
 	}
 
-	var numLocals uint32
+	var numLocals uint64
 	b := make([]byte, 1)
 	for i := uint32(0); i < ls; i++ {
 		n, _, err := leb128.DecodeUint32(r)
 		if err != nil {
 			return nil, fmt.Errorf("read n of locals: %w", err)
 		}
-		numLocals += n
+		numLocals += uint64(n)
 
 		if _, err := io.ReadFull(r, b); err != nil {
 			return nil, fmt.Errorf("read type of local")
 		}
+	}
+
+	if numLocals > math.MaxUint32 {
+		return nil, fmt.Errorf("too many locals: %d", numLocals)
 	}
 
 	// extract body
@@ -253,7 +254,7 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 
 	return &CodeSegment{
 		Body:      body[:len(body)-1],
-		NumLocals: numLocals,
+		NumLocals: uint32(numLocals),
 	}, nil
 }
 
@@ -266,7 +267,7 @@ type DataSegment struct {
 func readDataSegment(r io.Reader) (*DataSegment, error) {
 	d, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("read memory index: %w", err)
+		return nil, fmt.Errorf("read memory index: %v", err)
 	}
 
 	if d != 0 {
@@ -275,21 +276,17 @@ func readDataSegment(r io.Reader) (*DataSegment, error) {
 
 	expr, err := readConstantExpression(r)
 	if err != nil {
-		return nil, fmt.Errorf("read offset expression: %w", err)
-	}
-
-	if expr.optCode != OptCodeI32Const {
-		return nil, fmt.Errorf("offset expression must have i32.const optcode but go %#x", expr.optCode)
+		return nil, fmt.Errorf("read offset expression: %v", err)
 	}
 
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size of vector: %w", err)
+		return nil, fmt.Errorf("get the size of vector: %v", err)
 	}
 
 	b := make([]byte, vs)
 	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("read bytes for init: %w", err)
+		return nil, fmt.Errorf("read bytes for init: %v", err)
 	}
 
 	return &DataSegment{

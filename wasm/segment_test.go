@@ -34,8 +34,8 @@ func TestReadImportDesc(t *testing.T) {
 			exp: &ImportDesc{
 				Kind: 1,
 				TableTypePtr: &TableType{
-					Elem:  0x70,
-					Limit: &LimitsType{Min: 10},
+					ElemType: 0x70,
+					Limit:    &LimitsType{Min: 10},
 				},
 			},
 		},
@@ -50,7 +50,7 @@ func TestReadImportDesc(t *testing.T) {
 			bytes: []byte{0x03, 0x7e, 0x01},
 			exp: &ImportDesc{
 				Kind:          3,
-				GlobalTypePtr: &GlobalType{Value: ValueTypeI64, Mutable: true},
+				GlobalTypePtr: &GlobalType{ValType: ValueTypeI64, Mutable: true},
 			},
 		},
 	} {
@@ -83,10 +83,10 @@ func TestReadImportSegment(t *testing.T) {
 
 func TestReadGlobalSegment(t *testing.T) {
 	exp := &GlobalSegment{
-		Type: &GlobalType{Value: ValueTypeI64, Mutable: false},
+		Type: &GlobalType{ValType: ValueTypeI64, Mutable: false},
 		Init: &ConstantExpression{
-			optCode: OptCodeI64Const,
-			data:    []byte{0x01},
+			OptCode: OptCodeI64Const,
+			Data:    []byte{0x01},
 		},
 	}
 
@@ -159,8 +159,8 @@ func TestReadElementSegment(t *testing.T) {
 			exp: &ElementSegment{
 				TableIndex: 10,
 				OffsetExpr: &ConstantExpression{
-					optCode: OptCodeI32Const,
-					data:    []byte{0x01},
+					OptCode: OptCodeI32Const,
+					Data:    []byte{0x01},
 				},
 				Init: []uint32{5, 7},
 			},
@@ -170,8 +170,8 @@ func TestReadElementSegment(t *testing.T) {
 			exp: &ElementSegment{
 				TableIndex: 3,
 				OffsetExpr: &ConstantExpression{
-					optCode: OptCodeI32Const,
-					data:    []byte{0x04},
+					OptCode: OptCodeI32Const,
+					Data:    []byte{0x04},
 				},
 				Init: []uint32{10},
 			},
@@ -205,8 +205,8 @@ func TestDataSegment(t *testing.T) {
 			bytes: []byte{0x0, 0x41, 0x1, 0x0b, 0x02, 0x05, 0x07},
 			exp: &DataSegment{
 				OffsetExpression: &ConstantExpression{
-					optCode: OptCodeI32Const,
-					data:    []byte{0x01},
+					OptCode: OptCodeI32Const,
+					Data:    []byte{0x01},
 				},
 				Init: []byte{5, 7},
 			},
@@ -215,8 +215,8 @@ func TestDataSegment(t *testing.T) {
 			bytes: []byte{0x0, 0x41, 0x04, 0x0b, 0x01, 0x0a},
 			exp: &DataSegment{
 				OffsetExpression: &ConstantExpression{
-					optCode: OptCodeI32Const,
-					data:    []byte{0x04},
+					OptCode: OptCodeI32Const,
+					Data:    []byte{0x04},
 				},
 				Init: []byte{0x0a},
 			},

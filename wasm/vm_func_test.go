@@ -10,12 +10,12 @@ import (
 
 func TestHostFunction_Call(t *testing.T) {
 	var cnt int64
-	f := func(in int64) (int32, int64, float32, float64) {
+	f := func(_ *VirtualMachine, in int64) (int32, int64, float32, float64) {
 		cnt += in
 		return 1, 2, 3, 4
 	}
 	hf := &HostFunction{
-		function: reflect.ValueOf(f),
+		Function: reflect.ValueOf(f),
 		Signature: &FunctionType{
 			InputTypes:  []ValueType{ValueTypeI64},
 			ReturnTypes: []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64},
@@ -71,7 +71,7 @@ func TestVirtualMachine_execNativeFunction(t *testing.T) {
 	}
 
 	vm.execNativeFunction()
-	assert.Equal(t, uint64(4), vm.ActiveContext.PC)
+	assert.Equal(t, uint64(5), vm.ActiveContext.PC)
 	assert.Equal(t, uint64(0x01), vm.OperandStack.Pop())
 	assert.Equal(t, uint64(0x05), vm.OperandStack.Pop())
 }

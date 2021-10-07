@@ -38,12 +38,12 @@ func readValueTypes(r io.Reader, num uint32) ([]ValueType, error) {
 func readNameValue(r io.Reader) (string, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return "", fmt.Errorf("read size of name: %w", err)
+		return "", fmt.Errorf("read size of name: %v", err)
 	}
 
 	buf := make([]byte, vs)
 	if _, err := io.ReadFull(r, buf); err != nil {
-		return "", fmt.Errorf("read bytes of name: %w", err)
+		return "", fmt.Errorf("read bytes of name: %v", err)
 	}
 
 	return string(buf), nil

@@ -1,0 +1,1 @@
+(func (f32.const nan:1) drop)

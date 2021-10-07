@@ -1,4 +1,3 @@
-//go:generate tinygo build -opt=s -o file_system.wasm -target wasi file_system.go
 package main
 
 import (

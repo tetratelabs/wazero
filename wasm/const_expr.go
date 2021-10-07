@@ -11,22 +11,22 @@ import (
 )
 
 type ConstantExpression struct {
-	optCode OptCode
-	data    []byte
+	OptCode OptCode
+	Data    []byte
 }
 
-func (m *Module) executeConstExpression(expr *ConstantExpression) (v interface{}, err error) {
-	r := bytes.NewBuffer(expr.data)
-	switch expr.optCode {
+func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExpression) (v interface{}, err error) {
+	r := bytes.NewBuffer(expr.Data)
+	switch expr.OptCode {
 	case OptCodeI32Const:
 		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read int32: %w", err)
+			return nil, fmt.Errorf("read uint32: %w", err)
 		}
 	case OptCodeI64Const:
-		v, _, err = leb128.DecodeInt64(r)
+		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read int64: %w", err)
+			return nil, fmt.Errorf("read uint64: %w", err)
 		}
 	case OptCodeF32Const:
 		v, err = readFloat32(r)
@@ -43,12 +43,22 @@ func (m *Module) executeConstExpression(expr *ConstantExpression) (v interface{}
 		if err != nil {
 			return nil, fmt.Errorf("read index of global: %w", err)
 		}
-		if uint32(len(m.IndexSpace.Globals)) <= id {
+		if uint32(len(target.GlobalsAddrs)) <= id {
 			return nil, fmt.Errorf("global index out of range")
 		}
-		v = m.IndexSpace.Globals[id].Val
+		g := s.Globals[target.GlobalsAddrs[id]]
+		switch g.Type.ValType {
+		case ValueTypeI32:
+			v = int32(g.Val)
+		case ValueTypeI64:
+			v = int64(g.Val)
+		case ValueTypeF32:
+			v = math.Float32frombits(uint32(g.Val))
+		case ValueTypeF64:
+			v = math.Float64frombits(uint64(g.Val))
+		}
 	default:
-		return nil, fmt.Errorf("invalid opt code: %#x", expr.optCode)
+		return nil, fmt.Errorf("invalid opt code: %#x", expr.OptCode)
 	}
 	return v, nil
 }
@@ -57,7 +67,7 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	b := make([]byte, 1)
 	_, err := io.ReadFull(r, b)
 	if err != nil {
-		return nil, fmt.Errorf("read optcode: %w", err)
+		return nil, fmt.Errorf("read optcode: %v", err)
 	}
 	buf := new(bytes.Buffer)
 	teeR := io.TeeReader(r, buf)
@@ -75,24 +85,24 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	case OptCodeGlobalGet:
 		_, _, err = leb128.DecodeUint32(teeR)
 	default:
-		return nil, fmt.Errorf("%w for opt code: %#x", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%v for const expression opt code: %#x", ErrInvalidByte, b[0])
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("read value: %w", err)
+		return nil, fmt.Errorf("read value: %v", err)
 	}
 
 	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("look for end optcode: %w", err)
+		return nil, fmt.Errorf("look for end optcode: %v", err)
 	}
 
 	if b[0] != byte(OptCodeEnd) {
-		return nil, fmt.Errorf("constant expression has not terminated")
+		return nil, fmt.Errorf("constant expression has been not terminated")
 	}
 
 	return &ConstantExpression{
-		optCode: optCode,
-		data:    buf.Bytes(),
+		OptCode: optCode,
+		Data:    buf.Bytes(),
 	}, nil
 }
 
