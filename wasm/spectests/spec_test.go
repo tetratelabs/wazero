@@ -207,7 +207,6 @@ func TestSpecification(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d", wastName, c.Line)
 					switch c.CommandType {
 					case "module":
-						t.Log(c.Filename)
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
 

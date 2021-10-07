@@ -50,7 +50,7 @@ func (vm *VirtualMachine) InstantiateModule(module *Module, name string) (errRet
 	if module.StartSection != nil {
 		vm.Store.Functions[inst.FunctionAddrs[*module.StartSection]].Call(vm)
 	}
-	return nil
+	return
 }
 
 func (vm *VirtualMachine) ExecExportedFunction(moduleName, funcName string, args ...uint64) (returns []uint64, returnTypes []ValueType, err error) {
