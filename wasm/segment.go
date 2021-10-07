@@ -63,7 +63,7 @@ func readImportDesc(r io.Reader) (*ImportDesc, error) {
 			GlobalTypePtr: gt,
 		}, nil
 	default:
-		return nil, fmt.Errorf("%v: invalid byte for importdesc: %#x", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%w: invalid byte for importdesc: %#x", ErrInvalidByte, b[0])
 	}
 }
 

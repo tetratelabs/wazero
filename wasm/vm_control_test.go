@@ -76,7 +76,7 @@ func Test_ifOp(t *testing.T) {
 		assert.Equal(t, &Label{
 			Arity:          1,
 			ContinuationPC: 101,
-			OperandSP:      -2,
+			OperandSP:      -1,
 		}, ctx.LabelStack.Stack[ctx.LabelStack.SP])
 		assert.Equal(t, uint64(5), ctx.PC)
 	})
@@ -102,7 +102,7 @@ func Test_ifOp(t *testing.T) {
 		assert.Equal(t, &Label{
 			Arity:          1,
 			ContinuationPC: 101,
-			OperandSP:      -2,
+			OperandSP:      -1,
 		}, ctx.LabelStack.Stack[ctx.LabelStack.SP])
 		assert.Equal(t, uint64(51), ctx.PC)
 	})

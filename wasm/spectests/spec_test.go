@@ -253,14 +253,12 @@ func TestSpecification(t *testing.T) {
 							t.Fatalf("unsupported action type type: %v", c)
 						}
 					case "assert_malformed":
-						t.Log(c.Filename)
 						if c.ModuleType == "text" {
 							// We don't support direct loading of wast yet.
 							t.Skip()
 						}
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
-
 						mod, err := wasm.DecodeModule(buf)
 						if err == nil {
 							err = vm.InstantiateModule(mod, "")

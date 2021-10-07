@@ -99,7 +99,7 @@ func readTableType(r io.Reader) (*TableType, error) {
 	}
 
 	if b[0] != 0x70 {
-		return nil, fmt.Errorf("%v: invalid element type %#x != %#x", ErrInvalidByte, b[0], 0x70)
+		return nil, fmt.Errorf("%w: invalid element type %#x != %#x", ErrInvalidByte, b[0], 0x70)
 	}
 
 	lm, err := readLimitsType(r)
