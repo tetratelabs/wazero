@@ -2,6 +2,7 @@ package leb128
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,7 @@ func TestDecodeUint32(t *testing.T) {
 		exp    uint32
 		expErr bool
 	}{
+		{bytes: []byte{0xff, 0xff, 0xff, 0xff, 0xf}, exp: 0xffffffff},
 		{bytes: []byte{0x00}, exp: 0},
 		{bytes: []byte{0x04}, exp: 4},
 		{bytes: []byte{0x01}, exp: 1},
@@ -22,6 +24,7 @@ func TestDecodeUint32(t *testing.T) {
 		{bytes: []byte{0x80, 0x80, 0x80, 0x4f}, exp: 165675008},
 		{bytes: []byte{0x83, 0x80, 0x80, 0x80, 0x80, 0x00}, expErr: true},
 		{bytes: []byte{0x82, 0x80, 0x80, 0x80, 0x70}, expErr: true},
+		{bytes: []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x00}, expErr: true},
 	} {
 		actual, num, err := DecodeUint32(bytes.NewReader(c.bytes))
 		if c.expErr {
@@ -44,8 +47,9 @@ func TestDecodeUint64(t *testing.T) {
 		{bytes: []byte{0x80, 0x7f}, exp: 16256},
 		{bytes: []byte{0xe5, 0x8e, 0x26}, exp: 624485},
 		{bytes: []byte{0x80, 0x80, 0x80, 0x4f}, exp: 165675008},
-		{bytes: []byte{0x89, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01}, expErr: true},
+		{bytes: []byte{0x89, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x71}, expErr: true},
 	} {
+		// actual, err := binary.ReadUvarint(bytes.NewReader(c.bytes))
 		actual, num, err := DecodeUint64(bytes.NewReader(c.bytes))
 		if c.expErr {
 			require.Error(t, err)
@@ -58,10 +62,12 @@ func TestDecodeUint64(t *testing.T) {
 }
 
 func TestDecodeInt32(t *testing.T) {
-	for _, c := range []struct {
-		bytes []byte
-		exp   int32
+	for i, c := range []struct {
+		bytes  []byte
+		exp    int32
+		expErr bool
 	}{
+		{bytes: []byte{0x13}, exp: 19}, // 0x00010011
 		{bytes: []byte{0x00}, exp: 0},
 		{bytes: []byte{0x04}, exp: 4},
 		{bytes: []byte{0xFF, 0x00}, exp: 127},
@@ -69,11 +75,18 @@ func TestDecodeInt32(t *testing.T) {
 		{bytes: []byte{0x7f}, exp: -1},
 		{bytes: []byte{0x81, 0x7f}, exp: -127},
 		{bytes: []byte{0xFF, 0x7e}, exp: -129},
+		{bytes: []byte{0xff, 0xff, 0xff, 0xff, 0x0f}, expErr: true},
+		{bytes: []byte{0xff, 0xff, 0xff, 0xff, 0x4f}, expErr: true},
+		{bytes: []byte{0x80, 0x80, 0x80, 0x80, 0x70}, expErr: true},
 	} {
 		actual, num, err := DecodeInt32(bytes.NewReader(c.bytes))
-		require.NoError(t, err)
-		assert.Equal(t, c.exp, actual)
-		assert.Equal(t, uint64(len(c.bytes)), num)
+		if c.expErr {
+			assert.Error(t, err, fmt.Sprintf("%d-th got value %d", i, actual))
+		} else {
+			assert.NoError(t, err, i)
+			assert.Equal(t, c.exp, actual, i)
+			assert.Equal(t, uint64(len(c.bytes)), num, i)
+		}
 	}
 }
 

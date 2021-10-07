@@ -215,7 +215,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) e
 
 		blocks, err := parseBlocks(module, f.Body)
 		if err != nil {
-			return fmt.Errorf("parse blocks: %w", err)
+			return fmt.Errorf("parse blocks in function index %d: %w", codeIndex, err)
 		}
 		f.Blocks = blocks
 		target.FunctionAddrs = append(target.FunctionAddrs, len(s.Functions))
@@ -374,11 +374,7 @@ func parseBlocks(module *Module, body []byte) (map[uint64]*NativeFunctionBlock, 
 			// offset
 			_, num, err = leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
 			if err != nil {
-				var msg string
-				for i := 0; i < 5; i++ {
-					msg += fmt.Sprintf(", 0x%x", body[pc:][i])
-				}
-				return nil, fmt.Errorf("read memory offset: %w from: %s", err, msg[1:])
+				return nil, fmt.Errorf("read memory offset: %w", err)
 			}
 			pc += num - 1
 			continue
@@ -387,14 +383,19 @@ func parseBlocks(module *Module, body []byte) (map[uint64]*NativeFunctionBlock, 
 			switch OptCode(rawOc) {
 			case OptCodeI32Const:
 				_, num, err := leb128.DecodeInt32(bytes.NewBuffer(body[pc:]))
+				var msg string
+				for i := 0; i < 6 && i < len(body[pc:]); i++ {
+					msg += fmt.Sprintf(", 0x%x", body[pc:][i])
+				}
+				msg = msg[1:]
 				if err != nil {
-					return nil, fmt.Errorf("read immediate: %w", err)
+					return nil, fmt.Errorf("read i32 immediate: %w: bytes: %s", err, msg)
 				}
 				pc += num - 1
 			case OptCodeI64Const:
 				_, num, err := leb128.DecodeInt64(bytes.NewBuffer(body[pc:]))
 				if err != nil {
-					return nil, fmt.Errorf("read immediate: %w", err)
+					return nil, fmt.Errorf("read i64 immediate: %w", err)
 				}
 				pc += num - 1
 			case OptCodeF32Const:

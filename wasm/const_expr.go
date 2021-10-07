@@ -85,7 +85,7 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	case OptCodeGlobalGet:
 		_, _, err = leb128.DecodeUint32(teeR)
 	default:
-		return nil, fmt.Errorf("%w for opt code: %#x", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%w for const expression opt code: %#x", ErrInvalidByte, b[0])
 	}
 
 	if err != nil {
@@ -97,7 +97,7 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	}
 
 	if b[0] != byte(OptCodeEnd) {
-		return nil, fmt.Errorf("constant expression has not terminated")
+		return nil, fmt.Errorf("constant expression has been not terminated")
 	}
 
 	return &ConstantExpression{

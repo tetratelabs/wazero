@@ -41,13 +41,10 @@ func (m *Module) readSection(r *Reader) error {
 		return fmt.Errorf("read section id: %w", err)
 	}
 
-	fmt.Printf("size begin at %d\n", r.read)
 	ss, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return fmt.Errorf("get size of section for id=%d: %v", SectionID(b[0]), err)
 	}
-	fmt.Printf("size end at %d\n", r.read)
-	fmt.Printf("section size=%#x for section id=%d\n", ss, b[0])
 
 	sectionContentStart := r.read
 	switch SectionID(b[0]) {
