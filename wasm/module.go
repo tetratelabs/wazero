@@ -77,5 +77,8 @@ func DecodeModule(binary []byte) (*Module, error) {
 		return nil, fmt.Errorf("readSections failed: %w", err)
 	}
 
+	if len(ret.FunctionSection) != len(ret.CodeSection) {
+		return nil, fmt.Errorf("function and code section have inconsistent lengths")
+	}
 	return ret, nil
 }

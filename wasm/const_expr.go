@@ -67,7 +67,7 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	b := make([]byte, 1)
 	_, err := io.ReadFull(r, b)
 	if err != nil {
-		return nil, fmt.Errorf("read optcode: %w", err)
+		return nil, fmt.Errorf("read optcode: %v", err)
 	}
 	buf := new(bytes.Buffer)
 	teeR := io.TeeReader(r, buf)
@@ -85,15 +85,15 @@ func readConstantExpression(r io.Reader) (*ConstantExpression, error) {
 	case OptCodeGlobalGet:
 		_, _, err = leb128.DecodeUint32(teeR)
 	default:
-		return nil, fmt.Errorf("%w for const expression opt code: %#x", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%v for const expression opt code: %#x", ErrInvalidByte, b[0])
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("read value: %w", err)
+		return nil, fmt.Errorf("read value: vw", err)
 	}
 
 	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("look for end optcode: %w", err)
+		return nil, fmt.Errorf("look for end optcode: %v", err)
 	}
 
 	if b[0] != byte(OptCodeEnd) {

@@ -185,5 +185,5 @@ func memoryGrow(vm *VirtualMachine) {
 
 	vm.OperandStack.Push(uint64(len(memoryInst.Memory)) / PageSize)
 	memoryInst.Memory = append(memoryInst.Memory, make([]byte, n*PageSize)...)
-	vm.ActiveContext.PC++
+	vm.ActiveContext.PC++ // Skip reserved bytes.
 }

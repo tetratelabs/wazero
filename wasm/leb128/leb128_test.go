@@ -49,7 +49,6 @@ func TestDecodeUint64(t *testing.T) {
 		{bytes: []byte{0x80, 0x80, 0x80, 0x4f}, exp: 165675008},
 		{bytes: []byte{0x89, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x71}, expErr: true},
 	} {
-		// actual, err := binary.ReadUvarint(bytes.NewReader(c.bytes))
 		actual, num, err := DecodeUint64(bytes.NewReader(c.bytes))
 		if c.expErr {
 			require.Error(t, err)
@@ -67,7 +66,7 @@ func TestDecodeInt32(t *testing.T) {
 		exp    int32
 		expErr bool
 	}{
-		{bytes: []byte{0x13}, exp: 19}, // 0x00010011
+		{bytes: []byte{0x13}, exp: 19},
 		{bytes: []byte{0x00}, exp: 0},
 		{bytes: []byte{0x04}, exp: 4},
 		{bytes: []byte{0xFF, 0x00}, exp: 127},

@@ -61,7 +61,7 @@ func readLimitsType(r io.Reader) (*LimitsType, error) {
 	b := make([]byte, 1)
 	_, err := io.ReadFull(r, b)
 	if err != nil {
-		return nil, fmt.Errorf("read leading byte: %w", err)
+		return nil, fmt.Errorf("read leading byte: %v", err)
 	}
 
 	ret := &LimitsType{}
@@ -69,20 +69,20 @@ func readLimitsType(r io.Reader) (*LimitsType, error) {
 	case 0x00:
 		ret.Min, _, err = leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read min of limit: %w", err)
+			return nil, fmt.Errorf("read min of limit: %v", err)
 		}
 	case 0x01:
 		ret.Min, _, err = leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read min of limit: %w", err)
+			return nil, fmt.Errorf("read min of limit: %v", err)
 		}
 		m, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read min of limit: %w", err)
+			return nil, fmt.Errorf("read min of limit: %v", err)
 		}
 		ret.Max = &m
 	default:
-		return nil, fmt.Errorf("%w for limits: %#x != 0x00 or 0x01", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%v for limits: %#x != 0x00 or 0x01", ErrInvalidByte, b[0])
 	}
 	return ret, nil
 }
@@ -95,16 +95,16 @@ type TableType struct {
 func readTableType(r io.Reader) (*TableType, error) {
 	b := make([]byte, 1)
 	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("read leading byte: %w", err)
+		return nil, fmt.Errorf("read leading byte: %v", err)
 	}
 
 	if b[0] != 0x70 {
-		return nil, fmt.Errorf("%w: invalid element type %#x != %#x", ErrInvalidByte, b[0], 0x70)
+		return nil, fmt.Errorf("%v: invalid element type %#x != %#x", ErrInvalidByte, b[0], 0x70)
 	}
 
 	lm, err := readLimitsType(r)
 	if err != nil {
-		return nil, fmt.Errorf("read limits: %w", err)
+		return nil, fmt.Errorf("read limits: %v", err)
 	}
 
 	return &TableType{

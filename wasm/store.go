@@ -368,13 +368,13 @@ func parseBlocks(module *Module, body []byte) (map[uint64]*NativeFunctionBlock, 
 			// align
 			_, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
 			if err != nil {
-				return nil, fmt.Errorf("read memory align: %w", err)
+				return nil, fmt.Errorf("read memory align: %v", err)
 			}
 			pc += num
 			// offset
 			_, num, err = leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
 			if err != nil {
-				return nil, fmt.Errorf("read memory offset: %w", err)
+				return nil, fmt.Errorf("read memory offset: %v", err)
 			}
 			pc += num - 1
 			continue
@@ -383,19 +383,14 @@ func parseBlocks(module *Module, body []byte) (map[uint64]*NativeFunctionBlock, 
 			switch OptCode(rawOc) {
 			case OptCodeI32Const:
 				_, num, err := leb128.DecodeInt32(bytes.NewBuffer(body[pc:]))
-				var msg string
-				for i := 0; i < 6 && i < len(body[pc:]); i++ {
-					msg += fmt.Sprintf(", 0x%x", body[pc:][i])
-				}
-				msg = msg[1:]
 				if err != nil {
-					return nil, fmt.Errorf("read i32 immediate: %w: bytes: %s", err, msg)
+					return nil, fmt.Errorf("read i32 immediate: %s", err)
 				}
 				pc += num - 1
 			case OptCodeI64Const:
 				_, num, err := leb128.DecodeInt64(bytes.NewBuffer(body[pc:]))
 				if err != nil {
-					return nil, fmt.Errorf("read i64 immediate: %w", err)
+					return nil, fmt.Errorf("read i64 immediate: %v", err)
 				}
 				pc += num - 1
 			case OptCodeF32Const:
@@ -409,13 +404,20 @@ func parseBlocks(module *Module, body []byte) (map[uint64]*NativeFunctionBlock, 
 			(0x0c <= rawOc && rawOc <= 0x0d) || // br,br_if instructions
 			(0x10 <= rawOc && rawOc <= 0x11) { // call,call_indirect
 			pc++
-			_, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			val, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
 			if err != nil {
-				return nil, fmt.Errorf("read immediate: %w", err)
+				return nil, fmt.Errorf("read immediate: %v", err)
+			}
+			if (rawOc == 0x3f || rawOc == 0x40) && (val != 0 || num != 1) { // memory grow,size
+				return nil, fmt.Errorf("memory instruction reserved bytes not zero with 1 byte")
 			}
 			pc += num - 1
 			if rawOc == 0x11 { // if call_indirect
 				pc++
+				if body[pc] != 0x00 {
+					return nil, fmt.Errorf("call_indirect reserved bytes not zero but got %d", body[pc])
+
+				}
 			}
 			continue
 		} else if rawOc == 0x0e { // br_table

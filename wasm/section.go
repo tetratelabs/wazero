@@ -97,8 +97,11 @@ func (m *Module) readSectionCustom(r *Reader, sectionSize int) error {
 	if err != nil {
 		return fmt.Errorf("cannot read custom section name")
 	}
-	contents := make([]byte, int(sectionSize)-int(nameLenBytes)-int(nameLen))
-	// fmt.Printf("namelen=%d, nameLenBytes=%d, ss=%d\n", nameLen, nameLenBytes, ss)
+	contentLen := int(sectionSize) - int(nameLenBytes) - int(nameLen)
+	if contentLen < 0 {
+		return fmt.Errorf("malformed custom section %s", string(nameBuf))
+	}
+	contents := make([]byte, contentLen)
 	_, err = io.ReadFull(r, contents)
 	if err != nil {
 		return fmt.Errorf("cannot read custom section contents: %w", err)
