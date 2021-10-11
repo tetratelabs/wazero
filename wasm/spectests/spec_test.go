@@ -255,7 +255,33 @@ func TestSpecification(t *testing.T) {
 								}
 							}
 						case "get":
-							// TODO:
+							_, exps := c.getAssertReturnArgsExps(t)
+							require.Len(t, exps, 1)
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							inst, ok := vm.Store.ModuleInstances[moduleName]
+							require.True(t, ok)
+							addr := inst.Exports[c.Action.Field]
+							if addr.Kind != wasm.ExportKindGlobal {
+								t.Fatal()
+							}
+							actual := vm.Store.Globals[addr.Addr]
+							var expType wasm.ValueType
+							switch c.Exps[0].ValType {
+							case "i32":
+								expType = wasm.ValueTypeI32
+							case "i64":
+								expType = wasm.ValueTypeI64
+							case "f32":
+								expType = wasm.ValueTypeF32
+							case "f64":
+								expType = wasm.ValueTypeF64
+							}
+							require.NotNil(t, actual)
+							assert.Equal(t, expType, actual.Type.ValType)
+							assert.Equal(t, exps[0], actual.Val, expType)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
