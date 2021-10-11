@@ -262,7 +262,7 @@ func TestSpecification(t *testing.T) {
 								msg += " in module " + c.Action.Module
 							}
 							inst, ok := vm.Store.ModuleInstances[moduleName]
-							require.True(t, ok)
+							require.True(t, ok, msg)
 							addr := inst.Exports[c.Action.Field]
 							if addr.Kind != wasm.ExportKindGlobal {
 								t.Fatal()
@@ -279,9 +279,9 @@ func TestSpecification(t *testing.T) {
 							case "f64":
 								expType = wasm.ValueTypeF64
 							}
-							require.NotNil(t, actual)
-							assert.Equal(t, expType, actual.Type.ValType)
-							assert.Equal(t, exps[0], actual.Val, expType)
+							require.NotNil(t, actual, msg)
+							assert.Equal(t, expType, actual.Type.ValType, msg)
+							assert.Equal(t, exps[0], actual.Val, expType, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
