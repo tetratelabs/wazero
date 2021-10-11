@@ -109,6 +109,14 @@ func (c command) String() string {
 	return "{" + msg + "}"
 }
 
+func (c command) getAssertReturnArgs(t *testing.T) []uint64 {
+	var args []uint64
+	for _, arg := range c.Action.Args {
+		args = append(args, arg.ToUint64(t))
+	}
+	return args
+}
+
 func (c command) getAssertReturnArgsExps(t *testing.T) ([]uint64, []uint64) {
 	var args, exps []uint64
 	for _, arg := range c.Action.Args {
@@ -264,7 +272,24 @@ func TestSpecification(t *testing.T) {
 						}
 						require.Error(t, err, msg)
 					case "assert_trap":
-						// TODO:
+						moduleName := lastInstanceName
+						if c.Action.Module != "" {
+							moduleName = c.Action.Module
+						}
+						require.NotNil(t, vm)
+						switch c.Action.ActionType {
+						case "invoke":
+							args := c.getAssertReturnArgs(t)
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							assert.Panics(t, func() {
+								_, _, _ = vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
+							}, msg)
+						default:
+							t.Fatalf("unsupported action type type: %v", c)
+						}
 					case "assert_invalid":
 						// TODO:
 					case "assert_exhaustion":

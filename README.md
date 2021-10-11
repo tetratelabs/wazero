@@ -1,10 +1,8 @@
 # Gasm
 
-A minimal implementation of Wasm Virtual machine purely written in Go.
-The VM can be embedded in your Go program without any dependency like cgo, and enables Gophers to write Wasm host environments easily.
+A minimal implementation of Wasm Virtual machine purely written in Go. The VM passes all the [Wasm Spec test suites](https://github.com/WebAssembly/spec/tree/master/test/core) and is fully compatible Wasm v1.0 Specification.
 
-The implementation is quite straightforward and I hope this code would be a
- good starting point for novices to learn Wasm spec.
+The VM can be embedded in your Go program without any dependency like cgo, and enables Gophers to write Wasm host environments easily.
 
 ## Example
 
@@ -13,7 +11,6 @@ func Test_fibonacci(t *testing.T) {
 	binary, _ := os.ReadFile("wasm/fibonacci.wasm")
 	mod, _ := wasm.DecodeModule(binary)
 	vm, _ := wasm.NewVM()
-	wasi.NewEnvironment().RegisterToVirtualMachine(vm)
 	vm.InstantiateModule(mod, "test")
 
 	for _, c := range []struct {
@@ -32,4 +29,3 @@ func Test_fibonacci(t *testing.T) {
 ## References
 
 - https://webassembly.github.io/spec/core/index.html
-- https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md

@@ -717,26 +717,46 @@ func i32wrapi64(vm *VirtualMachine) {
 }
 
 func i32truncf32s(vm *VirtualMachine) {
-	v := math.Float32frombits(uint32(vm.OperandStack.Pop()))
-	vm.OperandStack.Push(uint64(int32(math.Trunc(float64(v)))))
+	v := math.Trunc(float64(math.Float32frombits(uint32(vm.OperandStack.Pop()))))
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < math.MinInt32 || v > math.MaxInt32 {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(uint64(int32(v)))
 	vm.ActiveContext.PC++
 }
 
 func i32truncf32u(vm *VirtualMachine) {
-	v := math.Float32frombits(uint32(vm.OperandStack.Pop()))
-	vm.OperandStack.Push(uint64(uint32(math.Trunc(float64(v)))))
+	v := math.Trunc(float64(math.Float32frombits(uint32(vm.OperandStack.Pop()))))
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < 0 || v > math.MaxUint32 {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(uint64(uint32(v)))
 	vm.ActiveContext.PC++
 }
 
 func i32truncf64s(vm *VirtualMachine) {
-	v := math.Float64frombits(vm.OperandStack.Pop())
-	vm.OperandStack.Push(uint64(int32(math.Trunc(v))))
+	v := math.Trunc(math.Float64frombits(vm.OperandStack.Pop()))
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < math.MinInt32 || v > math.MaxInt32 {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(uint64(int32(v)))
 	vm.ActiveContext.PC++
 }
 
 func i32truncf64u(vm *VirtualMachine) {
-	v := math.Float64frombits(vm.OperandStack.Pop())
-	vm.OperandStack.Push(uint64(uint32(math.Trunc(v))))
+	v := math.Trunc(math.Float64frombits(vm.OperandStack.Pop()))
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < 0 || v > math.MaxUint32 {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(uint64(uint32(v)))
 	vm.ActiveContext.PC++
 }
 
@@ -754,25 +774,49 @@ func i64extendi32u(vm *VirtualMachine) {
 
 func i64truncf32s(vm *VirtualMachine) {
 	v := math.Trunc(float64(math.Float32frombits(uint32(vm.OperandStack.Pop()))))
-	vm.OperandStack.Push(uint64(int64(v)))
+	res := int64(v)
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < math.MinInt64 || v > 0 && res < 0 {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(uint64(res))
 	vm.ActiveContext.PC++
 }
 
 func i64truncf32u(vm *VirtualMachine) {
 	v := math.Trunc(float64(math.Float32frombits(uint32(vm.OperandStack.Pop()))))
-	vm.OperandStack.Push(uint64(v))
+	res := uint64(v)
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < 0 || v > float64(res) {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(res)
 	vm.ActiveContext.PC++
 }
 
 func i64truncf64s(vm *VirtualMachine) {
 	v := math.Trunc(math.Float64frombits(vm.OperandStack.Pop()))
-	vm.OperandStack.Push(uint64(int64(v)))
+	res := int64(v)
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < math.MinInt64 || v > 0 && res < 0 {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(uint64(res))
 	vm.ActiveContext.PC++
 }
 
 func i64truncf64u(vm *VirtualMachine) {
 	v := math.Trunc(math.Float64frombits(vm.OperandStack.Pop()))
-	vm.OperandStack.Push(uint64(v))
+	res := uint64(v)
+	if math.IsNaN(v) {
+		panic("invalid conversion")
+	} else if v < 0 || v > float64(res) {
+		panic("integer overflow")
+	}
+	vm.OperandStack.Push(res)
 	vm.ActiveContext.PC++
 }
 

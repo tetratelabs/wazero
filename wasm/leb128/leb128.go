@@ -13,6 +13,7 @@ const (
 
 var (
 	errOverflow32 = errors.New("overflows a 32-bit integer")
+	errOverflow33 = errors.New("overflows a 33-bit integer")
 	errOverflow64 = errors.New("overflows a 64-bit integer")
 )
 
@@ -114,10 +115,6 @@ func DecodeInt33AsInt64(r io.Reader) (ret int64, num uint64, err error) {
 		}
 	}
 
-	if num > 5 {
-		return 0, 0, errOverflow64
-	}
-
 	// fixme: can be optimized
 	if shift < 33 && (b&int33Mask3) == int33Mask3 {
 		ret |= int33Mask4 << shift
@@ -127,6 +124,15 @@ func DecodeInt33AsInt64(r io.Reader) (ret int64, num uint64, err error) {
 	// if 33rd bit == 1, we translate it as a corresponding signed-33bit minus value
 	if ret&int33Mask5 > 0 {
 		ret = ret - int33Mask6
+	}
+	// Over flow checks.
+	// fixme: can be optimized.
+	if num > 5 {
+		return 0, 0, errOverflow33
+	} else if unused := b & 0b00100000; num == 5 && ret < 0 && unused != 0b00100000 {
+		return 0, 0, errOverflow33
+	} else if num == 5 && ret >= 0 && unused != 0x00 {
+		return 0, 0, errOverflow33
 	}
 	return ret, num, nil
 }
@@ -147,11 +153,17 @@ func DecodeInt64(r io.Reader) (ret int64, num uint64, err error) {
 		shift += 7
 		num++
 		if b&0x80 == 0 {
-			if num > 10 {
-				return 0, 0, errOverflow64
-			}
 			if shift < 64 && (b&int64Mask3) == int64Mask3 {
 				ret |= int64Mask4 << shift
+			}
+			// Over flow checks.
+			// fixme: can be optimized.
+			if num > 10 {
+				return 0, 0, errOverflow64
+			} else if unused := b & 0b00111110; num == 10 && ret < 0 && unused != 0b00111110 {
+				return 0, 0, errOverflow64
+			} else if num == 10 && ret >= 0 && unused != 0x00 {
+				return 0, 0, errOverflow64
 			}
 			return
 		}
