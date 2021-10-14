@@ -15,7 +15,8 @@ type (
 	}
 	NativeFunction struct {
 		Signature      *FunctionType
-		NumLocal       uint32
+		NumLocals      uint32
+		LocalTypes     []ValueType
 		Body           []byte
 		Blocks         map[uint64]*NativeFunctionBlock
 		ModuleInstance *ModuleInstance
@@ -24,6 +25,8 @@ type (
 		StartAt, ElseAt, EndAt uint64
 		BlockType              *FunctionType
 		BlockTypeBytes         uint64
+		IsLoop                 bool // TODO: might not be necessary
+		IsIf                   bool // TODO: might not be necessary
 	}
 )
 
@@ -83,7 +86,7 @@ func (h *HostFunction) Call(vm *VirtualMachine) {
 
 func (n *NativeFunction) Call(vm *VirtualMachine) {
 	al := len(n.Signature.InputTypes)
-	locals := make([]uint64, n.NumLocal+uint32(al))
+	locals := make([]uint64, n.NumLocals+uint32(al))
 	for i := 0; i < al; i++ {
 		locals[al-1-i] = vm.OperandStack.Pop()
 	}

@@ -3,6 +3,7 @@ package wasm
 import (
 	"fmt"
 	"io"
+	"unicode/utf8"
 
 	"github.com/mathetake/gasm/wasm/leb128"
 )
@@ -44,6 +45,10 @@ func readNameValue(r io.Reader) (string, error) {
 	buf := make([]byte, vs)
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return "", fmt.Errorf("read bytes of name: %v", err)
+	}
+
+	if !utf8.Valid(buf) {
+		return "", fmt.Errorf("name must be valid as utf8")
 	}
 
 	return string(buf), nil

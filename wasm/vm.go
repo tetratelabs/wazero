@@ -61,7 +61,7 @@ func (vm *VirtualMachine) ExecExportedFunction(moduleName, funcName string, args
 
 	exp, ok := m.Exports[funcName]
 	if !ok {
-		return nil, nil, fmt.Errorf("exported func of name '%s' not found in '%s'", funcName, moduleName)
+		return nil, nil, fmt.Errorf("exported function '%s' not found in '%s'", funcName, moduleName)
 	}
 
 	if exp.Kind != ExportKindFunction {
