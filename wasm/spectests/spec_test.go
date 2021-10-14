@@ -205,6 +205,7 @@ func TestSpecification(t *testing.T) {
 		wastName := filepath.Base(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
+			t.Parallel()
 			vm, err := wasm.NewVM()
 			require.NoError(t, err)
 			requireAddSpectestModule(t, vm)
