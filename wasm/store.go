@@ -731,8 +731,6 @@ func analyzeFunction(
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-			default:
-				panic("unreachable")
 			}
 			pc += num
 			// offset
@@ -761,8 +759,6 @@ func analyzeFunction(
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeMemorySize:
 				valueTypeStack.push(ValueTypeI32)
-			default:
-				panic("unreachable")
 			}
 			pc += num - 1
 		} else if 0x41 <= rawOc && rawOc <= 0x44 { // const instructions
@@ -788,8 +784,6 @@ func analyzeFunction(
 			case OptCodeF64Const:
 				valueTypeStack.push(ValueTypeF64)
 				pc += 7
-			default:
-				panic("unreachable")
 			}
 		} else if 0x20 <= rawOc && rawOc <= 0x24 { // variable instructions
 			pc++
@@ -852,8 +846,6 @@ func analyzeFunction(
 					globalDeclarations[index].ValType); err != nil {
 					return err
 				}
-			default:
-				panic("unreachable")
 			}
 		} else if rawOc == 0x0c { // br
 			pc++
@@ -864,7 +856,6 @@ func analyzeFunction(
 				return fmt.Errorf("invalid br operation: index out of range")
 			}
 			pc += num - 1
-			fmt.Println("branching to ", index)
 			// Check type soundness.
 			target := labelStack[len(labelStack)-int(index)-1]
 			targetResultType := target.BlockType.ReturnTypes
