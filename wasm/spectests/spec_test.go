@@ -179,7 +179,7 @@ func requireAddSpectestModule(t *testing.T, vm *wasm.VirtualMachine) {
 	}
 	// Register table export.
 	tableLimitMax := uint32(20)
-	err = vm.AddTableInstance("spectest", "table", 0, &tableLimitMax)
+	err = vm.AddTableInstance("spectest", "table", 10, &tableLimitMax)
 	require.NoError(t, err)
 	// Register table export.
 	memoryLimitMax := uint32(2)
@@ -203,7 +203,6 @@ func TestSpecification(t *testing.T) {
 		var base testbase
 		require.NoError(t, json.Unmarshal(raw, &base))
 		wastName := filepath.Base(base.SourceFile)
-
 		t.Run(wastName, func(t *testing.T) {
 			vm, err := wasm.NewVM()
 			require.NoError(t, err)
@@ -211,7 +210,7 @@ func TestSpecification(t *testing.T) {
 
 			var lastInstanceName string
 			for _, c := range base.Commands {
-				t.Run(fmt.Sprintf("%d", c.Line), func(t *testing.T) {
+				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d", wastName, c.Line)
 					switch c.CommandType {
 					case "module":
@@ -331,7 +330,17 @@ func TestSpecification(t *testing.T) {
 					case "assert_exhaustion":
 						// TODO:
 					case "assert_unlinkable":
-						// TODO:
+						if c.ModuleType == "text" {
+							// We don't support direct loading of wast yet.
+							t.Skip()
+						}
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
+						mod, err := wasm.DecodeModule(buf)
+						if err == nil {
+							err = vm.InstantiateModule(mod, "")
+						}
+						require.Error(t, err, msg)
 					case "assert_uninstantiable":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)

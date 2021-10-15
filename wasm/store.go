@@ -67,26 +67,45 @@ func NewStore() *Store {
 func (s *Store) Instantiate(module *Module, name string) (*ModuleInstance, error) {
 	instance := &ModuleInstance{Types: module.TypeSection}
 	s.ModuleInstances[name] = instance
-
+	// Resolve the imports before doing the actual instantiation (mutating store).
 	if err := s.resolveImports(module, instance); err != nil {
 		return nil, fmt.Errorf("resolve imports: %w", err)
 	}
-	if err := s.buildGlobalInstances(module, instance); err != nil {
+	// Instantiation.
+	// Note that some of them mutate the store, so
+	// in the case of errors, we must rollback the state of store.
+	var rollbackFuncs []func()
+	defer func() {
+		for _, f := range rollbackFuncs {
+			f()
+		}
+	}()
+	rs, err := s.buildGlobalInstances(module, instance)
+	rollbackFuncs = append(rollbackFuncs, rs...)
+	if err != nil {
 		return nil, fmt.Errorf("globals: %w", err)
 	}
-	if err := s.buildFunctionInstances(module, instance); err != nil {
+	rs, err = s.buildFunctionInstances(module, instance)
+	rollbackFuncs = append(rollbackFuncs, rs...)
+	if err != nil {
 		return nil, fmt.Errorf("functions: %w", err)
 	}
-	if err := s.buildTableInstances(module, instance); err != nil {
+	rs, err = s.buildTableInstances(module, instance)
+	rollbackFuncs = append(rollbackFuncs, rs...)
+	if err != nil {
 		return nil, fmt.Errorf("tables: %w", err)
 	}
-	if err := s.buildMemoryInstances(module, instance); err != nil {
+	rs, err = s.buildMemoryInstances(module, instance)
+	rollbackFuncs = append(rollbackFuncs, rs...)
+	if err != nil {
 		return nil, fmt.Errorf("memories: %w", err)
 	}
-	if err := s.buildExportInstances(module, instance); err != nil {
+	rs, err = s.buildExportInstances(module, instance)
+	rollbackFuncs = append(rollbackFuncs, rs...)
+	if err != nil {
 		return nil, fmt.Errorf("exports: %w", err)
 	}
-
+	// Check the start function is valid.
 	if module.StartSection != nil {
 		index := *module.StartSection
 		if int(index) >= len(instance.FunctionAddrs) {
@@ -97,6 +116,8 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleInstance, error
 			return nil, fmt.Errorf("start function must have the empty signature")
 		}
 	}
+	// Now we are safe to finalize the state.
+	rollbackFuncs = nil
 	return instance, nil
 }
 
@@ -125,19 +146,19 @@ func (s *Store) resolveImport(target *ModuleInstance, is *ImportSegment) error {
 	}
 	switch is.Desc.Kind {
 	case 0x00: // function
-		if err := s.applyFunctionImport(target, is, e); err != nil {
+		if err := s.applyFunctionImport(target, is.Desc.TypeIndexPtr, e); err != nil {
 			return fmt.Errorf("applyFunctionImport: %w", err)
 		}
 	case 0x01: // table
-		if err := s.applyTableImport(target, e); err != nil {
+		if err := s.applyTableImport(target, is.Desc.TableTypePtr, e); err != nil {
 			return fmt.Errorf("applyTableImport: %w", err)
 		}
 	case 0x02: // mem
-		if err := s.applyMemoryImport(target, e); err != nil {
+		if err := s.applyMemoryImport(target, is.Desc.MemTypePtr, e); err != nil {
 			return fmt.Errorf("applyMemoryImport: %w", err)
 		}
 	case 0x03: // global
-		if err := s.applyGlobalImport(target, e); err != nil {
+		if err := s.applyGlobalImport(target, is.Desc.GlobalTypePtr, e); err != nil {
 			return fmt.Errorf("applyGlobalImport: %w", err)
 		}
 	default:
@@ -147,16 +168,16 @@ func (s *Store) resolveImport(target *ModuleInstance, is *ImportSegment) error {
 	return nil
 }
 
-func (s *Store) applyFunctionImport(target *ModuleInstance, is *ImportSegment, externModuleExportIsntance *ExportInstance) error {
-	if is.Desc.TypeIndexPtr == nil {
-		return fmt.Errorf("is.Desc.TypeIndexPtr is nil")
+func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndexPtr *uint32, externModuleExportIsntance *ExportInstance) error {
+	if typeIndexPtr == nil {
+		return fmt.Errorf("type index is invalid")
 	}
 	f := s.Functions[externModuleExportIsntance.Addr]
-	typeIndex := *is.Desc.TypeIndexPtr
+	typeIndex := *typeIndexPtr
 	if int(typeIndex) >= len(target.Types) {
 		return fmt.Errorf("unknown type for function import")
 	}
-	iSig := target.Types[*is.Desc.TypeIndexPtr]
+	iSig := target.Types[typeIndex]
 	if !hasSameSignature(iSig.ReturnTypes, f.FunctionType().ReturnTypes) {
 		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.ReturnTypes, f.FunctionType().ReturnTypes)
 	} else if !hasSameSignature(iSig.InputTypes, f.FunctionType().InputTypes) {
@@ -166,33 +187,74 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, is *ImportSegment, e
 	return nil
 }
 
-func (s *Store) applyTableImport(target *ModuleInstance, externModuleExportIsntance *ExportInstance) error {
-	// TODO: verify the limit compatibility.
-	// TODO: verify the type compatibility.
+func (s *Store) applyTableImport(target *ModuleInstance, tableTypePtr *TableType, externModuleExportIsntance *ExportInstance) error {
+	t := s.Tables[externModuleExportIsntance.Addr]
+	if tableTypePtr == nil {
+		return fmt.Errorf("table type is invalid")
+	}
+	if t.ElemType != tableTypePtr.ElemType {
+		return fmt.Errorf("incompatible table imports: element type mismatch")
+	}
+	if t.Min < tableTypePtr.Limit.Min {
+		return fmt.Errorf("incompatible table imports: minimum size mismatch")
+	}
+
+	if tableTypePtr.Limit.Max != nil {
+		if t.Max == nil {
+			return fmt.Errorf("incompatible table imports: maximum size mismatch")
+		} else if *t.Max > *tableTypePtr.Limit.Max {
+			return fmt.Errorf("incompatible table imports: maximum size mismatch")
+		}
+	}
 	target.TableAddrs = append(target.TableAddrs, externModuleExportIsntance.Addr)
 	return nil
 }
 
-func (s *Store) applyMemoryImport(target *ModuleInstance, externModuleExportIsntance *ExportInstance) error {
-	// TODO: verify the limit compatibility.
+func (s *Store) applyMemoryImport(target *ModuleInstance, memoryTypePtr *MemoryType, externModuleExportIsntance *ExportInstance) error {
+	if memoryTypePtr == nil {
+		return fmt.Errorf("memory type is invalid")
+	}
+	t := s.Memories[externModuleExportIsntance.Addr]
+	if t.Min < memoryTypePtr.Min {
+		return fmt.Errorf("incompatible memory imports: minimum size mismatch")
+	}
+	if memoryTypePtr.Max != nil {
+		if t.Max == nil {
+			return fmt.Errorf("incompatible memory imports: maximum size mismatch")
+		} else if *t.Max > *memoryTypePtr.Max {
+			return fmt.Errorf("incompatible memory imports: maximum size mismatch")
+		}
+	}
 	target.MemoryAddrs = append(target.MemoryAddrs, externModuleExportIsntance.Addr)
 	return nil
 }
 
-func (s *Store) applyGlobalImport(target *ModuleInstance, externModuleExportIsntance *ExportInstance) error {
-	// TODO: verify the type compatibility.
+func (s *Store) applyGlobalImport(target *ModuleInstance, globalTypePtr *GlobalType, externModuleExportIsntance *ExportInstance) error {
+	if globalTypePtr == nil {
+		return fmt.Errorf("global type is invalid")
+	}
+	t := s.Globals[externModuleExportIsntance.Addr]
+	if globalTypePtr.Mutable != t.Type.Mutable {
+		return fmt.Errorf("incompatible global import: mutability mismatch")
+	} else if globalTypePtr.ValType != t.Type.ValType {
+		return fmt.Errorf("incompatible global import: value type mismatch")
+	}
 	target.GlobalsAddrs = append(target.GlobalsAddrs, externModuleExportIsntance.Addr)
 	return nil
 }
 
-func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) error {
+func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
+	prevLen := len(s.Globals)
+	rollbackFuncs = append(rollbackFuncs, func() {
+		s.Globals = s.Globals[:prevLen]
+	})
 	for _, gs := range module.GlobalSection {
 		raw, t, err := s.executeConstExpression(target, gs.Init)
 		if err != nil {
-			return fmt.Errorf("execution failed: %w", err)
+			return rollbackFuncs, fmt.Errorf("execution failed: %w", err)
 		}
 		if gs.Type.ValType != t {
-			return fmt.Errorf("global type mismatch")
+			return rollbackFuncs, fmt.Errorf("global type mismatch")
 		}
 		var gv uint64
 		switch v := raw.(type) {
@@ -211,10 +273,14 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) err
 			Val:  gv,
 		})
 	}
-	return nil
+	return rollbackFuncs, nil
 }
 
-func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) error {
+func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
+	prevLen := len(s.Functions)
+	rollbackFuncs = append(rollbackFuncs, func() {
+		s.Functions = s.Functions[:prevLen]
+	})
 	var functionDeclarations []uint32
 	var globalDecalarations []*GlobalType
 	var memoryDeclarations []*MemoryType
@@ -240,9 +306,9 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) e
 
 	for codeIndex, typeIndex := range module.FunctionSection {
 		if typeIndex >= uint32(len(module.TypeSection)) {
-			return fmt.Errorf("function type index out of range")
+			return rollbackFuncs, fmt.Errorf("function type index out of range")
 		} else if codeIndex >= len(module.CodeSection) {
-			return fmt.Errorf("code index out of range")
+			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
 		f := &NativeFunction{
@@ -259,15 +325,15 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) e
 			memoryDeclarations, tableDeclarations,
 		)
 		if err != nil {
-			return fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
+			return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
 		}
 		target.FunctionAddrs = append(target.FunctionAddrs, len(s.Functions))
 		s.Functions = append(s.Functions, f)
 	}
-	return nil
+	return rollbackFuncs, nil
 }
 
-func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) error {
+func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	// Allocate memory instances.
 	for _, memSec := range module.MemorySection {
 		memInst := &MemoryInstance{
@@ -282,19 +348,21 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) err
 	// Initialize the memory instance according to the Data section.
 	for _, d := range module.DataSection {
 		if d.MemoryIndex >= uint32(len(target.MemoryAddrs)) {
-			return fmt.Errorf("index out of range of index space")
+			return rollbackFuncs, fmt.Errorf("index out of range of index space")
 		}
 
 		rawOffset, offsetType, err := s.executeConstExpression(target, d.OffsetExpression)
 		if err != nil {
-			return fmt.Errorf("calculate offset: %w", err)
+			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
 		} else if offsetType != ValueTypeI32 {
-			return fmt.Errorf("offset is not int32 but %T", offsetType)
+			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
 		}
 
 		offset, ok := rawOffset.(int32)
 		if !ok {
-			return fmt.Errorf("offset is not int32 but 0x%x", offsetType)
+			return rollbackFuncs, fmt.Errorf("offset is not int32 but 0x%x", offsetType)
+		} else if offset < 0 {
+			return rollbackFuncs, fmt.Errorf("offset must be positive int32: %d", offset)
 		}
 
 		size := uint64(offset) + uint64(len(d.Init))
@@ -303,26 +371,28 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) err
 			max = uint64(*module.MemorySection[d.MemoryIndex].Max)
 		}
 		if size > max*PageSize {
-			return fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
+			return rollbackFuncs, fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
 		}
 
 		memoryInst := s.Memories[target.MemoryAddrs[d.MemoryIndex]]
 		if size > uint64(len(memoryInst.Memory)) {
-			next := make([]byte, size)
-			copy(next, memoryInst.Memory)
-			copy(next[offset:], d.Init)
-			memoryInst.Memory = next
-		} else {
-			copy(memoryInst.Memory[offset:], d.Init)
+			return rollbackFuncs, fmt.Errorf("out of bounds memory access")
 		}
+		// Setup the rollback function before mutating the acutal memory.
+		original := make([]byte, len(d.Init))
+		copy(original, memoryInst.Memory[offset:])
+		rollbackFuncs = append(rollbackFuncs, func() {
+			copy(memoryInst.Memory[offset:], original)
+		})
+		copy(memoryInst.Memory[offset:], d.Init)
 	}
 	if len(target.MemoryAddrs) > 1 {
-		return fmt.Errorf("multiple memories not supported")
+		return rollbackFuncs, fmt.Errorf("multiple memories not supported")
 	}
-	return nil
+	return rollbackFuncs, nil
 }
 
-func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) error {
+func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	// Allocate table instances.
 	for _, tableSeg := range module.TableSection {
 		tableInst := &TableInstance{
@@ -335,22 +405,23 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) erro
 		s.Tables = append(s.Tables, tableInst)
 	}
 
-	// Initialize the table elements according to the Elements section.
 	for _, elem := range module.ElementSection {
 		if elem.TableIndex >= uint32(len(target.TableAddrs)) {
-			return fmt.Errorf("index out of range of index space")
+			return rollbackFuncs, fmt.Errorf("index out of range of index space")
 		}
 
 		rawOffset, offsetType, err := s.executeConstExpression(target, elem.OffsetExpr)
 		if err != nil {
-			return fmt.Errorf("calculate offset: %w", err)
+			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
 		} else if offsetType != ValueTypeI32 {
-			return fmt.Errorf("offset is not int32 but %T", offsetType)
+			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
 		}
 
 		offset32, ok := rawOffset.(int32)
 		if !ok {
-			return fmt.Errorf("offset is not int32 but %T", offsetType)
+			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
+		} else if offset32 < 0 {
+			return rollbackFuncs, fmt.Errorf("offset must be positive int32 but %d", offset32)
 		}
 
 		offset := int(offset32)
@@ -362,40 +433,36 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) erro
 		}
 
 		if size > int(max) {
-			return fmt.Errorf("table size out of limit of %d", max)
+			return rollbackFuncs, fmt.Errorf("table size out of limit of %d", max)
 		}
 
 		tableInst := s.Tables[target.TableAddrs[elem.TableIndex]]
 		if size > len(tableInst.Table) {
-			next := make([]*uint32, size)
-			copy(next, tableInst.Table)
-			for i := range elem.Init {
-				elm := elem.Init[i]
-				if elm >= uint32(len(target.FunctionAddrs)) {
-					return fmt.Errorf("unknown function specified by element")
-				}
-				addr := uint32(target.FunctionAddrs[elm])
-				next[i+offset] = &addr
+			return rollbackFuncs, fmt.Errorf("out of bounds table access %d > %v", size, tableInst.Min)
+		}
+		for i := range elem.Init {
+			i := i
+			elm := elem.Init[i]
+			if elm >= uint32(len(target.FunctionAddrs)) {
+				return rollbackFuncs, fmt.Errorf("unknown function specified by element")
 			}
-			tableInst.Table = next
-		} else {
-			for i := range elem.Init {
-				elm := elem.Init[i]
-				if elm >= uint32(len(target.FunctionAddrs)) {
-					return fmt.Errorf("unknown function specified by element")
-				}
-				addr := uint32(target.FunctionAddrs[elm])
-				tableInst.Table[i+offset] = &addr
-			}
+			// Setup the rollback function before mutating the table instance.
+			pos := i + offset
+			original := tableInst.Table[pos]
+			rollbackFuncs = append(rollbackFuncs, func() {
+				tableInst.Table[pos] = original
+			})
+			addr := uint32(target.FunctionAddrs[elm])
+			tableInst.Table[pos] = &addr
 		}
 	}
 	if len(target.TableAddrs) > 1 {
-		return fmt.Errorf("multiple tables not supported")
+		return rollbackFuncs, fmt.Errorf("multiple tables not supported")
 	}
-	return nil
+	return rollbackFuncs, nil
 }
 
-func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) error {
+func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	target.Exports = make(map[string]*ExportInstance, len(module.ExportSection))
 	for name, exp := range module.ExportSection {
 		var addr int
@@ -403,22 +470,22 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) err
 		switch exp.Desc.Kind {
 		case ExportKindFunction:
 			if index >= len(target.FunctionAddrs) {
-				return fmt.Errorf("unknown function for export")
+				return nil, fmt.Errorf("unknown function for export")
 			}
 			addr = target.FunctionAddrs[index]
 		case ExportKindGlobal:
 			if index >= len(target.GlobalsAddrs) {
-				return fmt.Errorf("unknown global for export")
+				return nil, fmt.Errorf("unknown global for export")
 			}
 			addr = target.GlobalsAddrs[exp.Desc.Index]
 		case ExportKindMemory:
 			if index >= len(target.MemoryAddrs) {
-				return fmt.Errorf("unknown memory for export")
+				return nil, fmt.Errorf("unknown memory for export")
 			}
 			addr = target.MemoryAddrs[exp.Desc.Index]
 		case ExportKindTable:
 			if index >= len(target.TableAddrs) {
-				return fmt.Errorf("unknown memory for export")
+				return nil, fmt.Errorf("unknown memory for export")
 			}
 			addr = target.TableAddrs[exp.Desc.Index]
 		}
@@ -427,7 +494,7 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) err
 			Addr: addr,
 		}
 	}
-	return nil
+	return
 }
 
 type valueTypeStack struct {
