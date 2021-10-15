@@ -230,15 +230,17 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 		return nil, fmt.Errorf("get the size locals: %v", err)
 	}
 
-	var numLocals uint64
-	var localTypes []ValueType
+	var nums []uint64
+	var types []ValueType
+	var sum uint64
 	b := make([]byte, 1)
 	for i := uint32(0); i < ls; i++ {
 		n, _, err := leb128.DecodeUint32(r)
 		if err != nil {
 			return nil, fmt.Errorf("read n of locals: %v", err)
 		}
-		numLocals += uint64(n)
+		sum += uint64(n)
+		nums = append(nums, uint64(n))
 
 		_, err = io.ReadFull(r, b)
 		if err != nil {
@@ -246,19 +248,24 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 		}
 		switch vt := ValueType(b[0]); vt {
 		case ValueTypeI32, ValueTypeF32, ValueTypeI64, ValueTypeF64:
-			for i := uint32(0); i < n; i++ {
-				localTypes = append(localTypes, vt)
-			}
+			types = append(types, vt)
 		default:
 			return nil, fmt.Errorf("invalid local type: 0x%x", vt)
 		}
 	}
 
-	if numLocals > math.MaxUint32 {
-		return nil, fmt.Errorf("too many locals: %d", numLocals)
+	if sum > math.MaxUint32 {
+		return nil, fmt.Errorf("too many locals: %d", sum)
 	}
 
-	// extract body
+	var localTypes []ValueType
+	for i, num := range nums {
+		t := types[i]
+		for j := uint64(0); j < num; j++ {
+			localTypes = append(localTypes, t)
+		}
+	}
+
 	body, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
@@ -270,7 +277,7 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 
 	return &CodeSegment{
 		Body:       body,
-		NumLocals:  uint32(numLocals),
+		NumLocals:  uint32(sum),
 		LocalTypes: localTypes,
 	}, nil
 }
