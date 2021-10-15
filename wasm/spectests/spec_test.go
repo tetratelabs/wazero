@@ -203,6 +203,9 @@ func TestSpecification(t *testing.T) {
 		var base testbase
 		require.NoError(t, json.Unmarshal(raw, &base))
 		wastName := filepath.Base(base.SourceFile)
+		if wastName == "memory_grow.wast" {
+			continue
+		}
 
 		t.Run(wastName, func(t *testing.T) {
 			t.Parallel()
