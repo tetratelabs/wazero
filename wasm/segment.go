@@ -3,10 +3,16 @@ package wasm
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 
 	"github.com/mathetake/gasm/wasm/leb128"
+)
+
+const (
+	ImportKindFunction = 0x00
+	ImportKindTable    = 0x01
+	ImportKindMemory   = 0x02
+	ImportKindGlobal   = 0x03
 )
 
 type ImportDesc struct {
@@ -25,41 +31,40 @@ func readImportDesc(r io.Reader) (*ImportDesc, error) {
 	}
 
 	switch b[0] {
-	case 0x00:
+	case ImportKindFunction:
 		tID, _, err := leb128.DecodeUint32(r)
 		if err != nil {
 			return nil, fmt.Errorf("read typeindex: %v", err)
 		}
 		return &ImportDesc{
-			Kind:         0x00,
+			Kind:         ImportKindFunction,
 			TypeIndexPtr: &tID,
 		}, nil
-	case 0x01:
+	case ImportKindTable:
 		tt, err := readTableType(r)
 		if err != nil {
 			return nil, fmt.Errorf("read table type: %v", err)
 		}
 		return &ImportDesc{
-			Kind:         0x01,
+			Kind:         ImportKindTable,
 			TableTypePtr: tt,
 		}, nil
-	case 0x02:
+	case ImportKindMemory:
 		mt, err := readMemoryType(r)
 		if err != nil {
 			return nil, fmt.Errorf("read table type: %v", err)
 		}
 		return &ImportDesc{
-			Kind:       0x02,
+			Kind:       ImportKindMemory,
 			MemTypePtr: mt,
 		}, nil
-	case 0x03:
+	case ImportKindGlobal:
 		gt, err := readGlobalType(r)
 		if err != nil {
 			return nil, fmt.Errorf("read global type: %v", err)
 		}
-
 		return &ImportDesc{
-			Kind:          0x03,
+			Kind:          ImportKindGlobal,
 			GlobalTypePtr: gt,
 		}, nil
 	default:
@@ -206,8 +211,9 @@ func readElementSegment(r io.Reader) (*ElementSegment, error) {
 }
 
 type CodeSegment struct {
-	NumLocals uint32
-	Body      []byte
+	NumLocals  uint32
+	LocalTypes []ValueType
+	Body       []byte
 }
 
 func readCodeSegment(r io.Reader) (*CodeSegment, error) {
@@ -221,29 +227,46 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 	// parse locals
 	ls, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size locals: %w", err)
+		return nil, fmt.Errorf("get the size locals: %v", err)
 	}
 
-	var numLocals uint64
+	var nums []uint64
+	var types []ValueType
+	var sum uint64
 	b := make([]byte, 1)
 	for i := uint32(0); i < ls; i++ {
 		n, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read n of locals: %w", err)
+			return nil, fmt.Errorf("read n of locals: %v", err)
 		}
-		numLocals += uint64(n)
+		sum += uint64(n)
+		nums = append(nums, uint64(n))
 
-		if _, err := io.ReadFull(r, b); err != nil {
-			return nil, fmt.Errorf("read type of local")
+		_, err = io.ReadFull(r, b)
+		if err != nil {
+			return nil, fmt.Errorf("read type of local: %v", err)
+		}
+		switch vt := ValueType(b[0]); vt {
+		case ValueTypeI32, ValueTypeF32, ValueTypeI64, ValueTypeF64:
+			types = append(types, vt)
+		default:
+			return nil, fmt.Errorf("invalid local type: 0x%x", vt)
 		}
 	}
 
-	if numLocals > math.MaxUint32 {
-		return nil, fmt.Errorf("too many locals: %d", numLocals)
+	if sum > math.MaxUint32 {
+		return nil, fmt.Errorf("too many locals: %d", sum)
 	}
 
-	// extract body
-	body, err := ioutil.ReadAll(r)
+	var localTypes []ValueType
+	for i, num := range nums {
+		t := types[i]
+		for j := uint64(0); j < num; j++ {
+			localTypes = append(localTypes, t)
+		}
+	}
+
+	body, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
@@ -253,8 +276,9 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 	}
 
 	return &CodeSegment{
-		Body:      body[:len(body)-1],
-		NumLocals: uint32(numLocals),
+		Body:       body,
+		NumLocals:  uint32(sum),
+		LocalTypes: localTypes,
 	}, nil
 }
 

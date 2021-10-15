@@ -70,7 +70,7 @@ func (m *Module) readSections(r *Reader) error {
 			err = errors.New("invalid section id")
 		}
 
-		if sectionContentStart+int(ss) != r.read {
+		if err == nil && sectionContentStart+int(ss) != r.read {
 			err = fmt.Errorf("invalid section length: expected to be %d but got %d", ss, r.read-sectionContentStart)
 		}
 
@@ -149,7 +149,7 @@ func (m *Module) readSectionFunctions(r *Reader) error {
 	for i := range m.FunctionSection {
 		m.FunctionSection[i], _, err = leb128.DecodeUint32(r)
 		if err != nil {
-			return fmt.Errorf("get typeidx: %v", err)
+			return fmt.Errorf("get type index: %v", err)
 		}
 	}
 	return nil
@@ -215,7 +215,9 @@ func (m *Module) readSectionExports(r *Reader) error {
 		if err != nil {
 			return fmt.Errorf("read export: %v", err)
 		}
-
+		if _, ok := m.ExportSection[expDesc.Name]; ok {
+			return fmt.Errorf("duplicate export name: %s", expDesc.Name)
+		}
 		m.ExportSection[expDesc.Name] = expDesc
 	}
 	return nil
@@ -257,7 +259,7 @@ func (m *Module) readSectionCodes(r *Reader) error {
 	for i := range m.CodeSection {
 		m.CodeSection[i], err = readCodeSegment(r)
 		if err != nil {
-			return fmt.Errorf("read code segment: %v", err)
+			return fmt.Errorf("read %d-th code segment: %v", i, err)
 		}
 	}
 	return nil

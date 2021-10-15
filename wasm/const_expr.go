@@ -15,52 +15,58 @@ type ConstantExpression struct {
 	Data    []byte
 }
 
-func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExpression) (v interface{}, err error) {
+func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExpression) (v interface{}, valueType ValueType, err error) {
 	r := bytes.NewBuffer(expr.Data)
 	switch expr.OptCode {
 	case OptCodeI32Const:
 		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read uint32: %w", err)
+			return nil, 0, fmt.Errorf("read uint32: %w", err)
 		}
+		return v, ValueTypeI32, nil
 	case OptCodeI64Const:
 		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read uint64: %w", err)
+			return nil, 0, fmt.Errorf("read uint64: %w", err)
 		}
+		return v, ValueTypeI64, nil
 	case OptCodeF32Const:
 		v, err = readFloat32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read f34: %w", err)
+			return nil, 0, fmt.Errorf("read f34: %w", err)
 		}
+		return v, ValueTypeF32, nil
 	case OptCodeF64Const:
 		v, err = readFloat64(r)
 		if err != nil {
-			return nil, fmt.Errorf("read f64: %w", err)
+			return nil, 0, fmt.Errorf("read f64: %w", err)
 		}
+		return v, ValueTypeF64, nil
 	case OptCodeGlobalGet:
 		id, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("read index of global: %w", err)
+			return nil, 0, fmt.Errorf("read index of global: %w", err)
 		}
 		if uint32(len(target.GlobalsAddrs)) <= id {
-			return nil, fmt.Errorf("global index out of range")
+			return nil, 0, fmt.Errorf("global index out of range")
 		}
 		g := s.Globals[target.GlobalsAddrs[id]]
 		switch g.Type.ValType {
 		case ValueTypeI32:
 			v = int32(g.Val)
+			return v, ValueTypeI32, nil
 		case ValueTypeI64:
 			v = int64(g.Val)
+			return v, ValueTypeI64, nil
 		case ValueTypeF32:
 			v = math.Float32frombits(uint32(g.Val))
+			return v, ValueTypeF32, nil
 		case ValueTypeF64:
 			v = math.Float64frombits(uint64(g.Val))
+			return v, ValueTypeF64, nil
 		}
-	default:
-		return nil, fmt.Errorf("invalid opt code: %#x", expr.OptCode)
 	}
-	return v, nil
+	return nil, 0, fmt.Errorf("invalid opt code: %#x", expr.OptCode)
 }
 
 func readConstantExpression(r io.Reader) (*ConstantExpression, error) {

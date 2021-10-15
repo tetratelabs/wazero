@@ -1,6 +1,6 @@
 # Gasm
 
-A minimal implementation of Wasm Virtual machine purely written in Go. The VM passes all the [Wasm Spec test suites](https://github.com/WebAssembly/spec/tree/master/test/core) and is fully compatible Wasm v1.0 Specification.
+A minimal implementation of Wasm Virtual Machine purely written in Go. The VM passes all the [Wasm Spec test suites](https://github.com/WebAssembly/spec/tree/wg-1.0/test/core) and is fully compatible with the WebAssembly v1.0 Specification.
 
 The VM can be embedded in your Go program without any dependency like cgo, and enables Gophers to write Wasm host environments easily.
 

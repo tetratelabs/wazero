@@ -47,11 +47,4 @@ jobs:
             ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
-      - name: Install TinyGo
-        run: |
-          wget https://github.com/tinygo-org/tinygo/releases/download/v0.20.0/tinygo_0.20.0_amd64.deb
-          sudo dpkg -i tinygo_0.20.0_amd64.deb
-
-      - run: make build.examples
-
       - run: make test

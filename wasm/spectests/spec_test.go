@@ -202,8 +202,8 @@ func TestSpecification(t *testing.T) {
 
 		var base testbase
 		require.NoError(t, json.Unmarshal(raw, &base))
-
 		wastName := filepath.Base(base.SourceFile)
+
 		t.Run(wastName, func(t *testing.T) {
 			vm, err := wasm.NewVM()
 			require.NoError(t, err)
@@ -317,7 +317,17 @@ func TestSpecification(t *testing.T) {
 							t.Fatalf("unsupported action type type: %v", c)
 						}
 					case "assert_invalid":
-						// TODO:
+						if c.ModuleType == "text" {
+							// We don't support direct loading of wast yet.
+							t.Skip()
+						}
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
+						mod, err := wasm.DecodeModule(buf)
+						if err == nil {
+							err = vm.InstantiateModule(mod, "")
+						}
+						require.Error(t, err, msg)
 					case "assert_exhaustion":
 						// TODO:
 					case "assert_unlinkable":

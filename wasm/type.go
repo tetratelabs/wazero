@@ -39,6 +39,8 @@ func readFunctionType(r io.Reader) (*FunctionType, error) {
 	s, _, err = leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get the size of output value types: %w", err)
+	} else if s > 1 {
+		return nil, fmt.Errorf("multi value results not supported")
 	}
 
 	op, err := readValueTypes(r, s)
@@ -116,7 +118,21 @@ func readTableType(r io.Reader) (*TableType, error) {
 type MemoryType = LimitsType
 
 func readMemoryType(r io.Reader) (*MemoryType, error) {
-	return readLimitsType(r)
+	ret, err := readLimitsType(r)
+	if err != nil {
+		return nil, err
+	}
+	if ret.Min > uint32(PageSize) {
+		return nil, fmt.Errorf("memory min must be at most 65536 pages (4GiB)")
+	}
+	if ret.Max != nil {
+		if *ret.Max < ret.Min {
+			return nil, fmt.Errorf("memory size minimum must not be greater than maximum")
+		} else if *ret.Max > uint32(PageSize) {
+			return nil, fmt.Errorf("memory max must be at most 65536 pages (4GiB)")
+		}
+	}
+	return ret, nil
 }
 
 type GlobalType struct {

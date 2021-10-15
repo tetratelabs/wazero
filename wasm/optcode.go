@@ -56,12 +56,13 @@ const (
 	OptCodeMemorySize OptCode = 0x3f
 	OptCodeMemoryGrow OptCode = 0x40
 
-	// numeric instruction
+	// const instructions.
 	OptCodeI32Const OptCode = 0x41
 	OptCodeI64Const OptCode = 0x42
 	OptCodeF32Const OptCode = 0x43
 	OptCodeF64Const OptCode = 0x44
 
+	// numeric instructions.
 	OptCodeI32eqz OptCode = 0x45
 	OptCodeI32eq  OptCode = 0x46
 	OptCodeI32ne  OptCode = 0x47
