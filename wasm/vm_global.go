@@ -1,17 +1,17 @@
 package wasm
 
 func getGlobal(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 	index := vm.FetchUint32()
-	addr := vm.ActiveContext.Function.ModuleInstance.GlobalsAddrs[index]
-	vm.OperandStack.Push(vm.Store.Globals[addr].Val)
-	vm.ActiveContext.PC++
+	addr := vm.ActiveFrame.F.ModuleInstance.GlobalsAddrs[index]
+	vm.Operands.Push(vm.Store.Globals[addr].Val)
+	vm.ActiveFrame.PC++
 }
 
 func setGlobal(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 	index := vm.FetchUint32()
-	addr := vm.ActiveContext.Function.ModuleInstance.GlobalsAddrs[index]
-	vm.Store.Globals[addr].Val = vm.OperandStack.Pop()
-	vm.ActiveContext.PC++
+	addr := vm.ActiveFrame.F.ModuleInstance.GlobalsAddrs[index]
+	vm.Store.Globals[addr].Val = vm.Operands.Pop()
+	vm.ActiveFrame.PC++
 }

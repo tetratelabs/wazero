@@ -1,6 +1,7 @@
 package examples
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -10,8 +11,8 @@ import (
 	"github.com/mathetake/gasm/wasm"
 )
 
-func Test_panic(t *testing.T) {
-	buf, err := os.ReadFile("wasm/panic.wasm")
+func Test_trap(t *testing.T) {
+	buf, err := os.ReadFile("wasm/trap.wasm")
 	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule((buf))
@@ -26,9 +27,7 @@ func Test_panic(t *testing.T) {
 	err = vm.InstantiateModule(mod, "test")
 	require.NoError(t, err)
 
-	defer func() {
-		err := recover()
-		require.Equal(t, "unreachable", err)
-	}()
-	vm.ExecExportedFunction("test", "cause_panic")
+	_, _, err = vm.ExecExportedFunction("test", "cause_panic")
+	require.Error(t, err)
+	require.True(t, errors.Is(err, wasm.ErrFunctionTrapped))
 }

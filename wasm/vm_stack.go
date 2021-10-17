@@ -6,18 +6,18 @@ const (
 )
 
 func drop(vm *VirtualMachine) {
-	vm.OperandStack.Drop()
-	vm.ActiveContext.PC++
+	vm.Operands.Drop()
+	vm.ActiveFrame.PC++
 }
 
 func selectOp(vm *VirtualMachine) {
-	c := vm.OperandStack.Pop()
-	v2 := vm.OperandStack.Pop()
+	c := vm.Operands.Pop()
+	v2 := vm.Operands.Pop()
 	if c == 0 {
-		_ = vm.OperandStack.Pop()
-		vm.OperandStack.Push(v2)
+		_ = vm.Operands.Pop()
+		vm.Operands.Push(v2)
 	}
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 }
 
 func NewVirtualMachineOperandStack() *VirtualMachineOperandStack {
@@ -89,6 +89,49 @@ func (s *VirtualMachineLabelStack) Pop() *Label {
 }
 
 func (s *VirtualMachineLabelStack) Push(val *Label) {
+	if s.SP+1 == len(s.Stack) {
+		// grow stack
+		s.Stack = append(s.Stack, val)
+	} else {
+		s.Stack[s.SP+1] = val
+	}
+	s.SP++
+}
+
+type VirtualMachineFrameStack struct {
+	Stack []*VirtualMachineFrame
+	SP    int
+}
+
+type VirtualMachineFrame struct {
+	PC     uint64
+	Locals []uint64
+	F      *FunctionInstance
+	Labels *VirtualMachineLabelStack
+}
+
+func NewVirtualMachineFrames() *VirtualMachineFrameStack {
+	return &VirtualMachineFrameStack{
+		Stack: make([]*VirtualMachineFrame, initialLabelStackHeight),
+		SP:    -1,
+	}
+}
+
+func (s *VirtualMachineFrameStack) Peek() *VirtualMachineFrame {
+	if s.SP < 0 {
+		return nil
+	}
+	ret := s.Stack[s.SP]
+	return ret
+}
+
+func (s *VirtualMachineFrameStack) Pop() *VirtualMachineFrame {
+	ret := s.Stack[s.SP]
+	s.SP--
+	return ret
+}
+
+func (s *VirtualMachineFrameStack) Push(val *VirtualMachineFrame) {
 	if s.SP+1 == len(s.Stack) {
 		// grow stack
 		s.Stack = append(s.Stack, val)
