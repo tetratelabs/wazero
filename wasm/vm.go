@@ -3,35 +3,33 @@ package wasm
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
+	"time"
 
 	"github.com/mathetake/gasm/wasm/leb128"
 )
 
 const PageSize uint64 = 65536
 
+var ErrFunctionTrapped = errors.New("function trapped")
+
 type (
 	VirtualMachine struct {
-		Store         *Store
-		ActiveContext *NativeFunctionContext
-		OperandStack  *VirtualMachineOperandStack
-	}
-
-	NativeFunctionContext struct {
-		PC         uint64
-		Function   *NativeFunction
-		Locals     []uint64
-		LabelStack *VirtualMachineLabelStack
-		Returned   bool
+		Store       *Store
+		ActiveFrame *VirtualMachineFrame
+		Frames      *VirtualMachineFrameStack
+		Operands    *VirtualMachineOperandStack
 	}
 )
 
 func NewVM() (*VirtualMachine, error) {
 	return &VirtualMachine{
-		Store:        NewStore(),
-		OperandStack: NewVirtualMachineOperandStack(),
+		Store:    NewStore(),
+		Frames:   NewVirtualMachineFrames(),
+		Operands: NewVirtualMachineOperandStack(),
 	}, nil
 }
 
@@ -41,14 +39,24 @@ func (vm *VirtualMachine) InstantiateModule(module *Module, name string) (errRet
 		return err
 	}
 
-	defer func() {
-		if err := recover(); err != nil {
-			errRet = fmt.Errorf("calling start function failed: %v", err)
-		}
-	}()
-
 	if module.StartSection != nil {
-		vm.Store.Functions[inst.FunctionAddrs[*module.StartSection]].Call(vm)
+		f := vm.Store.Functions[inst.FunctionAddrs[*module.StartSection]]
+		if f.HostFunction != nil {
+			hostF := *f.HostFunction
+			if isDebugMode {
+				fmt.Printf("Call host function '%s'\n", f.Name)
+			}
+			tp := hostF.Type()
+			in := make([]reflect.Value, 1)
+			val := reflect.New(tp.In(0)).Elem()
+			val.Set(reflect.ValueOf(vm))
+			in[0] = val
+			_ = hostF.Call(in)
+		} else {
+			if err := vm.execFunction(f); err != nil {
+				errRet = fmt.Errorf("calling start function failed: %v", err)
+			}
+		}
 	}
 	return
 }
@@ -69,21 +77,64 @@ func (vm *VirtualMachine) ExecExportedFunction(moduleName, funcName string, args
 	}
 
 	f := vm.Store.Functions[exp.Addr]
-	if len(f.FunctionType().InputTypes) != len(args) {
+	if len(f.Signature.InputTypes) != len(args) {
 		return nil, nil, fmt.Errorf("invalid number of arguments")
 	}
 
 	for _, arg := range args {
-		vm.OperandStack.Push(arg)
+		vm.Operands.Push(arg)
 	}
 
-	f.Call(vm)
+	if err := vm.execFunction(f); err != nil {
+		return nil, nil, err
+	}
 
-	ret := make([]uint64, len(f.FunctionType().ReturnTypes))
+	ret := make([]uint64, len(f.Signature.ReturnTypes))
 	for i := range ret {
-		ret[len(ret)-1-i] = vm.OperandStack.Pop()
+		ret[len(ret)-1-i] = vm.Operands.Pop()
 	}
-	return ret, f.FunctionType().ReturnTypes, nil
+	return ret, f.Signature.ReturnTypes, nil
+}
+
+func (vm *VirtualMachine) execFunction(f *FunctionInstance) (errRet error) {
+	al := len(f.Signature.InputTypes)
+	locals := make([]uint64, f.NumLocals+uint32(al))
+	for i := 0; i < al; i++ {
+		locals[al-1-i] = vm.Operands.Pop()
+	}
+	frame := &VirtualMachineFrame{
+		F:      f,
+		Locals: locals,
+		Labels: NewVirtualMachineLabelStack(),
+	}
+	frame.Labels.Push(&Label{
+		Arity:          len(f.Signature.ReturnTypes),
+		ContinuationPC: uint64(len(f.Body)) - 1, // At return.
+		OperandSP:      -1,
+	})
+
+	prevFrameSP := vm.Frames.SP
+	defer func() {
+		if err := recover(); err != nil {
+			// Stack Unwind.
+			// TODO: include stack trace in the error message.
+			vm.Frames.SP = prevFrameSP
+			errRet = fmt.Errorf("%w: %v", ErrFunctionTrapped, err)
+		}
+	}()
+
+	vm.Frames.Push(frame)
+	vm.ActiveFrame = frame
+	for vm.ActiveFrame != nil {
+		if isDebugMode {
+			fmt.Printf("0x%x: op=%s (Label SP=%d, Operand SP=%d, Frame SP=%d) \n",
+				vm.ActiveFrame.PC, optcodeStrs[vm.ActiveFrame.F.Body[vm.ActiveFrame.PC]],
+				vm.ActiveFrame.Labels.SP, vm.Operands.SP, vm.Frames.SP)
+			time.Sleep(time.Millisecond)
+		}
+		virtualMachineInstructions[vm.ActiveFrame.F.Body[vm.ActiveFrame.PC]](vm)
+	}
+	return
 }
 
 func (vm *VirtualMachine) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
@@ -104,51 +155,51 @@ func (vm *VirtualMachine) AddMemoryInstance(moduleName, funcName string, min uin
 
 func (vm *VirtualMachine) FetchInt32() int32 {
 	ret, num, err := leb128.DecodeInt32(bytes.NewBuffer(
-		vm.ActiveContext.Function.Body[vm.ActiveContext.PC:]))
+		vm.ActiveFrame.F.Body[vm.ActiveFrame.PC:]))
 	if err != nil {
 		panic(err)
 	}
-	vm.ActiveContext.PC += num - 1
+	vm.ActiveFrame.PC += num - 1
 	return ret
 }
 
 func (vm *VirtualMachine) FetchUint32() uint32 {
 	ret, num, err := leb128.DecodeUint32(bytes.NewBuffer(
-		vm.ActiveContext.Function.Body[vm.ActiveContext.PC:]))
+		vm.ActiveFrame.F.Body[vm.ActiveFrame.PC:]))
 	if err != nil {
 		panic(err)
 	}
-	vm.ActiveContext.PC += num - 1
+	vm.ActiveFrame.PC += num - 1
 	return ret
 }
 
 func (vm *VirtualMachine) FetchInt64() int64 {
 	ret, num, err := leb128.DecodeInt64(bytes.NewBuffer(
-		vm.ActiveContext.Function.Body[vm.ActiveContext.PC:]))
+		vm.ActiveFrame.F.Body[vm.ActiveFrame.PC:]))
 	if err != nil {
 		panic(err)
 	}
-	vm.ActiveContext.PC += num - 1
+	vm.ActiveFrame.PC += num - 1
 	return ret
 }
 
 func (vm *VirtualMachine) FetchFloat32() float32 {
 	v := math.Float32frombits(binary.LittleEndian.Uint32(
-		vm.ActiveContext.Function.Body[vm.ActiveContext.PC:]))
-	vm.ActiveContext.PC += 3
+		vm.ActiveFrame.F.Body[vm.ActiveFrame.PC:]))
+	vm.ActiveFrame.PC += 3
 	return v
 }
 
 func (vm *VirtualMachine) FetchFloat64() float64 {
 	v := math.Float64frombits(binary.LittleEndian.Uint64(
-		vm.ActiveContext.Function.Body[vm.ActiveContext.PC:]))
-	vm.ActiveContext.PC += 7
+		vm.ActiveFrame.F.Body[vm.ActiveFrame.PC:]))
+	vm.ActiveFrame.PC += 7
 	return v
 }
 
 var virtualMachineInstructions = [256]func(vm *VirtualMachine){
 	OptCodeUnreachable:       func(vm *VirtualMachine) { panic("unreachable") },
-	OptCodeNop:               func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
+	OptCodeNop:               func(vm *VirtualMachine) { vm.ActiveFrame.PC++ },
 	OptCodeBlock:             block,
 	OptCodeLoop:              loop,
 	OptCodeIf:                ifOp,
@@ -157,7 +208,7 @@ var virtualMachineInstructions = [256]func(vm *VirtualMachine){
 	OptCodeBr:                br,
 	OptCodeBrIf:              brIf,
 	OptCodeBrTable:           brTable,
-	OptCodeReturn:            func(vm *VirtualMachine) { vm.ActiveContext.PC++; vm.ActiveContext.Returned = true },
+	OptCodeReturn:            returnOp,
 	OptCodeCall:              call,
 	OptCodeCallIndirect:      callIndirect,
 	OptCodeDrop:              drop,
@@ -315,8 +366,8 @@ var virtualMachineInstructions = [256]func(vm *VirtualMachine){
 	OptCodeF64Converti64s:    f64converti64s,
 	OptCodeF64Converti64u:    f64converti64u,
 	OptCodeF64Promotef32:     f64promotef32,
-	OptCodeI32reinterpretf32: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
-	OptCodeI64reinterpretf64: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
-	OptCodeF32reinterpreti32: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
-	OptCodeF64reinterpreti64: func(vm *VirtualMachine) { vm.ActiveContext.PC++ },
+	OptCodeI32reinterpretf32: func(vm *VirtualMachine) { vm.ActiveFrame.PC++ },
+	OptCodeI64reinterpretf64: func(vm *VirtualMachine) { vm.ActiveFrame.PC++ },
+	OptCodeF32reinterpreti32: func(vm *VirtualMachine) { vm.ActiveFrame.PC++ },
+	OptCodeF64reinterpreti64: func(vm *VirtualMachine) { vm.ActiveFrame.PC++ },
 }

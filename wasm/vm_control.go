@@ -7,106 +7,111 @@ import (
 )
 
 func block(vm *VirtualMachine) {
-	ctx := vm.ActiveContext
-	block, ok := ctx.Function.Blocks[ctx.PC]
+	frame := vm.ActiveFrame
+	block, ok := frame.F.Blocks[frame.PC]
 	if !ok {
 		panic("block not initialized")
 	}
 
-	ctx.PC += block.BlockTypeBytes
-	ctx.LabelStack.Push(&Label{
+	frame.PC += block.BlockTypeBytes
+	vm.ActiveFrame.Labels.Push(&Label{
 		Arity:          len(block.BlockType.ReturnTypes),
 		ContinuationPC: block.EndAt + 1,
-		OperandSP:      vm.OperandStack.SP,
+		OperandSP:      vm.Operands.SP,
 	})
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 }
 
 func loop(vm *VirtualMachine) {
-	ctx := vm.ActiveContext
-	block, ok := ctx.Function.Blocks[ctx.PC]
+	frame := vm.ActiveFrame
+	block, ok := frame.F.Blocks[frame.PC]
 	if !ok {
 		panic("block not found")
 	}
-	ctx.PC += block.BlockTypeBytes
+	frame.PC += block.BlockTypeBytes
 	arity := len(block.BlockType.InputTypes)
-	ctx.LabelStack.Push(&Label{
+	vm.ActiveFrame.Labels.Push(&Label{
 		Arity:          arity,
 		ContinuationPC: block.StartAt,
-		OperandSP:      vm.OperandStack.SP - arity,
+		OperandSP:      vm.Operands.SP - arity,
 	})
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 }
 
 func ifOp(vm *VirtualMachine) {
-	ctx := vm.ActiveContext
-	block, ok := ctx.Function.Blocks[ctx.PC]
+	frame := vm.ActiveFrame
+	block, ok := frame.F.Blocks[frame.PC]
 	if !ok {
 		panic("block not initialized")
 	}
-	ctx.PC += block.BlockTypeBytes
+	frame.PC += block.BlockTypeBytes
 
-	if vm.OperandStack.Pop() == 0 {
-		ctx.PC = block.ElseAt
+	if vm.Operands.Pop() == 0 {
+		frame.PC = block.ElseAt
 	}
 
 	arity := len(block.BlockType.ReturnTypes)
-	ctx.LabelStack.Push(&Label{
+	vm.ActiveFrame.Labels.Push(&Label{
 		Arity:          arity,
 		ContinuationPC: block.EndAt + 1,
-		OperandSP:      vm.OperandStack.SP - len(block.BlockType.InputTypes),
+		OperandSP:      vm.Operands.SP - len(block.BlockType.InputTypes),
 	})
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 }
 
 func elseOp(vm *VirtualMachine) {
-	l := vm.ActiveContext.LabelStack.Pop()
-	vm.ActiveContext.PC = l.ContinuationPC
+	l := vm.ActiveFrame.Labels.Pop()
+	vm.ActiveFrame.PC = l.ContinuationPC
 }
 
 func end(vm *VirtualMachine) {
-	_ = vm.ActiveContext.LabelStack.Pop()
-	vm.ActiveContext.PC++
+	_ = vm.ActiveFrame.Labels.Pop()
+	vm.ActiveFrame.PC++
+}
+
+func returnOp(vm *VirtualMachine) {
+	vm.Frames.Pop()
+	vm.ActiveFrame = vm.Frames.Peek()
 }
 
 func br(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 	index := vm.FetchUint32()
 	brAt(vm, index)
 }
 
 func brIf(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 	index := vm.FetchUint32()
-	c := vm.OperandStack.Pop()
+	c := vm.Operands.Pop()
 	if c != 0 {
 		brAt(vm, index)
 	} else {
-		vm.ActiveContext.PC++
+		vm.ActiveFrame.PC++
 	}
 }
 
 func brAt(vm *VirtualMachine, index uint32) {
 	var l *Label
 	for i := uint32(0); i < index+1; i++ {
-		l = vm.ActiveContext.LabelStack.Pop()
+		l = vm.ActiveFrame.Labels.Pop()
 	}
 
 	// TODO: can be optimized.
 	values := make([]uint64, 0, l.Arity)
 	for i := 0; i < l.Arity; i++ {
-		values = append(values, vm.OperandStack.Pop())
+		values = append(values, vm.Operands.Pop())
 	}
-	vm.OperandStack.SP = l.OperandSP
+	vm.Operands.SP = l.OperandSP
 	for _, v := range values {
-		vm.OperandStack.Push(v)
+		vm.Operands.Push(v)
 	}
-	vm.ActiveContext.PC = l.ContinuationPC
+	vm.ActiveFrame.PC = l.ContinuationPC
 }
 
 func brTable(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
-	r := bytes.NewBuffer(vm.ActiveContext.Function.Body[vm.ActiveContext.PC:])
+	vm.ActiveFrame.PC++
+	r := bytes.NewBuffer(vm.ActiveFrame.F.Body[vm.ActiveFrame.PC:])
 	nl, num, err := leb128.DecodeUint32(r)
 	if err != nil {
 		panic(err)
@@ -126,9 +131,9 @@ func brTable(vm *VirtualMachine) {
 	if err != nil {
 		panic(err)
 	}
-	vm.ActiveContext.PC += n + num
+	vm.ActiveFrame.PC += n + num
 
-	i := vm.OperandStack.Pop()
+	i := vm.Operands.Pop()
 	if uint32(i) < nl {
 		brAt(vm, lis[i])
 	} else {

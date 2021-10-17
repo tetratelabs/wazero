@@ -1,24 +1,24 @@
 package wasm
 
 func getLocal(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 	id := vm.FetchUint32()
-	vm.OperandStack.Push(vm.ActiveContext.Locals[id])
-	vm.ActiveContext.PC++
+	vm.Operands.Push(vm.ActiveFrame.Locals[id])
+	vm.ActiveFrame.PC++
 }
 
 func setLocal(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 	id := vm.FetchUint32()
-	v := vm.OperandStack.Pop()
-	vm.ActiveContext.Locals[id] = v
-	vm.ActiveContext.PC++
+	v := vm.Operands.Pop()
+	vm.ActiveFrame.Locals[id] = v
+	vm.ActiveFrame.PC++
 }
 
 func teeLocal(vm *VirtualMachine) {
-	vm.ActiveContext.PC++
+	vm.ActiveFrame.PC++
 	id := vm.FetchUint32()
-	v := vm.OperandStack.Peek()
-	vm.ActiveContext.Locals[id] = v
-	vm.ActiveContext.PC++
+	v := vm.Operands.Peek()
+	vm.ActiveFrame.Locals[id] = v
+	vm.ActiveFrame.PC++
 }

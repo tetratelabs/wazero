@@ -2,6 +2,7 @@ package spec
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -309,9 +310,8 @@ func TestSpecification(t *testing.T) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							assert.Panics(t, func() {
-								_, _, _ = vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
-							}, msg)
+							_, _, err := vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
+							assert.True(t, errors.Is(err, wasm.ErrFunctionTrapped), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

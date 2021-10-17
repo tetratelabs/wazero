@@ -15,7 +15,7 @@ type (
 	Store struct {
 		ModuleInstances map[string]*ModuleInstance
 
-		Functions []FuncInstance
+		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
 		Memories  []*MemoryInstance
 		Tables    []*TableInstance
@@ -36,9 +36,23 @@ type (
 		Addr int
 	}
 
-	FuncInstance interface {
-		Call(vm *VirtualMachine)
-		FunctionType() *FunctionType
+	FunctionInstance struct {
+		Name           string
+		ModuleInstance *ModuleInstance
+		Body           []byte
+		Signature      *FunctionType
+		NumLocals      uint32
+		LocalTypes     []ValueType
+		Blocks         map[uint64]*FunctionInstanceBlock
+		HostFunction   *reflect.Value
+	}
+
+	FunctionInstanceBlock struct {
+		StartAt, ElseAt, EndAt uint64
+		BlockType              *FunctionType
+		BlockTypeBytes         uint64
+		IsLoop                 bool // TODO: might not be necessary
+		IsIf                   bool // TODO: might not be necessary
 	}
 
 	GlobalInstance struct {
@@ -111,7 +125,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleInstance, error
 		if int(index) >= len(instance.FunctionAddrs) {
 			return nil, fmt.Errorf("invalid start function index: %d", index)
 		}
-		signature := s.Functions[instance.FunctionAddrs[index]].FunctionType()
+		signature := s.Functions[instance.FunctionAddrs[index]].Signature
 		if len(signature.InputTypes) != 0 || len(signature.ReturnTypes) != 0 {
 			return nil, fmt.Errorf("start function must have the empty signature")
 		}
@@ -178,10 +192,10 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndexPtr *uint32
 		return fmt.Errorf("unknown type for function import")
 	}
 	iSig := target.Types[typeIndex]
-	if !hasSameSignature(iSig.ReturnTypes, f.FunctionType().ReturnTypes) {
-		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.ReturnTypes, f.FunctionType().ReturnTypes)
-	} else if !hasSameSignature(iSig.InputTypes, f.FunctionType().InputTypes) {
-		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.InputTypes, f.FunctionType().InputTypes)
+	if !hasSameSignature(iSig.ReturnTypes, f.Signature.ReturnTypes) {
+		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.ReturnTypes, f.Signature.ReturnTypes)
+	} else if !hasSameSignature(iSig.InputTypes, f.Signature.InputTypes) {
+		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.InputTypes, f.Signature.InputTypes)
 	}
 	target.FunctionAddrs = append(target.FunctionAddrs, externModuleExportIsntance.Addr)
 	return nil
@@ -304,6 +318,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	memoryDeclarations = append(memoryDeclarations, module.MemorySection...)
 	tableDeclarations = append(tableDeclarations, module.TableSection...)
 
+	analysisCache := map[int]map[uint64]*FunctionInstanceBlock{}
 	for codeIndex, typeIndex := range module.FunctionSection {
 		if typeIndex >= uint32(len(module.TypeSection)) {
 			return rollbackFuncs, fmt.Errorf("function type index out of range")
@@ -311,24 +326,32 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
-		f := &NativeFunction{
+		f := &FunctionInstance{
 			Signature:      module.TypeSection[typeIndex],
 			Body:           module.CodeSection[codeIndex].Body,
 			NumLocals:      module.CodeSection[codeIndex].NumLocals,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
 			ModuleInstance: target,
-			Blocks:         map[uint64]*NativeFunctionBlock{},
+			Blocks:         map[uint64]*FunctionInstanceBlock{},
 		}
 
-		err := analyzeFunction(
-			module, f, functionDeclarations, globalDecalarations,
-			memoryDeclarations, tableDeclarations,
-		)
-		if err != nil {
-			return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
+		blocks, ok := analysisCache[codeIndex]
+		if !ok {
+			err := analyzeFunction(
+				module, f, functionDeclarations, globalDecalarations,
+				memoryDeclarations, tableDeclarations,
+			)
+			if err != nil {
+				return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
+			}
+			analysisCache[codeIndex] = f.Blocks
+		} else {
+			f.Blocks = blocks
 		}
+
 		target.FunctionAddrs = append(target.FunctionAddrs, len(s.Functions))
 		s.Functions = append(s.Functions, f)
+		f.Body[len(f.Body)-1] = byte(OptCodeReturn)
 	}
 	return rollbackFuncs, nil
 }
@@ -606,13 +629,13 @@ func (s *valueTypeStack) String() string {
 type BlockType = FunctionType
 
 func analyzeFunction(
-	module *Module, f *NativeFunction,
+	module *Module, f *FunctionInstance,
 	functionDeclarations []uint32,
 	globalDeclarations []*GlobalType,
 	memoryDeclarations []*MemoryType,
 	tableDeclarations []*TableType,
 ) error {
-	labelStack := []*NativeFunctionBlock{
+	labelStack := []*FunctionInstanceBlock{
 		{BlockType: f.Signature, StartAt: math.MaxUint64},
 	}
 	valueTypeStack := &valueTypeStack{}
@@ -1277,7 +1300,7 @@ func analyzeFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &NativeFunctionBlock{
+			labelStack = append(labelStack, &FunctionInstanceBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1289,7 +1312,7 @@ func analyzeFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &NativeFunctionBlock{
+			labelStack = append(labelStack, &FunctionInstanceBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1302,7 +1325,7 @@ func analyzeFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &NativeFunctionBlock{
+			labelStack = append(labelStack, &FunctionInstanceBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1484,10 +1507,10 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		Kind: ExportKindFunction,
 		Addr: len(s.Functions),
 	}
-	s.Functions = append(s.Functions, &HostFunction{
-		Name:      fmt.Sprintf("%s.%s", moduleName, funcName),
-		Function:  fn,
-		Signature: sig,
+	s.Functions = append(s.Functions, &FunctionInstance{
+		Name:         fmt.Sprintf("%s.%s", moduleName, funcName),
+		HostFunction: &fn,
+		Signature:    sig,
 	})
 	return nil
 }
