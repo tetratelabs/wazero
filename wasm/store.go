@@ -360,7 +360,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 	// Allocate memory instances.
 	for _, memSec := range module.MemorySection {
 		memInst := &MemoryInstance{
-			Memory: make([]byte, uint64(memSec.Min)*PageSize),
+			Memory: make([]byte, uint64(memSec.Min)*pageSize),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
 		}
@@ -393,7 +393,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 		if int(d.MemoryIndex) < len(module.MemorySection) && module.MemorySection[d.MemoryIndex].Max != nil {
 			max = uint64(*module.MemorySection[d.MemoryIndex].Max)
 		}
-		if size > max*PageSize {
+		if size > max*pageSize {
 			return rollbackFuncs, fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
 		}
 
@@ -1579,7 +1579,7 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 		Addr: len(s.Memories),
 	}
 	s.Memories = append(s.Memories, &MemoryInstance{
-		Memory: make([]byte, uint64(min)*PageSize),
+		Memory: make([]byte, uint64(min)*pageSize),
 		Min:    min,
 		Max:    max,
 	})

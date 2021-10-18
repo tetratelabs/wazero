@@ -1,5 +1,9 @@
 package wasm
 
+import (
+	"github.com/mathetake/gasm/wasm/buildoptions"
+)
+
 const (
 	initialOperandStackHeight = 1024
 	initialLabelStackHeight   = 10
@@ -132,6 +136,11 @@ func (s *VirtualMachineFrameStack) Pop() *VirtualMachineFrame {
 }
 
 func (s *VirtualMachineFrameStack) Push(val *VirtualMachineFrame) {
+	if buildoptions.CheckCallStackOverflow {
+		if buildoptions.CallStackHeightLimit <= s.SP {
+			panic(ErrCallStackOverflow)
+		}
+	}
 	if s.SP+1 == len(s.Stack) {
 		// grow stack
 		s.Stack = append(s.Stack, val)

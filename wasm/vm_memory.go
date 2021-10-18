@@ -161,7 +161,7 @@ func i64Store32(vm *VirtualMachine) {
 }
 
 func memorySize(vm *VirtualMachine) {
-	vm.Operands.Push(uint64(int32(uint64(len(vm.CurrentMemory())) / PageSize)))
+	vm.Operands.Push(uint64(int32(uint64(len(vm.CurrentMemory())) / pageSize)))
 	vm.ActiveFrame.PC += 2
 }
 
@@ -174,16 +174,16 @@ func memoryGrow(vm *VirtualMachine) {
 
 	max := uint64(math.MaxUint32)
 	if memoryInst.Max != nil {
-		max = uint64(*memoryInst.Max) * PageSize
+		max = uint64(*memoryInst.Max) * pageSize
 	}
-	if uint64(n*PageSize+uint64(len(memoryInst.Memory))) > max {
+	if uint64(n*pageSize+uint64(len(memoryInst.Memory))) > max {
 		v := int32(-1)
 		vm.Operands.Push(uint64(v))
 		vm.ActiveFrame.PC++
 		return
 	}
 
-	vm.Operands.Push(uint64(len(memoryInst.Memory)) / PageSize)
-	memoryInst.Memory = append(memoryInst.Memory, make([]byte, n*PageSize)...)
+	vm.Operands.Push(uint64(len(memoryInst.Memory)) / pageSize)
+	memoryInst.Memory = append(memoryInst.Memory, make([]byte, n*pageSize)...)
 	vm.ActiveFrame.PC++ // Skip reserved bytes.
 }

@@ -311,7 +311,7 @@ func TestSpecification(t *testing.T) {
 								msg += " in module " + c.Action.Module
 							}
 							_, _, err := vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
-							assert.True(t, errors.Is(err, wasm.ErrFunctionTrapped), msg)
+							assert.Error(t, err, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
@@ -328,7 +328,24 @@ func TestSpecification(t *testing.T) {
 						}
 						require.Error(t, err, msg)
 					case "assert_exhaustion":
-						// TODO:
+						moduleName := lastInstanceName
+						if c.Action.Module != "" {
+							moduleName = c.Action.Module
+						}
+						require.NotNil(t, vm)
+						switch c.Action.ActionType {
+						case "invoke":
+							args := c.getAssertReturnArgs(t)
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							_, _, err := vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
+							assert.Error(t, err, msg)
+							assert.True(t, errors.Is(err, wasm.ErrCallStackOverflow), msg)
+						default:
+							t.Fatalf("unsupported action type type: %v", c)
+						}
 					case "assert_unlinkable":
 						if c.ModuleType == "text" {
 							// We don't support direct loading of wast yet.
