@@ -1,7 +1,6 @@
 package examples
 
 import (
-	"errors"
 	"os"
 	"testing"
 
@@ -29,5 +28,4 @@ func Test_trap(t *testing.T) {
 
 	_, _, err = vm.ExecExportedFunction("test", "cause_panic")
 	require.Error(t, err)
-	require.True(t, errors.Is(err, wasm.ErrFunctionTrapped))
 }

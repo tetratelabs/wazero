@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+
+	"github.com/mathetake/gasm/wasm/buildoptions"
 )
 
 func call(vm *VirtualMachine) {
@@ -43,8 +45,8 @@ func callIn(vm *VirtualMachine, nextF *FunctionInstance) {
 	vm.ActiveFrame.PC++ // skip the current call instruction of the current frame.
 	if nextF.HostFunction != nil {
 		hostF := *nextF.HostFunction
-		if isDebugMode {
-			fmt.Printf("Call host function '%s'\n", nextF.Name)
+		if buildoptions.IsDebugMode {
+			fmt.Printf("call host function '%s'\n", nextF.Name)
 		}
 		tp := hostF.Type()
 		in := make([]reflect.Value, tp.NumIn())

@@ -1,4 +1,4 @@
-//go:build wasmdebug
+//go:build debug_mode
 
 package wasm
 

@@ -9,12 +9,15 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/mathetake/gasm/wasm/buildoptions"
 	"github.com/mathetake/gasm/wasm/leb128"
 )
 
-const PageSize uint64 = 65536
+const pageSize uint64 = 65536
 
-var ErrFunctionTrapped = errors.New("function trapped")
+var (
+	ErrCallStackOverflow = errors.New("callstack overflow")
+)
 
 type (
 	VirtualMachine struct {
@@ -43,9 +46,6 @@ func (vm *VirtualMachine) InstantiateModule(module *Module, name string) (errRet
 		f := vm.Store.Functions[inst.FunctionAddrs[*module.StartSection]]
 		if f.HostFunction != nil {
 			hostF := *f.HostFunction
-			if isDebugMode {
-				fmt.Printf("Call host function '%s'\n", f.Name)
-			}
 			tp := hostF.Type()
 			in := make([]reflect.Value, 1)
 			val := reflect.New(tp.In(0)).Elem()
@@ -115,20 +115,25 @@ func (vm *VirtualMachine) execFunction(f *FunctionInstance) (errRet error) {
 
 	prevFrameSP := vm.Frames.SP
 	defer func() {
-		if err := recover(); err != nil {
+		if v := recover(); v != nil {
 			// Stack Unwind.
 			// TODO: include stack trace in the error message.
 			vm.Frames.SP = prevFrameSP
-			errRet = fmt.Errorf("%w: %v", ErrFunctionTrapped, err)
+			err, ok := v.(error)
+			if ok {
+				errRet = err
+			} else {
+				errRet = fmt.Errorf("runtime error: %v", v)
+			}
 		}
 	}()
 
 	vm.Frames.Push(frame)
 	vm.ActiveFrame = frame
 	for vm.ActiveFrame != nil {
-		if isDebugMode {
+		if buildoptions.IsDebugMode {
 			fmt.Printf("0x%x: op=%s (Label SP=%d, Operand SP=%d, Frame SP=%d) \n",
-				vm.ActiveFrame.PC, optcodeStrs[vm.ActiveFrame.F.Body[vm.ActiveFrame.PC]],
+				vm.ActiveFrame.PC, buildoptions.OptcodeStrs[vm.ActiveFrame.F.Body[vm.ActiveFrame.PC]],
 				vm.ActiveFrame.Labels.SP, vm.Operands.SP, vm.Frames.SP)
 			time.Sleep(time.Millisecond)
 		}
