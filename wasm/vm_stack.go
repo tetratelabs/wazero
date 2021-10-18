@@ -103,9 +103,8 @@ func (s *VirtualMachineLabelStack) Push(val *Label) {
 }
 
 type VirtualMachineFrameStack struct {
-	Stack              []*VirtualMachineFrame
-	SP                 int
-	CheckStackOverflow bool
+	Stack []*VirtualMachineFrame
+	SP    int
 }
 
 type VirtualMachineFrame struct {
