@@ -47,10 +47,10 @@ func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExp
 		if err != nil {
 			return nil, 0, fmt.Errorf("read index of global: %w", err)
 		}
-		if uint32(len(target.GlobalsAddrs)) <= id {
+		if uint32(len(target.Globals)) <= id {
 			return nil, 0, fmt.Errorf("global index out of range")
 		}
-		g := s.Globals[target.GlobalsAddrs[id]]
+		g := target.Globals[id]
 		switch g.Type.ValType {
 		case ValueTypeI32:
 			v = int32(g.Val)

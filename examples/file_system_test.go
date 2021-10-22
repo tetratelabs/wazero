@@ -10,6 +10,7 @@ import (
 
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
+	"github.com/mathetake/gasm/wasm/naivevm"
 )
 
 func writeFile(fs wasi.FS, path string, data []byte) error {
@@ -53,16 +54,15 @@ func Test_file_system(t *testing.T) {
 
 	wasiEnv := wasi.NewEnvironment(wasi.Preopen(".", memFS))
 
-	vm, err := wasm.NewVM()
+	store := wasm.NewStore(naivevm.NewEngine())
+
+	err = wasiEnv.Register(store)
 	require.NoError(t, err)
 
-	err = wasiEnv.RegisterToVirtualMachine(vm)
+	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	err = vm.InstantiateModule(mod, "test")
-	require.NoError(t, err)
-
-	_, _, err = vm.ExecExportedFunction("test", "_start")
+	_, _, err = store.CallFunction("test", "_start")
 	require.NoError(t, err)
 
 	out, err := readFile(memFS, "output.txt")

@@ -10,6 +10,7 @@ import (
 
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
+	"github.com/mathetake/gasm/wasm/naivevm"
 )
 
 func Test_stdio(t *testing.T) {
@@ -25,13 +26,12 @@ func Test_stdio(t *testing.T) {
 		wasi.Stdout(stdoutBuf),
 		wasi.Stderr(stderrBuf),
 	)
-	vm, err := wasm.NewVM()
+	store := wasm.NewStore(naivevm.NewEngine())
+	err = wasiEnv.Register(store)
 	require.NoError(t, err)
-	err = wasiEnv.RegisterToVirtualMachine(vm)
+	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
-	err = vm.InstantiateModule(mod, "test")
-	require.NoError(t, err)
-	_, _, err = vm.ExecExportedFunction("test", "_start")
+	_, _, err = store.CallFunction("test", "_start")
 	require.NoError(t, err)
 	require.Equal(t, "Hello, WASI!", strings.TrimSpace(stdoutBuf.String()))
 	require.Equal(t, "Error Message", strings.TrimSpace(stderrBuf.String()))

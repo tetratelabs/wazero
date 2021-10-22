@@ -9,6 +9,7 @@ import (
 
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
+	"github.com/mathetake/gasm/wasm/naivevm"
 )
 
 func Test_hostFunc(t *testing.T) {
@@ -19,24 +20,23 @@ func Test_hostFunc(t *testing.T) {
 	require.NoError(t, err)
 
 	var cnt uint64
-	hostFunc := func(*wasm.VirtualMachine) {
+	hostFunc := func(*wasm.HostFunctionCallContext) {
 		cnt++
 	}
 
-	vm, err := wasm.NewVM()
+	store := wasm.NewStore(naivevm.NewEngine())
+
+	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(hostFunc))
 	require.NoError(t, err)
 
-	err = vm.AddHostFunction("env", "host_func", reflect.ValueOf(hostFunc))
+	err = wasi.NewEnvironment().Register(store)
 	require.NoError(t, err)
 
-	err = wasi.NewEnvironment().RegisterToVirtualMachine(vm)
-	require.NoError(t, err)
-
-	err = vm.InstantiateModule(mod, "test")
+	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
 	for _, exp := range []uint64{5, 10, 15} {
-		_, _, err = vm.ExecExportedFunction("test", "call_host_func", exp)
+		_, _, err = store.CallFunction("test", "call_host_func", exp)
 		require.NoError(t, err)
 		require.Equal(t, exp, cnt)
 		cnt = 0

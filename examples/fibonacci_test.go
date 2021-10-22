@@ -8,6 +8,7 @@ import (
 
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
+	"github.com/mathetake/gasm/wasm/naivevm"
 )
 
 func Test_fibonacci(t *testing.T) {
@@ -17,13 +18,13 @@ func Test_fibonacci(t *testing.T) {
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)
 
-	vm, err := wasm.NewVM()
+	store := wasm.NewStore(naivevm.NewEngine())
 	require.NoError(t, err)
 
-	err = wasi.NewEnvironment().RegisterToVirtualMachine(vm)
+	err = wasi.NewEnvironment().Register(store)
 	require.NoError(t, err)
 
-	err = vm.InstantiateModule(mod, "test")
+	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
 	for _, c := range []struct {
@@ -33,7 +34,7 @@ func Test_fibonacci(t *testing.T) {
 		{in: 10, exp: 55},
 		{in: 5, exp: 5},
 	} {
-		ret, retTypes, err := vm.ExecExportedFunction("test", "fibonacci", uint64(c.in))
+		ret, retTypes, err := store.CallFunction("test", "fibonacci", uint64(c.in))
 		require.NoError(t, err)
 		require.Len(t, ret, len(retTypes))
 		require.Equal(t, wasm.ValueTypeI32, retTypes[0])
