@@ -350,7 +350,7 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (ro
 			Val:  gv,
 		}
 		target.Globals = append(target.Globals, g)
-		s.Globals = append(s.Globals)
+		s.Globals = append(s.Globals, g)
 	}
 	return rollbackFuncs, nil
 }
