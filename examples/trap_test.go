@@ -8,6 +8,7 @@ import (
 
 	"github.com/mathetake/gasm/wasi"
 	"github.com/mathetake/gasm/wasm"
+	"github.com/mathetake/gasm/wasm/naivevm"
 )
 
 func Test_trap(t *testing.T) {
@@ -17,15 +18,14 @@ func Test_trap(t *testing.T) {
 	mod, err := wasm.DecodeModule((buf))
 	require.NoError(t, err)
 
-	vm, err := wasm.NewVM()
+	store := wasm.NewStore(naivevm.NewEngine())
+
+	err = wasi.NewEnvironment().Register(store)
 	require.NoError(t, err)
 
-	err = wasi.NewEnvironment().RegisterToVirtualMachine(vm)
+	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	err = vm.InstantiateModule(mod, "test")
-	require.NoError(t, err)
-
-	_, _, err = vm.ExecExportedFunction("test", "cause_panic")
+	_, _, err = store.CallFunction("test", "cause_panic")
 	require.Error(t, err)
 }

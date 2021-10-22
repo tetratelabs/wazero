@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mathetake/gasm/wasm"
+	"github.com/mathetake/gasm/wasm/naivevm"
 )
 
 type (
@@ -148,21 +149,21 @@ func (v commandActionVal) ToUint64(t *testing.T) uint64 {
 	}
 }
 
-func requireAddSpectestModule(t *testing.T, vm *wasm.VirtualMachine) {
+func requireAddSpectestModule(t *testing.T, store *wasm.Store) {
 	// Add functions
-	err := vm.AddHostFunction("spectest", "print", reflect.ValueOf(func(*wasm.VirtualMachine) {}))
+	err := store.AddHostFunction("spectest", "print", reflect.ValueOf(func(*wasm.HostFunctionCallContext) {}))
 	require.NoError(t, err)
-	err = vm.AddHostFunction("spectest", "print_i32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32) {}))
+	err = store.AddHostFunction("spectest", "print_i32", reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint32) {}))
 	require.NoError(t, err)
-	err = vm.AddHostFunction("spectest", "print_f32", reflect.ValueOf(func(*wasm.VirtualMachine, float32) {}))
+	err = store.AddHostFunction("spectest", "print_f32", reflect.ValueOf(func(*wasm.HostFunctionCallContext, float32) {}))
 	require.NoError(t, err)
-	err = vm.AddHostFunction("spectest", "print_i64", reflect.ValueOf(func(*wasm.VirtualMachine, uint64) {}))
+	err = store.AddHostFunction("spectest", "print_i64", reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint64) {}))
 	require.NoError(t, err)
-	err = vm.AddHostFunction("spectest", "print_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64) {}))
+	err = store.AddHostFunction("spectest", "print_f64", reflect.ValueOf(func(*wasm.HostFunctionCallContext, float64) {}))
 	require.NoError(t, err)
-	err = vm.AddHostFunction("spectest", "print_i32_f32", reflect.ValueOf(func(*wasm.VirtualMachine, uint32, float32) {}))
+	err = store.AddHostFunction("spectest", "print_i32_f32", reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint32, float32) {}))
 	require.NoError(t, err)
-	err = vm.AddHostFunction("spectest", "print_f64_f64", reflect.ValueOf(func(*wasm.VirtualMachine, float64, float64) {}))
+	err = store.AddHostFunction("spectest", "print_f64_f64", reflect.ValueOf(func(*wasm.HostFunctionCallContext, float64, float64) {}))
 	require.NoError(t, err)
 	// Register globals.
 	for _, g := range []struct {
@@ -175,16 +176,16 @@ func requireAddSpectestModule(t *testing.T, vm *wasm.VirtualMachine) {
 		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
 		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
 	} {
-		err = vm.AddGlobal("spectest", g.name, g.value, g.valueType, false)
+		err = store.AddGlobal("spectest", g.name, g.value, g.valueType, false)
 		require.NoError(t, err)
 	}
 	// Register table export.
 	tableLimitMax := uint32(20)
-	err = vm.AddTableInstance("spectest", "table", 10, &tableLimitMax)
+	err = store.AddTableInstance("spectest", "table", 10, &tableLimitMax)
 	require.NoError(t, err)
 	// Register table export.
 	memoryLimitMax := uint32(2)
-	err = vm.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax)
+	err = store.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax)
 	require.NoError(t, err)
 }
 
@@ -205,9 +206,8 @@ func TestSpecification(t *testing.T) {
 		require.NoError(t, json.Unmarshal(raw, &base))
 		wastName := filepath.Base(base.SourceFile)
 		t.Run(wastName, func(t *testing.T) {
-			vm, err := wasm.NewVM()
-			require.NoError(t, err)
-			requireAddSpectestModule(t, vm)
+			store := wasm.NewStore(naivevm.NewEngine())
+			requireAddSpectestModule(t, store)
 
 			var lastInstanceName string
 			for _, c := range base.Commands {
@@ -225,20 +225,19 @@ func TestSpecification(t *testing.T) {
 						if lastInstanceName == "" {
 							lastInstanceName = c.Filename
 						}
-						err = vm.InstantiateModule(mod, lastInstanceName)
+						err = store.Instantiate(mod, lastInstanceName)
 						require.NoError(t, err)
 					case "register":
 						name := lastInstanceName
 						if c.Name != "" {
 							name = c.Name
 						}
-						vm.Store.ModuleInstances[c.As] = vm.Store.ModuleInstances[name]
+						store.ModuleInstances[c.As] = store.ModuleInstances[name]
 					case "assert_return", "action":
 						moduleName := lastInstanceName
 						if c.Action.Module != "" {
 							moduleName = c.Action.Module
 						}
-						require.NotNil(t, vm)
 						switch c.Action.ActionType {
 						case "invoke":
 							args, exps := c.getAssertReturnArgsExps(t)
@@ -246,7 +245,7 @@ func TestSpecification(t *testing.T) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							vals, types, err := vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
+							vals, types, err := store.CallFunction(moduleName, c.Action.Field, args...)
 							if assert.NoError(t, err, msg) &&
 								assert.Equal(t, len(exps), len(vals), msg) &&
 								assert.Equal(t, len(exps), len(types), msg) {
@@ -261,13 +260,13 @@ func TestSpecification(t *testing.T) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							inst, ok := vm.Store.ModuleInstances[moduleName]
+							inst, ok := store.ModuleInstances[moduleName]
 							require.True(t, ok, msg)
 							addr := inst.Exports[c.Action.Field]
 							if addr.Kind != wasm.ExportKindGlobal {
 								t.Fatal()
 							}
-							actual := vm.Store.Globals[addr.Addr]
+							actual := addr.Global
 							var expType wasm.ValueType
 							switch c.Exps[0].ValType {
 							case "i32":
@@ -294,7 +293,7 @@ func TestSpecification(t *testing.T) {
 						require.NoError(t, err, msg)
 						mod, err := wasm.DecodeModule(buf)
 						if err == nil {
-							err = vm.InstantiateModule(mod, "")
+							err = store.Instantiate(mod, "")
 						}
 						require.Error(t, err, msg)
 					case "assert_trap":
@@ -302,7 +301,6 @@ func TestSpecification(t *testing.T) {
 						if c.Action.Module != "" {
 							moduleName = c.Action.Module
 						}
-						require.NotNil(t, vm)
 						switch c.Action.ActionType {
 						case "invoke":
 							args := c.getAssertReturnArgs(t)
@@ -310,7 +308,7 @@ func TestSpecification(t *testing.T) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
+							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
 							assert.Error(t, err, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -324,7 +322,7 @@ func TestSpecification(t *testing.T) {
 						require.NoError(t, err, msg)
 						mod, err := wasm.DecodeModule(buf)
 						if err == nil {
-							err = vm.InstantiateModule(mod, "")
+							err = store.Instantiate(mod, "")
 						}
 						require.Error(t, err, msg)
 					case "assert_exhaustion":
@@ -332,7 +330,6 @@ func TestSpecification(t *testing.T) {
 						if c.Action.Module != "" {
 							moduleName = c.Action.Module
 						}
-						require.NotNil(t, vm)
 						switch c.Action.ActionType {
 						case "invoke":
 							args := c.getAssertReturnArgs(t)
@@ -340,7 +337,7 @@ func TestSpecification(t *testing.T) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := vm.ExecExportedFunction(moduleName, c.Action.Field, args...)
+							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
 							assert.Error(t, err, msg)
 							assert.True(t, errors.Is(err, wasm.ErrCallStackOverflow), msg)
 						default:
@@ -355,7 +352,7 @@ func TestSpecification(t *testing.T) {
 						require.NoError(t, err, msg)
 						mod, err := wasm.DecodeModule(buf)
 						if err == nil {
-							err = vm.InstantiateModule(mod, "")
+							err = store.Instantiate(mod, "")
 						}
 						require.Error(t, err, msg)
 					case "assert_uninstantiable":
@@ -365,7 +362,7 @@ func TestSpecification(t *testing.T) {
 						mod, err := wasm.DecodeModule(buf)
 						require.NoError(t, err, msg)
 
-						err = vm.InstantiateModule(mod, "")
+						err = store.Instantiate(mod, "")
 						require.Error(t, err, msg)
 					default:
 						t.Fatalf("unsupported command type: %s", c)

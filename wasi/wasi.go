@@ -24,56 +24,56 @@ type WASIEnvirnment struct {
 	opened map[uint32]fileEntry
 }
 
-func (w *WASIEnvirnment) RegisterToVirtualMachine(vm *wasm.VirtualMachine) (err error) {
+func (w *WASIEnvirnment) Register(store *wasm.Store) (err error) {
 	for _, wasiName := range []string{
 		wasiUnstableName,
 		wasiSnapshotPreview1Name,
 	} {
-		err = vm.AddHostFunction(wasiName, "proc_exit", reflect.ValueOf(proc_exit))
+		err = store.AddHostFunction(wasiName, "proc_exit", reflect.ValueOf(proc_exit))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "fd_write", reflect.ValueOf(w.fd_write))
+		err = store.AddHostFunction(wasiName, "fd_write", reflect.ValueOf(w.fd_write))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "environ_sizes_get", reflect.ValueOf(environ_sizes_get))
+		err = store.AddHostFunction(wasiName, "environ_sizes_get", reflect.ValueOf(environ_sizes_get))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "environ_get", reflect.ValueOf(environ_get))
+		err = store.AddHostFunction(wasiName, "environ_get", reflect.ValueOf(environ_get))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "fd_prestat_get", reflect.ValueOf(w.fd_prestat_get))
+		err = store.AddHostFunction(wasiName, "fd_prestat_get", reflect.ValueOf(w.fd_prestat_get))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "fd_prestat_dir_name", reflect.ValueOf(w.fd_prestat_dir_name))
+		err = store.AddHostFunction(wasiName, "fd_prestat_dir_name", reflect.ValueOf(w.fd_prestat_dir_name))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "fd_fdstat_get", reflect.ValueOf(w.fd_fdstat_get))
+		err = store.AddHostFunction(wasiName, "fd_fdstat_get", reflect.ValueOf(w.fd_fdstat_get))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "fd_close", reflect.ValueOf(w.fd_close))
+		err = store.AddHostFunction(wasiName, "fd_close", reflect.ValueOf(w.fd_close))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "fd_read", reflect.ValueOf(w.fd_read))
+		err = store.AddHostFunction(wasiName, "fd_read", reflect.ValueOf(w.fd_read))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "path_open", reflect.ValueOf(w.path_open))
+		err = store.AddHostFunction(wasiName, "path_open", reflect.ValueOf(w.path_open))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "args_get", reflect.ValueOf(args_get))
+		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(args_get))
 		if err != nil {
 			return err
 		}
-		err = vm.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(args_sizes_get))
+		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(args_sizes_get))
 		if err != nil {
 			return err
 		}
@@ -142,14 +142,14 @@ func (w *WASIEnvirnment) randUnusedFD() uint32 {
 	}
 }
 
-func (w *WASIEnvirnment) fd_prestat_get(vm *wasm.VirtualMachine, fd uint32, bufPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err uint32) {
 	if _, ok := w.opened[fd]; !ok {
 		return EBADF
 	}
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_prestat_dir_name(vm *wasm.VirtualMachine, fd uint32, pathPtr uint32, pathLen uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err uint32) {
 	f, ok := w.opened[fd]
 	if !ok {
 		return EINVAL
@@ -159,19 +159,19 @@ func (w *WASIEnvirnment) fd_prestat_dir_name(vm *wasm.VirtualMachine, fd uint32,
 		return ENAMETOOLONG
 	}
 
-	copy(vm.CurrentMemory()[pathPtr:], f.path)
+	copy(ctx.Memory.Memory[pathPtr:], f.path)
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_fdstat_get(vm *wasm.VirtualMachine, fd uint32, bufPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err uint32) {
 	if _, ok := w.opened[fd]; !ok {
 		return EBADF
 	}
-	binary.LittleEndian.PutUint64(vm.CurrentMemory()[bufPtr+16:], R_FD_READ|R_FD_WRITE)
+	binary.LittleEndian.PutUint64(ctx.Memory.Memory[bufPtr+16:], R_FD_READ|R_FD_WRITE)
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) path_open(vm *wasm.VirtualMachine, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+func (w *WASIEnvirnment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
 	fsRightsBase, fsRightsInheriting uint64,
 	fdFlags, fdPtr uint32) (errno uint32) {
 	dir, ok := w.opened[fd]
@@ -179,7 +179,7 @@ func (w *WASIEnvirnment) path_open(vm *wasm.VirtualMachine, fd, dirFlags, pathPt
 		return EINVAL
 	}
 
-	path := string(vm.CurrentMemory()[pathPtr : pathPtr+pathLen])
+	path := string(ctx.Memory.Memory[pathPtr : pathPtr+pathLen])
 	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
 	if err != nil {
 		switch {
@@ -196,11 +196,11 @@ func (w *WASIEnvirnment) path_open(vm *wasm.VirtualMachine, fd, dirFlags, pathPt
 		file: f,
 	}
 
-	binary.LittleEndian.PutUint32(vm.CurrentMemory()[fdPtr:], newFD)
+	binary.LittleEndian.PutUint32(ctx.Memory.Memory[fdPtr:], newFD)
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_write(vm *wasm.VirtualMachine, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err uint32) {
 	var writer io.Writer
 
 	switch fd {
@@ -219,19 +219,19 @@ func (w *WASIEnvirnment) fd_write(vm *wasm.VirtualMachine, fd uint32, iovsPtr ui
 	var nwritten uint32
 	for i := uint32(0); i < iovsLen; i++ {
 		iovPtr := iovsPtr + i*8
-		offset := binary.LittleEndian.Uint32(vm.CurrentMemory()[iovPtr:])
-		l := binary.LittleEndian.Uint32(vm.CurrentMemory()[iovPtr+4:])
-		n, err := writer.Write(vm.CurrentMemory()[offset : offset+l])
+		offset := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr+4:])
+		n, err := writer.Write(ctx.Memory.Memory[offset : offset+l])
 		if err != nil {
 			panic(err)
 		}
 		nwritten += uint32(n)
 	}
-	binary.LittleEndian.PutUint32(vm.CurrentMemory()[nwrittenPtr:], nwritten)
+	binary.LittleEndian.PutUint32(ctx.Memory.Memory[nwrittenPtr:], nwritten)
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_read(vm *wasm.VirtualMachine, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err uint32) {
 	var reader io.Reader
 
 	switch fd {
@@ -248,9 +248,9 @@ func (w *WASIEnvirnment) fd_read(vm *wasm.VirtualMachine, fd uint32, iovsPtr uin
 	var nread uint32
 	for i := uint32(0); i < iovsLen; i++ {
 		iovPtr := iovsPtr + i*8
-		offset := binary.LittleEndian.Uint32(vm.CurrentMemory()[iovPtr:])
-		l := binary.LittleEndian.Uint32(vm.CurrentMemory()[iovPtr+4:])
-		n, err := reader.Read(vm.CurrentMemory()[offset : offset+l])
+		offset := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr+4:])
+		n, err := reader.Read(ctx.Memory.Memory[offset : offset+l])
 		nread += uint32(n)
 		if errors.Is(err, io.EOF) {
 			break
@@ -258,11 +258,11 @@ func (w *WASIEnvirnment) fd_read(vm *wasm.VirtualMachine, fd uint32, iovsPtr uin
 			return EIO
 		}
 	}
-	binary.LittleEndian.PutUint32(vm.CurrentMemory()[nreadPtr:], nread)
+	binary.LittleEndian.PutUint32(ctx.Memory.Memory[nreadPtr:], nread)
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_close(vm *wasm.VirtualMachine, fd uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err uint32) {
 	f, ok := w.opened[fd]
 	if !ok {
 		return EBADF
@@ -277,27 +277,27 @@ func (w *WASIEnvirnment) fd_close(vm *wasm.VirtualMachine, fd uint32) (err uint3
 	return ESUCCESS
 }
 
-func args_sizes_get(vm *wasm.VirtualMachine, argcPtr uint32, argvPtr uint32) (err uint32) {
+func args_sizes_get(ctx *wasm.HostFunctionCallContext, argcPtr uint32, argvPtr uint32) (err uint32) {
 	// not implemented yet
-	binary.LittleEndian.PutUint32(vm.CurrentMemory()[argcPtr:], 0)
-	binary.LittleEndian.PutUint32(vm.CurrentMemory()[argvPtr:], 0)
+	binary.LittleEndian.PutUint32(ctx.Memory.Memory[argcPtr:], 0)
+	binary.LittleEndian.PutUint32(ctx.Memory.Memory[argvPtr:], 0)
 	return 0
 }
 
-func args_get(*wasm.VirtualMachine, uint32, uint32) (err uint32) {
+func args_get(*wasm.HostFunctionCallContext, uint32, uint32) (err uint32) {
 	// not implemented yet
 	return
 }
 
-func proc_exit(*wasm.VirtualMachine, uint32) {
+func proc_exit(*wasm.HostFunctionCallContext, uint32) {
 	// not implemented yet
 }
 
-func environ_sizes_get(*wasm.VirtualMachine, uint32, uint32) (err uint32) {
+func environ_sizes_get(*wasm.HostFunctionCallContext, uint32, uint32) (err uint32) {
 	// not implemented yet
 	return
 }
 
-func environ_get(*wasm.VirtualMachine, uint32, uint32) (err uint32) {
+func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err uint32) {
 	return
 }
