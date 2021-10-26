@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 )
@@ -10,9 +9,6 @@ import (
 var (
 	magic   = []byte{0x00, 0x61, 0x73, 0x6D}
 	version = []byte{0x01, 0x00, 0x00, 0x00}
-
-	ErrInvalidMagicNumber = errors.New("invalid magic number")
-	ErrInvalidVersion     = errors.New("invalid version header")
 )
 
 type Reader struct {

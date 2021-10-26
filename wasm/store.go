@@ -321,6 +321,60 @@ func (s *Store) applyGlobalImport(target *ModuleInstance, globalTypePtr *GlobalT
 	return nil
 }
 
+func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExpression) (v interface{}, valueType ValueType, err error) {
+	r := bytes.NewBuffer(expr.Data)
+	switch expr.OptCode {
+	case OptCodeI32Const:
+		v, _, err = leb128.DecodeInt32(r)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read uint32: %w", err)
+		}
+		return v, ValueTypeI32, nil
+	case OptCodeI64Const:
+		v, _, err = leb128.DecodeInt32(r)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read uint64: %w", err)
+		}
+		return v, ValueTypeI64, nil
+	case OptCodeF32Const:
+		v, err = readFloat32(r)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read f34: %w", err)
+		}
+		return v, ValueTypeF32, nil
+	case OptCodeF64Const:
+		v, err = readFloat64(r)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read f64: %w", err)
+		}
+		return v, ValueTypeF64, nil
+	case OptCodeGlobalGet:
+		id, _, err := leb128.DecodeUint32(r)
+		if err != nil {
+			return nil, 0, fmt.Errorf("read index of global: %w", err)
+		}
+		if uint32(len(target.Globals)) <= id {
+			return nil, 0, fmt.Errorf("global index out of range")
+		}
+		g := target.Globals[id]
+		switch g.Type.ValType {
+		case ValueTypeI32:
+			v = int32(g.Val)
+			return v, ValueTypeI32, nil
+		case ValueTypeI64:
+			v = int64(g.Val)
+			return v, ValueTypeI64, nil
+		case ValueTypeF32:
+			v = math.Float32frombits(uint32(g.Val))
+			return v, ValueTypeF32, nil
+		case ValueTypeF64:
+			v = math.Float64frombits(uint64(g.Val))
+			return v, ValueTypeF64, nil
+		}
+	}
+	return nil, 0, fmt.Errorf("invalid opt code: %#x", expr.OptCode)
+}
+
 func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	prevLen := len(s.Globals)
 	rollbackFuncs = append(rollbackFuncs, func() {
@@ -600,7 +654,8 @@ type valueTypeStack struct {
 }
 
 const (
-	valueTypeUnknown = ValueType(0xFE)
+	// Only used in the anlyzeFunction below.
+	valueTypeUnknown = ValueType(0xFF)
 )
 
 func (s *valueTypeStack) pop() (ValueType, error) {
@@ -714,8 +769,8 @@ func analyzeFunction(
 	}
 	valueTypeStack := &valueTypeStack{}
 	for pc := uint64(0); pc < uint64(len(f.Body)); pc++ {
-		rawOc := f.Body[pc]
-		if 0x28 <= rawOc && rawOc <= 0x3e { // memory load,store
+		op := f.Body[pc]
+		if OptCodeI32Load <= op && op <= OptCodeI64Store32 {
 			if len(memoryDeclarations) == 0 {
 				return fmt.Errorf("unknown memory access")
 			}
@@ -724,7 +779,7 @@ func analyzeFunction(
 			if err != nil {
 				return fmt.Errorf("read memory align: %v", err)
 			}
-			switch OptCode(rawOc) {
+			switch op {
 			case OptCodeI32Load:
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
@@ -903,7 +958,7 @@ func analyzeFunction(
 				return fmt.Errorf("read memory offset: %v", err)
 			}
 			pc += num - 1
-		} else if 0x3f <= rawOc && rawOc <= 0x40 { // memory grow,size
+		} else if OptCodeMemorySize <= op && op <= OptCodeMemoryGrow {
 			if len(memoryDeclarations) == 0 {
 				return fmt.Errorf("unknown memory access")
 			}
@@ -915,7 +970,7 @@ func analyzeFunction(
 			if val != 0 || num != 1 {
 				return fmt.Errorf("memory instruction reserved bytes not zero with 1 byte")
 			}
-			switch OptCode(rawOc) {
+			switch OptCode(op) {
 			case OptCodeMemoryGrow:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
@@ -925,9 +980,9 @@ func analyzeFunction(
 				valueTypeStack.push(ValueTypeI32)
 			}
 			pc += num - 1
-		} else if 0x41 <= rawOc && rawOc <= 0x44 { // const instructions
+		} else if OptCodeI32Const <= op && op <= OptCodeF64Const {
 			pc++
-			switch OptCode(rawOc) {
+			switch OptCode(op) {
 			case OptCodeI32Const:
 				_, num, err := leb128.DecodeInt32(bytes.NewBuffer(f.Body[pc:]))
 				if err != nil {
@@ -949,14 +1004,14 @@ func analyzeFunction(
 				valueTypeStack.push(ValueTypeF64)
 				pc += 7
 			}
-		} else if 0x20 <= rawOc && rawOc <= 0x24 { // variable instructions
+		} else if OptCodeLocalGet <= op && op <= OptCodeGlobalSet {
 			pc++
 			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
 			pc += num - 1
-			switch OptCode(rawOc) {
+			switch OptCode(op) {
 			case OptCodeLocalGet:
 				inputLen := uint32(len(f.Signature.InputTypes))
 				if l := f.NumLocals + inputLen; index >= l {
@@ -1011,7 +1066,7 @@ func analyzeFunction(
 					return err
 				}
 			}
-		} else if rawOc == 0x0c { // br
+		} else if op == OptCodeBr {
 			pc++
 			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
 			if err != nil {
@@ -1033,7 +1088,7 @@ func analyzeFunction(
 			}
 			// br instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
-		} else if rawOc == 0x0d { // br_if
+		} else if op == OptCodeBrIf {
 			pc++
 			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
 			if err != nil {
@@ -1062,7 +1117,7 @@ func analyzeFunction(
 			for _, t := range targetResultType {
 				valueTypeStack.push(t)
 			}
-		} else if rawOc == 0x0e { // br_table
+		} else if op == OptCodeBrTable {
 			pc++
 			r := bytes.NewBuffer(f.Body[pc:])
 			nl, num, err := leb128.DecodeUint32(r)
@@ -1124,7 +1179,7 @@ func analyzeFunction(
 			}
 			// br_table instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
-		} else if rawOc == 0x10 { // call
+		} else if op == OptCodeCall {
 			pc++
 			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
 			if err != nil {
@@ -1143,7 +1198,7 @@ func analyzeFunction(
 			for _, exp := range funcType.ReturnTypes {
 				valueTypeStack.push(exp)
 			}
-		} else if rawOc == 0x11 { // call_indirect
+		} else if op == OptCodeCallIndirect {
 			pc++
 			typeIndex, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
 			if err != nil {
@@ -1172,8 +1227,8 @@ func analyzeFunction(
 			for _, exp := range funcType.ReturnTypes {
 				valueTypeStack.push(exp)
 			}
-		} else if 0x45 <= rawOc && rawOc <= 0xbf { // numeric instructions
-			switch OptCode(rawOc) {
+		} else if OptCodeI32eqz <= op && op <= OptCodeF64reinterpreti64 {
+			switch OptCode(op) {
 			case OptCodeI32eqz:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the operand for i32.eqz: %v", err)
@@ -1183,10 +1238,10 @@ func analyzeFunction(
 				OptCodeI32ltu, OptCodeI32gts, OptCodeI32gtu, OptCodeI32les,
 				OptCodeI32leu, OptCodeI32ges, OptCodeI32geu:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeI64eqz:
@@ -1198,31 +1253,31 @@ func analyzeFunction(
 				OptCodeI64ltu, OptCodeI64gts, OptCodeI64gtu,
 				OptCodeI64les, OptCodeI64leu, OptCodeI64ges, OptCodeI64geu:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeF32eq, OptCodeF32ne, OptCodeF32lt, OptCodeF32gt, OptCodeF32le, OptCodeF32ge:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeF64eq, OptCodeF64ne, OptCodeF64lt, OptCodeF64gt, OptCodeF64le, OptCodeF64ge:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeI32clz, OptCodeI32ctz, OptCodeI32popcnt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeI32add, OptCodeI32sub, OptCodeI32mul, OptCodeI32divs,
@@ -1230,15 +1285,15 @@ func analyzeFunction(
 				OptCodeI32or, OptCodeI32xor, OptCodeI32shl, OptCodeI32shrs,
 				OptCodeI32shru, OptCodeI32rotl, OptCodeI32rotr:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeI64clz, OptCodeI64ctz, OptCodeI64popcnt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OptCodeI64add, OptCodeI64sub, OptCodeI64mul, OptCodeI64divs,
@@ -1246,44 +1301,44 @@ func analyzeFunction(
 				OptCodeI64or, OptCodeI64xor, OptCodeI64shl, OptCodeI64shrs,
 				OptCodeI64shru, OptCodeI64rotl, OptCodeI64rotr:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OptCodeF32abs, OptCodeF32neg, OptCodeF32ceil,
 				OptCodeF32floor, OptCodeF32trunc, OptCodeF32nearest,
 				OptCodeF32sqrt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OptCodeF32add, OptCodeF32sub, OptCodeF32mul,
 				OptCodeF32div, OptCodeF32min, OptCodeF32max,
 				OptCodeF32copysign:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OptCodeF64abs, OptCodeF64neg, OptCodeF64ceil,
 				OptCodeF64floor, OptCodeF64trunc, OptCodeF64nearest,
 				OptCodeF64sqrt:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OptCodeF64add, OptCodeF64sub, OptCodeF64mul,
 				OptCodeF64div, OptCodeF64min, OptCodeF64max,
 				OptCodeF64copysign:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OptCodeI32wrapI64:
@@ -1293,37 +1348,37 @@ func analyzeFunction(
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeI32truncf32s, OptCodeI32truncf32u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeI32truncf64s, OptCodeI32truncf64u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OptCodeI64Extendi32s, OptCodeI64Extendi32u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OptCodeI64TruncF32s, OptCodeI64TruncF32u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
-					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OptCodeI64Truncf64s, OptCodeI64Truncf64u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
-					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeI64)
 			case OptCodeF32Converti32s, OptCodeF32Converti32u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OptCodeF32Converti64s, OptCodeF32Converti64u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF32)
 			case OptCodeF32Demotef64:
@@ -1333,12 +1388,12 @@ func analyzeFunction(
 				valueTypeStack.push(ValueTypeF32)
 			case OptCodeF64Converti32s, OptCodeF64Converti32u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
-					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OptCodeF64Converti64s, OptCodeF64Converti64u:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
-					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", rawOc, err)
+					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OptCodeF64Promotef32:
@@ -1367,9 +1422,9 @@ func analyzeFunction(
 				}
 				valueTypeStack.push(ValueTypeF64)
 			default:
-				return fmt.Errorf("invalid numeric instruction 0x%x", rawOc)
+				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
-		} else if rawOc == 0x02 { // Block
+		} else if op == OptCodeBlock {
 			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
@@ -1381,7 +1436,7 @@ func analyzeFunction(
 			})
 			valueTypeStack.pushStackLimit()
 			pc += num
-		} else if rawOc == 0x03 { // Loop
+		} else if op == OptCodeLoop {
 			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
@@ -1394,7 +1449,7 @@ func analyzeFunction(
 			})
 			valueTypeStack.pushStackLimit()
 			pc += num
-		} else if rawOc == 0x04 { // If
+		} else if op == OptCodeIf {
 			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
@@ -1410,7 +1465,7 @@ func analyzeFunction(
 			}
 			valueTypeStack.pushStackLimit()
 			pc += num
-		} else if rawOc == 0x05 { // Else
+		} else if op == OptCodeElse {
 			bl := labelStack[len(labelStack)-1]
 			bl.ElseAt = pc
 			// Check the type soundness of the instructions *before*　 entering this Eles Op.
@@ -1420,7 +1475,7 @@ func analyzeFunction(
 			// Before entring instructions inside else, we pop all the values pushed by
 			// then block.
 			valueTypeStack.resetAtStackLimit()
-		} else if rawOc == 0x0b { // End
+		} else if op == OptCodeEnd {
 			bl := labelStack[len(labelStack)-1]
 			bl.EndAt = pc
 			labelStack = labelStack[:len(labelStack)-1]
@@ -1446,7 +1501,7 @@ func analyzeFunction(
 			// We exit if/loop/block, so reset the constraints on the stack manipulation
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
-		} else if rawOc == 0x0f { // Return
+		} else if op == OptCodeReturn {
 			expTypes := f.Signature.ReturnTypes
 			for i := 0; i < len(expTypes); i++ {
 				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
@@ -1455,12 +1510,12 @@ func analyzeFunction(
 			}
 			// return instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
-		} else if rawOc == 0x1a { // Drop
+		} else if op == OptCodeDrop {
 			_, err := valueTypeStack.pop()
 			if err != nil {
 				return fmt.Errorf("invalid drop: %v", err)
 			}
-		} else if rawOc == 0x1b { // Select
+		} else if op == OptCodeSelect {
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("type mismatch on 3rd select operand: %v", err)
 			}
@@ -1480,12 +1535,12 @@ func analyzeFunction(
 			} else {
 				valueTypeStack.push(v1)
 			}
-		} else if rawOc == 0x00 { // unreachable
+		} else if op == OptCodeUnreachable {
 			// unreachable instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
-		} else if rawOc == 0x01 { // Nop
+		} else if op == OptCodeNop {
 		} else {
-			return fmt.Errorf("invalid instruction 0x%x", rawOc)
+			return fmt.Errorf("invalid instruction 0x%x", op)
 		}
 	}
 

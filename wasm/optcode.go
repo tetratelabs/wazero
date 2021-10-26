@@ -1,6 +1,6 @@
 package wasm
 
-type OptCode byte
+type OptCode = byte
 
 const (
 	// control instruction

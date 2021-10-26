@@ -8,7 +8,7 @@ import (
 	"github.com/mathetake/gasm/wasm/leb128"
 )
 
-type ValueType byte
+type ValueType = byte
 
 const (
 	ValueTypeI32 ValueType = 0x7f
@@ -19,18 +19,18 @@ const (
 
 func readValueTypes(r io.Reader, num uint32) ([]ValueType, error) {
 	ret := make([]ValueType, num)
-	buf := make([]byte, num)
+	buf := make([]ValueType, num)
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
 		return nil, err
 	}
 
 	for i, v := range buf {
-		switch vt := ValueType(v); vt {
+		switch v {
 		case ValueTypeI32, ValueTypeF32, ValueTypeI64, ValueTypeF64:
-			ret[i] = vt
+			ret[i] = v
 		default:
-			return nil, fmt.Errorf("invalid value type: %d", vt)
+			return nil, fmt.Errorf("invalid value type: %d", v)
 		}
 	}
 	return ret, nil
