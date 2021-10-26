@@ -8,11 +8,13 @@ import (
 	"github.com/mathetake/gasm/wasm/leb128"
 )
 
+type ImportKind = byte
+
 const (
-	ImportKindFunction = 0x00
-	ImportKindTable    = 0x01
-	ImportKindMemory   = 0x02
-	ImportKindGlobal   = 0x03
+	ImportKindFunction ImportKind = 0x00
+	ImportKindTable    ImportKind = 0x01
+	ImportKindMemory   ImportKind = 0x02
+	ImportKindGlobal   ImportKind = 0x03
 )
 
 type ImportDesc struct {
@@ -123,11 +125,13 @@ type ExportDesc struct {
 	Index uint32
 }
 
+type ExportKind = byte
+
 const (
-	ExportKindFunction byte = 0x00
-	ExportKindTable    byte = 0x01
-	ExportKindMemory   byte = 0x02
-	ExportKindGlobal   byte = 0x03
+	ExportKindFunction ExportKind = 0x00
+	ExportKindTable    ExportKind = 0x01
+	ExportKindMemory   ExportKind = 0x02
+	ExportKindGlobal   ExportKind = 0x03
 )
 
 func readExportDesc(r io.Reader) (*ExportDesc, error) {

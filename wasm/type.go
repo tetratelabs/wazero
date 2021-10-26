@@ -1,15 +1,10 @@
 package wasm
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/mathetake/gasm/wasm/leb128"
-)
-
-var (
-	ErrInvalidByte = errors.New("invalid byte")
 )
 
 type FunctionType struct {

@@ -1,7 +1,6 @@
 package wasm
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"unicode/utf8"
@@ -9,7 +8,7 @@ import (
 	"github.com/mathetake/gasm/wasm/leb128"
 )
 
-type SectionID byte
+type SectionID = byte
 
 const (
 	SectionIDCustom   SectionID = 0
@@ -41,7 +40,7 @@ func (m *Module) readSections(r *Reader) error {
 		}
 
 		sectionContentStart := r.read
-		switch SectionID(b[0]) {
+		switch b[0] {
 		case SectionIDCustom:
 			err = m.readSectionCustom(r, int(ss))
 		case SectionIDType:
@@ -67,7 +66,7 @@ func (m *Module) readSections(r *Reader) error {
 		case SectionIDData:
 			err = m.readSectionData(r)
 		default:
-			err = errors.New("invalid section id")
+			err = ErrInvalidSectionID
 		}
 
 		if err == nil && sectionContentStart+int(ss) != r.read {
