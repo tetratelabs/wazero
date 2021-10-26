@@ -15,7 +15,7 @@ However, if you are a decent Golang developer, you would definitely want to avoi
 
 Currentl any performance optimization hasn't been done to this runtiime yet, and the runtime is just a simple interpreter of Wasm binary. That means in terms of performance, the runtime here is infereior to any aforementioned runtimes (e.g. Wasmtime) for now.
 
-However theoretically speaking, this project have the potential to compete with these state-of-the-art JIT-style runtimes. The rational for that is it is well-know that [CGO is slow](https://stackoverflow.com/questions/28272285/why-cgos-performance-is-so-slow-is-there-something-wrong-with-my-testing-code). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
+However _theoretically speaking_, this project have the potential to compete with these state-of-the-art JIT-style runtimes. The rational for that is it is well-know that [CGO is slow](https://stackoverflow.com/questions/28272285/why-cgos-performance-is-so-slow-is-there-something-wrong-with-my-testing-code). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
 
 Luckily with unsafe pointer casts, we can do JIT compilation purely in Go (e.g. https://github.com/bspaans/jit-compiler), so if we develop JIT Wasm compiler in Go without using CGO, this runtime could be the fastest one for some usecases where we have to make large amount of CGO calls (e.g. Proxy-Wasm host environment, or request-based plugin systems).
 
