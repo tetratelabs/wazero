@@ -628,7 +628,7 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 				Global: target.Globals[exp.Desc.Index],
 			}
 		case ExportKindMemory:
-			if index != 0 {
+			if index != 0 || target.Memory == nil {
 				return nil, fmt.Errorf("unknown memory for export")
 			}
 			target.Exports[name] = &ExportInstance{
