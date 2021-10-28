@@ -67,14 +67,9 @@ func callIn(vm *naiveVirtualMachine, nextF *wasm.FunctionInstance) {
 			in[i] = val
 		}
 		val := reflect.New(tp.In(0)).Elem()
-		if len(vm.activeFrame.f.ModuleInstance.Memories) > 0 {
-			val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{
-				// Assumes we don't allow multiple memory instances.
-				Memory: vm.activeFrame.f.ModuleInstance.Memories[0],
-			}))
-		} else {
-			val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{Memory: nil}))
-		}
+		val.Set(reflect.ValueOf(
+			&wasm.HostFunctionCallContext{Memory: vm.activeFrame.f.ModuleInstance.Memory},
+		))
 
 		in[0] = val
 		vm.frames.push(&frame{f: nextF})
