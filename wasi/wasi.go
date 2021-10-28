@@ -159,7 +159,7 @@ func (w *WASIEnvirnment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, 
 		return ENAMETOOLONG
 	}
 
-	copy(ctx.Memory.Memory[pathPtr:], f.path)
+	copy(ctx.Memory.Buffer[pathPtr:], f.path)
 	return ESUCCESS
 }
 
@@ -167,7 +167,7 @@ func (w *WASIEnvirnment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uin
 	if _, ok := w.opened[fd]; !ok {
 		return EBADF
 	}
-	binary.LittleEndian.PutUint64(ctx.Memory.Memory[bufPtr+16:], R_FD_READ|R_FD_WRITE)
+	binary.LittleEndian.PutUint64(ctx.Memory.Buffer[bufPtr+16:], R_FD_READ|R_FD_WRITE)
 	return ESUCCESS
 }
 
@@ -179,7 +179,7 @@ func (w *WASIEnvirnment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFla
 		return EINVAL
 	}
 
-	path := string(ctx.Memory.Memory[pathPtr : pathPtr+pathLen])
+	path := string(ctx.Memory.Buffer[pathPtr : pathPtr+pathLen])
 	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
 	if err != nil {
 		switch {
@@ -196,7 +196,7 @@ func (w *WASIEnvirnment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFla
 		file: f,
 	}
 
-	binary.LittleEndian.PutUint32(ctx.Memory.Memory[fdPtr:], newFD)
+	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[fdPtr:], newFD)
 	return ESUCCESS
 }
 
@@ -219,15 +219,15 @@ func (w *WASIEnvirnment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, 
 	var nwritten uint32
 	for i := uint32(0); i < iovsLen; i++ {
 		iovPtr := iovsPtr + i*8
-		offset := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr:])
-		l := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr+4:])
-		n, err := writer.Write(ctx.Memory.Memory[offset : offset+l])
+		offset := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+4:])
+		n, err := writer.Write(ctx.Memory.Buffer[offset : offset+l])
 		if err != nil {
 			panic(err)
 		}
 		nwritten += uint32(n)
 	}
-	binary.LittleEndian.PutUint32(ctx.Memory.Memory[nwrittenPtr:], nwritten)
+	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[nwrittenPtr:], nwritten)
 	return ESUCCESS
 }
 
@@ -248,9 +248,9 @@ func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, i
 	var nread uint32
 	for i := uint32(0); i < iovsLen; i++ {
 		iovPtr := iovsPtr + i*8
-		offset := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr:])
-		l := binary.LittleEndian.Uint32(ctx.Memory.Memory[iovPtr+4:])
-		n, err := reader.Read(ctx.Memory.Memory[offset : offset+l])
+		offset := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+4:])
+		n, err := reader.Read(ctx.Memory.Buffer[offset : offset+l])
 		nread += uint32(n)
 		if errors.Is(err, io.EOF) {
 			break
@@ -258,7 +258,7 @@ func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, i
 			return EIO
 		}
 	}
-	binary.LittleEndian.PutUint32(ctx.Memory.Memory[nreadPtr:], nread)
+	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[nreadPtr:], nread)
 	return ESUCCESS
 }
 
@@ -279,8 +279,8 @@ func (w *WASIEnvirnment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) 
 
 func args_sizes_get(ctx *wasm.HostFunctionCallContext, argcPtr uint32, argvPtr uint32) (err uint32) {
 	// not implemented yet
-	binary.LittleEndian.PutUint32(ctx.Memory.Memory[argcPtr:], 0)
-	binary.LittleEndian.PutUint32(ctx.Memory.Memory[argvPtr:], 0)
+	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argcPtr:], 0)
+	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argvPtr:], 0)
 	return 0
 }
 

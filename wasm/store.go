@@ -26,7 +26,7 @@ type (
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
-		Memories  []*MemoryInstance
+		Memory    *MemoryInstance
 		Tables    []*TableInstance
 
 		Types []*FunctionType
@@ -82,7 +82,7 @@ type (
 	}
 
 	MemoryInstance struct {
-		Memory []byte
+		Buffer []byte
 		Min    uint32
 		Max    *uint32
 	}
@@ -156,14 +156,7 @@ func (s *Store) Instantiate(module *Module, name string) error {
 			tp := hostF.Type()
 			in := make([]reflect.Value, 1)
 			val := reflect.New(tp.In(0)).Elem()
-			if len(instance.Memories) > 0 {
-				val.Set(reflect.ValueOf(&HostFunctionCallContext{
-					// Assumes we don't allow multiple memory instances.
-					Memory: instance.Memories[0],
-				}))
-			} else {
-				val.Set(reflect.ValueOf(&HostFunctionCallContext{Memory: nil}))
-			}
+			val.Set(reflect.ValueOf(&HostFunctionCallContext{Memory: instance.Memory}))
 			in[0] = val
 			_ = hostF.Call(in)
 		} else {
@@ -289,7 +282,10 @@ func (s *Store) applyTableImport(target *ModuleInstance, tableTypePtr *TableType
 }
 
 func (s *Store) applyMemoryImport(target *ModuleInstance, memoryTypePtr *MemoryType, externModuleExportIsntance *ExportInstance) error {
-	if memoryTypePtr == nil {
+	if target.Memory != nil {
+		// The current Wasm spec doesn't allow multiple memories.
+		return fmt.Errorf("multiple memories are not supported")
+	} else if memoryTypePtr == nil {
 		return fmt.Errorf("memory type is invalid")
 	}
 	memory := externModuleExportIsntance.Memory
@@ -303,7 +299,7 @@ func (s *Store) applyMemoryImport(target *ModuleInstance, memoryTypePtr *MemoryT
 			return fmt.Errorf("incompatible memory imports: maximum size mismatch")
 		}
 	}
-	target.Memories = append(target.Memories, memory)
+	target.Memory = memory
 	return nil
 }
 
@@ -470,6 +466,8 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 		target.Functions = append(target.Functions, f)
 		s.Functions = append(s.Functions, f)
+		// TODO: this is only necessary because of the implementation detail of naivevm engine.
+		// so move this to under naivevm pkg.
 		f.Body[len(f.Body)-1] = byte(OptCodeReturn)
 	}
 	return rollbackFuncs, nil
@@ -478,19 +476,25 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	// Allocate memory instances.
 	for _, memSec := range module.MemorySection {
-		memInst := &MemoryInstance{
-			Memory: make([]byte, uint64(memSec.Min)*PageSize),
+		if target.Memory != nil {
+			// This case the memory instance is already imported,
+			// and the current Wasm spec doesn't allow multiple memories.
+			return rollbackFuncs, fmt.Errorf("multiple memories not supported")
+		}
+		target.Memory = &MemoryInstance{
+			Buffer: make([]byte, uint64(memSec.Min)*PageSize),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
 		}
-		target.Memories = append(target.Memories, memInst)
-		s.Memories = append(s.Memories, memInst)
+		s.Memories = append(s.Memories, target.Memory)
 	}
 
 	// Initialize the memory instance according to the Data section.
 	for _, d := range module.DataSection {
-		if d.MemoryIndex >= uint32(len(target.Memories)) {
-			return rollbackFuncs, fmt.Errorf("index out of range of index space")
+		if target.Memory == nil {
+			return rollbackFuncs, fmt.Errorf("unknown memory")
+		} else if d.MemoryIndex != 0 {
+			return rollbackFuncs, fmt.Errorf("memory index must be zero")
 		}
 
 		rawOffset, offsetType, err := s.executeConstExpression(target, d.OffsetExpression)
@@ -516,20 +520,17 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 			return rollbackFuncs, fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
 		}
 
-		memoryInst := target.Memories[d.MemoryIndex]
-		if size > uint64(len(memoryInst.Memory)) {
+		memoryInst := target.Memory
+		if size > uint64(len(memoryInst.Buffer)) {
 			return rollbackFuncs, fmt.Errorf("out of bounds memory access")
 		}
 		// Setup the rollback function before mutating the acutal memory.
 		original := make([]byte, len(d.Init))
-		copy(original, memoryInst.Memory[offset:])
+		copy(original, memoryInst.Buffer[offset:])
 		rollbackFuncs = append(rollbackFuncs, func() {
-			copy(memoryInst.Memory[offset:], original)
+			copy(memoryInst.Buffer[offset:], original)
 		})
-		copy(memoryInst.Memory[offset:], d.Init)
-	}
-	if len(target.Memories) > 1 {
-		return rollbackFuncs, fmt.Errorf("multiple memories not supported")
+		copy(memoryInst.Buffer[offset:], d.Init)
 	}
 	return rollbackFuncs, nil
 }
@@ -627,12 +628,12 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 				Global: target.Globals[exp.Desc.Index],
 			}
 		case ExportKindMemory:
-			if index >= len(target.Memories) {
+			if index != 0 || target.Memory == nil {
 				return nil, fmt.Errorf("unknown memory for export")
 			}
 			target.Exports[name] = &ExportInstance{
 				Kind:   exp.Desc.Kind,
-				Memory: target.Memories[exp.Desc.Index],
+				Memory: target.Memory,
 			}
 		case ExportKindTable:
 			if index >= len(target.Tables) {
@@ -1698,7 +1699,7 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 	}
 
 	memory := &MemoryInstance{
-		Memory: make([]byte, uint64(min)*PageSize),
+		Buffer: make([]byte, uint64(min)*PageSize),
 		Min:    min,
 		Max:    max,
 	}

@@ -15,7 +15,7 @@ func memoryBase(vm *naiveVirtualMachine) uint64 {
 }
 
 func (vm *naiveVirtualMachine) currentMemory() []byte {
-	return vm.activeFrame.f.ModuleInstance.Memories[0].Memory
+	return vm.activeFrame.f.ModuleInstance.Memory.Buffer
 }
 
 func i32Load(vm *naiveVirtualMachine) {
@@ -170,20 +170,20 @@ func memoryGrow(vm *naiveVirtualMachine) {
 	vm.activeFrame.pc++
 	n := vm.operands.pop()
 
-	memoryInst := vm.activeFrame.f.ModuleInstance.Memories[0]
+	memoryInst := vm.activeFrame.f.ModuleInstance.Memory
 
 	max := uint64(math.MaxUint32)
 	if memoryInst.Max != nil {
 		max = uint64(*memoryInst.Max) * wasm.PageSize
 	}
-	if uint64(n*wasm.PageSize+uint64(len(memoryInst.Memory))) > max {
+	if uint64(n*wasm.PageSize+uint64(len(memoryInst.Buffer))) > max {
 		v := int32(-1)
 		vm.operands.push(uint64(v))
 		vm.activeFrame.pc++
 		return
 	}
 
-	vm.operands.push(uint64(len(memoryInst.Memory)) / wasm.PageSize)
-	memoryInst.Memory = append(memoryInst.Memory, make([]byte, n*wasm.PageSize)...)
+	vm.operands.push(uint64(len(memoryInst.Buffer)) / wasm.PageSize)
+	memoryInst.Buffer = append(memoryInst.Buffer, make([]byte, n*wasm.PageSize)...)
 	vm.activeFrame.pc++ // Skip reserved bytes.
 }
