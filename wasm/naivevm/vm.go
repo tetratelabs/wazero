@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/mathetake/gasm/wasm"
@@ -13,10 +14,13 @@ import (
 )
 
 type (
+	compiledFunction = func(args ...uint64) (returns []uint64, err error)
+
 	naiveVirtualMachine struct {
-		activeFrame *frame
-		frames      *frameStack
-		operands    *operandStack
+		activeFrame       *frame
+		frames            *frameStack
+		operands          *operandStack
+		compiledFunctions map[*wasm.FunctionInstance]compiledFunction
 	}
 )
 
@@ -24,28 +28,108 @@ var _ wasm.Engine = &naiveVirtualMachine{}
 
 func NewEngine() wasm.Engine {
 	return &naiveVirtualMachine{
-		frames:   newFrameStack(),
-		operands: newOperandStack(),
+		frames:            newFrameStack(),
+		operands:          newOperandStack(),
+		compiledFunctions: make(map[*wasm.FunctionInstance]compiledFunction),
 	}
 }
 
 func (vm *naiveVirtualMachine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
-	for _, arg := range args {
-		vm.operands.push(arg)
+	compiled, ok := vm.compiledFunctions[f]
+	if !ok {
+		return nil, fmt.Errorf("function not compiled")
 	}
-
-	if err := vm.execFunction(f); err != nil {
-		return nil, err
-	}
-
-	ret := make([]uint64, len(f.Signature.ReturnTypes))
-	for i := range ret {
-		ret[len(ret)-1-i] = vm.operands.pop()
-	}
-	return ret, nil
+	return compiled(args...)
 }
 
-func (vm *naiveVirtualMachine) execFunction(f *wasm.FunctionInstance) (errRet error) {
+func (vm *naiveVirtualMachine) Compile(f *wasm.FunctionInstance) error {
+	var compiled compiledFunction
+	if f.HostFunction != nil {
+		// Compile host functions.
+		// First we do type check.
+		tp := f.HostFunction.Type()
+		for i := 0; i < tp.NumIn(); i++ {
+			kind := tp.In(i).Kind()
+			if i == 0 {
+				if kind != reflect.TypeOf(&wasm.HostFunctionCallContext{}).Kind() {
+					return fmt.Errorf("host function must accept *wasm.HostFunctionCallContext as the first param")
+				}
+			} else {
+				switch kind {
+				case reflect.Float64, reflect.Float32,
+					reflect.Uint32, reflect.Uint64,
+					reflect.Int32, reflect.Int64:
+				default:
+					return fmt.Errorf("host function can only accept Float32/64, Uint32/64, and Int32/64")
+				}
+			}
+		}
+		// Compile.
+		compiled = func(args ...uint64) (returns []uint64, err error) {
+			tp := f.HostFunction.Type()
+			in := make([]reflect.Value, tp.NumIn())
+			for i := len(in) - 1; i >= 1; i-- {
+				val := reflect.New(tp.In(i)).Elem()
+				raw := vm.operands.pop()
+				kind := tp.In(i).Kind()
+				switch kind {
+				case reflect.Float64, reflect.Float32:
+					val.SetFloat(math.Float64frombits(raw))
+				case reflect.Uint32, reflect.Uint64:
+					val.SetUint(raw)
+				case reflect.Int32, reflect.Int64:
+					val.SetInt(int64(raw))
+				}
+				in[i] = val
+			}
+			val := reflect.New(tp.In(0)).Elem()
+			var memory *wasm.MemoryInstance
+			if vm.activeFrame != nil {
+				memory = vm.activeFrame.f.ModuleInstance.Memory
+			}
+			val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{Memory: memory}))
+
+			in[0] = val
+			vm.frames.push(&frame{f: f})
+			for _, ret := range f.HostFunction.Call(in) {
+				switch ret.Kind() {
+				case reflect.Float64, reflect.Float32:
+					returns = append(returns, math.Float64bits(ret.Float()))
+				case reflect.Uint32, reflect.Uint64:
+					returns = append(returns, ret.Uint())
+				case reflect.Int32, reflect.Int64:
+					returns = append(returns, uint64(ret.Int()))
+				default:
+					panic("invalid return type")
+				}
+			}
+			vm.frames.pop()
+			return returns, nil
+		}
+	} else {
+		// Compile native Wasm functions.
+		f.Body[len(f.Body)-1] = byte(wasm.OptCodeReturn)
+		compiled = func(args ...uint64) (returns []uint64, err error) {
+			for _, arg := range args {
+				vm.operands.push(arg)
+			}
+
+			if err := vm.exec(f); err != nil {
+				return nil, err
+			}
+
+			ret := make([]uint64, len(f.Signature.ReturnTypes))
+			for i := range ret {
+				ret[len(ret)-1-i] = vm.operands.pop()
+			}
+			return ret, nil
+		}
+	}
+	vm.compiledFunctions[f] = compiled
+	return nil
+}
+
+func (vm *naiveVirtualMachine) exec(f *wasm.FunctionInstance) (errRet error) {
 	al := len(f.Signature.InputTypes)
 	locals := make([]uint64, f.NumLocals+uint32(al))
 	for i := 0; i < al; i++ {
