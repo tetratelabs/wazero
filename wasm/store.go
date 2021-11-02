@@ -151,18 +151,8 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	// Execute the start function.
 	if module.StartSection != nil {
 		f := instance.Functions[*module.StartSection]
-		if f.HostFunction != nil {
-			hostF := *f.HostFunction
-			tp := hostF.Type()
-			in := make([]reflect.Value, 1)
-			val := reflect.New(tp.In(0)).Elem()
-			val.Set(reflect.ValueOf(&HostFunctionCallContext{Memory: instance.Memory}))
-			in[0] = val
-			_ = hostF.Call(in)
-		} else {
-			if _, err := s.engine.Call(f); err != nil {
-				return fmt.Errorf("calling start function failed: %v", err)
-			}
+		if _, err := s.engine.Call(f); err != nil {
+			return fmt.Errorf("calling start function failed: %v", err)
 		}
 	}
 	return nil
@@ -464,11 +454,12 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			f.Blocks = blocks
 		}
 
+		if err := s.engine.Compile(f); err != nil {
+			return rollbackFuncs, fmt.Errorf("compilation failed at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
+		}
+
 		target.Functions = append(target.Functions, f)
 		s.Functions = append(s.Functions, f)
-		// TODO: this is only necessary because of the implementation detail of naivevm engine.
-		// so move this to under naivevm pkg.
-		f.Body[len(f.Body)-1] = byte(OptCodeReturn)
 	}
 	return rollbackFuncs, nil
 }
@@ -1634,9 +1625,13 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	}
 
 	f := &FunctionInstance{
-		Name:         fmt.Sprintf("%s.%s", moduleName, funcName),
-		HostFunction: &fn,
-		Signature:    sig,
+		Name:           fmt.Sprintf("%s.%s", moduleName, funcName),
+		HostFunction:   &fn,
+		Signature:      sig,
+		ModuleInstance: m,
+	}
+	if err := s.engine.Compile(f); err != nil {
+		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
 	m.Exports[funcName] = &ExportInstance{Kind: ExportKindFunction, Function: f}
 	s.Functions = append(s.Functions, f)
