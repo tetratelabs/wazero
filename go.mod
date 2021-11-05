@@ -1,4 +1,4 @@
-module github.com/mathetake/gasm
+module github.com/tetratelabs/wazero
 
 go 1.17
 
@@ -9,5 +9,3 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
-
-replace github.com/mathetake/gasm => ./

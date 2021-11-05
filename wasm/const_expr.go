@@ -7,7 +7,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/mathetake/gasm/wasm/leb128"
+	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
 type ConstantExpression struct {

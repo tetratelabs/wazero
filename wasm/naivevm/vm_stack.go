@@ -1,8 +1,8 @@
 package naivevm
 
 import (
-	"github.com/mathetake/gasm/wasm"
-	"github.com/mathetake/gasm/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
 const (

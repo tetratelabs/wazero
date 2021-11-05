@@ -5,7 +5,7 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"github.com/mathetake/gasm/wasm/leb128"
+	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
 type ValueType = byte
