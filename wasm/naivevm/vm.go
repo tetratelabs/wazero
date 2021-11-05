@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/mathetake/gasm/wasm"
-	"github.com/mathetake/gasm/wasm/buildoptions"
-	"github.com/mathetake/gasm/wasm/leb128"
+	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
 type (

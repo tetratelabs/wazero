@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/mathetake/gasm/wasi"
-	"github.com/mathetake/gasm/wasm"
-	"github.com/mathetake/gasm/wasm/naivevm"
+	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/naivevm"
 )
 
 func Test_stdio(t *testing.T) {

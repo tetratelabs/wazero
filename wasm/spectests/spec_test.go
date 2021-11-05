@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/mathetake/gasm/wasm"
-	"github.com/mathetake/gasm/wasm/naivevm"
+	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/naivevm"
 )
 
 type (
