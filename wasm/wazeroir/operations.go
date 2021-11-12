@@ -349,7 +349,7 @@ func (l *Label) String() (ret string) {
 	case LabelKindElse:
 		ret = fmt.Sprintf(".L%d_else", l.FrameID)
 	case LabelKindContinuation:
-		ret = fmt.Sprintf(".L%d_end", l.FrameID)
+		ret = fmt.Sprintf(".L%d_cont", l.FrameID)
 	}
 	return
 }

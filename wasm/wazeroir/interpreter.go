@@ -87,7 +87,7 @@ type interpreterOp struct {
 	b1, b2 byte
 	us     []uint64
 	rs     []*InclusiveRange
-	fs     *interpreterFunction
+	f      *interpreterFunction
 }
 
 // Implements wasm.Engine for interpreter.
@@ -235,11 +235,11 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 				// If the target function instance is not compiled,
 				// we set the callback so we can set the pointer to the target when the compilation done.
 				it.onComilationDoneCallbacks[targetInst] = append(it.onComilationDoneCallbacks[targetInst],
-					func(fs *interpreterFunction) {
-						op.fs = fs
+					func(compiled *interpreterFunction) {
+						op.f = compiled
 					})
 			} else {
-				op.fs = target
+				op.f = target
 			}
 		case *OperationCallIndirect:
 			op.us = make([]uint64, 2)
@@ -545,10 +545,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case OperationKindCall:
 			{
-				if op.fs.hostFn != nil {
-					it.callHostFunc(op.fs, it.stack[len(it.stack)-len(op.fs.signature.InputTypes):]...)
+				if op.f.hostFn != nil {
+					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.signature.InputTypes):]...)
 				} else {
-					it.callNativeFunc(op.fs)
+					it.callNativeFunc(op.f)
 				}
 				frame.pc++
 			}
