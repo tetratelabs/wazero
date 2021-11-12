@@ -115,6 +115,8 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 		return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
 	}
 
+	println(Disassemble(irOps))
+
 	fn, err := it.lowerIROps(f, irOps)
 	if err != nil {
 		return fmt.Errorf("failed to lower wazeroir operations to interpreter operatinos: %w", err)
@@ -148,7 +150,6 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 		case *OperationLabel:
 			labelKey := o.Label.String()
 			address := uint64(len(ret.body))
-			// fmt.Printf("address for %s: %d\n", labelKey, address)
 			labelAddress[labelKey] = address
 			for _, cb := range onLabelAddressResolved[labelKey] {
 				cb(address)
