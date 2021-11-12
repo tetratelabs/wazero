@@ -115,8 +115,6 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 		return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
 	}
 
-	println(Disassemble(irOps))
-
 	fn, err := it.lowerIROps(f, irOps)
 	if err != nil {
 		return fmt.Errorf("failed to lower wazeroir operations to interpreter operatinos: %w", err)
