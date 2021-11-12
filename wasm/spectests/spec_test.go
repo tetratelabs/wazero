@@ -34,9 +34,6 @@ func TestSpecification(t *testing.T) {
 		require.NoError(t, json.Unmarshal(raw, &base))
 
 		wastName := filepath.Base(base.SourceFile)
-		if wastName != "call.wast" {
-			continue
-		}
 		t.Run(wastName, func(t *testing.T) {
 			for _, tc := range []struct {
 				name   string
