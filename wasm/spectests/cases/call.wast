@@ -38,7 +38,7 @@
   (func (export "type-second-f32") (result f32)
     (call $f64-f32 (f64.const 64) (f32.const 32))
   )
-  (func (export "type-second-f64") (result f64) ;; 11
+  (func (export "type-second-f64") (result f64)
     (call $i64-f64 (i64.const 64) (f64.const 64.1))
   )
 
