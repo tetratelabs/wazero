@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/naivevm"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -34,17 +35,17 @@ func TestSpecification(t *testing.T) {
 
 		wastName := filepath.Base(base.SourceFile)
 		t.Run(wastName, func(t *testing.T) {
-
-			for _, engine := range []struct {
+			for _, tc := range []struct {
 				name   string
 				engine wasm.Engine
 			}{
-				// {engine: naivevm.NewEngine(), name: "naivevm"},
+				{engine: naivevm.NewEngine(), name: "naivevm"},
 				{engine: wazeroir.NewEngine(), name: "wazeroir_interpreter"},
 			} {
-				t.Run(engine.name, func(t *testing.T) {
+				tc := tc
+				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
-					store := wasm.NewStore(engine.engine)
+					store := wasm.NewStore(tc.engine)
 					require.NoError(t, AddSpectestModule(store))
 
 					var lastInstanceName string
