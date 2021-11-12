@@ -107,6 +107,9 @@ func (c *compiler) stackDump() string {
 	return "[" + strings.Join(strs, ", ") + "]"
 }
 
+// Compile lowers given function instance into wazeroir operations
+// so that the resulting operations can be consumed by the interpreter
+// or the JIT compilation engine.
 func Compile(f *wasm.FunctionInstance) ([]Operation, error) {
 	c := compiler{controlFrames: &controlFrames{}, f: f}
 	// Push function arguments.
