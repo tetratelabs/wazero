@@ -7,7 +7,7 @@
   (func $const-f32 (result f32) (f32.const 0xf32))
   (func $const-f64 (result f64) (f64.const 0xf64))
 
-  (func $id-i32 (param i32) (result i32) (local.get 0))
+  (func $id-i32 (param i32) (result i32) (local.get 0)) ;; 2
   (func $id-i64 (param i64) (result i64) (local.get 0))
   (func $id-f32 (param f32) (result f32) (local.get 0))
   (func $id-f64 (param f64) (result f64) (local.get 0))
@@ -15,7 +15,7 @@
   (func $f32-i32 (param f32 i32) (result i32) (local.get 1))
   (func $i32-i64 (param i32 i64) (result i64) (local.get 1))
   (func $f64-f32 (param f64 f32) (result f32) (local.get 1))
-  (func $i64-f64 (param i64 f64) (result f64) (local.get 1))
+  (func $i64-f64 (param i64 f64) (result f64) (local.get 1)) ;; 22
 
   ;; Typing
 
@@ -24,7 +24,7 @@
   (func (export "type-f32") (result f32) (call $const-f32))
   (func (export "type-f64") (result f64) (call $const-f64))
 
-  (func (export "type-first-i32") (result i32) (call $id-i32 (i32.const 32)))
+  (func (export "type-first-i32") (result i32) (call $id-i32 (i32.const 32))) ;; 1
   (func (export "type-first-i64") (result i64) (call $id-i64 (i64.const 64)))
   (func (export "type-first-f32") (result f32) (call $id-f32 (f32.const 1.32)))
   (func (export "type-first-f64") (result f64) (call $id-f64 (f64.const 1.64)))
@@ -38,7 +38,7 @@
   (func (export "type-second-f32") (result f32)
     (call $f64-f32 (f64.const 64) (f32.const 32))
   )
-  (func (export "type-second-f64") (result f64)
+  (func (export "type-second-f64") (result f64) ;; 11
     (call $i64-f64 (i64.const 64) (f64.const 64.1))
   )
 

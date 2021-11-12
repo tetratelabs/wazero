@@ -1,12 +1,12 @@
 //go:build debug_mode
 
-package wasm
+package buildoptions
 
 const (
-	isDebugMode = true
+	IsDebugMode = true
 )
 
-var optcodeStrs = [256]string{
+var OptcodeStrs = [256]string{
 	0x00: "Unreachable",
 	0x01: "Nop",
 	0x02: "Block",

@@ -447,19 +447,25 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 				memoryDeclarations, tableDeclarations,
 			)
 			if err != nil {
-				return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
+				return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection)-1, err)
 			}
 			analysisCache[codeIndex] = f.Blocks
 		} else {
 			f.Blocks = blocks
 		}
 
-		if err := s.engine.Compile(f); err != nil {
-			return rollbackFuncs, fmt.Errorf("compilation failed at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
-		}
-
 		target.Functions = append(target.Functions, f)
 		s.Functions = append(s.Functions, f)
+	}
+
+	// We compile functions after successfully finished analyzing all functions.
+	// This is not only because we want to do early feedback on malicious binaries,
+	// but also during the compilation phase, the compilers have to see all the possible
+	// functions' signatures in the module instance.
+	for i, f := range target.Functions {
+		if err := s.engine.Compile(f); err != nil {
+			return rollbackFuncs, fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
+		}
 	}
 	return rollbackFuncs, nil
 }
@@ -1417,7 +1423,7 @@ func analyzeFunction(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OptCodeBlock {
-			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1429,7 +1435,7 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OptCodeLoop {
-			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1442,7 +1448,7 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OptCodeIf {
-			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1543,7 +1549,7 @@ func analyzeFunction(
 	return nil
 }
 
-func readBlockType(module *Module, r io.Reader) (*BlockType, uint64, error) {
+func ReadBlockType(types []*FunctionType, r io.Reader) (*BlockType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
@@ -1562,10 +1568,10 @@ func readBlockType(module *Module, r io.Reader) (*BlockType, uint64, error) {
 	case -4: // 0x7c in original byte = f64
 		ret = &BlockType{ReturnTypes: []ValueType{ValueTypeF64}}
 	default:
-		if raw < 0 || (raw >= int64(len(module.TypeSection))) {
+		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
 		}
-		ret = module.TypeSection[raw]
+		ret = types[raw]
 	}
 	return ret, num, nil
 }
