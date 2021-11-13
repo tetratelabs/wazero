@@ -207,9 +207,6 @@ func TestSpecification(t *testing.T) {
 								t.Fatalf("unsupported command type: %s", c)
 							}
 						})
-						// if c.Line == 249 {
-						// 	return
-						// }
 					}
 				})
 			}
