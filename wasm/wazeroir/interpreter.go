@@ -455,14 +455,14 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 
 // Implements wasm.Engine for interpreter.
 func (it *interpreter) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
-	prevFrame := len(it.frames)
+	prevFrameLen := len(it.frames)
 	defer func() {
 		if v := recover(); v != nil {
 			// TODO: include stack trace in the error message.
 			if buildoptions.IsDebugMode {
 				debug.PrintStack()
 			}
-			it.frames = it.frames[:prevFrame]
+			it.frames = it.frames[:prevFrameLen]
 			err2, ok := v.(error)
 			if ok {
 				err = fmt.Errorf("runtime error: %w", err2)
@@ -548,8 +548,6 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		switch op.kind {
 		case OperationKindUnreachable:
 			panic("unreachable")
-		case OperationKindLabel:
-			panic("a bug in wazeroir interpreter: label operations must be eliminated at compile time")
 		case OperationKindBr:
 			{
 				frame.pc = op.us[0]
