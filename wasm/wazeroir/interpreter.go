@@ -27,8 +27,6 @@ type interpreter struct {
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
-	// Current active function frame.
-	activeFrame *interpreterFrame
 	// Function call stack.
 	frames []*interpreterFrame
 	// The callbacks when an function instance is compiled.
@@ -78,7 +76,6 @@ func (it *interpreter) pushFrame(frame *interpreterFrame) {
 		}
 	}
 	it.frames = append(it.frames, frame)
-	it.activeFrame = frame
 }
 
 func (it *interpreter) popFrame() (frame *interpreterFrame) {
@@ -90,11 +87,6 @@ func (it *interpreter) popFrame() (frame *interpreterFrame) {
 	// before compilation.
 	frame = it.frames[len(it.frames)-1]
 	it.frames = it.frames[:len(it.frames)-1]
-	if len(it.frames) > 0 {
-		it.activeFrame = it.frames[len(it.frames)-1]
-	} else {
-		it.activeFrame = nil
-	}
 	return
 }
 
@@ -513,8 +505,8 @@ func (it *interpreter) callHostFunc(f *interpreterFunction, args ...uint64) {
 
 	val := reflect.New(tp.In(0)).Elem()
 	var memory *wasm.MemoryInstance
-	if it.activeFrame != nil {
-		memory = it.activeFrame.f.moduleInstance.Memory
+	if len(it.frames) > 0 {
+		memory = it.frames[len(it.frames)-1].f.moduleInstance.Memory
 	}
 	val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{Memory: memory}))
 	in[0] = val
