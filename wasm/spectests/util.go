@@ -19,20 +19,20 @@ type (
 		CommandType string `json:"type"`
 		Line        int    `json:"line"`
 
-		// type == "module" || "register"
+		// Set when type == "module" || "register"
 		Name string `json:"name,omitempty"`
 
-		// type == "module" || "assert_uninstantiable" || "assert_malformed"
+		// Set when type == "module" || "assert_uninstantiable" || "assert_malformed"
 		Filename string `json:"filename,omitempty"`
 
-		// type == "register"
+		// Set when type == "register"
 		As string `json:"as,omitempty"`
 
-		// type == "assert_return" || "action"
+		// Set when type == "assert_return" || "action"
 		Action CommandAction      `json:"action,omitempty"`
 		Exps   []CommandActionVal `json:"expected"`
 
-		// type == "assert_malformed"
+		// Set when type == "assert_malformed"
 		ModuleType string `json:"module_type"`
 	}
 
@@ -40,7 +40,7 @@ type (
 		ActionType string             `json:"type"`
 		Args       []CommandActionVal `json:"args"`
 
-		// ActionType == "invoke"
+		// Set when ActionType == "invoke"
 		Field  string `json:"field,omitempty"`
 		Module string `json:"module,omitempty"`
 	}
