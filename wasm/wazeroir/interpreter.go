@@ -14,14 +14,26 @@ import (
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
+// interpreter implements wasm.Engine interface.
+// This is the direct interpreter of wazeroir operations.
 type interpreter struct {
-	functions       map[*wasm.FunctionInstance]*interpreterFunction
+	// Stores compiled functions.
+	functions map[*wasm.FunctionInstance]*interpreterFunction
+	// Cached function type IDs assigned to
+	// function signatures.
+	// Type IDs are used to check the signature of
+	// functions on call_indirect operation at runtime
 	functionTypeIDs map[string]uint64
-
-	stack       []uint64
+	// stack contains the operands.
+	// Note that all the values are represented as uint64.
+	stack []uint64
+	// Current active function frame.
 	activeFrame *interpreterFrame
-	frames      []*interpreterFrame
-
+	// Function call stack.
+	frames []*interpreterFrame
+	// The callbacks when an function instance is compiled.
+	// See the comment where this is used below for detail.
+	// Not used at runtime, and only in the compilation phase.
 	onComilationDoneCallbacks map[*wasm.FunctionInstance][]func(*interpreterFunction)
 }
 
@@ -30,12 +42,24 @@ func (it *interpreter) push(v uint64) {
 }
 
 func (it *interpreter) pop() (v uint64) {
+	// No need to check stack bound
+	// as we can assume that all the operations
+	// are valid thanks to analyzeFunction
+	// at module validation phase
+	// and wazeroir translation
+	// before compilation.
 	v = it.stack[len(it.stack)-1]
 	it.stack = it.stack[:len(it.stack)-1]
 	return
 }
 
 func (it *interpreter) drop(r *InclusiveRange) {
+	// No need to check stack bound
+	// as we can assume that all the operations
+	// are valid thanks to analyzeFunction
+	// at module validation phase
+	// and wazeroir translation
+	// before compilation.
 	if r == nil {
 		return
 	} else if r.Start == 0 {
@@ -58,6 +82,12 @@ func (it *interpreter) pushFrame(frame *interpreterFrame) {
 }
 
 func (it *interpreter) popFrame() (frame *interpreterFrame) {
+	// No need to check stack bound
+	// as we can assume that all the operations
+	// are valid thanks to analyzeFunction
+	// at module validation phase
+	// and wazeroir translation
+	// before compilation.
 	frame = it.frames[len(it.frames)-1]
 	it.frames = it.frames[:len(it.frames)-1]
 	if len(it.frames) > 0 {
@@ -69,8 +99,11 @@ func (it *interpreter) popFrame() (frame *interpreterFrame) {
 }
 
 type interpreterFrame struct {
+	// Program counter representing the current postion
+	// in the f.body.
 	pc uint64
-	f  *interpreterFunction
+	// The compiled function used in this function frame.
+	f *interpreterFunction
 }
 
 type interpreterFunction struct {

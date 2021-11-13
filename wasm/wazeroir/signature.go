@@ -6,6 +6,8 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+// signature represents how a Wasm optcode
+// manipulates the value stacks in terms of value types.
 type signature struct {
 	in, out []SignLessType
 }
@@ -140,31 +142,10 @@ var (
 	}
 )
 
-func funcTypeToSignature(tps *wasm.FunctionType) *signature {
-	ret := &signature{}
-	for _, vt := range tps.InputTypes {
-		ret.in = append(ret.in, wasmValueTypeToSignless(vt))
-	}
-	for _, vt := range tps.ReturnTypes {
-		ret.out = append(ret.out, wasmValueTypeToSignless(vt))
-	}
-	return ret
-}
-
-func wasmValueTypeToSignless(vt wasm.ValueType) SignLessType {
-	switch vt {
-	case wasm.ValueTypeI32:
-		return SignLessTypeI32
-	case wasm.ValueTypeI64:
-		return SignLessTypeI64
-	case wasm.ValueTypeF32:
-		return SignLessTypeF32
-	case wasm.ValueTypeF64:
-		return SignLessTypeF64
-	}
-	panic("unreachable")
-}
-
+// wasmOptcodeSignature returns the signature of given Wasm optcode.
+// Note that some of optcodes' signature vary depending on
+// the function instance (for example, local types).
+// "index" parameter is not used by most of optcodes.
 func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint32) (*signature, error) {
 	switch op {
 	case wasm.OptCodeUnreachable, wasm.OptCodeNop, wasm.OptCodeBlock, wasm.OptCodeLoop:
@@ -367,4 +348,29 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 	default:
 		return nil, fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
 	}
+}
+
+func funcTypeToSignature(tps *wasm.FunctionType) *signature {
+	ret := &signature{}
+	for _, vt := range tps.InputTypes {
+		ret.in = append(ret.in, wasmValueTypeToSignless(vt))
+	}
+	for _, vt := range tps.ReturnTypes {
+		ret.out = append(ret.out, wasmValueTypeToSignless(vt))
+	}
+	return ret
+}
+
+func wasmValueTypeToSignless(vt wasm.ValueType) SignLessType {
+	switch vt {
+	case wasm.ValueTypeI32:
+		return SignLessTypeI32
+	case wasm.ValueTypeI64:
+		return SignLessTypeI64
+	case wasm.ValueTypeF32:
+		return SignLessTypeF32
+	case wasm.ValueTypeF64:
+		return SignLessTypeF64
+	}
+	panic("unreachable")
 }
