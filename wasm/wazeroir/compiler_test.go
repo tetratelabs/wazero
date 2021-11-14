@@ -32,7 +32,7 @@ func TestCompile(t *testing.T) {
 		wastName := filepath.Base(base.SourceFile)
 		t.Run(wastName, func(t *testing.T) {
 			store := wasm.NewStore(&wasm.NopEngine{})
-			require.NoError(t, spectests.AddSpectestModule(store))
+			spectests.AddSpectestModule(t, store)
 			var lastInstanceName string
 
 			for _, c := range base.Commands {

@@ -46,7 +46,7 @@ func TestSpecification(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
 					store := wasm.NewStore(tc.engine)
-					require.NoError(t, AddSpectestModule(store))
+					AddSpectestModule(t, store)
 
 					var lastInstanceName string
 					for _, c := range base.Commands {

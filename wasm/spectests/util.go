@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
 )
@@ -138,37 +141,19 @@ func (v CommandActionVal) ToUint64() uint64 {
 	}
 }
 
-func AddSpectestModule(store *wasm.Store) error {
-	// Add functions
-	err := store.AddHostFunction("spectest", "print", reflect.ValueOf(func(*wasm.HostFunctionCallContext) {}))
-	if err != nil {
-		return err
+func AddSpectestModule(t *testing.T, store *wasm.Store) {
+	for n, v := range map[string]reflect.Value{
+		"print":         reflect.ValueOf(func(*wasm.HostFunctionCallContext) {}),
+		"print_i32":     reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint32) {}),
+		"print_f32":     reflect.ValueOf(func(*wasm.HostFunctionCallContext, float32) {}),
+		"print_i64":     reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint64) {}),
+		"print_f64":     reflect.ValueOf(func(*wasm.HostFunctionCallContext, float64) {}),
+		"print_i32_f32": reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint32, float32) {}),
+		"print_f64_f64": reflect.ValueOf(func(*wasm.HostFunctionCallContext, float64, float64) {}),
+	} {
+		require.NoError(t, store.AddHostFunction("spectest", n, v), "AddHostFunction(%s)", n)
 	}
-	err = store.AddHostFunction("spectest", "print_i32", reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint32) {}))
-	if err != nil {
-		return err
-	}
-	err = store.AddHostFunction("spectest", "print_f32", reflect.ValueOf(func(*wasm.HostFunctionCallContext, float32) {}))
-	if err != nil {
-		return err
-	}
-	err = store.AddHostFunction("spectest", "print_i64", reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint64) {}))
-	if err != nil {
-		return err
-	}
-	err = store.AddHostFunction("spectest", "print_f64", reflect.ValueOf(func(*wasm.HostFunctionCallContext, float64) {}))
-	if err != nil {
-		return err
-	}
-	err = store.AddHostFunction("spectest", "print_i32_f32", reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint32, float32) {}))
-	if err != nil {
-		return err
-	}
-	err = store.AddHostFunction("spectest", "print_f64_f64", reflect.ValueOf(func(*wasm.HostFunctionCallContext, float64, float64) {}))
-	if err != nil {
-		return err
-	}
-	// Register globals.
+
 	for _, g := range []struct {
 		name      string
 		valueType wasm.ValueType
@@ -179,22 +164,12 @@ func AddSpectestModule(store *wasm.Store) error {
 		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
 		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
 	} {
-		err = store.AddGlobal("spectest", g.name, g.value, g.valueType, false)
-		if err != nil {
-			return err
-		}
+		require.NoError(t, store.AddGlobal("spectest", g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
 	}
-	// Register table export.
+
 	tableLimitMax := uint32(20)
-	err = store.AddTableInstance("spectest", "table", 10, &tableLimitMax)
-	if err != nil {
-		return err
-	}
-	// Register table export.
+	require.NoError(t, store.AddTableInstance("spectest", "table", 10, &tableLimitMax))
+
 	memoryLimitMax := uint32(2)
-	err = store.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax)
-	if err != nil {
-		return err
-	}
-	return nil
+	require.NoError(t, store.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax))
 }
