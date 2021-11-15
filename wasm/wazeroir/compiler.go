@@ -479,7 +479,7 @@ operatorSwitch:
 		r := bytes.NewBuffer(c.f.Body[c.pc+1:])
 		numTargets, n, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return fmt.Errorf("read number of targest for br_table: %w", err)
+			return fmt.Errorf("error reading number of targets in br_table: %w", err)
 		}
 		c.pc += n
 
