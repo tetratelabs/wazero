@@ -1305,7 +1305,7 @@ operatorSwitch:
 		c.emit(
 			&OperationF64PromoteFromF32{},
 		)
-	case wasm.OptCodeI32reinterpretf32:
+	case wasm.OptCodeI32Reinterpretf32:
 		c.emit(
 			&OperationI32ReinterpretFromF32{},
 		)
