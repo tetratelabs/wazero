@@ -112,26 +112,26 @@ func (c command) String() string {
 	return "{" + msg + "}"
 }
 
-func (c command) GetAssertReturnArgs() []uint64 {
+func (c command) getAssertReturnArgs() []uint64 {
 	var args []uint64
 	for _, arg := range c.Action.Args {
-		args = append(args, arg.ToUint64())
+		args = append(args, arg.toUint64())
 	}
 	return args
 }
 
-func (c command) GetAssertReturnArgsExps() ([]uint64, []uint64) {
+func (c command) getAssertReturnArgsExps() ([]uint64, []uint64) {
 	var args, exps []uint64
 	for _, arg := range c.Action.Args {
-		args = append(args, arg.ToUint64())
+		args = append(args, arg.toUint64())
 	}
 	for _, exp := range c.Exps {
-		exps = append(exps, exp.ToUint64())
+		exps = append(exps, exp.toUint64())
 	}
 	return args, exps
 }
 
-func (v commandActionVal) ToUint64() uint64 {
+func (v commandActionVal) toUint64() uint64 {
 	if strings.Contains(v.Value, "nan") {
 		if v.ValType == "f32" {
 			return uint64(math.Float32bits(float32(math.NaN())))
@@ -148,7 +148,7 @@ func (v commandActionVal) ToUint64() uint64 {
 	}
 }
 
-func AddSpectestModule(t *testing.T, store *wasm.Store) {
+func addSpectestModule(t *testing.T, store *wasm.Store) {
 	for n, v := range map[string]reflect.Value{
 		"print":         reflect.ValueOf(func(*wasm.HostFunctionCallContext) {}),
 		"print_i32":     reflect.ValueOf(func(*wasm.HostFunctionCallContext, uint32) {}),
@@ -210,7 +210,7 @@ func TestSpecification(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
 					store := wasm.NewStore(tc.engine)
-					AddSpectestModule(t, store)
+					addSpectestModule(t, store)
 
 					var lastInstanceName string
 					for _, c := range base.Commands {
@@ -243,7 +243,7 @@ func TestSpecification(t *testing.T) {
 								}
 								switch c.Action.ActionType {
 								case "invoke":
-									args, exps := c.GetAssertReturnArgsExps()
+									args, exps := c.getAssertReturnArgsExps()
 									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
 									if c.Action.Module != "" {
 										msg += " in module " + c.Action.Module
@@ -257,7 +257,7 @@ func TestSpecification(t *testing.T) {
 										}
 									}
 								case "get":
-									_, exps := c.GetAssertReturnArgsExps()
+									_, exps := c.getAssertReturnArgsExps()
 									require.Len(t, exps, 1)
 									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
 									if c.Action.Module != "" {
@@ -306,7 +306,7 @@ func TestSpecification(t *testing.T) {
 								}
 								switch c.Action.ActionType {
 								case "invoke":
-									args := c.GetAssertReturnArgs()
+									args := c.getAssertReturnArgs()
 									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
 									if c.Action.Module != "" {
 										msg += " in module " + c.Action.Module
@@ -335,7 +335,7 @@ func TestSpecification(t *testing.T) {
 								}
 								switch c.Action.ActionType {
 								case "invoke":
-									args := c.GetAssertReturnArgs()
+									args := c.getAssertReturnArgs()
 									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
 									if c.Action.Module != "" {
 										msg += " in module " + c.Action.Module
