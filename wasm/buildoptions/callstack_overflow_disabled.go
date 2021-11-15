@@ -1,4 +1,4 @@
-//go:build disablew_callstack_overflow_check
+//go:build disable_callstack_overflow_check
 
 package buildoptions
 

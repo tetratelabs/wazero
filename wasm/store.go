@@ -447,19 +447,25 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 				memoryDeclarations, tableDeclarations,
 			)
 			if err != nil {
-				return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
+				return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection)-1, err)
 			}
 			analysisCache[codeIndex] = f.Blocks
 		} else {
 			f.Blocks = blocks
 		}
 
-		if err := s.engine.Compile(f); err != nil {
-			return rollbackFuncs, fmt.Errorf("compilation failed at index %d/%d: %v", codeIndex, len(module.FunctionSection), err)
-		}
-
 		target.Functions = append(target.Functions, f)
 		s.Functions = append(s.Functions, f)
+	}
+
+	// We compile functions after successfully finished analyzing all functions.
+	// This is not only because we want to do early feedback on malicious binaries,
+	// but also during the compilation phase, the compilers have to see all the possible
+	// function signatures in the module instance.
+	for i, f := range target.Functions {
+		if err := s.engine.Compile(f); err != nil {
+			return rollbackFuncs, fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
+		}
 	}
 	return rollbackFuncs, nil
 }
@@ -1219,7 +1225,7 @@ func analyzeFunction(
 			for _, exp := range funcType.ReturnTypes {
 				valueTypeStack.push(exp)
 			}
-		} else if OptCodeI32eqz <= op && op <= OptCodeF64reinterpreti64 {
+		} else if OptCodeI32eqz <= op && op <= OptCodeF64Reinterpreti64 {
 			switch OptCode(op) {
 			case OptCodeI32eqz:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
@@ -1393,22 +1399,22 @@ func analyzeFunction(
 					return fmt.Errorf("cannot pop the operand for f64.promote_f32: %v", err)
 				}
 				valueTypeStack.push(ValueTypeF64)
-			case OptCodeI32reinterpretf32:
+			case OptCodeI32Reinterpretf32:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the operand for i32.reinterpret_f32: %v", err)
 				}
 				valueTypeStack.push(ValueTypeI32)
-			case OptCodeI64reinterpretf64:
+			case OptCodeI64Reinterpretf64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the operand for i64.reinterpret_f64: %v", err)
 				}
 				valueTypeStack.push(ValueTypeI64)
-			case OptCodeF32reinterpreti32:
+			case OptCodeF32Reinterpreti32:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the operand for f32.reinterpret_i32: %v", err)
 				}
 				valueTypeStack.push(ValueTypeF32)
-			case OptCodeF64reinterpreti64:
+			case OptCodeF64Reinterpreti64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the operand for f64.reinterpret_i64: %v", err)
 				}
@@ -1417,7 +1423,7 @@ func analyzeFunction(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OptCodeBlock {
-			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1429,7 +1435,7 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OptCodeLoop {
-			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1442,7 +1448,7 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OptCodeIf {
-			bt, num, err := readBlockType(module, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1474,7 +1480,7 @@ func analyzeFunction(
 			f.Blocks[bl.StartAt] = bl
 			if bl.IsIf && bl.ElseAt <= bl.StartAt {
 				if len(bl.BlockType.ReturnTypes) > 0 {
-					return fmt.Errorf("type mismatch between then and else blocks.")
+					return fmt.Errorf("type mismatch between then and else blocks")
 				}
 				// To handle if block without else properly,
 				// we set ElseAt to EndAt-1 so we can just skip else.
@@ -1543,7 +1549,7 @@ func analyzeFunction(
 	return nil
 }
 
-func readBlockType(module *Module, r io.Reader) (*BlockType, uint64, error) {
+func ReadBlockType(types []*FunctionType, r io.Reader) (*BlockType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
@@ -1562,10 +1568,10 @@ func readBlockType(module *Module, r io.Reader) (*BlockType, uint64, error) {
 	case -4: // 0x7c in original byte = f64
 		ret = &BlockType{ReturnTypes: []ValueType{ValueTypeF64}}
 	default:
-		if raw < 0 || (raw >= int64(len(module.TypeSection))) {
+		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
 		}
-		ret = module.TypeSection[raw]
+		ret = types[raw]
 	}
 	return ret, num, nil
 }
