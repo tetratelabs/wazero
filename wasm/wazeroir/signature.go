@@ -146,6 +146,7 @@ var (
 // Note that some of optcodes' signature vary depending on
 // the function instance (for example, local types).
 // "index" parameter is not used by most of optcodes.
+// The returned signature is used for stack validation when lowering Wasm's optcodes to wazeroir.
 func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint32) (*signature, error) {
 	switch op {
 	case wasm.OptCodeUnreachable, wasm.OptCodeNop, wasm.OptCodeBlock, wasm.OptCodeLoop:

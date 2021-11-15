@@ -706,7 +706,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case OperationKindMemorySize:
 			{
-				v := uint64(int32(uint64(len(frame.f.moduleInstance.Memory.Buffer)) / wasm.PageSize))
+				v := uint64(len(frame.f.moduleInstance.Memory.Buffer)) / wasm.PageSize
 				it.push(v)
 				frame.pc++
 			}

@@ -37,7 +37,7 @@ type (
 func (c *controlFrame) ensureContinuation() {
 	// Make sure that if the frame is block and doesn't have continuation,
 	// change the kind so we can emit the continuation block
-	// later when we reache the end instruction of this frame.
+	// later when we reach the end instruction of this frame.
 	if c.kind == controlFrameKindBlockWithoutContinuationLabel {
 		c.kind = controlFrameKindBlockWithContinuationLabel
 	}
@@ -57,7 +57,7 @@ func (c *controlFrame) asBranchTarget() *BranchTarget {
 		controlFrameKindIfWithoutElse:
 		return &BranchTarget{Label: &Label{FrameID: c.frameID, Kind: LabelKindContinuation}}
 	}
-	panic("unreachable: a bug in wazeroir implementation")
+	panic(fmt.Sprintf("unreachable: a bug in wazeroir implementation: %v", c.kind))
 }
 
 func (c *controlFrames) functionFrame() *controlFrame {
@@ -129,14 +129,14 @@ func (c *compiler) stackDump() string {
 // or the JIT compilation engine.
 func Compile(f *wasm.FunctionInstance) ([]Operation, error) {
 	c := compiler{controlFrames: &controlFrames{}, f: f}
+
 	// Push function arguments.
 	for _, t := range f.Signature.InputTypes {
 		c.stackPush(wasmValueTypeToSignless(t))
 	}
-
 	// Emit const expressions for locals.
 	// Note that here we don't take function arguments
-	// into acount, meaning that callers must push
+	// into account, meaning that callers must push
 	// arguments before entering into the function body.
 	for _, t := range f.LocalTypes {
 		c.emitDefaultValue(t)
