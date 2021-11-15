@@ -539,6 +539,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
 		op := frame.f.body[frame.pc]
+		// TODO: add descriptino of each operation/case
+		// on, for example, how many args are used,
+		// how the stack is modified, etc.
 		switch op.kind {
 		case OperationKindUnreachable:
 			panic("unreachable")
