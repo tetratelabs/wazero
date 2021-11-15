@@ -488,7 +488,7 @@ operatorSwitch:
 		for i := range targets {
 			l, n, err := leb128.DecodeUint32(r)
 			if err != nil {
-				return fmt.Errorf("read target for br_table: %w", err)
+				return fmt.Errorf("error reading target %d in br_table: %w", i, err)
 			}
 			c.pc += n
 			targetFrame := c.controlFrames.get(int(l))
