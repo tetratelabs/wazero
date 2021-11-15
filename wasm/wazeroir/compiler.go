@@ -500,7 +500,7 @@ operatorSwitch:
 		// Prep default target control frame.
 		l, n, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return fmt.Errorf("read default target for br_table: %w", err)
+			return fmt.Errorf("error reading default target of br_table: %w", err)
 		}
 		c.pc += n
 		defaultTargetFrame := c.controlFrames.get(int(l))
