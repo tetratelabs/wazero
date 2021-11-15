@@ -422,8 +422,10 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 			*OperationI64ReinterpretFromF64,
 			*OperationF32ReinterpretFromI32,
 			*OperationF64ReinterpretFromI64:
-			// Reinterpret ops are essentially nop for interpreter mode.
-			// so just eliminate the ops.
+			// Reinterpret ops are essentially nop for interpreter mode
+			// because we treat all values as uint64, and the reinterpret is only used at module
+			// validation phase where we check type soundness of all the operations.
+			// So just eliminate the ops.
 			continue
 		case *OperationExtend:
 			if o.Signed {
