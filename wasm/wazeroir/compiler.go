@@ -291,7 +291,7 @@ operatorSwitch:
 		// Emit the branch operation to enter the then block.
 		c.emit(
 			&OperationBrIf{
-				Then: thenLable.asBranchTargetDrop(),
+				Then: thenLabel.asBranchTargetDrop(),
 				Else: elseLabel.asBranchTargetDrop(),
 			},
 			&OperationLabel{
