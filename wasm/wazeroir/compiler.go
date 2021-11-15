@@ -301,7 +301,7 @@ operatorSwitch:
 	case wasm.OptCodeElse:
 		frame := c.controlFrames.top()
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
-			// If it is currently in unreachhable, and the nested if,
+			// If it is currently in unreachable, and the nested if,
 			// just remove the entire else block.
 			break operatorSwitch
 		} else if c.unreachableState.on {
