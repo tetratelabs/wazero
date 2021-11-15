@@ -157,7 +157,7 @@ func Compile(f *wasm.FunctionInstance) ([]Operation, error) {
 	// Now enter the function body.
 	for !c.controlFrames.empty() {
 		if err := c.handleInstruction(); err != nil {
-			return nil, fmt.Errorf("hanlding instruction: %w\ndissasemble: %v", err, Disassemble(c.result))
+			return nil, fmt.Errorf("handling instruction: %w\ndisassemble: %v", err, Disassemble(c.result))
 		}
 	}
 	return c.result, nil
