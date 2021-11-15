@@ -202,7 +202,7 @@ operatorSwitch:
 		c.pc += num
 
 		if c.unreachableState.on {
-			// If it is currently in unreachhable,
+			// If it is currently in unreachable,
 			// just remove the entire block.
 			c.unreachableState.depth++
 			break operatorSwitch
