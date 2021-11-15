@@ -1377,7 +1377,7 @@ func (c *compiler) applyToStack(optCode wasm.OptCode) (*uint32, error) {
 
 	// Manipulate the stack according to the signtature.
 	// Note that the following algorithm assumes that
-	// the unkown type is unique in the signature,
+	// the unknown type is unique in the signature,
 	// and is determined by the actual type on the stack.
 	// The determined type is stored in this typeParam.
 	var typeParam *SignLessType
