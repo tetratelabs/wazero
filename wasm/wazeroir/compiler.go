@@ -285,7 +285,7 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLable := &Label{Kind: LabelKindHeader, FrameID: frame.frameID}
+		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID}
 		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
 
 		// Emit the branch operation to enter the then block.
