@@ -295,7 +295,7 @@ operatorSwitch:
 				Else: elseLabel.asBranchTargetDrop(),
 			},
 			&OperationLabel{
-				Label: thenLable,
+				Label: thenLabel,
 			},
 		)
 	case wasm.OptCodeElse:
