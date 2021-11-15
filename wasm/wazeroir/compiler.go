@@ -401,7 +401,7 @@ operatorSwitch:
 			// Return from function.
 			c.emit(
 				dropOp,
-				// Note nil label target is translated to "return" from the function.
+				// Pass empty target instead of nil to avoid misinterpretation as "return"
 				&OperationBr{Target: &BranchTarget{}},
 			)
 		case controlFrameKindIfWithoutElse:
