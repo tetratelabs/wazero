@@ -451,7 +451,7 @@ operatorSwitch:
 		)
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
-		// and can be safelly removed.
+		// and can be safely removed.
 		c.unreachableState.on = true
 	case wasm.OptCodeBrIf:
 		target, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
@@ -517,7 +517,7 @@ operatorSwitch:
 		)
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
-		// and can be safelly removed.
+		// and can be safely removed.
 		c.unreachableState.on = true
 	case wasm.OptCodeReturn:
 		functionFrame := c.controlFrames.functionFrame()
@@ -531,7 +531,7 @@ operatorSwitch:
 
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
-		// and can be safelly removed.
+		// and can be safely removed.
 		c.unreachableState.on = true
 	case wasm.OptCodeCall:
 		if index == nil {
