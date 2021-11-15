@@ -239,7 +239,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 					labelKey := target.Target.String()
 					addr, ok := labelAddress[labelKey]
 					if !ok {
-						i := i
+						i := i // pin index for later resolution
 						// If this is the forward jump (e.g. to the continuation of if, etc.),
 						// the target is not emitted yet, so resolve the address later.
 						onLabelAddressResolved[labelKey] = append(onLabelAddressResolved[labelKey],
