@@ -338,13 +338,13 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 		return signature_I64_F64, nil
 	case wasm.OptCodeF64Promotef32:
 		return signature_F32_F64, nil
-	case wasm.OptCodeI32reinterpretf32:
+	case wasm.OptCodeI32Reinterpretf32:
 		return signature_F32_I32, nil
-	case wasm.OptCodeI64reinterpretf64:
+	case wasm.OptCodeI64Reinterpretf64:
 		return signature_F64_I64, nil
-	case wasm.OptCodeF32reinterpreti32:
+	case wasm.OptCodeF32Reinterpreti32:
 		return signature_I32_F32, nil
-	case wasm.OptCodeF64reinterpreti64:
+	case wasm.OptCodeF64Reinterpreti64:
 		return signature_I64_F64, nil
 	default:
 		return nil, fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)

@@ -1225,7 +1225,7 @@ func analyzeFunction(
 			for _, exp := range funcType.ReturnTypes {
 				valueTypeStack.push(exp)
 			}
-		} else if OptCodeI32eqz <= op && op <= OptCodeF64reinterpreti64 {
+		} else if OptCodeI32eqz <= op && op <= OptCodeF64Reinterpreti64 {
 			switch OptCode(op) {
 			case OptCodeI32eqz:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
@@ -1399,22 +1399,22 @@ func analyzeFunction(
 					return fmt.Errorf("cannot pop the operand for f64.promote_f32: %v", err)
 				}
 				valueTypeStack.push(ValueTypeF64)
-			case OptCodeI32reinterpretf32:
+			case OptCodeI32Reinterpretf32:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the operand for i32.reinterpret_f32: %v", err)
 				}
 				valueTypeStack.push(ValueTypeI32)
-			case OptCodeI64reinterpretf64:
+			case OptCodeI64Reinterpretf64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the operand for i64.reinterpret_f64: %v", err)
 				}
 				valueTypeStack.push(ValueTypeI64)
-			case OptCodeF32reinterpreti32:
+			case OptCodeF32Reinterpreti32:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the operand for f32.reinterpret_i32: %v", err)
 				}
 				valueTypeStack.push(ValueTypeF32)
-			case OptCodeF64reinterpreti64:
+			case OptCodeF64Reinterpreti64:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the operand for f64.reinterpret_i64: %v", err)
 				}
@@ -1480,7 +1480,7 @@ func analyzeFunction(
 			f.Blocks[bl.StartAt] = bl
 			if bl.IsIf && bl.ElseAt <= bl.StartAt {
 				if len(bl.BlockType.ReturnTypes) > 0 {
-					return fmt.Errorf("type mismatch between then and else blocks.")
+					return fmt.Errorf("type mismatch between then and else blocks")
 				}
 				// To handle if block without else properly,
 				// we set ElseAt to EndAt-1 so we can just skip else.

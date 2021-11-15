@@ -146,10 +146,10 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	}
 
 	it.functions[f] = fn
-	for _, cb := range it.onComilationDoneCallbacks[f] {
+	for _, cb := range it.onCompilationDoneCallbacks[f] {
 		cb(fn)
 	}
-	delete(it.onComilationDoneCallbacks, f)
+	delete(it.onCompilationDoneCallbacks, f)
 	return nil
 }
 
@@ -258,7 +258,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 			if !ok {
 				// If the target function instance is not compiled,
 				// we set the callback so we can set the pointer to the target when the compilation done.
-				it.onComilationDoneCallbacks[targetInst] = append(it.onComilationDoneCallbacks[targetInst],
+				it.onCompilationDoneCallbacks[targetInst] = append(it.onCompilationDoneCallbacks[targetInst],
 					func(compiled *interpreterFunction) {
 						op.f = compiled
 					})

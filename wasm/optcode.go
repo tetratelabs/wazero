@@ -194,8 +194,8 @@ const (
 	OptCodeF64Converti64u OptCode = 0xba
 	OptCodeF64Promotef32  OptCode = 0xbb
 
-	OptCodeI32reinterpretf32 OptCode = 0xbc
-	OptCodeI64reinterpretf64 OptCode = 0xbd
-	OptCodeF32reinterpreti32 OptCode = 0xbe
-	OptCodeF64reinterpreti64 OptCode = 0xbf
+	OptCodeI32Reinterpretf32 OptCode = 0xbc
+	OptCodeI64Reinterpretf64 OptCode = 0xbd
+	OptCodeF32Reinterpreti32 OptCode = 0xbe
+	OptCodeF64Reinterpreti64 OptCode = 0xbf
 )

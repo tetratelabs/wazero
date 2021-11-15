@@ -124,6 +124,14 @@ func (c *compiler) stackDump() string {
 	return "[" + strings.Join(strs, ", ") + "]"
 }
 
+func (c *compiler) markUnreachable() {
+	c.unreachableState.on = true
+}
+
+func (c *compiler) resetUnreachable() {
+	c.unreachableState.on = false
+}
+
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
 // or the JIT compilation engine.
@@ -157,7 +165,7 @@ func Compile(f *wasm.FunctionInstance) ([]Operation, error) {
 	// Now enter the function body.
 	for !c.controlFrames.empty() {
 		if err := c.handleInstruction(); err != nil {
-			return nil, fmt.Errorf("handling instruction: %w\ndisassemble: %v", err, Disassemble(c.result))
+			return nil, fmt.Errorf("handling instruction: %w\ndisassemble: %v", err, Format(c.result))
 		}
 	}
 	return c.result, nil
@@ -190,7 +198,7 @@ operatorSwitch:
 		c.emit(
 			&OperationUnreachable{},
 		)
-		c.unreachableState.on = true
+		c.markUnreachable()
 	case wasm.OptCodeNop:
 		// Nop is noop!
 	case wasm.OptCodeBlock:
@@ -314,7 +322,7 @@ operatorSwitch:
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
 			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
-			c.unreachableState.on = false
+			c.resetUnreachable()
 			c.emit(
 				&OperationLabel{Label: elseLabel},
 			)
@@ -349,7 +357,7 @@ operatorSwitch:
 			c.unreachableState.depth--
 			break operatorSwitch
 		} else if c.unreachableState.on {
-			c.unreachableState.on = false
+			c.resetUnreachable()
 
 			frame := c.controlFrames.pop()
 			if c.controlFrames.empty() {
@@ -452,7 +460,7 @@ operatorSwitch:
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
-		c.unreachableState.on = true
+		c.markUnreachable()
 	case wasm.OptCodeBrIf:
 		target, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
@@ -518,7 +526,7 @@ operatorSwitch:
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
-		c.unreachableState.on = true
+		c.markUnreachable()
 	case wasm.OptCodeReturn:
 		functionFrame := c.controlFrames.functionFrame()
 		dropOp := &OperationDrop{Range: c.getFrameDropRange(functionFrame)}
@@ -532,7 +540,7 @@ operatorSwitch:
 		// Return operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
-		c.unreachableState.on = true
+		c.markUnreachable()
 	case wasm.OptCodeCall:
 		if index == nil {
 			return fmt.Errorf("index does not exist for function call")
@@ -1269,7 +1277,7 @@ operatorSwitch:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulInt32, OutputType: Float32},
 		)
-	case wasm.OptCodeF32ConvertI32u:
+	case wasm.OptCodeF32Converti32u:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulUint32, OutputType: Float32},
 		)
@@ -1309,15 +1317,15 @@ operatorSwitch:
 		c.emit(
 			&OperationI32ReinterpretFromF32{},
 		)
-	case wasm.OptCodeI64reinterpretf64:
+	case wasm.OptCodeI64Reinterpretf64:
 		c.emit(
 			&OperationI64ReinterpretFromF64{},
 		)
-	case wasm.OptCodeF32reinterpreti32:
+	case wasm.OptCodeF32Reinterpreti32:
 		c.emit(
 			&OperationF32ReinterpretFromI32{},
 		)
-	case wasm.OptCodeF64reinterpreti64:
+	case wasm.OptCodeF64Reinterpreti64:
 		c.emit(
 			&OperationF64ReinterpretFromI64{},
 		)
@@ -1391,7 +1399,7 @@ func (c *compiler) applyToStack(optCode wasm.OptCode) (*uint32, error) {
 			typeParam = &actual
 		}
 		if want != actual {
-			return nil, fmt.Errorf("input signature mismatch: want %s but got %s", want, actual)
+			return nil, fmt.Errorf("input signature mismatch: want %s but have %s", want, actual)
 		}
 	}
 

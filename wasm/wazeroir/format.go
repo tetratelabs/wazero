@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func Disassemble(ops []Operation) string {
+func Format(ops []Operation) string {
 	buf := bytes.NewBuffer(nil)
 
 	_, _ = buf.WriteString(".entrypoint:\n")

@@ -388,8 +388,8 @@ var virtualMachineInstructions = [256]func(vm *naiveVirtualMachine){
 	wasm.OptCodeF64Converti64s:    f64converti64s,
 	wasm.OptCodeF64Converti64u:    f64converti64u,
 	wasm.OptCodeF64Promotef32:     f64promotef32,
-	wasm.OptCodeI32reinterpretf32: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
-	wasm.OptCodeI64reinterpretf64: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
-	wasm.OptCodeF32reinterpreti32: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
-	wasm.OptCodeF64reinterpreti64: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
+	wasm.OptCodeI32Reinterpretf32: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
+	wasm.OptCodeI64Reinterpretf64: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
+	wasm.OptCodeF32Reinterpreti32: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
+	wasm.OptCodeF64Reinterpreti64: func(vm *naiveVirtualMachine) { vm.activeFrame.pc++ },
 }
