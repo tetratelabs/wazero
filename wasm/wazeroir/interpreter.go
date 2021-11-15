@@ -32,7 +32,7 @@ type interpreter struct {
 	// The callbacks when an function instance is compiled.
 	// See the comment where this is used below for detail.
 	// Not used at runtime, and only in the compilation phase.
-	onComilationDoneCallbacks map[*wasm.FunctionInstance][]func(*interpreterFunction)
+	onCompilationDoneCallbacks map[*wasm.FunctionInstance][]func(*interpreterFunction)
 }
 
 func (it *interpreter) push(v uint64) {
