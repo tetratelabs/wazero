@@ -142,7 +142,7 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 
 	fn, err := it.lowerIROps(f, irOps)
 	if err != nil {
-		return fmt.Errorf("failed to lower wazeroir operations to interpreter operatinos: %w", err)
+		return fmt.Errorf("failed to lower wazeroir operations to interpreter operations: %w", err)
 	}
 
 	it.functions[f] = fn
