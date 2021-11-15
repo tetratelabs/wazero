@@ -404,7 +404,7 @@ operatorSwitch:
 		case controlFrameKindFunction:
 			if !c.controlFrames.empty() {
 				// Should never happen. If so, there's a bug in the translation.
-				return fmt.Errorf("invalid function frame")
+				panic("bug: found more function control frames")
 			}
 			// Return from function.
 			c.emit(
@@ -439,7 +439,7 @@ operatorSwitch:
 			)
 		default:
 			// Should never happen. If so, there's a bug in the translation.
-			return fmt.Errorf("invalid control frame kind: 0x%x", frame.kind)
+			panic(fmt.Errorf("bug: invalid control frame kind: 0x%x", frame.kind))
 		}
 
 	case wasm.OptCodeBr:
