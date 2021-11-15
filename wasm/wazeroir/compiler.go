@@ -1269,7 +1269,7 @@ operatorSwitch:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulInt32, OutputType: Float32},
 		)
-	case wasm.OptCodeF32Converti32u:
+	case wasm.OptCodeF32ConvertI32u:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulUint32, OutputType: Float32},
 		)
