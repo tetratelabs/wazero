@@ -176,7 +176,7 @@ func (c *compiler) handleInstruction() error {
 
 	// Modify the stack according the current instruction.
 	// Note that some instructions will read "index" in
-	// applyToStack and advence c.pc inside the function.
+	// applyToStack and advance c.pc inside the function.
 	index, err := c.applyToStack(op)
 	if err != nil {
 		return fmt.Errorf("apply stack failed for 0x%x: %w: stack: %s", op, err, c.stackDump())
