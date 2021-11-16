@@ -62,3 +62,23 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
       - run: make test
+
+  bench:
+    name: Benchmark
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - run: make bench
