@@ -1,6 +1,14 @@
 goimports := golang.org/x/tools/cmd/goimports@v0.1.5
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 
+.PHONY: bench
+bench:
+	@go test -bench=. ./bench/bench._test.go
+
+.PHONY: build.bench
+build.bench:
+	tinygo build -o bench/case/case.wasm -scheduler=none -target=wasi bench/case/case.go
+
 .PHONY: build.examples
 build.examples:
 	@find ./examples/wasm -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
@@ -8,6 +16,7 @@ build.examples:
 spectests_cases_dir := wasm/spectests/cases
 spec_version := wg-1.0
 
+.PHONY: build.spectest
 build.spectest:
 	@rm -rf $(spectests_cases_dir) && mkdir -p $(spectests_cases_dir)
 	@cd $(spectests_cases_dir) \
@@ -23,7 +32,7 @@ build.spectest:
 
 .PHONY: test
 test:
-	@go test $$(eval go list ./... | grep -v "examples/wasm")
+	@go test $$(eval go list ./... | grep -v -E "examples/wasm|bench")
 
 .PHONY: lint
 lint:

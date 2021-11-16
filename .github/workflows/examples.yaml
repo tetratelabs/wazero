@@ -31,3 +31,7 @@ jobs:
       # TinyGo -> Wasm is not idempotent, so we only check things build.
       - name: Build examples
         run: make build.examples
+
+      # TinyGo -> Wasm is not idempotent, so we only check things build.
+      - name: Build bench cases
+        run: make build.bench

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/base64"
-	"fmt"
 	"reflect"
 	"unsafe"
 )
@@ -40,7 +39,14 @@ func base64OnString(num uint32) {
 	// do base64 encoding them for given times.
 	for i := uint32(0); i < num; i++ {
 		msg := getRandmString()
-		encoded := base64.StdEncoding.EncodeToString([]byte(msg))
-		fmt.Printf("base64 encoded string '%s'\n", encoded)
+		_ = base64.StdEncoding.EncodeToString([]byte(msg))
 	}
+}
+
+//export fibonacci
+func fibonacci(in uint32) uint32 {
+	if in <= 1 {
+		return in
+	}
+	return fibonacci(in-1) + fibonacci(in-2)
 }
