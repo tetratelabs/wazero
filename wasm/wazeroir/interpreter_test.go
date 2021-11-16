@@ -1,10 +1,11 @@
 package wazeroir
 
 import (
-	"github.com/tetratelabs/wazero/wasm/buildoptions"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
 func TestInterpreter_PushFrame(t *testing.T) {

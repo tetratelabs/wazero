@@ -139,14 +139,15 @@ func (s *frameStack) pop() *frame {
 }
 
 func (s *frameStack) push(val *frame) {
-	if s.sp+1 == len(s.stack) {
-		if callStackHeightLimit <= s.sp {
+	newSp := s.sp + 1
+	if newSp == len(s.stack) {
+		if callStackHeightLimit <= newSp {
 			panic(wasm.ErrCallStackOverflow)
 		}
 		// grow stack
 		s.stack = append(s.stack, val)
 	} else {
-		s.stack[s.sp+1] = val
+		s.stack[newSp] = val
 	}
-	s.sp++
+	s.sp = newSp
 }

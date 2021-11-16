@@ -81,7 +81,7 @@ func (it *interpreter) pushFrame(frame *interpreterFrame) {
 func (it *interpreter) popFrame() (frame *interpreterFrame) {
 	// No need to check stack bound as we can assume that all the operations are valid thanks to analyzeFunction at
 	// module validation phase and wazeroir translation before compilation.
-	oneLess := len(it.frames)-1
+	oneLess := len(it.frames) - 1
 	frame = it.frames[oneLess]
 	it.frames = it.frames[:oneLess]
 	return
