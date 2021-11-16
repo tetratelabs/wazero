@@ -70,7 +70,7 @@ func (it *interpreter) drop(r *InclusiveRange) {
 }
 
 func (it *interpreter) pushFrame(frame *interpreterFrame) {
-	if buildoptions.CallStackHeightLimit <= len(it.frames)-1 {
+	if buildoptions.CallStackHeightLimit <= len(it.frames) {
 		panic(wasm.ErrCallStackOverflow)
 	}
 	it.frames = append(it.frames, frame)
