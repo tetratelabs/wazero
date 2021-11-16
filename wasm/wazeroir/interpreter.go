@@ -14,6 +14,8 @@ import (
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
+var callStackHeightLimit = buildoptions.CallStackHeightLimit
+
 // interpreter implements wasm.Engine interface.
 // This is the direct interpreter of wazeroir operations.
 type interpreter struct {
@@ -70,23 +72,18 @@ func (it *interpreter) drop(r *InclusiveRange) {
 }
 
 func (it *interpreter) pushFrame(frame *interpreterFrame) {
-	if buildoptions.CheckCallStackOverflow {
-		if buildoptions.CallStackHeightLimit <= len(it.frames)-1 {
-			panic(wasm.ErrCallStackOverflow)
-		}
+	if callStackHeightLimit <= len(it.frames) {
+		panic(wasm.ErrCallStackOverflow)
 	}
 	it.frames = append(it.frames, frame)
 }
 
 func (it *interpreter) popFrame() (frame *interpreterFrame) {
-	// No need to check stack bound
-	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
-	// at module validation phase
-	// and wazeroir translation
-	// before compilation.
-	frame = it.frames[len(it.frames)-1]
-	it.frames = it.frames[:len(it.frames)-1]
+	// No need to check stack bound as we can assume that all the operations are valid thanks to analyzeFunction at
+	// module validation phase and wazeroir translation before compilation.
+	oneLess := len(it.frames) - 1
+	frame = it.frames[oneLess]
+	it.frames = it.frames[:oneLess]
 	return
 }
 
@@ -115,7 +112,7 @@ type interpreterOp struct {
 	f      *interpreterFunction
 }
 
-// Implements wasm.Engine for interpreter.
+// Compile Implements wasm.Engine for interpreter.
 func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	if _, ok := it.functions[f]; ok {
 		return nil
