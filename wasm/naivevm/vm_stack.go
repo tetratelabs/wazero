@@ -10,6 +10,8 @@ const (
 	initialLabelStackHeight   = 10
 )
 
+var callStackHeightLimit = buildoptions.CallStackHeightLimit
+
 func drop(vm *naiveVirtualMachine) {
 	vm.operands.drop()
 	vm.activeFrame.pc++
@@ -138,7 +140,7 @@ func (s *frameStack) pop() *frame {
 
 func (s *frameStack) push(val *frame) {
 	if s.sp+1 == len(s.stack) {
-		if buildoptions.CallStackHeightLimit <= s.sp {
+		if callStackHeightLimit <= s.sp {
 			panic(wasm.ErrCallStackOverflow)
 		}
 		// grow stack
