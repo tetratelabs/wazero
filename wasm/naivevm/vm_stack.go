@@ -137,12 +137,10 @@ func (s *frameStack) pop() *frame {
 }
 
 func (s *frameStack) push(val *frame) {
-	if buildoptions.CheckCallStackOverflow {
+	if s.sp+1 == len(s.stack) {
 		if buildoptions.CallStackHeightLimit <= s.sp {
 			panic(wasm.ErrCallStackOverflow)
 		}
-	}
-	if s.sp+1 == len(s.stack) {
 		// grow stack
 		s.stack = append(s.stack, val)
 	} else {
