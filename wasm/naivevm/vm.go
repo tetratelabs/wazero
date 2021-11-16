@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime/debug"
 	"time"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -90,7 +91,7 @@ func (vm *naiveVirtualMachine) Compile(f *wasm.FunctionInstance) error {
 			val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{Memory: memory}))
 
 			in[0] = val
-			vm.frames.push(&frame{f: f})
+			vm.pushFrame(&frame{f: f})
 			for _, ret := range f.HostFunction.Call(in) {
 				switch ret.Kind() {
 				case reflect.Float64, reflect.Float32:
@@ -103,7 +104,7 @@ func (vm *naiveVirtualMachine) Compile(f *wasm.FunctionInstance) error {
 					panic("invalid return type")
 				}
 			}
-			vm.frames.pop()
+			vm.popFrame()
 			return returns, nil
 		}
 	} else {
@@ -147,12 +148,17 @@ func (vm *naiveVirtualMachine) exec(f *wasm.FunctionInstance) (errRet error) {
 	})
 
 	prevFrameSP := vm.frames.sp
+	prevActive := vm.activeFrame
 	defer func() {
 		if v := recover(); v != nil {
 			// Stack Unwind.
-			// TODO: include stack trace in the error message.
+			if buildoptions.IsDebugMode {
+				debug.PrintStack()
+			}
 			vm.frames.sp = prevFrameSP
+			vm.activeFrame = vm.frames.peek()
 			err, ok := v.(error)
+			// TODO: include stack trace in the error message.
 			if ok {
 				errRet = err
 			} else {
@@ -161,9 +167,8 @@ func (vm *naiveVirtualMachine) exec(f *wasm.FunctionInstance) (errRet error) {
 		}
 	}()
 
-	vm.frames.push(frame)
-	vm.activeFrame = frame
-	for vm.activeFrame != nil {
+	vm.pushFrame(frame)
+	for vm.activeFrame != prevActive {
 		if buildoptions.IsDebugMode {
 			fmt.Printf("0x%x: op=%s (Label SP=%d, Operand SP=%d, Frame SP=%d) \n",
 				vm.activeFrame.pc, buildoptions.OptcodeStrs[vm.activeFrame.f.Body[vm.activeFrame.pc]],
@@ -217,6 +222,17 @@ func (vm *naiveVirtualMachine) FetchFloat64() float64 {
 		vm.activeFrame.f.Body[vm.activeFrame.pc:]))
 	vm.activeFrame.pc += 7
 	return v
+}
+
+func (vm *naiveVirtualMachine) pushFrame(f *frame) {
+	vm.frames.push(f)
+	vm.activeFrame = f
+}
+
+func (vm *naiveVirtualMachine) popFrame() *frame {
+	ret := vm.frames.pop()
+	vm.activeFrame = vm.frames.peek()
+	return ret
 }
 
 var virtualMachineInstructions = [256]func(vm *naiveVirtualMachine){

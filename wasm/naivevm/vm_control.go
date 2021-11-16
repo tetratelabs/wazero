@@ -70,8 +70,7 @@ func end(vm *naiveVirtualMachine) {
 }
 
 func returnOp(vm *naiveVirtualMachine) {
-	vm.frames.pop()
-	vm.activeFrame = vm.frames.peek()
+	vm.popFrame()
 }
 
 func br(vm *naiveVirtualMachine) {

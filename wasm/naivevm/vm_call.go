@@ -72,7 +72,7 @@ func callIn(vm *naiveVirtualMachine, nextF *wasm.FunctionInstance) {
 		))
 
 		in[0] = val
-		vm.frames.push(&frame{f: nextF})
+		vm.pushFrame(&frame{f: nextF})
 		for _, ret := range hostF.Call(in) {
 			switch ret.Kind() {
 			case reflect.Float64, reflect.Float32:
@@ -85,7 +85,7 @@ func callIn(vm *naiveVirtualMachine, nextF *wasm.FunctionInstance) {
 				panic("invalid return type")
 			}
 		}
-		vm.frames.pop()
+		vm.popFrame()
 	} else {
 		al := len(nextF.Signature.InputTypes)
 		locals := make([]uint64, nextF.NumLocals+uint32(al))
@@ -102,7 +102,6 @@ func callIn(vm *naiveVirtualMachine, nextF *wasm.FunctionInstance) {
 			continuationPC: uint64(len(nextF.Body)) - 1,
 			operandSP:      -1,
 		})
-		vm.frames.push(frame)
-		vm.activeFrame = frame
+		vm.pushFrame(frame)
 	}
 }
