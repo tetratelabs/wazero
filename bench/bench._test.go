@@ -63,7 +63,7 @@ func newStore(engine wasm.Engine) *wasm.Store {
 		_, _ = rand.Read(ctx.Memory.Buffer[bufAddr : bufAddr+10])
 	}
 
-	store.AddHostFunction("env", "get_random_string", reflect.ValueOf(getRandomString))
+	_ = store.AddHostFunction("env", "get_random_string", reflect.ValueOf(getRandomString))
 	_ = wasi.NewEnvironment().Register(store)
 	return store
 }
