@@ -82,5 +82,3 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 
       - run: make bench
-
-      # TODO: publish results as PR comments if becomes slow?

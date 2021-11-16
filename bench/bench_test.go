@@ -23,7 +23,7 @@ func BenchmarkEngines(b *testing.B) {
 		runBase64Benches(b, store)
 		runFibBenches(b, store)
 	})
-	b.Run("wazeroir_interpreter", func(b *testing.B) {
+	b.Run("wazeroir", func(b *testing.B) {
 		store := newStore(wazeroir.NewEngine())
 		_ = store.Instantiate(mod, "test")
 		runBase64Benches(b, store)
