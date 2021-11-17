@@ -14,7 +14,7 @@ another language that targets Wasm, such as Rust.
 func Test_fibonacci(t *testing.T) {
 	binary, _ := os.ReadFile("wasm/fibonacci.wasm")
 	mod, _ := wasm.DecodeModule(binary)
-	store := wasm.NewStore(naivevm.NewEngine())
+	store := wasm.NewStore(wazeroir.NewEngine())
 	store.Instantiate(mod, "test")
 
 	for _, c := range []struct {
