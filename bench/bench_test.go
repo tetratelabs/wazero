@@ -65,7 +65,7 @@ func runBase64Benches(b *testing.B, store *wasm.Store) {
 func runFibBenches(b *testing.B, store *wasm.Store) {
 	for _, num := range []int{5, 10, 20} {
 		b.ResetTimer()
-		b.Run(fmt.Sprintf("fibofor_%d", num), func(b *testing.B) {
+		b.Run(fmt.Sprintf("fib_for_%d", num), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, _, err := store.CallFunction("test", "fibonacci", uint64(num))
 				if err != nil {

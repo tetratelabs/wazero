@@ -41,6 +41,6 @@ func base64OnString(num uint32) {
 	for i := uint32(0); i < num; i++ {
 		msg := getRandmString()
 		encoded := base64.StdEncoding.EncodeToString([]byte(msg))
-		fmt.Printf("base64 encoded string '%s'\n", encoded)
+		fmt.Printf("base64 encoded string '%s'\n", encoded[:10])
 	}
 }
