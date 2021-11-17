@@ -16,18 +16,37 @@ import (
 
 func BenchmarkEngines(b *testing.B) {
 	buf, _ := os.ReadFile("case/case.wasm")
-	mod, _ := wasm.DecodeModule((buf))
 	b.Run("naivevm", func(b *testing.B) {
 		store := newStore(naivevm.NewEngine())
-		_ = store.Instantiate(mod, "test")
+		mod, err := wasm.DecodeModule((buf))
+		if err != nil {
+			panic(err)
+		}
+		err = store.Instantiate(mod, "test")
+		if err != nil {
+			panic(err)
+		}
 		runBase64Benches(b, store)
 		runFibBenches(b, store)
+		runStringsManipulationBenches(b, store)
+		runReverseArrayBenches(b, store)
+		runRandomMatMul(b, store)
 	})
 	b.Run("wazeroir", func(b *testing.B) {
 		store := newStore(wazeroir.NewEngine())
-		_ = store.Instantiate(mod, "test")
+		mod, err := wasm.DecodeModule((buf))
+		if err != nil {
+			panic(err)
+		}
+		err = store.Instantiate(mod, "test")
+		if err != nil {
+			panic(err)
+		}
 		runBase64Benches(b, store)
 		runFibBenches(b, store)
+		runStringsManipulationBenches(b, store)
+		runReverseArrayBenches(b, store)
+		runRandomMatMul(b, store)
 	})
 }
 
@@ -35,8 +54,9 @@ func runBase64Benches(b *testing.B, store *wasm.Store) {
 	for _, numPerExec := range []int{5, 100, 10000} {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("base64_%d_per_exec", numPerExec), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				_, _, _ = store.CallFunction("test", "base64", uint64(numPerExec))
+			_, _, err := store.CallFunction("test", "base64", uint64(numPerExec))
+			if err != nil {
+				panic(err)
 			}
 		})
 	}
@@ -45,9 +65,54 @@ func runBase64Benches(b *testing.B, store *wasm.Store) {
 func runFibBenches(b *testing.B, store *wasm.Store) {
 	for _, num := range []int{5, 10, 20} {
 		b.ResetTimer()
-		b.Run(fmt.Sprintf("fibo_for_%d", num), func(b *testing.B) {
+		b.Run(fmt.Sprintf("fibofor_%d", num), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, _ = store.CallFunction("test", "fibonacci", uint64(num))
+				_, _, err := store.CallFunction("test", "fibonacci", uint64(num))
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+	}
+}
+
+func runStringsManipulationBenches(b *testing.B, store *wasm.Store) {
+	for _, initialSize := range []int{50, 100, 1000} {
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("string_manipulation_size_%d", initialSize), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _, err := store.CallFunction("test", "string_manipulation", uint64(initialSize))
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+	}
+}
+
+func runReverseArrayBenches(b *testing.B, store *wasm.Store) {
+	for _, arraySize := range []int{500, 1000, 10000} {
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("reverse_array_size_%d", arraySize), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _, err := store.CallFunction("test", "reverse_array", uint64(arraySize))
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+	}
+}
+
+func runRandomMatMul(b *testing.B, store *wasm.Store) {
+	for _, matrixSize := range []int{5, 10, 100} {
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("random_mat_mul_size_%d", matrixSize), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, _, err := store.CallFunction("test", "random_mat_mul", uint64(matrixSize))
+				if err != nil {
+					panic(err)
+				}
 			}
 		})
 	}
