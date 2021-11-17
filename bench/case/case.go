@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/base64"
+	"math/rand"
 	"reflect"
+	"strings"
 	"unsafe"
 )
 
@@ -49,4 +51,52 @@ func fibonacci(in uint32) uint32 {
 		return in
 	}
 	return fibonacci(in-1) + fibonacci(in-2)
+}
+
+//export string_manipulation
+func stringManipulation(initialSize uint32) {
+	var str string
+	for i := 0; i < int(initialSize); i++ {
+		str += "a"
+		str += "b"
+	}
+	str2 := strings.Replace(str, "a", "b", -1)
+	str3 := str2[:3]
+	str4 := str2[3:]
+	lastStr := str4 + str3
+	lastStr = ""
+	print(lastStr)
+}
+
+//export reverse_array
+func reverseArray(size uint32) {
+	array := make([]int, size)
+	for i := 0; i < (len(array) >> 1); i++ {
+		j := len(array) - i - 1
+		array[j], array[i] = array[i], array[j]
+	}
+}
+
+//export random_mat_mul
+func randomMatMul(n uint32) {
+	var a, b, result [][]int
+	for i := uint32(0); i < n; i++ {
+		arow := make([]int, n)
+		brow := make([]int, n)
+		for j := uint32(0); j < n; j++ {
+			arow[j] = rand.Int()
+			brow[j] = rand.Int()
+		}
+		a = append(a, arow)
+		b = append(b, brow)
+		result = append(result, make([]int, n))
+	}
+
+	for i := uint32(0); i < n; i++ {
+		for j := uint32(0); j < n; j++ {
+			for k := uint32(0); k < n; k++ {
+				result[i][j] += a[i][k] * b[k][j]
+			}
+		}
+	}
 }
