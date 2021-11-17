@@ -8,7 +8,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/naivevm"
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 func Test_trap(t *testing.T) {
@@ -18,7 +18,7 @@ func Test_trap(t *testing.T) {
 	mod, err := wasm.DecodeModule((buf))
 	require.NoError(t, err)
 
-	store := wasm.NewStore(naivevm.NewEngine())
+	store := wasm.NewStore(wazeroir.NewEngine())
 
 	err = wasi.NewEnvironment().Register(store)
 	require.NoError(t, err)
