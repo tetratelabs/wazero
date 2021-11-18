@@ -96,11 +96,11 @@ type interpreterFrame struct {
 }
 
 type interpreterFunction struct {
-	moduleInstance *wasm.ModuleInstance
-	body           []*interpreterOp
-	hostFn         *reflect.Value
-	signature      *wasm.FunctionType
-	typeID         uint64
+	funcInstantance *wasm.FunctionInstance
+	body            []*interpreterOp
+	hostFn          *reflect.Value
+	signature       *wasm.FunctionType
+	typeID          uint64
 }
 
 // Non-interface union of all the wazeroir operations.
@@ -118,7 +118,7 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 		return nil
 	} else if f.HostFunction != nil {
 		ret := &interpreterFunction{
-			hostFn: f.HostFunction, moduleInstance: f.ModuleInstance,
+			hostFn: f.HostFunction, funcInstantance: f,
 			signature: f.Signature,
 		}
 		if id, ok := it.functionTypeIDs[funcTypeString(f.Signature)]; !ok {
@@ -153,7 +153,7 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 // Lowers the wazeroir operations to interpreter friendly struct.
 func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 	ops []Operation) (*interpreterFunction, error) {
-	ret := &interpreterFunction{moduleInstance: f.ModuleInstance, signature: f.Signature}
+	ret := &interpreterFunction{funcInstantance: f, signature: f.Signature}
 	if id, ok := it.functionTypeIDs[funcTypeString(f.Signature)]; !ok {
 		id = uint64(len(it.functionTypeIDs))
 		it.functionTypeIDs[funcTypeString(f.Signature)] = id
@@ -449,16 +449,29 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, args ...uint64) (returns [
 	prevFrameLen := len(it.frames)
 	defer func() {
 		if v := recover(); v != nil {
-			// TODO: include stack trace in the error message.
 			if buildoptions.IsDebugMode {
 				debug.PrintStack()
 			}
+			traceNum := len(it.frames) - prevFrameLen
+			traces := make([]string, 0, traceNum)
+			for i := 0; i < traceNum; i++ {
+				frame := it.popFrame()
+				name := frame.f.funcInstantance.Name
+				// TODO: include the original instruction which corresponds
+				// to frame.f.body[frame.pc].
+				traces = append(traces, fmt.Sprintf("\t%d - %s", i, name))
+			}
+
 			it.frames = it.frames[:prevFrameLen]
 			err2, ok := v.(error)
 			if ok {
-				err = fmt.Errorf("runtime error: %w", err2)
+				err = fmt.Errorf("wasm runtime error: %w", err2)
 			} else {
-				err = fmt.Errorf("runtime error: %v", v)
+				err = fmt.Errorf("wasm runtime error: %v", v)
+			}
+
+			if len(traces) > 0 {
+				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
 			}
 		}
 	}()
@@ -505,7 +518,7 @@ func (it *interpreter) callHostFunc(f *interpreterFunction, args ...uint64) {
 	val := reflect.New(tp.In(0)).Elem()
 	var memory *wasm.MemoryInstance
 	if len(it.frames) > 0 {
-		memory = it.frames[len(it.frames)-1].f.moduleInstance.Memory
+		memory = it.frames[len(it.frames)-1].f.funcInstantance.ModuleInstance.Memory
 	}
 	val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{Memory: memory}))
 	in[0] = val
@@ -529,9 +542,9 @@ func (it *interpreter) callHostFunc(f *interpreterFunction, args ...uint64) {
 
 func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
-	memoryInst := frame.f.moduleInstance.Memory
-	globals := frame.f.moduleInstance.Globals
-	tables := f.moduleInstance.Tables
+	memoryInst := frame.f.funcInstantance.ModuleInstance.Memory
+	globals := frame.f.funcInstantance.ModuleInstance.Globals
+	tables := f.funcInstantance.ModuleInstance.Tables
 	it.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -708,7 +721,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case OperationKindMemorySize:
 			{
-				v := uint64(len(frame.f.moduleInstance.Memory.Buffer)) / wasm.PageSize
+				v := uint64(len(memoryInst.Buffer)) / wasm.PageSize
 				it.push(v)
 				frame.pc++
 			}

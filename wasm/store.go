@@ -416,12 +416,20 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			tableDeclarations = append(tableDeclarations, imp.Desc.TableTypePtr)
 		}
 	}
+	importedFunctionNum := len(functionDeclarations)
 	functionDeclarations = append(functionDeclarations, module.FunctionSection...)
 	for _, g := range module.GlobalSection {
 		globalDecalarations = append(globalDecalarations, g.Type)
 	}
 	memoryDeclarations = append(memoryDeclarations, module.MemorySection...)
 	tableDeclarations = append(tableDeclarations, module.TableSection...)
+
+	functionNames, _ := module.GetFunctionNames()
+	if functionNames == nil {
+		// We cannot guarantiee the existence of "name" custom section
+		// in the binary.
+		functionNames = map[uint32]string{}
+	}
 
 	analysisCache := map[int]map[uint64]*FunctionInstanceBlock{}
 	for codeIndex, typeIndex := range module.FunctionSection {
@@ -431,7 +439,18 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
+		// Get the function name if it exists.
+		// Please note that we plus with importedFunctionNum as
+		// the index in the function name section is for all the declarations,
+		// meaning that index starts with imported functions, and then
+		// the function defined in the module comes.
+		name, ok := functionNames[uint32(codeIndex)+uint32(importedFunctionNum)]
+		if !ok {
+			name = "unknown"
+		}
+
 		f := &FunctionInstance{
+			Name:           name,
 			Signature:      module.TypeSection[typeIndex],
 			Body:           module.CodeSection[codeIndex].Body,
 			NumLocals:      module.CodeSection[codeIndex].NumLocals,

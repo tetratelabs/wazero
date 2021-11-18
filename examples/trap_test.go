@@ -1,6 +1,7 @@
 package examples
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -28,4 +29,5 @@ func Test_trap(t *testing.T) {
 
 	_, _, err = store.CallFunction("test", "cause_panic")
 	require.Error(t, err)
+	fmt.Println(err)
 }
