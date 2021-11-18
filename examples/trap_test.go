@@ -28,4 +28,13 @@ func Test_trap(t *testing.T) {
 
 	_, _, err = store.CallFunction("test", "cause_panic")
 	require.Error(t, err)
+
+	const expErrMsg = `wasm runtime error: unreachable
+wasm backtrace:
+	0: runtime._panic
+	1: main.three
+	2: main.two
+	3: main.one
+	4: cause_panic`
+	require.Equal(t, expErrMsg, err.Error())
 }

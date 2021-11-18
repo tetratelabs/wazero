@@ -416,12 +416,22 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			tableDeclarations = append(tableDeclarations, imp.Desc.TableTypePtr)
 		}
 	}
+	importedFunctionNum := len(functionDeclarations)
 	functionDeclarations = append(functionDeclarations, module.FunctionSection...)
 	for _, g := range module.GlobalSection {
 		globalDecalarations = append(globalDecalarations, g.Type)
 	}
 	memoryDeclarations = append(memoryDeclarations, module.MemorySection...)
 	tableDeclarations = append(tableDeclarations, module.TableSection...)
+
+	functionNames, _ := module.GetFunctionNames()
+	if functionNames == nil {
+		// We cannot guarantee the existence of "name" custom section
+		// in the binary. That is because the custom section is optional
+		// in the sepc and some compiler optimize it out to reduce
+		// the binary size.
+		functionNames = map[uint32]string{}
+	}
 
 	analysisCache := map[int]map[uint64]*FunctionInstanceBlock{}
 	for codeIndex, typeIndex := range module.FunctionSection {
@@ -431,7 +441,15 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
+		// Get the function name if it exists.
+		// The function index includes imports, skip them here.
+		name, ok := functionNames[uint32(codeIndex)+uint32(importedFunctionNum)]
+		if !ok {
+			name = "unknown"
+		}
+
 		f := &FunctionInstance{
+			Name:           name,
 			Signature:      module.TypeSection[typeIndex],
 			Body:           module.CodeSection[codeIndex].Body,
 			NumLocals:      module.CodeSection[codeIndex].NumLocals,
