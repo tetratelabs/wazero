@@ -25,7 +25,7 @@ func Test_hostFunc(t *testing.T) {
 
 	// Host-side implementation of get_random_string on Wasm import.
 	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
-		const bufferSize = 10000 // force memory space grow to ensure eager failures on missing setup 
+		const bufferSize = 10000 // force memory space grow to ensure eager failures on missing setup
 		// Allocate the in-Wasm memory region so we can store the generated string.
 		// Note that this is recursive call. That means that this is the VM function call during the VM function call.
 		// More precisely, we call test.base64 (in Wasm), and the function in turn calls this get_random_string function,
