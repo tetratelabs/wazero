@@ -96,7 +96,7 @@ func (m *Module) GetFunctionNames() (map[uint32]string, error) {
 
 		size, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read the size of subsection: %w", err)
+			return nil, fmt.Errorf("failed to read the size of subsection %d: %w", id, err)
 		}
 
 		if id == 1 {
@@ -106,7 +106,7 @@ func (m *Module) GetFunctionNames() (map[uint32]string, error) {
 			// Skip other subsections.
 			_, err := r.Seek(int64(size), io.SeekCurrent)
 			if err != nil {
-				return nil, fmt.Errorf("failed to seek: %w", err)
+				return nil, fmt.Errorf("failed to skip subsection %d: %w", id, err)
 			}
 		}
 	}

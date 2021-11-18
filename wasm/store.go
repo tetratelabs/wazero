@@ -426,8 +426,10 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 	functionNames, _ := module.GetFunctionNames()
 	if functionNames == nil {
-		// We cannot guarantiee the existence of "name" custom section
-		// in the binary.
+		// We cannot guarantee the existence of "name" custom section
+		// in the binary. That is because the custom section is optional
+		// in the sepc and some compiler optimize it out to reduce
+		// the binary size.
 		functionNames = map[uint32]string{}
 	}
 
@@ -440,10 +442,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		// Get the function name if it exists.
-		// Please note that we plus with importedFunctionNum as
-		// the index in the function name section is for all the declarations,
-		// meaning that index starts with imported functions, and then
-		// the function defined in the module comes.
+		// The function index includes imports, skip them here.
 		name, ok := functionNames[uint32(codeIndex)+uint32(importedFunctionNum)]
 		if !ok {
 			name = "unknown"
