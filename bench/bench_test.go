@@ -15,39 +15,48 @@ import (
 )
 
 func BenchmarkEngines(b *testing.B) {
-	buf, _ := os.ReadFile("case/case.wasm")
 	b.Run("naivevm", func(b *testing.B) {
 		store := newStore(naivevm.NewEngine())
-		mod, err := wasm.DecodeModule((buf))
-		if err != nil {
-			panic(err)
-		}
-		err = store.Instantiate(mod, "test")
-		if err != nil {
-			panic(err)
-		}
-		runBase64Benches(b, store)
-		runFibBenches(b, store)
-		runStringsManipulationBenches(b, store)
-		runReverseArrayBenches(b, store)
-		runRandomMatMul(b, store)
+		setUpStore(store)
+		runAllBenches(b, store)
 	})
 	b.Run("wazeroir", func(b *testing.B) {
 		store := newStore(wazeroir.NewEngine())
-		mod, err := wasm.DecodeModule((buf))
-		if err != nil {
-			panic(err)
-		}
-		err = store.Instantiate(mod, "test")
-		if err != nil {
-			panic(err)
-		}
-		runBase64Benches(b, store)
-		runFibBenches(b, store)
-		runStringsManipulationBenches(b, store)
-		runReverseArrayBenches(b, store)
-		runRandomMatMul(b, store)
+		setUpStore(store)
+		runAllBenches(b, store)
 	})
+}
+
+func setUpStore(store *wasm.Store) {
+	buf, err := os.ReadFile("case/case.wasm")
+	if err != nil {
+		panic(err)
+	}
+	mod, err := wasm.DecodeModule((buf))
+	if err != nil {
+		panic(err)
+	}
+	err = store.Instantiate(mod, "test")
+	if err != nil {
+		panic(err)
+	}
+
+	// We assume that TinyGo binary expose "_start" symbol
+	// to initialize the memory state.
+	// Meaning that TinyGo binary is "WASI command":
+	// https://github.com/WebAssembly/WASI/blob/main/design/application-abi.md
+	_, _, err = store.CallFunction("test", "_start")
+	if err != nil {
+		panic(err)
+	}
+}
+
+func runAllBenches(b *testing.B, store *wasm.Store) {
+	runBase64Benches(b, store)
+	runFibBenches(b, store)
+	runStringsManipulationBenches(b, store)
+	runReverseArrayBenches(b, store)
+	runRandomMatMul(b, store)
 }
 
 func runBase64Benches(b *testing.B, store *wasm.Store) {

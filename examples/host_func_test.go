@@ -25,7 +25,7 @@ func Test_hostFunc(t *testing.T) {
 
 	// Host-side implementation of get_random_string on Wasm import.
 	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
-		const bufferSize = 10
+		const bufferSize = 10000
 		// Allocate the in-Wasm memory region so we can store the generated string.
 		// Note that this is recursive call. That means that this is the VM function call during the VM function call.
 		// More precisely, we call test.base64 (in Wasm), and the function in turn calls this get_random_string function,
@@ -52,6 +52,13 @@ func Test_hostFunc(t *testing.T) {
 	require.NoError(t, err)
 
 	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	// We assume that TinyGo binary expose "_start" symbol
+	// to initialize the memory state.
+	// Meaning that TinyGo binary is "WASI command":
+	// https://github.com/WebAssembly/WASI/blob/main/design/application-abi.md
+	_, _, err = store.CallFunction("test", "_start")
 	require.NoError(t, err)
 
 	_, _, err = store.CallFunction("test", "base64", 5)
