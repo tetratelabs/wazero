@@ -22,7 +22,7 @@ type obj struct {
 	debug bool
 }
 
-func (o *obj) fprintf()  {
+func (o *obj) fprintf() {
 	if o.debug {
 		fmt.Fprintf(io.Discard, "arg: %v", arg)
 	}
