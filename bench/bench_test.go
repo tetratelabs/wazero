@@ -11,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/naivevm"
+	"github.com/tetratelabs/wazero/wasm/v1_0"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -18,12 +19,20 @@ func BenchmarkEngines(b *testing.B) {
 	b.Run("naivevm", func(b *testing.B) {
 		store := newStore(naivevm.NewEngine())
 		setUpStore(store)
-		runAllBenches(b, store)
+		if m, ok := v1_0.NewModule(store, "test"); !ok {
+			b.Fatal("couldn't find module test in nativevm")
+		} else {
+			runAllBenches(b, m)
+		}
 	})
 	b.Run("wazeroir", func(b *testing.B) {
 		store := newStore(wazeroir.NewEngine())
 		setUpStore(store)
-		runAllBenches(b, store)
+		if m, ok := v1_0.NewModule(store, "test"); !ok {
+			b.Fatal("couldn't find module test in wazeroir")
+		} else {
+			runAllBenches(b, m)
+		}
 	})
 }
 
@@ -32,7 +41,7 @@ func setUpStore(store *wasm.Store) {
 	if err != nil {
 		panic(err)
 	}
-	mod, err := wasm.DecodeModule((buf))
+	mod, err := wasm.DecodeModule(buf)
 	if err != nil {
 		panic(err)
 	}
@@ -51,33 +60,41 @@ func setUpStore(store *wasm.Store) {
 	}
 }
 
-func runAllBenches(b *testing.B, store *wasm.Store) {
-	runBase64Benches(b, store)
-	runFibBenches(b, store)
-	runStringsManipulationBenches(b, store)
-	runReverseArrayBenches(b, store)
-	runRandomMatMul(b, store)
+func runAllBenches(b *testing.B, module v1_0.Module) {
+	runBase64Benches(b, module)
+	runFibBenches(b, module)
+	runStringsManipulationBenches(b, module)
+	runReverseArrayBenches(b, module)
+	runRandomMatMul(b, module)
 }
 
-func runBase64Benches(b *testing.B, store *wasm.Store) {
+func runBase64Benches(b *testing.B, module v1_0.Module) {
+	functionName := "base64"
+	f, ok := module.FunctionByName(functionName)
+	if !ok {
+		b.Fatalf("couldn't find function %s in module %s", functionName, module.Name())
+	}
 	for _, numPerExec := range []int{5, 100, 10000} {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("base64_%d_per_exec", numPerExec), func(b *testing.B) {
-			_, _, err := store.CallFunction("test", "base64", uint64(numPerExec))
-			if err != nil {
+			if _, err := f.Call(uint64(numPerExec)); err != nil {
 				panic(err)
 			}
 		})
 	}
 }
 
-func runFibBenches(b *testing.B, store *wasm.Store) {
+func runFibBenches(b *testing.B, module v1_0.Module) {
+	functionName := "fibonacci"
+	f, ok := module.FunctionByName(functionName)
+	if !ok {
+		b.Fatalf("couldn't find function %s in module %s", functionName, module.Name())
+	}
 	for _, num := range []int{5, 10, 20} {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("fib_for_%d", num), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, err := store.CallFunction("test", "fibonacci", uint64(num))
-				if err != nil {
+				if _, err := f.Call(uint64(num)); err != nil {
 					panic(err)
 				}
 			}
@@ -85,13 +102,17 @@ func runFibBenches(b *testing.B, store *wasm.Store) {
 	}
 }
 
-func runStringsManipulationBenches(b *testing.B, store *wasm.Store) {
+func runStringsManipulationBenches(b *testing.B, module v1_0.Module) {
+	functionName := "string_manipulation"
+	f, ok := module.FunctionByName(functionName)
+	if !ok {
+		b.Fatalf("couldn't find function %s in module %s", functionName, module.Name())
+	}
 	for _, initialSize := range []int{50, 100, 1000} {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("string_manipulation_size_%d", initialSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, err := store.CallFunction("test", "string_manipulation", uint64(initialSize))
-				if err != nil {
+				if _, err := f.Call(uint64(initialSize)); err != nil {
 					panic(err)
 				}
 			}
@@ -99,13 +120,17 @@ func runStringsManipulationBenches(b *testing.B, store *wasm.Store) {
 	}
 }
 
-func runReverseArrayBenches(b *testing.B, store *wasm.Store) {
+func runReverseArrayBenches(b *testing.B, module v1_0.Module) {
+	functionName := "reverse_array"
+	f, ok := module.FunctionByName(functionName)
+	if !ok {
+		b.Fatalf("couldn't find function %s in module %s", functionName, module.Name())
+	}
 	for _, arraySize := range []int{500, 1000, 10000} {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("reverse_array_size_%d", arraySize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, err := store.CallFunction("test", "reverse_array", uint64(arraySize))
-				if err != nil {
+				if _, err := f.Call(uint64(arraySize)); err != nil {
 					panic(err)
 				}
 			}
@@ -113,13 +138,17 @@ func runReverseArrayBenches(b *testing.B, store *wasm.Store) {
 	}
 }
 
-func runRandomMatMul(b *testing.B, store *wasm.Store) {
+func runRandomMatMul(b *testing.B, module v1_0.Module) {
+	functionName := "random_mat_mul"
+	f, ok := module.FunctionByName(functionName)
+	if !ok {
+		b.Fatalf("couldn't find function %s in module %s", functionName, module.Name())
+	}
 	for _, matrixSize := range []int{5, 10, 100} {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("random_mat_mul_size_%d", matrixSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _, err := store.CallFunction("test", "random_mat_mul", uint64(matrixSize))
-				if err != nil {
+				if _, err := f.Call(uint64(matrixSize)); err != nil {
 					panic(err)
 				}
 			}

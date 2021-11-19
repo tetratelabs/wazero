@@ -158,6 +158,9 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	return nil
 }
 
+// CallFunction invokes an exported function with the supplied arguments and returns index-coordinated arrays of results
+// and their value types. Any error returned pertains to the runtime: For example, if the function isn't exported or an
+// unrecoverable error happened while attempting to invoke the function.
 func (s *Store) CallFunction(moduleName, funcName string, args ...uint64) (returns []uint64, returnTypes []ValueType, err error) {
 	m, ok := s.ModuleInstances[moduleName]
 	if !ok {
@@ -180,6 +183,25 @@ func (s *Store) CallFunction(moduleName, funcName string, args ...uint64) (retur
 
 	ret, err := s.engine.Call(f, args...)
 	return ret, f.Signature.ReturnTypes, err
+}
+
+// FunctionByName returns a function of the given name or false for any failure including it not being exported.
+func (s *Store) FunctionByName(moduleName string, funcName string) (*FunctionInstance, bool) {
+	m, ok := s.ModuleInstances[moduleName]
+	if !ok {
+		return nil, false
+	}
+
+	exp, ok := m.Exports[funcName]
+	if !ok {
+		return nil, false
+	}
+
+	if exp.Kind != ExportKindFunction {
+		return nil, false
+	}
+
+	return exp.Function, true
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
