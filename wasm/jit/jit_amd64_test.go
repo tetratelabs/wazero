@@ -61,7 +61,8 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	returnFunction(builder)
 
 	// Compile.
-	code := mmapCodeSegment(builder.Assemble())
+	code, err := mmapCodeSegment(builder.Assemble())
+	require.NoError(t, err)
 	// Setup engine.
 	mem := newMemoryInst()
 	eng := newEngine()
@@ -127,7 +128,9 @@ func TestPushValueWithGoroutines(t *testing.T) {
 			// Finally increment the stack pointer and write it back to the eng.sp
 			returnFunction(builder)
 
-			code := mmapCodeSegment(builder.Assemble())
+			// Compile.
+			code, err := mmapCodeSegment(builder.Assemble())
+			require.NoError(t, err)
 
 			eng := newEngine()
 			mem := newMemoryInst()
@@ -159,12 +162,14 @@ func Test_setJITStatus(t *testing.T) {
 		initializeReservedRegisters(builder)
 		setJITStatus(builder, s)
 		returnFunction(builder)
-		codes := mmapCodeSegment(builder.Assemble())
+		// Compile.
+		code, err := mmapCodeSegment(builder.Assemble())
+		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
 		mem := newMemoryInst()
 		jitcall(
-			uintptr(unsafe.Pointer(&codes[0])),
+			uintptr(unsafe.Pointer(&code[0])),
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
@@ -182,12 +187,14 @@ func Test_setFunctionCallIndexFromConst(t *testing.T) {
 		initializeReservedRegisters(builder)
 		setFunctionCallIndexFromConst(builder, index)
 		returnFunction(builder)
-		codes := mmapCodeSegment(builder.Assemble())
+		// Compile.
+		code, err := mmapCodeSegment(builder.Assemble())
+		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
 		mem := newMemoryInst()
 		jitcall(
-			uintptr(unsafe.Pointer(&codes[0])),
+			uintptr(unsafe.Pointer(&code[0])),
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
@@ -206,12 +213,14 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 		movConstToRegister(builder, int64(index), reg)
 		setFunctionCallIndexFromRegister(builder, reg)
 		returnFunction(builder)
-		codes := mmapCodeSegment(builder.Assemble())
+		// Compile.
+		code, err := mmapCodeSegment(builder.Assemble())
+		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
 		mem := newMemoryInst()
 		jitcall(
-			uintptr(unsafe.Pointer(&codes[0])),
+			uintptr(unsafe.Pointer(&code[0])),
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
@@ -234,14 +243,16 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	pushRegisterToStack(builder, x86.REG_AX)
 	setJITStatus(builder, jitStatusCallFunction)
 	returnFunction(builder)
-	codes := mmapCodeSegment(builder.Assemble())
+	// Compile.
+	code, err := mmapCodeSegment(builder.Assemble())
+	require.NoError(t, err)
 
 	// Run codes
 	eng := newEngine()
 	eng.sp++
 	mem := newMemoryInst()
 	jitcall(
-		uintptr(unsafe.Pointer(&codes[0])),
+		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
@@ -250,7 +261,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 
 	// Run code again on the continuation
 	jitcall(
-		uintptr(unsafe.Pointer(&codes[0]))+eng.continuationAddressOffset,
+		uintptr(unsafe.Pointer(&code[0]))+eng.continuationAddressOffset,
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
@@ -271,7 +282,9 @@ func Test_callFunction(t *testing.T) {
 		movConstToRegister(builder, int64(50), x86.REG_AX)
 		pushRegisterToStack(builder, x86.REG_AX)
 		returnFunction(builder)
-		codes := mmapCodeSegment(builder.Assemble())
+		// Compile.
+		code, err := mmapCodeSegment(builder.Assemble())
+		require.NoError(t, err)
 
 		// Setup.
 		eng := newEngine()
@@ -280,7 +293,7 @@ func Test_callFunction(t *testing.T) {
 
 		// The first call.
 		jitcall(
-			uintptr(unsafe.Pointer(&codes[0])),
+			uintptr(unsafe.Pointer(&code[0])),
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
@@ -289,7 +302,7 @@ func Test_callFunction(t *testing.T) {
 
 		// Continue.
 		jitcall(
-			uintptr(unsafe.Pointer(&codes[0]))+eng.continuationAddressOffset,
+			uintptr(unsafe.Pointer(&code[0]))+eng.continuationAddressOffset,
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
@@ -309,7 +322,9 @@ func Test_callFunction(t *testing.T) {
 		movConstToRegister(builder, int64(50), x86.REG_AX)
 		pushRegisterToStack(builder, x86.REG_AX)
 		returnFunction(builder)
-		codes := mmapCodeSegment(builder.Assemble())
+		// Compile.
+		code, err := mmapCodeSegment(builder.Assemble())
+		require.NoError(t, err)
 
 		// Setup.
 		eng := newEngine()
@@ -318,7 +333,7 @@ func Test_callFunction(t *testing.T) {
 
 		// The first call.
 		jitcall(
-			uintptr(unsafe.Pointer(&codes[0])),
+			uintptr(unsafe.Pointer(&code[0])),
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
@@ -327,7 +342,7 @@ func Test_callFunction(t *testing.T) {
 
 		// Continue.
 		jitcall(
-			uintptr(unsafe.Pointer(&codes[0]))+eng.continuationAddressOffset,
+			uintptr(unsafe.Pointer(&code[0]))+eng.continuationAddressOffset,
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
@@ -350,7 +365,9 @@ func Test_callHostFunction(t *testing.T) {
 		// We push the value onto stack
 		setJITStatus(builder, jitStatusReturned)
 		returnFunction(builder)
-		codes := mmapCodeSegment(builder.Assemble())
+		// Compile.
+		code, err := mmapCodeSegment(builder.Assemble())
+		require.NoError(t, err)
 
 		// Setup.
 		eng := newEngine()
@@ -360,7 +377,7 @@ func Test_callHostFunction(t *testing.T) {
 		mem := newMemoryInst()
 
 		// Call into the function
-		f := &compiledFunction{codeSegment: codes, memoryInst: mem}
+		f := &compiledFunction{codeSegment: code, memoryInst: mem}
 		eng.exec(f)
 		require.Equal(t, uint64(50)*100, eng.stack[0])
 	})
@@ -384,7 +401,9 @@ func Test_callHostFunction(t *testing.T) {
 		// We push the value onto stack
 		setJITStatus(builder, jitStatusReturned)
 		returnFunction(builder)
-		codes := mmapCodeSegment(builder.Assemble())
+		// Compile.
+		code, err := mmapCodeSegment(builder.Assemble())
+		require.NoError(t, err)
 
 		// Setup.
 		eng := newEngine()
@@ -393,7 +412,7 @@ func Test_callHostFunction(t *testing.T) {
 		mem := newMemoryInst()
 
 		// Call into the function
-		f := &compiledFunction{codeSegment: codes, memoryInst: mem}
+		f := &compiledFunction{codeSegment: code, memoryInst: mem}
 		eng.exec(f)
 		require.Equal(t, uint64(50)*200, eng.stack[0])
 	})
@@ -420,7 +439,9 @@ func Test_popFromStackToRegister(t *testing.T) {
 	// Push it back to the stack.
 	pushRegisterToStack(builder, targetRegister)
 	returnFunction(builder)
-	codes := mmapCodeSegment(builder.Assemble())
+	// Compile.
+	code, err := mmapCodeSegment(builder.Assemble())
+	require.NoError(t, err)
 
 	// Call in.
 	eng := newEngine()
@@ -430,7 +451,7 @@ func Test_popFromStackToRegister(t *testing.T) {
 	mem := newMemoryInst()
 	require.Equal(t, []uint64{0, 10000, 20000}, eng.stack[:eng.sp])
 	jitcall(
-		uintptr(unsafe.Pointer(&codes[0])),
+		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
