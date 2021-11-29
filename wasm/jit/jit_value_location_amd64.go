@@ -27,11 +27,17 @@ var (
 	gpFloatRegisters = []int{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
 		x86.REG_X4, x86.REG_X5, x86.REG_X6, x86.REG_X7,
+		x86.REG_X8, x86.REG_X9, x86.REG_X10, x86.REG_X11,
+		x86.REG_X12, x86.REG_X13, x86.REG_X14, x86.REG_X15,
 	}
+	// Note that we never invoke "call" instruction,
+	// so we don't need to care about the calling convension.
+	// TODO: we still have to take into acounts RAX,RDX register
+	// usages in DIV,MUL operations.
 	gpIntRegisters = []int{
 		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
-		x86.REG_SP, x86.REG_BP, x86.REG_SI, x86.REG_DI,
-		x86.REG_R8, x86.REG_R9, x86.REG_R10, x86.REG_R11,
+		x86.REG_BP, x86.REG_SI, x86.REG_DI, x86.REG_R8,
+		x86.REG_R9, x86.REG_R10, x86.REG_R11,
 	}
 	errFreeRegisterNotFound = errors.New("free register not found")
 )
