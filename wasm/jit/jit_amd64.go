@@ -35,11 +35,16 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
+	// TODO: delete
+	fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir))
+
 	b, err := asm.NewBuilder("amd64", 128)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
+
 	builder := &amd64Builder{eng: e, builder: b, locationStack: newValueLocationStack()}
+	builder.initializeReservedRegisters()
 
 	for _, op := range ir {
 		switch o := op.(type) {

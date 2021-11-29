@@ -83,13 +83,13 @@ func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	// Pop float value.
 	popped := s.pop()
 	require.Equal(t, floatLocation, popped)
-	// Now we cannot find the steal tareget.
+	// Now we cannot find the steal target.
 	target = s.takeStealTargetFromUsedRegister(gpTypeFloat)
 	require.Nil(t, target)
 	// Pop int value.
 	popped = s.pop()
 	require.Equal(t, intLocation, popped)
-	// Now we cannot find the steal tareget.
+	// Now we cannot find the steal target.
 	target = s.takeStealTargetFromUsedRegister(gpTypeInt)
 	require.Nil(t, target)
 }
