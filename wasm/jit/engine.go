@@ -199,7 +199,6 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.callFrameStack = prevFrame
 			if prevFrame != nil {
 				e.currentBaseStackPointer = prevFrame.baseStackPointer
-				// Set the stack pointer to the beginning of the function outputs
 				e.currentStackPointer = prevFrame.continuationStackPointer
 			}
 		case jitStatusCallFunction:
@@ -220,6 +219,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Now move onto the callee function.
 			e.callFrameStack = frame
 			e.currentBaseStackPointer = frame.baseStackPointer
+			// Set the stack pointer so that base+sp would point to the top of function inputs.
 			e.currentStackPointer = nextFunc.inputNum
 		case jitStatusCallBuiltInFunction:
 			switch e.functionCallIndex {
