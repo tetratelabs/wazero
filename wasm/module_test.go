@@ -30,8 +30,8 @@ func TestDecodeModule(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		tc := tc // pin! see https://github.com/kyoh86/scopelint for why
+	for _, tt := range tests {
+		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
 			m, e := DecodeModule(tc.input)
