@@ -230,5 +230,5 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		// TODO: support arm64!
 		return nil, fmt.Errorf("unsupported GOARCH: %s", runtime.GOARCH)
 	}
-	return e.compileForAMD64(f)
+	return e.compile(f)
 }

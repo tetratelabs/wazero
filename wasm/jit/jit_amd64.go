@@ -28,7 +28,7 @@ const (
 	memoryReg             = x86.REG_R15
 )
 
-func (e *engine) compileForAMD64(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
+func (e *engine) compile(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
 	b, err := asm.NewBuilder("amd64", 128)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
@@ -39,13 +39,14 @@ func (e *engine) compileForAMD64(f *wasm.FunctionInstance) (*compiledWasmFunctio
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
 	}
-
 	return &compiledWasmFunction{codeSegment: code, memoryInst: nil}, nil
 }
 
 type amd64Builder struct {
 	eng     *engine
 	builder *asm.Builder
+	// TODO: get the maximum height.
+	// memoryStack []uint64
 }
 
 func (a *amd64Builder) assemble() ([]byte, error) {
