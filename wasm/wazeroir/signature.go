@@ -176,9 +176,9 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 		}
 		var t SignLessType
 		if index < inputLen {
-			t = wasmValueTypeToSignless(f.Signature.InputTypes[index])
+			t = WasmValueTypeToSignless(f.Signature.InputTypes[index])
 		} else {
-			t = wasmValueTypeToSignless(f.LocalTypes[index-inputLen])
+			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
 		return &signature{out: []SignLessType{t}}, nil
 	case wasm.OptCodeLocalSet:
@@ -188,9 +188,9 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 		}
 		var t SignLessType
 		if index < inputLen {
-			t = wasmValueTypeToSignless(f.Signature.InputTypes[index])
+			t = WasmValueTypeToSignless(f.Signature.InputTypes[index])
 		} else {
-			t = wasmValueTypeToSignless(f.LocalTypes[index-inputLen])
+			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
 		return &signature{in: []SignLessType{t}}, nil
 	case wasm.OptCodeLocalTee:
@@ -200,9 +200,9 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 		}
 		var t SignLessType
 		if index < inputLen {
-			t = wasmValueTypeToSignless(f.Signature.InputTypes[index])
+			t = WasmValueTypeToSignless(f.Signature.InputTypes[index])
 		} else {
-			t = wasmValueTypeToSignless(f.LocalTypes[index-inputLen])
+			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
 		return &signature{in: []SignLessType{t}, out: []SignLessType{t}}, nil
 	case wasm.OptCodeGlobalGet:
@@ -210,14 +210,14 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
-			out: []SignLessType{wasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
+			out: []SignLessType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
 		}, nil
 	case wasm.OptCodeGlobalSet:
 		if len(f.ModuleInstance.Globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
-			in: []SignLessType{wasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
+			in: []SignLessType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
 		}, nil
 	case wasm.OptCodeI32Load:
 		return signature_I32_I32, nil
@@ -354,15 +354,15 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 func funcTypeToSignature(tps *wasm.FunctionType) *signature {
 	ret := &signature{}
 	for _, vt := range tps.InputTypes {
-		ret.in = append(ret.in, wasmValueTypeToSignless(vt))
+		ret.in = append(ret.in, WasmValueTypeToSignless(vt))
 	}
 	for _, vt := range tps.ReturnTypes {
-		ret.out = append(ret.out, wasmValueTypeToSignless(vt))
+		ret.out = append(ret.out, WasmValueTypeToSignless(vt))
 	}
 	return ret
 }
 
-func wasmValueTypeToSignless(vt wasm.ValueType) SignLessType {
+func WasmValueTypeToSignless(vt wasm.ValueType) SignLessType {
 	switch vt {
 	case wasm.ValueTypeI32:
 		return SignLessTypeI32

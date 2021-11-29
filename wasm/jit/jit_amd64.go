@@ -42,23 +42,32 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
+	builder := &amd64Builder{eng: e, f: f, builder: b, locationStack: newValueLocationStack()}
+	// Move the signature locals onto stack, as we assume that
+	// all the function parameters (signature locals) are already pushed on the stack
+	// by the caller.
+	builder.pushSignatureLocals()
 
-	builder := &amd64Builder{eng: e, builder: b, locationStack: newValueLocationStack()}
+	// Initialize the reserved registers first of all.
 	builder.initializeReservedRegisters()
-
+	// Now move onto the function body to compile each wazeroir operation.
 	for _, op := range ir {
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLabel:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationBr:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationBrIf:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationBrTable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationCall:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationCallIndirect:
 		case *wazeroir.OperationDrop:
@@ -66,6 +75,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationSelect:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationPick:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationSwap:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -96,6 +106,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationConstI32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstI64:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstF32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -112,12 +123,15 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationGt:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLe:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationGe:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationAdd:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationSub:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationMul:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -192,10 +206,23 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	return &compiledWasmFunction{codeSegment: code, memoryInst: nil}, nil
 }
 
+func (b *amd64Builder) pushSignatureLocals() {
+	for ; b.memoryStackPointer < uint64(len(b.f.Signature.InputTypes)); b.memoryStackPointer++ {
+		t := b.f.Signature.InputTypes[b.memoryStackPointer]
+		sp := uint64(b.memoryStackPointer)
+		loc := &valueLocation{valueType: wazeroir.WasmValueTypeToSignless(t), stackPointer: &sp}
+		b.locationStack.push(loc)
+	}
+}
+
 type amd64Builder struct {
-	eng           *engine
-	builder       *asm.Builder
+	eng     *engine
+	f       *wasm.FunctionInstance
+	builder *asm.Builder
+	// location stack holds the state of wazeroir virtual stack.
+	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
+	// Stack pointer which begins with signature locals.
 	// TODO: get the maximum height.
 	memoryStackPointer uint64
 }

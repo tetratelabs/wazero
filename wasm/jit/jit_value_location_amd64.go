@@ -6,10 +6,13 @@ package jit
 import (
 	"errors"
 
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 )
 
 type valueLocation struct {
+	// TODO: might not be neeeded at all!
+	valueType    wazeroir.SignLessType
 	register     *int
 	stackPointer *uint64
 	// conditional registers?
@@ -93,6 +96,16 @@ const (
 	gpTypeFloat
 )
 
+func gpRegisterTypeFromSignLess(in wazeroir.SignLessType) (ret generalPurposeRegisterType) {
+	switch in {
+	case wazeroir.SignLessTypeF32, wazeroir.SignLessTypeF64:
+		ret = gpTypeFloat
+	case wazeroir.SignLessTypeI32, wazeroir.SignLessTypeI64:
+		ret = gpTypeInt
+	}
+	return
+}
+
 // Search for unused registers, and if found, returns the resgister
 // and mark it used.
 func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (int, error) {
@@ -115,7 +128,7 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (in
 
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
-func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (target *valueLocation) {
+func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (target *valueLocation, ok bool) {
 	for i := 0; i < s.sp; i++ {
 		loc := s.stack[i]
 		if loc.onRegister() {
@@ -133,5 +146,6 @@ func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRe
 			}
 		}
 	}
+	ok = target != nil
 	return
 }

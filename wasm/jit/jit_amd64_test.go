@@ -56,6 +56,22 @@ func requireNewBuilder(t *testing.T) *amd64Builder {
 	return &amd64Builder{eng: nil, builder: b}
 }
 
+func TestAmd64Builder_pushSignatureLocals(t *testing.T) {
+	f := &wasm.FunctionInstance{Signature: &wasm.FunctionType{
+		InputTypes: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
+	}}
+	builder := &amd64Builder{locationStack: newValueLocationStack(), f: f}
+	builder.pushSignatureLocals()
+	require.Equal(t, uint64(len(f.Signature.InputTypes)), builder.memoryStackPointer)
+	require.Equal(t, 2, builder.locationStack.sp)
+	loc := builder.locationStack.pop()
+	require.Equal(t, wazeroir.SignLessTypeI32, loc.valueType)
+	require.Equal(t, uint64(1), *loc.stackPointer)
+	loc = builder.locationStack.pop()
+	require.Equal(t, wazeroir.SignLessTypeF64, loc.valueType)
+	require.Equal(t, uint64(0), *loc.stackPointer)
+}
+
 // Test engine.exec method on the resursive function calls.
 func TestRecursiveFunctionCalls(t *testing.T) {
 	const tmpReg = x86.REG_AX

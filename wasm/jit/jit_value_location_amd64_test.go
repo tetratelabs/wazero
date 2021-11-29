@@ -73,23 +73,25 @@ func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s.push(intLocation)
 	s.push(floatLocation)
 	// Take for float.
-	target := s.takeStealTargetFromUsedRegister(gpTypeFloat)
-	require.NotNil(t, target)
+	target, ok := s.takeStealTargetFromUsedRegister(gpTypeFloat)
+	require.True(t, ok)
 	require.Equal(t, floatLocation, target)
 	// Take for ints.
-	target = s.takeStealTargetFromUsedRegister(gpTypeInt)
-	require.NotNil(t, target)
+	target, ok = s.takeStealTargetFromUsedRegister(gpTypeInt)
+	require.True(t, ok)
 	require.Equal(t, intLocation, target)
 	// Pop float value.
 	popped := s.pop()
 	require.Equal(t, floatLocation, popped)
 	// Now we cannot find the steal target.
-	target = s.takeStealTargetFromUsedRegister(gpTypeFloat)
+	target, ok = s.takeStealTargetFromUsedRegister(gpTypeFloat)
+	require.False(t, ok)
 	require.Nil(t, target)
 	// Pop int value.
 	popped = s.pop()
 	require.Equal(t, intLocation, popped)
 	// Now we cannot find the steal target.
-	target = s.takeStealTargetFromUsedRegister(gpTypeInt)
+	target, ok = s.takeStealTargetFromUsedRegister(gpTypeInt)
+	require.False(t, ok)
 	require.Nil(t, target)
 }
