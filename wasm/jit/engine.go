@@ -12,8 +12,9 @@ type engine struct {
 	// The actual Go-allocated stack.
 	// Note that we NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
 	stack []uint64
-	// Wasm stack pointer on .stack field
-	sp uint64
+	// Wasm stack pointer on .stack field which is accessed by currentBaseStackPointer+currentStackPointer
+	currentStackPointer     uint64
+	currentBaseStackPointer uint64
 	// Where we store the status code of JIT execution.
 	jitCallStatusCode jitStatusCodes
 	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
@@ -97,14 +98,14 @@ func newEngine() *engine {
 }
 
 func (e *engine) pop() (ret uint64) {
-	ret = e.stack[e.sp-1]
-	e.sp--
+	ret = e.stack[e.currentBaseStackPointer+e.currentStackPointer-1]
+	e.currentStackPointer--
 	return
 }
 
 func (e *engine) push(v uint64) {
-	e.stack[e.sp] = v
-	e.sp++
+	e.stack[e.currentBaseStackPointer+e.currentStackPointer] = v
+	e.currentStackPointer++
 }
 
 type jitStatusCodes uint32
@@ -118,22 +119,33 @@ const (
 )
 
 var (
-	engineStackOffset               = int64(unsafe.Offsetof((&engine{}).stack))
-	engineSPOffset                  = int64(unsafe.Offsetof((&engine{}).sp))
-	engineJITStatusOffset           = int64(unsafe.Offsetof((&engine{}).jitCallStatusCode))
-	engineFunctionCallIndexOffset   = int64(unsafe.Offsetof((&engine{}).functionCallIndex))
-	engineContinuationAddressOffset = int64(unsafe.Offsetof((&engine{}).continuationAddressOffset))
+	engineStackSliceOffset              = int64(unsafe.Offsetof((&engine{}).stack))
+	engineCurrentStackPointerOffset     = int64(unsafe.Offsetof((&engine{}).currentStackPointer))
+	engineCurrentBaseStackPointerOffset = int64(unsafe.Offsetof((&engine{}).currentBaseStackPointer))
+	engineJITStatusOffset               = int64(unsafe.Offsetof((&engine{}).jitCallStatusCode))
+	engineFunctionCallIndexOffset       = int64(unsafe.Offsetof((&engine{}).functionCallIndex))
+	engineContinuationAddressOffset     = int64(unsafe.Offsetof((&engine{}).continuationAddressOffset))
 )
 
 type callFrame struct {
-	continuationAddress uintptr
-	f                   *compiledWasmFunction
-	prev                *callFrame
+	continuationAddress      uintptr
+	continuationStackPointer uint64
+	baseStackPointer         uint64
+	f                        *compiledWasmFunction
+	prev                     *callFrame
+}
+
+func (c *callFrame) String() string {
+	return fmt.Sprintf(
+		"[continuation address=%d, continuation stack poitner=%d, base stack pointer=%d]",
+		c.continuationAddress, c.continuationStackPointer, c.baseStackPointer,
+	)
 }
 
 type compiledWasmFunction struct {
-	codeSegment []byte
-	memoryInst  *wasm.MemoryInstance
+	inputNum, outputNum uint64
+	codeSegment         []byte
+	memoryInst          *wasm.MemoryInstance
 }
 
 func (c *compiledWasmFunction) initialAddress() uintptr {
@@ -158,6 +170,12 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	}
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
+		if false { // TODO: use buildoptions.IsDebugMode.
+			fmt.Printf("callframe=%s, currentBaseStackPointer: %d, currentStackPointer: %d, stack: %v\n",
+				currentFrame.String(), e.currentBaseStackPointer, e.currentStackPointer,
+				e.stack[:e.currentBaseStackPointer+e.currentStackPointer],
+			)
+		}
 		// TODO: We should check the size of the stack,
 		// and if it's running out, grow it before calling into JITed code.
 		// It should be possible to check the necessity by statically
@@ -177,21 +195,32 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		case jitStatusReturned:
 			// Meaning that the current frame exits
 			// so we just get back to the caller's frame.
-			e.callFrameStack = currentFrame.prev
+			prevFrame := currentFrame.prev
+			e.callFrameStack = prevFrame
+			if prevFrame != nil {
+				e.currentBaseStackPointer = prevFrame.baseStackPointer
+				// Set the stack pointer to the beginning of the function outputs
+				e.currentStackPointer = prevFrame.continuationStackPointer
+			}
 		case jitStatusCallFunction:
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so
 			// we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.f.initialAddress() + e.continuationAddressOffset
+			currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.outputNum - nextFunc.inputNum
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.initialAddress(),
 				f:                   nextFunc,
 				// Set the caller frame as prev so we can return back to the current frame!
 				prev: currentFrame,
+				// Set the base pointer to the beginning of the function inputs
+				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputNum,
 			}
 			// Now move onto the callee function.
 			e.callFrameStack = frame
+			e.currentBaseStackPointer = frame.baseStackPointer
+			e.currentStackPointer = nextFunc.inputNum
 		case jitStatusCallBuiltInFunction:
 			switch e.functionCallIndex {
 			case builtinFunctionIndexGrowMemory:

@@ -105,6 +105,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	// and call itself recursively.
 	builder.pushRegisterToStack(tmpReg)
 	builder.callFunctionFromConstIndex(0)
+	builder.popFromStackToRegister(tmpReg)
 	// ::End
 	// If zero, we return from this function after pushing 5.
 	prog = builder.movConstToRegister(5, tmpReg)
@@ -112,7 +113,6 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	builder.pushRegisterToStack(tmpReg)
 	builder.setJITStatus(jitStatusReturned)
 	builder.returnFunction()
-
 	// Compile.
 	code, err := builder.assemble()
 	require.NoError(t, err)
@@ -120,18 +120,16 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	mem := newMemoryInst()
 	eng := newEngine()
 	eng.stack[0] = 10 // We call recursively 10 times.
-	eng.sp++
-	compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+	eng.currentStackPointer++
+	compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem, inputNum: 1, outputNum: 1}
 	eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 	// Call into the function
 	eng.exec(compiledFunc)
-
-	// We must return 10 times, so 5 is pushed onto the stack 10 times.
-	require.Equal(t, []uint64{5, 5, 5, 5, 5, 5, 5, 5, 5, 5}, eng.stack[:eng.sp])
+	require.Equal(t, []uint64{5, 0, 0, 0, 0}, eng.stack[:5])
 	// And the callstack should be empty.
 	require.Nil(t, eng.callFrameStack)
 
-	// Check the stability with busy Go runtime.
+	// // Check the stability with busy Go runtime.
 	var wg sync.WaitGroup
 	const goroutines = 10000
 	wg.Add(goroutines)
@@ -147,7 +145,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 			mem := newMemoryInst()
 			eng := newEngine()
 			eng.stack[0] = 10 // We call recursively 10 times.
-			eng.sp++
+			eng.currentStackPointer++
 			compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
 			eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 			// Call into the function
@@ -193,7 +191,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 			eng.exec(f)
 
 			// Because we pushed the value, eng.sp must be incremented by 1
-			if eng.sp != 1 {
+			if eng.currentStackPointer != 1 {
 				panic("eng.sp must be incremented.")
 			}
 
@@ -297,7 +295,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 
 	// Run codes
 	eng := newEngine()
-	eng.sp++
+	eng.currentStackPointer++
 	mem := newMemoryInst()
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
@@ -335,7 +333,7 @@ func Test_callFunction(t *testing.T) {
 
 		// Setup.
 		eng := newEngine()
-		eng.sp++
+		eng.currentStackPointer++
 		mem := newMemoryInst()
 
 		// The first call.
@@ -374,7 +372,7 @@ func Test_callFunction(t *testing.T) {
 
 		// Setup.
 		eng := newEngine()
-		eng.sp++
+		eng.currentStackPointer++
 		mem := newMemoryInst()
 
 		// The first call.
@@ -417,7 +415,7 @@ func Test_callHostFunction(t *testing.T) {
 		// Setup.
 		eng := newEngine()
 		eng.hostFunctions = append(eng.hostFunctions, func() {
-			eng.stack[eng.sp-1] *= 100
+			eng.stack[eng.currentStackPointer-1] *= 100
 		})
 		mem := newMemoryInst()
 
@@ -452,7 +450,7 @@ func Test_callHostFunction(t *testing.T) {
 		// Setup.
 		eng := newEngine()
 		eng.hostFunctions = make([]func(), 2)
-		eng.hostFunctions[1] = func() { eng.stack[eng.sp-1] *= 200 }
+		eng.hostFunctions[1] = func() { eng.stack[eng.currentStackPointer-1] *= 200 }
 		mem := newMemoryInst()
 
 		// Call into the function
@@ -488,17 +486,36 @@ func Test_popFromStackToRegister(t *testing.T) {
 
 	// Call in.
 	eng := newEngine()
-	eng.sp = 3
-	eng.stack[eng.sp-2] = 10000
-	eng.stack[eng.sp-1] = 20000
+	eng.currentStackPointer = 3
+	eng.stack[eng.currentStackPointer-2] = 10000
+	eng.stack[eng.currentStackPointer-1] = 20000
 	mem := newMemoryInst()
-	require.Equal(t, []uint64{0, 10000, 20000}, eng.stack[:eng.sp])
+	require.Equal(t, []uint64{0, 10000, 20000}, eng.stack[:eng.currentStackPointer])
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
 	// Check the sp and value.
-	require.Equal(t, uint64(2), eng.sp)
-	require.Equal(t, []uint64{0, 10001}, eng.stack[:eng.sp])
+	require.Equal(t, uint64(2), eng.currentStackPointer)
+	require.Equal(t, []uint64{0, 10001}, eng.stack[:eng.currentStackPointer])
+}
+
+func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+	builder.returnFunction()
+
+	// Assemble.
+	code, err := builder.assemble()
+	require.NoError(t, err)
+
+	// Run codes.
+	eng := newEngine()
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
 }
