@@ -41,7 +41,7 @@ func isIntRegister(r int) bool {
 }
 
 func isFloatRegister(r int) bool {
-	return gpFloatRegisters[0] <= r && r <= gpFloatRegisters[len(gpIntRegisters)-1]
+	return gpFloatRegisters[0] <= r && r <= gpFloatRegisters[len(gpFloatRegisters)-1]
 }
 
 func newValueLocationStack() *valueLocationStack {
@@ -57,16 +57,20 @@ type valueLocationStack struct {
 }
 
 func (s *valueLocationStack) push(loc *valueLocation) {
-	s.stack[s.sp] = loc
-	s.sp++
+	if s.sp >= len(s.stack) {
+		s.stack = append(s.stack, loc)
+		s.sp++
+	} else {
+		s.stack[s.sp] = loc
+		s.sp++
+	}
 }
 
-type generalPurposeRegisterType byte
-
-const (
-	gpTypeInt generalPurposeRegisterType = iota
-	gpTypeFloat
-)
+func (s *valueLocationStack) pop() (loc *valueLocation) {
+	s.sp--
+	loc = s.stack[s.sp]
+	return
+}
 
 func (s *valueLocationStack) releaseRegister(reg int) {
 	delete(s.usedRegisters, reg)
@@ -75,6 +79,13 @@ func (s *valueLocationStack) releaseRegister(reg int) {
 func (s *valueLocationStack) markRegisterUsed(reg int) {
 	s.usedRegisters[reg] = struct{}{}
 }
+
+type generalPurposeRegisterType byte
+
+const (
+	gpTypeInt generalPurposeRegisterType = iota
+	gpTypeFloat
+)
 
 // Search for unused registers, and if found, returns the resgister
 // and mark it used.
@@ -99,7 +110,8 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (in
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
 func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (target *valueLocation) {
-	for _, loc := range s.stack {
+	for i := 0; i < s.sp; i++ {
+		loc := s.stack[i]
 		if loc.onRegister() {
 			switch tp {
 			case gpTypeFloat:
