@@ -18,58 +18,63 @@ func newMemoryInst() *wasm.MemoryInstance {
 	return &wasm.MemoryInstance{Buffer: make([]byte, 1024)}
 }
 
+func requireNewBuilder(t *testing.T) *amd64Builder {
+	b, err := asm.NewBuilder("amd64", 128)
+	require.NoError(t, err)
+	return &amd64Builder{eng: nil, builder: b}
+}
+
 // Test engine.exec method on the resursive function calls.
 func TestRecursiveFunctionCalls(t *testing.T) {
 	const tmpReg = x86.REG_AX
 	// Build a function that decrements top of stack,
 	// and recursively call itself until the top value becomes zero,
 	// and if the value becomes zero, add 5 onto the top and return.
-	builder, err := asm.NewBuilder("amd64", 128)
-	require.NoError(t, err)
-	initializeReservedRegisters(builder)
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
 	// Pop the value from the stack
-	popFromStackToRegister(builder, tmpReg)
+	builder.popFromStackToRegister(tmpReg)
 	// Decrement tha value.
-	prog := builder.NewProg()
+	prog := builder.builder.NewProg()
 	prog.As = x86.ADECQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = tmpReg
-	builder.AddInstruction(prog)
+	builder.addInstruction(prog)
 	// Check if the value equals zero
-	prog = builder.NewProg()
+	prog = builder.newProg()
 	prog.As = x86.ACMPQ
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = tmpReg
 	prog.To.Type = obj.TYPE_CONST
 	prog.To.Offset = 0
-	builder.AddInstruction(prog)
+	builder.addInstruction(prog)
 	// If zero, jump to ::End
-	jmp := builder.NewProg()
+	jmp := builder.newProg()
 	jmp.As = x86.AJEQ
 	jmp.To.Type = obj.TYPE_BRANCH
-	builder.AddInstruction(jmp)
+	builder.addInstruction(jmp)
 	// If not zero, we call push back the value to the stack
 	// and call itself recursively.
-	pushRegisterToStack(builder, tmpReg)
-	callFunctionFromConstIndex(builder, 0)
+	builder.pushRegisterToStack(tmpReg)
+	builder.callFunctionFromConstIndex(0)
 	// ::End
 	// If zero, we return from this function after pushing 5.
-	prog = movConstToRegister(builder, 5, tmpReg)
+	prog = builder.movConstToRegister(5, tmpReg)
 	jmp.To.SetTarget(prog) // the above mov instruction is the jump target of the JEQ.
-	pushRegisterToStack(builder, tmpReg)
-	setJITStatus(builder, jitStatusReturned)
-	returnFunction(builder)
+	builder.pushRegisterToStack(tmpReg)
+	builder.setJITStatus(jitStatusReturned)
+	builder.returnFunction()
 
 	// Compile.
-	code, err := mmapCodeSegment(builder.Assemble())
+	code, err := builder.assemble()
 	require.NoError(t, err)
 	// Setup engine.
 	mem := newMemoryInst()
 	eng := newEngine()
 	eng.stack[0] = 10 // We call recursively 10 times.
 	eng.sp++
-	compiledFunc := &compiledFunction{codeSegment: code, memoryInst: mem}
-	eng.compiledWasmFunctions = []*compiledFunction{compiledFunc}
+	compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+	eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 	// Call into the function
 	eng.exec(compiledFunc)
 
@@ -95,8 +100,8 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 			eng := newEngine()
 			eng.stack[0] = 10 // We call recursively 10 times.
 			eng.sp++
-			compiledFunc := &compiledFunction{codeSegment: code, memoryInst: mem}
-			eng.compiledWasmFunctions = []*compiledFunction{compiledFunc}
+			compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+			eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 			// Call into the function
 			eng.exec(compiledFunc)
 		}()
@@ -118,24 +123,23 @@ func TestPushValueWithGoroutines(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Build native codes.
-			builder, err := asm.NewBuilder("amd64", 128)
-			require.NoError(t, err)
-			initializeReservedRegisters(builder)
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
 			// Push consts to pushTargetRegister.
-			movConstToRegister(builder, int64(targetValue), pushTargetRegister)
+			builder.movConstToRegister(int64(targetValue), pushTargetRegister)
 			// Push pushTargetRegister into the engine.stack[engine.sp].
-			pushRegisterToStack(builder, pushTargetRegister)
+			builder.pushRegisterToStack(pushTargetRegister)
 			// Finally increment the stack pointer and write it back to the eng.sp
-			returnFunction(builder)
+			builder.returnFunction()
 
 			// Compile.
-			code, err := mmapCodeSegment(builder.Assemble())
+			code, err := builder.assemble()
 			require.NoError(t, err)
 
 			eng := newEngine()
 			mem := newMemoryInst()
 
-			f := &compiledFunction{codeSegment: code, memoryInst: mem}
+			f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
 
 			// Call into the function
 			eng.exec(f)
@@ -157,13 +161,12 @@ func TestPushValueWithGoroutines(t *testing.T) {
 func Test_setJITStatus(t *testing.T) {
 	for _, s := range []jitStatusCodes{jitStatusReturned, jitStatusCallFunction, jitStatusCallBuiltInFunction} {
 		// Build codes.
-		builder, err := asm.NewBuilder("amd64", 128)
-		require.NoError(t, err)
-		initializeReservedRegisters(builder)
-		setJITStatus(builder, s)
-		returnFunction(builder)
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		builder.setJITStatus(s)
+		builder.returnFunction()
 		// Compile.
-		code, err := mmapCodeSegment(builder.Assemble())
+		code, err := builder.assemble()
 		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
@@ -182,13 +185,12 @@ func Test_setFunctionCallIndexFromConst(t *testing.T) {
 	// Build codes.
 	for _, index := range []uint32{1, 5, 20} {
 		// Build codes.
-		builder, err := asm.NewBuilder("amd64", 128)
-		require.NoError(t, err)
-		initializeReservedRegisters(builder)
-		setFunctionCallIndexFromConst(builder, index)
-		returnFunction(builder)
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		builder.setFunctionCallIndexFromConst(index)
+		builder.returnFunction()
 		// Compile.
-		code, err := mmapCodeSegment(builder.Assemble())
+		code, err := builder.assemble()
 		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
@@ -207,14 +209,13 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 	reg := int16(x86.REG_R10)
 	for _, index := range []uint32{1, 5, 20} {
 		// Build codes.
-		builder, err := asm.NewBuilder("amd64", 128)
-		require.NoError(t, err)
-		initializeReservedRegisters(builder)
-		movConstToRegister(builder, int64(index), reg)
-		setFunctionCallIndexFromRegister(builder, reg)
-		returnFunction(builder)
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		builder.movConstToRegister(int64(index), reg)
+		builder.setFunctionCallIndexFromRegister(reg)
+		builder.returnFunction()
 		// Compile.
-		code, err := mmapCodeSegment(builder.Assemble())
+		code, err := builder.assemble()
 		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
@@ -231,20 +232,19 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 
 func Test_setContinuationAtNextInstruction(t *testing.T) {
 	// Build codes.
-	builder, err := asm.NewBuilder("amd64", 128)
-	require.NoError(t, err)
-	initializeReservedRegisters(builder)
-	setContinuationOffsetAtNextInstructionAndReturn(builder)
-	exp := uintptr(len(builder.Assemble()))
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+	builder.setContinuationOffsetAtNextInstructionAndReturn()
+	exp := uintptr(len(builder.builder.Assemble()))
 	// On the continuation, we have to setup the registers again.
-	initializeReservedRegisters(builder)
+	builder.initializeReservedRegisters()
 	// The continuation after function calls.
-	movConstToRegister(builder, int64(50), x86.REG_AX)
-	pushRegisterToStack(builder, x86.REG_AX)
-	setJITStatus(builder, jitStatusCallFunction)
-	returnFunction(builder)
+	builder.movConstToRegister(int64(50), x86.REG_AX)
+	builder.pushRegisterToStack(x86.REG_AX)
+	builder.setJITStatus(jitStatusCallFunction)
+	builder.returnFunction()
 	// Compile.
-	code, err := mmapCodeSegment(builder.Assemble())
+	code, err := builder.assemble()
 	require.NoError(t, err)
 
 	// Run codes
@@ -273,17 +273,16 @@ func Test_callFunction(t *testing.T) {
 	t.Run("from const", func(t *testing.T) {
 		const functionIndex uint32 = 10
 		// Build codes.
-		builder, err := asm.NewBuilder("amd64", 128)
-		require.NoError(t, err)
-		initializeReservedRegisters(builder)
-		callFunctionFromConstIndex(builder, functionIndex)
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		builder.callFunctionFromConstIndex(functionIndex)
 		// On the continuation after function call,
 		// We push the value onto stack
-		movConstToRegister(builder, int64(50), x86.REG_AX)
-		pushRegisterToStack(builder, x86.REG_AX)
-		returnFunction(builder)
+		builder.movConstToRegister(int64(50), x86.REG_AX)
+		builder.pushRegisterToStack(x86.REG_AX)
+		builder.returnFunction()
 		// Compile.
-		code, err := mmapCodeSegment(builder.Assemble())
+		code, err := builder.assemble()
 		require.NoError(t, err)
 
 		// Setup.
@@ -312,18 +311,17 @@ func Test_callFunction(t *testing.T) {
 		const functionIndex uint32 = 10
 		const reg = x86.REG_AX
 		// Build codes.
-		builder, err := asm.NewBuilder("amd64", 128)
-		require.NoError(t, err)
-		initializeReservedRegisters(builder)
-		movConstToRegister(builder, int64(functionIndex), reg)
-		callFunctionFromRegisterIndex(builder, reg)
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		builder.movConstToRegister(int64(functionIndex), reg)
+		builder.callFunctionFromRegisterIndex(reg)
 		// On the continuation after function call,
 		// We push the value onto stack
-		movConstToRegister(builder, int64(50), x86.REG_AX)
-		pushRegisterToStack(builder, x86.REG_AX)
-		returnFunction(builder)
+		builder.movConstToRegister(int64(50), x86.REG_AX)
+		builder.pushRegisterToStack(x86.REG_AX)
+		builder.returnFunction()
 		// Compile.
-		code, err := mmapCodeSegment(builder.Assemble())
+		code, err := builder.assemble()
 		require.NoError(t, err)
 
 		// Setup.
@@ -354,19 +352,18 @@ func Test_callHostFunction(t *testing.T) {
 	t.Run("from const", func(t *testing.T) {
 		const functionIndex uint32 = 0
 		// Build codes.
-		builder, err := asm.NewBuilder("amd64", 128)
-		require.NoError(t, err)
-		initializeReservedRegisters(builder)
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
 		// Push the value onto stack.
-		movConstToRegister(builder, int64(50), x86.REG_AX)
-		pushRegisterToStack(builder, x86.REG_AX)
-		callHostFunctionFromConstIndex(builder, functionIndex)
+		builder.movConstToRegister(int64(50), x86.REG_AX)
+		builder.pushRegisterToStack(x86.REG_AX)
+		builder.callHostFunctionFromConstIndex(functionIndex)
 		// On the continuation after function call,
 		// We push the value onto stack
-		setJITStatus(builder, jitStatusReturned)
-		returnFunction(builder)
+		builder.setJITStatus(jitStatusReturned)
+		builder.returnFunction()
 		// Compile.
-		code, err := mmapCodeSegment(builder.Assemble())
+		code, err := builder.assemble()
 		require.NoError(t, err)
 
 		// Setup.
@@ -377,7 +374,7 @@ func Test_callHostFunction(t *testing.T) {
 		mem := newMemoryInst()
 
 		// Call into the function
-		f := &compiledFunction{codeSegment: code, memoryInst: mem}
+		f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
 		eng.exec(f)
 		require.Equal(t, uint64(50)*100, eng.stack[0])
 	})
@@ -388,21 +385,20 @@ func Test_callHostFunction(t *testing.T) {
 			tmpReg               = x86.REG_AX
 		)
 		// Build codes.
-		builder, err := asm.NewBuilder("amd64", 128)
-		require.NoError(t, err)
-		initializeReservedRegisters(builder)
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
 		// Push the value onto stack.
-		movConstToRegister(builder, int64(50), tmpReg)
-		pushRegisterToStack(builder, x86.REG_AX)
+		builder.movConstToRegister(int64(50), tmpReg)
+		builder.pushRegisterToStack(x86.REG_AX)
 		// Set the function index
-		movConstToRegister(builder, int64(1), tmpReg)
-		callHostFunctionFromRegisterIndex(builder, tmpReg)
+		builder.movConstToRegister(int64(1), tmpReg)
+		builder.callHostFunctionFromRegisterIndex(tmpReg)
 		// On the continuation after function call,
 		// We push the value onto stack
-		setJITStatus(builder, jitStatusReturned)
-		returnFunction(builder)
+		builder.setJITStatus(jitStatusReturned)
+		builder.returnFunction()
 		// Compile.
-		code, err := mmapCodeSegment(builder.Assemble())
+		code, err := builder.assemble()
 		require.NoError(t, err)
 
 		// Setup.
@@ -412,7 +408,7 @@ func Test_callHostFunction(t *testing.T) {
 		mem := newMemoryInst()
 
 		// Call into the function
-		f := &compiledFunction{codeSegment: code, memoryInst: mem}
+		f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
 		eng.exec(f)
 		require.Equal(t, uint64(50)*200, eng.stack[0])
 	})
@@ -424,23 +420,22 @@ func Test_popFromStackToRegister(t *testing.T) {
 	// Build function.
 	// Pop the value from the top twice,
 	// and push back the last value to the top incremented by one.
-	builder, err := asm.NewBuilder("amd64", 128)
-	require.NoError(t, err)
-	initializeReservedRegisters(builder)
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
 	// Pop twice.
-	popFromStackToRegister(builder, targetRegister)
-	popFromStackToRegister(builder, targetRegister)
+	builder.popFromStackToRegister(targetRegister)
+	builder.popFromStackToRegister(targetRegister)
 	// Increment the popped value on the register.
-	prog := builder.NewProg()
+	prog := builder.newProg()
 	prog.As = x86.AINCQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = targetRegister
-	builder.AddInstruction(prog)
+	builder.addInstruction(prog)
 	// Push it back to the stack.
-	pushRegisterToStack(builder, targetRegister)
-	returnFunction(builder)
+	builder.pushRegisterToStack(targetRegister)
+	builder.returnFunction()
 	// Compile.
-	code, err := mmapCodeSegment(builder.Assemble())
+	code, err := builder.assemble()
 	require.NoError(t, err)
 
 	// Call in.

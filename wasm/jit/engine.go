@@ -3,6 +3,7 @@ package jit
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -28,7 +29,7 @@ type engine struct {
 	// Function call frames in linked list
 	callFrameStack *callFrame
 	// Store the compiled functions and indexes.
-	compiledWasmFunctions     []*compiledFunction
+	compiledWasmFunctions     []*compiledWasmFunction
 	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int
 	// Store the host functions and indexes.
 	hostFunctions     []func()
@@ -127,16 +128,16 @@ var (
 
 type callFrame struct {
 	continuationAddress uintptr
-	f                   *compiledFunction
+	f                   *compiledWasmFunction
 	prev                *callFrame
 }
 
-type compiledFunction struct {
+type compiledWasmFunction struct {
 	codeSegment []byte
 	memoryInst  *wasm.MemoryInstance
 }
 
-func (c *compiledFunction) initialAddress() uintptr {
+func (c *compiledWasmFunction) initialAddress() uintptr {
 	return uintptr(unsafe.Pointer(&c.codeSegment[0]))
 }
 
@@ -150,7 +151,7 @@ func (e *engine) stackGrow() {
 	e.stack = newStack
 }
 
-func (e *engine) exec(f *compiledFunction) {
+func (e *engine) exec(f *compiledWasmFunction) {
 	e.callFrameStack = &callFrame{
 		continuationAddress: f.initialAddress(),
 		f:                   f,
@@ -224,6 +225,10 @@ func (e *engine) memoryGrow(m *wasm.MemoryInstance, newPages uint64) {
 	}
 }
 
-func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	return nil, nil
+func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
+	if runtime.GOARCH != "amd64" {
+		// TODO: support arm64!
+		return nil, fmt.Errorf("unsupported GOARCH: %s", runtime.GOARCH)
+	}
+	return e.compileForAMD64(f)
 }

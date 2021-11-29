@@ -4,6 +4,9 @@
 package jit
 
 import (
+	"fmt"
+
+	"github.com/tetratelabs/wazero/wasm"
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
@@ -25,120 +28,158 @@ const (
 	memoryReg             = x86.REG_R15
 )
 
-func setJITStatus(b *asm.Builder, status jitStatusCodes) *obj.Prog {
-	prog := b.NewProg()
+func (e *engine) compileForAMD64(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
+	b, err := asm.NewBuilder("amd64", 128)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
+	}
+	builder := &amd64Builder{eng: e, builder: b}
+
+	code, err := builder.assemble()
+	if err != nil {
+		return nil, fmt.Errorf("failed to assemble: %w", err)
+	}
+
+	return &compiledWasmFunction{codeSegment: code, memoryInst: nil}, nil
+}
+
+type amd64Builder struct {
+	eng     *engine
+	builder *asm.Builder
+}
+
+func (a *amd64Builder) assemble() ([]byte, error) {
+	code, err := mmapCodeSegment(a.builder.Assemble())
+	return code, err
+}
+
+func (a *amd64Builder) addInstruction(prog *obj.Prog) {
+	a.builder.AddInstruction(prog)
+}
+
+func (a *amd64Builder) newProg() (prog *obj.Prog) {
+	return a.builder.NewProg()
+}
+
+func (a *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {
+	prog := a.builder.NewProg()
 	prog.As = x86.AMOVL
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(status)
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineJITStatusOffset
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 	return prog
 }
 
-func callHostFunctionFromConstIndex(b *asm.Builder, index uint32) {
+func (a *amd64Builder) callHostFunctionFromConstIndex(index uint32) {
 	// Set the jit status as jitStatusCallFunction
-	setJITStatus(b, jitStatusCallHostFunction)
+	a.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
-	setFunctionCallIndexFromConst(b, index)
+	a.setFunctionCallIndexFromConst(index)
 	// Set the continuation offset on the next instruction.
-	setContinuationOffsetAtNextInstructionAndReturn(b)
+	a.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
 	// we must setup the reserved registers again.
-	initializeReservedRegisters(b)
+	a.initializeReservedRegisters()
 }
 
-func callHostFunctionFromRegisterIndex(b *asm.Builder, reg int16) {
+func (a *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 	// Set the jit status as jitStatusCallFunction
-	setJITStatus(b, jitStatusCallHostFunction)
+	a.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
-	setFunctionCallIndexFromRegister(b, reg)
+	a.setFunctionCallIndexFromRegister(reg)
 	// Set the continuation offset on the next instruction.
-	setContinuationOffsetAtNextInstructionAndReturn(b)
+	a.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
 	// we must setup the reserved registers again.
-	initializeReservedRegisters(b)
+	a.initializeReservedRegisters()
 }
 
-func callFunctionFromConstIndex(b *asm.Builder, index uint32) {
+func (a *amd64Builder) callFunctionFromConstIndex(index uint32) {
 	// Set the jit status as jitStatusCallFunction
-	setJITStatus(b, jitStatusCallFunction)
+	a.setJITStatus(jitStatusCallFunction)
 	// Set the function index.
-	setFunctionCallIndexFromConst(b, index)
+	a.setFunctionCallIndexFromConst(index)
 	// Set the continuation offset on the next instruction.
-	setContinuationOffsetAtNextInstructionAndReturn(b)
+	a.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
 	// we must setup the reserved registers again.
-	initializeReservedRegisters(b)
+	a.initializeReservedRegisters()
 }
 
-func callFunctionFromRegisterIndex(b *asm.Builder, reg int16) {
+func (a *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
 	// Set the jit status as jitStatusCallFunction
-	setJITStatus(b, jitStatusCallFunction)
+	a.setJITStatus(jitStatusCallFunction)
 	// Set the function index.
-	setFunctionCallIndexFromRegister(b, reg)
+	a.setFunctionCallIndexFromRegister(reg)
 	// Set the continuation offset on the next instruction.
-	setContinuationOffsetAtNextInstructionAndReturn(b)
+	a.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
 	// we must setup the reserved registers again.
-	initializeReservedRegisters(b)
+	a.initializeReservedRegisters()
 }
 
-func setContinuationOffsetAtNextInstructionAndReturn(b *asm.Builder) {
+// TODO: If this function call is the tail call,
+// we don't need to return back to this function.
+// Maybe better have another status for that case,
+// so that we don't call back again to this function
+// and instead just release the call frame.
+func (a *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	// Create the instruction for setting offset.
-	prog := b.NewProg()
+	prog := a.builder.NewProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(0) // Place holder!
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineContinuationAddressOffset
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 	// Then return temporarily -- giving control to normal Go code.
-	returnFunction(b)
+	a.returnFunction()
 	// As we cannot read RIP register directly,
 	// we calculate now the offset to the next instruction
 	// relative to the beginning of this function body.
-	prog.From.Offset = int64(len(b.Assemble()))
+	prog.From.Offset = int64(len(a.builder.Assemble()))
 }
 
-func setFunctionCallIndexFromRegister(b *asm.Builder, reg int16) {
-	prog := b.NewProg()
+func (a *amd64Builder) setFunctionCallIndexFromRegister(reg int16) {
+	prog := a.builder.NewProg()
 	prog.As = x86.AMOVL
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = reg
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineFunctionCallIndexOffset
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 }
 
-func setFunctionCallIndexFromConst(b *asm.Builder, index uint32) {
-	prog := b.NewProg()
+func (a *amd64Builder) setFunctionCallIndexFromConst(index uint32) {
+	prog := a.builder.NewProg()
 	prog.As = x86.AMOVL
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(index)
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineFunctionCallIndexOffset
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 }
 
-func movConstToRegister(b *asm.Builder, val int64, targetRegister int16) *obj.Prog {
-	prog := b.NewProg()
+func (a *amd64Builder) movConstToRegister(val int64, targetRegister int16) *obj.Prog {
+	prog := a.builder.NewProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = val
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = targetRegister
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 	return prog
 }
 
-func pushRegisterToStack(b *asm.Builder, fromReg int16) {
+func (a *amd64Builder) pushRegisterToStack(fromReg int16) {
 	// Push value.
-	prog := b.NewProg()
+	prog := a.builder.NewProg()
 	prog.As = x86.AMOVQ
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = cachedStackSliceReg
@@ -146,26 +187,26 @@ func pushRegisterToStack(b *asm.Builder, fromReg int16) {
 	prog.To.Scale = 8
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = fromReg
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 
 	// Increment cached stack pointer.
-	prog = b.NewProg()
+	prog = a.builder.NewProg()
 	prog.As = x86.AINCQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = cachedStackPointerReg
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 }
 
-func popFromStackToRegister(b *asm.Builder, toReg int16) {
+func (a *amd64Builder) popFromStackToRegister(toReg int16) {
 	// Decrement the cached stack pointer.
-	prog := b.NewProg()
+	prog := a.builder.NewProg()
 	prog.As = x86.ADECQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = cachedStackPointerReg
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 
 	// Pop value to the resgister.
-	prog = b.NewProg()
+	prog = a.builder.NewProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
 	prog.From.Reg = cachedStackSliceReg
@@ -173,31 +214,31 @@ func popFromStackToRegister(b *asm.Builder, toReg int16) {
 	prog.From.Scale = 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = toReg
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 }
 
-func returnFunction(b *asm.Builder) {
+func (a *amd64Builder) returnFunction() {
 	// Write back the cached SP to the actual eng.sp.
-	prog := b.NewProg()
+	prog := a.builder.NewProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = cachedStackPointerReg
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineSPOffset
-	b.AddInstruction(prog)
+	a.builder.AddInstruction(prog)
 
 	// Return.
-	ret := b.NewProg()
+	ret := a.builder.NewProg()
 	ret.As = obj.ARET
-	b.AddInstruction(ret)
+	a.builder.AddInstruction(ret)
 }
 
-func initializeReservedRegisters(b *asm.Builder) {
+func (a *amd64Builder) initializeReservedRegisters() {
 	// Cache the current stack pointer (engine.sp).
 	// movq cachedStackPointerReg [engineInstanceReg+engineSPOffset]
 	{
-		prog := b.NewProg()
+		prog := a.builder.NewProg()
 		prog.As = x86.AMOVQ
 		prog.From.Type = obj.TYPE_MEM
 		prog.From.Reg = engineInstanceReg
@@ -205,12 +246,12 @@ func initializeReservedRegisters(b *asm.Builder) {
 		// Push to cachedStackPointerReg.
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = cachedStackPointerReg
-		b.AddInstruction(prog)
+		a.builder.AddInstruction(prog)
 	}
 	// Cache the pointer to the current stack backing array.
 	// movq cachedStackSliceReg [engineInstanceReg+engineStackOffset]
 	{
-		prog := b.NewProg()
+		prog := a.builder.NewProg()
 		prog.As = x86.AMOVQ
 		prog.From.Type = obj.TYPE_MEM
 		prog.From.Reg = engineInstanceReg
@@ -218,6 +259,6 @@ func initializeReservedRegisters(b *asm.Builder) {
 		// Push to cachedStackPointerReg.
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = cachedStackSliceReg
-		b.AddInstruction(prog)
+		a.builder.AddInstruction(prog)
 	}
 }

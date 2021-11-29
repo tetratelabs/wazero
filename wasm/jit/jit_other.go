@@ -6,3 +6,7 @@ package jit
 func jitcall(codeSegment, engine, memory uintptr) {
 	panic("unsupported GOARCH")
 }
+
+func (e *engine) compileForAMD64(*wasm.FunctionInstance) (*compiledWasmFunction, error) {
+	panic("unsupported GOARCH")
+}
