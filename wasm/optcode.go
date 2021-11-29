@@ -6,21 +6,21 @@ const (
 	// control instructions. See https://www.w3.org/TR/wasm-core-1/#control-instructions
 
 	// OptCodeUnreachable causes an unconditional trap.
-	OptCodeUnreachable  OptCode = 0x00
+	OptCodeUnreachable OptCode = 0x00
 	// OptCodeNop does nothing
-	OptCodeNop          OptCode = 0x01
+	OptCodeNop OptCode = 0x01
 	// OptCodeBlock brackets a sequence of instructions. A branch instruction on an if label breaks out to after its
 	// OptCodeEnd.
-	OptCodeBlock        OptCode = 0x02
+	OptCodeBlock OptCode = 0x02
 	// OptCodeLoop brackets a sequence of instructions. A branch instruction on a loop label will jump back to the
 	// beginning of its block.
-	OptCodeLoop         OptCode = 0x03
+	OptCodeLoop OptCode = 0x03
 	// OptCodeIf brackets a sequence of instructions. When the top of the stack evaluates to 1, the block is executed.
 	// Zero jumps to the optional OptCodeElse. A branch instruction on an if label breaks out to after its OptCodeEnd.
-	OptCodeIf           OptCode = 0x04
+	OptCodeIf OptCode = 0x04
 	// OptCodeElse brackets a sequence of instructions enclosed by an OptCodeIf. A branch instruction on a then label
 	// breaks out to after the OptCodeEnd on the enclosing OptCodeIf.
-	OptCodeElse         OptCode = 0x05
+	OptCodeElse OptCode = 0x05
 	// OptCodeEnd terminates a control instruction OptCodeBlock, OptCodeLoop or OptCodeIf.
 	OptCodeEnd          OptCode = 0x0b
 	OptCodeBr           OptCode = 0x0c
