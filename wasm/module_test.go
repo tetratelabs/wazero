@@ -6,6 +6,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDecodeModule(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       []byte
+		expected    *Module
+		expectedErr string
+	}{
+		{
+			name:     "empty",
+			input:    []byte("\x00asm\x01\x00\x00\x00"),
+			expected: &Module{CustomSections: map[string][]byte{}},
+		},
+		{
+			name:        "wrong magic",
+			input:       []byte("wasm\x01\x00\x00\x00"),
+			expectedErr: "invalid magic number",
+		},
+		{
+			name:        "wrong version",
+			input:       []byte("\x00asm\x01\x00\x00\x01"),
+			expectedErr: "invalid version header",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			m, e := DecodeModule(tc.input)
+			if tc.expectedErr != "" {
+				require.EqualError(t, e, tc.expectedErr)
+			} else {
+				require.NoError(t, e)
+				require.Equal(t, tc.expected, m)
+			}
+		})
+	}
+}
+
 func TestModuleGetFunctionNames(t *testing.T) {
 	m := Module{
 		CustomSections: map[string][]byte{},
