@@ -25,10 +25,10 @@ func Test_isFloatRegister(t *testing.T) {
 func TestValueLocationStack_basic(t *testing.T) {
 	s := newValueLocationStack()
 	// Push.
-	depth := 100
-	s.push(&valueLocation{stackDepth: &depth})
+	depth := uint64(100)
+	s.push(&valueLocation{stackPointer: &depth})
 	require.Equal(t, 1, s.sp)
-	require.Equal(t, depth, *s.stack[s.sp-1].stackDepth)
+	require.Equal(t, depth, *s.stack[s.sp-1].stackPointer)
 	// markRegisterUsed.
 	reg := x86.REG_X1
 	s.markRegisterUsed(reg)

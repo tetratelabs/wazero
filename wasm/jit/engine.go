@@ -3,7 +3,6 @@ package jit
 import (
 	"fmt"
 	"math"
-	"runtime"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -223,12 +222,4 @@ func (e *engine) memoryGrow(m *wasm.MemoryInstance, newPages uint64) {
 		e.push(uint64(uint64(len(m.Buffer)) / wasm.PageSize))
 		m.Buffer = append(m.Buffer, make([]byte, newPages*wasm.PageSize)...)
 	}
-}
-
-func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
-	if runtime.GOARCH != "amd64" {
-		// TODO: support arm64!
-		return nil, fmt.Errorf("unsupported GOARCH: %s", runtime.GOARCH)
-	}
-	return e.compile(f)
 }

@@ -10,13 +10,13 @@ import (
 )
 
 type valueLocation struct {
-	register   *int
-	stackDepth *int
+	register     *int
+	stackPointer *uint64
 	// conditional registers?
 }
 
 func (v *valueLocation) onStack() bool {
-	return v.stackDepth != nil
+	return v.stackPointer != nil
 }
 
 func (v *valueLocation) onRegister() bool {
