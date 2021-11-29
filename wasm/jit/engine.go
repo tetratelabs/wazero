@@ -190,6 +190,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			uintptr(unsafe.Pointer(e)),
 			uintptr(unsafe.Pointer(&currentFrame.f.memoryInst.Buffer[0])),
 		)
+
 		// Check the status code from JIT code.
 		switch e.jitCallStatusCode {
 		case jitStatusReturned:
@@ -222,6 +223,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Set the stack pointer so that base+sp would point to the top of function inputs.
 			e.currentStackPointer = nextFunc.inputNum
 		case jitStatusCallBuiltInFunction:
+			// TODO: check the signature and modify stack pointer.
 			switch e.functionCallIndex {
 			case builtinFunctionIndexGrowMemory:
 				v := e.pop()
@@ -232,6 +234,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			currentFrame.continuationAddress = currentFrame.f.initialAddress() + e.continuationAddressOffset
 		case jitStatusCallHostFunction:
 			e.hostFunctions[e.functionCallIndex]()
+			// TODO: check the signature and modify stack pointer.
 			currentFrame.continuationAddress = currentFrame.f.initialAddress() + e.continuationAddressOffset
 		default:
 			panic("invalid status code!")
