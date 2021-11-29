@@ -3,13 +3,25 @@ package wasm
 type OptCode = byte
 
 const (
-	// control instruction
-	OptCodeUnreachable  OptCode = 0x00
-	OptCodeNop          OptCode = 0x01
-	OptCodeBlock        OptCode = 0x02
-	OptCodeLoop         OptCode = 0x03
-	OptCodeIf           OptCode = 0x04
-	OptCodeElse         OptCode = 0x05
+	// control instructions. See https://www.w3.org/TR/wasm-core-1/#control-instructions
+
+	// OptCodeUnreachable causes an unconditional trap.
+	OptCodeUnreachable OptCode = 0x00
+	// OptCodeNop does nothing
+	OptCodeNop OptCode = 0x01
+	// OptCodeBlock brackets a sequence of instructions. A branch instruction on an if label breaks out to after its
+	// OptCodeEnd.
+	OptCodeBlock OptCode = 0x02
+	// OptCodeLoop brackets a sequence of instructions. A branch instruction on a loop label will jump back to the
+	// beginning of its block.
+	OptCodeLoop OptCode = 0x03
+	// OptCodeIf brackets a sequence of instructions. When the top of the stack evaluates to 1, the block is executed.
+	// Zero jumps to the optional OptCodeElse. A branch instruction on an if label breaks out to after its OptCodeEnd.
+	OptCodeIf OptCode = 0x04
+	// OptCodeElse brackets a sequence of instructions enclosed by an OptCodeIf. A branch instruction on a then label
+	// breaks out to after the OptCodeEnd on the enclosing OptCodeIf.
+	OptCodeElse OptCode = 0x05
+	// OptCodeEnd terminates a control instruction OptCodeBlock, OptCodeLoop or OptCodeIf.
 	OptCodeEnd          OptCode = 0x0b
 	OptCodeBr           OptCode = 0x0c
 	OptCodeBrIf         OptCode = 0x0d
@@ -18,18 +30,21 @@ const (
 	OptCodeCall         OptCode = 0x10
 	OptCodeCallIndirect OptCode = 0x11
 
-	// parametric instruction
+	// parametric instructions
+
 	OptCodeDrop   OptCode = 0x1a
 	OptCodeSelect OptCode = 0x1b
 
-	// variable instruction
+	// variable instructions
+
 	OptCodeLocalGet  OptCode = 0x20
 	OptCodeLocalSet  OptCode = 0x21
 	OptCodeLocalTee  OptCode = 0x22
 	OptCodeGlobalGet OptCode = 0x23
 	OptCodeGlobalSet OptCode = 0x24
 
-	// memory instruction
+	// memory instructions
+
 	OptCodeI32Load    OptCode = 0x28
 	OptCodeI64Load    OptCode = 0x29
 	OptCodeF32Load    OptCode = 0x2a
@@ -56,13 +71,15 @@ const (
 	OptCodeMemorySize OptCode = 0x3f
 	OptCodeMemoryGrow OptCode = 0x40
 
-	// const instructions.
+	// const instructions
+
 	OptCodeI32Const OptCode = 0x41
 	OptCodeI64Const OptCode = 0x42
 	OptCodeF32Const OptCode = 0x43
 	OptCodeF64Const OptCode = 0x44
 
-	// numeric instructions.
+	// numeric instructions
+
 	OptCodeI32eqz OptCode = 0x45
 	OptCodeI32eq  OptCode = 0x46
 	OptCodeI32ne  OptCode = 0x47
