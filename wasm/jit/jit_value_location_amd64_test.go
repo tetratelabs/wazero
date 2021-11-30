@@ -41,27 +41,27 @@ func TestValueLocationStack_basic(t *testing.T) {
 func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	s := newValueLocationStack()
 	// For int registers.
-	r, err := s.takeFreeRegister(gpTypeInt)
-	require.NoError(t, err)
+	r, ok := s.takeFreeRegister(gpTypeInt)
+	require.True(t, ok)
 	require.True(t, isIntRegister(r))
 	// Mark all the int registers used.
 	for _, r := range gpIntRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for int.
-	_, err = s.takeFreeRegister(gpTypeInt)
-	require.Equal(t, errFreeRegisterNotFound, err)
+	_, ok = s.takeFreeRegister(gpTypeInt)
+	require.False(t, ok)
 	// But we still should be able to take float regs.
-	r, err = s.takeFreeRegister(gpTypeFloat)
-	require.NoError(t, err)
+	r, ok = s.takeFreeRegister(gpTypeFloat)
+	require.True(t, ok)
 	require.True(t, isFloatRegister(r))
 	// Mark all the float registers used.
 	for _, r := range gpFloatRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for floats.
-	_, err = s.takeFreeRegister(gpTypeFloat)
-	require.Equal(t, errFreeRegisterNotFound, err)
+	_, ok = s.takeFreeRegister(gpTypeFloat)
+	require.False(t, ok)
 }
 
 func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {

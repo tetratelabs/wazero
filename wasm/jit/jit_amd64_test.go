@@ -846,3 +846,93 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 		})
 	})
 }
+
+func TestAmd64Builder_handleConstI64(t *testing.T) {
+	t.Run("free register", func(t *testing.T) {
+		o := &wazeroir.OperationConstI64{Value: 10000}
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+
+		err := builder.handleConstI64(o)
+		require.NoError(t, err)
+
+		reg := *builder.locationStack.peek().register
+
+		// To verify the behavior, we increment and push the const value
+		// to the stack.
+		prog := builder.newProg()
+		prog.As = x86.AINCQ
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = reg
+		builder.addInstruction(prog)
+		builder.pushRegisterToStack(reg)
+		builder.returnFunction()
+
+		// Assemble.
+		code, err := builder.assemble()
+		require.NoError(t, err)
+		// Run code.
+		eng := newEngine()
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the stack.
+		require.Equal(t, uint64(1), eng.currentStackPointer)
+		require.Equal(t, o.Value+1, eng.stack[eng.currentStackPointer-1])
+	})
+
+	t.Run("steal", func(t *testing.T) {
+		o := &wazeroir.OperationConstI64{Value: 10000}
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		// Use up all the Int regs.
+		for _, r := range gpIntRegisters {
+			builder.locationStack.markRegisterUsed(r)
+		}
+		builder.memoryStackPointer = 10
+
+		// Set the steal target location with the initial const value.
+		stealTargetReg := int16(x86.REG_AX)
+		stealTargetLoc := &valueLocation{register: &stealTargetReg}
+		builder.locationStack.push(stealTargetLoc)
+		builder.movConstToRegister(50, stealTargetReg)
+
+		// Now emit the const code.
+		err := builder.handleConstI64(o)
+		require.NoError(t, err)
+		// And at this point, the stolen value's location is on the stack.
+		require.False(t, stealTargetLoc.onRegister())
+		require.True(t, stealTargetLoc.onStack())
+		require.Equal(t, uint64(10), *stealTargetLoc.stackPointer)
+		require.Equal(t, uint64(11), builder.memoryStackPointer)
+
+		// To verify the behavior, we increment and push the const value
+		// to the stack.
+		prog := builder.newProg()
+		prog.As = x86.AINCQ
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = stealTargetReg
+		builder.addInstruction(prog)
+		builder.pushRegisterToStack(stealTargetReg)
+		builder.returnFunction()
+
+		// Assemble.
+		code, err := builder.assemble()
+		require.NoError(t, err)
+		// Run code.
+		eng := newEngine()
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the stack.
+		require.Equal(t, uint64(2), eng.currentStackPointer)
+		require.Equal(t, o.Value+1, eng.stack[eng.currentStackPointer-1])
+		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-2])
+	})
+}

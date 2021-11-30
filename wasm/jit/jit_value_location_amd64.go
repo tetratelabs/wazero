@@ -4,8 +4,6 @@
 package jit
 
 import (
-	"errors"
-
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 )
@@ -52,7 +50,6 @@ var (
 		x86.REG_BP, x86.REG_SI, x86.REG_DI, x86.REG_R8,
 		x86.REG_R9, x86.REG_R10, x86.REG_R11,
 	}
-	errFreeRegisterNotFound = errors.New("free register not found")
 )
 
 func isIntRegister(r int16) bool {
@@ -123,7 +120,7 @@ func gpRegisterTypeFromSignLess(in wazeroir.SignLessType) (ret generalPurposeReg
 
 // Search for unused registers, and if found, returns the resgister
 // and mark it used.
-func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (int16, error) {
+func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {
 	var targetRegs []int16
 	switch tp {
 	case gpTypeFloat:
@@ -136,9 +133,9 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (in
 			continue
 		}
 		s.markRegisterUsed(candidate)
-		return candidate, nil
+		return candidate, true
 	}
-	return 0, errFreeRegisterNotFound
+	return 0, false
 }
 
 // Search through the stack, and steal the register from the last used

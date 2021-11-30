@@ -4,7 +4,6 @@
 package jit
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -110,7 +109,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationConstI32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstI64:
-			// TODO:
+			if err := builder.handleConstI64(o); err != nil {
+				return nil, fmt.Errorf("error handling pick operation %v: %w", o, err)
+			}
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstF32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -281,7 +282,7 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 	// we could optimize the instruction according to the bit size of the value.
 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
 	pickTarget := b.locationStack.stack[len(b.locationStack.stack)-1-o.Depth]
-	if reg, err := b.locationStack.takeFreeRegister(gpTypeInt); err == nil {
+	if reg, ok := b.locationStack.takeFreeRegister(gpTypeInt); ok {
 		if pickTarget.onRegister() {
 			prog := b.newProg()
 			prog.As = x86.AMOVQ
@@ -318,7 +319,7 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 		loc := &valueLocation{register: &reg}
 		b.locationStack.push(loc)
 		return nil
-	} else if errors.Is(err, errFreeRegisterNotFound) {
+	} else {
 		stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
 		if !ok {
 			return fmt.Errorf("cannot steal register")
@@ -370,9 +371,26 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 			panic("TODO!")
 		}
 		return nil
-	} else {
-		return fmt.Errorf("cannot take free register: %w", err)
 	}
+}
+
+func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
+	reg, ok := b.locationStack.takeFreeRegister(gpTypeInt)
+	if !ok {
+		stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
+		if !ok {
+			return fmt.Errorf("cannot steal register")
+		}
+		// We move the value in the steal target register onto stack.
+		evictedValueStackPointer := b.memoryStackPointer
+		b.pushRegisterToStack(*stealTarget.register)
+		reg = *stealTarget.register
+		stealTarget.setStackPointer(evictedValueStackPointer)
+	}
+	loc := &valueLocation{register: &reg}
+	b.locationStack.push(loc)
+	b.movConstToRegister(int64(o.Value), reg)
+	return nil
 }
 
 func (b *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {
