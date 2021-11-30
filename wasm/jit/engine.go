@@ -48,7 +48,8 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 		f := e.compiledWasmFunctions[index]
 		e.exec(f)
 	} else {
-		return nil, fmt.Errorf("invalid function")
+		err = fmt.Errorf("invalid function")
+		return
 	}
 	returns = make([]uint64, len(f.Signature.ReturnTypes))
 	for i := range returns {
@@ -132,7 +133,7 @@ type callFrame struct {
 	continuationStackPointer uint64
 	baseStackPointer         uint64
 	f                        *compiledWasmFunction
-	prev                     *callFrame
+	caller                   *callFrame
 }
 
 func (c *callFrame) String() string {
@@ -166,7 +167,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	e.callFrameStack = &callFrame{
 		continuationAddress: f.initialAddress(),
 		f:                   f,
-		prev:                nil,
+		caller:              nil,
 	}
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
@@ -196,11 +197,11 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		case jitStatusReturned:
 			// Meaning that the current frame exits
 			// so we just get back to the caller's frame.
-			prevFrame := currentFrame.prev
-			e.callFrameStack = prevFrame
-			if prevFrame != nil {
-				e.currentBaseStackPointer = prevFrame.baseStackPointer
-				e.currentStackPointer = prevFrame.continuationStackPointer
+			callerFrame := currentFrame.caller
+			e.callFrameStack = callerFrame
+			if callerFrame != nil {
+				e.currentBaseStackPointer = callerFrame.baseStackPointer
+				e.currentStackPointer = callerFrame.continuationStackPointer
 			}
 		case jitStatusCallFunction:
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
@@ -212,8 +213,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			frame := &callFrame{
 				continuationAddress: nextFunc.initialAddress(),
 				f:                   nextFunc,
-				// Set the caller frame as prev so we can return back to the current frame!
-				prev: currentFrame,
+				// Set the caller frame so we can return back to the current frame!
+				caller: currentFrame,
 				// Set the base pointer to the beginning of the function inputs
 				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputNum,
 			}

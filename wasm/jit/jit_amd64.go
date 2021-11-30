@@ -5,6 +5,7 @@ package jit
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
@@ -56,8 +57,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationUnreachable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLabel:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleLabel(o); err != nil {
+				return nil, fmt.Errorf("error handling label operation %s: %w", o, err)
+			}
 		case *wazeroir.OperationBr:
 			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -199,6 +201,15 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			return nil, fmt.Errorf("unreachable: a bug in JIT compiler")
 		}
 	}
+
+	if len(builder.onLabelStartCallbacks) > 0 {
+		keys := make([]string, 0, len(builder.onLabelStartCallbacks))
+		for key := range builder.onLabelStartCallbacks {
+			keys = append(keys, key)
+		}
+		return nil, fmt.Errorf("labels are not defined: %s", strings.Join(keys, ","))
+	}
+
 	code, err := builder.assemble()
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
@@ -225,6 +236,9 @@ type amd64Builder struct {
 	// Stack pointer which begins with signature locals.
 	// TODO: get the maximum height.
 	memoryStackPointer uint64
+	// Label resolvers.
+	onLabelStartCallbacks map[string][]func(*obj.Prog)
+	labelProgs            map[string]*obj.Prog
 }
 
 func (b *amd64Builder) assemble() ([]byte, error) {
@@ -238,6 +252,26 @@ func (b *amd64Builder) addInstruction(prog *obj.Prog) {
 
 func (b *amd64Builder) newProg() (prog *obj.Prog) {
 	return b.builder.NewProg()
+}
+
+func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
+	// We use NOP as a beginning of instructions in a label.
+	// This should be eventually optimized out by assembler.
+	labelKey := o.Label.String()
+	labelBegin := b.newProg()
+	labelBegin.As = obj.ANOP
+	b.addInstruction(labelBegin)
+	// Save the instructions so that backward branching
+	// instructions can jump to this label.
+	b.labelProgs[labelKey] = labelBegin
+	// Invoke callbacks to notify the forward branching
+	// instructions can properly jump to this label.
+	for _, cb := range b.onLabelStartCallbacks[labelKey] {
+		cb(labelBegin)
+	}
+	// Now we don't need to call the callbacks.
+	delete(b.onLabelStartCallbacks, labelKey)
+	return nil
 }
 
 func (b *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {

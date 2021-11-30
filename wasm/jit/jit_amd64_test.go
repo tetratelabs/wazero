@@ -53,7 +53,10 @@ func newMemoryInst() *wasm.MemoryInstance {
 func requireNewBuilder(t *testing.T) *amd64Builder {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
-	return &amd64Builder{eng: nil, builder: b}
+	return &amd64Builder{eng: nil, builder: b,
+		onLabelStartCallbacks: map[string][]func(*obj.Prog){},
+		labelProgs:            map[string]*obj.Prog{},
+	}
 }
 
 func TestAmd64Builder_pushSignatureLocals(t *testing.T) {
@@ -507,6 +510,35 @@ func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
 	builder.returnFunction()
 
 	// Assemble.
+	code, err := builder.assemble()
+	require.NoError(t, err)
+
+	// Run codes.
+	eng := newEngine()
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+}
+
+func TestAmd64Builder_handleLabel(t *testing.T) {
+	builder := requireNewBuilder(t)
+	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
+
+	var called bool
+	builder.onLabelStartCallbacks[label.String()] = append(builder.onLabelStartCallbacks[label.String()],
+		func(p *obj.Prog) { called = true },
+	)
+	err := builder.handleLabel(&wazeroir.OperationLabel{Label: label})
+	require.NoError(t, err)
+	require.Len(t, builder.onLabelStartCallbacks, 0)
+	require.Contains(t, builder.labelProgs, label.String())
+	require.True(t, called)
+
+	// Assemble.
+	builder.returnFunction()
 	code, err := builder.assemble()
 	require.NoError(t, err)
 
