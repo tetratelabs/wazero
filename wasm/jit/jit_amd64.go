@@ -326,13 +326,13 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 		// First we copy the value in the target register onto stack.
 		evictedValueStackPointer := b.memoryStackPointer
 		b.pushRegisterToStack(*stealTarget.register)
+		reg := *stealTarget.register
+		stealTarget.setStackPointer(evictedValueStackPointer)
 
 		// This case, pick target is the steal target, meaning that
 		// we don't need to move the value. Instead copy the
 		// register value onto memory stack, and swap the locations.
 		if stealTarget == pickTarget {
-			reg := *stealTarget.register
-			stealTarget.setStackPointer(evictedValueStackPointer)
 			loc := &valueLocation{register: &reg}
 			b.locationStack.push(loc)
 			return nil
@@ -345,11 +345,9 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 			prog.From.Type = obj.TYPE_REG
 			prog.From.Reg = *pickTarget.register
 			prog.To.Type = obj.TYPE_REG
-			prog.To.Reg = *stealTarget.register
+			prog.To.Reg = reg
 			b.addInstruction(prog)
-			stealTarget.setStackPointer(evictedValueStackPointer)
 		} else if pickTarget.onStack() {
-			reg := *stealTarget.register
 			// Place the stack pointer at first.
 			prog := b.newProg()
 			prog.As = x86.AMOVQ
@@ -358,7 +356,6 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = reg
 			b.addInstruction(prog)
-			stealTarget.setStackPointer(evictedValueStackPointer)
 			// Then Copy the value from the stack.
 			prog = b.newProg()
 			prog.As = x86.AMOVQ
