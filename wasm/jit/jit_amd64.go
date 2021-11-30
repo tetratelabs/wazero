@@ -111,7 +111,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstI64:
 			if err := builder.handleConstI64(o); err != nil {
-				return nil, fmt.Errorf("error handling pick operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling i64.const operation %v: %w", o, err)
 			}
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstF32:
@@ -134,7 +134,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationGe:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationAdd:
-			// TODO:
+			if err := builder.handleAdd(o); err != nil {
+				return nil, fmt.Errorf("error handling add operation %v: %w", o, err)
+			}
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationSub:
 			// TODO:
@@ -340,6 +342,125 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 	// so push the location onto the stack.
 	loc := &valueLocation{register: &reg}
 	b.locationStack.push(loc)
+	return nil
+}
+
+func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
+	// TODO: if the previous instruction is const, then
+	// this can be optimized. Same goes for other arithmetic instructions.
+
+	prog := b.newProg()
+	var tp generalPurposeRegisterType
+	switch o.Type {
+	case wazeroir.SignLessTypeI32:
+		prog.As = x86.AADDL
+		tp = gpTypeInt
+	case wazeroir.SignLessTypeI64:
+		prog.As = x86.AADDQ
+		tp = gpTypeInt
+	case wazeroir.SignLessTypeF32:
+		prog.As = x86.AADDSS
+		tp = gpTypeFloat
+	case wazeroir.SignLessTypeF64:
+		prog.As = x86.AADDSD
+		tp = gpTypeFloat
+	}
+
+	x2 := b.locationStack.pop()
+	var x2Register int16
+	if x2.onStack() {
+		var ok bool
+		x2Register, ok = b.locationStack.takeFreeRegister(gpTypeInt)
+		if !ok {
+			stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(tp)
+			if !ok {
+				return fmt.Errorf("cannot steal register")
+			}
+			// First we copy the value in the target register onto stack.
+			evictedValueStackPointer := b.memoryStackPointer
+			x2Register = *stealTarget.register
+			b.pushRegisterToStack(x2Register)
+			stealTarget.setStackPointer(evictedValueStackPointer)
+		}
+		// Then move the value to the stolen register.
+		// Place the stack pointer at first.
+		prog := b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_CONST
+		prog.From.Offset = int64(*x2.stackPointer)
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x2Register
+		b.addInstruction(prog)
+
+		// Then Copy the value from the stack.
+		prog = b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_MEM
+		prog.From.Reg = cachedStackBasePointerReg
+		prog.From.Index = x2Register
+		prog.From.Scale = 8
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x2Register
+		b.addInstruction(prog)
+	} else if x2.onRegister() {
+		x2Register = *x2.register
+	} else if x2.onConditionalRegister() {
+		panic("TODO")
+	}
+
+	x1 := b.locationStack.peek()
+	var x1Register int16
+	if x1.onStack() {
+		var ok bool
+		x1Register, ok = b.locationStack.takeFreeRegister(gpTypeInt)
+		if !ok {
+			stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(tp)
+			if !ok {
+				return fmt.Errorf("cannot steal register")
+			}
+			// move the value in the steal target register onto stack.
+			evictedValueStackPointer := b.memoryStackPointer
+			x1Register = *stealTarget.register
+			b.pushRegisterToStack(x1Register)
+			stealTarget.setStackPointer(evictedValueStackPointer)
+		}
+		// Then move the value to the stolen register.
+		// Place the stack pointer at first.
+		prog := b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_CONST
+		prog.From.Offset = int64(*x1.stackPointer)
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x1Register
+		b.addInstruction(prog)
+
+		// Then Copy the value from the stack.
+		prog = b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_MEM
+		prog.From.Reg = cachedStackBasePointerReg
+		prog.From.Index = x1Register
+		prog.From.Scale = 8
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x1Register
+		b.addInstruction(prog)
+
+		x1.setRegister(x1Register)
+	} else if x1.onRegister() {
+		x1Register = *x1.register
+	} else if x1.onConditionalRegister() {
+		panic("TODO")
+	}
+
+	// x1 += x2.
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = x2Register
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = x1Register
+	b.addInstruction(prog)
+
+	// We no longer need x2 register, so mark it unused.
+	b.locationStack.releaseRegister(x2Register)
 	return nil
 }
 

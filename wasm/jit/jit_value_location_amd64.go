@@ -22,6 +22,11 @@ func (v *valueLocation) setStackPointer(sp uint64) {
 	v.stackPointer = &sp
 }
 
+func (v *valueLocation) setRegister(reg int16) {
+	v.register = &reg
+	v.stackPointer = nil
+}
+
 func (v *valueLocation) onStack() bool {
 	return v.stackPointer != nil
 }
