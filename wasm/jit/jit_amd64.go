@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -77,8 +78,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationSelect:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationPick:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handlePick(o); err != nil {
+				return nil, fmt.Errorf("error handling pick operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationSwap:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationGlobalGet:
@@ -274,6 +276,108 @@ func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
 	return nil
 }
 
+func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
+	// TODO: if we track the type of values on the stack,
+	// we could optimize the instruction according to the bit size of the value.
+	// For now, we just move the entire register i.e. as a quad word (8 bytes).
+	pickTarget := b.locationStack.stack[len(b.locationStack.stack)-1-o.Depth]
+	if reg, err := b.locationStack.takeFreeRegister(gpTypeInt); err == nil {
+		if pickTarget.onRegister() {
+			prog := b.newProg()
+			prog.As = x86.AMOVQ
+			prog.From.Type = obj.TYPE_REG
+			prog.From.Reg = *pickTarget.register
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = reg
+			b.addInstruction(prog)
+		} else if pickTarget.onStack() {
+			// Place the stack pointer at first.
+			prog := b.newProg()
+			prog.As = x86.AMOVQ
+			prog.From.Type = obj.TYPE_CONST
+			prog.From.Offset = int64(*pickTarget.stackPointer)
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = reg
+			b.addInstruction(prog)
+
+			// Then Copy the value from the stack.
+			prog = b.newProg()
+			prog.As = x86.AMOVQ
+			prog.From.Type = obj.TYPE_MEM
+			prog.From.Reg = cachedStackBasePointerReg
+			prog.From.Index = reg
+			prog.From.Scale = 8
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = reg
+			b.addInstruction(prog)
+		} else if pickTarget.onConditionalRegister() {
+			panic("TODO")
+		}
+		// Now we already placed the picked value on the register,
+		// so push the location onto the stack.
+		loc := &valueLocation{register: &reg}
+		b.locationStack.push(loc)
+		return nil
+	} else if errors.Is(err, errFreeRegisterNotFound) {
+		stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
+		if !ok {
+			return fmt.Errorf("cannot steal register")
+		}
+		// First we copy the value in the target register onto stack.
+		evictedValueStackPointer := b.memoryStackPointer
+		b.pushRegisterToStack(*stealTarget.register)
+
+		// This case, pick target is the steal target, meaning that
+		// we don't need to move the value. Instead copy the
+		// register value onto memory stack, and swap the locations.
+		if stealTarget == pickTarget {
+			reg := *stealTarget.register
+			stealTarget.setStackPointer(evictedValueStackPointer)
+			loc := &valueLocation{register: &reg}
+			b.locationStack.push(loc)
+			return nil
+		}
+
+		if pickTarget.onRegister() {
+			// Copy the value of pickTarget into stealTarget.
+			prog := b.newProg()
+			prog.As = x86.AMOVQ
+			prog.From.Type = obj.TYPE_REG
+			prog.From.Reg = *pickTarget.register
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = *stealTarget.register
+			b.addInstruction(prog)
+			stealTarget.setStackPointer(evictedValueStackPointer)
+		} else if pickTarget.onStack() {
+			reg := *stealTarget.register
+			// Place the stack pointer at first.
+			prog := b.newProg()
+			prog.As = x86.AMOVQ
+			prog.From.Type = obj.TYPE_CONST
+			prog.From.Offset = int64(*pickTarget.stackPointer)
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = reg
+			b.addInstruction(prog)
+			stealTarget.setStackPointer(evictedValueStackPointer)
+			// Then Copy the value from the stack.
+			prog = b.newProg()
+			prog.As = x86.AMOVQ
+			prog.From.Type = obj.TYPE_MEM
+			prog.From.Reg = cachedStackBasePointerReg
+			prog.From.Index = reg
+			prog.From.Scale = 8
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = reg
+			b.addInstruction(prog)
+		} else if pickTarget.onConditionalRegister() {
+			panic("TODO!")
+		}
+		return nil
+	} else {
+		return fmt.Errorf("cannot take free register: %w", err)
+	}
+}
+
 func (b *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {
 	prog := b.newProg()
 	prog.As = x86.AMOVL
@@ -409,6 +513,7 @@ func (b *amd64Builder) pushRegisterToStack(fromReg int16) {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = cachedStackPointerReg
 	b.addInstruction(prog)
+	b.memoryStackPointer++
 }
 
 func (b *amd64Builder) popFromStackToRegister(toReg int16) {

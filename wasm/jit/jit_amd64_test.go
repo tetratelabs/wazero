@@ -1,3 +1,6 @@
+//go:build amd64
+// +build amd64
+
 package jit
 
 import (
@@ -54,6 +57,7 @@ func requireNewBuilder(t *testing.T) *amd64Builder {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
 	return &amd64Builder{eng: nil, builder: b,
+		locationStack:         newValueLocationStack(),
 		onLabelStartCallbacks: map[string][]func(*obj.Prog){},
 		labelProgs:            map[string]*obj.Prog{},
 	}
@@ -513,7 +517,7 @@ func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
 	code, err := builder.assemble()
 	require.NoError(t, err)
 
-	// Run codes.
+	// Run code.
 	eng := newEngine()
 	mem := newMemoryInst()
 	jitcall(
@@ -525,6 +529,7 @@ func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
 
 func TestAmd64Builder_handleLabel(t *testing.T) {
 	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
 	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
 
 	var called bool
@@ -542,7 +547,7 @@ func TestAmd64Builder_handleLabel(t *testing.T) {
 	code, err := builder.assemble()
 	require.NoError(t, err)
 
-	// Run codes.
+	// Run code.
 	eng := newEngine()
 	mem := newMemoryInst()
 	jitcall(
@@ -550,4 +555,294 @@ func TestAmd64Builder_handleLabel(t *testing.T) {
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
+}
+
+func TestAmd64Builder_handlePick(t *testing.T) {
+	t.Run("free register", func(t *testing.T) {
+		o := &wazeroir.OperationPick{Depth: 1}
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		// The case when the original value is already in register.
+		t.Run("on reg", func(t *testing.T) {
+			// Set up the pick target original value.
+			orignalReg := int16(x86.REG_AX)
+			loc := &valueLocation{register: &orignalReg}
+			builder.locationStack.push(loc)
+			builder.locationStack.push(nil)
+			builder.movConstToRegister(100, orignalReg)
+			// Now insert pick code.
+			err := builder.handlePick(o)
+			require.NoError(t, err)
+			// Increment the picked value.
+			pickedLocation := builder.locationStack.peek()
+			prog := builder.newProg()
+			prog.As = x86.AINCQ
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = *pickedLocation.register
+			builder.addInstruction(prog)
+			// To verify the behavior, we push the incremented picked value
+			// to the stack.
+			builder.pushRegisterToStack(*pickedLocation.register)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			eng := newEngine()
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(101), eng.stack[eng.currentStackPointer-1])
+		})
+		// The case when the original value is in stack.
+		t.Run("on stack", func(t *testing.T) {
+			eng := newEngine()
+
+			// Setup the original value.
+			sp := uint64(1)
+			loc := &valueLocation{stackPointer: &sp}
+			builder.locationStack.push(loc)
+			builder.locationStack.push(nil)
+			eng.currentStackPointer = 5
+			eng.currentBaseStackPointer = 1
+			eng.stack[eng.currentBaseStackPointer+sp] = 100
+
+			// Now insert pick code.
+			err := builder.handlePick(o)
+			require.NoError(t, err)
+
+			// Increment the picked value.
+			pickedLocation := builder.locationStack.peek()
+			prog := builder.newProg()
+			prog.As = x86.AINCQ
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = *pickedLocation.register
+			builder.addInstruction(prog)
+
+			// To verify the behavior, we push the incremented picked value
+			// to the stack.
+			builder.pushRegisterToStack(*pickedLocation.register)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			require.Equal(t, uint64(100), eng.stack[eng.currentBaseStackPointer+sp]) // Original value shouldn't be affected.
+			require.Equal(t, uint64(6), eng.currentStackPointer)
+			require.Equal(t, uint64(101), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
+		})
+	})
+	t.Run("steal register", func(t *testing.T) {
+		t.Run("steal = pick target", func(t *testing.T) {
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			// Use up all the Int regs.
+			for _, r := range gpIntRegisters {
+				builder.locationStack.markRegisterUsed(r)
+			}
+			o := &wazeroir.OperationPick{Depth: 1}
+			orignalReg := int16(x86.REG_AX)
+			pickTarget := &valueLocation{register: &orignalReg}
+			builder.locationStack.push(pickTarget)
+			builder.locationStack.push(&valueLocation{})
+			builder.movConstToRegister(100, orignalReg)
+			builder.memoryStackPointer = 20
+			// Verify the steal target will be the picked target.
+			stealTarget, ok := builder.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
+			require.True(t, ok)
+			require.Equal(t, pickTarget, stealTarget)
+
+			// Insert pick code.
+			err := builder.handlePick(o)
+			require.NoError(t, err)
+			// Now the steal target's location should be on stack.
+			require.False(t, stealTarget.onRegister())
+			require.True(t, stealTarget.onStack())
+			require.Equal(t, uint64(20), *stealTarget.stackPointer)
+			require.Equal(t, uint64(21), builder.memoryStackPointer)
+			// Plus the peek of value location stack should be the target reg.
+			require.Equal(t, orignalReg, *builder.locationStack.peek().register)
+
+			// To verify the behavior, we increment and push the picked value
+			// to the stack.
+			prog := builder.newProg()
+			prog.As = x86.AINCQ
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = orignalReg
+			builder.addInstruction(prog)
+			builder.pushRegisterToStack(orignalReg)
+			require.Equal(t, uint64(22), builder.memoryStackPointer)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			// Run code.
+			eng := newEngine()
+			mem := newMemoryInst()
+			eng.currentStackPointer = 20
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			// Check the stack.
+			require.Equal(t, uint64(22), eng.currentStackPointer)
+			require.Equal(t, uint64(101), eng.stack[eng.currentStackPointer-1])
+		})
+		t.Run("pick target on register", func(t *testing.T) {
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			// Use up all the Int regs.
+			for _, r := range gpIntRegisters {
+				builder.locationStack.markRegisterUsed(r)
+			}
+			o := &wazeroir.OperationPick{Depth: 0}
+			stealReg := int16(x86.REG_R9)
+			stealTargetLoc := &valueLocation{register: &stealReg}
+			builder.locationStack.push(stealTargetLoc)
+			builder.movConstToRegister(50, stealReg)
+			orignalReg := int16(x86.REG_AX)
+			pickTargetLoc := &valueLocation{register: &orignalReg}
+			builder.locationStack.push(pickTargetLoc)
+			builder.movConstToRegister(100, orignalReg)
+			builder.memoryStackPointer = 20
+
+			// Verify the steal target will not be the picked target.
+			{
+				stealTarget, ok := builder.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
+				require.True(t, ok)
+				// require.Equal(t, stealTargetLoc, stealTarget)
+				require.NotEqual(t, pickTargetLoc, stealTarget)
+			}
+
+			// Insert pick code.
+			err := builder.handlePick(o)
+			require.NoError(t, err)
+
+			// Now the steal target's location should be on stack.
+			require.False(t, stealTargetLoc.onRegister())
+			require.True(t, stealTargetLoc.onStack())
+			require.Equal(t, uint64(20), *stealTargetLoc.stackPointer)
+			require.Equal(t, uint64(21), builder.memoryStackPointer)
+
+			// To verify the behavior, we increment and push the picked value
+			// to the stack.
+			prog := builder.newProg()
+			prog.As = x86.AINCQ
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = stealReg
+			builder.addInstruction(prog)
+			builder.pushRegisterToStack(stealReg)
+			require.Equal(t, uint64(22), builder.memoryStackPointer)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			// Run code.
+			eng := newEngine()
+			mem := newMemoryInst()
+			eng.currentStackPointer = 20
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			// Check the stack.
+			require.Equal(t, uint64(22), eng.currentStackPointer)
+			require.Equal(t, uint64(101), eng.stack[eng.currentStackPointer-1])
+			// Steal target's value should be evicted on the stack.
+			require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-2])
+		})
+
+		t.Run("pick target on stack", func(t *testing.T) {
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			// Use up all the Int regs.
+			for _, r := range gpIntRegisters {
+				builder.locationStack.markRegisterUsed(r)
+			}
+			eng := newEngine()
+
+			// Setup the stack.
+			pickTargetStackPointer := uint64(1)
+			eng.currentStackPointer = 5
+			eng.currentBaseStackPointer = 1
+			eng.stack[eng.currentBaseStackPointer+pickTargetStackPointer] = 100
+
+			// Setup value locations.
+			o := &wazeroir.OperationPick{Depth: 0}
+			stealReg := int16(x86.REG_R9)
+			stealTargetLoc := &valueLocation{register: &stealReg}
+			builder.locationStack.push(stealTargetLoc)
+			builder.movConstToRegister(50, stealReg)
+			pickTargetLoc := &valueLocation{stackPointer: &pickTargetStackPointer}
+			builder.locationStack.push(pickTargetLoc)
+			builder.memoryStackPointer = 5
+
+			// Verify the steal target will not be the picked target.
+			{
+				stealTarget, ok := builder.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
+				require.True(t, ok)
+				// require.Equal(t, stealTargetLoc, stealTarget)
+				require.NotEqual(t, pickTargetLoc, stealTarget)
+			}
+
+			// Insert pick code.
+			err := builder.handlePick(o)
+			require.NoError(t, err)
+
+			// Now the steal target's location should be on stack.
+			require.False(t, stealTargetLoc.onRegister())
+			require.True(t, stealTargetLoc.onStack())
+			require.Equal(t, uint64(5), *stealTargetLoc.stackPointer)
+			require.Equal(t, uint64(6), builder.memoryStackPointer)
+
+			// To verify the behavior, we increment and push the picked value
+			// to the stack.
+			prog := builder.newProg()
+			prog.As = x86.AINCQ
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = stealReg
+			builder.addInstruction(prog)
+			builder.pushRegisterToStack(stealReg)
+			require.Equal(t, uint64(7), builder.memoryStackPointer)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			require.Equal(t, uint64(7), eng.currentStackPointer)
+			require.Equal(t, uint64(101), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
+			// Steal target's value should be evicted on the stack.
+			require.Equal(t, uint64(50), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-2])
+		})
+	})
 }

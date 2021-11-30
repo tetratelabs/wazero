@@ -30,7 +30,7 @@ func TestValueLocationStack_basic(t *testing.T) {
 	require.Equal(t, 1, s.sp)
 	require.Equal(t, depth, *s.stack[s.sp-1].stackPointer)
 	// markRegisterUsed.
-	reg := x86.REG_X1
+	reg := int16(x86.REG_X1)
 	s.markRegisterUsed(reg)
 	require.Contains(t, s.usedRegisters, reg)
 	// releaseRegister
@@ -66,9 +66,9 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 
 func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s := newValueLocationStack()
-	intReg := x86.REG_R10
+	intReg := int16(x86.REG_R10)
 	intLocation := &valueLocation{register: &intReg}
-	floatReg := x86.REG_X0
+	floatReg := int16(x86.REG_X0)
 	floatLocation := &valueLocation{register: &floatReg}
 	s.push(intLocation)
 	s.push(floatLocation)

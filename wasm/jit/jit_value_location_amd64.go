@@ -13,9 +13,14 @@ import (
 type valueLocation struct {
 	// TODO: might not be neeeded at all!
 	valueType    wazeroir.SignLessType
-	register     *int
+	register     *int16
 	stackPointer *uint64
 	// conditional registers?
+}
+
+func (v *valueLocation) setStackPointer(sp uint64) {
+	v.register = nil
+	v.stackPointer = &sp
 }
 
 func (v *valueLocation) onStack() bool {
@@ -26,8 +31,13 @@ func (v *valueLocation) onRegister() bool {
 	return v.register != nil
 }
 
+func (v *valueLocation) onConditionalRegister() bool {
+	// TODO!
+	return false
+}
+
 var (
-	gpFloatRegisters = []int{
+	gpFloatRegisters = []int16{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
 		x86.REG_X4, x86.REG_X5, x86.REG_X6, x86.REG_X7,
 		x86.REG_X8, x86.REG_X9, x86.REG_X10, x86.REG_X11,
@@ -37,7 +47,7 @@ var (
 	// so we don't need to care about the calling convension.
 	// TODO: we still have to take into acounts RAX,RDX register
 	// usages in DIV,MUL operations.
-	gpIntRegisters = []int{
+	gpIntRegisters = []int16{
 		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
 		x86.REG_BP, x86.REG_SI, x86.REG_DI, x86.REG_R8,
 		x86.REG_R9, x86.REG_R10, x86.REG_R11,
@@ -45,24 +55,24 @@ var (
 	errFreeRegisterNotFound = errors.New("free register not found")
 )
 
-func isIntRegister(r int) bool {
+func isIntRegister(r int16) bool {
 	return gpIntRegisters[0] <= r && r <= gpIntRegisters[len(gpIntRegisters)-1]
 }
 
-func isFloatRegister(r int) bool {
+func isFloatRegister(r int16) bool {
 	return gpFloatRegisters[0] <= r && r <= gpFloatRegisters[len(gpFloatRegisters)-1]
 }
 
 func newValueLocationStack() *valueLocationStack {
 	return &valueLocationStack{
-		usedRegisters: map[int]struct{}{},
+		usedRegisters: map[int16]struct{}{},
 	}
 }
 
 type valueLocationStack struct {
 	stack         []*valueLocation
 	sp            int
-	usedRegisters map[int]struct{}
+	usedRegisters map[int16]struct{}
 }
 
 func (s *valueLocationStack) push(loc *valueLocation) {
@@ -81,11 +91,16 @@ func (s *valueLocationStack) pop() (loc *valueLocation) {
 	return
 }
 
-func (s *valueLocationStack) releaseRegister(reg int) {
+func (s *valueLocationStack) peek() (loc *valueLocation) {
+	loc = s.stack[s.sp-1]
+	return
+}
+
+func (s *valueLocationStack) releaseRegister(reg int16) {
 	delete(s.usedRegisters, reg)
 }
 
-func (s *valueLocationStack) markRegisterUsed(reg int) {
+func (s *valueLocationStack) markRegisterUsed(reg int16) {
 	s.usedRegisters[reg] = struct{}{}
 }
 
@@ -108,8 +123,8 @@ func gpRegisterTypeFromSignLess(in wazeroir.SignLessType) (ret generalPurposeReg
 
 // Search for unused registers, and if found, returns the resgister
 // and mark it used.
-func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (int, error) {
-	var targetRegs []int
+func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (int16, error) {
+	var targetRegs []int16
 	switch tp {
 	case gpTypeFloat:
 		targetRegs = gpFloatRegisters
@@ -128,24 +143,21 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (in
 
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
-func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (target *valueLocation, ok bool) {
+func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {
 	for i := 0; i < s.sp; i++ {
 		loc := s.stack[i]
 		if loc.onRegister() {
 			switch tp {
 			case gpTypeFloat:
 				if isFloatRegister(*loc.register) {
-					target = loc
-					break
+					return loc, true
 				}
 			case gpTypeInt:
 				if isIntRegister(*loc.register) {
-					target = loc
-					break
+					return loc, true
 				}
 			}
 		}
 	}
-	ok = target != nil
-	return
+	return nil, false
 }
