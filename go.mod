@@ -5,5 +5,5 @@ go 1.16
 
 require (
 	github.com/stretchr/testify v1.5.1
-	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+	github.com/twitchyliquid64/golang-asm v0.15.1
 )
