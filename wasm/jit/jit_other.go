@@ -3,6 +3,8 @@
 
 package jit
 
+import "github.com/tetratelabs/wazero/wasm"
+
 func jitcall(codeSegment, engine, memory uintptr) {
 	panic("unsupported GOARCH")
 }

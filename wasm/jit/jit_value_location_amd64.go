@@ -4,8 +4,9 @@
 package jit
 
 import (
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
+
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 type valueLocation struct {
@@ -107,16 +108,6 @@ const (
 	gpTypeInt generalPurposeRegisterType = iota
 	gpTypeFloat
 )
-
-func gpRegisterTypeFromSignLess(in wazeroir.SignLessType) (ret generalPurposeRegisterType) {
-	switch in {
-	case wazeroir.SignLessTypeF32, wazeroir.SignLessTypeF64:
-		ret = gpTypeFloat
-	case wazeroir.SignLessTypeI32, wazeroir.SignLessTypeI64:
-		ret = gpTypeInt
-	}
-	return
-}
 
 // Search for unused registers, and if found, returns the resgister
 // and mark it used.
