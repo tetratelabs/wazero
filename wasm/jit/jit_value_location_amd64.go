@@ -50,10 +50,10 @@ func (v *valueLocation) onRegister() bool {
 	return v.register != -1
 }
 
-func (v *valueLocation) onConditionalRegister() bool {
-	// TODO!
-	return false
-}
+// func (v *valueLocation) onConditionalRegister() bool {
+// 	// TODO!
+// 	return false
+// }
 
 func newValueLocationStack() *valueLocationStack {
 	return &valueLocationStack{
@@ -101,12 +101,13 @@ func (s *valueLocationStack) peek() (loc *valueLocation) {
 	return
 }
 
-func (s *valueLocationStack) releaseRegister(reg int16) {
-	delete(s.usedRegisters, reg)
+func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
+	delete(s.usedRegisters, loc.register)
+	loc.register = -1
 }
 
-func (s *valueLocationStack) markRegisterUsed(reg int16) {
-	s.usedRegisters[reg] = struct{}{}
+func (s *valueLocationStack) markRegisterUsed(loc *valueLocation) {
+	s.usedRegisters[loc.register] = struct{}{}
 }
 
 type generalPurposeRegisterType byte
@@ -130,7 +131,6 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 		if _, ok := s.usedRegisters[candidate]; ok {
 			continue
 		}
-		s.markRegisterUsed(candidate)
 		return candidate, true
 	}
 	return 0, false

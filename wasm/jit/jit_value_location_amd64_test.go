@@ -35,12 +35,13 @@ func TestValueLocationStack_basic(t *testing.T) {
 	require.Equal(t, uint64(101), loc.stackPointer)
 	require.Equal(t, int16(x86.REG_X1), loc.register)
 	// markRegisterUsed.
-	reg := int16(x86.REG_X1)
-	s.markRegisterUsed(reg)
-	require.Contains(t, s.usedRegisters, reg)
+	loc = &valueLocation{register: int16(x86.REG_X1)}
+	s.markRegisterUsed(loc)
+	require.Contains(t, s.usedRegisters, loc.register)
 	// releaseRegister
-	s.releaseRegister(reg)
-	require.NotContains(t, s.usedRegisters, reg)
+	s.releaseRegister(loc)
+	require.NotContains(t, s.usedRegisters, loc.register)
+	require.Equal(t, int16(-1), loc.register)
 }
 
 func TestValueLocationStack_takeFreeRegister(t *testing.T) {
@@ -51,7 +52,7 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	require.True(t, isIntRegister(r))
 	// Mark all the int registers used.
 	for _, r := range gpIntRegisters {
-		s.markRegisterUsed(r)
+		s.markRegisterUsed(&valueLocation{register: r})
 	}
 	// Now we cannot take free ones for int.
 	_, ok = s.takeFreeRegister(gpTypeInt)
@@ -62,7 +63,7 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	require.True(t, isFloatRegister(r))
 	// Mark all the float registers used.
 	for _, r := range gpFloatRegisters {
-		s.markRegisterUsed(r)
+		s.markRegisterUsed(&valueLocation{register: r})
 	}
 	// Now we cannot take free ones for floats.
 	_, ok = s.takeFreeRegister(gpTypeFloat)

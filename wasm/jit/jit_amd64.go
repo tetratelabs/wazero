@@ -109,9 +109,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationConstI32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstI64:
-			// if err := builder.handleConstI64(o); err != nil {
-			// 	return nil, fmt.Errorf("error handling i64.const operation %v: %w", o, err)
-			// }
+			if err := builder.handleConstI64(o); err != nil {
+				return nil, fmt.Errorf("error handling i64.const operation %v: %w", o, err)
+			}
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstF32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -223,7 +223,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 }
 
 func (b *amd64Builder) pushSignatureLocals() {
-	for _, _ = range b.f.Signature.InputTypes {
+	for range b.f.Signature.InputTypes {
 		b.locationStack.pushValueOnStack()
 	}
 }
@@ -456,24 +456,36 @@ func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
 // 	return nil
 // }
 
-// func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
-// 	reg, ok := b.locationStack.takeFreeRegister(gpTypeInt)
-// 	if !ok {
-// 		stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
-// 		if !ok {
-// 			return fmt.Errorf("cannot steal register")
-// 		}
-// 		// We move the value in the steal target register onto stack.
-// 		evictedValueStackPointer := b.memoryStackPointer
-// 		b.pushRegisterToStack(*stealTarget.register)
-// 		reg = *stealTarget.register
-// 		stealTarget.setStackPointer(evictedValueStackPointer)
-// 	}
-// 	loc := &valueLocation{register: &reg}
-// 	b.locationStack.push(loc)
-// 	b.movConstToRegister(int64(o.Value), reg)
-// 	return nil
-// }
+func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
+	reg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+	_ = b.locationStack.pushValueOnRegister(reg)
+	b.movConstToRegister(int64(o.Value), reg)
+	return nil
+}
+
+func (b *amd64Builder) allocateRegister(t generalPurposeRegisterType) (reg int16, err error) {
+	var ok bool
+	// Try to get the unused register.
+	reg, ok = b.locationStack.takeFreeRegister(t)
+	if ok {
+		return
+	}
+
+	// If not found, we have to steal the register.
+	stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(t)
+	if !ok {
+		err = fmt.Errorf("cannot steal register")
+		return
+	}
+
+	// Release the steal target register value onto stack location.
+	reg = stealTarget.register
+	b.releaseRegisterFromValue(stealTarget)
+	return
+}
 
 func (b *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {
 	prog := b.newProg()
@@ -617,7 +629,7 @@ func (b *amd64Builder) releaseRegisterFromValue(loc *valueLocation) {
 	b.addInstruction(prog)
 
 	// Mark the register is free.
-	b.locationStack.releaseRegister(loc.register)
+	b.locationStack.releaseRegister(loc)
 }
 
 func (b *amd64Builder) assignRegisterToValue(loc *valueLocation, reg int16) {
@@ -642,8 +654,8 @@ func (b *amd64Builder) assignRegisterToValue(loc *valueLocation, reg int16) {
 	b.addInstruction(prog)
 
 	// Now the value is on register, so mark as such.
-	loc.register = reg
-	b.locationStack.markRegisterUsed(reg)
+	loc.setRegister(reg)
+	b.locationStack.markRegisterUsed(loc)
 }
 
 func (b *amd64Builder) returnFunction() {
