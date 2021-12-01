@@ -24,11 +24,16 @@ func Test_isFloatRegister(t *testing.T) {
 
 func TestValueLocationStack_basic(t *testing.T) {
 	s := newValueLocationStack()
-	// Push.
-	depth := uint64(100)
-	s.push(&valueLocation{stackPointer: &depth})
-	require.Equal(t, 1, s.sp)
-	require.Equal(t, depth, *s.stack[s.sp-1].stackPointer)
+	// Push stack value.
+	s.sp = 100
+	loc := s.pushValueOnStack()
+	require.Equal(t, uint64(101), s.sp)
+	require.Equal(t, uint64(100), loc.stackPointer)
+	//
+	loc = s.pushValueOnRegister(x86.REG_X1)
+	require.Equal(t, uint64(102), s.sp)
+	require.Equal(t, uint64(101), loc.stackPointer)
+	require.Equal(t, int16(x86.REG_X1), loc.register)
 	// markRegisterUsed.
 	reg := int16(x86.REG_X1)
 	s.markRegisterUsed(reg)
@@ -67,9 +72,9 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s := newValueLocationStack()
 	intReg := int16(x86.REG_R10)
-	intLocation := &valueLocation{register: &intReg}
+	intLocation := &valueLocation{register: intReg}
 	floatReg := int16(x86.REG_X0)
-	floatLocation := &valueLocation{register: &floatReg}
+	floatLocation := &valueLocation{register: floatReg}
 	s.push(intLocation)
 	s.push(floatLocation)
 	// Take for float.

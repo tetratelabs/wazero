@@ -5,40 +5,7 @@ package jit
 
 import (
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
-
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
-
-type valueLocation struct {
-	// TODO: might not be neeeded at all!
-	valueType    wazeroir.SignLessType
-	register     *int16
-	stackPointer *uint64
-	// conditional registers?
-}
-
-func (v *valueLocation) setStackPointer(sp uint64) {
-	v.register = nil
-	v.stackPointer = &sp
-}
-
-func (v *valueLocation) setRegister(reg int16) {
-	v.register = &reg
-	v.stackPointer = nil
-}
-
-func (v *valueLocation) onStack() bool {
-	return v.stackPointer != nil
-}
-
-func (v *valueLocation) onRegister() bool {
-	return v.register != nil
-}
-
-func (v *valueLocation) onConditionalRegister() bool {
-	// TODO!
-	return false
-}
 
 var (
 	gpFloatRegisters = []int16{
@@ -53,8 +20,8 @@ var (
 	// usages in DIV,MUL operations.
 	gpIntRegisters = []int16{
 		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
-		x86.REG_BP, x86.REG_SI, x86.REG_DI, x86.REG_R8,
-		x86.REG_R9, x86.REG_R10, x86.REG_R11,
+		x86.REG_SI, x86.REG_DI, x86.REG_R8, x86.REG_R9,
+		x86.REG_R10, x86.REG_R11,
 	}
 )
 
@@ -66,6 +33,28 @@ func isFloatRegister(r int16) bool {
 	return gpFloatRegisters[0] <= r && r <= gpFloatRegisters[len(gpFloatRegisters)-1]
 }
 
+type valueLocation struct {
+	// Set to be -1 if the value is stored in the memory stack.
+	register int16
+	// This is the location of this value in the (virtual) stack,
+	// even though if .register != -1, the value is not written into memory yet.
+	stackPointer uint64
+	// conditional registers?
+}
+
+func (v *valueLocation) setRegister(reg int16) {
+	v.register = reg
+}
+
+func (v *valueLocation) onRegister() bool {
+	return v.register != -1
+}
+
+func (v *valueLocation) onConditionalRegister() bool {
+	// TODO!
+	return false
+}
+
 func newValueLocationStack() *valueLocationStack {
 	return &valueLocationStack{
 		usedRegisters: map[int16]struct{}{},
@@ -74,12 +63,25 @@ func newValueLocationStack() *valueLocationStack {
 
 type valueLocationStack struct {
 	stack         []*valueLocation
-	sp            int
+	sp            uint64
 	usedRegisters map[int16]struct{}
 }
 
+func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
+	loc = &valueLocation{register: reg}
+	s.push(loc)
+	return
+}
+
+func (s *valueLocationStack) pushValueOnStack() (loc *valueLocation) {
+	loc = &valueLocation{register: -1}
+	s.push(loc)
+	return
+}
+
 func (s *valueLocationStack) push(loc *valueLocation) {
-	if s.sp >= len(s.stack) {
+	loc.stackPointer = s.sp
+	if s.sp >= uint64(len(s.stack)) {
 		s.stack = append(s.stack, loc)
 		s.sp++
 	} else {
@@ -137,16 +139,16 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
 func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {
-	for i := 0; i < s.sp; i++ {
+	for i := uint64(0); i < s.sp; i++ {
 		loc := s.stack[i]
 		if loc.onRegister() {
 			switch tp {
 			case gpTypeFloat:
-				if isFloatRegister(*loc.register) {
+				if isFloatRegister(loc.register) {
 					return loc, true
 				}
 			case gpTypeInt:
-				if isIntRegister(*loc.register) {
+				if isIntRegister(loc.register) {
 					return loc, true
 				}
 			}
