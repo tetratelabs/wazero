@@ -133,9 +133,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationGe:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationAdd:
-			// if err := builder.handleAdd(o); err != nil {
-			// 	return nil, fmt.Errorf("error handling add operation %v: %w", o, err)
-			// }
+			if err := builder.handleAdd(o); err != nil {
+				return nil, fmt.Errorf("error handling add operation %v: %w", o, err)
+			}
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationSub:
 			// TODO:
