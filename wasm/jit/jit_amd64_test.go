@@ -810,6 +810,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			_ = builder.locationStack.pushValueOnStack() // dummy value!
 			x1Location := builder.locationStack.pushValueOnStack()
 			x2Location := builder.locationStack.pushValueOnRegister(x86.REG_R10)
+			builder.locationStack.markRegisterUsed(x2Location)
 			eng.stack[x1Location.stackPointer] = 5000
 			builder.movConstToRegister(300, x2Location.register)
 			builder.handleAdd(o)
@@ -843,6 +844,9 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			eng.stack[x1Location.stackPointer] = 5000
 			eng.stack[x2Location.stackPointer] = 13
 			builder.handleAdd(o)
+			require.True(t, x1Location.onRegister())
+			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
+			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
 
 			// To verify the behavior, we push the value
 			// to the stack.
@@ -870,9 +874,13 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			_ = builder.locationStack.pushValueOnStack() // dummy value!
 			x1Location := builder.locationStack.pushValueOnRegister(x86.REG_R10)
 			x2Location := builder.locationStack.pushValueOnStack()
+			builder.locationStack.markRegisterUsed(x1Location)
 			eng.stack[x2Location.stackPointer] = 5000
 			builder.movConstToRegister(132, x1Location.register)
 			builder.handleAdd(o)
+			require.True(t, x1Location.onRegister())
+			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
+			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
 
 			// To verify the behavior, we push the value
 			// to the stack.

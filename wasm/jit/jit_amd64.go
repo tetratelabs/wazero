@@ -407,6 +407,7 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 		prog.To.Reg = x1Register
 		b.addInstruction(prog)
 		x1.setRegister(x1Register)
+		b.locationStack.markRegisterUsed(x1)
 	} else if x1.onConditionalRegister() {
 		panic("TODO")
 	}
