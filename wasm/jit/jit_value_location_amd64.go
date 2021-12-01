@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 )
 
@@ -34,12 +35,26 @@ func isFloatRegister(r int16) bool {
 }
 
 type valueLocation struct {
+	valueType wazeroir.SignLessType
 	// Set to be -1 if the value is stored in the memory stack.
 	register int16
 	// This is the location of this value in the (virtual) stack,
 	// even though if .register != -1, the value is not written into memory yet.
 	stackPointer uint64
 	// conditional registers?
+}
+
+func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
+	switch v.valueType {
+	case wazeroir.SignLessTypeI32, wazeroir.SignLessTypeI64:
+		t = gpTypeInt
+	case wazeroir.SignLessTypeF32, wazeroir.SignLessTypeF64:
+		t = gpTypeFloat
+	}
+	return
+}
+func (v *valueLocation) setValueType(t wazeroir.SignLessType) {
+	v.valueType = t
 }
 
 func (v *valueLocation) setRegister(reg int16) {
@@ -50,10 +65,14 @@ func (v *valueLocation) onRegister() bool {
 	return v.register != -1
 }
 
-// func (v *valueLocation) onConditionalRegister() bool {
-// 	// TODO!
-// 	return false
-// }
+func (v *valueLocation) onStack() bool {
+	return v.register == -1
+}
+
+func (v *valueLocation) onConditionalRegister() bool {
+	// TODO!
+	return false
+}
 
 func newValueLocationStack() *valueLocationStack {
 	return &valueLocationStack{

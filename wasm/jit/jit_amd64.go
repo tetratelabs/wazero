@@ -223,8 +223,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 }
 
 func (b *amd64Builder) pushSignatureLocals() {
-	for range b.f.Signature.InputTypes {
-		b.locationStack.pushValueOnStack()
+	for _, t := range b.f.Signature.InputTypes {
+		loc := b.locationStack.pushValueOnStack()
+		loc.setValueType(wazeroir.WasmValueTypeToSignless(t))
 	}
 }
 
@@ -273,69 +274,53 @@ func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
 	return nil
 }
 
-// func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
-// 	// TODO: if we track the type of values on the stack,
-// 	// we could optimize the instruction according to the bit size of the value.
-// 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
-// 	pickTarget := b.locationStack.stack[len(b.locationStack.stack)-1-o.Depth]
-// 	reg, ok := b.locationStack.takeFreeRegister(gpTypeInt)
-// 	if !ok {
-// 		stealTarget, ok := b.locationStack.takeStealTargetFromUsedRegister(gpTypeInt)
-// 		if !ok {
-// 			return fmt.Errorf("cannot steal register")
-// 		}
-// 		// First we copy the value in the target register onto stack.
-// 		evictedValueStackPointer := b.memoryStackPointer
-// 		reg = *stealTarget.register
-// 		b.pushRegisterToStack(reg)
-// 		stealTarget.setStackPointer(evictedValueStackPointer)
+func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
+	// TODO: if we track the type of values on the stack,
+	// we could optimize the instruction according to the bit size of the value.
+	// For now, we just move the entire register i.e. as a quad word (8 bytes).
+	pickTarget := b.locationStack.stack[len(b.locationStack.stack)-1-o.Depth]
+	reg, err := b.allocateRegister(pickTarget.registerType())
+	if err != nil {
+		return err
+	}
 
-// 		// This case, pick target is the steal target, meaning that
-// 		// we don't need to move the value. Instead copy the
-// 		// register value onto memory stack, and swap the locations.
-// 		if stealTarget == pickTarget {
-// 			b.locationStack.pushValueOnRegister(reg)
-// 			return nil
-// 		}
-// 	}
+	if pickTarget.onRegister() {
+		prog := b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_REG
+		prog.From.Reg = pickTarget.register
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = reg
+		b.addInstruction(prog)
+	} else if pickTarget.onStack() {
+		// Place the stack pointer at first.
+		prog := b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_CONST
+		prog.From.Offset = int64(pickTarget.stackPointer)
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = reg
+		b.addInstruction(prog)
 
-// 	if pickTarget.onRegister() {
-// 		prog := b.newProg()
-// 		prog.As = x86.AMOVQ
-// 		prog.From.Type = obj.TYPE_REG
-// 		prog.From.Reg = *pickTarget.register
-// 		prog.To.Type = obj.TYPE_REG
-// 		prog.To.Reg = reg
-// 		b.addInstruction(prog)
-// 	} else if pickTarget.onStack() {
-// 		// Place the stack pointer at first.
-// 		prog := b.newProg()
-// 		prog.As = x86.AMOVQ
-// 		prog.From.Type = obj.TYPE_CONST
-// 		prog.From.Offset = int64(*pickTarget.stackPointer)
-// 		prog.To.Type = obj.TYPE_REG
-// 		prog.To.Reg = reg
-// 		b.addInstruction(prog)
-
-// 		// Then Copy the value from the stack.
-// 		prog = b.newProg()
-// 		prog.As = x86.AMOVQ
-// 		prog.From.Type = obj.TYPE_MEM
-// 		prog.From.Reg = cachedStackBasePointerReg
-// 		prog.From.Index = reg
-// 		prog.From.Scale = 8
-// 		prog.To.Type = obj.TYPE_REG
-// 		prog.To.Reg = reg
-// 		b.addInstruction(prog)
-// 	} else if pickTarget.onConditionalRegister() {
-// 		panic("TODO")
-// 	}
-// 	// Now we already placed the picked value on the register,
-// 	// so push the location onto the stack.
-// 	loc := &valueLocation{register: &reg}
-// 	b.locationStack.push(loc)
-// 	return nil
-// }
+		// Then Copy the value from the stack.
+		prog = b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_MEM
+		prog.From.Reg = cachedStackBasePointerReg
+		prog.From.Index = reg
+		prog.From.Scale = 8
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = reg
+		b.addInstruction(prog)
+	} else if pickTarget.onConditionalRegister() {
+		panic("TODO")
+	}
+	// Now we already placed the picked value on the register,
+	// so push the location onto the stack.
+	loc := b.locationStack.pushValueOnRegister(reg)
+	loc.setValueType(pickTarget.valueType)
+	return nil
+}
 
 // func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 // 	// TODO: if the previous instruction is const, then
@@ -461,7 +446,8 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 	if err != nil {
 		return err
 	}
-	_ = b.locationStack.pushValueOnRegister(reg)
+	loc := b.locationStack.pushValueOnRegister(reg)
+	loc.setValueType(wazeroir.SignLessTypeI32)
 	b.movConstToRegister(int64(o.Value), reg)
 	return nil
 }
