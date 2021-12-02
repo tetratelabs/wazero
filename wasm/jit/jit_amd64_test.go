@@ -1263,6 +1263,109 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 	})
 }
 
+func TestAmd64Builder_handleDrop(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		builder := requireNewBuilder(t)
+		err := builder.handleDrop(&wazeroir.OperationDrop{})
+		require.NoError(t, err)
+	})
+	t.Run("zero start", func(t *testing.T) {
+		builder := requireNewBuilder(t)
+		shouldPeek := builder.locationStack.pushValueOnStack()
+		const numReg = 10
+		for i := int16(0); i < numReg; i++ {
+			loc := builder.locationStack.pushValueOnRegister(i)
+			builder.locationStack.markRegisterUsed(loc)
+		}
+		err := builder.handleDrop(&wazeroir.OperationDrop{
+			Range: &wazeroir.InclusiveRange{Start: 0, End: numReg},
+		})
+		require.NoError(t, err)
+		for i := int16(0); i < numReg; i++ {
+			require.NotContains(t, builder.locationStack.usedRegisters, i)
+		}
+		actualPeek := builder.locationStack.peek()
+		require.Equal(t, shouldPeek, actualPeek)
+	})
+	t.Run("live all on register", func(t *testing.T) {
+		const (
+			numLive = 3
+			dropNum = 5
+		)
+		builder := requireNewBuilder(t)
+		shouldBottom := builder.locationStack.pushValueOnStack()
+		for i := int16(0); i < dropNum; i++ {
+			loc := builder.locationStack.pushValueOnRegister(i)
+			builder.locationStack.markRegisterUsed(loc)
+		}
+		for i := int16(dropNum); i < numLive+dropNum; i++ {
+			loc := builder.locationStack.pushValueOnRegister(i)
+			builder.locationStack.markRegisterUsed(loc)
+		}
+		err := builder.handleDrop(&wazeroir.OperationDrop{
+			Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
+		})
+		require.NoError(t, err)
+		for i := int16(0); i < dropNum; i++ {
+			require.NotContains(t, builder.locationStack.usedRegisters, i)
+		}
+		for i := int16(dropNum); i < numLive+dropNum; i++ {
+			require.Contains(t, builder.locationStack.usedRegisters, i)
+		}
+		for i := int16(0); i < numLive; i++ {
+			actual := builder.locationStack.pop()
+			require.True(t, actual.onRegister())
+			require.Equal(t, numLive+dropNum-1-i, actual.register)
+		}
+		require.Equal(t, uint64(1), builder.locationStack.sp)
+		require.Equal(t, shouldBottom, builder.locationStack.pop())
+	})
+	t.Run("live on stack", func(t *testing.T) {
+		const (
+			numLive        = 3
+			dropNum        = 5
+			liveRegisterID = 10
+		)
+		builder := requireNewBuilder(t)
+		bottom := builder.locationStack.pushValueOnStack()
+		for i := int16(0); i < dropNum; i++ {
+			loc := builder.locationStack.pushValueOnRegister(i)
+			builder.locationStack.markRegisterUsed(loc)
+		}
+		// The bottom live value is on the stack.
+		bottomLive := builder.locationStack.pushValueOnStack()
+		// The second live value is on the register.
+		LiveRegister := builder.locationStack.pushValueOnRegister(liveRegisterID)
+		builder.locationStack.markRegisterUsed(LiveRegister)
+		// The top live value is on the conditional.
+		topLive := builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateAE)
+		require.True(t, topLive.onConditionalRegister())
+		err := builder.handleDrop(&wazeroir.OperationDrop{
+			Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
+		})
+		require.NoError(t, err)
+		require.Equal(t, uint64(4), builder.locationStack.sp)
+		for i := int16(0); i < dropNum; i++ {
+			require.NotContains(t, builder.locationStack.usedRegisters, i)
+		}
+		// Top value should be on the register.
+		actualTopLive := builder.locationStack.pop()
+		require.True(t, actualTopLive.onRegister() && !actualTopLive.onConditionalRegister())
+		require.Equal(t, topLive, actualTopLive)
+		// Second one should be on the same register.
+		actualLiveRegister := builder.locationStack.pop()
+		require.Equal(t, LiveRegister, actualLiveRegister)
+		// The bottom live value should be moved onto the stack.
+		actualBottomLive := builder.locationStack.pop()
+		require.Equal(t, bottomLive, actualBottomLive)
+		require.True(t, actualBottomLive.onRegister() && !actualBottomLive.onStack())
+		// The bottom after drop should stay on stack.
+		actualBottom := builder.locationStack.pop()
+		require.Equal(t, bottom, actualBottom)
+		require.True(t, bottom.onStack())
+	})
+}
+
 func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {
 	eng := newEngine()
 	builder := requireNewBuilder(t)
