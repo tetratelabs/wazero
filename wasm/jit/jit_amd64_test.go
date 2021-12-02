@@ -1213,6 +1213,7 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		)
 		// Check the status.
 		require.Equal(t, jitStatusCallHostFunction, eng.jitCallStatusCode)
+		require.Equal(t, int64(functionIndex), eng.functionCallIndex)
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(2), eng.currentStackPointer)
 		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
@@ -1225,10 +1226,10 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		// Setup.
 		eng := newEngine()
 		builder.eng = eng
-		hostFuncInstance := &wasm.FunctionInstance{}
+		wasmFuncInstance := &wasm.FunctionInstance{}
 		builder.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
-		builder.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
-		eng.hostFunctionIndex[hostFuncInstance] = functionIndex
+		builder.f.ModuleInstance.Functions[functionIndex] = wasmFuncInstance
+		eng.compiledWasmFunctionIndex[wasmFuncInstance] = functionIndex
 
 		// Build codes.
 		builder.initializeReservedRegisters()
@@ -1253,6 +1254,7 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		)
 		// Check the status.
 		require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
+		require.Equal(t, int64(functionIndex), eng.functionCallIndex)
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(3), eng.currentStackPointer)
 		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
