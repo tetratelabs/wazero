@@ -74,8 +74,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			}
 		case *wazeroir.OperationCallIndirect:
 		case *wazeroir.OperationDrop:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleDrop(o); err != nil {
+				return nil, fmt.Errorf("error handling drop operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationSelect:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationPick:
@@ -284,6 +285,52 @@ func (b *amd64Builder) handleCall(o *wazeroir.OperationCall) error {
 	} else {
 		index := b.eng.compiledWasmFunctionIndex[target]
 		b.callFunctionFromConstIndex(index)
+	}
+	return nil
+}
+
+func (b *amd64Builder) handleDrop(o *wazeroir.OperationDrop) error {
+	if o.Range == nil {
+		return nil
+	} else if o.Range.Start == 0 {
+		for i := 0; i < o.Range.End; i++ {
+			if loc := b.locationStack.pop(); loc.onRegister() {
+				b.locationStack.releaseRegister(loc)
+			}
+		}
+		return nil
+	}
+
+	// If the top is conditional, and it's not target of drop,
+	// we most assign it to the register before adjusting stacks.
+	top := b.locationStack.peek()
+	if top.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(top); err != nil {
+			return err
+		}
+	}
+
+	var liveValues []*valueLocation
+	for i := 0; i < o.Range.Start; i++ {
+		liveValues = append(liveValues, b.locationStack.pop())
+	}
+	for i := 0; i < o.Range.End-o.Range.Start+1; i++ {
+		if loc := b.locationStack.pop(); loc.onRegister() {
+			b.locationStack.releaseRegister(loc)
+		}
+	}
+	for i := range liveValues {
+		live := liveValues[len(liveValues)-1-i]
+		if live.onStack() {
+			// Write the value in the old stack location to a register
+			if err := b.moveStackToRegister(live.registerType(), live); err != nil {
+				return err
+			}
+			// Then modify the location in the stack with new stack pointer.
+			b.locationStack.push(live)
+		} else if live.onRegister() {
+			b.locationStack.push(live)
+		}
 	}
 	return nil
 }
@@ -525,7 +572,8 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 
 	// Finally we have the result on the conditional register,
 	// so record it.
-	b.locationStack.pushValueOnConditionalRegister(resultConditionState)
+	loc := b.locationStack.pushValueOnConditionalRegister(resultConditionState)
+	loc.setValueType(wazeroir.SignLessTypeI32)
 	return nil
 }
 
@@ -878,36 +926,35 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	b.addInstruction(prog)
 
 	// Next we move the base pointer (engine.currentBaseStackPointer) to
-	// a temporary register. Here we use tmpRegister=rax but anything un-reserved is fine.
-	// movq [engineInstanceReg+engineCurrentBaseStackPointerOffset] tmpRegister
-	const tmpRegister = x86.REG_AX
+	// a temporary register.
+	// movq [engineInstanceReg+engineCurrentBaseStackPointerOffset] temporaryRegister
 	prog = b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
 	prog.From.Reg = engineInstanceReg
 	prog.From.Offset = engineCurrentBaseStackPointerOffset
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = tmpRegister
+	prog.To.Reg = temporaryRegister
 	b.addInstruction(prog)
 
-	// Multiply tmpRegister with 8 via shift left with 3.
-	// shlq $3 tmpRegister
+	// Multiply temporaryRegister with 8 via shift left with 3.
+	// shlq $3 temporaryRegister
 	prog = b.newProg()
 	prog.As = x86.ASHLQ
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = tmpRegister
+	prog.To.Reg = temporaryRegister
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = 3
 	b.addInstruction(prog)
 
-	// Finally we add the tmpRegister to cachedStackBasePointerReg.
-	// addq [tmpRegister] cachedStackBasePointerReg
+	// Finally we add the temporaryRegister to cachedStackBasePointerReg.
+	// addq [temporaryRegister] cachedStackBasePointerReg
 	prog = b.newProg()
 	prog.As = x86.AADDQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = cachedStackBasePointerReg
 	prog.From.Type = obj.TYPE_REG
-	prog.From.Reg = tmpRegister
+	prog.From.Reg = temporaryRegister
 	b.addInstruction(prog)
 	return prog
 }

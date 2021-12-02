@@ -70,6 +70,8 @@ func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
 		t = gpTypeInt
 	case wazeroir.SignLessTypeF32, wazeroir.SignLessTypeF64:
 		t = gpTypeFloat
+	default:
+		panic("unreachable")
 	}
 	return
 }
