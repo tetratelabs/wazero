@@ -1198,7 +1198,8 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
 		builder.locationStack.markRegisterUsed(loc)
 		builder.movConstToRegister(int64(50), loc.register)
-		builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		err := builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		require.NoError(t, err)
 
 		// Compile.
 		code, err := builder.assemble()
@@ -1239,7 +1240,8 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
 		builder.locationStack.markRegisterUsed(loc)
 		builder.movConstToRegister(int64(50), loc.register)
-		builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		err := builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		require.NoError(t, err)
 
 		// Compile.
 		code, err := builder.assemble()
