@@ -962,7 +962,6 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			fmt.Println(eng.stack[:4])
 			require.Equal(t, uint64(1), eng.currentStackPointer)
 			if tc.exp {
 				require.Equal(t, uint64(1), eng.stack[eng.currentStackPointer-1])
@@ -1023,7 +1022,6 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			fmt.Println(eng.stack[:4])
 			require.Equal(t, uint64(1), eng.currentStackPointer)
 			if tc.exp {
 				require.Equal(t, uint64(1), eng.stack[eng.currentStackPointer-1])

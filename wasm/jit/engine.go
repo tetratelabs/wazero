@@ -58,6 +58,23 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 	return
 }
 
+func (e *engine) PreCompile(f *wasm.FunctionInstance) error {
+	if f.HostFunction != nil {
+		if _, ok := e.hostFunctionIndex[f]; ok {
+			return nil
+		}
+		id := len(e.hostFunctionIndex)
+		e.hostFunctionIndex[f] = id
+	} else {
+		if _, ok := e.compiledWasmFunctionIndex[f]; ok {
+			return nil
+		}
+		id := len(e.compiledWasmFunctionIndex)
+		e.compiledWasmFunctionIndex[f] = id
+	}
+	return nil
+}
+
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	if f.HostFunction != nil {
 		if _, ok := e.hostFunctionIndex[f]; ok {
@@ -66,8 +83,6 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 		hf := func() {
 			// TODO:
 		}
-		id := len(e.hostFunctions)
-		e.hostFunctionIndex[f] = id
 		e.hostFunctions = append(e.hostFunctions, hf)
 	} else {
 		if _, ok := e.compiledWasmFunctionIndex[f]; ok {
@@ -77,8 +92,6 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 		if err != nil {
 			return fmt.Errorf("failed to compile Wasm function: %w", err)
 		}
-		id := len(e.compiledWasmFunctions)
-		e.compiledWasmFunctionIndex[f] = id
 		e.compiledWasmFunctions = append(e.compiledWasmFunctions, cf)
 	}
 	return nil

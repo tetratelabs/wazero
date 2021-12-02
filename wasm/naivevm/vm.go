@@ -35,6 +35,10 @@ func NewEngine() wasm.Engine {
 	}
 }
 
+func (it *naiveVirtualMachine) PreCompile(f *wasm.FunctionInstance) error {
+	return nil
+}
+
 func (vm *naiveVirtualMachine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
 	compiled, ok := vm.compiledFunctions[f]
 	if !ok {

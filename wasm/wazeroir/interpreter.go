@@ -112,6 +112,11 @@ type interpreterOp struct {
 	f      *interpreterFunction
 }
 
+// PreCompile Implements wasm.Engine for interpreter.
+func (it *interpreter) PreCompile(f *wasm.FunctionInstance) error {
+	return nil
+}
+
 // Compile Implements wasm.Engine for interpreter.
 func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	if _, ok := it.functions[f]; ok {

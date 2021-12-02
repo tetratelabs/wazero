@@ -577,7 +577,7 @@ func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
 	// See
 	// - https://c9x.me/x86/html/file_module_x86_id_288.html
 	// - https://github.com/golang/go/blob/master/src/cmd/internal/obj/x86/asm6.go#L1453-L1468
-	// to translate x86.ASET* to the state's conditionalRegisterState*
+	// to translate conditionalRegisterState* to x86.ASET*
 	switch loc.conditionalRegister {
 	case conditionalRegisterStateE:
 		prog.As = x86.ASETEQ
@@ -603,8 +603,6 @@ func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
 		prog.As = x86.ASETCS
 	case conditionalRegisterStateBE:
 		prog.As = x86.ASETLS
-	default:
-		panic("unreachable")
 	}
 	b.addInstruction(prog)
 

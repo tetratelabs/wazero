@@ -9,4 +9,8 @@ type Engine interface {
 	Call(f *FunctionInstance, args ...uint64) (returns []uint64, err error)
 	// Compile compiles down the function instance.
 	Compile(f *FunctionInstance) error
+	// PreCompile prepares the compilation for given function instance.
+	// This is called for all the instances in a module instance
+	// before Compile is called.
+	PreCompile(f *FunctionInstance) error
 }
