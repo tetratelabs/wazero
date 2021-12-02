@@ -69,8 +69,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationBrTable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationCall:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleCall(o); err != nil {
+				return nil, fmt.Errorf("error handling call operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationCallIndirect:
 		case *wazeroir.OperationDrop:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -650,7 +651,7 @@ func (b *amd64Builder) allocateRegister(t generalPurposeRegisterType) (reg int16
 
 	// Release the steal target register value onto stack location.
 	reg = stealTarget.register
-	b.releaseRegisterFromValue(stealTarget)
+	b.releaseRegister(stealTarget)
 	return
 }
 
@@ -671,6 +672,8 @@ func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
 	b.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
+	// Release all the registers as our calling convention requires the caller-save.
+	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
@@ -683,6 +686,8 @@ func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 	b.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
+	// Release all the registers as our calling convention requires the caller-save.
+	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
@@ -705,27 +710,28 @@ func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) 
 	return
 }
 
-func (b *amd64Builder) releaseAllRegistersToStack() error {
-	used := len(b.locationStack.usedRegisters)
-	for i := len(b.locationStack.stack) - 1; i >= 0 && used > 0; i-- {
-		if loc := b.locationStack.stack[i]; loc.onRegister() {
-			b.releaseRegisterFromValue(loc)
-			used--
-		}
-	}
-	return nil
-}
-
 func (b *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
 	// Set the jit status as jitStatusCallFunction
 	b.setJITStatus(jitStatusCallFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
+	// Release all the registers as our calling convention requires the caller-save.
+	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
 	// we must setup the reserved registers again.
 	b.initializeReservedRegisters()
+}
+
+func (b *amd64Builder) releaseAllRegistersToStack() {
+	used := len(b.locationStack.usedRegisters)
+	for i := len(b.locationStack.stack) - 1; i >= 0 && used > 0; i-- {
+		if loc := b.locationStack.stack[i]; loc.onRegister() {
+			b.releaseRegister(loc)
+			used--
+		}
+	}
 }
 
 // TODO: If this function call is the tail call,
@@ -786,7 +792,7 @@ func (b *amd64Builder) movConstToRegister(val int64, targetRegister int16) *obj.
 	return prog
 }
 
-func (b *amd64Builder) releaseRegisterFromValue(loc *valueLocation) {
+func (b *amd64Builder) releaseRegister(loc *valueLocation) {
 	// First we place the const of stack pointer onto the temp register.
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
