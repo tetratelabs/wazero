@@ -301,18 +301,18 @@ func (b *amd64Builder) handleDrop(o *wazeroir.OperationDrop) error {
 		return nil
 	}
 
-	// If the top is conditional, and it's not target of drop,
-	// we most assign it to the register before adjusting stacks.
-	top := b.locationStack.peek()
-	if top.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(top); err != nil {
-			return err
-		}
-	}
-
-	var liveValues []*valueLocation
+	var (
+		top              *valueLocation
+		topIsConditional bool
+		liveValues       []*valueLocation
+	)
 	for i := 0; i < o.Range.Start; i++ {
-		liveValues = append(liveValues, b.locationStack.pop())
+		live := b.locationStack.pop()
+		if top == nil {
+			top = live
+			topIsConditional = top.onConditionalRegister()
+		}
+		liveValues = append(liveValues, live)
 	}
 	for i := 0; i < o.Range.End-o.Range.Start+1; i++ {
 		if loc := b.locationStack.pop(); loc.onRegister() {
@@ -322,6 +322,14 @@ func (b *amd64Builder) handleDrop(o *wazeroir.OperationDrop) error {
 	for i := range liveValues {
 		live := liveValues[len(liveValues)-1-i]
 		if live.onStack() {
+			if topIsConditional {
+				// If the top is conditional, and it's not target of drop,
+				// we must assign it to the register before we emit any instructions here.
+				if err := b.moveConditionalToGPRegister(top); err != nil {
+					return err
+				}
+				topIsConditional = false
+			}
 			// Write the value in the old stack location to a register
 			if err := b.moveStackToRegister(live.registerType(), live); err != nil {
 				return err
