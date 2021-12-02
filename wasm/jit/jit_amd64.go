@@ -583,7 +583,7 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.SignLessTypeI32)
+	loc.setValueType(wazeroir.SignLessTypeI64)
 	b.movConstToRegister(int64(o.Value), reg)
 	return nil
 }

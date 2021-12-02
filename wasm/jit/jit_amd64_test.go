@@ -741,7 +741,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 	// To verify the behavior, we increment and push the const value
 	// to the stack.
 	loc := builder.locationStack.peek()
-	require.Equal(t, wazeroir.SignLessTypeI32, loc.valueType)
+	require.Equal(t, wazeroir.SignLessTypeI64, loc.valueType)
 	prog := builder.newProg()
 	prog.As = x86.AINCQ
 	prog.To.Type = obj.TYPE_REG
