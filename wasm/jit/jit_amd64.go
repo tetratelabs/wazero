@@ -77,9 +77,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationSelect:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationPick:
-			// if err := builder.handlePick(o); err != nil {
-			// 	return nil, fmt.Errorf("error handling pick operation %v: %w", o, err)
-			// }
+			if err := builder.handlePick(o); err != nil {
+				return nil, fmt.Errorf("error handling pick operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationSwap:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationGlobalGet:
@@ -112,7 +112,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			if err := builder.handleConstI64(o); err != nil {
 				return nil, fmt.Errorf("error handling i64.const operation %v: %w", o, err)
 			}
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstF32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstF64:
@@ -136,10 +135,10 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			if err := builder.handleAdd(o); err != nil {
 				return nil, fmt.Errorf("error handling add operation %v: %w", o, err)
 			}
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationSub:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleSub(o); err != nil {
+				return nil, fmt.Errorf("error handling sub operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationMul:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationClz:
@@ -342,6 +341,111 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 		panic("add tests!")
 	case wazeroir.SignLessTypeF64:
 		instruction = x86.AADDSD
+		tp = gpTypeFloat
+		panic("add tests!")
+	}
+
+	x2 := b.locationStack.pop()
+	if x2.onStack() {
+		x2Register, err := b.allocateRegister(tp)
+		if err != nil {
+			return err
+		}
+
+		// Then move the value to the stolen register.
+		// Place the stack pointer at first.
+		prog := b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_CONST
+		prog.From.Offset = int64(x2.stackPointer)
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x2Register
+		b.addInstruction(prog)
+
+		// Then Copy the value from the stack.
+		prog = b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_MEM
+		prog.From.Reg = cachedStackBasePointerReg
+		prog.From.Index = x2Register
+		prog.From.Scale = 8
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x2Register
+		b.addInstruction(prog)
+		x2.setRegister(x2Register)
+		b.locationStack.markRegisterUsed(x2)
+	} else if x2.onConditionalRegister() {
+		panic("TODO")
+	}
+
+	x1 := b.locationStack.peek()
+	if x1.onStack() {
+		x1Register, err := b.allocateRegister(tp)
+		if err != nil {
+			return err
+		}
+
+		// Then move the value to the stolen register.
+		// Place the stack pointer at first.
+		prog := b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_CONST
+		prog.From.Offset = int64(x1.stackPointer)
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x1Register
+		b.addInstruction(prog)
+
+		// Then Copy the value from the stack.
+		prog = b.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_MEM
+		prog.From.Reg = cachedStackBasePointerReg
+		prog.From.Index = x1Register
+		prog.From.Scale = 8
+		prog.To.Type = obj.TYPE_REG
+		prog.To.Reg = x1Register
+		b.addInstruction(prog)
+		x1.setRegister(x1Register)
+		b.locationStack.markRegisterUsed(x1)
+	} else if x1.onConditionalRegister() {
+		panic("TODO")
+	}
+
+	// x1 += x2.
+	prog := b.newProg()
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = x2.register
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = x1.register
+	prog.As = instruction
+	b.addInstruction(prog)
+
+	// We no longer need x2 register after ADD operation here,
+	// so we release it.
+	b.locationStack.releaseRegister(x2)
+	return nil
+}
+
+func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
+	// TODO: if the previous instruction is const, then
+	// this can be optimized. Same goes for other arithmetic instructions.
+
+	var instruction obj.As
+	var tp generalPurposeRegisterType
+	switch o.Type {
+	case wazeroir.SignLessTypeI32:
+		instruction = x86.ASUBL
+		tp = gpTypeInt
+		panic("add tests!")
+	case wazeroir.SignLessTypeI64:
+		instruction = x86.ASUBQ
+		tp = gpTypeInt
+	case wazeroir.SignLessTypeF32:
+		instruction = x86.ASUBSS
+		tp = gpTypeFloat
+		panic("add tests!")
+	case wazeroir.SignLessTypeF64:
+		instruction = x86.ASUBSD
 		tp = gpTypeFloat
 		panic("add tests!")
 	}
