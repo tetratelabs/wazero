@@ -4,8 +4,9 @@
 package jit
 
 import (
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
+
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 var (
@@ -34,14 +35,33 @@ func isFloatRegister(r int16) bool {
 	return gpFloatRegisters[0] <= r && r <= gpFloatRegisters[len(gpFloatRegisters)-1]
 }
 
+type conditionalRegisterState byte
+
+const (
+	conditionalRegisterStateUnset conditionalRegisterState = 0 + iota
+	conditionalRegisterStateE                              // ZF equal to zero
+	conditionalRegisterStateNE                             //˜ZF not equal to zero
+	conditionalRegisterStateS                              // SF negative
+	conditionalRegisterStateNS                             // ˜SF non-negative
+	conditionalRegisterStateG                              // ˜(SF xor OF) & ˜ ZF greater (signed >)
+	conditionalRegisterStateGE                             // ˜(SF xor OF) greater or equal (signed >=)
+	conditionalRegisterStateL                              // SF xor OF less (signed <)
+	conditionalRegisterStateLE                             // (SF xor OF) | ZF less or equal (signed <=)
+	conditionalRegisterStateA                              // ˜CF & ˜ZF above (unsigned >)
+	conditionalRegisterStateAE                             // ˜CF above or equal (unsigned >=)
+	conditionalRegisterStateB                              // CF below (unsigned <)
+	conditionalRegisterStateBE                             // CF | ZF below or equal (unsigned <=)
+)
+
 type valueLocation struct {
 	valueType wazeroir.SignLessType
-	// Set to be -1 if the value is stored in the memory stack.
+	// Set to -1 if the value is stored in the memory stack.
 	register int16
+	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
+	conditionalRegister conditionalRegisterState
 	// This is the location of this value in the (virtual) stack,
 	// even though if .register != -1, the value is not written into memory yet.
 	stackPointer uint64
-	// conditional registers?
 }
 
 func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
@@ -59,19 +79,19 @@ func (v *valueLocation) setValueType(t wazeroir.SignLessType) {
 
 func (v *valueLocation) setRegister(reg int16) {
 	v.register = reg
+	v.conditionalRegister = conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onRegister() bool {
-	return v.register != -1
+	return v.register != -1 && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onStack() bool {
-	return v.register == -1
+	return v.register == -1 && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onConditionalRegister() bool {
-	// TODO!
-	return false
+	return v.conditionalRegister != conditionalRegisterStateUnset
 }
 
 func newValueLocationStack() *valueLocationStack {
@@ -87,13 +107,19 @@ type valueLocationStack struct {
 }
 
 func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
-	loc = &valueLocation{register: reg}
+	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
 	s.push(loc)
 	return
 }
 
 func (s *valueLocationStack) pushValueOnStack() (loc *valueLocation) {
-	loc = &valueLocation{register: -1}
+	loc = &valueLocation{register: -1, conditionalRegister: conditionalRegisterStateUnset}
+	s.push(loc)
+	return
+}
+
+func (s *valueLocationStack) pushValueOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
+	loc = &valueLocation{register: -1, conditionalRegister: state}
 	s.push(loc)
 	return
 }

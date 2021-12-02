@@ -127,8 +127,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationGt:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLe:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleLe(o); err != nil {
+				return nil, fmt.Errorf("error handling le operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationGe:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationAdd:
@@ -347,68 +348,24 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 
 	x2 := b.locationStack.pop()
 	if x2.onStack() {
-		x2Register, err := b.allocateRegister(tp)
-		if err != nil {
+		if err := b.moveStackToRegister(tp, x2); err != nil {
 			return err
 		}
-
-		// Then move the value to the stolen register.
-		// Place the stack pointer at first.
-		prog := b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_CONST
-		prog.From.Offset = int64(x2.stackPointer)
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x2Register
-		b.addInstruction(prog)
-
-		// Then Copy the value from the stack.
-		prog = b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_MEM
-		prog.From.Reg = cachedStackBasePointerReg
-		prog.From.Index = x2Register
-		prog.From.Scale = 8
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x2Register
-		b.addInstruction(prog)
-		x2.setRegister(x2Register)
-		b.locationStack.markRegisterUsed(x2)
 	} else if x2.onConditionalRegister() {
-		panic("TODO")
+		if err := b.moveConditionalToGPRegister(x2); err != nil {
+			return err
+		}
 	}
 
-	x1 := b.locationStack.peek()
+	x1 := b.locationStack.peek() // Note this is peek, pop!
 	if x1.onStack() {
-		x1Register, err := b.allocateRegister(tp)
-		if err != nil {
+		if err := b.moveStackToRegister(tp, x1); err != nil {
 			return err
 		}
-
-		// Then move the value to the stolen register.
-		// Place the stack pointer at first.
-		prog := b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_CONST
-		prog.From.Offset = int64(x1.stackPointer)
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x1Register
-		b.addInstruction(prog)
-
-		// Then Copy the value from the stack.
-		prog = b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_MEM
-		prog.From.Reg = cachedStackBasePointerReg
-		prog.From.Index = x1Register
-		prog.From.Scale = 8
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x1Register
-		b.addInstruction(prog)
-		x1.setRegister(x1Register)
-		b.locationStack.markRegisterUsed(x1)
 	} else if x1.onConditionalRegister() {
-		panic("TODO")
+		// This shouldn't happen as the conditional
+		// register must be on top of the stack.
+		panic("a bug in jit compiler")
 	}
 
 	// x1 += x2.
@@ -452,68 +409,24 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 
 	x2 := b.locationStack.pop()
 	if x2.onStack() {
-		x2Register, err := b.allocateRegister(tp)
-		if err != nil {
+		if err := b.moveStackToRegister(tp, x2); err != nil {
 			return err
 		}
-
-		// Then move the value to the stolen register.
-		// Place the stack pointer at first.
-		prog := b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_CONST
-		prog.From.Offset = int64(x2.stackPointer)
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x2Register
-		b.addInstruction(prog)
-
-		// Then Copy the value from the stack.
-		prog = b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_MEM
-		prog.From.Reg = cachedStackBasePointerReg
-		prog.From.Index = x2Register
-		prog.From.Scale = 8
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x2Register
-		b.addInstruction(prog)
-		x2.setRegister(x2Register)
-		b.locationStack.markRegisterUsed(x2)
 	} else if x2.onConditionalRegister() {
-		panic("TODO")
+		if err := b.moveConditionalToGPRegister(x2); err != nil {
+			return err
+		}
 	}
 
-	x1 := b.locationStack.peek()
+	x1 := b.locationStack.peek() // Note this is peek, pop!
 	if x1.onStack() {
-		x1Register, err := b.allocateRegister(tp)
-		if err != nil {
+		if err := b.moveStackToRegister(tp, x1); err != nil {
 			return err
 		}
-
-		// Then move the value to the stolen register.
-		// Place the stack pointer at first.
-		prog := b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_CONST
-		prog.From.Offset = int64(x1.stackPointer)
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x1Register
-		b.addInstruction(prog)
-
-		// Then Copy the value from the stack.
-		prog = b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_MEM
-		prog.From.Reg = cachedStackBasePointerReg
-		prog.From.Index = x1Register
-		prog.From.Scale = 8
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = x1Register
-		b.addInstruction(prog)
-		x1.setRegister(x1Register)
-		b.locationStack.markRegisterUsed(x1)
 	} else if x1.onConditionalRegister() {
-		panic("TODO")
+		// This shouldn't happen as the conditional
+		// register must be on top of the stack.
+		panic("a bug in jit compiler")
 	}
 
 	// x1 += x2.
@@ -531,6 +444,77 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 	return nil
 }
 
+func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
+	var resultConditionState conditionalRegisterState
+	var instruction obj.As
+	var tp generalPurposeRegisterType
+	switch o.Type {
+	case wazeroir.SignFulTypeInt32:
+		resultConditionState = conditionalRegisterStateLE
+		instruction = x86.ACMPL
+		tp = gpTypeInt
+	case wazeroir.SignFulTypeUint32:
+		resultConditionState = conditionalRegisterStateBE
+		instruction = x86.ACMPL
+		tp = gpTypeInt
+	case wazeroir.SignFulTypeInt64:
+		resultConditionState = conditionalRegisterStateLE
+		instruction = x86.ACMPQ
+		tp = gpTypeInt
+	case wazeroir.SignFulTypeUint64:
+		resultConditionState = conditionalRegisterStateBE
+		instruction = x86.ACMPQ
+		tp = gpTypeInt
+	case wazeroir.SignFulTypeFloat32:
+		tp = gpTypeFloat
+		panic("add test!")
+	case wazeroir.SignFulTypeFloat64:
+		tp = gpTypeFloat
+		panic("add test!")
+	}
+
+	x2 := b.locationStack.pop()
+	if x2.onStack() {
+		if err := b.moveStackToRegister(tp, x2); err != nil {
+			return err
+		}
+	} else if x2.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(x2); err != nil {
+			return err
+		}
+	}
+
+	x1 := b.locationStack.pop()
+	if x1.onStack() {
+		if err := b.moveStackToRegister(tp, x1); err != nil {
+			return err
+		}
+	} else if x1.onConditionalRegister() {
+		// This shouldn't happen as the conditional
+		// register must be on top of the stack.
+		panic("a bug in jit compiler")
+	}
+
+	// Compare: set the flag based on x1-x2.
+	prog := b.newProg()
+	prog.As = instruction
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = x1.register
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = x2.register
+	b.addInstruction(prog)
+
+	// We no longer need x1,x2 register after cmp operation here,
+	// so we release it.
+	b.locationStack.releaseRegister(x1)
+	b.locationStack.releaseRegister(x2)
+
+	// Finally we have the result on the conditional register,
+	// so record it.
+	b.locationStack.pushValueOnConditionalRegister(resultConditionState)
+	return nil
+}
+
 func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 	reg, err := b.allocateRegister(gpTypeInt)
 	if err != nil {
@@ -539,6 +523,103 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 	loc := b.locationStack.pushValueOnRegister(reg)
 	loc.setValueType(wazeroir.SignLessTypeI32)
 	b.movConstToRegister(int64(o.Value), reg)
+	return nil
+}
+
+func (b *amd64Builder) moveStackToRegister(tp generalPurposeRegisterType, loc *valueLocation) error {
+	// Allocate the register.
+	reg, err := b.allocateRegister(tp)
+	if err != nil {
+		return err
+	}
+
+	// Then move the value to the stolen register.
+	// Place the stack pointer at first.
+	prog := b.newProg()
+	prog.As = x86.AMOVQ
+	prog.From.Type = obj.TYPE_CONST
+	prog.From.Offset = int64(loc.stackPointer)
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	b.addInstruction(prog)
+
+	// Then Copy the value from the stack.
+	prog = b.newProg()
+	prog.As = x86.AMOVQ
+	prog.From.Type = obj.TYPE_MEM
+	prog.From.Reg = cachedStackBasePointerReg
+	prog.From.Index = reg
+	prog.From.Scale = 8
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	b.addInstruction(prog)
+
+	// Mark it uses the register.
+	loc.setRegister(reg)
+	b.locationStack.markRegisterUsed(loc)
+	return nil
+}
+
+func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
+	// Get the free register.
+	reg, ok := b.locationStack.takeFreeRegister(gpTypeInt)
+	if !ok {
+		// This in theory should never be reached as moveConditionalToGPRegister
+		// is called right after comparison operations, meaning that
+		// at least two registers are free at the moment.
+		return fmt.Errorf("conditional register mov requires a free register")
+	}
+
+	// Set the flag bit to the destination.
+	prog := b.newProg()
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	// See
+	// - https://c9x.me/x86/html/file_module_x86_id_288.html
+	// - https://github.com/golang/go/blob/master/src/cmd/internal/obj/x86/asm6.go#L1453-L1468
+	// to translate x86.ASET* to the state's conditionalRegisterState*
+	switch loc.conditionalRegister {
+	case conditionalRegisterStateE:
+		prog.As = x86.ASETEQ
+	case conditionalRegisterStateNE:
+		prog.As = x86.ASETNE
+	case conditionalRegisterStateS:
+		prog.As = x86.ASETMI
+	case conditionalRegisterStateNS:
+		prog.As = x86.ASETPL
+	case conditionalRegisterStateG:
+		prog.As = x86.ASETGT
+	case conditionalRegisterStateGE:
+		prog.As = x86.ASETGE
+	case conditionalRegisterStateL:
+		prog.As = x86.ASETLT
+	case conditionalRegisterStateLE:
+		prog.As = x86.ASETLE
+	case conditionalRegisterStateA:
+		prog.As = x86.ASETHI
+	case conditionalRegisterStateAE:
+		prog.As = x86.ASETCC
+	case conditionalRegisterStateB:
+		prog.As = x86.ASETCS
+	case conditionalRegisterStateBE:
+		prog.As = x86.ASETLS
+	default:
+		panic("unreachable")
+	}
+	b.addInstruction(prog)
+
+	// Then we reset the unnecessary bit.
+	prog = b.newProg()
+	prog.As = x86.AANDQ
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	prog.From.Type = obj.TYPE_CONST
+	prog.From.Offset = 0x1
+	b.addInstruction(prog)
+
+	// Mark it uses the register.
+	loc.setRegister(reg)
+	b.locationStack.markRegisterUsed(loc)
 	return nil
 }
 

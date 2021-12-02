@@ -779,7 +779,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			builder.locationStack.markRegisterUsed(x2Location)
 			builder.movConstToRegister(100, x1Reg)
 			builder.movConstToRegister(300, x2Reg)
-			builder.handleAdd(o)
+			err := builder.handleAdd(o)
+			require.NoError(t, err)
 			require.Contains(t, builder.locationStack.usedRegisters, x1Reg)
 			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
 
@@ -813,7 +814,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			builder.locationStack.markRegisterUsed(x2Location)
 			eng.stack[x1Location.stackPointer] = 5000
 			builder.movConstToRegister(300, x2Location.register)
-			builder.handleAdd(o)
+			err := builder.handleAdd(o)
+			require.NoError(t, err)
 
 			// To verify the behavior, we push the value
 			// to the stack.
@@ -843,7 +845,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			x2Location := builder.locationStack.pushValueOnStack()
 			eng.stack[x1Location.stackPointer] = 5000
 			eng.stack[x2Location.stackPointer] = 13
-			builder.handleAdd(o)
+			err := builder.handleAdd(o)
+			require.NoError(t, err)
 			require.True(t, x1Location.onRegister())
 			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
 			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
@@ -877,7 +880,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			builder.locationStack.markRegisterUsed(x1Location)
 			eng.stack[x2Location.stackPointer] = 5000
 			builder.movConstToRegister(132, x1Location.register)
-			builder.handleAdd(o)
+			err := builder.handleAdd(o)
+			require.NoError(t, err)
 			require.True(t, x1Location.onRegister())
 			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
 			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
@@ -904,6 +908,132 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 	})
 }
 
+func TestAmd64Builder_handleLe(t *testing.T) {
+	t.Run("int32", func(t *testing.T) {
+		for _, tc := range []struct {
+			x1, x2      int32
+			signed, exp bool
+		}{
+			{x1: 100, x2: -1, signed: false, exp: true},
+			{x1: -1, x2: 100, signed: false, exp: false},
+			{x1: 100, x2: 200, signed: true, exp: true},
+			{x1: 200, x2: 100, signed: true, exp: false},
+		} {
+			var o *wazeroir.OperationLe
+			if tc.signed {
+				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeInt32}
+			} else {
+				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeUint32}
+			}
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			x1Reg := int16(x86.REG_R9)
+			x2Reg := int16(x86.REG_R10)
+			x1Location := builder.locationStack.pushValueOnRegister(x1Reg)
+			x2Location := builder.locationStack.pushValueOnRegister(x2Reg)
+			builder.locationStack.markRegisterUsed(x1Location)
+			builder.locationStack.markRegisterUsed(x2Location)
+			builder.movConstToRegister(int64(tc.x1), x1Reg)
+			builder.movConstToRegister(int64(tc.x2), x2Reg)
+			err := builder.handleLe(o)
+			require.NoError(t, err)
+
+			require.NotContains(t, builder.locationStack.usedRegisters, x1Reg)
+			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
+			// To verify the behavior, we push the flag value
+			// to the stack.
+			top := builder.locationStack.peek()
+			require.True(t, top.onConditionalRegister() && !top.onRegister())
+			err = builder.moveConditionalToGPRegister(top)
+			require.NoError(t, err)
+			require.True(t, !top.onConditionalRegister() && top.onRegister())
+			builder.releaseRegisterFromValue(top)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			eng := newEngine()
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			fmt.Println(eng.stack[:4])
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+			if tc.exp {
+				require.Equal(t, uint64(1), eng.stack[eng.currentStackPointer-1])
+			} else {
+				require.Equal(t, uint64(0), eng.stack[eng.currentStackPointer-1])
+			}
+		}
+	})
+	t.Run("int64", func(t *testing.T) {
+		for _, tc := range []struct {
+			x1, x2      int64
+			signed, exp bool
+		}{
+			{x1: 100, x2: -1, signed: false, exp: true},
+			{x1: -1, x2: 100, signed: false, exp: false},
+			{x1: 100, x2: 200, signed: true, exp: true},
+			{x1: 200, x2: 100, signed: true, exp: false},
+		} {
+			var o *wazeroir.OperationLe
+			if tc.signed {
+				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeInt64}
+			} else {
+				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeUint64}
+			}
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			x1Reg := int16(x86.REG_R9)
+			x2Reg := int16(x86.REG_R10)
+			x1Location := builder.locationStack.pushValueOnRegister(x1Reg)
+			x2Location := builder.locationStack.pushValueOnRegister(x2Reg)
+			builder.locationStack.markRegisterUsed(x1Location)
+			builder.locationStack.markRegisterUsed(x2Location)
+			builder.movConstToRegister(tc.x1, x1Reg)
+			builder.movConstToRegister(tc.x2, x2Reg)
+			err := builder.handleLe(o)
+			require.NoError(t, err)
+			require.NotContains(t, builder.locationStack.usedRegisters, x1Reg)
+			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
+			// To verify the behavior, we push the flag value
+			// to the stack.
+			top := builder.locationStack.peek()
+			require.True(t, top.onConditionalRegister() && !top.onRegister())
+			err = builder.moveConditionalToGPRegister(top)
+			require.NoError(t, err)
+			require.True(t, !top.onConditionalRegister() && top.onRegister())
+			builder.releaseRegisterFromValue(top)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			eng := newEngine()
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			fmt.Println(eng.stack[:4])
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+			if tc.exp {
+				require.Equal(t, uint64(1), eng.stack[eng.currentStackPointer-1])
+			} else {
+				require.Equal(t, uint64(0), eng.stack[eng.currentStackPointer-1])
+			}
+		}
+	})
+}
+
 func TestAmd64Builder_handleSub(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
 		o := &wazeroir.OperationSub{Type: wazeroir.SignLessTypeI64}
@@ -918,7 +1048,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			builder.locationStack.markRegisterUsed(x2Location)
 			builder.movConstToRegister(300, x1Reg)
 			builder.movConstToRegister(51, x2Reg)
-			builder.handleSub(o)
+			err := builder.handleSub(o)
+			require.NoError(t, err)
 			require.Contains(t, builder.locationStack.usedRegisters, x1Reg)
 			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
 
@@ -952,7 +1083,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			builder.locationStack.markRegisterUsed(x2Location)
 			eng.stack[x1Location.stackPointer] = 5000
 			builder.movConstToRegister(300, x2Location.register)
-			builder.handleSub(o)
+			err := builder.handleSub(o)
+			require.NoError(t, err)
 
 			// To verify the behavior, we push the value
 			// to the stack.
@@ -982,7 +1114,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			x2Location := builder.locationStack.pushValueOnStack()
 			eng.stack[x1Location.stackPointer] = 5000
 			eng.stack[x2Location.stackPointer] = 13
-			builder.handleSub(o)
+			err := builder.handleSub(o)
+			require.NoError(t, err)
 			require.True(t, x1Location.onRegister())
 			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
 			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
@@ -1016,7 +1149,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			builder.locationStack.markRegisterUsed(x1Location)
 			eng.stack[x2Location.stackPointer] = 132
 			builder.movConstToRegister(5000, x1Location.register)
-			builder.handleSub(o)
+			err := builder.handleSub(o)
+			require.NoError(t, err)
 			require.True(t, x1Location.onRegister())
 			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
 			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
