@@ -143,7 +143,7 @@ type jitStatusCodes uint32
 
 const (
 	jitStatusReturned jitStatusCodes = iota
-	jitStatusCallFunction
+	jitStatusCallWasmFunction
 	jitStatusCallBuiltInFunction
 	jitStatusCallHostFunction
 	// TODO: trap, etc?
@@ -233,7 +233,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				e.currentBaseStackPointer = callerFrame.baseStackPointer
 				e.currentStackPointer = callerFrame.continuationStackPointer
 			}
-		case jitStatusCallFunction:
+		case jitStatusCallWasmFunction:
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so
 			// we can resume this caller function frame.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"unsafe"
@@ -206,7 +207,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 }
 
 func Test_setJITStatus(t *testing.T) {
-	for _, s := range []jitStatusCodes{jitStatusReturned, jitStatusCallFunction, jitStatusCallBuiltInFunction} {
+	for _, s := range []jitStatusCodes{jitStatusReturned, jitStatusCallWasmFunction, jitStatusCallBuiltInFunction} {
 		// Build codes.
 		builder := requireNewBuilder(t)
 		builder.initializeReservedRegisters()
@@ -292,7 +293,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	builder.movConstToRegister(int64(50), tmpReg)
 	builder.releaseRegister(loc)
 	require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
-	builder.setJITStatus(jitStatusCallFunction)
+	builder.setJITStatus(jitStatusCallWasmFunction)
 	builder.returnFunction()
 	// Compile.
 	code, err := builder.assemble()
@@ -315,7 +316,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
-	require.Equal(t, jitStatusCallFunction, eng.jitCallStatusCode)
+	require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
 	require.Equal(t, uint64(50), eng.stack[1])
 }
 
@@ -351,7 +352,7 @@ func Test_callFunction(t *testing.T) {
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
-		require.Equal(t, jitStatusCallFunction, eng.jitCallStatusCode)
+		require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
 		require.Equal(t, functionIndex, eng.functionCallIndex)
 
 		// Continue.
@@ -391,7 +392,7 @@ func Test_callFunction(t *testing.T) {
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
-		require.Equal(t, jitStatusCallFunction, eng.jitCallStatusCode)
+		require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
 		require.Equal(t, functionIndex, eng.functionCallIndex)
 
 		// Continue.
@@ -1176,7 +1177,86 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 }
 
 func TestAmd64Builder_handleCall(t *testing.T) {
-	// TODO!
+	t.Run("host function", func(t *testing.T) {
+		const functionIndex = 5
+		builder := requireNewBuilder(t)
+		builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
+
+		// Setup.
+		eng := newEngine()
+		builder.eng = eng
+		hostFuncRefValue := reflect.ValueOf(func() {})
+		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue}
+		builder.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
+		builder.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
+		eng.hostFunctionIndex[hostFuncInstance] = functionIndex
+
+		// Build codes.
+		builder.initializeReservedRegisters()
+		// Push the value onto stack.
+		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
+		builder.locationStack.markRegisterUsed(loc)
+		builder.movConstToRegister(int64(50), loc.register)
+		builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+
+		// Compile.
+		code, err := builder.assemble()
+		require.NoError(t, err)
+
+		// Run code.
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the status.
+		require.Equal(t, jitStatusCallHostFunction, eng.jitCallStatusCode)
+		// All the registers must be written back to stack.
+		require.Equal(t, uint64(2), eng.currentStackPointer)
+		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
+	})
+	t.Run("wasm function", func(t *testing.T) {
+		const functionIndex = 20
+		builder := requireNewBuilder(t)
+		builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
+
+		// Setup.
+		eng := newEngine()
+		builder.eng = eng
+		hostFuncInstance := &wasm.FunctionInstance{}
+		builder.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
+		builder.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
+		eng.hostFunctionIndex[hostFuncInstance] = functionIndex
+
+		// Build codes.
+		builder.initializeReservedRegisters()
+		// Push the value onto stack.
+		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
+		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
+		builder.locationStack.markRegisterUsed(loc)
+		builder.movConstToRegister(int64(50), loc.register)
+		builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+
+		// Compile.
+		code, err := builder.assemble()
+		require.NoError(t, err)
+
+		// Run code.
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the status.
+		require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
+		// All the registers must be written back to stack.
+		require.Equal(t, uint64(3), eng.currentStackPointer)
+		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
+	})
 }
 
 func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {

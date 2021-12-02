@@ -74,6 +74,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			}
 		case *wazeroir.OperationCallIndirect:
 		case *wazeroir.OperationDrop:
+			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationSelect:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -668,7 +669,7 @@ func (b *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {
 }
 
 func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
-	// Set the jit status as jitStatusCallFunction
+	// Set the jit status as jitStatusCallHostFunction
 	b.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
@@ -682,7 +683,7 @@ func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
 }
 
 func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
-	// Set the jit status as jitStatusCallFunction
+	// Set the jit status as jitStatusCallHostFunction
 	b.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
@@ -696,8 +697,8 @@ func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 }
 
 func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) {
-	// Set the jit status as jitStatusCallFunction
-	b.setJITStatus(jitStatusCallFunction)
+	// Set the jit status as jitStatusCallWasmFunction
+	b.setJITStatus(jitStatusCallWasmFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
 	// Release all the registers as our calling convention requires the caller-save.
@@ -711,8 +712,8 @@ func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) 
 }
 
 func (b *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
-	// Set the jit status as jitStatusCallFunction
-	b.setJITStatus(jitStatusCallFunction)
+	// Set the jit status as jitStatusCallWasmFunction
+	b.setJITStatus(jitStatusCallWasmFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
 	// Release all the registers as our calling convention requires the caller-save.
@@ -736,7 +737,7 @@ func (b *amd64Builder) releaseAllRegistersToStack() {
 
 // TODO: If this function call is the tail call,
 // we don't need to return back to this function.
-// Maybe better have another status for that case,
+// Maybe better have another status for that case
 // so that we don't call back again to this function
 // and instead just release the call frame.
 func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
