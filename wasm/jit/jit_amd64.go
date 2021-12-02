@@ -274,6 +274,18 @@ func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
 	return nil
 }
 
+func (b *amd64Builder) handleCall(o *wazeroir.OperationCall) error {
+	target := b.f.ModuleInstance.Functions[o.FunctionIndex]
+	if target.HostFunction != nil {
+		index := b.eng.hostFunctionIndex[target]
+		b.callHostFunctionFromConstIndex(index)
+	} else {
+		index := b.eng.compiledWasmFunctionIndex[target]
+		b.callFunctionFromConstIndex(index)
+	}
+	return nil
+}
+
 func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 	// TODO: if we track the type of values on the stack,
 	// we could optimize the instruction according to the bit size of the value.
@@ -654,7 +666,7 @@ func (b *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {
 	return prog
 }
 
-func (b *amd64Builder) callHostFunctionFromConstIndex(index uint32) {
+func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
 	// Set the jit status as jitStatusCallFunction
 	b.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
@@ -678,7 +690,7 @@ func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 	b.initializeReservedRegisters()
 }
 
-func (b *amd64Builder) callFunctionFromConstIndex(index uint32) (last *obj.Prog) {
+func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) {
 	// Set the jit status as jitStatusCallFunction
 	b.setJITStatus(jitStatusCallFunction)
 	// Set the function index.
@@ -726,6 +738,8 @@ func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	// As we cannot read RIP register directly,
 	// we calculate now the offset to the next instruction
 	// relative to the beginning of this function body.
+	// TODO: this unnecessarily computationally expensive,
+	// so we should reuse the result of b.builder.Assemble() here.
 	prog.From.Offset = int64(len(b.builder.Assemble()))
 }
 
@@ -740,11 +754,11 @@ func (b *amd64Builder) setFunctionCallIndexFromRegister(reg int16) {
 	b.addInstruction(prog)
 }
 
-func (b *amd64Builder) setFunctionCallIndexFromConst(index uint32) {
+func (b *amd64Builder) setFunctionCallIndexFromConst(index int64) {
 	prog := b.newProg()
 	prog.As = x86.AMOVL
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(index)
+	prog.From.Offset = index
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineFunctionCallIndexOffset

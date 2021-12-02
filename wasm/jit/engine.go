@@ -19,7 +19,7 @@ type engine struct {
 	jitCallStatusCode jitStatusCodes
 	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
 	// Indicating the function call index.
-	functionCallIndex uint32
+	functionCallIndex int64
 	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
 	// We use this value to continue the current function
 	// after calling the target function exits.
@@ -30,10 +30,10 @@ type engine struct {
 	callFrameStack *callFrame
 	// Store the compiled functions and indexes.
 	compiledWasmFunctions     []*compiledWasmFunction
-	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int
+	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int64
 	// Store the host functions and indexes.
 	hostFunctions     []func()
-	hostFunctionIndex map[*wasm.FunctionInstance]int
+	hostFunctionIndex map[*wasm.FunctionInstance]int64
 }
 
 var _ wasm.Engine = &engine{}
@@ -65,14 +65,14 @@ func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 			if _, ok := e.hostFunctionIndex[f]; ok {
 				return nil
 			}
-			id := len(e.hostFunctionIndex)
+			id := int64(len(e.hostFunctionIndex))
 			e.hostFunctionIndex[f] = id
 			newUniqueHostFunctions++
 		} else {
 			if _, ok := e.compiledWasmFunctionIndex[f]; ok {
 				return nil
 			}
-			id := len(e.compiledWasmFunctionIndex)
+			id := int64(len(e.compiledWasmFunctionIndex))
 			e.compiledWasmFunctionIndex[f] = id
 			newUniqueWasmFunctions++
 		}
@@ -122,8 +122,8 @@ func newEngine() *engine {
 	const initialStackSize = 100
 	e := &engine{
 		stack:                     make([]uint64, initialStackSize),
-		compiledWasmFunctionIndex: make(map[*wasm.FunctionInstance]int),
-		hostFunctionIndex:         make(map[*wasm.FunctionInstance]int),
+		compiledWasmFunctionIndex: make(map[*wasm.FunctionInstance]int64),
+		hostFunctionIndex:         make(map[*wasm.FunctionInstance]int64),
 	}
 	return e
 }

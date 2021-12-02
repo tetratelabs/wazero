@@ -21,13 +21,6 @@ import (
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
-func Test_a(t *testing.T) {
-	a := make([]int, 10)
-	a = append(a, 2)
-	a[12] = 10
-	fmt.Println(a)
-}
-
 func Test_fibonacci(t *testing.T) {
 	buf, err := os.ReadFile("testdata/fib.wasm")
 	require.NoError(t, err)
@@ -237,7 +230,7 @@ func Test_setJITStatus(t *testing.T) {
 
 func Test_setFunctionCallIndexFromConst(t *testing.T) {
 	// Build codes.
-	for _, index := range []uint32{1, 5, 20} {
+	for _, index := range []int64{1, 5, 20} {
 		// Build codes.
 		builder := requireNewBuilder(t)
 		builder.initializeReservedRegisters()
@@ -261,11 +254,11 @@ func Test_setFunctionCallIndexFromConst(t *testing.T) {
 
 func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 	reg := int16(x86.REG_R10)
-	for _, index := range []uint32{1, 5, 20} {
+	for _, index := range []int64{1, 5, 20} {
 		// Build codes.
 		builder := requireNewBuilder(t)
 		builder.initializeReservedRegisters()
-		builder.movConstToRegister(int64(index), reg)
+		builder.movConstToRegister(index, reg)
 		builder.setFunctionCallIndexFromRegister(reg)
 		builder.returnFunction()
 		// Compile.
@@ -328,8 +321,8 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 
 func Test_callFunction(t *testing.T) {
 	const (
-		functionIndex uint32 = 10
-		tmpReg               = x86.REG_AX
+		functionIndex int64 = 10
+		tmpReg              = x86.REG_AX
 	)
 	t.Run("from const", func(t *testing.T) {
 		// Build codes.
@@ -370,11 +363,11 @@ func Test_callFunction(t *testing.T) {
 		require.Equal(t, uint64(50), eng.stack[1])
 	})
 	t.Run("from reg", func(t *testing.T) {
-		const functionIndex uint32 = 10
+		const functionIndex int64 = 10
 		// Build codes.
 		builder := requireNewBuilder(t)
 		builder.initializeReservedRegisters()
-		builder.movConstToRegister(int64(functionIndex), tmpReg)
+		builder.movConstToRegister(functionIndex, tmpReg)
 		builder.callFunctionFromRegisterIndex(tmpReg)
 		// On the continuation after function call,
 		// We push the value onto stack
@@ -414,8 +407,8 @@ func Test_callFunction(t *testing.T) {
 func Test_callHostFunction(t *testing.T) {
 	t.Run("from const", func(t *testing.T) {
 		const (
-			functionIndex uint32 = 0
-			tmpReg               = x86.REG_AX
+			functionIndex int64 = 0
+			tmpReg              = x86.REG_AX
 		)
 		// Build codes.
 		builder := requireNewBuilder(t)
@@ -1180,4 +1173,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			require.Equal(t, uint64(4868), eng.stack[eng.currentStackPointer-1])
 		})
 	})
+}
+
+func TestAmd64Builder_handleCall(t *testing.T) {
+	// TODO!
 }
