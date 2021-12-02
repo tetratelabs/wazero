@@ -44,10 +44,10 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
 	builder := &amd64Builder{eng: e, f: f, builder: b, locationStack: newValueLocationStack()}
-	// Move the signature locals onto stack, as we assume that
-	// all the function parameters (signature locals) are already pushed on the stack
+	// Move the function inputs onto stack, as we assume that
+	// all the function inputs (parameters) are already pushed on the stack
 	// by the caller.
-	builder.pushSignatureLocals()
+	builder.pushFunctionInputs()
 
 	// Initialize the reserved registers first of all.
 	builder.initializeReservedRegisters()
@@ -223,7 +223,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	return &compiledWasmFunction{codeSegment: code, memoryInst: nil}, nil
 }
 
-func (b *amd64Builder) pushSignatureLocals() {
+func (b *amd64Builder) pushFunctionInputs() {
 	for _, t := range b.f.Signature.InputTypes {
 		loc := b.locationStack.pushValueOnStack()
 		loc.setValueType(wazeroir.WasmValueTypeToSignless(t))

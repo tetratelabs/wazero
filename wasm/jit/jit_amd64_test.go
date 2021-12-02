@@ -57,12 +57,12 @@ func requireNewBuilder(t *testing.T) *amd64Builder {
 	}
 }
 
-func TestAmd64Builder_pushSignatureLocals(t *testing.T) {
+func TestAmd64Builder_pushFunctionInputs(t *testing.T) {
 	f := &wasm.FunctionInstance{Signature: &wasm.FunctionType{
 		InputTypes: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
 	}}
 	builder := &amd64Builder{locationStack: newValueLocationStack(), f: f}
-	builder.pushSignatureLocals()
+	builder.pushFunctionInputs()
 	require.Equal(t, uint64(len(f.Signature.InputTypes)), builder.locationStack.sp)
 	loc := builder.locationStack.pop()
 	require.Equal(t, uint64(1), loc.stackPointer)
