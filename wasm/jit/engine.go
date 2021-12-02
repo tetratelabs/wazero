@@ -58,41 +58,58 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 	return
 }
 
-func (e *engine) PreCompile(f *wasm.FunctionInstance) error {
-	if f.HostFunction != nil {
-		if _, ok := e.hostFunctionIndex[f]; ok {
-			return nil
+func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
+	var newUniqueHostFunctions, newUniqueWasmFunctions int
+	for _, f := range fs {
+		if f.HostFunction != nil {
+			if _, ok := e.hostFunctionIndex[f]; ok {
+				return nil
+			}
+			id := len(e.hostFunctionIndex)
+			e.hostFunctionIndex[f] = id
+			newUniqueHostFunctions++
+		} else {
+			if _, ok := e.compiledWasmFunctionIndex[f]; ok {
+				return nil
+			}
+			id := len(e.compiledWasmFunctionIndex)
+			e.compiledWasmFunctionIndex[f] = id
+			newUniqueWasmFunctions++
 		}
-		id := len(e.hostFunctionIndex)
-		e.hostFunctionIndex[f] = id
-	} else {
-		if _, ok := e.compiledWasmFunctionIndex[f]; ok {
-			return nil
-		}
-		id := len(e.compiledWasmFunctionIndex)
-		e.compiledWasmFunctionIndex[f] = id
 	}
+	e.hostFunctions = append(
+		e.hostFunctions,
+		make([]func(), newUniqueHostFunctions)...,
+	)
+	e.compiledWasmFunctions = append(
+		e.compiledWasmFunctions,
+		make([]*compiledWasmFunction, newUniqueWasmFunctions)...,
+	)
 	return nil
 }
 
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	if f.HostFunction != nil {
-		if _, ok := e.hostFunctionIndex[f]; ok {
+		id := e.hostFunctionIndex[f]
+		if e.hostFunctions[id] != nil {
+			// Already compiled.
 			return nil
 		}
 		hf := func() {
 			// TODO:
 		}
-		e.hostFunctions = append(e.hostFunctions, hf)
+		e.hostFunctions[id] = hf
 	} else {
-		if _, ok := e.compiledWasmFunctionIndex[f]; ok {
+		id := e.compiledWasmFunctionIndex[f]
+		if e.compiledWasmFunctions[id] != nil {
+			// Already compiled.
 			return nil
 		}
 		cf, err := e.compileWasmFunction(f)
 		if err != nil {
 			return fmt.Errorf("failed to compile Wasm function: %w", err)
 		}
-		e.compiledWasmFunctions = append(e.compiledWasmFunctions, cf)
+		e.compiledWasmFunctions[id] = cf
 	}
 	return nil
 }

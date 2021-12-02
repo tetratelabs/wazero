@@ -113,7 +113,7 @@ type interpreterOp struct {
 }
 
 // PreCompile Implements wasm.Engine for interpreter.
-func (it *interpreter) PreCompile(f *wasm.FunctionInstance) error {
+func (it *interpreter) PreCompile(fs []*wasm.FunctionInstance) error {
 	return nil
 }
 

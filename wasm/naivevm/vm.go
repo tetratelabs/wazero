@@ -35,7 +35,7 @@ func NewEngine() wasm.Engine {
 	}
 }
 
-func (it *naiveVirtualMachine) PreCompile(f *wasm.FunctionInstance) error {
+func (it *naiveVirtualMachine) PreCompile(fs []*wasm.FunctionInstance) error {
 	return nil
 }
 

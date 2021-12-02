@@ -21,6 +21,13 @@ import (
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
+func Test_a(t *testing.T) {
+	a := make([]int, 10)
+	a = append(a, 2)
+	a[12] = 10
+	fmt.Println(a)
+}
+
 func Test_fibonacci(t *testing.T) {
 	buf, err := os.ReadFile("testdata/fib.wasm")
 	require.NoError(t, err)
