@@ -1178,3 +1178,44 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 func TestAmd64Builder_handleCall(t *testing.T) {
 	// TODO!
 }
+
+func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {
+	eng := newEngine()
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+	x1Reg := int16(x86.REG_AX)
+	x2Reg := int16(x86.REG_R10)
+	_ = builder.locationStack.pushValueOnStack()
+	eng.stack[0] = 100
+	x1Location := builder.locationStack.pushValueOnRegister(x1Reg)
+	x2Location := builder.locationStack.pushValueOnRegister(x2Reg)
+	_ = builder.locationStack.pushValueOnStack()
+	eng.stack[3] = 123
+	builder.locationStack.markRegisterUsed(x1Location)
+	builder.locationStack.markRegisterUsed(x2Location)
+	require.Len(t, builder.locationStack.usedRegisters, 2)
+
+	// Set the values supposed to be released to stack memory space.
+	builder.movConstToRegister(300, x1Reg)
+	builder.movConstToRegister(51, x2Reg)
+	builder.releaseAllRegistersToStack()
+	require.Len(t, builder.locationStack.usedRegisters, 0)
+	builder.returnFunction()
+
+	// Assemble.
+	code, err := builder.assemble()
+	require.NoError(t, err)
+	// Run code.
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+	// Check the stack.
+	require.Equal(t, uint64(4), eng.currentStackPointer)
+	require.Equal(t, uint64(123), eng.stack[eng.currentStackPointer-1])
+	require.Equal(t, uint64(51), eng.stack[eng.currentStackPointer-2])
+	require.Equal(t, uint64(300), eng.stack[eng.currentStackPointer-3])
+	require.Equal(t, uint64(100), eng.stack[eng.currentStackPointer-4])
+}

@@ -695,15 +695,25 @@ func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) 
 	b.setJITStatus(jitStatusCallFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
-
-	// TODO: evict all the registers to stack.
-
+	// Release all the registers as our calling convention requires the caller-save.
+	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
 	// we must setup the reserved registers again.
 	last = b.initializeReservedRegisters()
 	return
+}
+
+func (b *amd64Builder) releaseAllRegistersToStack() error {
+	used := len(b.locationStack.usedRegisters)
+	for i := len(b.locationStack.stack) - 1; i >= 0 && used > 0; i-- {
+		if loc := b.locationStack.stack[i]; loc.onRegister() {
+			b.releaseRegisterFromValue(loc)
+			used--
+		}
+	}
+	return nil
 }
 
 func (b *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
