@@ -239,10 +239,11 @@ func (b *amd64Builder) pushFunctionInputs() {
 }
 
 type amd64Builder struct {
-	eng     *engine
-	f       *wasm.FunctionInstance
-	ir      *wazeroir.CompilationResult
-	builder *asm.Builder
+	eng          *engine
+	f            *wasm.FunctionInstance
+	ir           *wazeroir.CompilationResult
+	setJmpOrigin *obj.Prog
+	builder      *asm.Builder
 	// location stack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
@@ -263,7 +264,12 @@ func (b *amd64Builder) addInstruction(prog *obj.Prog) {
 }
 
 func (b *amd64Builder) newProg() (prog *obj.Prog) {
-	return b.builder.NewProg()
+	ret := b.builder.NewProg()
+	if b.setJmpOrigin != nil {
+		b.setJmpOrigin.To.SetTarget(ret)
+		b.setJmpOrigin = nil
+	}
+	return
 }
 
 func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
@@ -289,6 +295,108 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 }
 
 func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
+	// Here's the diagram of how we organize the instructions necessarly for brif operation.
+	//
+	// jmp_with_cond -> drop (.Else) -> jmp (.Else) -> drop (.Then) -> jmp (.Then)
+	//    |-------------------(satisfied)------------------^^^
+
+	cond := b.locationStack.pop()
+	var jmpWithCond *obj.Prog
+	if cond.onConditionalRegister() {
+		jmpWithCond = b.newProg()
+		jmpWithCond.To.Type = obj.TYPE_BRANCH
+		switch cond.conditionalRegister {
+		case conditionalRegisterStateE:
+			jmpWithCond.As = x86.AJEQ
+		case conditionalRegisterStateNE:
+			jmpWithCond.As = x86.AJNE
+		case conditionalRegisterStateS:
+			jmpWithCond.As = x86.AJMI
+		case conditionalRegisterStateNS:
+			jmpWithCond.As = x86.AJPL
+		case conditionalRegisterStateG:
+			jmpWithCond.As = x86.AJGT
+		case conditionalRegisterStateGE:
+			jmpWithCond.As = x86.AJGE
+		case conditionalRegisterStateL:
+			jmpWithCond.As = x86.AJLT
+		case conditionalRegisterStateLE:
+			jmpWithCond.As = x86.AJLE
+		case conditionalRegisterStateA:
+			jmpWithCond.As = x86.AJHI
+		case conditionalRegisterStateAE:
+			jmpWithCond.As = x86.AJCC
+		case conditionalRegisterStateB:
+			jmpWithCond.As = x86.AJCS
+		case conditionalRegisterStateBE:
+			jmpWithCond.As = x86.AJLS
+		}
+	} else {
+		if cond.onStack() {
+			if err := b.moveStackToRegister(cond.registerType(), cond); err != nil {
+				return err
+			}
+		}
+		// Check if the value equals zero
+		prog := b.newProg()
+		prog.As = x86.ACMPQ
+		prog.From.Type = obj.TYPE_REG
+		prog.From.Reg = cond.register
+		prog.To.Type = obj.TYPE_CONST
+		prog.To.Offset = 0
+		b.addInstruction(prog)
+		// Then emit jump instruction.
+		jmpWithCond := b.newProg()
+		jmpWithCond.As = x86.AJEQ
+		jmpWithCond.To.Type = obj.TYPE_BRANCH
+		b.addInstruction(jmpWithCond)
+	}
+
+	// Handle else branches.
+	if err := b.emitDropRange(o.Else.ToDrop); err != nil {
+		return err
+	}
+	if o.Else.Target.IsReturnTarget() {
+		// Release all the registers as our calling convention requires the callee-save.
+		b.releaseAllRegistersToStack()
+		b.setJITStatus(jitStatusReturned)
+		// Then return from this function.
+		b.returnFunction()
+	} else {
+		elseLabelKey := o.Else.Target.Label.String()
+		if b.ir.LabelCallers[elseLabelKey] > 1 {
+			b.preJumpRegisterAdjustment()
+		}
+		elseJmp := b.newProg()
+		elseJmp.As = obj.AJMP
+		elseJmp.To.Type = obj.TYPE_BRANCH
+		b.addInstruction(elseJmp)
+		b.assignJumpTarget(elseLabelKey, elseJmp)
+	}
+
+	// Handle then branches. We assign jmpWithCond to setJmpOrigin
+	// so we can jump to the initial instruction emitted below.
+	b.setJmpOrigin = jmpWithCond
+	if err := b.emitDropRange(o.Then.ToDrop); err != nil {
+		return err
+	}
+	if o.Then.Target.IsReturnTarget() {
+		// Release all the registers as our calling convention requires the callee-save.
+		b.releaseAllRegistersToStack()
+		b.setJITStatus(jitStatusReturned)
+		// Then return from this function.
+		b.returnFunction()
+	} else {
+		thenLabelKey := o.Then.Target.Label.String()
+		if b.ir.LabelCallers[thenLabelKey] > 1 {
+			b.preJumpRegisterAdjustment()
+		}
+		thenJmp := b.newProg()
+		thenJmp.As = obj.AJMP
+		thenJmp.To.Type = obj.TYPE_BRANCH
+		b.addInstruction(thenJmp)
+		b.assignJumpTarget(thenLabelKey, thenJmp)
+	}
 	return nil
 }
 
@@ -344,12 +452,15 @@ func (b *amd64Builder) handleCall(o *wazeroir.OperationCall) error {
 	}
 	return nil
 }
-
 func (b *amd64Builder) handleDrop(o *wazeroir.OperationDrop) error {
-	if o.Range == nil {
+	return b.emitDropRange(o.Range)
+}
+
+func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
+	if r == nil {
 		return nil
-	} else if o.Range.Start == 0 {
-		for i := 0; i < o.Range.End; i++ {
+	} else if r.Start == 0 {
+		for i := 0; i < r.End; i++ {
 			if loc := b.locationStack.pop(); loc.onRegister() {
 				b.locationStack.releaseRegister(loc)
 			}
@@ -362,7 +473,7 @@ func (b *amd64Builder) handleDrop(o *wazeroir.OperationDrop) error {
 		topIsConditional bool
 		liveValues       []*valueLocation
 	)
-	for i := 0; i < o.Range.Start; i++ {
+	for i := 0; i < r.Start; i++ {
 		live := b.locationStack.pop()
 		if top == nil {
 			top = live
@@ -370,7 +481,7 @@ func (b *amd64Builder) handleDrop(o *wazeroir.OperationDrop) error {
 		}
 		liveValues = append(liveValues, live)
 	}
-	for i := 0; i < o.Range.End-o.Range.Start+1; i++ {
+	for i := 0; i < r.End-r.Start+1; i++ {
 		if loc := b.locationStack.pop(); loc.onRegister() {
 			b.locationStack.releaseRegister(loc)
 		}
