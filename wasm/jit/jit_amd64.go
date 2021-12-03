@@ -61,8 +61,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling label operation %s: %w", o, err)
 			}
 		case *wazeroir.OperationBr:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleBr(o); err != nil {
+				return nil, fmt.Errorf("error handling br operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationBrIf:
 			// TODO:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -258,6 +259,45 @@ func (b *amd64Builder) addInstruction(prog *obj.Prog) {
 
 func (b *amd64Builder) newProg() (prog *obj.Prog) {
 	return b.builder.NewProg()
+}
+
+func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
+	if o.Target.IsReturnTarget() {
+		// Release all the registers as our calling convention requires the callee-save.
+		b.releaseAllRegistersToStack()
+		b.setJITStatus(jitStatusReturned)
+		// Then return from this function.
+		b.returnFunction()
+	} else {
+		labelKey := o.Target.String()
+		targetNumCallers := b.ir.LabelCallers[labelKey]
+		if targetNumCallers > 1 {
+			b.preJumpRegisterAdjustment()
+		}
+		jmp := b.newProg()
+		jmp.As = obj.AJMP
+		jmp.To.Type = obj.TYPE_BRANCH
+		b.addInstruction(jmp)
+		b.assignJumpTarget(labelKey, jmp)
+	}
+	return nil
+}
+
+// If a jump target has multiple callesr (origins),
+// we must have unique register states, so this function
+// must be called before such jump instruction.
+func (b *amd64Builder) preJumpRegisterAdjustment() {
+}
+
+func (b *amd64Builder) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
+	jmpTarget, ok := b.labelInitialInstructions[labelKey]
+	if ok {
+		jmpInstruction.To.SetTarget(jmpTarget)
+	} else {
+		b.onLabelStartCallbacks[labelKey] = append(b.onLabelStartCallbacks[labelKey], func(jmpTarget *obj.Prog) {
+			jmpInstruction.To.SetTarget(jmpTarget)
+		})
+	}
 }
 
 func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
@@ -732,7 +772,7 @@ func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
 	b.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
-	// Release all the registers as our calling convention requires the caller-save.
+	// Release all the registers as our calling convention requires the callee-save.
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
@@ -746,7 +786,7 @@ func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 	b.setJITStatus(jitStatusCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
-	// Release all the registers as our calling convention requires the caller-save.
+	// Release all the registers as our calling convention requires the callee-save.
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
@@ -760,7 +800,7 @@ func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) 
 	b.setJITStatus(jitStatusCallWasmFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
-	// Release all the registers as our calling convention requires the caller-save.
+	// Release all the registers as our calling convention requires the callee-save.
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
@@ -775,7 +815,7 @@ func (b *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
 	b.setJITStatus(jitStatusCallWasmFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
-	// Release all the registers as our calling convention requires the caller-save.
+	// Release all the registers as our calling convention requires the callee-save.
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
