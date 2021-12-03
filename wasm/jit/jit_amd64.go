@@ -37,13 +37,17 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	}
 
 	// TODO: delete
-	fmt.Printf("compilation target wazeroir:\n%s\n%v", wazeroir.Format(ir.Operations), ir.LabelCallers)
+	fmt.Printf("compilation target wazeroir:\n%s\n%v\n", wazeroir.Format(ir.Operations), ir.LabelCallers)
 
 	b, err := asm.NewBuilder("amd64", 128)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
-	builder := &amd64Builder{eng: e, f: f, builder: b, locationStack: newValueLocationStack(), ir: ir}
+	builder := &amd64Builder{
+		eng: e, f: f, builder: b, locationStack: newValueLocationStack(), ir: ir,
+		labelInitialInstructions: make(map[string]*obj.Prog),
+		onLabelStartCallbacks:    make(map[string][]func(*obj.Prog)),
+	}
 	// Move the function inputs onto stack, as we assume that
 	// all the function inputs (parameters) are already pushed on the stack
 	// by the caller.
@@ -65,8 +69,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling br operation %v: %w", o, err)
 			}
 		case *wazeroir.OperationBrIf:
-			// TODO:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleBrIf(o); err != nil {
+				return nil, fmt.Errorf("error handling br_if operation %v: %w", o, err)
+			}
 		case *wazeroir.OperationBrTable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationCall:
@@ -280,6 +285,10 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 		b.addInstruction(jmp)
 		b.assignJumpTarget(labelKey, jmp)
 	}
+	return nil
+}
+
+func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 	return nil
 }
 

@@ -40,7 +40,7 @@ func Test_fibonacci(t *testing.T) {
 	f := exp.Function
 	e := newEngine()
 	_, err = e.compileWasmFunction(f)
-	require.Error(t, err) // Once we support all operations, this should fail!
+	require.NoError(t, err) // Once we support all operations, this should fail!
 	t.Log(err)
 }
 
