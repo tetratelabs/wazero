@@ -18,8 +18,9 @@ var (
 	}
 	// Note that we never invoke "call" instruction,
 	// so we don't need to care about the calling convension.
-	// TODO: we still have to take into acounts RAX,RDX register
-	// usages in DIV,MUL operations.
+	// TODO: Maybe it is safe just save rbp, rsp somewhere
+	// in Go-allocated variables, and reuse these registers
+	// in JITed functions and write them back before returns.
 	gpIntRegisters = []int16{
 		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
 		x86.REG_SI, x86.REG_DI, x86.REG_R8, x86.REG_R9,
