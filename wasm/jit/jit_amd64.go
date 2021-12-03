@@ -264,9 +264,9 @@ func (b *amd64Builder) addInstruction(prog *obj.Prog) {
 }
 
 func (b *amd64Builder) newProg() (prog *obj.Prog) {
-	ret := b.builder.NewProg()
+	prog = b.builder.NewProg()
 	if b.setJmpOrigin != nil {
-		b.setJmpOrigin.To.SetTarget(ret)
+		b.setJmpOrigin.To.SetTarget(prog)
 		b.setJmpOrigin = nil
 	}
 	return
