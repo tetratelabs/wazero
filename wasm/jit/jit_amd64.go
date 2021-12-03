@@ -287,6 +287,10 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 // we must have unique register states, so this function
 // must be called before such jump instruction.
 func (b *amd64Builder) preJumpRegisterAdjustment() {
+	// For now, we just release all registers to memory.
+	// But this is obviously inefficient, so we come back here
+	// later once we finish the baseline implementation.
+	b.releaseAllRegistersToStack()
 }
 
 func (b *amd64Builder) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
