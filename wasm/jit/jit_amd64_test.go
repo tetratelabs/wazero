@@ -1321,48 +1321,88 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 		require.Equal(t, shouldBottom, builder.locationStack.pop())
 	})
 	t.Run("live on stack", func(t *testing.T) {
-		const (
-			numLive        = 3
-			dropNum        = 5
-			liveRegisterID = 10
-		)
-		builder := requireNewBuilder(t)
-		bottom := builder.locationStack.pushValueOnStack()
-		for i := int16(0); i < dropNum; i++ {
-			loc := builder.locationStack.pushValueOnRegister(i)
-			builder.locationStack.markRegisterUsed(loc)
-		}
-		// The bottom live value is on the stack.
-		bottomLive := builder.locationStack.pushValueOnStack()
-		// The second live value is on the register.
-		LiveRegister := builder.locationStack.pushValueOnRegister(liveRegisterID)
-		builder.locationStack.markRegisterUsed(LiveRegister)
-		// The top live value is on the conditional.
-		topLive := builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateAE)
-		require.True(t, topLive.onConditionalRegister())
-		err := builder.handleDrop(&wazeroir.OperationDrop{
-			Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
+		// This is for testing all the edge cases with fake registers.
+		t.Run("fake registers", func(t *testing.T) {
+			const (
+				numLive        = 3
+				dropNum        = 5
+				liveRegisterID = 10
+			)
+			builder := requireNewBuilder(t)
+			bottom := builder.locationStack.pushValueOnStack()
+			for i := int16(0); i < dropNum; i++ {
+				loc := builder.locationStack.pushValueOnRegister(i)
+				builder.locationStack.markRegisterUsed(loc)
+			}
+			// The bottom live value is on the stack.
+			bottomLive := builder.locationStack.pushValueOnStack()
+			// The second live value is on the register.
+			LiveRegister := builder.locationStack.pushValueOnRegister(liveRegisterID)
+			builder.locationStack.markRegisterUsed(LiveRegister)
+			// The top live value is on the conditional.
+			topLive := builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateAE)
+			require.True(t, topLive.onConditionalRegister())
+			err := builder.handleDrop(&wazeroir.OperationDrop{
+				Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
+			})
+			require.NoError(t, err)
+			require.Equal(t, uint64(4), builder.locationStack.sp)
+			for i := int16(0); i < dropNum; i++ {
+				require.NotContains(t, builder.locationStack.usedRegisters, i)
+			}
+			// Top value should be on the register.
+			actualTopLive := builder.locationStack.pop()
+			require.True(t, actualTopLive.onRegister() && !actualTopLive.onConditionalRegister())
+			require.Equal(t, topLive, actualTopLive)
+			// Second one should be on the same register.
+			actualLiveRegister := builder.locationStack.pop()
+			require.Equal(t, LiveRegister, actualLiveRegister)
+			// The bottom live value should be moved onto the stack.
+			actualBottomLive := builder.locationStack.pop()
+			require.Equal(t, bottomLive, actualBottomLive)
+			require.True(t, actualBottomLive.onRegister() && !actualBottomLive.onStack())
+			// The bottom after drop should stay on stack.
+			actualBottom := builder.locationStack.pop()
+			require.Equal(t, bottom, actualBottom)
+			require.True(t, bottom.onStack())
 		})
-		require.NoError(t, err)
-		require.Equal(t, uint64(4), builder.locationStack.sp)
-		for i := int16(0); i < dropNum; i++ {
-			require.NotContains(t, builder.locationStack.usedRegisters, i)
-		}
-		// Top value should be on the register.
-		actualTopLive := builder.locationStack.pop()
-		require.True(t, actualTopLive.onRegister() && !actualTopLive.onConditionalRegister())
-		require.Equal(t, topLive, actualTopLive)
-		// Second one should be on the same register.
-		actualLiveRegister := builder.locationStack.pop()
-		require.Equal(t, LiveRegister, actualLiveRegister)
-		// The bottom live value should be moved onto the stack.
-		actualBottomLive := builder.locationStack.pop()
-		require.Equal(t, bottomLive, actualBottomLive)
-		require.True(t, actualBottomLive.onRegister() && !actualBottomLive.onStack())
-		// The bottom after drop should stay on stack.
-		actualBottom := builder.locationStack.pop()
-		require.Equal(t, bottom, actualBottom)
-		require.True(t, bottom.onStack())
+		t.Run("real", func(t *testing.T) {
+			eng := newEngine()
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			bottom := builder.locationStack.pushValueOnRegister(x86.REG_R10)
+			dropTarget := builder.locationStack.pushValueOnRegister(x86.REG_R9)
+			builder.locationStack.markRegisterUsed(bottom)
+			builder.locationStack.markRegisterUsed(dropTarget)
+			top := builder.locationStack.pushValueOnStack()
+			eng.stack[top.stackPointer] = 5000
+			builder.movConstToRegister(300, bottom.register)
+			err := builder.handleDrop(&wazeroir.OperationDrop{
+				Range: &wazeroir.InclusiveRange{Start: 1, End: 1},
+			})
+			require.NoError(t, err)
+			builder.releaseRegister(bottom)
+			builder.releaseRegister(top)
+			builder.returnFunction()
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			require.Equal(t, []uint64{0, 0, 5000}, eng.stack[:3])
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			require.Equal(t, uint64(2), eng.currentStackPointer)
+			require.Equal(t, []uint64{
+				300,
+				5000, // top value should be moved to the dropped position.
+				5000, // This is the current stack pointer so this old value will be not used.
+			}, eng.stack[:eng.currentStackPointer+1])
+		})
 	})
 }
 

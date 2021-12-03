@@ -334,7 +334,7 @@ func (b *amd64Builder) handleDrop(o *wazeroir.OperationDrop) error {
 			if err := b.moveStackToRegister(live.registerType(), live); err != nil {
 				return err
 			}
-			// Then modify the location in the stack with new stack pointer.
+			// Modify the location in the stack with new stack pointer.
 			b.locationStack.push(live)
 		} else if live.onRegister() {
 			b.locationStack.push(live)
