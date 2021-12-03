@@ -343,6 +343,9 @@ type Label struct {
 }
 
 func (l *Label) String() (ret string) {
+	if l == nil {
+		return ""
+	}
 	switch l.Kind {
 	case LabelKindHeader:
 		ret = fmt.Sprintf(".L%d", l.FrameID)

@@ -37,13 +37,13 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	}
 
 	// TODO: delete
-	fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir))
+	fmt.Printf("compilation target wazeroir:\n%s\n%v", wazeroir.Format(ir.Operations), ir.LabelCallers)
 
 	b, err := asm.NewBuilder("amd64", 128)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
-	builder := &amd64Builder{eng: e, f: f, builder: b, locationStack: newValueLocationStack()}
+	builder := &amd64Builder{eng: e, f: f, builder: b, locationStack: newValueLocationStack(), ir: ir}
 	// Move the function inputs onto stack, as we assume that
 	// all the function inputs (parameters) are already pushed on the stack
 	// by the caller.
@@ -52,7 +52,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	// Initialize the reserved registers first of all.
 	builder.initializeReservedRegisters()
 	// Now move onto the function body to compile each wazeroir operation.
-	for _, op := range ir {
+	for _, op := range ir.Operations {
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -235,13 +235,16 @@ func (b *amd64Builder) pushFunctionInputs() {
 type amd64Builder struct {
 	eng     *engine
 	f       *wasm.FunctionInstance
+	ir      *wazeroir.CompilationResult
 	builder *asm.Builder
 	// location stack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
 	// Label resolvers.
 	onLabelStartCallbacks map[string][]func(*obj.Prog)
-	labelProgs            map[string]*obj.Prog
+	// Store the initial instructions for each label so
+	// other block can jump into it.
+	labelInitialInstructions map[string]*obj.Prog
 }
 
 func (b *amd64Builder) assemble() ([]byte, error) {
@@ -266,7 +269,7 @@ func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
 	b.addInstruction(labelBegin)
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
-	b.labelProgs[labelKey] = labelBegin
+	b.labelInitialInstructions[labelKey] = labelBegin
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
 	for _, cb := range b.onLabelStartCallbacks[labelKey] {

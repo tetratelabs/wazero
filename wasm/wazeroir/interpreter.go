@@ -137,12 +137,12 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 		return nil
 	}
 
-	irOps, err := Compile(f)
+	ir, err := Compile(f)
 	if err != nil {
 		return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
 	}
 
-	fn, err := it.lowerIROps(f, irOps)
+	fn, err := it.lowerIROps(f, ir.Operations)
 	if err != nil {
 		return fmt.Errorf("failed to lower wazeroir operations to interpreter operations: %w", err)
 	}

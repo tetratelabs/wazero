@@ -52,9 +52,9 @@ func requireNewBuilder(t *testing.T) *amd64Builder {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
 	return &amd64Builder{eng: nil, builder: b,
-		locationStack:         newValueLocationStack(),
-		onLabelStartCallbacks: map[string][]func(*obj.Prog){},
-		labelProgs:            map[string]*obj.Prog{},
+		locationStack:            newValueLocationStack(),
+		onLabelStartCallbacks:    map[string][]func(*obj.Prog){},
+		labelInitialInstructions: map[string]*obj.Prog{},
 	}
 }
 
@@ -617,7 +617,7 @@ func TestAmd64Builder_handleLabel(t *testing.T) {
 	err := builder.handleLabel(&wazeroir.OperationLabel{Label: label})
 	require.NoError(t, err)
 	require.Len(t, builder.onLabelStartCallbacks, 0)
-	require.Contains(t, builder.labelProgs, label.String())
+	require.Contains(t, builder.labelInitialInstructions, label.String())
 	require.True(t, called)
 
 	// Assemble.
