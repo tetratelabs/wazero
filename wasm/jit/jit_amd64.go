@@ -297,8 +297,8 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 	// Here's the diagram of how we organize the instructions necessarly for brif operation.
 	//
-	// jmp_with_cond -> drop (.Else) -> jmp (.Else) -> drop (.Then) -> jmp (.Then)
-	//    |-------------------(satisfied)------------------^^^
+	// jmp_with_cond  -> jmp (.Else) -> drop (.Then) -> jmp (.Then)
+	//    |-----------(satisfied)----------^^^
 
 	cond := b.locationStack.pop()
 	var jmpWithCond *obj.Prog
@@ -349,13 +349,11 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 		jmpWithCond := b.newProg()
 		jmpWithCond.As = x86.AJEQ
 		jmpWithCond.To.Type = obj.TYPE_BRANCH
-		b.addInstruction(jmpWithCond)
 	}
+	b.addInstruction(jmpWithCond)
 
-	// Handle else branches.
-	if err := b.emitDropRange(o.Else.ToDrop); err != nil {
-		return err
-	}
+	// Handle else branches. Note that in br_if,
+	// the else branch is the continuation so Else.ToDrop is nil.
 	if o.Else.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		b.releaseAllRegistersToStack()
