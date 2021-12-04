@@ -297,8 +297,11 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 	// Here's the diagram of how we organize the instructions necessarly for brif operation.
 	//
-	// jmp_with_cond  -> jmp (.Else) -> drop (.Then) -> jmp (.Then)
-	//    |-----------(satisfied)----------^^^
+	// jmp_with_cond -> drop (.Then) -> jmp (.Then) -> jmp (.Else)
+	//    |----------------(satisfied)-----------------^^^
+	//
+	// Note that .Else branch doesn't have ToDrop as .Else is in reality
+	// corresponding to either If's Else block or Br_if's else block in Wasm.
 
 	cond := b.locationStack.pop()
 	var jmpWithCond *obj.Prog
@@ -352,29 +355,8 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 	}
 	b.addInstruction(jmpWithCond)
 
-	// Handle else branches. Note that in br_if,
-	// the else branch is the continuation so Else.ToDrop is nil.
-	if o.Else.Target.IsReturnTarget() {
-		// Release all the registers as our calling convention requires the callee-save.
-		b.releaseAllRegistersToStack()
-		b.setJITStatus(jitStatusReturned)
-		// Then return from this function.
-		b.returnFunction()
-	} else {
-		elseLabelKey := o.Else.Target.Label.String()
-		if b.ir.LabelCallers[elseLabelKey] > 1 {
-			b.preJumpRegisterAdjustment()
-		}
-		elseJmp := b.newProg()
-		elseJmp.As = obj.AJMP
-		elseJmp.To.Type = obj.TYPE_BRANCH
-		b.addInstruction(elseJmp)
-		b.assignJumpTarget(elseLabelKey, elseJmp)
-	}
-
-	// Handle then branches. We assign jmpWithCond to setJmpOrigin
-	// so we can jump to the initial instruction emitted below.
-	b.setJmpOrigin = jmpWithCond
+	// Handle then branch.
+	// TODO: Clone location stack here.
 	if err := b.emitDropRange(o.Then.ToDrop); err != nil {
 		return err
 	}
@@ -394,6 +376,29 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 		thenJmp.To.Type = obj.TYPE_BRANCH
 		b.addInstruction(thenJmp)
 		b.assignJumpTarget(thenLabelKey, thenJmp)
+	}
+
+	// TODO: revert the location stack change here.
+
+	// Handle else branch. We assign jmpWithCond to setJmpOrigin
+	// so we can jump to the initial instruction emitted below.
+	b.setJmpOrigin = jmpWithCond
+	if o.Else.Target.IsReturnTarget() {
+		// Release all the registers as our calling convention requires the callee-save.
+		b.releaseAllRegistersToStack()
+		b.setJITStatus(jitStatusReturned)
+		// Then return from this function.
+		b.returnFunction()
+	} else {
+		elseLabelKey := o.Else.Target.Label.String()
+		if b.ir.LabelCallers[elseLabelKey] > 1 {
+			b.preJumpRegisterAdjustment()
+		}
+		elseJmp := b.newProg()
+		elseJmp.As = obj.AJMP
+		elseJmp.To.Type = obj.TYPE_BRANCH
+		b.addInstruction(elseJmp)
+		b.assignJumpTarget(elseLabelKey, elseJmp)
 	}
 	return nil
 }

@@ -495,7 +495,7 @@ operatorSwitch:
 				Then: &BranchTargetDrop{ToDrop: drop, Target: target},
 				Else: continuationLabel.asBranchTargetDrop(),
 			},
-			// Start emitting then block operations.
+			// Start emitting else block operations.
 			&OperationLabel{
 				Label: continuationLabel,
 			},
