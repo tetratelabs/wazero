@@ -111,6 +111,7 @@ type valueLocationStack struct {
 
 func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
+	s.markRegisterUsed(reg)
 	s.push(loc)
 	return
 }
@@ -154,8 +155,8 @@ func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	loc.register = -1
 }
 
-func (s *valueLocationStack) markRegisterUsed(loc *valueLocation) {
-	s.usedRegisters[loc.register] = struct{}{}
+func (s *valueLocationStack) markRegisterUsed(reg int16) {
+	s.usedRegisters[reg] = struct{}{}
 }
 
 type generalPurposeRegisterType byte

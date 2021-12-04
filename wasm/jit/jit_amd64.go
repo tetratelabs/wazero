@@ -793,7 +793,7 @@ func (b *amd64Builder) moveStackToRegister(tp generalPurposeRegisterType, loc *v
 
 	// Mark it uses the register.
 	loc.setRegister(reg)
-	b.locationStack.markRegisterUsed(loc)
+	b.locationStack.markRegisterUsed(reg)
 	return nil
 }
 
@@ -854,7 +854,7 @@ func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
 
 	// Mark it uses the register.
 	loc.setRegister(reg)
-	b.locationStack.markRegisterUsed(loc)
+	b.locationStack.markRegisterUsed(reg)
 	return nil
 }
 
@@ -1064,7 +1064,7 @@ func (b *amd64Builder) assignRegisterToValue(loc *valueLocation, reg int16) {
 
 	// Now the value is on register, so mark as such.
 	loc.setRegister(reg)
-	b.locationStack.markRegisterUsed(loc)
+	b.locationStack.markRegisterUsed(reg)
 }
 
 func (b *amd64Builder) returnFunction() {
