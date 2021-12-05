@@ -193,9 +193,10 @@ func (e *engine) stackGrow() {
 
 func (e *engine) exec(f *compiledWasmFunction) {
 	e.callFrameStack = &callFrame{
-		continuationAddress: f.codeInitialAddress,
-		f:                   f,
-		caller:              nil,
+		continuationAddress:      f.codeInitialAddress,
+		f:                        f,
+		caller:                   nil,
+		continuationStackPointer: f.inputNum,
 	}
 	// TODO: We should check the size of the stack,
 	// and if it's running out, grow it before calling into JITed code.
@@ -206,7 +207,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	}
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
-		if true { // TODO: use buildoptions.IsDebugMode.
+		if false { // TODO: use buildoptions.IsDebugMode.
 			fmt.Printf("callframe=%s, currentBaseStackPointer: %d, currentStackPointer: %d, stack: %v\n",
 				currentFrame.String(), e.currentBaseStackPointer, e.currentStackPointer,
 				e.stack[:e.currentBaseStackPointer+e.currentStackPointer],
@@ -237,6 +238,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 			currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.outputNum - nextFunc.inputNum
+			currentFrame.baseStackPointer = e.currentBaseStackPointer
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,

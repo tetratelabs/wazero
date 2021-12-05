@@ -23,6 +23,13 @@ import (
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
+func fibonacci(in uint64) uint64 {
+	if in <= 1 {
+		return 1
+	}
+	return fibonacci(in-1) + fibonacci(in-2)
+}
+
 func Test_fibonacci(t *testing.T) {
 	buf, err := os.ReadFile("testdata/fib.wasm")
 	require.NoError(t, err)
@@ -39,16 +46,16 @@ func Test_fibonacci(t *testing.T) {
 	exp, ok := m.Exports["fib"]
 	require.True(t, ok)
 	f := exp.Function
-	e := newEngine()
-	cf, err := e.compileWasmFunction(f)
-	require.NoError(t, err)
-	// TODO: delete!
-	fmt.Println(hex.EncodeToString(cf.codeSegment))
 	eng := newEngine()
-	eng.compiledWasmFunctions = append(eng.compiledWasmFunctions, cf)
-	eng.push(4)
-	eng.exec(cf)
-	fmt.Println(e.stack[:10])
+	err = eng.PreCompile([]*wasm.FunctionInstance{f})
+	require.NoError(t, err)
+	err = eng.Compile(f)
+	require.NoError(t, err)
+	for _, in := range []uint64{5, 10, 20} {
+		out, err := eng.Call(f, in)
+		require.NoError(t, err)
+		require.Equal(t, fibonacci(in), out[0])
+	}
 }
 
 func newMemoryInst() *wasm.MemoryInstance {
@@ -925,8 +932,10 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			signed, exp bool
 		}{
 			{x1: 100, x2: -1, signed: false, exp: true},
+			{x1: -1, x2: -1, signed: false, exp: true},
 			{x1: -1, x2: 100, signed: false, exp: false},
 			{x1: 100, x2: 200, signed: true, exp: true},
+			{x1: 100, x2: 100, signed: true, exp: true},
 			{x1: 200, x2: 100, signed: true, exp: false},
 		} {
 			var o *wazeroir.OperationLe
@@ -1392,8 +1401,7 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 			require.Equal(t, []uint64{
 				300,
 				5000, // top value should be moved to the dropped position.
-				5000, // This is the current stack pointer so this old value will be not used.
-			}, eng.stack[:eng.currentStackPointer+1])
+			}, eng.stack[:eng.currentStackPointer])
 		})
 	})
 }
