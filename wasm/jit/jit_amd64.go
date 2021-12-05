@@ -239,16 +239,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 
-	// As we cannot read RIP register directly,
-	// we calculate now the offset to the next instruction
-	// relative to the beginning of this function body.
-	if len(code) >= int(math.MaxUint32) {
-		return nil, fmt.Errorf("JIT cannot support program with more than 4GB")
-	}
-	for _, obj := range builder.functionCalls {
-		start := obj.Pc + 5
-		binary.LittleEndian.PutUint32(code[start:start+4], uint32(start+4))
-	}
 	return cf, nil
 }
 
@@ -279,6 +269,16 @@ type amd64Builder struct {
 
 func (b *amd64Builder) assemble() ([]byte, error) {
 	code, err := mmapCodeSegment(b.builder.Assemble())
+	// As we cannot read RIP register directly,
+	// we calculate now the offset to the next instruction
+	// relative to the beginning of this function body.
+	if len(code) >= int(math.MaxUint32) {
+		return nil, fmt.Errorf("JIT cannot support program with more than 4GB")
+	}
+	for _, obj := range b.functionCalls {
+		start := obj.Pc + 5
+		binary.LittleEndian.PutUint32(code[start:start+4], uint32(start+4))
+	}
 	return code, err
 }
 
@@ -1001,9 +1001,9 @@ func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineContinuationAddressOffset
 	b.addInstruction(prog)
+	b.functionCalls = append(b.functionCalls, prog)
 	// Then return temporarily -- giving control to normal Go code.
 	b.returnFunction()
-	b.functionCalls = append(b.functionCalls, prog)
 }
 
 func (b *amd64Builder) setFunctionCallIndexFromRegister(reg int16) {
