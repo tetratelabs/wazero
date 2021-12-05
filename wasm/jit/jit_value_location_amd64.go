@@ -109,6 +109,24 @@ type valueLocationStack struct {
 	usedRegisters map[int16]struct{}
 }
 
+func (s *valueLocationStack) clone() *valueLocationStack {
+	ret := &valueLocationStack{}
+	ret.sp = s.sp
+	ret.usedRegisters = make(map[int16]struct{}, len(ret.usedRegisters))
+	for r := range s.usedRegisters {
+		ret.markRegisterUsed(r)
+	}
+	ret.stack = make([]*valueLocation, len(s.stack))
+	for i, v := range s.stack {
+		ret.stack[i] = &valueLocation{
+			valueType:           v.valueType,
+			conditionalRegister: v.conditionalRegister,
+			stackPointer:        v.stackPointer,
+			register:            v.register,
+		}
+	}
+	return ret
+}
 func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
 	s.markRegisterUsed(reg)
