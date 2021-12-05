@@ -259,7 +259,7 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for inside and the continuation of this loop.
-		loopLabel := &Label{FrameID: frame.frameID, Kind: LabelKindHeader}
+		loopLabel := &Label{FrameID: frame.frameID, Kind: LabelKindHeader, OriginalStackLen: frame.originalStackLen}
 		c.result.LabelCallers[loopLabel.String()]++
 
 		// Emit the branch operation to enter inside the loop.
@@ -299,8 +299,8 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID}
-		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
+		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
 		c.result.LabelCallers[thenLabel.String()]++
 		c.result.LabelCallers[elseLabel.String()]++
 
@@ -329,7 +329,7 @@ operatorSwitch:
 
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
-			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
+			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse, OriginalStackLen: top.originalStackLen}
 			c.resetUnreachable()
 			c.emit(
 				&OperationLabel{Label: elseLabel},
@@ -348,7 +348,7 @@ operatorSwitch:
 		c.stack = c.stack[:frame.originalStackLen]
 
 		// Prep labels for else and the continueation of this if block.
-		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
+		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse, OriginalStackLen: frame.originalStackLen}
 		continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
 		c.result.LabelCallers[continuationLabel.String()]++
 
@@ -378,10 +378,10 @@ operatorSwitch:
 				c.stackPush(t)
 			}
 
-			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
+			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation, OriginalStackLen: len(c.stack)}
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
-				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
+				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
 				c.result.LabelCallers[elseLabel.String()]++
 				c.emit(
 					&OperationLabel{Label: elseLabel},
@@ -424,8 +424,8 @@ operatorSwitch:
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
-			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
+			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID, OriginalStackLen: len(c.stack)}
 			c.result.LabelCallers[elseLabel.String()]++
 			c.result.LabelCallers[continuationLabel.String()]++
 			c.emit(
@@ -439,7 +439,7 @@ operatorSwitch:
 			)
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
+			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID, OriginalStackLen: len(c.stack)}
 			c.result.LabelCallers[continuationLabel.String()]++
 			c.emit(
 				dropOp,

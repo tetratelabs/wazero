@@ -338,8 +338,9 @@ const (
 )
 
 type Label struct {
-	FrameID uint32
-	Kind    LabelKind
+	FrameID          uint32
+	OriginalStackLen int
+	Kind             LabelKind
 }
 
 func (l *Label) String() (ret string) {

@@ -451,6 +451,7 @@ func (b *amd64Builder) assignJumpTarget(labelKey string, jmpInstruction *obj.Pro
 }
 
 func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
+	b.locationStack.sp = uint64(o.Label.OriginalStackLen)
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
 	labelKey := o.Label.String()
@@ -543,7 +544,7 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 	// TODO: if we track the type of values on the stack,
 	// we could optimize the instruction according to the bit size of the value.
 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
-	pickTarget := b.locationStack.stack[len(b.locationStack.stack)-1-o.Depth]
+	pickTarget := b.locationStack.stack[b.locationStack.sp-1-uint64(o.Depth)]
 	reg, err := b.allocateRegister(pickTarget.registerType())
 	if err != nil {
 		return err

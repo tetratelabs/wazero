@@ -46,7 +46,7 @@ func Test_fibonacci(t *testing.T) {
 	fmt.Println(hex.EncodeToString(cf.codeSegment))
 	eng := newEngine()
 	eng.compiledWasmFunctions = append(eng.compiledWasmFunctions, cf)
-	eng.stack[0] = 4
+	eng.push(4)
 	eng.exec(cf)
 	fmt.Println(e.stack[:10])
 }
