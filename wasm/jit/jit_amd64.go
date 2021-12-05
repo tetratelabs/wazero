@@ -232,7 +232,11 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
 	}
-	cf := &compiledWasmFunction{codeSegment: code}
+	cf := &compiledWasmFunction{
+		codeSegment: code,
+		inputNum:    uint64(len(f.Signature.InputTypes)),
+		outputNum:   uint64(len(f.Signature.ReturnTypes)),
+	}
 	cf.memoryInst = f.ModuleInstance.Memory
 	if cf.memoryInst != nil {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memoryInst.Buffer[0]))
