@@ -177,10 +177,8 @@ type compiledWasmFunction struct {
 	inputNum, outputNum uint64
 	codeSegment         []byte
 	memoryInst          *wasm.MemoryInstance
-}
-
-func (c *compiledWasmFunction) initialAddress() uintptr {
-	return uintptr(unsafe.Pointer(&c.codeSegment[0]))
+	codeInitialAddress  uintptr
+	memoryAddress       uintptr
 }
 
 const (
@@ -195,31 +193,31 @@ func (e *engine) stackGrow() {
 
 func (e *engine) exec(f *compiledWasmFunction) {
 	e.callFrameStack = &callFrame{
-		continuationAddress: f.initialAddress(),
+		continuationAddress: f.codeInitialAddress,
 		f:                   f,
 		caller:              nil,
 	}
+	// TODO: We should check the size of the stack,
+	// and if it's running out, grow it before calling into JITed code.
+	// It should be possible to check the necessity by statically
+	// analyzing the max height of the stack in the function.
+	if false {
+		e.stackGrow()
+	}
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
-		if false { // TODO: use buildoptions.IsDebugMode.
+		if true { // TODO: use buildoptions.IsDebugMode.
 			fmt.Printf("callframe=%s, currentBaseStackPointer: %d, currentStackPointer: %d, stack: %v\n",
 				currentFrame.String(), e.currentBaseStackPointer, e.currentStackPointer,
 				e.stack[:e.currentBaseStackPointer+e.currentStackPointer],
 			)
-		}
-		// TODO: We should check the size of the stack,
-		// and if it's running out, grow it before calling into JITed code.
-		// It should be possible to check the necessity by statically
-		// analyzing the max height of the stack in the function.
-		if false {
-			e.stackGrow()
 		}
 
 		// Call into the jitted code.
 		jitcall(
 			currentFrame.continuationAddress,
 			uintptr(unsafe.Pointer(e)),
-			uintptr(unsafe.Pointer(&currentFrame.f.memoryInst.Buffer[0])),
+			currentFrame.f.memoryAddress,
 		)
 
 		// Check the status code from JIT code.
@@ -237,16 +235,23 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so
 			// we can resume this caller function frame.
-			currentFrame.continuationAddress = currentFrame.f.initialAddress() + e.continuationAddressOffset
+			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 			currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.outputNum - nextFunc.inputNum
 			// Create the callee frame.
 			frame := &callFrame{
-				continuationAddress: nextFunc.initialAddress(),
+				continuationAddress: nextFunc.codeInitialAddress,
 				f:                   nextFunc,
 				// Set the caller frame so we can return back to the current frame!
 				caller: currentFrame,
 				// Set the base pointer to the beginning of the function inputs
 				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputNum,
+			}
+			// TODO: We should check the size of the stack,
+			// and if it's running out, grow it before calling into JITed code.
+			// It should be possible to check the necessity by statically
+			// analyzing the max height of the stack in the function.
+			if false {
+				e.stackGrow()
 			}
 			// Now move onto the callee function.
 			e.callFrameStack = frame
@@ -262,11 +267,11 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			default:
 				panic("invalid builtin function index")
 			}
-			currentFrame.continuationAddress = currentFrame.f.initialAddress() + e.continuationAddressOffset
+			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 		case jitStatusCallHostFunction:
 			e.hostFunctions[e.functionCallIndex]()
 			// TODO: check the signature and modify stack pointer.
-			currentFrame.continuationAddress = currentFrame.f.initialAddress() + e.continuationAddressOffset
+			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 		default:
 			panic("invalid status code!")
 		}

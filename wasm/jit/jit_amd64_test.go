@@ -45,6 +45,10 @@ func Test_fibonacci(t *testing.T) {
 	// TODO: delete!
 	str := hex.EncodeToString(cf.codeSegment)
 	fmt.Println(str)
+	eng := newEngine()
+	eng.stack[0] = 4
+	eng.exec(cf)
+	fmt.Println(eng.stack[:10])
 }
 
 func newMemoryInst() *wasm.MemoryInstance {

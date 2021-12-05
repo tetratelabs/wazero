@@ -6,6 +6,7 @@ package jit
 import (
 	"fmt"
 	"strings"
+	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
@@ -229,7 +230,13 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
 	}
-	return &compiledWasmFunction{codeSegment: code, memoryInst: nil}, nil
+	cf := &compiledWasmFunction{codeSegment: code}
+	cf.memoryInst = f.ModuleInstance.Memory
+	if cf.memoryInst != nil {
+		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memoryInst.Buffer[0]))
+	}
+	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
+	return cf, nil
 }
 
 func (b *amd64Builder) pushFunctionInputs() {
@@ -451,12 +458,14 @@ func (b *amd64Builder) preJumpRegisterAdjustment() {
 }
 
 func (b *amd64Builder) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
+	fmt.Println(labelKey)
 	jmpTarget, ok := b.labelInitialInstructions[labelKey]
 	if ok {
 		jmpInstruction.To.SetTarget(jmpTarget)
 	} else {
 		b.onLabelStartCallbacks[labelKey] = append(b.onLabelStartCallbacks[labelKey], func(jmpTarget *obj.Prog) {
 			jmpInstruction.To.SetTarget(jmpTarget)
+			fmt.Printf("for %s: %s\n", labelKey, jmpTarget.As.String())
 		})
 	}
 }
