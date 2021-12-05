@@ -277,7 +277,8 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 	}
 	for _, obj := range b.functionCalls {
 		start := obj.Pc + 5
-		binary.LittleEndian.PutUint32(code[start:start+4], uint32(start+4))
+		afterReturnInst := obj.Link.Link.Link
+		binary.LittleEndian.PutUint32(code[start:start+4], uint32(afterReturnInst.Pc))
 	}
 	return code, err
 }

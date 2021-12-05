@@ -43,8 +43,7 @@ func Test_fibonacci(t *testing.T) {
 	cf, err := e.compileWasmFunction(f)
 	require.NoError(t, err)
 	// TODO: delete!
-	str := hex.EncodeToString(cf.codeSegment)
-	fmt.Println(str)
+	fmt.Println(hex.EncodeToString(cf.codeSegment))
 	eng := newEngine()
 	eng.compiledWasmFunctions = append(eng.compiledWasmFunctions, cf)
 	eng.stack[0] = 4
@@ -128,6 +127,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	// Compile.
 	code, err := builder.assemble()
 	require.NoError(t, err)
+	fmt.Println(hex.EncodeToString(code))
 	// Setup engine.
 	mem := newMemoryInst()
 	compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem, inputNum: 1, outputNum: 1}
