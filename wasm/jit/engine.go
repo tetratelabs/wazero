@@ -206,7 +206,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	}
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
-		if true { // TODO: use buildoptions.IsDebugMode.
+		if false { // TODO: use buildoptions.IsDebugMode.
 			fmt.Printf("callframe=%s, currentBaseStackPointer: %d, currentStackPointer: %d, stack: %v\n",
 				currentFrame.String(), e.currentBaseStackPointer, e.currentStackPointer,
 				e.stack[:e.currentBaseStackPointer+e.currentStackPointer],

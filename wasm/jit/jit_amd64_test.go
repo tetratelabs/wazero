@@ -131,6 +131,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	// Setup engine.
 	mem := newMemoryInst()
 	compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem, inputNum: 1, outputNum: 1}
+	compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 	eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 	// Call into the function
 	eng.exec(compiledFunc)
@@ -155,6 +156,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 			eng := newEngine()
 			eng.stack[0] = 10 // We call recursively 10 times.
 			compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem, inputNum: 1, outputNum: 1}
+			compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 			eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 			// Call into the function
 			eng.exec(compiledFunc)
@@ -196,6 +198,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 			mem := newMemoryInst()
 
 			f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+			f.codeInitialAddress = uintptr(unsafe.Pointer(&f.codeSegment[0]))
 
 			// Call into the function
 			eng.exec(f)
@@ -446,6 +449,7 @@ func Test_callHostFunction(t *testing.T) {
 
 		// Call into the function
 		f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+		f.codeInitialAddress = uintptr(unsafe.Pointer(&f.codeSegment[0]))
 		eng.exec(f)
 		require.Equal(t, uint64(50)*100, eng.stack[1])
 	})
@@ -483,6 +487,7 @@ func Test_callHostFunction(t *testing.T) {
 
 		// Call into the function
 		f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+		f.codeInitialAddress = uintptr(unsafe.Pointer(&f.codeSegment[0]))
 		eng.exec(f)
 		require.Equal(t, uint64(50)*200, eng.stack[1])
 	})
