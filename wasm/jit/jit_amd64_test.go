@@ -46,9 +46,10 @@ func Test_fibonacci(t *testing.T) {
 	str := hex.EncodeToString(cf.codeSegment)
 	fmt.Println(str)
 	eng := newEngine()
+	eng.compiledWasmFunctions = append(eng.compiledWasmFunctions, cf)
 	eng.stack[0] = 4
 	eng.exec(cf)
-	fmt.Println(eng.stack[:10])
+	fmt.Println(e.stack[:10])
 }
 
 func newMemoryInst() *wasm.MemoryInstance {

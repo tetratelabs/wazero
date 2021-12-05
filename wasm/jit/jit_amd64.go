@@ -4,7 +4,9 @@
 package jit
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math"
 	"strings"
 	"unsafe"
 
@@ -40,7 +42,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	// TODO: delete
 	fmt.Printf("compilation target wazeroir:\n%s\n%v\n", wazeroir.Format(ir.Operations), ir.LabelCallers)
 
-	b, err := asm.NewBuilder("amd64", 128)
+	b, err := asm.NewBuilder("amd64", 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
@@ -236,6 +238,17 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memoryInst.Buffer[0]))
 	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
+
+	// As we cannot read RIP register directly,
+	// we calculate now the offset to the next instruction
+	// relative to the beginning of this function body.
+	if len(code) >= int(math.MaxUint32) {
+		return nil, fmt.Errorf("JIT cannot support program with more than 4GB")
+	}
+	for _, obj := range builder.functionCalls {
+		start := obj.Pc + 5
+		binary.LittleEndian.PutUint32(code[start:start+4], uint32(start+4))
+	}
 	return cf, nil
 }
 
@@ -261,6 +274,7 @@ type amd64Builder struct {
 	// Store the initial instructions for each label so
 	// other block can jump into it.
 	labelInitialInstructions map[string]*obj.Prog
+	functionCalls            []*obj.Prog
 }
 
 func (b *amd64Builder) assemble() ([]byte, error) {
@@ -270,14 +284,14 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 
 func (b *amd64Builder) addInstruction(prog *obj.Prog) {
 	b.builder.AddInstruction(prog)
-}
-
-func (b *amd64Builder) newProg() (prog *obj.Prog) {
-	prog = b.builder.NewProg()
 	if b.setJmpOrigin != nil {
 		b.setJmpOrigin.To.SetTarget(prog)
 		b.setJmpOrigin = nil
 	}
+}
+
+func (b *amd64Builder) newProg() (prog *obj.Prog) {
+	prog = b.builder.NewProg()
 	return
 }
 
@@ -301,38 +315,6 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 		b.assignJumpTarget(labelKey, jmp)
 	}
 	return nil
-}
-
-func negateJumpInstruction(in obj.As) (out obj.As) {
-	switch in {
-	case x86.AJEQ:
-		out = x86.AJNE
-	case x86.AJNE:
-		out = x86.AJEQ
-	case x86.AJMI:
-		out = x86.AJPL
-	case x86.AJPL:
-		out = x86.AJMI
-	case x86.AJGT:
-		out = x86.AJLE
-	case x86.AJGE:
-		out = x86.AJLT
-	case x86.AJLT:
-		out = x86.AJGE
-	case x86.AJLE:
-		out = x86.AJGT
-	case x86.AJHI:
-		out = x86.AJLS
-	case x86.AJCC:
-		out = x86.AJCS
-	case x86.AJCS:
-		out = x86.AJCC
-	case x86.AJLS:
-		out = x86.AJHI
-	default:
-		panic("unreachable")
-	}
-	return
 }
 
 func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
@@ -388,29 +370,41 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 	}
 
 	// Make sure that the next coming label is the else jump target.
-	nextLabel := b.ir.Operations[b.nextPC].(*wazeroir.OperationLabel)
-	thenTarget, elseTarget := o.Then, o.Else
-	if nextLabel.Label.String() == thenTarget.Target.Label.String() {
-		// This case means that this wazeroir br_if operations comes from
-		// if operation in Wasm.
-		// Note that this case also both branch has empty ToDrop.
-		jmpWithCond.As = negateJumpInstruction(jmpWithCond.As)
-		thenTarget, elseTarget = elseTarget, thenTarget
-	}
-
 	b.addInstruction(jmpWithCond)
+	thenTarget, elseTarget := o.Then, o.Else
 
 	// Here's the diagram of how we organize the instructions necessarly for brif operation.
 	//
-	// jmp_with_cond -> drop (.Then) -> jmp (.Then) -> Else operations...
-	//    |----------------(satisfied)-----------------^^^
+	// jmp_with_cond -> jmp (.Else) -> Then operations...
+	//    |---------(satisfied)------------^^^
 	//
 	// Note that .Else branch doesn't have ToDrop as .Else is in reality
 	// corresponding to either If's Else block or Br_if's else block in Wasm.
 
-	// Handle then branch.
+	// Emit for else branches
 	saved := b.locationStack
 	b.locationStack = saved.clone()
+	if elseTarget.Target.IsReturnTarget() {
+		// Release all the registers as our calling convention requires the callee-save.
+		b.releaseAllRegistersToStack()
+		b.setJITStatus(jitStatusReturned)
+		// Then return from this function.
+		b.returnFunction()
+	} else {
+		elseLabelKey := elseTarget.Target.Label.String()
+		if b.ir.LabelCallers[elseLabelKey] > 1 {
+			b.preJumpRegisterAdjustment()
+		}
+		elseJmp := b.newProg()
+		elseJmp.As = obj.AJMP
+		elseJmp.To.Type = obj.TYPE_BRANCH
+		b.addInstruction(elseJmp)
+		b.assignJumpTarget(elseLabelKey, elseJmp)
+	}
+
+	// Handle then branch.
+	b.setJmpOrigin = jmpWithCond
+	b.locationStack = saved
 	if err := b.emitDropRange(thenTarget.ToDrop); err != nil {
 		return err
 	}
@@ -431,19 +425,6 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 		b.addInstruction(thenJmp)
 		b.assignJumpTarget(thenLabelKey, thenJmp)
 	}
-
-	// Handle else branch.
-	b.locationStack = saved
-	// We assign jmpWithCond to setJmpOrigin
-	// so we can jump to the initial instruction emitted below.
-	b.setJmpOrigin = jmpWithCond
-	if elseTarget.Target.IsReturnTarget() {
-		// Release all the registers as our calling convention requires the callee-save.
-		b.releaseAllRegistersToStack()
-		b.setJITStatus(jitStatusReturned)
-		// Then return from this function.
-		b.returnFunction()
-	}
 	return nil
 }
 
@@ -458,14 +439,12 @@ func (b *amd64Builder) preJumpRegisterAdjustment() {
 }
 
 func (b *amd64Builder) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
-	fmt.Println(labelKey)
 	jmpTarget, ok := b.labelInitialInstructions[labelKey]
 	if ok {
 		jmpInstruction.To.SetTarget(jmpTarget)
 	} else {
 		b.onLabelStartCallbacks[labelKey] = append(b.onLabelStartCallbacks[labelKey], func(jmpTarget *obj.Prog) {
 			jmpInstruction.To.SetTarget(jmpTarget)
-			fmt.Printf("for %s: %s\n", labelKey, jmpTarget.As.String())
 		})
 	}
 }
@@ -1017,19 +996,14 @@ func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(0) // Place holder!
+	prog.From.Offset = int64(0) // Place holder. We calculate the value later.
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineContinuationAddressOffset
 	b.addInstruction(prog)
 	// Then return temporarily -- giving control to normal Go code.
 	b.returnFunction()
-	// As we cannot read RIP register directly,
-	// we calculate now the offset to the next instruction
-	// relative to the beginning of this function body.
-	// TODO: this unnecessarily computationally expensive,
-	// so we should reuse the result of b.builder.Assemble() here.
-	prog.From.Offset = int64(len(b.builder.Assemble()))
+	b.functionCalls = append(b.functionCalls, prog)
 }
 
 func (b *amd64Builder) setFunctionCallIndexFromRegister(reg int16) {
