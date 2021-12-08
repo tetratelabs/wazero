@@ -42,17 +42,18 @@ Given that we cannot use `call` instruction at all in native code, here's how we
 
 The general principle is that all the function calls consists of 1) emitting instruction to record the continuation program counter to `engine.continuationAddressOffset` 2) emitting `return` instruction.
 
-For example, the following code
+For example, the following Wasm code
 
 ```
-0x3: call 100
+0x3: call 1
 0x5: i64.const 100
 ```
 
 will be compiled as 
 
 ```
-mov [engine.continuationAddressOffset] 0x05 ;; Set the continuation address to continuationAddressOffset field of engine.
+mov [engine.functionCallIndex] $1 ;; Set the index of call target function to functionCallIndex field of engine.
+mov [engine.continuationAddressOffset] $0x05 ;; Set the continuation address to continuationAddressOffset field of engine.
 return ;; Return from the function.
 mov ... $100 ;; This is the beginning of program *after* function return.
 ```
