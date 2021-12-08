@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
 	"reflect"
 	"sync"
 	"testing"
@@ -19,45 +18,9 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
-	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
-
-func fibonacci(in uint64) uint64 {
-	if in <= 1 {
-		return 1
-	}
-	return fibonacci(in-1) + fibonacci(in-2)
-}
-
-func Test_fibonacci(t *testing.T) {
-	buf, err := os.ReadFile("testdata/fib.wasm")
-	require.NoError(t, err)
-	mod, err := wasm.DecodeModule(buf)
-	require.NoError(t, err)
-	store := wasm.NewStore(wazeroir.NewEngine())
-	require.NoError(t, err)
-	err = wasi.NewEnvironment().Register(store)
-	require.NoError(t, err)
-	err = store.Instantiate(mod, "test")
-	require.NoError(t, err)
-	m, ok := store.ModuleInstances["test"]
-	require.True(t, ok)
-	exp, ok := m.Exports["fib"]
-	require.True(t, ok)
-	f := exp.Function
-	eng := newEngine()
-	err = eng.PreCompile([]*wasm.FunctionInstance{f})
-	require.NoError(t, err)
-	err = eng.Compile(f)
-	require.NoError(t, err)
-	for _, in := range []uint64{5, 10, 20} {
-		out, err := eng.Call(f, in)
-		require.NoError(t, err)
-		require.Equal(t, fibonacci(in), out[0])
-	}
-}
 
 func newMemoryInst() *wasm.MemoryInstance {
 	return &wasm.MemoryInstance{Buffer: make([]byte, 1024)}
@@ -424,7 +387,7 @@ func Test_callFunction(t *testing.T) {
 	})
 }
 
-func Test_callHostFunction(t *testing.T) {
+func TestEngine_exec_callHostFunction(t *testing.T) {
 	t.Run("from const", func(t *testing.T) {
 		const (
 			functionIndex int64 = 0
@@ -450,7 +413,7 @@ func Test_callHostFunction(t *testing.T) {
 
 		// Setup.
 		eng := newEngine()
-		eng.hostFunctions = append(eng.hostFunctions, func() {
+		eng.hostFunctions = append(eng.hostFunctions, func(ctx *wasm.HostFunctionCallContext) {
 			eng.stack[eng.currentStackPointer-1] *= 100
 		})
 		mem := newMemoryInst()
@@ -489,15 +452,27 @@ func Test_callHostFunction(t *testing.T) {
 
 		// Setup.
 		eng := newEngine()
-		eng.hostFunctions = make([]func(), 2)
-		eng.hostFunctions[1] = func() { eng.stack[eng.currentStackPointer-1] *= 200 }
+		hostFunc := reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext, _, in uint64) uint64 {
+			return in * 200
+		})
+		hostFunctionInstance := &wasm.FunctionInstance{
+			HostFunction: &hostFunc,
+			Signature: &wasm.FunctionType{
+				InputTypes:  []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
+				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI64},
+			},
+		}
+		eng.hostFunctionIndex[hostFunctionInstance] = 1
+		eng.hostFunctions = make([]func(ctx *wasm.HostFunctionCallContext), 2)
+		err = eng.Compile(hostFunctionInstance)
+		require.NoError(t, err)
 		mem := newMemoryInst()
 
 		// Call into the function
 		f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
 		f.codeInitialAddress = uintptr(unsafe.Pointer(&f.codeSegment[0]))
 		eng.exec(f)
-		require.Equal(t, uint64(50)*200, eng.stack[1])
+		require.Equal(t, uint64(50)*200, eng.stack[0])
 	})
 }
 

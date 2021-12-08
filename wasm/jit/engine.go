@@ -3,9 +3,11 @@ package jit
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
 type engine struct {
@@ -32,7 +34,7 @@ type engine struct {
 	compiledWasmFunctions     []*compiledWasmFunction
 	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int64
 	// Store the host functions and indexes.
-	hostFunctions     []func()
+	hostFunctions     []func(ctx *wasm.HostFunctionCallContext)
 	hostFunctionIndex map[*wasm.FunctionInstance]int64
 }
 
@@ -43,7 +45,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 		e.push(arg)
 	}
 	if index, ok := e.hostFunctionIndex[f]; ok {
-		e.hostFunctions[index]()
+		e.hostFunctions[index](&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
 	} else if index, ok := e.compiledWasmFunctionIndex[f]; ok {
 		f := e.compiledWasmFunctions[index]
 		e.exec(f)
@@ -58,19 +60,22 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 	return
 }
 
+// PreCompile implements wasm.Engine for engine.
+// Here we assign unique ids to all the function instances,
+// so we can reference it when we compile each function instance.
 func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 	var newUniqueHostFunctions, newUniqueWasmFunctions int
 	for _, f := range fs {
 		if f.HostFunction != nil {
 			if _, ok := e.hostFunctionIndex[f]; ok {
-				return nil
+				continue
 			}
 			id := int64(len(e.hostFunctionIndex))
 			e.hostFunctionIndex[f] = id
 			newUniqueHostFunctions++
 		} else {
 			if _, ok := e.compiledWasmFunctionIndex[f]; ok {
-				return nil
+				continue
 			}
 			id := int64(len(e.compiledWasmFunctionIndex))
 			e.compiledWasmFunctionIndex[f] = id
@@ -79,7 +84,7 @@ func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 	}
 	e.hostFunctions = append(
 		e.hostFunctions,
-		make([]func(), newUniqueHostFunctions)...,
+		make([]func(ctx *wasm.HostFunctionCallContext), newUniqueHostFunctions)...,
 	)
 	e.compiledWasmFunctions = append(
 		e.compiledWasmFunctions,
@@ -95,8 +100,38 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 			// Already compiled.
 			return nil
 		}
-		hf := func() {
-			// TODO:
+		hf := func(ctx *wasm.HostFunctionCallContext) {
+			tp := f.HostFunction.Type()
+			in := make([]reflect.Value, tp.NumIn())
+			for i := len(in) - 1; i >= 1; i-- {
+				val := reflect.New(tp.In(i)).Elem()
+				raw := e.pop()
+				kind := tp.In(i).Kind()
+				switch kind {
+				case reflect.Float64, reflect.Float32:
+					val.SetFloat(math.Float64frombits(raw))
+				case reflect.Uint32, reflect.Uint64:
+					val.SetUint(raw)
+				case reflect.Int32, reflect.Int64:
+					val.SetInt(int64(raw))
+				}
+				in[i] = val
+			}
+			val := reflect.New(tp.In(0)).Elem()
+			val.Set(reflect.ValueOf(ctx))
+			in[0] = val
+			for _, ret := range f.HostFunction.Call(in) {
+				switch ret.Kind() {
+				case reflect.Float64, reflect.Float32:
+					e.push(math.Float64bits(ret.Float()))
+				case reflect.Uint32, reflect.Uint64:
+					e.push(ret.Uint())
+				case reflect.Int32, reflect.Int64:
+					e.push(uint64(ret.Int()))
+				default:
+					panic("invalid return type")
+				}
+			}
 		}
 		e.hostFunctions[id] = hf
 	} else {
@@ -207,7 +242,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	}
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
-		if false { // TODO: use buildoptions.IsDebugMode.
+		if buildoptions.IsDebugMode {
 			fmt.Printf("callframe=%s, currentBaseStackPointer: %d, currentStackPointer: %d, stack: %v\n",
 				currentFrame.String(), e.currentBaseStackPointer, e.currentStackPointer,
 				e.stack[:e.currentBaseStackPointer+e.currentStackPointer],
@@ -271,7 +306,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			}
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 		case jitStatusCallHostFunction:
-			e.hostFunctions[e.functionCallIndex]()
+			e.hostFunctions[e.functionCallIndex](&wasm.HostFunctionCallContext{Memory: f.memoryInst})
 			// TODO: check the signature and modify stack pointer.
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 		default:
