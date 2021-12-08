@@ -5,6 +5,7 @@ package jit
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"unsafe"
@@ -22,12 +23,10 @@ func jitcall(codeSegment, engine, memory uintptr)
 // Reserved registers:
 // Note that we don't use "call" instruction.
 // R12: pointer to engine instance (i.e. *engine as uintptr)
-// R13: temporary register
 // R14: cached stack base pointer (engine.currentStackBase) in the current function call.
 // R15: pointer to memory space (i.e. *[]byte as uintptr).
 const (
 	engineInstanceReg         = x86.REG_R12
-	temporaryRegister         = x86.REG_R13
 	cachedStackBasePointerReg = x86.REG_R14
 	// memoryReg                 = x86.REG_R15
 )
@@ -289,6 +288,7 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 		afterReturnInst := obj.Link.Link.Link.Link
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
+	fmt.Println(hex.EncodeToString(code))
 	return code, nil
 }
 
@@ -568,22 +568,12 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 		prog.To.Reg = reg
 		b.addInstruction(prog)
 	} else if pickTarget.onStack() {
-		// Place the stack pointer at first.
+		// Copy the value from the stack.
 		prog := b.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_CONST
-		prog.From.Offset = int64(pickTarget.stackPointer)
-		prog.To.Type = obj.TYPE_REG
-		prog.To.Reg = reg
-		b.addInstruction(prog)
-
-		// Then Copy the value from the stack.
-		prog = b.newProg()
 		prog.As = x86.AMOVQ
 		prog.From.Type = obj.TYPE_MEM
 		prog.From.Reg = cachedStackBasePointerReg
-		prog.From.Index = reg
-		prog.From.Scale = 8
+		prog.From.Offset = int64(pickTarget.stackPointer) * 8
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = reg
 		b.addInstruction(prog)
@@ -1003,6 +993,9 @@ func (b *amd64Builder) releaseAllRegistersToStack() {
 // so that we don't call back again to this function
 // and instead just release the call frame.
 func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
+	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
+	// all the registers, so at this point we always have free registers.
+	tmpReg, _ := b.locationStack.takeFreeRegister(gpTypeInt)
 	// Create the instruction for setting offset.
 	// We use tmp register to store the const, not directly movq to memory
 	// as it is not valid to move 64-bit const to memory directly.
@@ -1011,7 +1004,7 @@ func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = temporaryRegister
+	prog.To.Reg = tmpReg
 	// We calculate the return address offset later, as at this point of compilation
 	// we don't yet know addresses of instructions.
 	// We intentionally use 1 << 33 to let the assembler to emit the instructions for
@@ -1024,7 +1017,7 @@ func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog = b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_REG
-	prog.From.Reg = temporaryRegister
+	prog.From.Reg = tmpReg
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineContinuationAddressOffset
@@ -1067,22 +1060,12 @@ func (b *amd64Builder) movConstToRegister(val int64, targetRegister int16) *obj.
 }
 
 func (b *amd64Builder) releaseRegister(loc *valueLocation) {
-	// First we place the const of stack pointer onto the temp register.
-	prog := b.newProg()
-	prog.As = x86.AMOVQ
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = temporaryRegister
-	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(loc.stackPointer)
-	b.addInstruction(prog)
-
 	// Push value.
-	prog = b.newProg()
+	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = cachedStackBasePointerReg
-	prog.To.Index = temporaryRegister
-	prog.To.Scale = 8
+	prog.To.Offset = int64(loc.stackPointer) * 8
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = loc.register
 	b.addInstruction(prog)
@@ -1092,22 +1075,12 @@ func (b *amd64Builder) releaseRegister(loc *valueLocation) {
 }
 
 func (b *amd64Builder) assignRegisterToValue(loc *valueLocation, reg int16) {
-	// First we place the const of stack pointer onto the temp register.
-	prog := b.newProg()
-	prog.As = x86.AMOVQ
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = temporaryRegister
-	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(loc.stackPointer)
-	b.addInstruction(prog)
-
 	// Pop value to the resgister.
-	prog = b.newProg()
+	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
 	prog.From.Reg = cachedStackBasePointerReg
-	prog.From.Index = temporaryRegister
-	prog.From.Scale = 8
+	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
 	b.addInstruction(prog)
@@ -1150,16 +1123,20 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog.To.Reg = cachedStackBasePointerReg
 	b.addInstruction(prog)
 
+	// initializeReservedRegisters is called at the beginning of function calls
+	// or right after function returns so at this point we always have free registers.
+	reg, _ := b.locationStack.takeFreeRegister(gpTypeInt)
+
 	// Next we move the base pointer (engine.currentBaseStackPointer) to
 	// a temporary register.
-	// movq [engineInstanceReg+engineCurrentBaseStackPointerOffset] temporaryRegister
+	// movq [engineInstanceReg+engineCurrentBaseStackPointerOffset] reg
 	prog = b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
 	prog.From.Reg = engineInstanceReg
 	prog.From.Offset = engineCurrentBaseStackPointerOffset
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = temporaryRegister
+	prog.To.Reg = reg
 	b.addInstruction(prog)
 
 	// Multiply temporaryRegister with 8 via shift left with 3.
@@ -1167,7 +1144,7 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog = b.newProg()
 	prog.As = x86.ASHLQ
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = temporaryRegister
+	prog.To.Reg = reg
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = 3
 	b.addInstruction(prog)
@@ -1179,7 +1156,7 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = cachedStackBasePointerReg
 	prog.From.Type = obj.TYPE_REG
-	prog.From.Reg = temporaryRegister
+	prog.From.Reg = reg
 	b.addInstruction(prog)
 	return prog
 }
