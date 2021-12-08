@@ -20,7 +20,7 @@ The assembled native codes are represented as `[]byte` and the slice region is m
 ## How to enter native codes
 
 Assuming that we have a native code as `[]byte`, it is straightforward to enter the native code region via 
-Go assembly code. In [engine.go](engine.go), we have the function without body called `jitcall`
+Go assembly code. In this package, we have the function without body called `jitcall`
 
 ```go
 func jitcall(codeSegment, engine, memory uintptr)
@@ -97,4 +97,4 @@ case jitStatusReturned:
 
 To summarize, every function call is achieved by returning back to Go code (`engine.exec`'s main loop) with some continuation infor, and enter the callee native code (or host functions) from there. That, of course, comes with a bit of overhead because each function call is implemented by two steps (returning back to `jitcall` callsite AND entering `jitcall` again) vs just `call` instruction (or `jmp`) in usual native codes.
 
-Note that this mechanism is a minimal PoC impl, so in the near future, we achieve the function calls without returning back to `engine.exec`'s main loop and instead `jmp` directly to the callee native code.
+Note that this mechanism is a minimal PoC impl, so in the near future, we would achieve the function calls without returning back to `engine.exec`'s main loop and instead `jmp` directly to the callee native code.
