@@ -38,8 +38,6 @@ type engine struct {
 	hostFunctionIndex map[*wasm.FunctionInstance]int64
 }
 
-var _ wasm.Engine = &engine{}
-
 func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
 	for _, arg := range args {
 		e.push(arg)
