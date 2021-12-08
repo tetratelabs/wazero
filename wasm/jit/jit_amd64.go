@@ -272,12 +272,15 @@ type amd64Builder struct {
 
 func (b *amd64Builder) assemble() ([]byte, error) {
 	code, err := mmapCodeSegment(b.builder.Assemble())
+	if err != nil {
+		return nil, err
+	}
 	// As we cannot read RIP register directly,
 	// we calculate now the offset to the next instruction
 	// relative to the beginning of this function body.
 	const operandSizeBytes = 8
 	for _, obj := range b.requireFunctionCallReturnAddressOffsetResolution {
-		// Skip MOVABS, and the register: "0x49, 0xbd"
+		// Skip MOV, and the register(rax): "0x49, 0xbd"
 		start := obj.Pc + 2
 		// obj.Link = setting offset to memory
 		// obj.Link.Link = writing back the stack pointer to eng.currentStackPointer.
@@ -286,7 +289,7 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 		afterReturnInst := obj.Link.Link.Link.Link
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
-	return code, err
+	return code, nil
 }
 
 func (b *amd64Builder) addInstruction(prog *obj.Prog) {

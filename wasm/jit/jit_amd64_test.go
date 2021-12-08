@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -1448,4 +1449,18 @@ func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {
 	require.Equal(t, uint64(51), eng.stack[eng.currentStackPointer-2])
 	require.Equal(t, uint64(300), eng.stack[eng.currentStackPointer-3])
 	require.Equal(t, uint64(100), eng.stack[eng.currentStackPointer-4])
+}
+
+func TestAmd64Builder_assemble(t *testing.T) {
+	builder := requireNewBuilder(t)
+	builder.setContinuationOffsetAtNextInstructionAndReturn()
+	prog := builder.newProg()
+	prog.As = x86.AINCQ
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = x86.REG_R10
+	builder.addInstruction(prog)
+	code, err := builder.assemble()
+	require.NoError(t, err)
+	actual := binary.LittleEndian.Uint64(code[2:10])
+	require.Equal(t, uint64(prog.Pc), actual)
 }
