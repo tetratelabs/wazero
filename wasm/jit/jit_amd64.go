@@ -1139,8 +1139,8 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog.To.Reg = reg
 	b.addInstruction(prog)
 
-	// Multiply temporaryRegister with 8 via shift left with 3.
-	// shlq $3 temporaryRegister
+	// Multiply reg with 8 via shift left with 3.
+	// shlq $3 reg
 	prog = b.newProg()
 	prog.As = x86.ASHLQ
 	prog.To.Type = obj.TYPE_REG
@@ -1149,8 +1149,8 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog.From.Offset = 3
 	b.addInstruction(prog)
 
-	// Finally we add the temporaryRegister to cachedStackBasePointerReg.
-	// addq [temporaryRegister] cachedStackBasePointerReg
+	// Finally we add the reg to cachedStackBasePointerReg.
+	// addq [reg] cachedStackBasePointerReg
 	prog = b.newProg()
 	prog.As = x86.AADDQ
 	prog.To.Type = obj.TYPE_REG
