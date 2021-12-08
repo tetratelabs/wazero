@@ -799,23 +799,12 @@ func (b *amd64Builder) moveStackToRegister(tp generalPurposeRegisterType, loc *v
 		return err
 	}
 
-	// Then move the value to the stolen register.
-	// Place the stack pointer at first.
+	// Then copy the value from the stack.
 	prog := b.newProg()
-	prog.As = x86.AMOVQ
-	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(loc.stackPointer)
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = reg
-	b.addInstruction(prog)
-
-	// Then Copy the value from the stack.
-	prog = b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
 	prog.From.Reg = cachedStackBasePointerReg
-	prog.From.Index = reg
-	prog.From.Scale = 8
+	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
 	b.addInstruction(prog)
