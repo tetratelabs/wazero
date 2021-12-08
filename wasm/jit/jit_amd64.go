@@ -58,7 +58,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	builder.initializeReservedRegisters()
 	// Now move onto the function body to compile each wazeroir operation.
 	for _, op := range ir.Operations {
-		builder.nextPC++
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -255,7 +254,6 @@ type amd64Builder struct {
 	eng          *engine
 	f            *wasm.FunctionInstance
 	ir           *wazeroir.CompilationResult
-	nextPC       int
 	setJmpOrigin *obj.Prog
 	builder      *asm.Builder
 	// location stack holds the state of wazeroir virtual stack.
