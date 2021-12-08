@@ -6,7 +6,6 @@ package jit
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 	"strings"
 	"unsafe"
 
@@ -267,8 +266,8 @@ type amd64Builder struct {
 	onLabelStartCallbacks map[string][]func(*obj.Prog)
 	// Store the initial instructions for each label so
 	// other block can jump into it.
-	labelInitialInstructions map[string]*obj.Prog
-	functionCalls            []*obj.Prog
+	labelInitialInstructions                         map[string]*obj.Prog
+	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 }
 
 func (b *amd64Builder) assemble() ([]byte, error) {
@@ -276,13 +275,16 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 	// As we cannot read RIP register directly,
 	// we calculate now the offset to the next instruction
 	// relative to the beginning of this function body.
-	if len(code) >= int(math.MaxUint32) {
-		return nil, fmt.Errorf("JIT cannot support program with more than 4GB")
-	}
-	for _, obj := range b.functionCalls {
-		start := obj.Pc + 5
-		afterReturnInst := obj.Link.Link.Link
-		binary.LittleEndian.PutUint32(code[start:start+4], uint32(afterReturnInst.Pc))
+	const operandSizeBytes = 8
+	for _, obj := range b.requireFunctionCallReturnAddressOffsetResolution {
+		// Skip MOVABS, and the register: "0x49, 0xbd"
+		start := obj.Pc + 2
+		// obj.Link = setting offset to memory
+		// obj.Link.Link = writing back the stack pointer to eng.currentStackPointer.
+		// obj.Link.Link.Link = Return instruction.
+		// Therefore obj.Link.Link.Link.Link means the next instruction after the return.
+		afterReturnInst := obj.Link.Link.Link.Link
+		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
 	return code, err
 }
@@ -999,15 +1001,31 @@ func (b *amd64Builder) releaseAllRegistersToStack() {
 // and instead just release the call frame.
 func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	// Create the instruction for setting offset.
+	// We use tmp register to store the const, not directly movq to memory
+	// as it is not valid to move 64-bit const to memory directly.
+	// TODO: is it really illegal, though?
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(0) // Place holder. We calculate the value later.
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = temporaryRegister
+	// We calculate the return address offset later, as at this point of compilation
+	// we don't yet know addresses of instructions.
+	// We intentionally use 1 << 33 to let the assembler to emit the instructions for
+	// 64-bit mov, instead of 32-bit mov.
+	prog.From.Offset = int64(1 << 33)
+	// Append this instruction so we can later resolve the actual offset of the next instruction after return below.
+	b.requireFunctionCallReturnAddressOffsetResolution = append(b.requireFunctionCallReturnAddressOffsetResolution, prog)
+	b.addInstruction(prog)
+
+	prog = b.newProg()
+	prog.As = x86.AMOVQ
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = temporaryRegister
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineContinuationAddressOffset
 	b.addInstruction(prog)
-	b.functionCalls = append(b.functionCalls, prog)
 	// Then return temporarily -- giving control to normal Go code.
 	b.returnFunction()
 }
@@ -1097,7 +1115,7 @@ func (b *amd64Builder) assignRegisterToValue(loc *valueLocation, reg int16) {
 }
 
 func (b *amd64Builder) returnFunction() {
-	// Write back the cached SP to the actual eng.sp.
+	// Write back the cached SP to the actual eng.currentStackPointer.
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST

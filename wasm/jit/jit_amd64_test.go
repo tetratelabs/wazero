@@ -748,42 +748,47 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 }
 
 func TestAmd64Builder_handleConstI64(t *testing.T) {
-	o := &wazeroir.OperationConstI64{Value: 10000}
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
-	// Dummy value not used!
-	_ = builder.locationStack.pushValueOnStack()
+	for _, v := range []uint64{1, 1 << 5, 1 << 35, 1 << 63} {
+		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+			o := &wazeroir.OperationConstI64{Value: v}
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			// Dummy value not used!
+			_ = builder.locationStack.pushValueOnStack()
 
-	// Now emit the const instruction.
-	err := builder.handleConstI64(o)
-	require.NoError(t, err)
+			// Now emit the const instruction.
+			err := builder.handleConstI64(o)
+			require.NoError(t, err)
 
-	// To verify the behavior, we increment and push the const value
-	// to the stack.
-	loc := builder.locationStack.peek()
-	require.Equal(t, wazeroir.SignLessTypeI64, loc.valueType)
-	prog := builder.newProg()
-	prog.As = x86.AINCQ
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = loc.register
-	builder.addInstruction(prog)
-	builder.releaseRegister(loc)
-	builder.returnFunction()
+			// To verify the behavior, we increment and push the const value
+			// to the stack.
+			loc := builder.locationStack.peek()
+			require.Equal(t, wazeroir.SignLessTypeI64, loc.valueType)
+			prog := builder.newProg()
+			prog.As = x86.AINCQ
+			prog.To.Type = obj.TYPE_REG
+			prog.To.Reg = loc.register
+			builder.addInstruction(prog)
+			builder.releaseRegister(loc)
+			builder.returnFunction()
 
-	// Assemble.
-	code, err := builder.assemble()
-	require.NoError(t, err)
-	// Run code.
-	eng := newEngine()
-	mem := newMemoryInst()
-	jitcall(
-		uintptr(unsafe.Pointer(&code[0])),
-		uintptr(unsafe.Pointer(eng)),
-		uintptr(unsafe.Pointer(&mem.Buffer[0])),
-	)
-	// Check the stack.
-	require.Equal(t, uint64(2), eng.currentStackPointer)
-	require.Equal(t, o.Value+1, eng.stack[eng.currentStackPointer-1])
+			// Assemble.
+			code, err := builder.assemble()
+			fmt.Println(hex.EncodeToString(code))
+			require.NoError(t, err)
+			// Run code.
+			eng := newEngine()
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			require.Equal(t, uint64(2), eng.currentStackPointer)
+			require.Equal(t, o.Value+1, eng.stack[eng.currentStackPointer-1])
+		})
+	}
 }
 
 func TestAmd64Builder_handleAdd(t *testing.T) {
