@@ -83,6 +83,18 @@ and calling into another function in JIT engine's main loop:
     }
 ```
 
-To summarize, every function call is achieved by returning back to Go code (`engine.exec`'s main loop) and enter the native code (or host functions) from there. That, of course, comes with a bit of overhead because each function call is implemented by returning back to `jitcall` callsite AND entering `jitcall` again.
+After finished executing the callee code, we return back to the caller's code with the specified return address:
 
-Note that this mechanism is a minimal PoC impl, so in the near future, we achieve the function calls without returning back to `engine.exec`'s main loop and instead `jmp` directly to the callee native code. 
+```go
+case jitStatusReturned:
+    // Meaning that the current frame exits
+    // so we just get back to the caller's frame.
+    callerFrame := currentFrame.caller
+    e.callFrameStack = callerFrame
+    e.currentBaseStackPointer = callerFrame.baseStackPointer
+    e.currentStackPointer = callerFrame.continuationStackPointer
+```
+
+To summarize, every function call is achieved by returning back to Go code (`engine.exec`'s main loop) with some continuation infor, and enter the callee native code (or host functions) from there. That, of course, comes with a bit of overhead because each function call is implemented by two steps (returning back to `jitcall` callsite AND entering `jitcall` again) vs just `call` instruction (or `jmp`) in usual native codes.
+
+Note that this mechanism is a minimal PoC impl, so in the near future, we achieve the function calls without returning back to `engine.exec`'s main loop and instead `jmp` directly to the callee native code.
