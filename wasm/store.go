@@ -1657,6 +1657,10 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		Signature:      sig,
 		ModuleInstance: m,
 	}
+	if err := s.engine.PreCompile([]*FunctionInstance{f}); err != nil {
+		return fmt.Errorf("failed to precompile %s: %v", f.Name, err)
+	}
+
 	if err := s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
