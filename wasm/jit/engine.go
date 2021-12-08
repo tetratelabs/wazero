@@ -153,8 +153,9 @@ func NewEngine() wasm.Engine {
 	return newEngine()
 }
 
+const initialStackSize = 100
+
 func newEngine() *engine {
-	const initialStackSize = 100
 	e := &engine{
 		stack:                     make([]uint64, initialStackSize),
 		compiledWasmFunctionIndex: make(map[*wasm.FunctionInstance]int64),

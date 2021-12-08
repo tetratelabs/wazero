@@ -2,6 +2,7 @@ package jit
 
 import (
 	"os"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -48,4 +49,44 @@ func TestEngine_fibonacci(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, fibonacci(in), out[0])
 	}
+}
+
+func TestEngine_PreCompile(t *testing.T) {
+	eng := newEngine()
+	hf := reflect.ValueOf(func(*wasm.HostFunctionCallContext) {})
+	fs := []*wasm.FunctionInstance{
+		{HostFunction: &hf},
+		{HostFunction: nil},
+		{HostFunction: nil},
+		{HostFunction: nil},
+	}
+	err := eng.PreCompile(fs)
+	require.NoError(t, err)
+	require.Len(t, eng.compiledWasmFunctions, 3)
+	require.Len(t, eng.compiledWasmFunctionIndex, 3)
+	require.Len(t, eng.hostFunctions, 1)
+	require.Len(t, eng.hostFunctionIndex, 1)
+	err = eng.PreCompile(fs)
+	// Precompiling same functions should be noop.
+	require.NoError(t, err)
+	require.Len(t, eng.compiledWasmFunctions, 3)
+	require.Len(t, eng.compiledWasmFunctionIndex, 3)
+	require.Len(t, eng.hostFunctions, 1)
+	require.Len(t, eng.hostFunctionIndex, 1)
+	// Check the indexes.
+	require.Equal(t, int64(0), eng.hostFunctionIndex[fs[0]])
+	require.Equal(t, int64(0), eng.compiledWasmFunctionIndex[fs[1]])
+	require.Equal(t, int64(1), eng.compiledWasmFunctionIndex[fs[2]])
+	require.Equal(t, int64(2), eng.compiledWasmFunctionIndex[fs[3]])
+}
+
+func TestEngine_stackGrow(t *testing.T) {
+	eng := newEngine()
+	require.Len(t, eng.stack, initialStackSize)
+	eng.push(10)
+	require.Equal(t, uint64(1), eng.currentStackPointer)
+	eng.stackGrow()
+	require.Len(t, eng.stack, initialStackSize*2)
+	require.Equal(t, uint64(1), eng.currentStackPointer)
+	require.Equal(t, uint64(10), eng.stack[eng.currentStackPointer-1])
 }
