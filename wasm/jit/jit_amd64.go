@@ -6,7 +6,6 @@ package jit
 import (
 	"encoding/binary"
 	"fmt"
-	"strings"
 	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
@@ -19,15 +18,15 @@ import (
 
 func jitcall(codeSegment, engine, memory uintptr)
 
-// Reserved registers:
+// Reserved registers.
 // Note that we don't use "call" instruction (See wasm/jit/RATIONALE.md#general-limitations-on-pure-go-jit-engines)
-// R12: pointer to engine instance (i.e. *engine as uintptr)
-// R14: cached stack base pointer (engine.currentStackBase) in the current function call.
-// R15: pointer to memory space (i.e. *[]byte as uintptr).
 const (
-	engineInstanceReg         = x86.REG_R12
+	// engineInstanceReg R12: pointer to engine instance (i.e. *engine as uintptr)
+	engineInstanceReg = x86.REG_R12
+	// cachedStackBasePointerReg R14: cached stack base pointer (engine.currentStackBase) in the current function call.
 	cachedStackBasePointerReg = x86.REG_R14
 	// TODO: we use memoryReg later when we support the store/load memory operations.
+	// memoryReg R15: pointer to memory space (i.e. *[]byte as uintptr).
 	// memoryReg                 = x86.REG_R15
 )
 
@@ -40,7 +39,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	// TODO: delete
 	fmt.Printf("compilation target wazeroir:\n%s\n%v\n", wazeroir.Format(ir.Operations), ir.LabelCallers)
 
-	b, err := asm.NewBuilder("amd64", 0)
+	// We can chose arbitrary number instead of 1024 which indicates the cache size in the builder.
+	// TODO: optimize the number.
+	b, err := asm.NewBuilder("amd64", 1024)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
@@ -215,14 +216,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in JIT compiler")
 		}
-	}
-
-	if len(builder.onLabelStartCallbacks) > 0 {
-		keys := make([]string, 0, len(builder.onLabelStartCallbacks))
-		for key := range builder.onLabelStartCallbacks {
-			keys = append(keys, key)
-		}
-		return nil, fmt.Errorf("labels are not defined: %s", strings.Join(keys, ","))
 	}
 
 	code, err := builder.assemble()
