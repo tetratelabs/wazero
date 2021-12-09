@@ -118,7 +118,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 		i := i
 		go func() {
 			if i/10 == 0 {
-				// This is to kick the Go runtime to come in
+				// This is to kick the Go runtime to come in.
 				fmt.Fprintf(io.Discard, "aaaaaaaaaaaa")
 			}
 			defer wg.Done()

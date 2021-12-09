@@ -355,7 +355,19 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 			jmpWithCond.As = x86.AJLS
 		}
 	} else {
+		// Usually the comparison operand for br_if is on the conditional register,
+		// but in some cases, they are on the stack or register.
+		// For example, the following code
+		// 		i64.const 1
+		//      local.get 1
+		//      i64.add
+		//      br_if ....
+		// will try to use the result of i64.add, which resides on the stack,
+		// as the operand for br_if instruction.
 		if cond.onStack() {
+			// This case even worse, the operand is not on a allocated register, but
+			// actually in the stack memory, so we have to assig a register to it
+			// before we judge if we should jump to the Then branch or Else.
 			if err := b.moveStackToRegister(cond.registerType(), cond); err != nil {
 				return err
 			}
