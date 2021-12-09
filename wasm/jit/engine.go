@@ -160,7 +160,7 @@ func NewEngine() wasm.Engine {
 	return newEngine()
 }
 
-const initialStackSize = 100
+const initialStackSize = 1024
 
 func newEngine() *engine {
 	e := &engine{
@@ -251,16 +251,31 @@ type compiledWasmFunction struct {
 	codeInitialAddress uintptr
 	// The same purpose as codeInitialAddress, but for memory.Buffer.
 	memoryAddress uintptr
+	// The max of the stack height this function can reach.
+	maxtStackHeight uint64
 }
 
 const (
 	builtinFunctionIndexGrowMemory = iota
 )
 
-func (e *engine) stackGrow() {
-	newStack := make([]uint64, len(e.stack)*2)
-	copy(newStack[:len(e.stack)], e.stack)
-	e.stack = newStack
+// Grow the stack size according to requiredHeight argument
+// which is the required height from the base pointer
+// for the next function frame execution.
+func (e *engine) maybeGrowStack(requiredHeight uint64) {
+	currentLen := uint64(len(e.stack))
+	remained := currentLen - e.currentBaseStackPointer
+	if requiredHeight > remained {
+		// This case we need to grow the stack as the empty slots
+		// are not able to store all the stack items.
+		// So we grow the stack with the new len = currentLen*2+required.
+		required := requiredHeight - remained
+		newStack := make([]uint64, currentLen*2+(required))
+		top := e.currentBaseStackPointer + e.currentStackPointer
+		copy(newStack[:top], e.stack[:top])
+		e.stack = newStack
+	}
+	// TODO: maybe better think about how to shrink the stack as well.
 }
 
 func (e *engine) exec(f *compiledWasmFunction) {
@@ -270,13 +285,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		caller:                   nil,
 		continuationStackPointer: f.inputs,
 	}
-	// TODO: We should check the size of the stack,
-	// and if it's running out, grow it before calling into JITed code.
-	// It should be possible to check the necessity by statically
-	// analyzing the max height of the stack in the function.
-	if false {
-		e.stackGrow()
-	}
+	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
+	e.maybeGrowStack(f.maxtStackHeight)
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
@@ -322,13 +332,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				// Set the base pointer to the beginning of the function inputs
 				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputs,
 			}
-			// TODO: We should check the size of the stack,
-			// and if it's running out, grow it before calling into JITed code.
-			// It should be possible to check the necessity by statically
-			// analyzing the max height of the stack in the function.
-			if false {
-				e.stackGrow()
-			}
+			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
+			e.maybeGrowStack(nextFunc.maxtStackHeight)
 			// Now move onto the callee function.
 			e.callFrameStack = frame
 			e.currentBaseStackPointer = frame.baseStackPointer

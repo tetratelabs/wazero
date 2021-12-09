@@ -224,10 +224,11 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 
 func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunction {
 	cf := &compiledWasmFunction{
-		codeSegment: code,
-		inputs:      uint64(len(b.f.Signature.InputTypes)),
-		returns:     uint64(len(b.f.Signature.ReturnTypes)),
-		memory:      b.f.ModuleInstance.Memory,
+		codeSegment:     code,
+		inputs:          uint64(len(b.f.Signature.InputTypes)),
+		returns:         uint64(len(b.f.Signature.ReturnTypes)),
+		memory:          b.f.ModuleInstance.Memory,
+		maxtStackHeight: b.locationStack.maxHeight,
 	}
 	if cf.memory != nil {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
