@@ -283,6 +283,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				e.currentStackPointer = callerFrame.continuationStackPointer
 			}
 		case jitCallStatusCodeCallWasmFunction:
+			// This never panics as we made sure that the index exists for all the referenced functions
+			// in a module.
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so
 			// we can resume this caller function frame.
@@ -316,16 +318,12 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			case builtinFunctionIndexGrowMemory:
 				v := e.pop()
 				e.memoryGrow(currentFrame.f.memory, v)
-			default:
-				panic("invalid builtin function index")
 			}
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeCallHostFunction:
 			e.hostFunctions[e.functionCallIndex](&wasm.HostFunctionCallContext{Memory: f.memory})
 			// TODO: check the signature and modify stack pointer.
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
-		default:
-			panic("invalid status code!")
 		}
 	}
 }
@@ -335,6 +333,7 @@ func (e *engine) memoryGrow(m *wasm.MemoryInstance, newPages uint64) {
 	if m.Max != nil {
 		max = uint64(*m.Max) * wasm.PageSize
 	}
+	// If exceeds the max of memory size, we push -1 according to the spec
 	if uint64(newPages*wasm.PageSize+uint64(len(m.Buffer))) > max {
 		v := int32(-1)
 		e.push(uint64(v))
