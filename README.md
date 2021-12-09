@@ -37,7 +37,7 @@ func Test_fibonacci(t *testing.T) {
 ## Status
 - wazero is an early project, so APIs are subject to change until version 1.0.
 
-- The interpreter-base wazero runtime passes all the [Wasm Spec test suites](https://github.com/WebAssembly/spec/tree/wg-1.0/test/core) and
+- The interpreter-based wazero runtime passes all the [Wasm Spec test suites](https://github.com/WebAssembly/spec/tree/wg-1.0/test/core) and
 is fully compatible with the WebAssembly v1.0 Specification.
 - We are currently working on a JIT compilation engine written in Go to improve the performance issue. You can check the work-in-progress JIT engine codebase in [wasm/jit](./wasm/jit) directory. Please refer to [wasm/jit/RATIONALE.md](wasm/jit/RATIONALE.md) for the design choices and considerations in our JIT engine.
 
