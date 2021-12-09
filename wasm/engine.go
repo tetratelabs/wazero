@@ -11,6 +11,10 @@ type Engine interface {
 	Compile(f *FunctionInstance) error
 	// PreCompile prepares the compilation for given function instances.
 	// This is called for all the instances in a module instance
-	// before Compile is called.
+	// before Compile is called. That is necessary because
+	// JIT engine needs to assign unique ids to each function instance
+	// before it compiles each function. Concretely, the JIT engine
+	// uses the ids at the time when emitting call instructions against the yet-compiled
+	// function instances.
 	PreCompile(fs []*FunctionInstance) error
 }
