@@ -24,13 +24,6 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
 }
 
-func fibonacci(in uint64) uint64 {
-	if in <= 1 {
-		return 1
-	}
-	return fibonacci(in-1) + fibonacci(in-2)
-}
-
 func TestEngine_fibonacci(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
 		t.Skip()
@@ -55,16 +48,17 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.NoError(t, err)
 	err = eng.Compile(f)
 	require.NoError(t, err)
-	for _, in := range []uint64{5, 10, 20} {
-		out, err := eng.Call(f, in)
-		require.NoError(t, err)
-		require.Equal(t, fibonacci(in), out[0])
-	}
+	out, err := eng.Call(f, 20)
+	require.NoError(t, err)
+	require.Equal(t, uint64(10946), out[0])
 }
 
 func TestEngine_PreCompile(t *testing.T) {
 	eng := newEngine()
 	hf := reflect.ValueOf(func(*wasm.HostFunctionCallContext) {})
+	// Usually the function instances in a module consist of the maxture
+	// of host functions and wasm functions. And we treat a fcuntion instance
+	// as a native one when .HostFunction is nil.
 	fs := []*wasm.FunctionInstance{
 		{HostFunction: &hf},
 		{HostFunction: nil},
@@ -73,22 +67,22 @@ func TestEngine_PreCompile(t *testing.T) {
 	}
 	err := eng.PreCompile(fs)
 	require.NoError(t, err)
+	// Check the indexes.
 	require.Len(t, eng.compiledWasmFunctions, 3)
 	require.Len(t, eng.compiledWasmFunctionIndex, 3)
 	require.Len(t, eng.hostFunctions, 1)
 	require.Len(t, eng.hostFunctionIndex, 1)
+	prevCompiledFunctions := make([]*compiledWasmFunction, len(eng.compiledWasmFunctions))
+	prevHostFunctions := make([]hostFunction, len(eng.hostFunctions))
+	copy(prevCompiledFunctions, eng.compiledWasmFunctions)
+	copy(prevHostFunctions, eng.hostFunctions)
 	err = eng.PreCompile(fs)
 	// Precompiling same functions should be noop.
 	require.NoError(t, err)
-	require.Len(t, eng.compiledWasmFunctions, 3)
 	require.Len(t, eng.compiledWasmFunctionIndex, 3)
-	require.Len(t, eng.hostFunctions, 1)
 	require.Len(t, eng.hostFunctionIndex, 1)
-	// Check the indexes.
-	require.Equal(t, int64(0), eng.hostFunctionIndex[fs[0]])
-	require.Equal(t, int64(0), eng.compiledWasmFunctionIndex[fs[1]])
-	require.Equal(t, int64(1), eng.compiledWasmFunctionIndex[fs[2]])
-	require.Equal(t, int64(2), eng.compiledWasmFunctionIndex[fs[3]])
+	require.Equal(t, prevHostFunctions, eng.hostFunctions)
+	require.Equal(t, prevCompiledFunctions, eng.compiledWasmFunctions)
 }
 
 func TestEngine_stackGrow(t *testing.T) {

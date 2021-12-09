@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"unsafe"
@@ -288,7 +287,6 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 		afterReturnInst := obj.Link.Link.Link.Link
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
-	fmt.Println(hex.EncodeToString(code))
 	return code, nil
 }
 
