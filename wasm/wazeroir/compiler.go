@@ -133,7 +133,11 @@ func (c *compiler) resetUnreachable() {
 }
 
 type CompilationResult struct {
-	Operations   []Operation
+	// Operations holds wazerois operations compiled from Wasm instructions in a Wasm function.
+	Operations []Operation
+	// LabelCallers maps Label.String() to the number of callers to that label.
+	// Here "callers" means that the callsites which jumps to the label with br, br_if or br_table
+	// instructions.
 	LabelCallers map[string]int
 }
 

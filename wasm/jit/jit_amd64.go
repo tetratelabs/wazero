@@ -36,7 +36,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
-	// We can chose arbitrary number instead of 1024 which indicates the cache size in the builder.
+	// We can choose arbitrary number instead of 1024 which indicates the cache size in the builder.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("amd64", 1024)
 	if err != nil {
@@ -285,11 +285,6 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 }
 
 func (b *amd64Builder) addInstruction(prog *obj.Prog) {
-	// If the next instruction is jmp and , we can omit this instruction
-	// as in anycase we can jump to the next next instruction.
-	if prog.As == obj.AJMP && b.setJmpOrigin != nil && b.setJmpOrigin.As == obj.AJMP {
-		return
-	}
 	b.builder.AddInstruction(prog)
 	if b.setJmpOrigin != nil {
 		b.setJmpOrigin.To.SetTarget(prog)
@@ -313,6 +308,9 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 		labelKey := o.Target.String()
 		targetNumCallers := b.ir.LabelCallers[labelKey]
 		if targetNumCallers > 1 {
+			// If the number of callers to the target label is larget than one,
+			// we have multiple origins to the target branch. In that case,
+			// we must have unique register state.
 			b.preJumpRegisterAdjustment()
 		}
 		jmp := b.newProg()
