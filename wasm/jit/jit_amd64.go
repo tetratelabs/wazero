@@ -219,18 +219,21 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
 	}
+	return builder.newCompiledWasmFunction(code), nil
+}
+
+func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunction {
 	cf := &compiledWasmFunction{
 		codeSegment: code,
-		inputs:      uint64(len(f.Signature.InputTypes)),
-		returns:     uint64(len(f.Signature.ReturnTypes)),
+		inputs:      uint64(len(b.f.Signature.InputTypes)),
+		returns:     uint64(len(b.f.Signature.ReturnTypes)),
+		memory:      b.f.ModuleInstance.Memory,
 	}
-	cf.memory = f.ModuleInstance.Memory
 	if cf.memory != nil {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
 	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
-
-	return cf, nil
+	return cf
 }
 
 func (b *amd64Builder) pushFunctionInputs() {
