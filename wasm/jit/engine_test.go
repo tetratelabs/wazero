@@ -90,8 +90,11 @@ func TestEngine_stackGrow(t *testing.T) {
 	require.Len(t, eng.stack, initialStackSize)
 	eng.push(10)
 	require.Equal(t, uint64(1), eng.currentStackPointer)
+	require.Equal(t, uint64(10), eng.stack[eng.currentStackPointer-1])
 	eng.stackGrow()
 	require.Len(t, eng.stack, initialStackSize*2)
+	// stackGrow only grows the stack len,
+	// and must not modify neither stack pointer nor the values in the stack.
 	require.Equal(t, uint64(1), eng.currentStackPointer)
 	require.Equal(t, uint64(10), eng.stack[eng.currentStackPointer-1])
 }

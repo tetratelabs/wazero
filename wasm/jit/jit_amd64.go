@@ -20,13 +20,14 @@ import (
 func jitcall(codeSegment, engine, memory uintptr)
 
 // Reserved registers:
-// Note that we don't use "call" instruction.
+// Note that we don't use "call" instruction (See wasm/jit/RATIONALE.md#general-limitations-on-pure-go-jit-engines)
 // R12: pointer to engine instance (i.e. *engine as uintptr)
 // R14: cached stack base pointer (engine.currentStackBase) in the current function call.
 // R15: pointer to memory space (i.e. *[]byte as uintptr).
 const (
 	engineInstanceReg         = x86.REG_R12
 	cachedStackBasePointerReg = x86.REG_R14
+	// TODO: we use memoryReg later when we support the store/load memory operations.
 	// memoryReg                 = x86.REG_R15
 )
 
