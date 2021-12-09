@@ -362,7 +362,7 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 		//      local.get 1
 		//      i64.add
 		//      br_if ....
-		// will try to use the result of i64.add, which resides on the stack,
+		// will try to use the result of i64.add, which resides on the (virtual) stack,
 		// as the operand for br_if instruction.
 		if cond.onStack() {
 			// This case even worse, the operand is not on a allocated register, but
