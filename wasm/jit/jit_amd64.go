@@ -251,9 +251,11 @@ func (b *amd64Builder) pushFunctionInputs() {
 }
 
 type amd64Builder struct {
-	eng          *engine
-	f            *wasm.FunctionInstance
-	ir           *wazeroir.CompilationResult
+	eng *engine
+	f   *wasm.FunctionInstance
+	ir  *wazeroir.CompilationResult
+	// Set a jmp kind instruction where you want to set the next coming
+	// instruction as the destination of the jmp instruction.
 	setJmpOrigin *obj.Prog
 	builder      *asm.Builder
 	// location stack holds the state of wazeroir virtual stack.
@@ -291,6 +293,11 @@ func (b *amd64Builder) assemble() ([]byte, error) {
 }
 
 func (b *amd64Builder) addInstruction(prog *obj.Prog) {
+	// If the next instruction is jmp and , we can omit this instruction
+	// as in anycase we can jump to the next next instruction.
+	if prog.As == obj.AJMP && b.setJmpOrigin != nil && b.setJmpOrigin.As == obj.AJMP {
+		return
+	}
 	b.builder.AddInstruction(prog)
 	if b.setJmpOrigin != nil {
 		b.setJmpOrigin.To.SetTarget(prog)
