@@ -14,4 +14,4 @@ https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/m
 
 ### JIT engine implementation
 
-See [wasm/jit/README.md](wasm/jit/README.md).
+See [wasm/jit/RATIONALE.md](wasm/jit/RATIONALE.md).
