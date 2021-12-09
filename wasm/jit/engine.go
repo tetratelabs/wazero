@@ -34,9 +34,11 @@ type engine struct {
 	compiledWasmFunctions     []*compiledWasmFunction
 	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int64
 	// Store the host functions and indexes.
-	hostFunctions     []func(ctx *wasm.HostFunctionCallContext)
+	hostFunctions     []hostFunction
 	hostFunctionIndex map[*wasm.FunctionInstance]int64
 }
+
+type hostFunction = func(ctx *wasm.HostFunctionCallContext)
 
 func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
 	for _, arg := range args {
@@ -85,7 +87,7 @@ func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 	}
 	e.hostFunctions = append(
 		e.hostFunctions,
-		make([]func(ctx *wasm.HostFunctionCallContext), newUniqueHostFunctions)...,
+		make([]hostFunction, newUniqueHostFunctions)...,
 	)
 	e.compiledWasmFunctions = append(
 		e.compiledWasmFunctions,

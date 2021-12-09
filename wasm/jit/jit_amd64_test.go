@@ -463,7 +463,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 			},
 		}
 		eng.hostFunctionIndex[hostFunctionInstance] = 1
-		eng.hostFunctions = make([]func(ctx *wasm.HostFunctionCallContext), 2)
+		eng.hostFunctions = make([]hostFunction, 2)
 		err = eng.Compile(hostFunctionInstance)
 		require.NoError(t, err)
 		mem := newMemoryInst()
