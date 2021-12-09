@@ -51,6 +51,14 @@ func TestValueLocationStack_basic(t *testing.T) {
 		actual, exp := s.stack[i], cloned.stack[i]
 		require.NotEqual(t, uintptr(unsafe.Pointer(exp)), uintptr(unsafe.Pointer(actual)))
 	}
+	// Check the max height.
+	for i := 0; i < 1000; i++ {
+		s.pushValueOnStack()
+	}
+	for i := 0; i < 1000; i++ {
+		s.pop()
+	}
+	require.Equal(t, uint64(1001), s.maxHeight)
 }
 
 func TestValueLocationStack_takeFreeRegister(t *testing.T) {
