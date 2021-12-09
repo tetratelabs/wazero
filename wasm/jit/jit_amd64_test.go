@@ -101,7 +101,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	fmt.Println(hex.EncodeToString(code))
 	// Setup engine.
 	mem := newMemoryInst()
-	compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputNum: 1, outputNum: 1}
+	compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputs: 1, returns: 1}
 	compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 	eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 	// Call into the function
@@ -126,7 +126,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 			mem := newMemoryInst()
 			eng := newEngine()
 			eng.stack[0] = 10 // We call recursively 10 times.
-			compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputNum: 1, outputNum: 1}
+			compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputs: 1, returns: 1}
 			compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 			eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 			// Call into the function

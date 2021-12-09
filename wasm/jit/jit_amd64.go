@@ -231,8 +231,8 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	}
 	cf := &compiledWasmFunction{
 		codeSegment: code,
-		inputNum:    uint64(len(f.Signature.InputTypes)),
-		outputNum:   uint64(len(f.Signature.ReturnTypes)),
+		inputs:      uint64(len(f.Signature.InputTypes)),
+		returns:     uint64(len(f.Signature.ReturnTypes)),
 	}
 	cf.memory = f.ModuleInstance.Memory
 	if cf.memory != nil {

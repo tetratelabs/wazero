@@ -224,11 +224,19 @@ func (c *callFrame) String() string {
 }
 
 type compiledWasmFunction struct {
-	inputNum, outputNum uint64
-	codeSegment         []byte
-	memory              *wasm.MemoryInstance
-	codeInitialAddress  uintptr
-	memoryAddress       uintptr
+	// inputs,returns represents the number of input/returns of function.
+	inputs, returns uint64
+	// codeSegment is holding the compiled native code as a byte slice.
+	codeSegment []byte
+	// memory is the pointer to a memory instance which the original function instance refers to.
+	memory *wasm.MemoryInstance
+	// Pre-calculated pointer pointing to the initial byte of .codeSegment slice.
+	// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
+	// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field
+	// so we don't need to repeat the calculation on each function call.
+	codeInitialAddress uintptr
+	// The same purpose as codeInitialAddress, but for memory.Buffer.
+	memoryAddress uintptr
 }
 
 const (
@@ -246,7 +254,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		continuationAddress:      f.codeInitialAddress,
 		f:                        f,
 		caller:                   nil,
-		continuationStackPointer: f.inputNum,
+		continuationStackPointer: f.inputs,
 	}
 	// TODO: We should check the size of the stack,
 	// and if it's running out, grow it before calling into JITed code.
@@ -289,7 +297,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Calculate the continuation address so
 			// we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
-			currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.outputNum - nextFunc.inputNum
+			currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.returns - nextFunc.inputs
 			currentFrame.baseStackPointer = e.currentBaseStackPointer
 			// Create the callee frame.
 			frame := &callFrame{
@@ -298,7 +306,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				// Set the caller frame so we can return back to the current frame!
 				caller: currentFrame,
 				// Set the base pointer to the beginning of the function inputs
-				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputNum,
+				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputs,
 			}
 			// TODO: We should check the size of the stack,
 			// and if it's running out, grow it before calling into JITed code.
@@ -311,7 +319,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.callFrameStack = frame
 			e.currentBaseStackPointer = frame.baseStackPointer
 			// Set the stack pointer so that base+sp would point to the top of function inputs.
-			e.currentStackPointer = nextFunc.inputNum
+			e.currentStackPointer = nextFunc.inputs
 		case jitCallStatusCodeCallBuiltInFunction:
 			// TODO: check the signature and modify stack pointer.
 			switch e.functionCallIndex {
