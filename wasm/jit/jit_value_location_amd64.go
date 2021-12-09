@@ -149,12 +149,13 @@ func (s *valueLocationStack) pushValueOnConditionalRegister(state conditionalReg
 func (s *valueLocationStack) push(loc *valueLocation) {
 	loc.stackPointer = s.sp
 	if s.sp >= uint64(len(s.stack)) {
+		// This case we need to grow the stack capacity by appending the item,
+		// rather than indexing.
 		s.stack = append(s.stack, loc)
-		s.sp++
 	} else {
 		s.stack[s.sp] = loc
-		s.sp++
 	}
+	s.sp++
 }
 
 func (s *valueLocationStack) pop() (loc *valueLocation) {
@@ -184,7 +185,7 @@ const (
 	gpTypeFloat
 )
 
-// Search for unused registers, and if found, returns the resgister
+// Search for unused registers, and if found, returns the register
 // and mark it used.
 func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {
 	var targetRegs []int16

@@ -5,6 +5,7 @@ package jit
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
@@ -25,23 +26,31 @@ func Test_isFloatRegister(t *testing.T) {
 func TestValueLocationStack_basic(t *testing.T) {
 	s := newValueLocationStack()
 	// Push stack value.
-	s.sp = 100
 	loc := s.pushValueOnStack()
-	require.Equal(t, uint64(101), s.sp)
-	require.Equal(t, uint64(100), loc.stackPointer)
-	//
+	require.Equal(t, uint64(1), s.sp)
+	require.Equal(t, uint64(0), loc.stackPointer)
+	// Push the register value.
 	loc = s.pushValueOnRegister(x86.REG_X1)
-	require.Equal(t, uint64(102), s.sp)
-	require.Equal(t, uint64(101), loc.stackPointer)
+	require.Equal(t, uint64(2), s.sp)
+	require.Equal(t, uint64(1), loc.stackPointer)
 	require.Equal(t, int16(x86.REG_X1), loc.register)
 	require.Contains(t, s.usedRegisters, loc.register)
 	// markRegisterUsed.
 	s.markRegisterUsed(x86.REG_X2)
 	require.Contains(t, s.usedRegisters, int16(x86.REG_X2))
-	// releaseRegister
+	// releaseRegister.
 	s.releaseRegister(loc)
 	require.NotContains(t, s.usedRegisters, loc.register)
 	require.Equal(t, int16(-1), loc.register)
+	// Clone.
+	cloned := s.clone()
+	require.Equal(t, s.usedRegisters, cloned.usedRegisters)
+	require.Equal(t, len(s.stack), len(cloned.stack))
+	require.Equal(t, s.sp, cloned.sp)
+	for i := 0; i < int(s.sp); i++ {
+		actual, exp := s.stack[i], cloned.stack[i]
+		require.NotEqual(t, uintptr(unsafe.Pointer(exp)), uintptr(unsafe.Pointer(actual)))
+	}
 }
 
 func TestValueLocationStack_takeFreeRegister(t *testing.T) {

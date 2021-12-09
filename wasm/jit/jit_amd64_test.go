@@ -189,25 +189,33 @@ func TestPushValueWithGoroutines(t *testing.T) {
 }
 
 func Test_setJITStatus(t *testing.T) {
-	for _, s := range []jitCallStatusCode{jitCallStatusCodeReturned, jitCallStatusCodeCallWasmFunction, jitCallStatusCodeCallBuiltInFunction} {
-		// Build codes.
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		builder.setJITStatus(s)
-		builder.returnFunction()
-		// Compile.
-		code, err := builder.assemble()
-		require.NoError(t, err)
-		// Run codes
-		eng := newEngine()
-		mem := newMemoryInst()
-		jitcall(
-			uintptr(unsafe.Pointer(&code[0])),
-			uintptr(unsafe.Pointer(eng)),
-			uintptr(unsafe.Pointer(&mem.Buffer[0])),
-		)
-		// Check status.
-		require.Equal(t, s, eng.jitCallStatusCode)
+	for _, s := range []jitCallStatusCode{
+		jitCallStatusCodeReturned,
+		jitCallStatusCodeCallWasmFunction,
+		jitCallStatusCodeCallBuiltInFunction,
+		jitCallStatusCodeCallHostFunction,
+	} {
+		t.Run(s.String(), func(t *testing.T) {
+
+			// Build codes.
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			builder.setJITStatus(s)
+			builder.returnFunction()
+			// Compile.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run codes
+			eng := newEngine()
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check status.
+			require.Equal(t, s, eng.jitCallStatusCode)
+		})
 	}
 }
 

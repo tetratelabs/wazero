@@ -112,8 +112,8 @@ type interpreterOp struct {
 	f      *interpreterFunction
 }
 
-// PreCompile Implements wasm.Engine for interpreter.
 func (it *interpreter) PreCompile(fs []*wasm.FunctionInstance) error {
+	// We have nothing to do on the precompile phase, in contrast to JIT engine.
 	return nil
 }
 

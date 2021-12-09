@@ -345,6 +345,8 @@ type Label struct {
 
 func (l *Label) String() (ret string) {
 	if l == nil {
+		// Sometimes String() is called on the nil label which is interpreted
+		// as the function return.
 		return ""
 	}
 	switch l.Kind {

@@ -198,6 +198,20 @@ const (
 	// TODO: trap, etc?
 )
 
+func (s jitCallStatusCode) String() (ret string) {
+	switch s {
+	case jitCallStatusCodeReturned:
+		ret = "returned"
+	case jitCallStatusCodeCallWasmFunction:
+		ret = "call_wasm_function"
+	case jitCallStatusCodeCallBuiltInFunction:
+		ret = "call_builtin_function"
+	case jitCallStatusCodeCallHostFunction:
+		ret = "call_host_function"
+	}
+	return
+}
+
 // These consts are used in native codes to manipulate the engine's fields.
 const (
 	engineStackSliceOffset              = 0

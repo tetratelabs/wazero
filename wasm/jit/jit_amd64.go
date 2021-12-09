@@ -360,7 +360,7 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 				return err
 			}
 		}
-		// Check if the value equals zero
+		// Check if the value not equals zero.
 		prog := b.newProg()
 		prog.As = x86.ACMPQ
 		prog.From.Type = obj.TYPE_REG
@@ -368,9 +368,9 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 		prog.To.Type = obj.TYPE_CONST
 		prog.To.Offset = 0
 		b.addInstruction(prog)
-		// Then emit jump instruction.
+		// Emit jump instruction which jumps when the value does not equals zero.
 		jmpWithCond = b.newProg()
-		jmpWithCond.As = x86.AJEQ
+		jmpWithCond.As = x86.AJNE
 		jmpWithCond.To.Type = obj.TYPE_BRANCH
 	}
 
