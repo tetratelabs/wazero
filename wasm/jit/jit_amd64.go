@@ -36,9 +36,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
-	// TODO: delete
-	fmt.Printf("compilation target wazeroir:\n%s\n%v\n", wazeroir.Format(ir.Operations), ir.LabelCallers)
-
 	// We can chose arbitrary number instead of 1024 which indicates the cache size in the builder.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("amd64", 1024)
@@ -64,32 +61,32 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLabel:
 			if err := builder.handleLabel(o); err != nil {
-				return nil, fmt.Errorf("error handling label operation %s: %w", o, err)
+				return nil, fmt.Errorf("error handling label operation: %w", err)
 			}
 		case *wazeroir.OperationBr:
 			if err := builder.handleBr(o); err != nil {
-				return nil, fmt.Errorf("error handling br operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling br operation: %w", err)
 			}
 		case *wazeroir.OperationBrIf:
 			if err := builder.handleBrIf(o); err != nil {
-				return nil, fmt.Errorf("error handling br_if operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling br_if operation: %w", err)
 			}
 		case *wazeroir.OperationBrTable:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationCall:
 			if err := builder.handleCall(o); err != nil {
-				return nil, fmt.Errorf("error handling call operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling call operation: %w", err)
 			}
 		case *wazeroir.OperationCallIndirect:
 		case *wazeroir.OperationDrop:
 			if err := builder.handleDrop(o); err != nil {
-				return nil, fmt.Errorf("error handling drop operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling drop operation: %w", err)
 			}
 		case *wazeroir.OperationSelect:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationPick:
 			if err := builder.handlePick(o); err != nil {
-				return nil, fmt.Errorf("error handling pick operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling pick operation: %w", err)
 			}
 		case *wazeroir.OperationSwap:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -121,7 +118,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstI64:
 			if err := builder.handleConstI64(o); err != nil {
-				return nil, fmt.Errorf("error handling i64.const operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling i64.const operation: %w", err)
 			}
 		case *wazeroir.OperationConstF32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
@@ -139,17 +136,17 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLe:
 			if err := builder.handleLe(o); err != nil {
-				return nil, fmt.Errorf("error handling le operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling le operation: %w", err)
 			}
 		case *wazeroir.OperationGe:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationAdd:
 			if err := builder.handleAdd(o); err != nil {
-				return nil, fmt.Errorf("error handling add operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling add operation: %w", err)
 			}
 		case *wazeroir.OperationSub:
 			if err := builder.handleSub(o); err != nil {
-				return nil, fmt.Errorf("error handling sub operation %v: %w", o, err)
+				return nil, fmt.Errorf("error handling sub operation: %w", err)
 			}
 		case *wazeroir.OperationMul:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
