@@ -187,11 +187,11 @@ type jitCallStatusCode uint32
 const (
 	// jitStatusReturned means the jitcall reaches the end of function, and returns successfully.
 	jitCallStatusCodeReturned jitCallStatusCode = iota
-	// jitCallStatusCodeCallWasmFunction means the jitcall returns returns to make a regular Wasm function call.
+	// jitCallStatusCodeCallWasmFunction means the jitcall returns to make a regular Wasm function call.
 	jitCallStatusCodeCallWasmFunction
-	// jitCallStatusCodeCallWasmFunction means the jitcall returns returns to make a builtin function call.
+	// jitCallStatusCodeCallWasmFunction means the jitcall returns to make a builtin function call.
 	jitCallStatusCodeCallBuiltInFunction
-	// jitCallStatusCodeCallWasmFunction means the jitcall returns returns to make a host function call.
+	// jitCallStatusCodeCallWasmFunction means the jitcall returns to make a host function call.
 	jitCallStatusCodeCallHostFunction
 	// TODO: trap, etc?
 )
