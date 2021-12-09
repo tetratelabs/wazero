@@ -93,7 +93,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	prog = builder.movConstToRegister(5, loc.register)
 	jmp.To.SetTarget(prog) // the above mov instruction is the jump target of the JEQ.
 	builder.releaseRegister(loc)
-	builder.setJITStatus(jitStatusReturned)
+	builder.setJITStatus(jitCallStatusCodeReturned)
 	builder.returnFunction()
 	// Compile.
 	code, err := builder.assemble()
@@ -101,7 +101,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	fmt.Println(hex.EncodeToString(code))
 	// Setup engine.
 	mem := newMemoryInst()
-	compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem, inputNum: 1, outputNum: 1}
+	compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputNum: 1, outputNum: 1}
 	compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 	eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 	// Call into the function
@@ -126,7 +126,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 			mem := newMemoryInst()
 			eng := newEngine()
 			eng.stack[0] = 10 // We call recursively 10 times.
-			compiledFunc := &compiledWasmFunction{codeSegment: code, memoryInst: mem, inputNum: 1, outputNum: 1}
+			compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputNum: 1, outputNum: 1}
 			compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 			eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 			// Call into the function
@@ -168,7 +168,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 			eng := newEngine()
 			mem := newMemoryInst()
 
-			f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+			f := &compiledWasmFunction{codeSegment: code, memory: mem}
 			f.codeInitialAddress = uintptr(unsafe.Pointer(&f.codeSegment[0]))
 
 			// Call into the function
@@ -189,7 +189,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 }
 
 func Test_setJITStatus(t *testing.T) {
-	for _, s := range []jitStatusCodes{jitStatusReturned, jitStatusCallWasmFunction, jitStatusCallBuiltInFunction} {
+	for _, s := range []jitCallStatusCode{jitCallStatusCodeReturned, jitCallStatusCodeCallWasmFunction, jitCallStatusCodeCallBuiltInFunction} {
 		// Build codes.
 		builder := requireNewBuilder(t)
 		builder.initializeReservedRegisters()
@@ -275,7 +275,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	builder.movConstToRegister(int64(50), tmpReg)
 	builder.releaseRegister(loc)
 	require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
-	builder.setJITStatus(jitStatusCallWasmFunction)
+	builder.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	builder.returnFunction()
 	// Compile.
 	code, err := builder.assemble()
@@ -298,7 +298,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
-	require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
+	require.Equal(t, jitCallStatusCodeCallWasmFunction, eng.jitCallStatusCode)
 	require.Equal(t, uint64(50), eng.stack[1])
 }
 
@@ -334,7 +334,7 @@ func Test_callFunction(t *testing.T) {
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
-		require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
+		require.Equal(t, jitCallStatusCodeCallWasmFunction, eng.jitCallStatusCode)
 		require.Equal(t, functionIndex, eng.functionCallIndex)
 
 		// Continue.
@@ -374,7 +374,7 @@ func Test_callFunction(t *testing.T) {
 			uintptr(unsafe.Pointer(eng)),
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
-		require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
+		require.Equal(t, jitCallStatusCodeCallWasmFunction, eng.jitCallStatusCode)
 		require.Equal(t, functionIndex, eng.functionCallIndex)
 
 		// Continue.
@@ -405,7 +405,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		builder.callHostFunctionFromConstIndex(functionIndex)
 		// On the continuation after function call,
 		// We push the value onto stack
-		builder.setJITStatus(jitStatusReturned)
+		builder.setJITStatus(jitCallStatusCodeReturned)
 		builder.returnFunction()
 		// Compile.
 		code, err := builder.assemble()
@@ -419,7 +419,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		mem := newMemoryInst()
 
 		// Call into the function
-		f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+		f := &compiledWasmFunction{codeSegment: code, memory: mem}
 		f.codeInitialAddress = uintptr(unsafe.Pointer(&f.codeSegment[0]))
 		eng.exec(f)
 		require.Equal(t, uint64(50)*100, eng.stack[1])
@@ -444,7 +444,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		builder.callHostFunctionFromRegisterIndex(tmpReg)
 		// On the continuation after function call,
 		// We push the value onto stack
-		builder.setJITStatus(jitStatusReturned)
+		builder.setJITStatus(jitCallStatusCodeReturned)
 		builder.returnFunction()
 		// Compile.
 		code, err := builder.assemble()
@@ -469,7 +469,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		mem := newMemoryInst()
 
 		// Call into the function
-		f := &compiledWasmFunction{codeSegment: code, memoryInst: mem}
+		f := &compiledWasmFunction{codeSegment: code, memory: mem}
 		f.codeInitialAddress = uintptr(unsafe.Pointer(&f.codeSegment[0]))
 		eng.exec(f)
 		require.Equal(t, uint64(50)*200, eng.stack[0])
@@ -1203,7 +1203,7 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
 		// Check the status.
-		require.Equal(t, jitStatusCallHostFunction, eng.jitCallStatusCode)
+		require.Equal(t, jitCallStatusCodeCallHostFunction, eng.jitCallStatusCode)
 		require.Equal(t, int64(functionIndex), eng.functionCallIndex)
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(2), eng.currentStackPointer)
@@ -1244,7 +1244,7 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
 		// Check the status.
-		require.Equal(t, jitStatusCallWasmFunction, eng.jitCallStatusCode)
+		require.Equal(t, jitCallStatusCodeCallWasmFunction, eng.jitCallStatusCode)
 		require.Equal(t, int64(functionIndex), eng.functionCallIndex)
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(3), eng.currentStackPointer)

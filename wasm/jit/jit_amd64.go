@@ -234,9 +234,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		inputNum:    uint64(len(f.Signature.InputTypes)),
 		outputNum:   uint64(len(f.Signature.ReturnTypes)),
 	}
-	cf.memoryInst = f.ModuleInstance.Memory
-	if cf.memoryInst != nil {
-		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memoryInst.Buffer[0]))
+	cf.memory = f.ModuleInstance.Memory
+	if cf.memory != nil {
+		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
 	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 
@@ -314,7 +314,7 @@ func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
 	if o.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		b.releaseAllRegistersToStack()
-		b.setJITStatus(jitStatusReturned)
+		b.setJITStatus(jitCallStatusCodeReturned)
 		// Then return from this function.
 		b.returnFunction()
 	} else {
@@ -402,7 +402,7 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 	if elseTarget.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		b.releaseAllRegistersToStack()
-		b.setJITStatus(jitStatusReturned)
+		b.setJITStatus(jitCallStatusCodeReturned)
 		// Then return from this function.
 		b.returnFunction()
 	} else {
@@ -426,7 +426,7 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 	if thenTarget.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		b.releaseAllRegistersToStack()
-		b.setJITStatus(jitStatusReturned)
+		b.setJITStatus(jitCallStatusCodeReturned)
 		// Then return from this function.
 		b.returnFunction()
 	} else {
@@ -902,21 +902,21 @@ func (b *amd64Builder) allocateRegister(t generalPurposeRegisterType) (reg int16
 	return
 }
 
-func (b *amd64Builder) setJITStatus(status jitStatusCodes) *obj.Prog {
+func (b *amd64Builder) setJITStatus(status jitCallStatusCode) *obj.Prog {
 	prog := b.newProg()
 	prog.As = x86.AMOVL
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(status)
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = engineInstanceReg
-	prog.To.Offset = engineJITStatusOffset
+	prog.To.Offset = engineJITCallStatusCodeOffset
 	b.addInstruction(prog)
 	return prog
 }
 
 func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
-	// Set the jit status as jitStatusCallHostFunction
-	b.setJITStatus(jitStatusCallHostFunction)
+	// Set the jit status as jitCallStatusCodeCallHostFunction
+	b.setJITStatus(jitCallStatusCodeCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
 	// Release all the registers as our calling convention requires the callee-save.
@@ -929,8 +929,8 @@ func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
 }
 
 func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
-	// Set the jit status as jitStatusCallHostFunction
-	b.setJITStatus(jitStatusCallHostFunction)
+	// Set the jit status as jitCallStatusCodeCallHostFunction
+	b.setJITStatus(jitCallStatusCodeCallHostFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
 	// Release all the registers as our calling convention requires the callee-save.
@@ -943,8 +943,8 @@ func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 }
 
 func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) {
-	// Set the jit status as jitStatusCallWasmFunction
-	b.setJITStatus(jitStatusCallWasmFunction)
+	// Set the jit status as jitCallStatusCodeCallWasmFunction
+	b.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
 	// Release all the registers as our calling convention requires the callee-save.
@@ -958,8 +958,8 @@ func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) 
 }
 
 func (b *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
-	// Set the jit status as jitStatusCallWasmFunction
-	b.setJITStatus(jitStatusCallWasmFunction)
+	// Set the jit status as jitCallStatusCodeCallWasmFunction
+	b.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	// Set the function index.
 	b.setFunctionCallIndexFromRegister(reg)
 	// Release all the registers as our calling convention requires the callee-save.

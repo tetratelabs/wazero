@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +13,16 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
+
+// Ensures that the offset consts do not drift when we manipulate the engine struct.
+func TestEngine_veifyOffsetValue(t *testing.T) {
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).stack)), engineStackSliceOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).currentStackPointer)), engineCurrentStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).currentBaseStackPointer)), engineCurrentBaseStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).jitCallStatusCode)), engineJITCallStatusCodeOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallIndex)), engineFunctionCallIndexOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
+}
 
 func fibonacci(in uint64) uint64 {
 	if in <= 1 {

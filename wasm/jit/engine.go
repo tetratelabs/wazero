@@ -18,7 +18,7 @@ type engine struct {
 	currentStackPointer     uint64
 	currentBaseStackPointer uint64
 	// Where we store the status code of JIT execution.
-	jitCallStatusCode jitStatusCodes
+	jitCallStatusCode jitCallStatusCode
 	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
 	// Indicating the function call index.
 	functionCallIndex int64
@@ -42,15 +42,19 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 	for _, arg := range args {
 		e.push(arg)
 	}
+	// Note that there's no conflict between e.hostFunctionIndex and e.compiledWasmFunctionIndex,
+	// meaning that each *wasm.FunctionInstance is assigned to either host function index or wasm function one.
 	if index, ok := e.hostFunctionIndex[f]; ok {
 		e.hostFunctions[index](&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
 	} else if index, ok := e.compiledWasmFunctionIndex[f]; ok {
 		f := e.compiledWasmFunctions[index]
 		e.exec(f)
 	} else {
-		err = fmt.Errorf("invalid function")
+		err = fmt.Errorf("function not compiled")
 		return
 	}
+	// Note the top value is the tail of the returns,
+	// so we assign the returns in reverse order.
 	returns = make([]uint64, len(f.Signature.ReturnTypes))
 	for i := range returns {
 		returns[len(returns)-1-i] = e.pop()
@@ -58,7 +62,6 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 	return
 }
 
-// PreCompile implements wasm.Engine for engine.
 // Here we assign unique ids to all the function instances,
 // so we can reference it when we compile each function instance.
 func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
@@ -68,14 +71,14 @@ func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 			if _, ok := e.hostFunctionIndex[f]; ok {
 				continue
 			}
-			id := int64(len(e.hostFunctionIndex))
+			id := getNewID(e.hostFunctionIndex)
 			e.hostFunctionIndex[f] = id
 			newUniqueHostFunctions++
 		} else {
 			if _, ok := e.compiledWasmFunctionIndex[f]; ok {
 				continue
 			}
-			id := int64(len(e.compiledWasmFunctionIndex))
+			id := getNewID(e.compiledWasmFunctionIndex)
 			e.compiledWasmFunctionIndex[f] = id
 			newUniqueWasmFunctions++
 		}
@@ -89,6 +92,10 @@ func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 		make([]*compiledWasmFunction, newUniqueWasmFunctions)...,
 	)
 	return nil
+}
+
+func getNewID(idMap map[*wasm.FunctionInstance]int64) int64 {
+	return int64(len(idMap))
 }
 
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
@@ -173,23 +180,30 @@ func (e *engine) push(v uint64) {
 	e.currentStackPointer++
 }
 
-type jitStatusCodes uint32
+// jitCallStatusCode represents the result of `jitcall`.
+// This is set by the jitted native code.
+type jitCallStatusCode uint32
 
 const (
-	jitStatusReturned jitStatusCodes = iota
-	jitStatusCallWasmFunction
-	jitStatusCallBuiltInFunction
-	jitStatusCallHostFunction
+	// jitStatusReturned means the jitcall reaches the end of function, and returns successfully.
+	jitCallStatusCodeReturned jitCallStatusCode = iota
+	// jitCallStatusCodeCallWasmFunction means the jitcall returns returns to make a regular Wasm function call.
+	jitCallStatusCodeCallWasmFunction
+	// jitCallStatusCodeCallWasmFunction means the jitcall returns returns to make a builtin function call.
+	jitCallStatusCodeCallBuiltInFunction
+	// jitCallStatusCodeCallWasmFunction means the jitcall returns returns to make a host function call.
+	jitCallStatusCodeCallHostFunction
 	// TODO: trap, etc?
 )
 
-var (
-	engineStackSliceOffset              = int64(unsafe.Offsetof((&engine{}).stack))
-	engineCurrentStackPointerOffset     = int64(unsafe.Offsetof((&engine{}).currentStackPointer))
-	engineCurrentBaseStackPointerOffset = int64(unsafe.Offsetof((&engine{}).currentBaseStackPointer))
-	engineJITStatusOffset               = int64(unsafe.Offsetof((&engine{}).jitCallStatusCode))
-	engineFunctionCallIndexOffset       = int64(unsafe.Offsetof((&engine{}).functionCallIndex))
-	engineContinuationAddressOffset     = int64(unsafe.Offsetof((&engine{}).continuationAddressOffset))
+// These consts are used in native codes to manipulate the engine's fields.
+const (
+	engineStackSliceOffset              = 0
+	engineCurrentStackPointerOffset     = 24
+	engineCurrentBaseStackPointerOffset = 32
+	engineJITCallStatusCodeOffset       = 40
+	engineFunctionCallIndexOffset       = 48
+	engineContinuationAddressOffset     = 56
 )
 
 type callFrame struct {
@@ -202,7 +216,7 @@ type callFrame struct {
 
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
-		"[continuation address=%d, continuation stack poitner=%d, base stack pointer=%d]",
+		"[continuation address=%d, continuation stack pointer=%d, base stack pointer=%d]",
 		c.continuationAddress, c.continuationStackPointer, c.baseStackPointer,
 	)
 }
@@ -210,7 +224,7 @@ func (c *callFrame) String() string {
 type compiledWasmFunction struct {
 	inputNum, outputNum uint64
 	codeSegment         []byte
-	memoryInst          *wasm.MemoryInstance
+	memory              *wasm.MemoryInstance
 	codeInitialAddress  uintptr
 	memoryAddress       uintptr
 }
@@ -257,7 +271,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 
 		// Check the status code from JIT code.
 		switch e.jitCallStatusCode {
-		case jitStatusReturned:
+		case jitCallStatusCodeReturned:
 			// Meaning that the current frame exits
 			// so we just get back to the caller's frame.
 			callerFrame := currentFrame.caller
@@ -266,7 +280,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				e.currentBaseStackPointer = callerFrame.baseStackPointer
 				e.currentStackPointer = callerFrame.continuationStackPointer
 			}
-		case jitStatusCallWasmFunction:
+		case jitCallStatusCodeCallWasmFunction:
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so
 			// we can resume this caller function frame.
@@ -294,18 +308,18 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.currentBaseStackPointer = frame.baseStackPointer
 			// Set the stack pointer so that base+sp would point to the top of function inputs.
 			e.currentStackPointer = nextFunc.inputNum
-		case jitStatusCallBuiltInFunction:
+		case jitCallStatusCodeCallBuiltInFunction:
 			// TODO: check the signature and modify stack pointer.
 			switch e.functionCallIndex {
 			case builtinFunctionIndexGrowMemory:
 				v := e.pop()
-				e.memoryGrow(currentFrame.f.memoryInst, v)
+				e.memoryGrow(currentFrame.f.memory, v)
 			default:
 				panic("invalid builtin function index")
 			}
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
-		case jitStatusCallHostFunction:
-			e.hostFunctions[e.functionCallIndex](&wasm.HostFunctionCallContext{Memory: f.memoryInst})
+		case jitCallStatusCodeCallHostFunction:
+			e.hostFunctions[e.functionCallIndex](&wasm.HostFunctionCallContext{Memory: f.memory})
 			// TODO: check the signature and modify stack pointer.
 			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
 		default:
