@@ -112,6 +112,11 @@ type interpreterOp struct {
 	f      *interpreterFunction
 }
 
+func (it *interpreter) PreCompile(fs []*wasm.FunctionInstance) error {
+	// We have nothing to do on the precompile phase, in contrast to JIT engine.
+	return nil
+}
+
 // Compile Implements wasm.Engine for interpreter.
 func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	if _, ok := it.functions[f]; ok {
@@ -132,12 +137,12 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 		return nil
 	}
 
-	irOps, err := Compile(f)
+	ir, err := Compile(f)
 	if err != nil {
 		return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
 	}
 
-	fn, err := it.lowerIROps(f, irOps)
+	fn, err := it.lowerIROps(f, ir.Operations)
 	if err != nil {
 		return fmt.Errorf("failed to lower wazeroir operations to interpreter operations: %w", err)
 	}

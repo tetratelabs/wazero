@@ -338,11 +338,17 @@ const (
 )
 
 type Label struct {
-	FrameID uint32
-	Kind    LabelKind
+	FrameID          uint32
+	OriginalStackLen int
+	Kind             LabelKind
 }
 
 func (l *Label) String() (ret string) {
+	if l == nil {
+		// Sometimes String() is called on the nil label which is interpreted
+		// as the function return.
+		return ""
+	}
 	switch l.Kind {
 	case LabelKindHeader:
 		ret = fmt.Sprintf(".L%d", l.FrameID)

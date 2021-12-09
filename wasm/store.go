@@ -480,6 +480,9 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	// This is not only because we want to do early feedback on malicious binaries,
 	// but also during the compilation phase, the compilers have to see all the possible
 	// function signatures in the module instance.
+	if err = s.engine.PreCompile(target.Functions); err != nil {
+		return rollbackFuncs, fmt.Errorf("failed to precompile: %w", err)
+	}
 	for i, f := range target.Functions {
 		if err := s.engine.Compile(f); err != nil {
 			return rollbackFuncs, fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
@@ -1654,6 +1657,10 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		Signature:      sig,
 		ModuleInstance: m,
 	}
+	if err := s.engine.PreCompile([]*FunctionInstance{f}); err != nil {
+		return fmt.Errorf("failed to precompile %s: %v", f.Name, err)
+	}
+
 	if err := s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}

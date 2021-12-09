@@ -112,7 +112,7 @@ type compiler struct {
 	}
 	pc     uint64
 	f      *wasm.FunctionInstance
-	result []Operation
+	result CompilationResult
 }
 
 // For debugging only.
@@ -132,15 +132,24 @@ func (c *compiler) resetUnreachable() {
 	c.unreachableState.on = false
 }
 
+type CompilationResult struct {
+	// Operations holds wazerois operations compiled from Wasm instructions in a Wasm function.
+	Operations []Operation
+	// LabelCallers maps Label.String() to the number of callers to that label.
+	// Here "callers" means that the callsites which jumps to the label with br, br_if or br_table
+	// instructions.
+	LabelCallers map[string]int
+}
+
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
 // or the JIT compilation engine.
-func Compile(f *wasm.FunctionInstance) ([]Operation, error) {
-	c := compiler{controlFrames: &controlFrames{}, f: f}
+func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
+	c := compiler{controlFrames: &controlFrames{}, f: f, result: CompilationResult{LabelCallers: map[string]int{}}}
 
 	// Push function arguments.
 	for _, t := range f.Signature.InputTypes {
-		c.stackPush(wasmValueTypeToSignless(t))
+		c.stackPush(WasmValueTypeToSignless(t))
 	}
 	// Emit const expressions for locals.
 	// Note that here we don't take function arguments
@@ -153,7 +162,7 @@ func Compile(f *wasm.FunctionInstance) ([]Operation, error) {
 	// Insert the function control frame.
 	returns := make([]SignLessType, 0, len(f.Signature.ReturnTypes))
 	for _, t := range f.Signature.ReturnTypes {
-		returns = append(returns, wasmValueTypeToSignless(t))
+		returns = append(returns, WasmValueTypeToSignless(t))
 	}
 	c.controlFrames.push(&controlFrame{
 		frameID:          c.nextID(),
@@ -165,10 +174,10 @@ func Compile(f *wasm.FunctionInstance) ([]Operation, error) {
 	// Now enter the function body.
 	for !c.controlFrames.empty() {
 		if err := c.handleInstruction(); err != nil {
-			return nil, fmt.Errorf("handling instruction: %w\ndisassemble: %v", err, Format(c.result))
+			return nil, fmt.Errorf("handling instruction: %w\ndisassemble: %v", err, Format(c.result.Operations))
 		}
 	}
-	return c.result, nil
+	return &c.result, nil
 }
 
 // Translate the current Wasm instruction to wazeroir's operations,
@@ -223,7 +232,7 @@ operatorSwitch:
 			kind:             controlFrameKindBlockWithoutContinuationLabel,
 		}
 		for _, t := range bt.ReturnTypes {
-			frame.returns = append(frame.returns, wasmValueTypeToSignless(t))
+			frame.returns = append(frame.returns, WasmValueTypeToSignless(t))
 		}
 		c.controlFrames.push(frame)
 
@@ -249,12 +258,13 @@ operatorSwitch:
 			kind:             controlFrameKindLoop,
 		}
 		for _, t := range bt.ReturnTypes {
-			frame.returns = append(frame.returns, wasmValueTypeToSignless(t))
+			frame.returns = append(frame.returns, WasmValueTypeToSignless(t))
 		}
 		c.controlFrames.push(frame)
 
 		// Prep labels for inside and the continuation of this loop.
-		loopLabel := &Label{FrameID: frame.frameID, Kind: LabelKindHeader}
+		loopLabel := &Label{FrameID: frame.frameID, Kind: LabelKindHeader, OriginalStackLen: frame.originalStackLen}
+		c.result.LabelCallers[loopLabel.String()]++
 
 		// Emit the branch operation to enter inside the loop.
 		c.emit(
@@ -288,13 +298,15 @@ operatorSwitch:
 			kind: controlFrameKindIfWithoutElse,
 		}
 		for _, t := range bt.ReturnTypes {
-			frame.returns = append(frame.returns, wasmValueTypeToSignless(t))
+			frame.returns = append(frame.returns, WasmValueTypeToSignless(t))
 		}
 		c.controlFrames.push(frame)
 
 		// Prep labels for if and else of this if.
-		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID}
-		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
+		thenLabel := &Label{Kind: LabelKindHeader, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+		elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+		c.result.LabelCallers[thenLabel.String()]++
+		c.result.LabelCallers[elseLabel.String()]++
 
 		// Emit the branch operation to enter the then block.
 		c.emit(
@@ -321,7 +333,7 @@ operatorSwitch:
 
 			// We are no longer unreachable in else frame,
 			// so emit the correct label, and reset the unreachable state.
-			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
+			elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse, OriginalStackLen: top.originalStackLen}
 			c.resetUnreachable()
 			c.emit(
 				&OperationLabel{Label: elseLabel},
@@ -340,8 +352,9 @@ operatorSwitch:
 		c.stack = c.stack[:frame.originalStackLen]
 
 		// Prep labels for else and the continueation of this if block.
-		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse}
+		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse, OriginalStackLen: frame.originalStackLen}
 		continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
+		c.result.LabelCallers[continuationLabel.String()]++
 
 		// Emit the instructions for exiting the if loop,
 		// and then the initiation of else block.
@@ -369,10 +382,11 @@ operatorSwitch:
 				c.stackPush(t)
 			}
 
-			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
+			continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation, OriginalStackLen: len(c.stack)}
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
-				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
+				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+				c.result.LabelCallers[elseLabel.String()]++
 				c.emit(
 					&OperationLabel{Label: elseLabel},
 					&OperationBr{Target: continuationLabel.asBranchTarget()},
@@ -414,8 +428,10 @@ operatorSwitch:
 			)
 		case controlFrameKindIfWithoutElse:
 			// This case we have to emit "empty" else label.
-			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID}
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
+			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
+			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID, OriginalStackLen: len(c.stack)}
+			c.result.LabelCallers[elseLabel.String()]++
+			c.result.LabelCallers[continuationLabel.String()]++
 			c.emit(
 				dropOp,
 				&OperationBr{Target: continuationLabel.asBranchTarget()},
@@ -427,7 +443,8 @@ operatorSwitch:
 			)
 		case controlFrameKindBlockWithContinuationLabel,
 			controlFrameKindIfWithElse:
-			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID}
+			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID, OriginalStackLen: len(c.stack)}
+			c.result.LabelCallers[continuationLabel.String()]++
 			c.emit(
 				dropOp,
 				&OperationBr{Target: continuationLabel.asBranchTarget()},
@@ -443,42 +460,46 @@ operatorSwitch:
 		}
 
 	case wasm.OptCodeBr:
-		target, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		targetIndex, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
 		}
 		c.pc += n
 
-		targetFrame := c.controlFrames.get(int(target))
+		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		dropOp := &OperationDrop{Range: c.getFrameDropRange(targetFrame)}
-
+		target := targetFrame.asBranchTarget()
+		c.result.LabelCallers[target.Label.String()]++
 		c.emit(
 			dropOp,
-			&OperationBr{Target: targetFrame.asBranchTarget()},
+			&OperationBr{Target: target},
 		)
 		// Br operation is stack-polymorphic, and mark the state as unreachable.
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
 		c.markUnreachable()
 	case wasm.OptCodeBrIf:
-		target, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		targetIndex, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
 		}
 		c.pc += n
 
-		targetFrame := c.controlFrames.get(int(target))
+		targetFrame := c.controlFrames.get(int(targetIndex))
 		targetFrame.ensureContinuation()
 		drop := c.getFrameDropRange(targetFrame)
+		target := targetFrame.asBranchTarget()
+		c.result.LabelCallers[target.Label.String()]++
 
 		continuationLabel := &Label{FrameID: c.nextID(), Kind: LabelKindHeader}
+		c.result.LabelCallers[continuationLabel.String()]++
 		c.emit(
 			&OperationBrIf{
-				Then: &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asBranchTarget()},
+				Then: &BranchTargetDrop{ToDrop: drop, Target: target},
 				Else: continuationLabel.asBranchTargetDrop(),
 			},
-			// Start emitting then block operations.
+			// Start emitting else block operations.
 			&OperationLabel{
 				Label: continuationLabel,
 			},
@@ -502,7 +523,9 @@ operatorSwitch:
 			targetFrame := c.controlFrames.get(int(l))
 			targetFrame.ensureContinuation()
 			drop := c.getFrameDropRange(targetFrame)
-			targets[i] = &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asBranchTarget()}
+			target := &BranchTargetDrop{ToDrop: drop, Target: targetFrame.asBranchTarget()}
+			targets[i] = target
+			c.result.LabelCallers[target.Target.Label.String()]++
 		}
 
 		// Prep default target control frame.
@@ -514,12 +537,14 @@ operatorSwitch:
 		defaultTargetFrame := c.controlFrames.get(int(l))
 		defaultTargetFrame.ensureContinuation()
 		defaultTargetDrop := c.getFrameDropRange(defaultTargetFrame)
+		defaultTarget := defaultTargetFrame.asBranchTarget()
+		c.result.LabelCallers[defaultTarget.Label.String()]++
 
 		c.emit(
 			&OperationBrTable{
 				Targets: targets,
 				Default: &BranchTargetDrop{
-					ToDrop: defaultTargetDrop, Target: defaultTargetFrame.asBranchTarget(),
+					ToDrop: defaultTargetDrop, Target: defaultTarget,
 				},
 			},
 		)
@@ -1444,7 +1469,7 @@ func (c *compiler) emit(ops ...Operation) {
 					continue
 				}
 			}
-			c.result = append(c.result, op)
+			c.result.Operations = append(c.result.Operations, op)
 			if buildoptions.IsDebugMode {
 				fmt.Printf("emitting ")
 				formatOperation(os.Stdout, op)

@@ -11,3 +11,7 @@ runtime vs interpreting Wasm directly (the `naivevm` interpreter).
 
 Note: `microwasm` was never specified formally, and only exists in a historical codebase of wasmtime:
 https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/microwasm.rs
+
+### JIT engine implementation
+
+See [wasm/jit/RATIONALE.md](wasm/jit/RATIONALE.md).
