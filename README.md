@@ -35,10 +35,11 @@ func Test_fibonacci(t *testing.T) {
 ```
 
 ## Status
-wazero is an early project, so APIs are subject to change until version 1.0.
+- wazero is an early project, so APIs are subject to change until version 1.0.
 
-The wazero runtime passes all the [Wasm Spec test suites](https://github.com/WebAssembly/spec/tree/wg-1.0/test/core) and
+- The interpreter-base wazero runtime passes all the [Wasm Spec test suites](https://github.com/WebAssembly/spec/tree/wg-1.0/test/core) and
 is fully compatible with the WebAssembly v1.0 Specification.
+- We are currently working on a JIT compilation engine written in Go to improve the performance issue. You can check the work-in-progress JIT engine codebase in [wasm/jit](./wasm/jit) directory. Please refer to [wasm/jit/RATIONALE.md](wasm/jit/RATIONALE.md) for the design choices and considerations in our JIT engine.
 
 ## Background
 
@@ -54,5 +55,3 @@ Currently any performance optimization hasn't been done to this runtime yet, and
 However _theoretically speaking_, this project have the potential to compete with these state-of-the-art JIT-style runtimes. The rationale for that is it is well-know that [CGO is slow](https://github.com/golang/go/issues/19574). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
 
 Luckily with unsafe pointer casts, we can do JIT compilation purely in Go (e.g. https://github.com/bspaans/jit-compiler), so if we develop JIT Wasm compiler in Go without using CGO, this runtime could be the fastest one for some usecases where we have to make large amount of CGO calls (e.g. Proxy-Wasm host environment, or request-based plugin systems).
-
-So as a long-term goal for this project, we are planning to add lowering of Wasm binary into more efficient and powerful format, and a JIT compilation engine purely written in Go.
