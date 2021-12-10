@@ -58,7 +58,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	for _, op := range ir.Operations {
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			builder.handleUnreachable()
 		case *wazeroir.OperationLabel:
 			if err := builder.handleLabel(o); err != nil {
 				return nil, fmt.Errorf("error handling label operation: %w", err)
@@ -224,11 +224,12 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 
 func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunction {
 	cf := &compiledWasmFunction{
-		codeSegment:     code,
-		inputs:          uint64(len(b.f.Signature.InputTypes)),
-		returns:         uint64(len(b.f.Signature.ReturnTypes)),
-		memory:          b.f.ModuleInstance.Memory,
-		maxStackPointer: b.locationStack.maxStackPointer,
+		originalFunctionInstance: b.f,
+		codeSegment:              code,
+		inputs:                   uint64(len(b.f.Signature.InputTypes)),
+		returns:                  uint64(len(b.f.Signature.ReturnTypes)),
+		memory:                   b.f.ModuleInstance.Memory,
+		maxStackPointer:          b.locationStack.maxStackPointer,
 	}
 	if cf.memory != nil {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
@@ -296,6 +297,12 @@ func (b *amd64Builder) addInstruction(prog *obj.Prog) {
 func (b *amd64Builder) newProg() (prog *obj.Prog) {
 	prog = b.builder.NewProg()
 	return
+}
+
+func (b *amd64Builder) handleUnreachable() {
+	b.releaseAllRegistersToStack()
+	b.setJITStatus(jitCallStatusCodeUnreachable)
+	b.returnFunction()
 }
 
 func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
@@ -491,7 +498,7 @@ func (b *amd64Builder) handleLabel(o *wazeroir.OperationLabel) error {
 func (b *amd64Builder) handleCall(o *wazeroir.OperationCall) error {
 	target := b.f.ModuleInstance.Functions[o.FunctionIndex]
 	if target.HostFunction != nil {
-		index := b.eng.hostFunctionIndex[target]
+		index := b.eng.compiledHostFunctionIndex[target]
 		b.callHostFunctionFromConstIndex(index)
 	} else {
 		index := b.eng.compiledWasmFunctionIndex[target]

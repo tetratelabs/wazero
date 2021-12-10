@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strings"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -34,20 +35,43 @@ type engine struct {
 	compiledWasmFunctions     []*compiledWasmFunction
 	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int64
 	// Store the host functions and indexes.
-	hostFunctions     []hostFunction
-	hostFunctionIndex map[*wasm.FunctionInstance]int64
+	compiledHostFunctions     []*compiledHostFunction
+	compiledHostFunctionIndex map[*wasm.FunctionInstance]int64
 }
 
-type hostFunction = func(ctx *wasm.HostFunctionCallContext)
-
 func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
+	prevFrame := e.callFrameStack
+	defer func() {
+		if v := recover(); v != nil {
+			top := e.callFrameStack
+			var traces []string
+			var counter int
+			for top != prevFrame {
+				traces = append(traces, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
+				top = top.caller
+				counter++
+				// TODO: include DWARF symbols.
+			}
+			err2, ok := v.(error)
+			if ok {
+				err = fmt.Errorf("wasm runtime error: %w", err2)
+			} else {
+				err = fmt.Errorf("wasm runtime error: %v", v)
+			}
+
+			if len(traces) > 0 {
+				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
+			}
+		}
+	}()
+
 	for _, arg := range args {
 		e.push(arg)
 	}
 	// Note that there's no conflict between e.hostFunctionIndex and e.compiledWasmFunctionIndex,
 	// meaning that each *wasm.FunctionInstance is assigned to either host function index or wasm function one.
-	if index, ok := e.hostFunctionIndex[f]; ok {
-		e.hostFunctions[index](&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
+	if index, ok := e.compiledHostFunctionIndex[f]; ok {
+		e.compiledHostFunctions[index].f(&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
 	} else if index, ok := e.compiledWasmFunctionIndex[f]; ok {
 		f := e.compiledWasmFunctions[index]
 		e.exec(f)
@@ -70,11 +94,11 @@ func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 	var newUniqueHostFunctions, newUniqueWasmFunctions int
 	for _, f := range fs {
 		if f.HostFunction != nil {
-			if _, ok := e.hostFunctionIndex[f]; ok {
+			if _, ok := e.compiledHostFunctionIndex[f]; ok {
 				continue
 			}
-			id := getNewID(e.hostFunctionIndex)
-			e.hostFunctionIndex[f] = id
+			id := getNewID(e.compiledHostFunctionIndex)
+			e.compiledHostFunctionIndex[f] = id
 			newUniqueHostFunctions++
 		} else {
 			if _, ok := e.compiledWasmFunctionIndex[f]; ok {
@@ -85,9 +109,9 @@ func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 			newUniqueWasmFunctions++
 		}
 	}
-	e.hostFunctions = append(
-		e.hostFunctions,
-		make([]hostFunction, newUniqueHostFunctions)...,
+	e.compiledHostFunctions = append(
+		e.compiledHostFunctions,
+		make([]*compiledHostFunction, newUniqueHostFunctions)...,
 	)
 	e.compiledWasmFunctions = append(
 		e.compiledWasmFunctions,
@@ -102,8 +126,8 @@ func getNewID(idMap map[*wasm.FunctionInstance]int64) int64 {
 
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	if f.HostFunction != nil {
-		id := e.hostFunctionIndex[f]
-		if e.hostFunctions[id] != nil {
+		id := e.compiledHostFunctionIndex[f]
+		if e.compiledHostFunctions[id] != nil {
 			// Already compiled.
 			return nil
 		}
@@ -140,7 +164,7 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 				}
 			}
 		}
-		e.hostFunctions[id] = hf
+		e.compiledHostFunctions[id] = &compiledHostFunction{f: hf, name: f.Name}
 	} else {
 		id := e.compiledWasmFunctionIndex[f]
 		if e.compiledWasmFunctions[id] != nil {
@@ -166,7 +190,7 @@ func newEngine() *engine {
 	e := &engine{
 		stack:                     make([]uint64, initialStackSize),
 		compiledWasmFunctionIndex: make(map[*wasm.FunctionInstance]int64),
-		hostFunctionIndex:         make(map[*wasm.FunctionInstance]int64),
+		compiledHostFunctionIndex: make(map[*wasm.FunctionInstance]int64),
 	}
 	return e
 }
@@ -195,6 +219,8 @@ const (
 	jitCallStatusCodeCallBuiltInFunction
 	// jitCallStatusCodeCallWasmFunction means the jitcall returns to make a host function call.
 	jitCallStatusCodeCallHostFunction
+	// jitCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
+	jitCallStatusCodeUnreachable
 	// TODO: trap, etc?
 )
 
@@ -208,6 +234,8 @@ func (s jitCallStatusCode) String() (ret string) {
 		ret = "call_builtin_function"
 	case jitCallStatusCodeCallHostFunction:
 		ret = "call_host_function"
+	case jitCallStatusCodeUnreachable:
+		ret = "unreachable"
 	}
 	return
 }
@@ -226,18 +254,34 @@ type callFrame struct {
 	continuationAddress      uintptr
 	continuationStackPointer uint64
 	baseStackPointer         uint64
-	f                        *compiledWasmFunction
+	wasmFunction             *compiledWasmFunction
+	hostFunction             *compiledHostFunction
 	caller                   *callFrame
 }
 
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
-		"[continuation address=%d, continuation stack pointer=%d, base stack pointer=%d]",
-		c.continuationAddress, c.continuationStackPointer, c.baseStackPointer,
+		"[%s: continuation address=%d, continuation stack pointer=%d, base stack pointer=%d]",
+		c.getFunctionName(), c.continuationAddress, c.continuationStackPointer, c.baseStackPointer,
 	)
 }
 
+func (c *callFrame) getFunctionName() string {
+	if c.wasmFunction != nil {
+		return c.wasmFunction.originalFunctionInstance.Name
+	} else {
+		return c.hostFunction.name
+	}
+}
+
+type compiledHostFunction = struct {
+	f    func(ctx *wasm.HostFunctionCallContext)
+	name string
+}
+
 type compiledWasmFunction struct {
+	// FunctionInstance from which this is compiled.
+	originalFunctionInstance *wasm.FunctionInstance
 	// inputs,returns represents the number of input/returns of function.
 	inputs, returns uint64
 	// codeSegment is holding the compiled native code as a byte slice.
@@ -280,7 +324,7 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 func (e *engine) exec(f *compiledWasmFunction) {
 	e.callFrameStack = &callFrame{
 		continuationAddress:      f.codeInitialAddress,
-		f:                        f,
+		wasmFunction:             f,
 		caller:                   nil,
 		continuationStackPointer: f.inputs,
 	}
@@ -299,7 +343,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		jitcall(
 			currentFrame.continuationAddress,
 			uintptr(unsafe.Pointer(e)),
-			currentFrame.f.memoryAddress,
+			currentFrame.wasmFunction.memoryAddress,
 		)
 
 		// Check the status code from JIT code.
@@ -319,13 +363,13 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so
 			// we can resume this caller function frame.
-			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
+			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 			currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.returns - nextFunc.inputs
 			currentFrame.baseStackPointer = e.currentBaseStackPointer
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
-				f:                   nextFunc,
+				wasmFunction:        nextFunc,
 				// Set the caller frame so we can return back to the current frame!
 				caller: currentFrame,
 				// Set the base pointer to the beginning of the function inputs
@@ -339,17 +383,23 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Set the stack pointer so that base+sp would point to the top of function inputs.
 			e.currentStackPointer = nextFunc.inputs
 		case jitCallStatusCodeCallBuiltInFunction:
-			// TODO: check the signature and modify stack pointer.
 			switch e.functionCallIndex {
 			case builtinFunctionIndexGrowMemory:
 				v := e.pop()
-				e.memoryGrow(currentFrame.f.memory, v)
+				e.memoryGrow(currentFrame.wasmFunction.memory, v)
 			}
-			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
+			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeCallHostFunction:
-			e.hostFunctions[e.functionCallIndex](&wasm.HostFunctionCallContext{Memory: f.memory})
-			// TODO: check the signature and modify stack pointer.
-			currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
+			targetHostFunction := e.compiledHostFunctions[e.functionCallIndex]
+			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
+			// Push the call frame for this host function.
+			e.callFrameStack = &callFrame{hostFunction: targetHostFunction, caller: currentFrame}
+			// Call into the host function.
+			targetHostFunction.f(&wasm.HostFunctionCallContext{Memory: f.memory})
+			// Pop the call frame.
+			e.callFrameStack = currentFrame
+		case jitCallStatusCodeUnreachable:
+			panic("unreachable")
 		}
 	}
 }

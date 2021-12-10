@@ -194,6 +194,7 @@ func Test_setJITStatus(t *testing.T) {
 		jitCallStatusCodeCallWasmFunction,
 		jitCallStatusCodeCallBuiltInFunction,
 		jitCallStatusCodeCallHostFunction,
+		jitCallStatusCodeUnreachable,
 	} {
 		t.Run(s.String(), func(t *testing.T) {
 
@@ -421,9 +422,12 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 
 		// Setup.
 		eng := newEngine()
-		eng.hostFunctions = append(eng.hostFunctions, func(ctx *wasm.HostFunctionCallContext) {
-			eng.stack[eng.currentStackPointer-1] *= 100
-		})
+		hostFunction := &compiledHostFunction{
+			f: func(ctx *wasm.HostFunctionCallContext) {
+				eng.stack[eng.currentStackPointer-1] *= 100
+			},
+		}
+		eng.compiledHostFunctions = append(eng.compiledHostFunctions, hostFunction)
 		mem := newMemoryInst()
 
 		// Call into the function
@@ -470,8 +474,8 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI64},
 			},
 		}
-		eng.hostFunctionIndex[hostFunctionInstance] = 1
-		eng.hostFunctions = make([]hostFunction, 2)
+		eng.compiledHostFunctionIndex[hostFunctionInstance] = 1
+		eng.compiledHostFunctions = make([]*compiledHostFunction, 2)
 		err = eng.Compile(hostFunctionInstance)
 		require.NoError(t, err)
 		mem := newMemoryInst()
@@ -1188,7 +1192,7 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue}
 		builder.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
 		builder.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
-		eng.hostFunctionIndex[hostFuncInstance] = functionIndex
+		eng.compiledHostFunctionIndex[hostFuncInstance] = functionIndex
 
 		// Build codes.
 		builder.initializeReservedRegisters()
@@ -1446,4 +1450,34 @@ func TestAmd64Builder_assemble(t *testing.T) {
 	require.NoError(t, err)
 	actual := binary.LittleEndian.Uint64(code[2:10])
 	require.Equal(t, uint64(prog.Pc), actual)
+}
+
+func TestAmd64Builder_handleUnreachable(t *testing.T) {
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+	x1Reg := int16(x86.REG_AX)
+	x2Reg := int16(x86.REG_R10)
+	builder.locationStack.pushValueOnRegister(x1Reg)
+	builder.locationStack.pushValueOnRegister(x2Reg)
+	builder.movConstToRegister(300, x1Reg)
+	builder.movConstToRegister(51, x2Reg)
+	builder.handleUnreachable()
+
+	// Assemble.
+	code, err := builder.assemble()
+	require.NoError(t, err)
+	// Run code.
+	eng := newEngine()
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+
+	// Check the jitCallStatus of engine.
+	require.Equal(t, jitCallStatusCodeUnreachable, eng.jitCallStatusCode)
+	// All the values on registers must be written back to stack.
+	require.Equal(t, uint64(300), eng.stack[0])
+	require.Equal(t, uint64(51), eng.stack[1])
 }
