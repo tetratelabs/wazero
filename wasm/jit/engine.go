@@ -268,7 +268,7 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 	if maxStackPointer > remained {
 		// This case we need to grow the stack as the empty slots
 		// are not able to store all the stack items.
-		// So we grow the stack with the new len = currentLen*2+required.
+		// So we grow the stack with the new len = currentLen*2+maxStackPointer.
 		newStack := make([]uint64, currentLen*2+(maxStackPointer))
 		top := e.currentBaseStackPointer + e.currentStackPointer
 		copy(newStack[:top], e.stack[:top])

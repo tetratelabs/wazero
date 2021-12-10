@@ -54,6 +54,9 @@ const (
 	conditionalRegisterStateBE                             // CF | ZF below or equal (unsigned <=)
 )
 
+// valueLocation corresponds to each variable pushed onto the wazeroir (virtual) stack,
+// and it has the information about where it exists in the physical machine.
+// It exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
 	valueType wazeroir.SignLessType
 	// Set to -1 if the value is stored in the memory stack.
@@ -76,6 +79,7 @@ func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
 	}
 	return
 }
+
 func (v *valueLocation) setValueType(t wazeroir.SignLessType) {
 	v.valueType = t
 }
@@ -103,10 +107,23 @@ func newValueLocationStack() *valueLocationStack {
 	}
 }
 
+// valueLocationStack represents the wazeroir virtual stack
+// where each item holds the information about where it exists
+// on the physical machine.
+// Notably this is only used in the compilation phase, not runtime,
+// and we change the state of this struct at every wazeroir operation we compile.
+// In this way, we can see where the operands of a operation (for example,
+// two variables for wazeroir add operation.) exist and check the neccesity for
+// moving the variable to registers to perform actual CPU instruction
+// to achieve wazeroir's add operation.
 type valueLocationStack struct {
-	stack           []*valueLocation
-	sp              uint64
-	usedRegisters   map[int16]struct{}
+	// Holds all the variables.
+	stack []*valueLocation
+	// The current stack pointer.
+	sp uint64
+	// Stores the used registers.
+	usedRegisters map[int16]struct{}
+	// Records max(.sp) across the lifespan of this struct.
 	maxStackPointer uint64
 }
 
@@ -128,6 +145,7 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 	}
 	return ret
 }
+
 func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
 	s.markRegisterUsed(reg)
