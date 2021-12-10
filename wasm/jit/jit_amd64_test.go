@@ -1481,3 +1481,29 @@ func TestAmd64Builder_handleUnreachable(t *testing.T) {
 	require.Equal(t, uint64(300), eng.stack[0])
 	require.Equal(t, uint64(51), eng.stack[1])
 }
+
+func TestAmd64Builder_handleSelect(t *testing.T) {
+	// There are mainly 8 cases we have to test:
+	// - [x1 = reg, x2 = reg] select x1
+	// - [x1 = reg, x2 = reg] select x2
+	// - [x1 = reg, x2 = stack] select x1
+	// - [x1 = reg, x2 = stack] select x2
+	// - [x1 = stack, x2 = reg] select x1
+	// - [x1 = stack, x2 = reg] select x2
+	// - [x1 = stack, x2 = stack] select x1
+	// - [x1 = stack, x2 = stack] select x2
+	// And for each case, we have to test with
+	// three conditional value location: stack, gp register, conditional register.
+	// So in total we have 24 cases.
+	const x1Value, x2Value = 100, 200
+	for _, c := range []struct {
+		caseName                                                          string
+		x1OnRgister, x2OnRegister                                         bool
+		selectX1                                                          bool
+		condlValueOnStack, condValueOnGPRegister, condValueOnCondRegister bool
+	}{} {
+		t.Run(c.caseName, func(t *testing.T) {
+
+		})
+	}
+}
