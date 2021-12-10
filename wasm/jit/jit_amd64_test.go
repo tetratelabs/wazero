@@ -1496,14 +1496,118 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 	// three conditional value location: stack, gp register, conditional register.
 	// So in total we have 24 cases.
 	const x1Value, x2Value = 100, 200
-	for _, c := range []struct {
-		caseName                                                          string
+	for i, tc := range []struct {
 		x1OnRgister, x2OnRegister                                         bool
 		selectX1                                                          bool
 		condlValueOnStack, condValueOnGPRegister, condValueOnCondRegister bool
-	}{} {
-		t.Run(c.caseName, func(t *testing.T) {
+	}{
+		// Conditional value on stack.
+		{x1OnRgister: true, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
+		{x1OnRgister: true, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
+		{x1OnRgister: true, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
+		{x1OnRgister: true, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
+		{x1OnRgister: false, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
+		{x1OnRgister: false, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
+		{x1OnRgister: false, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
+		{x1OnRgister: false, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
+		// Conditional value on register.
+		{x1OnRgister: true, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRgister: true, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRgister: true, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRgister: true, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRgister: false, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRgister: false, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRgister: false, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRgister: false, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
+		// Conditional value on conditional register.
+		{x1OnRgister: true, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRgister: true, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRgister: true, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRgister: true, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRgister: false, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRgister: false, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRgister: false, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRgister: false, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
+	} {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			builder := requireNewBuilder(t)
+			eng := newEngine()
+			builder.initializeReservedRegisters()
+			var x1, x2, c *valueLocation
+			if tc.x1OnRgister {
+				x1 = builder.locationStack.pushValueOnRegister(x86.REG_AX)
+				builder.movConstToRegister(x1Value, x1.register)
+			} else {
+				x1 = builder.locationStack.pushValueOnStack()
+				eng.stack[x1.stackPointer] = x1Value
+			}
+			if tc.x2OnRegister {
+				x2 = builder.locationStack.pushValueOnRegister(x86.REG_R10)
+				builder.movConstToRegister(x2Value, x2.register)
+			} else {
+				x2 = builder.locationStack.pushValueOnStack()
+				eng.stack[x2.stackPointer] = x2Value
+			}
+			if tc.condlValueOnStack {
+				c = builder.locationStack.pushValueOnStack()
+				if tc.selectX1 {
+					eng.stack[c.stackPointer] = 1
+				} else {
+					eng.stack[c.stackPointer] = 0
+				}
+			} else if tc.condValueOnGPRegister {
+				c = builder.locationStack.pushValueOnRegister(x86.REG_R9)
+				if tc.selectX1 {
+					builder.movConstToRegister(1, c.register)
+				} else {
+					builder.movConstToRegister(0, c.register)
+				}
+			} else if tc.condValueOnCondRegister {
+				builder.movConstToRegister(0, x86.REG_CX)
+				cmp := builder.newProg()
+				cmp.As = x86.ACMPQ
+				cmp.From.Type = obj.TYPE_REG
+				cmp.From.Reg = x86.REG_CX
+				cmp.To.Type = obj.TYPE_CONST
+				if tc.selectX1 {
+					cmp.To.Offset = 0
+				} else {
+					cmp.To.Offset = 1
+				}
+				builder.addInstruction(cmp)
+				builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+			}
 
+			// Now emit code for select.
+			builder.handleSelect()
+			// The code generation should not affect the x1's placement in any case.
+			require.Equal(t, tc.x1OnRgister, x1.onRegister())
+			// Plus x1 is top of the stack.
+			require.Equal(t, x1, builder.locationStack.peek())
+
+			// Now write back the x1 to the memory if it is on a register.
+			if tc.x1OnRgister {
+				builder.releaseRegisterToStack(x1)
+			}
+			builder.returnFunction()
+
+			// Run code.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			// Check the selected value.
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+			if tc.selectX1 {
+				require.Equal(t, eng.stack[x1.stackPointer], uint64(x1Value))
+			} else {
+				require.Equal(t, eng.stack[x1.stackPointer], uint64(x2Value))
+			}
 		})
 	}
 }
