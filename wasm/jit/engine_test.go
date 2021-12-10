@@ -9,9 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 // Ensures that the offset consts do not drift when we manipulate the engine struct.
@@ -32,25 +30,36 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)
-	store := wasm.NewStore(wazeroir.NewEngine())
-	require.NoError(t, err)
-	err = wasi.NewEnvironment().Register(store)
+	store := wasm.NewStore(NewEngine())
 	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
-	m, ok := store.ModuleInstances["test"]
-	require.True(t, ok)
-	exp, ok := m.Exports["fib"]
-	require.True(t, ok)
-	f := exp.Function
-	eng := newEngine()
-	err = eng.PreCompile([]*wasm.FunctionInstance{f})
-	require.NoError(t, err)
-	err = eng.Compile(f)
-	require.NoError(t, err)
-	out, err := eng.Call(f, 20)
+	out, _, err := store.CallFunction("test", "fib", 20)
 	require.NoError(t, err)
 	require.Equal(t, uint64(10946), out[0])
+}
+
+func TestEngine_unreachable(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip()
+	}
+	buf, err := os.ReadFile("testdata/unreachable.wasm")
+	require.NoError(t, err)
+	mod, err := wasm.DecodeModule(buf)
+	require.NoError(t, err)
+	store := wasm.NewStore(NewEngine())
+	require.NoError(t, err)
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+	_, _, err = store.CallFunction("test", "cause_unreachable")
+	exp := `wasm runtime error: unreachable
+wasm backtrace:
+	0: three
+	1: two
+	2: one
+	3: cause_unreachable`
+	require.Error(t, err)
+	require.Equal(t, exp, err.Error())
 }
 
 func TestEngine_PreCompile(t *testing.T) {
@@ -70,18 +79,18 @@ func TestEngine_PreCompile(t *testing.T) {
 	// Check the indexes.
 	require.Len(t, eng.compiledWasmFunctions, 3)
 	require.Len(t, eng.compiledWasmFunctionIndex, 3)
-	require.Len(t, eng.hostFunctions, 1)
-	require.Len(t, eng.hostFunctionIndex, 1)
+	require.Len(t, eng.compiledHostFunctions, 1)
+	require.Len(t, eng.compiledHostFunctionIndex, 1)
 	prevCompiledFunctions := make([]*compiledWasmFunction, len(eng.compiledWasmFunctions))
-	prevHostFunctions := make([]hostFunction, len(eng.hostFunctions))
+	prevHostFunctions := make([]*compiledHostFunction, len(eng.compiledHostFunctions))
 	copy(prevCompiledFunctions, eng.compiledWasmFunctions)
-	copy(prevHostFunctions, eng.hostFunctions)
+	copy(prevHostFunctions, eng.compiledHostFunctions)
 	err = eng.PreCompile(fs)
 	// Precompiling same functions should be noop.
 	require.NoError(t, err)
 	require.Len(t, eng.compiledWasmFunctionIndex, 3)
-	require.Len(t, eng.hostFunctionIndex, 1)
-	require.Equal(t, prevHostFunctions, eng.hostFunctions)
+	require.Len(t, eng.compiledHostFunctionIndex, 1)
+	require.Equal(t, prevHostFunctions, eng.compiledHostFunctions)
 	require.Equal(t, prevCompiledFunctions, eng.compiledWasmFunctions)
 }
 
