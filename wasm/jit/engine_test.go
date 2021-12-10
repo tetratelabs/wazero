@@ -85,16 +85,35 @@ func TestEngine_PreCompile(t *testing.T) {
 	require.Equal(t, prevCompiledFunctions, eng.compiledWasmFunctions)
 }
 
-func TestEngine_stackGrow(t *testing.T) {
-	eng := newEngine()
-	require.Len(t, eng.stack, initialStackSize)
-	eng.push(10)
-	require.Equal(t, uint64(1), eng.currentStackPointer)
-	require.Equal(t, uint64(10), eng.stack[eng.currentStackPointer-1])
-	eng.stackGrow()
-	require.Len(t, eng.stack, initialStackSize*2)
-	// stackGrow only grows the stack len,
-	// and must not modify neither stack pointer nor the values in the stack.
-	require.Equal(t, uint64(1), eng.currentStackPointer)
-	require.Equal(t, uint64(10), eng.stack[eng.currentStackPointer-1])
+func TestEngine_maybeGrowStack(t *testing.T) {
+	t.Run("grow", func(t *testing.T) {
+		eng := &engine{stack: make([]uint64, 10)}
+		eng.currentBaseStackPointer = 5
+		eng.push(10)
+		require.Equal(t, uint64(1), eng.currentStackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
+		eng.maybeGrowStack(100)
+		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
+		// but we require 100 max stack pointer for the next function,
+		// so this results in making the stack length 120 = 10(current len)*2+(100(maxStackPointer))
+		require.Len(t, eng.stack, 120)
+		// maybeAdjustStack only shrink the stack,
+		// and must not modify neither stack pointer nor the values in the stack.
+		require.Equal(t, uint64(1), eng.currentStackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
+	})
+	t.Run("noop", func(t *testing.T) {
+		eng := &engine{stack: make([]uint64, 10)}
+		eng.currentBaseStackPointer = 1
+		eng.push(10)
+		require.Equal(t, uint64(1), eng.currentStackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
+		eng.maybeGrowStack(6)
+		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
+		// and we only require 6 max stack pointer for the next function, so we have enough empty slots.
+		// so maybeGrowStack must not modify neither stack pointer, the values in the stack nor stack len.
+		require.Len(t, eng.stack, 10)
+		require.Equal(t, uint64(1), eng.currentStackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
+	})
 }
