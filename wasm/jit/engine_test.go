@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -33,8 +32,6 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.NoError(t, err)
 	store := wasm.NewStore(NewEngine())
 	require.NoError(t, err)
-	err = wasi.NewEnvironment().Register(store)
-	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 	out, _, err := store.CallFunction("test", "fib", 20)
@@ -51,8 +48,6 @@ func TestEngine_unreachable(t *testing.T) {
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)
 	store := wasm.NewStore(NewEngine())
-	require.NoError(t, err)
-	err = wasi.NewEnvironment().Register(store)
 	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
