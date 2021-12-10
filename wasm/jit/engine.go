@@ -50,7 +50,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 				traces = append(traces, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
 				top = top.caller
 				counter++
-				// TODO: include DWARF symbols. See #58 
+				// TODO: include DWARF symbols. See #58
 			}
 			err2, ok := v.(error)
 			if ok {
