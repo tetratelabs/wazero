@@ -41,13 +41,14 @@ type engine struct {
 
 func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
 	prevFrame := e.callFrameStack
+	// We ensure that this function never panics.
 	defer func() {
 		if v := recover(); v != nil {
 			top := e.callFrameStack
-			var traces []string
+			var frames []string
 			var counter int
 			for top != prevFrame {
-				traces = append(traces, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
+				frames = append(frames, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
 				top = top.caller
 				counter++
 				// TODO: include DWARF symbols. See #58
@@ -59,8 +60,8 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 				err = fmt.Errorf("wasm runtime error: %v", v)
 			}
 
-			if len(traces) > 0 {
-				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
+			if len(frames) > 0 {
+				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
 			}
 		}
 	}()
@@ -268,7 +269,7 @@ func (c *callFrame) String() string {
 
 func (c *callFrame) getFunctionName() string {
 	if c.wasmFunction != nil {
-		return c.wasmFunction.originalFunctionInstance.Name
+		return c.wasmFunction.source.Name
 	} else {
 		return c.hostFunction.name
 	}
@@ -280,8 +281,8 @@ type compiledHostFunction = struct {
 }
 
 type compiledWasmFunction struct {
-	// FunctionInstance from which this is compiled.
-	originalFunctionInstance *wasm.FunctionInstance
+	// The source function instance from which this is compiled.
+	source *wasm.FunctionInstance
 	// inputs,returns represents the number of input/returns of function.
 	inputs, returns uint64
 	// codeSegment is holding the compiled native code as a byte slice.
