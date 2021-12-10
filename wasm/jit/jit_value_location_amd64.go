@@ -56,7 +56,7 @@ const (
 
 // valueLocation corresponds to each variable pushed onto the wazeroir (virtual) stack,
 // and it has the information about where it exists in the physical machine.
-// It exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
+// It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
 	valueType wazeroir.SignLessType
 	// Set to -1 if the value is stored in the memory stack.
