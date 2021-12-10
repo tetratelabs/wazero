@@ -84,7 +84,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling drop operation: %w", err)
 			}
 		case *wazeroir.OperationSelect:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleSelect(); err != nil {
+				return nil, fmt.Errorf("error handling select operation: %w", err)
+			}
 		case *wazeroir.OperationPick:
 			if err := builder.handlePick(o); err != nil {
 				return nil, fmt.Errorf("error handling pick operation: %w", err)
@@ -890,7 +892,6 @@ func (b *amd64Builder) moveStackToRegister(loc *valueLocation) {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = loc.register
 	b.addInstruction(prog)
-	return
 }
 
 func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
