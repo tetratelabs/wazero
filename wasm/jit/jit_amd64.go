@@ -228,7 +228,7 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 		inputs:          uint64(len(b.f.Signature.InputTypes)),
 		returns:         uint64(len(b.f.Signature.ReturnTypes)),
 		memory:          b.f.ModuleInstance.Memory,
-		maxtStackHeight: b.locationStack.maxHeight,
+		maxStackPointer: b.locationStack.maxStackPointer,
 	}
 	if cf.memory != nil {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))

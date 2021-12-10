@@ -104,10 +104,10 @@ func newValueLocationStack() *valueLocationStack {
 }
 
 type valueLocationStack struct {
-	stack         []*valueLocation
-	sp            uint64
-	usedRegisters map[int16]struct{}
-	maxHeight     uint64
+	stack           []*valueLocation
+	sp              uint64
+	usedRegisters   map[int16]struct{}
+	maxStackPointer uint64
 }
 
 func (s *valueLocationStack) clone() *valueLocationStack {
@@ -156,8 +156,8 @@ func (s *valueLocationStack) push(loc *valueLocation) {
 	} else {
 		s.stack[s.sp] = loc
 	}
-	if s.sp > s.maxHeight {
-		s.maxHeight = s.sp
+	if s.sp > s.maxStackPointer {
+		s.maxStackPointer = s.sp
 	}
 	s.sp++
 }

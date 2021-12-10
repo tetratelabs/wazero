@@ -94,8 +94,8 @@ func TestEngine_maybeGrowStack(t *testing.T) {
 		require.Equal(t, uint64(10), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
 		eng.maybeGrowStack(100)
 		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
-		// but we require 100 max height for the next function,
-		// so this results in making the stack length 120 = 10(current len)*2+(100(requiredMaxHeight))
+		// but we require 100 max stack pointer for the next function,
+		// so this results in making the stack length 120 = 10(current len)*2+(100(maxStackPointer))
 		require.Len(t, eng.stack, 120)
 		// maybeAdjustStack only shrink the stack,
 		// and must not modify neither stack pointer nor the values in the stack.
@@ -110,7 +110,7 @@ func TestEngine_maybeGrowStack(t *testing.T) {
 		require.Equal(t, uint64(10), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
 		eng.maybeGrowStack(6)
 		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
-		// and we only require 6 max height for the next function, so we have enough empty slots.
+		// and we only require 6 max stack pointer for the next function, so we have enough empty slots.
 		// so maybeGrowStack must not modify neither stack pointer, the values in the stack nor stack len.
 		require.Len(t, eng.stack, 10)
 		require.Equal(t, uint64(1), eng.currentStackPointer)

@@ -251,25 +251,25 @@ type compiledWasmFunction struct {
 	codeInitialAddress uintptr
 	// The same purpose as codeInitialAddress, but for memory.Buffer.
 	memoryAddress uintptr
-	// The max of the stack height this function can reach.
-	maxtStackHeight uint64
+	// The max of the stack pointer this function can reach.
+	maxStackPointer uint64
 }
 
 const (
 	builtinFunctionIndexGrowMemory = iota
 )
 
-// Grow the stack size according to requiredHeight argument
-// which is the required height from the base pointer
+// Grow the stack size according to maxStackPointer argument
+// which is the max stack pointer from the base pointer
 // for the next function frame execution.
-func (e *engine) maybeGrowStack(requiredHeight uint64) {
+func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 	currentLen := uint64(len(e.stack))
 	remained := currentLen - e.currentBaseStackPointer
-	if requiredHeight > remained {
+	if maxStackPointer > remained {
 		// This case we need to grow the stack as the empty slots
 		// are not able to store all the stack items.
 		// So we grow the stack with the new len = currentLen*2+required.
-		newStack := make([]uint64, currentLen*2+(requiredHeight))
+		newStack := make([]uint64, currentLen*2+(maxStackPointer))
 		top := e.currentBaseStackPointer + e.currentStackPointer
 		copy(newStack[:top], e.stack[:top])
 		e.stack = newStack
@@ -285,7 +285,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		continuationStackPointer: f.inputs,
 	}
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
-	e.maybeGrowStack(f.maxtStackHeight)
+	e.maybeGrowStack(f.maxStackPointer)
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
@@ -332,7 +332,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputs,
 			}
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
-			e.maybeGrowStack(nextFunc.maxtStackHeight)
+			e.maybeGrowStack(nextFunc.maxStackPointer)
 			// Now move onto the callee function.
 			e.callFrameStack = frame
 			e.currentBaseStackPointer = frame.baseStackPointer
