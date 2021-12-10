@@ -595,7 +595,6 @@ func (b *amd64Builder) handleSelect() error {
 	// Now we can use c.register as temporary location.
 	// We alias it here for readability.
 	tmpRegister := c.register
-	b.locationStack.releaseRegister(c)
 
 	// Set the jump if the top value is not zero.
 	jmpIfNotZero := b.newProg()
@@ -610,6 +609,10 @@ func (b *amd64Builder) handleSelect() error {
 		x2.register = tmpRegister
 		b.moveStackToRegister(x2)
 	}
+
+	//
+	// At this point x2's value is always on a register.
+	//
 
 	// Then release the value in the x2's register to the x1's stack position.
 	if x1.onRegister() {
@@ -628,8 +631,9 @@ func (b *amd64Builder) handleSelect() error {
 	// Else, we don't need to adjust value, just need to jump to the next instruction.
 	b.setJmpOrigin = jmpIfNotZero
 
-	// In any case, we don't need x2 anymore!
+	// In any case, we don't need x2 and c anymore!
 	b.locationStack.releaseRegister(x2)
+	b.locationStack.releaseRegister(c)
 	return nil
 }
 
