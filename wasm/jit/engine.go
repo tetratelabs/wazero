@@ -251,7 +251,7 @@ type compiledWasmFunction struct {
 	codeInitialAddress uintptr
 	// The same purpose as codeInitialAddress, but for memory.Buffer.
 	memoryAddress uintptr
-	// The max of the stack pointer this function can reach.
+	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
 }
 
