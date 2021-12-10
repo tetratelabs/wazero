@@ -1579,7 +1579,8 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 			}
 
 			// Now emit code for select.
-			builder.handleSelect()
+			err := builder.handleSelect()
+			require.NoError(t, err)
 			// The code generation should not affect the x1's placement in any case.
 			require.Equal(t, tc.x1OnRgister, x1.onRegister())
 			// Plus x1 is top of the stack.
