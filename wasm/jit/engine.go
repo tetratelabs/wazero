@@ -41,7 +41,10 @@ type engine struct {
 
 func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
 	prevFrame := e.callFrameStack
-	// We ensure that this function never panics.
+	// We ensure that this Call method never panics as
+	// this is Call method indirectly invoked by embedders via store.CallFunction,
+	// and we have to make sure that all the runtime errors, including the one happening inside
+	// host functions, will be capatured as errors, not panics.
 	defer func() {
 		if v := recover(); v != nil {
 			top := e.callFrameStack
