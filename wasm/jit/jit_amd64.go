@@ -583,16 +583,6 @@ func (b *amd64Builder) handleSelect() error {
 		}
 	}
 
-	// To disambiguate the value location after selection, we move x1 and x2
-	// to stack memory space. As a result, the selected value will be either
-	// of x1 or x2 and placed on top of the stack no matter they live in register or stack.
-	if x2.onRegister() {
-		b.releaseRegisterToStack(x2)
-	}
-	if x1.onRegister() {
-		b.releaseRegisterToStack(x1)
-	}
-
 	// Compare the conditional value with zero.
 	cmpZero := b.newProg()
 	cmpZero.As = x86.ACMPQ
@@ -600,26 +590,46 @@ func (b *amd64Builder) handleSelect() error {
 	cmpZero.From.Reg = c.register
 	cmpZero.To.Type = obj.TYPE_CONST
 	cmpZero.To.Offset = 0
+	b.addInstruction(cmpZero)
 
 	// Now we can use c.register as temporary location.
 	// We alias it here for readability.
 	tmpRegister := c.register
+	b.locationStack.releaseRegister(c)
 
 	// Set the jump if the top value is not zero.
 	jmpIfNotZero := b.newProg()
 	jmpIfNotZero.As = x86.AJNE
 	jmpIfNotZero.To.Type = obj.TYPE_BRANCH
+	b.addInstruction(jmpIfNotZero)
 
 	// If the value is zero, we must place the value of x2 onto the stack position of x1.
-	// First we copy the value of x2 to the temporary register.
-	x2.register = tmpRegister
-	b.moveStackToRegister(x2)
-	// Then release the value to the x1's stack position.
-	x1.register = tmpRegister
-	b.releaseRegisterToStack(x1) // Note inside we mark the register unused!
+
+	// First we copy the value of x2 to the temporary register if x2 is not currently on a register.
+	if x2.onStack() {
+		x2.register = tmpRegister
+		b.moveStackToRegister(x2)
+	}
+
+	// Then release the value in the x2's register to the x1's stack position.
+	if x1.onRegister() {
+		movX2ToX1 := b.newProg()
+		movX2ToX1.As = x86.AMOVQ
+		movX2ToX1.From.Type = obj.TYPE_REG
+		movX2ToX1.From.Reg = x2.register
+		movX2ToX1.To.Type = obj.TYPE_REG
+		movX2ToX1.To.Reg = x1.register
+		b.addInstruction(movX2ToX1)
+	} else {
+		x1.register = x2.register
+		b.releaseRegisterToStack(x1) // Note inside we mark the register unused!
+	}
 
 	// Else, we don't need to adjust value, just need to jump to the next instruction.
 	b.setJmpOrigin = jmpIfNotZero
+
+	// In any case, we don't need x2 anymore!
+	b.locationStack.releaseRegister(x2)
 	return nil
 }
 
