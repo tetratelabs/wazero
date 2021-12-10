@@ -269,8 +269,7 @@ func (e *engine) maybeGrowStack(requiredHeight uint64) {
 		// This case we need to grow the stack as the empty slots
 		// are not able to store all the stack items.
 		// So we grow the stack with the new len = currentLen*2+required.
-		required := requiredHeight - remained
-		newStack := make([]uint64, currentLen*2+(required))
+		newStack := make([]uint64, currentLen*2+(requiredHeight))
 		top := e.currentBaseStackPointer + e.currentStackPointer
 		copy(newStack[:top], e.stack[:top])
 		e.stack = newStack
