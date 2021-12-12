@@ -194,6 +194,7 @@ func (s *valueLocationStack) peek() (loc *valueLocation) {
 func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	delete(s.usedRegisters, loc.register)
 	loc.register = -1
+	loc.conditionalRegister = conditionalRegisterStateUnset
 }
 
 func (s *valueLocationStack) markRegisterUsed(reg int16) {
