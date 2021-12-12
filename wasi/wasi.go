@@ -142,14 +142,14 @@ func (w *WASIEnvirnment) randUnusedFD() uint32 {
 	}
 }
 
-func (w *WASIEnvirnment) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := w.opened[fd]; !ok {
 		return EBADF
 	}
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
 	f, ok := w.opened[fd]
 	if !ok {
 		return EINVAL
@@ -163,7 +163,7 @@ func (w *WASIEnvirnment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, 
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := w.opened[fd]; !ok {
 		return EBADF
 	}
@@ -173,7 +173,7 @@ func (w *WASIEnvirnment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uin
 
 func (w *WASIEnvirnment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
 	fsRightsBase, fsRightsInheriting uint64,
-	fdFlags, fdPtr uint32) (errno uint32) {
+	fdFlags, fdPtr uint32) (errno Errno) {
 	dir, ok := w.opened[fd]
 	if !ok || dir.fileSys == nil {
 		return EINVAL
@@ -200,7 +200,7 @@ func (w *WASIEnvirnment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFla
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
 	var writer io.Writer
 
 	switch fd {
@@ -231,7 +231,7 @@ func (w *WASIEnvirnment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, 
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
 	var reader io.Reader
 
 	switch fd {
@@ -262,7 +262,7 @@ func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, i
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err uint32) {
+func (w *WASIEnvirnment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
 	f, ok := w.opened[fd]
 	if !ok {
 		return EBADF
@@ -277,14 +277,14 @@ func (w *WASIEnvirnment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) 
 	return ESUCCESS
 }
 
-func args_sizes_get(ctx *wasm.HostFunctionCallContext, argcPtr uint32, argvPtr uint32) (err uint32) {
+func args_sizes_get(ctx *wasm.HostFunctionCallContext, argcPtr uint32, argvPtr uint32) (err Errno) {
 	// not implemented yet
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argcPtr:], 0)
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argvPtr:], 0)
 	return 0
 }
 
-func args_get(*wasm.HostFunctionCallContext, uint32, uint32) (err uint32) {
+func args_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	// not implemented yet
 	return
 }
@@ -293,11 +293,11 @@ func proc_exit(*wasm.HostFunctionCallContext, uint32) {
 	// not implemented yet
 }
 
-func environ_sizes_get(*wasm.HostFunctionCallContext, uint32, uint32) (err uint32) {
+func environ_sizes_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	// not implemented yet
 	return
 }
 
-func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err uint32) {
+func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	return
 }
