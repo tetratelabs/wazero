@@ -315,6 +315,14 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 	x1 := b.locationStack.stack[len(b.locationStack.stack)-1]
 	x2 := b.locationStack.stack[index]
 
+	// If x1 is on the conditional register, we must move it to a gp
+	// register before swap.
+	if x1.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(x1); err != nil {
+			return err
+		}
+	}
+
 	if x1.onRegister() && x2.onRegister() {
 		x1.register, x2.register = x2.register, x1.register
 	} else if x1.onRegister() && x2.onStack() {
@@ -341,7 +349,7 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 		// Save x2's value to the temporary top of the stack.
 		tmpStackLocation := b.locationStack.pushValueOnRegister(reg)
 		b.releaseRegisterToStack(tmpStackLocation)
-		// Then move the x2's value to the x2's register location.
+		// Then move the x1's value to the x2's register location.
 		x1.register = reg
 		b.moveStackToRegister(x1)
 		// Now move the x1's value to the x2's stack location.
@@ -366,7 +374,7 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 		// Save x2's value to the temporary top of the stack.
 		tmpStackLocation := b.locationStack.pushValueOnRegister(reg)
 		b.releaseRegisterToStack(tmpStackLocation)
-		// Then move the x2's value to the x2's register location.
+		// Then move the x1's value to the x2's register location.
 		x1.register = reg
 		b.moveStackToRegister(x1)
 		// Now move the x1's value to the x2's stack location.
@@ -380,33 +388,6 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 		x1.setRegister(reg)
 		b.locationStack.markRegisterUsed(reg)
 		_ = b.locationStack.pop() // Delete tmpStackLocation.
-	} else if x1.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(x1); err != nil {
-			return err
-		}
-		if x2.onRegister() {
-			x1.register, x2.register = x2.register, x1.register
-		} else {
-			reg := x1.register
-			// Save x1's value to the temporary top of the stack.
-			tmpStackLocation := b.locationStack.pushValueOnRegister(reg)
-			b.releaseRegisterToStack(tmpStackLocation)
-			// Then move the x2's value to the x1's register location.
-			x2.register = reg
-			b.moveStackToRegister(x2)
-			// Now move the x1's value to the x1's stack location.
-			b.releaseRegisterToStack(x1)
-			// Next we move the saved x1's value to the register.
-			tmpStackLocation.setRegister(reg)
-			b.moveStackToRegister(tmpStackLocation)
-			// Finally move the x1's value in the register to the x2's stack location.
-			b.locationStack.releaseRegister(x1)
-			b.locationStack.releaseRegister(tmpStackLocation)
-			x2.setRegister(reg)
-			b.locationStack.markRegisterUsed(reg)
-			_ = b.locationStack.pop() // Delete tmpStackLocation.
-		}
-
 	}
 	return nil
 }
