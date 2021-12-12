@@ -312,6 +312,9 @@ func (b *amd64Builder) handleUnreachable() {
 
 func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 	index := len(b.locationStack.stack) - 1 - o.Depth
+	// Note that, in theory, the register types and value types
+	// are the same between these swap targets as swap operations
+	// are generated from local.set,tee instructions in Wasm.
 	x1 := b.locationStack.stack[len(b.locationStack.stack)-1]
 	x2 := b.locationStack.stack[index]
 
