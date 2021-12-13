@@ -377,7 +377,7 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 		// as the operand for br_if instruction.
 		if cond.onStack() {
 			// This case even worse, the operand is not on a allocated register, but
-			// actually in the stack memory, so we have to assig a register to it
+			// actually in the stack memory, so we have to assign a register to it
 			// before we judge if we should jump to the Then branch or Else.
 			if err := b.moveStackToRegisterWithAllocation(cond.registerType(), cond); err != nil {
 				return err
