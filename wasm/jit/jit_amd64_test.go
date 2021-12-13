@@ -1612,3 +1612,73 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 		})
 	}
 }
+
+func TestAmd64Builder_handleSwap(t *testing.T) {
+	var x1Value, x2Value int64 = 100, 200
+	for i, tc := range []struct {
+		x1OnConditionalRegister, x1OnRegister, x2OnRegister bool
+	}{
+		{x1OnRegister: true, x2OnRegister: true},
+		{x1OnRegister: true, x2OnRegister: false},
+		{x1OnRegister: false, x2OnRegister: true},
+		{x1OnRegister: false, x2OnRegister: false},
+		// x1 on conditional register
+		{x1OnConditionalRegister: true, x2OnRegister: false},
+		{x1OnConditionalRegister: true, x2OnRegister: true},
+	} {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			eng := newEngine()
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			if tc.x2OnRegister {
+				x2 := builder.locationStack.pushValueOnRegister(x86.REG_R10)
+				builder.movConstToRegister(x2Value, x2.register)
+			} else {
+				x2 := builder.locationStack.pushValueOnStack()
+				eng.stack[x2.stackPointer] = uint64(x2Value)
+			}
+			_ = builder.locationStack.pushValueOnStack() // Dummy value!
+			if tc.x1OnRegister && !tc.x1OnConditionalRegister {
+				x1 := builder.locationStack.pushValueOnRegister(x86.REG_AX)
+				builder.movConstToRegister(x1Value, x1.register)
+			} else if !tc.x1OnConditionalRegister {
+				x1 := builder.locationStack.pushValueOnStack()
+				eng.stack[x1.stackPointer] = uint64(x1Value)
+			} else {
+				builder.movConstToRegister(0, x86.REG_AX)
+				cmp := builder.newProg()
+				cmp.As = x86.ACMPQ
+				cmp.From.Type = obj.TYPE_REG
+				cmp.From.Reg = x86.REG_AX
+				cmp.To.Type = obj.TYPE_CONST
+				cmp.To.Offset = 0
+				cmp.To.Offset = 0
+				builder.addInstruction(cmp)
+				builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+				x1Value = 1
+			}
+
+			// Swap x1 and x2.
+			err := builder.handleSwap(&wazeroir.OperationSwap{Depth: 2})
+			require.NoError(t, err)
+			// To verify the behavior, we release all the registers to stack locations.
+			builder.releaseAllRegistersToStack()
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			require.Equal(t, uint64(3), eng.currentStackPointer)
+			// Check values are swapped.
+			require.Equal(t, uint64(x1Value), eng.stack[0])
+			require.Equal(t, uint64(x2Value), eng.stack[2])
+		})
+	}
+}

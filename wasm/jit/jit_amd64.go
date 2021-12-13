@@ -92,7 +92,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling pick operation: %w", err)
 			}
 		case *wazeroir.OperationSwap:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleSwap(o); err != nil {
+				return nil, fmt.Errorf("error handling swap operation: %w", err)
+			}
 		case *wazeroir.OperationGlobalGet:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationGlobalSet:
@@ -306,6 +308,91 @@ func (b *amd64Builder) handleUnreachable() {
 	b.releaseAllRegistersToStack()
 	b.setJITStatus(jitCallStatusCodeUnreachable)
 	b.returnFunction()
+}
+
+func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
+	index := len(b.locationStack.stack) - 1 - o.Depth
+	// Note that, in theory, the register types and value types
+	// are the same between these swap targets as swap operations
+	// are generated from local.set,tee instructions in Wasm.
+	x1 := b.locationStack.stack[len(b.locationStack.stack)-1]
+	x2 := b.locationStack.stack[index]
+
+	// If x1 is on the conditional register, we must move it to a gp
+	// register before swap.
+	if x1.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(x1); err != nil {
+			return err
+		}
+	}
+
+	if x1.onRegister() && x2.onRegister() {
+		x1.register, x2.register = x2.register, x1.register
+	} else if x1.onRegister() && x2.onStack() {
+		reg := x1.register
+		// Save x1's value to the temporary top of the stack.
+		tmpStackLocation := b.locationStack.pushValueOnRegister(reg)
+		b.releaseRegisterToStack(tmpStackLocation)
+		// Then move the x2's value to the x1's register location.
+		x2.register = reg
+		b.moveStackToRegister(x2)
+		// Now move the x1's value to the x1's stack location.
+		b.releaseRegisterToStack(x1)
+		// Next we move the saved x1's value to the register.
+		tmpStackLocation.setRegister(reg)
+		b.moveStackToRegister(tmpStackLocation)
+		// Finally move the x1's value in the register to the x2's stack location.
+		b.locationStack.releaseRegister(x1)
+		b.locationStack.releaseRegister(tmpStackLocation)
+		x2.setRegister(reg)
+		b.locationStack.markRegisterUsed(reg)
+		_ = b.locationStack.pop() // Delete tmpStackLocation.
+	} else if x1.onStack() && x2.onRegister() {
+		reg := x2.register
+		// Save x2's value to the temporary top of the stack.
+		tmpStackLocation := b.locationStack.pushValueOnRegister(reg)
+		b.releaseRegisterToStack(tmpStackLocation)
+		// Then move the x1's value to the x2's register location.
+		x1.register = reg
+		b.moveStackToRegister(x1)
+		// Now move the x1's value to the x2's stack location.
+		b.releaseRegisterToStack(x2)
+		// Next we move the saved x2's value to the register.
+		tmpStackLocation.setRegister(reg)
+		b.moveStackToRegister(tmpStackLocation)
+		// Finally move the x2's value in the register to the x2's stack location.
+		b.locationStack.releaseRegister(x2)
+		b.locationStack.releaseRegister(tmpStackLocation)
+		x1.setRegister(reg)
+		b.locationStack.markRegisterUsed(reg)
+		_ = b.locationStack.pop() // Delete tmpStackLocation.
+	} else if x1.onStack() && x2.onStack() {
+		reg, err := b.allocateRegister(x1.registerType())
+		if err != nil {
+			return err
+		}
+		// First we move the x2's value to the temp register.
+		x2.setRegister(reg)
+		b.moveStackToRegister(x2)
+		// Save x2's value to the temporary top of the stack.
+		tmpStackLocation := b.locationStack.pushValueOnRegister(reg)
+		b.releaseRegisterToStack(tmpStackLocation)
+		// Then move the x1's value to the x2's register location.
+		x1.register = reg
+		b.moveStackToRegister(x1)
+		// Now move the x1's value to the x2's stack location.
+		b.releaseRegisterToStack(x2)
+		// Next we move the saved x2's value to the register.
+		tmpStackLocation.setRegister(reg)
+		b.moveStackToRegister(tmpStackLocation)
+		// Finally move the x2's value in the register to the x2's stack location.
+		b.locationStack.releaseRegister(x2)
+		b.locationStack.releaseRegister(tmpStackLocation)
+		x1.setRegister(reg)
+		b.locationStack.markRegisterUsed(reg)
+		_ = b.locationStack.pop() // Delete tmpStackLocation.
+	}
+	return nil
 }
 
 func (b *amd64Builder) handleBr(o *wazeroir.OperationBr) error {
