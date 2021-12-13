@@ -84,7 +84,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	builder.addInstruction(jmp)
 	// If not zero, we call push back the value to the stack
 	// and call itself recursively.
-	builder.releaseRegister(loc)
+	builder.releaseRegisterToStack(loc)
 	require.NotContains(t, builder.locationStack.usedRegisters, loc.register)
 	builder.callFunctionFromConstIndex(0)
 	// ::End
@@ -92,7 +92,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	builder.assignRegisterToValue(loc, tmpReg)
 	prog = builder.movConstToRegister(5, loc.register)
 	jmp.To.SetTarget(prog) // the above mov instruction is the jump target of the JEQ.
-	builder.releaseRegister(loc)
+	builder.releaseRegisterToStack(loc)
 	builder.setJITStatus(jitCallStatusCodeReturned)
 	builder.returnFunction()
 	// Compile.
@@ -157,7 +157,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 			loc := builder.locationStack.pushValueOnRegister(pushTargetRegister)
 			builder.movConstToRegister(int64(targetValue), pushTargetRegister)
 			// Push pushTargetRegister into the engine.stack[engine.sp].
-			builder.releaseRegister(loc)
+			builder.releaseRegisterToStack(loc)
 			// Finally increment the stack pointer and write it back to the eng.sp
 			builder.returnFunction()
 
@@ -282,7 +282,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
 	loc := builder.locationStack.pushValueOnRegister(tmpReg)
 	builder.movConstToRegister(int64(50), tmpReg)
-	builder.releaseRegister(loc)
+	builder.releaseRegisterToStack(loc)
 	require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
 	builder.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	builder.returnFunction()
@@ -326,7 +326,7 @@ func Test_callFunction(t *testing.T) {
 		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
 		loc := builder.locationStack.pushValueOnRegister(tmpReg)
 		builder.movConstToRegister(int64(50), tmpReg)
-		builder.releaseRegister(loc)
+		builder.releaseRegisterToStack(loc)
 		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
 		builder.returnFunction()
 		// Compile.
@@ -366,7 +366,7 @@ func Test_callFunction(t *testing.T) {
 		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
 		loc := builder.locationStack.pushValueOnRegister(tmpReg)
 		builder.movConstToRegister(int64(50), tmpReg)
-		builder.releaseRegister(loc)
+		builder.releaseRegisterToStack(loc)
 		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
 		builder.returnFunction()
 		// Compile.
@@ -409,7 +409,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
 		loc := builder.locationStack.pushValueOnRegister(tmpReg)
 		builder.movConstToRegister(int64(50), tmpReg)
-		builder.releaseRegister(loc)
+		builder.releaseRegisterToStack(loc)
 		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
 		builder.callHostFunctionFromConstIndex(functionIndex)
 		// On the continuation after function call,
@@ -449,7 +449,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
 		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
 		builder.movConstToRegister(int64(50), tmpReg)
-		builder.releaseRegister(loc)
+		builder.releaseRegisterToStack(loc)
 		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
 		// Set the function index
 		builder.movConstToRegister(int64(1), tmpReg)
@@ -518,7 +518,7 @@ func Test_popFromStackToRegister(t *testing.T) {
 	result := builder.locationStack.pushValueOnRegister(targetRegister1)
 	builder.addInstruction(prog)
 	// Push it back to the stack.
-	builder.releaseRegister(result)
+	builder.releaseRegisterToStack(result)
 	builder.returnFunction()
 	// Compile.
 	code, err := builder.assemble()
@@ -590,7 +590,7 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 		// Create new value using the stolen register.
 		loc := builder.locationStack.pushValueOnRegister(reg)
 		builder.movConstToRegister(int64(2000), loc.register)
-		builder.releaseRegister(loc)
+		builder.releaseRegisterToStack(loc)
 		builder.returnFunction()
 
 		// Assemble.
@@ -668,9 +668,9 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 		builder.addInstruction(prog)
 		// To verify the behavior, we push the incremented picked value
 		// to the stack.
-		builder.releaseRegister(pickedLocation)
+		builder.releaseRegisterToStack(pickedLocation)
 		// Also write the original location back to the stack.
-		builder.releaseRegister(pickTargetLocation)
+		builder.releaseRegisterToStack(pickTargetLocation)
 		builder.returnFunction()
 
 		// Assemble.
@@ -715,7 +715,7 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 
 		// To verify the behavior, we push the incremented picked value
 		// to the stack.
-		builder.releaseRegister(pickedLocation)
+		builder.releaseRegisterToStack(pickedLocation)
 		builder.returnFunction()
 
 		// Assemble.
@@ -757,7 +757,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = loc.register
 			builder.addInstruction(prog)
-			builder.releaseRegister(loc)
+			builder.releaseRegisterToStack(loc)
 			builder.returnFunction()
 
 			// Assemble.
@@ -798,7 +798,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(x1Location)
+			builder.releaseRegisterToStack(x1Location)
 			builder.returnFunction()
 
 			// Assemble.
@@ -830,7 +830,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(builder.locationStack.peek())
+			builder.releaseRegisterToStack(builder.locationStack.peek())
 			builder.returnFunction()
 
 			// Assemble.
@@ -864,7 +864,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(builder.locationStack.peek())
+			builder.releaseRegisterToStack(builder.locationStack.peek())
 			builder.returnFunction()
 
 			// Assemble.
@@ -898,7 +898,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(builder.locationStack.peek())
+			builder.releaseRegisterToStack(builder.locationStack.peek())
 			builder.returnFunction()
 
 			// Assemble.
@@ -957,7 +957,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			err = builder.moveConditionalToGPRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
-			builder.releaseRegister(top)
+			builder.releaseRegisterToStack(top)
 			builder.returnFunction()
 
 			// Assemble.
@@ -1015,7 +1015,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			err = builder.moveConditionalToGPRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
-			builder.releaseRegister(top)
+			builder.releaseRegisterToStack(top)
 			builder.returnFunction()
 
 			// Assemble.
@@ -1059,7 +1059,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(x1Location)
+			builder.releaseRegisterToStack(x1Location)
 			builder.returnFunction()
 
 			// Assemble.
@@ -1091,7 +1091,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(builder.locationStack.peek())
+			builder.releaseRegisterToStack(builder.locationStack.peek())
 			builder.returnFunction()
 
 			// Assemble.
@@ -1125,7 +1125,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(builder.locationStack.peek())
+			builder.releaseRegisterToStack(builder.locationStack.peek())
 			builder.returnFunction()
 
 			// Assemble.
@@ -1159,7 +1159,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 
 			// To verify the behavior, we push the value
 			// to the stack.
-			builder.releaseRegister(builder.locationStack.peek())
+			builder.releaseRegisterToStack(builder.locationStack.peek())
 			builder.returnFunction()
 
 			// Assemble.
@@ -1375,8 +1375,8 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 				Range: &wazeroir.InclusiveRange{Start: 1, End: 1},
 			})
 			require.NoError(t, err)
-			builder.releaseRegister(bottom)
-			builder.releaseRegister(top)
+			builder.releaseRegisterToStack(bottom)
+			builder.releaseRegisterToStack(top)
 			builder.returnFunction()
 			// Assemble.
 			code, err := builder.assemble()
@@ -1480,4 +1480,135 @@ func TestAmd64Builder_handleUnreachable(t *testing.T) {
 	// All the values on registers must be written back to stack.
 	require.Equal(t, uint64(300), eng.stack[0])
 	require.Equal(t, uint64(51), eng.stack[1])
+}
+
+func TestAmd64Builder_handleSelect(t *testing.T) {
+	// There are mainly 8 cases we have to test:
+	// - [x1 = reg, x2 = reg] select x1
+	// - [x1 = reg, x2 = reg] select x2
+	// - [x1 = reg, x2 = stack] select x1
+	// - [x1 = reg, x2 = stack] select x2
+	// - [x1 = stack, x2 = reg] select x1
+	// - [x1 = stack, x2 = reg] select x2
+	// - [x1 = stack, x2 = stack] select x1
+	// - [x1 = stack, x2 = stack] select x2
+	// And for each case, we have to test with
+	// three conditional value location: stack, gp register, conditional register.
+	// So in total we have 24 cases.
+	const x1Value, x2Value = 100, 200
+	for i, tc := range []struct {
+		x1OnRegister, x2OnRegister                                        bool
+		selectX1                                                          bool
+		condlValueOnStack, condValueOnGPRegister, condValueOnCondRegister bool
+	}{
+		// Conditional value on stack.
+		{x1OnRegister: true, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
+		// Conditional value on register.
+		{x1OnRegister: true, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
+		// Conditional value on conditional register.
+		{x1OnRegister: true, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
+	} {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			builder := requireNewBuilder(t)
+			eng := newEngine()
+			builder.initializeReservedRegisters()
+			var x1, x2, c *valueLocation
+			if tc.x1OnRegister {
+				x1 = builder.locationStack.pushValueOnRegister(x86.REG_AX)
+				builder.movConstToRegister(x1Value, x1.register)
+			} else {
+				x1 = builder.locationStack.pushValueOnStack()
+				eng.stack[x1.stackPointer] = x1Value
+			}
+			if tc.x2OnRegister {
+				x2 = builder.locationStack.pushValueOnRegister(x86.REG_R10)
+				builder.movConstToRegister(x2Value, x2.register)
+			} else {
+				x2 = builder.locationStack.pushValueOnStack()
+				eng.stack[x2.stackPointer] = x2Value
+			}
+			if tc.condlValueOnStack {
+				c = builder.locationStack.pushValueOnStack()
+				if tc.selectX1 {
+					eng.stack[c.stackPointer] = 1
+				} else {
+					eng.stack[c.stackPointer] = 0
+				}
+			} else if tc.condValueOnGPRegister {
+				c = builder.locationStack.pushValueOnRegister(x86.REG_R9)
+				if tc.selectX1 {
+					builder.movConstToRegister(1, c.register)
+				} else {
+					builder.movConstToRegister(0, c.register)
+				}
+			} else if tc.condValueOnCondRegister {
+				builder.movConstToRegister(0, x86.REG_CX)
+				cmp := builder.newProg()
+				cmp.As = x86.ACMPQ
+				cmp.From.Type = obj.TYPE_REG
+				cmp.From.Reg = x86.REG_CX
+				cmp.To.Type = obj.TYPE_CONST
+				if tc.selectX1 {
+					cmp.To.Offset = 0
+				} else {
+					cmp.To.Offset = 1
+				}
+				builder.addInstruction(cmp)
+				builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+			}
+
+			// Now emit code for select.
+			err := builder.handleSelect()
+			require.NoError(t, err)
+			// The code generation should not affect the x1's placement in any case.
+			require.Equal(t, tc.x1OnRegister, x1.onRegister())
+			// Plus x1 is top of the stack.
+			require.Equal(t, x1, builder.locationStack.peek())
+
+			// Now write back the x1 to the memory if it is on a register.
+			if tc.x1OnRegister {
+				builder.releaseRegisterToStack(x1)
+			}
+			builder.returnFunction()
+
+			// Run code.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			// Check the selected value.
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+			if tc.selectX1 {
+				require.Equal(t, eng.stack[x1.stackPointer], uint64(x1Value))
+			} else {
+				require.Equal(t, eng.stack[x1.stackPointer], uint64(x2Value))
+			}
+		})
+	}
 }

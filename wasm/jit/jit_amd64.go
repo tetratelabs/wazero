@@ -78,12 +78,15 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling call operation: %w", err)
 			}
 		case *wazeroir.OperationCallIndirect:
+			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationDrop:
 			if err := builder.handleDrop(o); err != nil {
 				return nil, fmt.Errorf("error handling drop operation: %w", err)
 			}
 		case *wazeroir.OperationSelect:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleSelect(); err != nil {
+				return nil, fmt.Errorf("error handling select operation: %w", err)
+			}
 		case *wazeroir.OperationPick:
 			if err := builder.handlePick(o); err != nil {
 				return nil, fmt.Errorf("error handling pick operation: %w", err)
@@ -374,9 +377,9 @@ func (b *amd64Builder) handleBrIf(o *wazeroir.OperationBrIf) error {
 		// as the operand for br_if instruction.
 		if cond.onStack() {
 			// This case even worse, the operand is not on a allocated register, but
-			// actually in the stack memory, so we have to assig a register to it
+			// actually in the stack memory, so we have to assign a register to it
 			// before we judge if we should jump to the Then branch or Else.
-			if err := b.moveStackToRegister(cond.registerType(), cond); err != nil {
+			if err := b.moveStackToRegisterWithAllocation(cond.registerType(), cond); err != nil {
 				return err
 			}
 		}
@@ -552,7 +555,7 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 				topIsConditional = false
 			}
 			// Write the value in the old stack location to a register
-			if err := b.moveStackToRegister(live.registerType(), live); err != nil {
+			if err := b.moveStackToRegisterWithAllocation(live.registerType(), live); err != nil {
 				return err
 			}
 			// Modify the location in the stack with new stack pointer.
@@ -561,6 +564,84 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 			b.locationStack.push(live)
 		}
 	}
+	return nil
+}
+
+// handleSelect uses top three values on the stack:
+// Assume we have stack as [..., x1, x2, c], if the value of c
+// equals zero, then the stack results in [..., x1]
+// otherwise, [..., x2].
+// The emitted native code depends on whether the values are on
+// the physical registers or memory stack, or maybe conditional register.
+func (b *amd64Builder) handleSelect() error {
+	c := b.locationStack.pop()
+	x2 := b.locationStack.pop()
+	// We do not consume x1 here, but modify the value according to
+	// the conditional value "c" above.
+	peekedX1 := b.locationStack.peek()
+
+	// Ensure the conditional value lives in a gp register.
+	if c.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(c); err != nil {
+			return err
+		}
+	} else if c.onStack() {
+		if err := b.moveStackToRegisterWithAllocation(c.registerType(), c); err != nil {
+			return err
+		}
+	}
+
+	// Compare the conditional value with zero.
+	cmpZero := b.newProg()
+	cmpZero.As = x86.ACMPQ
+	cmpZero.From.Type = obj.TYPE_REG
+	cmpZero.From.Reg = c.register
+	cmpZero.To.Type = obj.TYPE_CONST
+	cmpZero.To.Offset = 0
+	b.addInstruction(cmpZero)
+
+	// Now we can use c.register as temporary location.
+	// We alias it here for readability.
+	tmpRegister := c.register
+
+	// Set the jump if the top value is not zero.
+	jmpIfNotZero := b.newProg()
+	jmpIfNotZero.As = x86.AJNE
+	jmpIfNotZero.To.Type = obj.TYPE_BRANCH
+	b.addInstruction(jmpIfNotZero)
+
+	// If the value is zero, we must place the value of x2 onto the stack position of x1.
+
+	// First we copy the value of x2 to the temporary register if x2 is not currently on a register.
+	if x2.onStack() {
+		x2.register = tmpRegister
+		b.moveStackToRegister(x2)
+	}
+
+	//
+	// At this point x2's value is always on a register.
+	//
+
+	// Then release the value in the x2's register to the x1's stack position.
+	if peekedX1.onRegister() {
+		movX2ToX1 := b.newProg()
+		movX2ToX1.As = x86.AMOVQ
+		movX2ToX1.From.Type = obj.TYPE_REG
+		movX2ToX1.From.Reg = x2.register
+		movX2ToX1.To.Type = obj.TYPE_REG
+		movX2ToX1.To.Reg = peekedX1.register
+		b.addInstruction(movX2ToX1)
+	} else {
+		peekedX1.register = x2.register
+		b.releaseRegisterToStack(peekedX1) // Note inside we mark the register unused!
+	}
+
+	// Else, we don't need to adjust value, just need to jump to the next instruction.
+	b.setJmpOrigin = jmpIfNotZero
+
+	// In any case, we don't need x2 and c anymore!
+	b.locationStack.releaseRegister(x2)
+	b.locationStack.releaseRegister(c)
 	return nil
 }
 
@@ -628,7 +709,7 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 
 	x2 := b.locationStack.pop()
 	if x2.onStack() {
-		if err := b.moveStackToRegister(tp, x2); err != nil {
+		if err := b.moveStackToRegisterWithAllocation(tp, x2); err != nil {
 			return err
 		}
 	} else if x2.onConditionalRegister() {
@@ -639,7 +720,7 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 
 	x1 := b.locationStack.peek() // Note this is peek, pop!
 	if x1.onStack() {
-		if err := b.moveStackToRegister(tp, x1); err != nil {
+		if err := b.moveStackToRegisterWithAllocation(tp, x1); err != nil {
 			return err
 		}
 	} else if x1.onConditionalRegister() {
@@ -689,7 +770,7 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 
 	x2 := b.locationStack.pop()
 	if x2.onStack() {
-		if err := b.moveStackToRegister(tp, x2); err != nil {
+		if err := b.moveStackToRegisterWithAllocation(tp, x2); err != nil {
 			return err
 		}
 	} else if x2.onConditionalRegister() {
@@ -700,7 +781,7 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 
 	x1 := b.locationStack.peek() // Note this is peek, pop!
 	if x1.onStack() {
-		if err := b.moveStackToRegister(tp, x1); err != nil {
+		if err := b.moveStackToRegisterWithAllocation(tp, x1); err != nil {
 			return err
 		}
 	} else if x1.onConditionalRegister() {
@@ -755,7 +836,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 
 	x2 := b.locationStack.pop()
 	if x2.onStack() {
-		if err := b.moveStackToRegister(tp, x2); err != nil {
+		if err := b.moveStackToRegisterWithAllocation(tp, x2); err != nil {
 			return err
 		}
 	} else if x2.onConditionalRegister() {
@@ -766,7 +847,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 
 	x1 := b.locationStack.pop()
 	if x1.onStack() {
-		if err := b.moveStackToRegister(tp, x1); err != nil {
+		if err := b.moveStackToRegisterWithAllocation(tp, x1); err != nil {
 			return err
 		}
 	} else if x1.onConditionalRegister() {
@@ -807,27 +888,33 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 	return nil
 }
 
-func (b *amd64Builder) moveStackToRegister(tp generalPurposeRegisterType, loc *valueLocation) error {
+// TODO: maybe split this function as this is doing too much at once to say at once.
+func (b *amd64Builder) moveStackToRegisterWithAllocation(tp generalPurposeRegisterType, loc *valueLocation) error {
 	// Allocate the register.
 	reg, err := b.allocateRegister(tp)
 	if err != nil {
 		return err
 	}
 
-	// Then copy the value from the stack.
+	// Mark it uses the register.
+	loc.setRegister(reg)
+	b.locationStack.markRegisterUsed(reg)
+
+	// Now ready to move value.
+	b.moveStackToRegister(loc)
+	return nil
+}
+
+func (b *amd64Builder) moveStackToRegister(loc *valueLocation) {
+	// Copy the value from the stack.
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
 	prog.From.Reg = cachedStackBasePointerReg
 	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = reg
+	prog.To.Reg = loc.register
 	b.addInstruction(prog)
-
-	// Mark it uses the register.
-	loc.setRegister(reg)
-	b.locationStack.markRegisterUsed(reg)
-	return nil
 }
 
 func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
@@ -908,7 +995,7 @@ func (b *amd64Builder) allocateRegister(t generalPurposeRegisterType) (reg int16
 
 	// Release the steal target register value onto stack location.
 	reg = stealTarget.register
-	b.releaseRegister(stealTarget)
+	b.releaseRegisterToStack(stealTarget)
 	return
 }
 
@@ -985,7 +1072,7 @@ func (b *amd64Builder) releaseAllRegistersToStack() {
 	used := len(b.locationStack.usedRegisters)
 	for i := len(b.locationStack.stack) - 1; i >= 0 && used > 0; i-- {
 		if loc := b.locationStack.stack[i]; loc.onRegister() {
-			b.releaseRegister(loc)
+			b.releaseRegisterToStack(loc)
 			used--
 		}
 	}
@@ -1063,7 +1150,7 @@ func (b *amd64Builder) movConstToRegister(val int64, targetRegister int16) *obj.
 	return prog
 }
 
-func (b *amd64Builder) releaseRegister(loc *valueLocation) {
+func (b *amd64Builder) releaseRegisterToStack(loc *valueLocation) {
 	// Push value.
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
