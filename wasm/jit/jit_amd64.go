@@ -570,7 +570,7 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 func (b *amd64Builder) handleSelect() error {
 	c := b.locationStack.pop()
 	x2 := b.locationStack.pop()
-	x1 := b.locationStack.peek() // Note this is peek!
+	peekedX1 := b.locationStack.peek()
 
 	// Ensure the conditional value lives in a gp register.
 	if c.onConditionalRegister() {
