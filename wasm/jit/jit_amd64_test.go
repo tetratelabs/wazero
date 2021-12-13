@@ -1534,7 +1534,7 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 			eng := newEngine()
 			builder.initializeReservedRegisters()
 			var x1, x2, c *valueLocation
-			if tc.x1OnRgister {
+			if tc.x1OnRegister {
 				x1 = builder.locationStack.pushValueOnRegister(x86.REG_AX)
 				builder.movConstToRegister(x1Value, x1.register)
 			} else {
