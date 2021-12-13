@@ -888,6 +888,7 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 	return nil
 }
 
+// TODO: maybe split this function as this is doing too much at once to say at once.
 func (b *amd64Builder) moveStackToRegisterWithAllocation(tp generalPurposeRegisterType, loc *valueLocation) error {
 	// Allocate the register.
 	reg, err := b.allocateRegister(tp)
