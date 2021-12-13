@@ -567,6 +567,12 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 	return nil
 }
 
+// handleSelect uses top three values on the stack:
+// Assume we have stack as [..., x1, x2, c], if the value of c
+// equals zero, then the stack results in [..., x1]
+// otherwise, [..., x2].
+// The emitted native code depends on whether the values are on
+// the physical registers or memory stack, or maybe conditional register.
 func (b *amd64Builder) handleSelect() error {
 	c := b.locationStack.pop()
 	x2 := b.locationStack.pop()
