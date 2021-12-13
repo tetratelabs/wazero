@@ -570,6 +570,8 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 func (b *amd64Builder) handleSelect() error {
 	c := b.locationStack.pop()
 	x2 := b.locationStack.pop()
+	// We do not consume x1 here, but modify the value according to
+	// the conditional value "c" above.
 	peekedX1 := b.locationStack.peek()
 
 	// Ensure the conditional value lives in a gp register.
@@ -615,17 +617,17 @@ func (b *amd64Builder) handleSelect() error {
 	//
 
 	// Then release the value in the x2's register to the x1's stack position.
-	if x1.onRegister() {
+	if peekedX1.onRegister() {
 		movX2ToX1 := b.newProg()
 		movX2ToX1.As = x86.AMOVQ
 		movX2ToX1.From.Type = obj.TYPE_REG
 		movX2ToX1.From.Reg = x2.register
 		movX2ToX1.To.Type = obj.TYPE_REG
-		movX2ToX1.To.Reg = x1.register
+		movX2ToX1.To.Reg = peekedX1.register
 		b.addInstruction(movX2ToX1)
 	} else {
-		x1.register = x2.register
-		b.releaseRegisterToStack(x1) // Note inside we mark the register unused!
+		peekedX1.register = x2.register
+		b.releaseRegisterToStack(peekedX1) // Note inside we mark the register unused!
 	}
 
 	// Else, we don't need to adjust value, just need to jump to the next instruction.

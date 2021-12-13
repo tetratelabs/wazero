@@ -1497,37 +1497,37 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 	// So in total we have 24 cases.
 	const x1Value, x2Value = 100, 200
 	for i, tc := range []struct {
-		x1OnRgister, x2OnRegister                                         bool
+		x1OnRegister, x2OnRegister                                        bool
 		selectX1                                                          bool
 		condlValueOnStack, condValueOnGPRegister, condValueOnCondRegister bool
 	}{
 		// Conditional value on stack.
-		{x1OnRgister: true, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
-		{x1OnRgister: true, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
-		{x1OnRgister: true, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
-		{x1OnRgister: true, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
-		{x1OnRgister: false, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
-		{x1OnRgister: false, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
-		{x1OnRgister: false, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
-		{x1OnRgister: false, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: false, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: true, condlValueOnStack: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condlValueOnStack: true},
 		// Conditional value on register.
-		{x1OnRgister: true, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
-		{x1OnRgister: true, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
-		{x1OnRgister: true, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
-		{x1OnRgister: true, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
-		{x1OnRgister: false, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
-		{x1OnRgister: false, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
-		{x1OnRgister: false, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
-		{x1OnRgister: false, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: false, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: true, condValueOnGPRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condValueOnGPRegister: true},
 		// Conditional value on conditional register.
-		{x1OnRgister: true, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
-		{x1OnRgister: true, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
-		{x1OnRgister: true, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
-		{x1OnRgister: true, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
-		{x1OnRgister: false, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
-		{x1OnRgister: false, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
-		{x1OnRgister: false, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
-		{x1OnRgister: false, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: true, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: true, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: true, selectX1: false, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: true, condValueOnCondRegister: true},
+		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			builder := requireNewBuilder(t)
@@ -1582,12 +1582,12 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 			err := builder.handleSelect()
 			require.NoError(t, err)
 			// The code generation should not affect the x1's placement in any case.
-			require.Equal(t, tc.x1OnRgister, x1.onRegister())
+			require.Equal(t, tc.x1OnRegister, x1.onRegister())
 			// Plus x1 is top of the stack.
 			require.Equal(t, x1, builder.locationStack.peek())
 
 			// Now write back the x1 to the memory if it is on a register.
-			if tc.x1OnRgister {
+			if tc.x1OnRegister {
 				builder.releaseRegisterToStack(x1)
 			}
 			builder.returnFunction()
