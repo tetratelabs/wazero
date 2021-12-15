@@ -213,9 +213,12 @@ func lex(source []byte, parser parseToken) error {
 	return nil // EOF
 }
 
-// utf8Size returns the size of the UTF-8 rune based on its first byte, or zero
+// utf8Size returns the size of the UTF-8 rune based on its first byte, or zero.
+//
+// Note: We don't validate the subsequent bytes make a well-formed UTF-8 rune intentionally for performance and to keep
+// lexing allocation free. Meanwhile, the impact is that we might skip over malformed bytes.
 var utf8Size = [256]int{
-	//   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+	// 1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
 	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x00-0x0F
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x10-0x1F
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x20-0x2F
@@ -224,7 +227,7 @@ var utf8Size = [256]int{
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x50-0x5F
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x60-0x6F
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x70-0x7F
-	//   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+	// 1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 0x80-0x8F
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 0x90-0x9F
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 0xA0-0xAF
