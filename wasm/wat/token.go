@@ -91,7 +91,7 @@ const (
 )
 
 // tokenNames is index-coordinated with tokenType
-var tokenNames = []string{
+var tokenNames = [...]string{
 	"tokenInvalid",
 	"tokenKeyword",
 	"tokenUN",
