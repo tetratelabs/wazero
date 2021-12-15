@@ -79,7 +79,7 @@ const (
 	// tokenLParen is a left paren: '('
 	tokenLParen
 
-	// tokenLParen is a left paren: ')'
+	// tokenRParen is a right paren: ')'
 	tokenRParen
 
 	// tokenReserved is a sequence of idChar characters which are neither a tokenId nor a tokenString.
