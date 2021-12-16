@@ -232,7 +232,7 @@ func lex(fileName string, source []byte, parser parseToken) error {
 
 // utf8Size returns the size of the UTF-8 rune based on its first byte, or zero.
 //
-// Note: The null byte (0x00) is here as it is valid in comments. See WebAssembly/spec#1372
+// Note: The null byte (0x00) is here as it is valid in string tokens and comments. See WebAssembly/spec#1372
 //
 // Note: We don't validate the subsequent bytes make a well-formed UTF-8 rune intentionally for performance and to keep
 // lexing allocation free. Meanwhile, the impact is that we might skip over malformed bytes.
