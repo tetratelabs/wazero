@@ -66,7 +66,7 @@ const (
 	// See https://www.w3.org/TR/wasm-core-1/#strings%E2%91%A0
 	tokenString
 
-	// tokenId is a sequence of idChar characters prefixed by a '$':
+	// tokenID is a sequence of idChar characters prefixed by a '$':
 	//
 	// For example, in the below, '$y' is an id:
 	//		local.get $y
@@ -82,7 +82,7 @@ const (
 	// tokenRParen is a right paren: ')'
 	tokenRParen
 
-	// tokenReserved is a sequence of idChar characters which are neither a tokenId nor a tokenString.
+	// tokenReserved is a sequence of idChar characters which are neither a tokenID nor a tokenString.
 	//
 	// For example, '0$y' is a tokenReserved, because it doesn't start with a letter or '$'.
 	//
@@ -98,7 +98,7 @@ var tokenNames = [...]string{
 	"tokenSN",
 	"tokenFN",
 	"tokenString",
-	"tokenId",
+	"tokenID",
 	"tokenLParen",
 	"tokenRParen",
 	"tokenReserved",
@@ -115,8 +115,8 @@ const (
 	xx = tokenInvalid
 	// xs is the start of tokenString ('"')
 	xs = tokenString
-	// xi is the start of tokenId ('$')
-	xi = tokenId
+	// xi is the start of tokenID ('$')
+	xi = tokenID
 	// lp is the start of tokenLParen ('(')
 	lp = tokenLParen
 	// rp is the start of tokenRParen (')')

@@ -16,7 +16,7 @@ func TestTokenType_String(t *testing.T) {
 		{tokenSN, "tokenSN"},
 		{tokenFN, "tokenFN"},
 		{tokenString, "tokenString"},
-		{tokenId, "tokenId"},
+		{tokenID, "tokenID"},
 		{tokenLParen, "tokenLParen"},
 		{tokenRParen, "tokenRParen"},
 		{tokenReserved, "tokenReserved"},

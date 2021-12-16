@@ -192,7 +192,7 @@ func lex(source []byte, parser parseToken) error {
 			// set the position to after the quote
 			peekPos = peekPos + 1
 			col = col + 1
-		case tokenKeyword, tokenId, tokenReserved: // min 1 byte; end with zero or more idChar
+		case tokenKeyword, tokenID, tokenReserved: // min 1 byte; end with zero or more idChar
 			// Start after the first character and run until the end. Note all allowed characters are single byte.
 		IdChars:
 			for ; peekPos < length; peekPos = peekPos + 1 {
