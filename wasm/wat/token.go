@@ -74,7 +74,7 @@ const (
 	//		i32.lt_s
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#text-id
-	tokenId
+	tokenID
 
 	// tokenLParen is a left paren: '('
 	tokenLParen
