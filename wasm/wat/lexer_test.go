@@ -223,13 +223,13 @@ func TestLex(t *testing.T) {
 		},
 		{
 			name:     "after white space characters - EOL",
-			input:    " \t\n(",
-			expected: []*token{{tokenLParen, 2, 1, 3, "("}},
+			input:    " \t\na",
+			expected: []*token{{tokenKeyword, 2, 1, 3, "a"}},
 		},
 		{
 			name:     "after white space characters - Windows EOL",
-			input:    " \t\r\n(",
-			expected: []*token{{tokenLParen, 2, 1, 4, "("}},
+			input:    " \t\r\na",
+			expected: []*token{{tokenKeyword, 2, 1, 4, "a"}},
 		},
 		{
 			name:  "only line comment - EOL before EOF",
@@ -245,43 +245,43 @@ func TestLex(t *testing.T) {
 		},
 		{
 			name:     "after line comment",
-			input:    ";; TODO\n(",
-			expected: []*token{{tokenLParen, 2, 1, 8, "("}},
+			input:    ";; TODO\na",
+			expected: []*token{{tokenKeyword, 2, 1, 8, "a"}},
 		},
 		{
 			name:     "double line comment",
-			input:    ";; TODO\n;; YOLO\n(",
-			expected: []*token{{tokenLParen, 3, 1, 16, "("}},
+			input:    ";; TODO\n;; YOLO\na",
+			expected: []*token{{tokenKeyword, 3, 1, 16, "a"}},
 		},
 		{
 			name:     "after unicode line comment",
-			input:    ";; брэд-ЛГТМ\n(",
-			expected: []*token{{tokenLParen, 2, 1, 21, "("}},
+			input:    ";; брэд-ЛГТМ\na",
+			expected: []*token{{tokenKeyword, 2, 1, 21, "a"}},
 		},
 		{
 			name:     "after line comment - Windows EOL",
-			input:    ";; TODO\r\n(",
-			expected: []*token{{tokenLParen, 2, 1, 9, "("}},
+			input:    ";; TODO\r\na",
+			expected: []*token{{tokenKeyword, 2, 1, 9, "a"}},
 		},
 		{
 			name:     "after redundant line comment",
-			input:    ";;;; TODO\n(",
-			expected: []*token{{tokenLParen, 2, 1, 10, "("}},
+			input:    ";;;; TODO\na",
+			expected: []*token{{tokenKeyword, 2, 1, 10, "a"}},
 		},
 		{
 			name:     "after line commenting out block comment",
-			input:    ";; TODO (; ;)\n(",
-			expected: []*token{{tokenLParen, 2, 1, 14, "("}},
+			input:    ";; TODO (; ;)\na",
+			expected: []*token{{tokenKeyword, 2, 1, 14, "a"}},
 		},
 		{
 			name:     "after line commenting out open block comment",
-			input:    ";; TODO (;\n(",
-			expected: []*token{{tokenLParen, 2, 1, 11, "("}},
+			input:    ";; TODO (;\na",
+			expected: []*token{{tokenKeyword, 2, 1, 11, "a"}},
 		},
 		{
 			name:     "after line commenting out close block comment",
-			input:    ";; TODO ;)\n(",
-			expected: []*token{{tokenLParen, 2, 1, 11, "("}},
+			input:    ";; TODO ;)\na",
+			expected: []*token{{tokenKeyword, 2, 1, 11, "a"}},
 		},
 		{
 			name:  "only block comment - EOL before EOF",
@@ -297,18 +297,18 @@ func TestLex(t *testing.T) {
 		},
 		{
 			name:     "double block comment",
-			input:    "(; TODO ;)(; YOLO ;))",
-			expected: []*token{{tokenRParen, 1, 21, 20, ")"}},
+			input:    "(; TODO ;)(; YOLO ;)a",
+			expected: []*token{{tokenKeyword, 1, 21, 20, "a"}},
 		},
 		{
 			name:     "double block comment - EOL",
-			input:    "(; TODO ;)\n(; YOLO ;)\n)",
-			expected: []*token{{tokenRParen, 3, 1, 22, ")"}},
+			input:    "(; TODO ;)\n(; YOLO ;)\na",
+			expected: []*token{{tokenKeyword, 3, 1, 22, "a"}},
 		},
 		{
 			name:     "after block comment",
-			input:    "(; TODO ;)(",
-			expected: []*token{{tokenLParen, 1, 11, 10, "("}},
+			input:    "(; TODO ;)a",
+			expected: []*token{{tokenKeyword, 1, 11, 10, "a"}},
 		},
 		{
 			name:  "only nested block comment - EOL before EOF",
@@ -324,23 +324,33 @@ func TestLex(t *testing.T) {
 		},
 		{
 			name:     "after nested block comment",
-			input:    "(; TODO (; (YOLO) ;) ;)(",
-			expected: []*token{{tokenLParen, 1, 24, 23, "("}},
+			input:    "(; TODO (; (YOLO) ;) ;)a",
+			expected: []*token{{tokenKeyword, 1, 24, 23, "a"}},
 		},
 		{
 			name:     "after nested block comment - EOL",
-			input:    "(; TODO (; (YOLO) ;) ;)\n (",
-			expected: []*token{{tokenLParen, 2, 2, 25, "("}},
+			input:    "(; TODO (; (YOLO) ;) ;)\n a",
+			expected: []*token{{tokenKeyword, 2, 2, 25, "a"}},
 		},
 		{
 			name:     "after nested block comment - Windows EOL",
-			input:    "(; TODO (; (YOLO) ;) ;)\r\n (",
-			expected: []*token{{tokenLParen, 2, 2, 26, "("}},
+			input:    "(; TODO (; (YOLO) ;) ;)\r\n a",
+			expected: []*token{{tokenKeyword, 2, 2, 26, "a"}},
 		},
 		{
 			name:     "white space between parens",
 			input:    "( )",
 			expected: []*token{{tokenLParen, 1, 1, 0, "("}, {tokenRParen, 1, 3, 2, ")"}},
+		},
+		{
+			name:  "nested parens",
+			input: "(())",
+			expected: []*token{
+				{tokenLParen, 1, 1, 0, "("},
+				{tokenLParen, 1, 2, 1, "("},
+				{tokenRParen, 1, 3, 2, ")"},
+				{tokenRParen, 1, 4, 3, ")"},
+			},
 		},
 		{
 			name:     "empty string",
@@ -421,6 +431,26 @@ func TestLex_Errors(t *testing.T) {
 		expectedErr error
 	}{
 		{
+			name:        "close paren before open paren",
+			input:       []byte(")("),
+			expectedErr: errors.New("1:1 found ')' before '('"),
+		},
+		{
+			name:        "unbalanced nesting",
+			input:       []byte("(()"),
+			expectedErr: errors.New("1:4 expected ')', but reached end of input"),
+		},
+		{
+			name:        "open paren at end of input",
+			input:       []byte("("),
+			expectedErr: errors.New("1:1 found '(' at end of input"),
+		},
+		{
+			name:        "begin block comment at end of input",
+			input:       []byte("(;"),
+			expectedErr: errors.New("1:3 expected block comment end ';)', but reached end of input"),
+		},
+		{
 			name:        "half line comment",
 			input:       []byte("; TODO"),
 			expectedErr: errors.New("1:1 unexpected character ;"),
@@ -428,7 +458,7 @@ func TestLex_Errors(t *testing.T) {
 		{
 			name:        "open block comment",
 			input:       []byte("(; TODO"),
-			expectedErr: errors.New("1:7 expected block comment end ';)'"),
+			expectedErr: errors.New("1:8 expected block comment end ';)', but reached end of input"),
 		},
 		{
 			name:        "close block comment",
@@ -438,7 +468,7 @@ func TestLex_Errors(t *testing.T) {
 		{
 			name:        "unbalanced nested block comment",
 			input:       []byte("(; TODO (; (YOLO) ;)"),
-			expectedErr: errors.New("1:20 expected block comment end ';)'"),
+			expectedErr: errors.New("1:21 expected block comment end ';)', but reached end of input"),
 		},
 		{
 			name:        "dangling unicode",

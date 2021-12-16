@@ -158,51 +158,7 @@ func buildIdChars() (result [256]bool) {
 
 func _idChar(ch byte) bool {
 	switch ch {
-	case '!':
-		fallthrough
-	case '#':
-		fallthrough
-	case '$':
-		fallthrough
-	case '%':
-		fallthrough
-	case '&':
-		fallthrough
-	case '\'':
-		fallthrough
-	case '*':
-		fallthrough
-	case '+':
-		fallthrough
-	case '-':
-		fallthrough
-	case '.':
-		fallthrough
-	case '/':
-		fallthrough
-	case ':':
-		fallthrough
-	case '<':
-		fallthrough
-	case '=':
-		fallthrough
-	case '>':
-		fallthrough
-	case '?':
-		fallthrough
-	case '@':
-		fallthrough
-	case '\\':
-		fallthrough
-	case '^':
-		fallthrough
-	case '_':
-		fallthrough
-	case '`':
-		fallthrough
-	case '|':
-		fallthrough
-	case '~':
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '/', ':', '<', '=', '>', '?', '@', '\\', '^', '_', '`', '|', '~':
 		return true
 	}
 	switch {
