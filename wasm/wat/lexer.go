@@ -175,8 +175,8 @@ func lex(source []byte, parser parseToken) error {
 				return fmt.Errorf("%d:%d expected end quote", line, col)
 			}
 
-			// set the position to after the quote
 			p = peekPos
+			// set the position to after the quote
 			peekPos = peekPos + 1
 			col = col + 1
 		case tokenKeyword, tokenId, tokenReserved: // min 1 byte; end with zero or more idChar
