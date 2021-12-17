@@ -1,7 +1,6 @@
 package wat
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 	"unicode/utf8"
@@ -412,6 +411,23 @@ func TestLex(t *testing.T) {
 			input:    "1a", // whitespace is optional between tokens, and a keyword can be single-character!
 			expected: []*token{{tokenUN, 1, 1, 0, "1"}, {tokenKeyword, 1, 2, 1, "a"}},
 		},
+		{
+			name:  "0x80 in block comment",
+			input: "(; \000);)",
+		},
+		{
+			name:  "0x80 in block comment unicode",
+			input: "(; 私\000);)",
+		},
+		{
+			name:  "0x80 in line comment",
+			input: ";; \000",
+		},
+		{
+			name:     "0x80 in string",
+			input:    "\" \000\"",
+			expected: []*token{{tokenString, 1, 1, 0, "\" \000\""}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -428,86 +444,91 @@ func TestLex_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       []byte
-		expectedErr error
+		expectedErr string
 	}{
 		{
 			name:        "close paren before open paren",
 			input:       []byte(")("),
-			expectedErr: errors.New("1:1 found ')' before '('"),
+			expectedErr: "test.wasm:1:1: found ')' before '('",
 		},
 		{
 			name:        "unbalanced nesting",
 			input:       []byte("(()"),
-			expectedErr: errors.New("1:4 expected ')', but reached end of input"),
+			expectedErr: "test.wasm:1:4: expected ')', but reached end of input",
 		},
 		{
 			name:        "open paren at end of input",
 			input:       []byte("("),
-			expectedErr: errors.New("1:1 found '(' at end of input"),
+			expectedErr: "test.wasm:1:1: found '(' at end of input",
 		},
 		{
 			name:        "begin block comment at end of input",
 			input:       []byte("(;"),
-			expectedErr: errors.New("1:3 expected block comment end ';)', but reached end of input"),
+			expectedErr: "test.wasm:1:3: expected block comment end ';)', but reached end of input",
 		},
 		{
 			name:        "half line comment",
 			input:       []byte("; TODO"),
-			expectedErr: errors.New("1:1 unexpected character ;"),
+			expectedErr: "test.wasm:1:1: unexpected character ;",
 		},
 		{
 			name:        "open block comment",
 			input:       []byte("(; TODO"),
-			expectedErr: errors.New("1:8 expected block comment end ';)', but reached end of input"),
+			expectedErr: "test.wasm:1:8: expected block comment end ';)', but reached end of input",
 		},
 		{
 			name:        "close block comment",
 			input:       []byte(";) TODO"),
-			expectedErr: errors.New("1:1 unexpected character ;"),
+			expectedErr: "test.wasm:1:1: unexpected character ;",
 		},
 		{
 			name:        "unbalanced nested block comment",
 			input:       []byte("(; TODO (; (YOLO) ;)"),
-			expectedErr: errors.New("1:21 expected block comment end ';)', but reached end of input"),
+			expectedErr: "test.wasm:1:21: expected block comment end ';)', but reached end of input",
 		},
 		{
 			name:        "dangling unicode",
 			input:       []byte(" 私"),
-			expectedErr: errors.New("1:2 expected an ASCII character, not 私"),
+			expectedErr: "test.wasm:1:2: expected an ASCII character, not 私",
 		},
 		{
-			name:        "NULL in block comment",
-			input:       append([]byte("(; "), 0),
-			expectedErr: errors.New("1:4 found an invalid byte in block comment: 0x0"),
+			name:        "0x80 in block comment",
+			input:       []byte("(; \200)"),
+			expectedErr: "test.wasm:1:4: found an invalid byte in block comment: 0x80",
 		},
 		{
-			name:        "NULL in block comment unicode",
-			input:       append([]byte("(; "), 0),
-			expectedErr: errors.New("1:4 found an invalid byte in block comment: 0x0"),
+			name:        "0x80 in block comment unicode",
+			input:       []byte("(; 私\200)"),
+			expectedErr: "test.wasm:1:5: found an invalid byte in block comment: 0x80",
 		},
 		{
-			name:        "NULL in line comment",
-			input:       append([]byte(";; "), 0),
-			expectedErr: errors.New("1:4 found an invalid byte in line comment: 0x0"),
+			name:        "0x80 in line comment",
+			input:       []byte(";; \200"),
+			expectedErr: "test.wasm:1:4: found an invalid byte in line comment: 0x80",
 		},
 		{
-			name:        "NULL in string",
-			input:       append([]byte("\""), 0),
-			expectedErr: errors.New("1:2 found an invalid byte in string token: 0x0"),
+			name:        "0x80 in line comment unicode",
+			input:       []byte(";; 私\200"),
+			expectedErr: "test.wasm:1:5: found an invalid byte in line comment: 0x80",
+		},
+		{
+			name:        "0x80 in string",
+			input:       []byte("\" \200\""),
+			expectedErr: "test.wasm:1:3: found an invalid byte in string token: 0x80",
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, lex(tc.input, noopParseToken), tc.expectedErr)
+			require.EqualError(t, lex("test.wasm", tc.input, noopParseToken), tc.expectedErr)
 		})
 	}
 }
 
 func lexTokens(input string) ([]*token, error) {
 	var tokens []*token
-	e := lex([]byte(input), func(source []byte, tok tokenType, line, col, beginPos, endPos int) (err error) {
+	e := lex("test.wasm", []byte(input), func(source []byte, tok tokenType, line, col, beginPos, endPos int) (err error) {
 		tokens = append(tokens, &token{tok, line, col, beginPos, string(source[beginPos:endPos])})
 		return
 	})
@@ -550,7 +571,7 @@ func BenchmarkLex(b *testing.B) {
 		b.Run(bm.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				err := lex(bm.data, noopParseToken)
+				err := lex("test.wasm", bm.data, noopParseToken)
 				if err != nil {
 					panic(err)
 				}
