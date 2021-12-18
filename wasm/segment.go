@@ -275,8 +275,8 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
 
-	if body[len(body)-1] != byte(OptCodeEnd) {
-		return nil, fmt.Errorf("expr not end with OptCodeEnd")
+	if body[len(body)-1] != byte(OpcodeEnd) {
+		return nil, fmt.Errorf("expr not end with OpcodeEnd")
 	}
 
 	return &CodeSegment{

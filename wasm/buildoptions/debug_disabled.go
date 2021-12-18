@@ -3,8 +3,4 @@
 
 package buildoptions
 
-const (
-	IsDebugMode = false
-)
-
-var OptcodeStrs []string
+const IsDebugMode = false
