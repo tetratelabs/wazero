@@ -6,25 +6,32 @@ import (
 )
 
 // parseToken allows a parser to inspect a token without necessarily allocating strings
-// * source is the underlying byte stream: do not modify this
 // * tokenType is the token type
-// * beginPos is the byte position in the source where the token begins, inclusive
-// * endPos is the byte position in the source where the token ends, exclusive
+// * tokenBytes are the UTF-8 bytes representing the token. Do not modify this.
+// * line is the source line number determined by unescaped '\n' characters.
+// * col is the UTF-8 column number.
 //
 // Returning an error will short-circuit any future invocations.
-type parseToken func(source []byte, tok tokenType, beginLine, beginCol, beginPos, endPos int) error
+type parseToken func(tok tokenType, tokenBytes []byte, line, col int) error
 
-// lex invokes the parser function for each token, the source is exhausted. The fileName is used in error messages.
+var (
+	constantLParen = []byte{'('}
+	constantRParen = []byte{')'}
+)
+
+// lex invokes the parser function for the given source.
 //
-// Errors from the parser or during tokenization exit early, such as dangling block comments or unexpected characters.
-func lex(fileName string, source []byte, parser parseToken) error {
-	length := len(source)
-	// p is the position in the source, and a parameter to the parser.
-	p := 0
-	// line is the line number in the source as determined by unescaped '\n' characters, and a parameter to the parser.
+// This function returns when the source is exhausted or an error occurs. Example errors include an error invoking the
+// parser, dangling block comments or unexpected characters.
+func lex(parser parseToken, fileName string, source []byte) error {
+	// i is the source index to begin reading, inclusive.
+	i := 0
+	// end is the source index to stop reading, exclusive.
+	end := len(source)
+	// line is the source line number determined by unescaped '\n' characters.
 	line := 1
-	// col is the UTF-8 aware column number, and a parameter to the parser
-	col := 0
+	// col is the UTF-8 column number.
+	col := 1
 
 	// Web assembly expressions are grouped by parenthesis, even the minimal example "(module)". We track nesting level
 	// to help report problems instead of bubbling to the parser layer.
@@ -35,8 +42,8 @@ func lex(fileName string, source []byte, parser parseToken) error {
 	// inline processing.
 	blockCommentDepth := 0
 
-	for ; p < length; p = p + 1 {
-		b1 := source[p]
+	for ; i < end; i, col = i+1, col+1 {
+		b1 := source[i]
 
 		// The spec does not consider newlines apart from '\n'. Notably, a bare '\r' is not a newline here.
 		// See https://www.w3.org/TR/wasm-core-1/#text-comment
@@ -46,8 +53,6 @@ func lex(fileName string, source []byte, parser parseToken) error {
 			continue // next line
 		}
 
-		// Otherwise, advance the column regardless of whether we are whitespace or not
-		col = col + 1                              // the current character is at least one byte long
 		if b1 == ' ' || b1 == '\t' || b1 == '\r' { // fast path ASCII whitespace
 			continue // next whitespace
 		}
@@ -55,39 +60,39 @@ func lex(fileName string, source []byte, parser parseToken) error {
 		// Handle parens and comments, noting block comments, ex. "(; look! ;)", can be nested.
 		switch b1 {
 		case '(':
-			peekPos := p + 1
-			if peekPos == length { // invalid regardless of block comment or not. nothing opens at EOF!
+			peek := i + 1
+			if peek == end { // invalid regardless of block comment or not. nothing opens at EOF!
 				return fmt.Errorf("%s:%d:%d: found '(' at end of input", fileName, line, col)
 			}
-			if source[peekPos] == ';' { // next block comment
-				p = peekPos // continue after "(;"
+			if source[peek] == ';' { // next block comment
+				i = peek // continue after "(;"
 				col = col + 1
 				blockCommentDepth = blockCommentDepth + 1
 				continue
-			} else if blockCommentDepth == 0 {
-				if e := parser(source, tokenLParen, line, col, p, p+1); e != nil {
+			} else if blockCommentDepth == 0 { // Fast path left paren token at the expense of code duplication.
+				if e := parser(tokenLParen, constantLParen, line, col); e != nil {
 					return e
 				}
 				parenDepth = parenDepth + 1
 				continue
 			}
 		case ')':
-			if blockCommentDepth == 0 {
+			if blockCommentDepth == 0 { // Fast path right paren token at the expense of code duplication.
 				if parenDepth == 0 {
 					return fmt.Errorf("%s:%d:%d: found ')' before '('", fileName, line, col)
 				}
-				if e := parser(source, tokenRParen, line, col, p, p+1); e != nil {
+				if e := parser(tokenRParen, constantRParen, line, col); e != nil {
 					return e
 				}
 				parenDepth = parenDepth - 1
 				continue
 			}
 		case ';': // possible line comment or block comment end
-			peekPos := p + 1
-			if peekPos < length {
-				b2 := source[peekPos]
+			peek := i + 1
+			if peek < end {
+				b2 := source[peek]
 				if blockCommentDepth > 0 && b2 == ')' {
-					p = peekPos // continue after ";)"
+					i = peek // continue after ";)"
 					col = col + 1
 					blockCommentDepth = blockCommentDepth - 1
 					continue
@@ -95,12 +100,12 @@ func lex(fileName string, source []byte, parser parseToken) error {
 
 				if b2 == ';' { // line comment
 					// Start after ";;" and run until the end. Note UTF-8 (multi-byte) characters are allowed.
-					peekPos = peekPos + 1
+					peek = peek + 1
 					col = col + 1
 
 				LineComment:
-					for peekPos < length {
-						peeked := source[peekPos]
+					for peek < end {
+						peeked := source[peek]
 						if peeked == '\n' {
 							break LineComment // EOL bookkeeping will proceed on the next iteration
 						}
@@ -110,12 +115,12 @@ func lex(fileName string, source []byte, parser parseToken) error {
 						if s == 0 {
 							return fmt.Errorf("%s:%d:%d: found an invalid byte in line comment: 0x%x", fileName, line, col, peeked)
 						}
-						peekPos = peekPos + s
+						peek = peek + s
 					}
 
 					// -1 because for loop will + 1: This optimizes speed of tokenization over line comments.
-					p = peekPos - 1 // at the '\n'
-					continue        // end of line comment
+					i = peek - 1 // at the '\n'
+					continue     // end of line comment
 				}
 			}
 		}
@@ -126,7 +131,7 @@ func lex(fileName string, source []byte, parser parseToken) error {
 			if s == 0 {
 				return fmt.Errorf("%s:%d:%d: found an invalid byte in block comment: 0x%x", fileName, line, col, b1)
 			}
-			p = p + s - 1 // -1 because for loop will + 1: This optimizes speed of tokenization over block comments.
+			i = i + s - 1 // -1 because for loop will + 1: This optimizes speed of tokenization over block comments.
 			continue
 		}
 
@@ -137,28 +142,28 @@ func lex(fileName string, source []byte, parser parseToken) error {
 		//
 		// See https://www.w3.org/TR/wasm-core-1/#characters%E2%91%A0
 
-		// Track positions passed to the parser
-		// beginLine == line because no token is allowed to include an unescaped '\n'
-		beginCol := col  // the start column of the token (fixed)
-		beginPos := p    // the start position of the token (fixed)
-		peekPos := p + 1 // when finished scanning, this becomes endPos (the position after the token).
-
 		tok := firstTokenByte[b1]
+		// Track positions passed to the parser
+		b := i        // the start position of the token (fixed)
+		peek := i + 1 // when finished scanning, this becomes end (the position after the token).
+		// line == line because no token is allowed to include an unescaped '\n'
+		c := col // the start column of the token (fixed)
+
 		switch tok {
 		case tokenSN: // min 2 bytes for sign and number; ambiguous: could be tokenFN
 			return fmt.Errorf("%s:%d:%d: TODO: signed", fileName, line, col)
 		case tokenUN: // min 1 byte; ambiguous when >=3 bytes as could be tokenFN
-			if peekPos < length {
-				peeked := source[peekPos]
+			if peek < end {
+				peeked := source[peek]
 				if peeked == 'x' {
 					return fmt.Errorf("%s:%d:%d: TODO: hex", fileName, line, col)
 				}
 			Number:
 				// Start after the number and run until the end. Note all allowed characters are single byte.
-				for ; peekPos < length; peekPos = peekPos + 1 {
-					switch source[peekPos] {
+				for ; peek < end; peek = peek + 1 {
+					switch source[peek] {
 					case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '_':
-						p = peekPos
+						i = peek
 						col = col + 1
 					default:
 						break Number // end of this token (or malformed, which the next loop will notice)
@@ -169,8 +174,8 @@ func lex(fileName string, source []byte, parser parseToken) error {
 			hitQuote := false
 			// Start at the second character and run until the end. Note UTF-8 (multi-byte) characters are allowed.
 		String:
-			for peekPos < length {
-				peeked := source[peekPos]
+			for peek < end {
+				peeked := source[peek]
 				if peeked == '"' { // TODO: escaping and banning disallowed characters like newlines.
 					hitQuote = true
 					break String
@@ -181,27 +186,27 @@ func lex(fileName string, source []byte, parser parseToken) error {
 				if s == 0 {
 					return fmt.Errorf("%s:%d:%d: found an invalid byte in string token: 0x%x", fileName, line, col, peeked)
 				}
-				peekPos = peekPos + s
+				peek = peek + s
 			}
 
 			if !hitQuote {
 				return fmt.Errorf("%s:%d:%d: expected end quote", fileName, line, col)
 			}
 
-			p = peekPos
+			i = peek
 			// set the position to after the quote
-			peekPos = peekPos + 1
+			peek = peek + 1
 			col = col + 1
 		case tokenKeyword, tokenID, tokenReserved: // min 1 byte; end with zero or more idChar
 			// Start after the first character and run until the end. Note all allowed characters are single byte.
 		IdChars:
-			for ; peekPos < length; peekPos = peekPos + 1 {
-				if !idChar[source[peekPos]] {
+			for ; peek < end; peek = peek + 1 {
+				if !idChar[source[peek]] {
 					break IdChars // end of this token (or malformed, which the next loop will notice)
 				}
 				col = col + 1
 			}
-			p = peekPos - 1
+			i = peek - 1
 		default:
 			if b1 > 0x7F { // non-ASCII
 				r, _ := utf8.DecodeRune(source[line:])
@@ -216,16 +221,16 @@ func lex(fileName string, source []byte, parser parseToken) error {
 		//
 		// TODO: Ex. inf nan nan:0xfffffffffffff or nan:0x400000
 
-		if e := parser(source, tok, line, beginCol, beginPos, peekPos); e != nil {
+		if e := parser(tok, source[b:peek], line, c); e != nil {
 			return e
 		}
 	}
 
 	if blockCommentDepth > 0 {
-		return fmt.Errorf("%s:%d:%d: expected block comment end ';)', but reached end of input", fileName, line, col+1)
+		return fmt.Errorf("%s:%d:%d: expected block comment end ';)', but reached end of input", fileName, line, col)
 	}
 	if parenDepth > 0 {
-		return fmt.Errorf("%s:%d:%d: expected ')', but reached end of input", fileName, line, col+1)
+		return fmt.Errorf("%s:%d:%d: expected ')', but reached end of input", fileName, line, col)
 	}
 	return nil // EOF
 }
