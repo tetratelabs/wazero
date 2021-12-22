@@ -846,7 +846,7 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 			err := builder.handleConstF32(o)
 			require.NoError(t, err)
 
-			// To verify the behavior, we increment and push the const value
+			// To verify the behavior, we double and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
 			require.Equal(t, wazeroir.SignLessTypeF32, loc.valueType)
@@ -891,7 +891,7 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 			err := builder.handleConstF64(o)
 			require.NoError(t, err)
 
-			// To verify the behavior, we increment and push the const value
+			// To verify the behavior, we double and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
 			require.Equal(t, wazeroir.SignLessTypeF64, loc.valueType)
