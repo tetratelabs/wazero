@@ -97,9 +97,13 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling swap operation: %w", err)
 			}
 		case *wazeroir.OperationGlobalGet:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleGlobalGet(o); err != nil {
+				return nil, fmt.Errorf("error handling global.get operation: %w", err)
+			}
 		case *wazeroir.OperationGlobalSet:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleGlobalSet(o); err != nil {
+				return nil, fmt.Errorf("error handling global.set operation: %w", err)
+			}
 		case *wazeroir.OperationLoad:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLoad8:
@@ -245,6 +249,9 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 	}
 	if cf.memory != nil {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
+	}
+	if len(b.f.ModuleInstance.Globals) > 0 {
+		cf.globalSliceAddress = uintptr(unsafe.Pointer(&b.f.ModuleInstance.Globals[0]))
 	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 	return cf
@@ -399,6 +406,131 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 		b.locationStack.markRegisterUsed(reg)
 		_ = b.locationStack.pop() // Delete tmpStackLocation.
 	}
+	return nil
+}
+
+const globalInstanceValueOffset = 8
+
+func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
+	intReg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// First, move the pointer to the global slice into the allocated register.
+	moveGlobalSlicePointer := b.newProg()
+	moveGlobalSlicePointer.As = x86.AMOVQ
+	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
+	moveGlobalSlicePointer.To.Reg = intReg
+	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
+	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
+	b.addInstruction(moveGlobalSlicePointer)
+
+	// Then, get the memory location of the target global instance's pointer.
+	getGlobalInstanceLocation := b.newProg()
+	getGlobalInstanceLocation.As = x86.AADDQ
+	getGlobalInstanceLocation.To.Type = obj.TYPE_REG
+	getGlobalInstanceLocation.To.Reg = intReg
+	getGlobalInstanceLocation.From.Type = obj.TYPE_CONST
+	getGlobalInstanceLocation.From.Offset = 8 * int64(o.Index)
+	b.addInstruction(getGlobalInstanceLocation)
+
+	// Now, move the location of the global instance into the register.
+	getGlobalInstancePointer := b.newProg()
+	getGlobalInstancePointer.As = x86.AMOVQ
+	getGlobalInstancePointer.To.Type = obj.TYPE_REG
+	getGlobalInstancePointer.To.Reg = intReg
+	getGlobalInstancePointer.From.Type = obj.TYPE_MEM
+	getGlobalInstancePointer.From.Reg = intReg
+	b.addInstruction(getGlobalInstancePointer)
+
+	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
+	valueReg := intReg
+	wasmType := b.f.ModuleInstance.Globals[o.Index].Type.ValType
+	switch wasmType {
+	case wasm.ValueTypeF32, wasm.ValueTypeF64:
+		valueReg, err = b.allocateRegister(gpTypeFloat)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Using the register holding the pointer to the target instance, move its value into a register.
+	moveValue := b.newProg()
+	moveValue.As = x86.AMOVQ
+	moveValue.To.Type = obj.TYPE_REG
+	moveValue.To.Reg = valueReg
+	moveValue.From.Type = obj.TYPE_MEM
+	moveValue.From.Reg = intReg
+	moveValue.From.Offset = globalInstanceValueOffset
+	b.addInstruction(moveValue)
+
+	// Record that the retrieved global value on the top of the stack is now in a register.
+	loc := b.locationStack.pushValueOnRegister(valueReg)
+	loc.setValueType(wazeroir.WasmValueTypeToSignless(wasmType))
+	return nil
+}
+
+func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
+	// First, move the value to set into a temporary register.
+	val := b.locationStack.pop()
+	if val.onStack() {
+		if err := b.moveStackToRegisterWithAllocation(val.registerType(), val); err != nil {
+			return err
+		}
+	} else if val.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(val); err != nil {
+			return err
+		}
+	}
+
+	// Allocate a register to hold the memory location of the target global instance.
+	intReg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// First, move the pointer to the global slice into the allocated register.
+	moveGlobalSlicePointer := b.newProg()
+	moveGlobalSlicePointer.As = x86.AMOVQ
+	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
+	moveGlobalSlicePointer.To.Reg = intReg
+	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
+	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
+	b.addInstruction(moveGlobalSlicePointer)
+
+	// Then, get the memory location of the target global instance's pointer.
+	getGlobalInstanceLocation := b.newProg()
+	getGlobalInstanceLocation.As = x86.AADDQ
+	getGlobalInstanceLocation.To.Type = obj.TYPE_REG
+	getGlobalInstanceLocation.To.Reg = intReg
+	getGlobalInstanceLocation.From.Type = obj.TYPE_CONST
+	getGlobalInstanceLocation.From.Offset = 8 * int64(o.Index)
+	b.addInstruction(getGlobalInstanceLocation)
+
+	// Now, move the location of the global instance into the register.
+	getGlobalInstancePointer := b.newProg()
+	getGlobalInstancePointer.As = x86.AMOVQ
+	getGlobalInstancePointer.To.Type = obj.TYPE_REG
+	getGlobalInstancePointer.To.Reg = intReg
+	getGlobalInstancePointer.From.Type = obj.TYPE_MEM
+	getGlobalInstancePointer.From.Reg = intReg
+	b.addInstruction(getGlobalInstancePointer)
+
+	// Now ready to write the value to the global instance location.
+	moveValue := b.newProg()
+	moveValue.As = x86.AMOVQ
+	moveValue.From.Type = obj.TYPE_REG
+	moveValue.From.Reg = val.register
+	moveValue.To.Type = obj.TYPE_MEM
+	moveValue.To.Reg = intReg
+	moveValue.To.Offset = globalInstanceValueOffset
+	b.addInstruction(moveValue)
+
+	// Since the value is now written to memory, release the value register.
+	b.locationStack.releaseRegister(val)
 	return nil
 }
 
