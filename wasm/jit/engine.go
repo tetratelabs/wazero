@@ -12,7 +12,7 @@ import (
 )
 
 type engine struct {
-	// These fields are used and manipulated by JITed codes.
+	// These fields are used and manipulated by JITed code.
 
 	// The actual Go-allocated stack.
 	// Note that we NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
