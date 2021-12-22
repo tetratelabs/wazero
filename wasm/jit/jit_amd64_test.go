@@ -1700,7 +1700,8 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
 			// Now emit the code.
 			builder.initializeReservedRegisters()
-			builder.handleGlobalGet(&wazeroir.OperationGlobalGet{Index: 1})
+			err := builder.handleGlobalGet(&wazeroir.OperationGlobalGet{Index: 1})
+			require.NoError(t, err)
 			// At this point, the top of stack must be the retrieved global on a register.
 			global := builder.locationStack.peek()
 			require.True(t, global.onRegister())
@@ -1716,7 +1717,6 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 
 			// Assemble.
 			code, err := builder.assemble()
-			fmt.Println(hex.EncodeToString(code))
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
