@@ -750,11 +750,11 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 func TestAmd64Builder_handleConstI32(t *testing.T) {
 	for _, v := range []uint32{1, 1 << 5, 1 << 31} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-			o := &wazeroir.OperationConstI32{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
 
 			// Now emit the const instruction.
+			o := &wazeroir.OperationConstI32{Value: v}
 			err := builder.handleConstI32(o)
 			require.NoError(t, err)
 
@@ -791,11 +791,11 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 func TestAmd64Builder_handleConstI64(t *testing.T) {
 	for _, v := range []uint64{1, 1 << 5, 1 << 35, 1 << 63} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-			o := &wazeroir.OperationConstI64{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
 
 			// Now emit the const instruction.
+			o := &wazeroir.OperationConstI64{Value: v}
 			err := builder.handleConstI64(o)
 			require.NoError(t, err)
 
@@ -832,11 +832,11 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 func TestAmd64Builder_handleConstF32(t *testing.T) {
 	for _, v := range []float32{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			o := &wazeroir.OperationConstF32{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
 
 			// Now emit the const instruction.
+			o := &wazeroir.OperationConstF32{Value: v}
 			err := builder.handleConstF32(o)
 			require.NoError(t, err)
 
@@ -875,11 +875,11 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 func TestAmd64Builder_handleConstF64(t *testing.T) {
 	for _, v := range []float64{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			o := &wazeroir.OperationConstF64{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
 
 			// Now emit the const instruction.
+			o := &wazeroir.OperationConstF64{Value: v}
 			err := builder.handleConstF64(o)
 			require.NoError(t, err)
 
