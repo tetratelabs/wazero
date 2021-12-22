@@ -6,6 +6,7 @@ package jit
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
@@ -120,15 +121,21 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationMemoryGrow:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationConstI32:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleConstI32(o); err != nil {
+				return nil, fmt.Errorf("error handling i32.const operation: %w", err)
+			}
 		case *wazeroir.OperationConstI64:
 			if err := builder.handleConstI64(o); err != nil {
 				return nil, fmt.Errorf("error handling i64.const operation: %w", err)
 			}
 		case *wazeroir.OperationConstF32:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleConstF32(o); err != nil {
+				return nil, fmt.Errorf("error handling f32.const operation: %w", err)
+			}
 		case *wazeroir.OperationConstF64:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleConstF64(o); err != nil {
+				return nil, fmt.Errorf("error handling f64.const operation: %w", err)
+			}
 		case *wazeroir.OperationEq:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationNe:
@@ -964,6 +971,24 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	return nil
 }
 
+func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
+	reg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+	loc := b.locationStack.pushValueOnRegister(reg)
+	loc.setValueType(wazeroir.SignLessTypeI32)
+
+	prog := b.newProg()
+	prog.As = x86.AMOVL // Note 32-bit move!
+	prog.From.Type = obj.TYPE_CONST
+	prog.From.Offset = int64(o.Value)
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	b.addInstruction(prog)
+	return nil
+}
+
 func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 	reg, err := b.allocateRegister(gpTypeInt)
 	if err != nil {
@@ -971,7 +996,78 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
 	loc.setValueType(wazeroir.SignLessTypeI64)
-	b.movConstToRegister(int64(o.Value), reg)
+
+	prog := b.newProg()
+	prog.As = x86.AMOVQ
+	prog.From.Type = obj.TYPE_CONST
+	prog.From.Offset = int64(o.Value)
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	b.addInstruction(prog)
+	return nil
+}
+
+func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
+	reg, err := b.allocateRegister(gpTypeFloat)
+	if err != nil {
+		return err
+	}
+	loc := b.locationStack.pushValueOnRegister(reg)
+	loc.setValueType(wazeroir.SignLessTypeF32)
+
+	// We cannot directly load the value from memory to float regs,
+	// so we move it to int reg temporarily.
+	tmpReg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+	moveToTmpReg := b.newProg()
+	moveToTmpReg.As = x86.AMOVL // Note 32-bit mov!
+	moveToTmpReg.From.Type = obj.TYPE_CONST
+	moveToTmpReg.From.Offset = int64(uint64(math.Float32bits(o.Value)))
+	moveToTmpReg.To.Type = obj.TYPE_REG
+	moveToTmpReg.To.Reg = tmpReg
+	b.addInstruction(moveToTmpReg)
+
+	prog := b.newProg()
+	prog.As = x86.AMOVL // Note 32-bit mov!
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = tmpReg
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	b.addInstruction(prog)
+	return nil
+}
+
+func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
+	reg, err := b.allocateRegister(gpTypeFloat)
+	if err != nil {
+		return err
+	}
+	loc := b.locationStack.pushValueOnRegister(reg)
+	loc.setValueType(wazeroir.SignLessTypeF64)
+
+	// We cannot directly load the value from memory to float regs,
+	// so we move it to int reg temporarily.
+	tmpReg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+	moveToTmpReg := b.newProg()
+	moveToTmpReg.As = x86.AMOVQ
+	moveToTmpReg.From.Type = obj.TYPE_CONST
+	moveToTmpReg.From.Offset = int64(math.Float64bits(o.Value))
+	moveToTmpReg.To.Type = obj.TYPE_REG
+	moveToTmpReg.To.Reg = tmpReg
+	b.addInstruction(moveToTmpReg)
+
+	prog := b.newProg()
+	prog.As = x86.AMOVQ
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = tmpReg
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = reg
+	b.addInstruction(prog)
 	return nil
 }
 
@@ -1224,17 +1320,6 @@ func (b *amd64Builder) setFunctionCallIndexFromConst(index int64) {
 	prog.To.Reg = engineInstanceReg
 	prog.To.Offset = engineFunctionCallIndexOffset
 	b.addInstruction(prog)
-}
-
-func (b *amd64Builder) movConstToRegister(val int64, targetRegister int16) *obj.Prog {
-	prog := b.newProg()
-	prog.As = x86.AMOVQ
-	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = val
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = targetRegister
-	b.addInstruction(prog)
-	return prog
 }
 
 func (b *amd64Builder) releaseRegisterToStack(loc *valueLocation) {
