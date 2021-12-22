@@ -468,7 +468,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 }
 
 func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
-	// We ensure that the value to set exists on a register at first.
+	// First, move the value to set into a temporary register.
 	val := b.locationStack.pop()
 	if val.onStack() {
 		if err := b.moveStackToRegisterWithAllocation(val.registerType(), val); err != nil {
