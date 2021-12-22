@@ -429,7 +429,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	getGlobalInstanceLocation.From.Offset = 8 * int64(o.Index)
 	b.addInstruction(getGlobalInstanceLocation)
 
-	// Now move the global instance's location to the register.
+	// Now, move the location of the global instance into the register.
 	getGlobalInstancePointer := b.newProg()
 	getGlobalInstancePointer.As = x86.AMOVQ
 	getGlobalInstancePointer.To.Type = obj.TYPE_REG
