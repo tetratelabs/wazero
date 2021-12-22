@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/naivevm"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -203,7 +202,6 @@ func TestSpecification(t *testing.T) {
 				name   string
 				engine wasm.Engine
 			}{
-				{engine: naivevm.NewEngine(), name: "naivevm"},
 				{engine: wazeroir.NewEngine(), name: "wazeroir_interpreter"},
 			} {
 				tc := tc

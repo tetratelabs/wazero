@@ -10,16 +10,10 @@ import (
 
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/naivevm"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 func BenchmarkEngines(b *testing.B) {
-	b.Run("naivevm", func(b *testing.B) {
-		store := newStore(naivevm.NewEngine())
-		setUpStore(store)
-		runAllBenches(b, store)
-	})
 	b.Run("wazeroir", func(b *testing.B) {
 		store := newStore(wazeroir.NewEngine())
 		setUpStore(store)

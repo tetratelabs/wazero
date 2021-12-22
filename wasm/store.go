@@ -47,7 +47,6 @@ type (
 		Signature      *FunctionType
 		NumLocals      uint32
 		LocalTypes     []ValueType
-		Blocks         map[uint64]*FunctionInstanceBlock
 		HostFunction   *reflect.Value
 	}
 
@@ -433,7 +432,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		functionNames = map[uint32]string{}
 	}
 
-	analysisCache := map[int]map[uint64]*FunctionInstanceBlock{}
+	analysisCache := map[int]map[uint64]struct{}{}
 	for codeIndex, typeIndex := range module.FunctionSection {
 		if typeIndex >= uint32(len(module.TypeSection)) {
 			return rollbackFuncs, fmt.Errorf("function type index out of range")
@@ -455,11 +454,9 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			NumLocals:      module.CodeSection[codeIndex].NumLocals,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
 			ModuleInstance: target,
-			Blocks:         map[uint64]*FunctionInstanceBlock{},
 		}
 
-		blocks, ok := analysisCache[codeIndex]
-		if !ok {
+		if _, ok := analysisCache[codeIndex]; !ok {
 			err := analyzeFunction(
 				module, f, functionDeclarations, globalDecalarations,
 				memoryDeclarations, tableDeclarations,
@@ -467,9 +464,6 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			if err != nil {
 				return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection)-1, err)
 			}
-			analysisCache[codeIndex] = f.Blocks
-		} else {
-			f.Blocks = blocks
 		}
 
 		target.Functions = append(target.Functions, f)
@@ -1498,7 +1492,6 @@ func analyzeFunction(
 			bl := labelStack[len(labelStack)-1]
 			bl.EndAt = pc
 			labelStack = labelStack[:len(labelStack)-1]
-			f.Blocks[bl.StartAt] = bl
 			if bl.IsIf && bl.ElseAt <= bl.StartAt {
 				if len(bl.BlockType.ReturnTypes) > 0 {
 					return fmt.Errorf("type mismatch between then and else blocks")
