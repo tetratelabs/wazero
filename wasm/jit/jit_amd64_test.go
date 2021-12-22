@@ -1683,7 +1683,7 @@ func TestAmd64Builder_handleSwap(t *testing.T) {
 	}
 }
 
-// Ensures the globalInstanceValueOffset doesn't drift when we modify the struct (wasm.GlobalInstance).
+// TestGlobalInstanceValueOffset ensures the globalInstanceValueOffset doesn't drift when we modify the struct (wasm.GlobalInstance).
 func TestGlobalInstanceValueOffset(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&wasm.GlobalInstance{}).Val)), globalInstanceValueOffset)
 }
