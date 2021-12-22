@@ -36,7 +36,7 @@ type engine struct {
 	// Function call frames in linked list
 	callFrameStack *callFrame
 
-	// Following fields are not used by JITed codes. Only used during compilation.
+	// The following fields are only used during compilation.
 
 	// Store the compiled functions and indexes.
 	compiledWasmFunctions     []*compiledWasmFunction
