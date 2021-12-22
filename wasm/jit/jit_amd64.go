@@ -449,7 +449,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 		}
 	}
 
-	// Now we have the pointer to the target instance in the allocated int register.
+	// Using the register holding the pointer to the target instance, move its value into a register.
 	moveValue := b.newProg()
 	moveValue.As = x86.AMOVQ
 	moveValue.To.Type = obj.TYPE_REG
