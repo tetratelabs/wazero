@@ -6,7 +6,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-// signature represents how a Wasm optcode
+// signature represents how a Wasm opcode
 // manipulates the value stacks in terms of value types.
 type signature struct {
 	in, out []SignLessType
@@ -142,34 +142,34 @@ var (
 	}
 )
 
-// wasmOptcodeSignature returns the signature of given Wasm optcode.
-// Note that some of optcodes' signature vary depending on
+// wasmOpcodeSignature returns the signature of given Wasm opcode.
+// Note that some of opcodes' signature vary depending on
 // the function instance (for example, local types).
-// "index" parameter is not used by most of optcodes.
-// The returned signature is used for stack validation when lowering Wasm's optcodes to wazeroir.
-func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint32) (*signature, error) {
+// "index" parameter is not used by most of opcodes.
+// The returned signature is used for stack validation when lowering Wasm's opcodes to wazeroir.
+func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32) (*signature, error) {
 	switch op {
-	case wasm.OptCodeUnreachable, wasm.OptCodeNop, wasm.OptCodeBlock, wasm.OptCodeLoop:
+	case wasm.OpcodeUnreachable, wasm.OpcodeNop, wasm.OpcodeBlock, wasm.OpcodeLoop:
 		return signature_None_None, nil
-	case wasm.OptCodeIf:
+	case wasm.OpcodeIf:
 		return signature_I32_None, nil
-	case wasm.OptCodeElse, wasm.OptCodeEnd, wasm.OptCodeBr:
+	case wasm.OpcodeElse, wasm.OpcodeEnd, wasm.OpcodeBr:
 		return signature_None_None, nil
-	case wasm.OptCodeBrIf, wasm.OptCodeBrTable:
+	case wasm.OpcodeBrIf, wasm.OpcodeBrTable:
 		return signature_I32_None, nil
-	case wasm.OptCodeReturn:
+	case wasm.OpcodeReturn:
 		return signature_None_None, nil
-	case wasm.OptCodeCall:
+	case wasm.OpcodeCall:
 		return funcTypeToSignature(f.ModuleInstance.Functions[index].Signature), nil
-	case wasm.OptCodeCallIndirect:
+	case wasm.OpcodeCallIndirect:
 		ret := funcTypeToSignature(f.ModuleInstance.Types[index])
 		ret.in = append(ret.in, SignLessTypeI32)
 		return ret, nil
-	case wasm.OptCodeDrop:
+	case wasm.OpcodeDrop:
 		return signature_Unknown_None, nil
-	case wasm.OptCodeSelect:
+	case wasm.OpcodeSelect:
 		return signature_UnknownUnkownI32_Unknown, nil
-	case wasm.OptCodeLocalGet:
+	case wasm.OpcodeLocalGet:
 		inputLen := uint32(len(f.Signature.InputTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
@@ -181,7 +181,7 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
 		return &signature{out: []SignLessType{t}}, nil
-	case wasm.OptCodeLocalSet:
+	case wasm.OpcodeLocalSet:
 		inputLen := uint32(len(f.Signature.InputTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
@@ -193,7 +193,7 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
 		return &signature{in: []SignLessType{t}}, nil
-	case wasm.OptCodeLocalTee:
+	case wasm.OpcodeLocalTee:
 		inputLen := uint32(len(f.Signature.InputTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
@@ -205,146 +205,146 @@ func wasmOptcodeSignature(f *wasm.FunctionInstance, op wasm.OptCode, index uint3
 			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
 		return &signature{in: []SignLessType{t}, out: []SignLessType{t}}, nil
-	case wasm.OptCodeGlobalGet:
+	case wasm.OpcodeGlobalGet:
 		if len(f.ModuleInstance.Globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
 			out: []SignLessType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
 		}, nil
-	case wasm.OptCodeGlobalSet:
+	case wasm.OpcodeGlobalSet:
 		if len(f.ModuleInstance.Globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
 			in: []SignLessType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
 		}, nil
-	case wasm.OptCodeI32Load:
+	case wasm.OpcodeI32Load:
 		return signature_I32_I32, nil
-	case wasm.OptCodeI64Load:
+	case wasm.OpcodeI64Load:
 		return signature_I32_I64, nil
-	case wasm.OptCodeF32Load:
+	case wasm.OpcodeF32Load:
 		return signature_I32_F32, nil
-	case wasm.OptCodeF64Load:
+	case wasm.OpcodeF64Load:
 		return signature_I32_F64, nil
-	case wasm.OptCodeI32Load8s, wasm.OptCodeI32Load8u, wasm.OptCodeI32Load16s, wasm.OptCodeI32Load16u:
+	case wasm.OpcodeI32Load8S, wasm.OpcodeI32Load8U, wasm.OpcodeI32Load16S, wasm.OpcodeI32Load16U:
 		return signature_I32_I32, nil
-	case wasm.OptCodeI64Load8s, wasm.OptCodeI64Load8u, wasm.OptCodeI64Load16s, wasm.OptCodeI64Load16u,
-		wasm.OptCodeI64Load32s, wasm.OptCodeI64Load32u:
+	case wasm.OpcodeI64Load8S, wasm.OpcodeI64Load8U, wasm.OpcodeI64Load16S, wasm.OpcodeI64Load16U,
+		wasm.OpcodeI64Load32S, wasm.OpcodeI64Load32U:
 		return signature_I32_I64, nil
-	case wasm.OptCodeI32Store:
+	case wasm.OpcodeI32Store:
 		return signature_I32I32_None, nil
-	case wasm.OptCodeI64Store:
+	case wasm.OpcodeI64Store:
 		return signature_I32I64_None, nil
-	case wasm.OptCodeF32Store:
+	case wasm.OpcodeF32Store:
 		return signature_I32F32_None, nil
-	case wasm.OptCodeF64Store:
+	case wasm.OpcodeF64Store:
 		return signature_I32F64_None, nil
-	case wasm.OptCodeI32Store8:
+	case wasm.OpcodeI32Store8:
 		return signature_I32I32_None, nil
-	case wasm.OptCodeI32Store16:
+	case wasm.OpcodeI32Store16:
 		return signature_I32I32_None, nil
-	case wasm.OptCodeI64Store8:
+	case wasm.OpcodeI64Store8:
 		return signature_I32I64_None, nil
-	case wasm.OptCodeI64Store16:
+	case wasm.OpcodeI64Store16:
 		return signature_I32I64_None, nil
-	case wasm.OptCodeI64Store32:
+	case wasm.OpcodeI64Store32:
 		return signature_I32I64_None, nil
-	case wasm.OptCodeMemorySize:
+	case wasm.OpcodeMemorySize:
 		return signature_None_I32, nil
-	case wasm.OptCodeMemoryGrow:
+	case wasm.OpcodeMemoryGrow:
 		return signature_I32_I32, nil
-	case wasm.OptCodeI32Const:
+	case wasm.OpcodeI32Const:
 		return signature_None_I32, nil
-	case wasm.OptCodeI64Const:
+	case wasm.OpcodeI64Const:
 		return signature_None_I64, nil
-	case wasm.OptCodeF32Const:
+	case wasm.OpcodeF32Const:
 		return signature_None_F32, nil
-	case wasm.OptCodeF64Const:
+	case wasm.OpcodeF64Const:
 		return signature_None_F64, nil
-	case wasm.OptCodeI32eqz:
+	case wasm.OpcodeI32Eqz:
 		return signature_I32_I32, nil
-	case wasm.OptCodeI32eq, wasm.OptCodeI32ne, wasm.OptCodeI32lts,
-		wasm.OptCodeI32ltu, wasm.OptCodeI32gts, wasm.OptCodeI32gtu,
-		wasm.OptCodeI32les, wasm.OptCodeI32leu, wasm.OptCodeI32ges,
-		wasm.OptCodeI32geu:
+	case wasm.OpcodeI32Eq, wasm.OpcodeI32Ne, wasm.OpcodeI32LtS,
+		wasm.OpcodeI32LtU, wasm.OpcodeI32GtS, wasm.OpcodeI32GtU,
+		wasm.OpcodeI32LeS, wasm.OpcodeI32LeU, wasm.OpcodeI32GeS,
+		wasm.OpcodeI32GeU:
 		return signature_I32I32_I32, nil
-	case wasm.OptCodeI64eqz:
+	case wasm.OpcodeI64Eqz:
 		return signature_I64_I32, nil
-	case wasm.OptCodeI64eq, wasm.OptCodeI64ne, wasm.OptCodeI64lts,
-		wasm.OptCodeI64ltu, wasm.OptCodeI64gts, wasm.OptCodeI64gtu,
-		wasm.OptCodeI64les, wasm.OptCodeI64leu, wasm.OptCodeI64ges,
-		wasm.OptCodeI64geu:
+	case wasm.OpcodeI64Eq, wasm.OpcodeI64Ne, wasm.OpcodeI64LtS,
+		wasm.OpcodeI64LtU, wasm.OpcodeI64GtS, wasm.OpcodeI64GtU,
+		wasm.OpcodeI64LeS, wasm.OpcodeI64LeU, wasm.OpcodeI64GeS,
+		wasm.OpcodeI64GeU:
 		return signature_I64I64_I32, nil
-	case wasm.OptCodeF32eq, wasm.OptCodeF32ne, wasm.OptCodeF32lt,
-		wasm.OptCodeF32gt, wasm.OptCodeF32le, wasm.OptCodeF32ge:
+	case wasm.OpcodeF32Eq, wasm.OpcodeF32Ne, wasm.OpcodeF32Lt,
+		wasm.OpcodeF32Gt, wasm.OpcodeF32Le, wasm.OpcodeF32Ge:
 		return signature_F32F32_I32, nil
-	case wasm.OptCodeF64eq, wasm.OptCodeF64ne, wasm.OptCodeF64lt,
-		wasm.OptCodeF64gt, wasm.OptCodeF64le, wasm.OptCodeF64ge:
+	case wasm.OpcodeF64Eq, wasm.OpcodeF64Ne, wasm.OpcodeF64Lt,
+		wasm.OpcodeF64Gt, wasm.OpcodeF64Le, wasm.OpcodeF64Ge:
 		return signature_F64F64_I32, nil
-	case wasm.OptCodeI32clz, wasm.OptCodeI32ctz, wasm.OptCodeI32popcnt:
+	case wasm.OpcodeI32Clz, wasm.OpcodeI32Ctz, wasm.OpcodeI32Popcnt:
 		return signature_I32_I32, nil
-	case wasm.OptCodeI32add, wasm.OptCodeI32sub, wasm.OptCodeI32mul,
-		wasm.OptCodeI32divs, wasm.OptCodeI32divu, wasm.OptCodeI32rems,
-		wasm.OptCodeI32remu, wasm.OptCodeI32and, wasm.OptCodeI32or,
-		wasm.OptCodeI32xor, wasm.OptCodeI32shl, wasm.OptCodeI32shrs,
-		wasm.OptCodeI32shru, wasm.OptCodeI32rotl, wasm.OptCodeI32rotr:
+	case wasm.OpcodeI32Add, wasm.OpcodeI32Sub, wasm.OpcodeI32Mul,
+		wasm.OpcodeI32DivS, wasm.OpcodeI32DivU, wasm.OpcodeI32RemS,
+		wasm.OpcodeI32RemU, wasm.OpcodeI32And, wasm.OpcodeI32Or,
+		wasm.OpcodeI32Xor, wasm.OpcodeI32Shl, wasm.OpcodeI32ShrS,
+		wasm.OpcodeI32ShrU, wasm.OpcodeI32Rotl, wasm.OpcodeI32Rotr:
 		return signature_I32I32_I32, nil
-	case wasm.OptCodeI64clz, wasm.OptCodeI64ctz, wasm.OptCodeI64popcnt:
+	case wasm.OpcodeI64Clz, wasm.OpcodeI64Ctz, wasm.OpcodeI64Popcnt:
 		return signature_I64_I64, nil
-	case wasm.OptCodeI64add, wasm.OptCodeI64sub, wasm.OptCodeI64mul,
-		wasm.OptCodeI64divs, wasm.OptCodeI64divu, wasm.OptCodeI64rems,
-		wasm.OptCodeI64remu, wasm.OptCodeI64and, wasm.OptCodeI64or,
-		wasm.OptCodeI64xor, wasm.OptCodeI64shl, wasm.OptCodeI64shrs,
-		wasm.OptCodeI64shru, wasm.OptCodeI64rotl, wasm.OptCodeI64rotr:
+	case wasm.OpcodeI64Add, wasm.OpcodeI64Sub, wasm.OpcodeI64Mul,
+		wasm.OpcodeI64DivS, wasm.OpcodeI64DivU, wasm.OpcodeI64RemS,
+		wasm.OpcodeI64RemU, wasm.OpcodeI64And, wasm.OpcodeI64Or,
+		wasm.OpcodeI64Xor, wasm.OpcodeI64Shl, wasm.OpcodeI64ShrS,
+		wasm.OpcodeI64ShrU, wasm.OpcodeI64Rotl, wasm.OpcodeI64Rotr:
 		return signature_I64I64_I64, nil
-	case wasm.OptCodeF32abs, wasm.OptCodeF32neg, wasm.OptCodeF32ceil,
-		wasm.OptCodeF32floor, wasm.OptCodeF32trunc, wasm.OptCodeF32nearest,
-		wasm.OptCodeF32sqrt:
+	case wasm.OpcodeF32Abs, wasm.OpcodeF32Neg, wasm.OpcodeF32Ceil,
+		wasm.OpcodeF32Floor, wasm.OpcodeF32Trunc, wasm.OpcodeF32Nearest,
+		wasm.OpcodeF32Sqrt:
 		return signature_F32_F32, nil
-	case wasm.OptCodeF32add, wasm.OptCodeF32sub, wasm.OptCodeF32mul,
-		wasm.OptCodeF32div, wasm.OptCodeF32min, wasm.OptCodeF32max,
-		wasm.OptCodeF32copysign:
+	case wasm.OpcodeF32Add, wasm.OpcodeF32Sub, wasm.OpcodeF32Mul,
+		wasm.OpcodeF32Div, wasm.OpcodeF32Min, wasm.OpcodeF32Max,
+		wasm.OpcodeF32Copysign:
 		return signature_F32F32_F32, nil
-	case wasm.OptCodeF64abs, wasm.OptCodeF64neg, wasm.OptCodeF64ceil,
-		wasm.OptCodeF64floor, wasm.OptCodeF64trunc, wasm.OptCodeF64nearest,
-		wasm.OptCodeF64sqrt:
+	case wasm.OpcodeF64Abs, wasm.OpcodeF64Neg, wasm.OpcodeF64Ceil,
+		wasm.OpcodeF64Floor, wasm.OpcodeF64Trunc, wasm.OpcodeF64Nearest,
+		wasm.OpcodeF64Sqrt:
 		return signature_F64_F64, nil
-	case wasm.OptCodeF64add, wasm.OptCodeF64sub, wasm.OptCodeF64mul,
-		wasm.OptCodeF64div, wasm.OptCodeF64min, wasm.OptCodeF64max,
-		wasm.OptCodeF64copysign:
+	case wasm.OpcodeF64Add, wasm.OpcodeF64Sub, wasm.OpcodeF64Mul,
+		wasm.OpcodeF64Div, wasm.OpcodeF64Min, wasm.OpcodeF64Max,
+		wasm.OpcodeF64Copysign:
 		return signature_F64F64_F64, nil
-	case wasm.OptCodeI32wrapI64:
+	case wasm.OpcodeI32WrapI64:
 		return signature_I64_I32, nil
-	case wasm.OptCodeI32truncf32s, wasm.OptCodeI32truncf32u:
+	case wasm.OpcodeI32TruncF32S, wasm.OpcodeI32TruncF32U:
 		return signature_F32_I32, nil
-	case wasm.OptCodeI32truncf64s, wasm.OptCodeI32truncf64u:
+	case wasm.OpcodeI32TruncF64S, wasm.OpcodeI32TruncF64U:
 		return signature_F64_I32, nil
-	case wasm.OptCodeI64Extendi32s, wasm.OptCodeI64Extendi32u:
+	case wasm.OpcodeI64ExtendI32S, wasm.OpcodeI64ExtendI32U:
 		return signature_I32_I64, nil
-	case wasm.OptCodeI64TruncF32s, wasm.OptCodeI64TruncF32u:
+	case wasm.OpcodeI64TruncF32S, wasm.OpcodeI64TruncF32U:
 		return signature_F32_I64, nil
-	case wasm.OptCodeI64Truncf64s, wasm.OptCodeI64Truncf64u:
+	case wasm.OpcodeI64TruncF64S, wasm.OpcodeI64TruncF64U:
 		return signature_F64_I64, nil
-	case wasm.OptCodeF32Converti32s, wasm.OptCodeF32Converti32u:
+	case wasm.OpcodeF32ConvertI32s, wasm.OpcodeF32ConvertI32U:
 		return signature_I32_F32, nil
-	case wasm.OptCodeF32Converti64s, wasm.OptCodeF32Converti64u:
+	case wasm.OpcodeF32ConvertI64S, wasm.OpcodeF32ConvertI64U:
 		return signature_I64_F32, nil
-	case wasm.OptCodeF32Demotef64:
+	case wasm.OpcodeF32DemoteF64:
 		return signature_F64_F32, nil
-	case wasm.OptCodeF64Converti32s, wasm.OptCodeF64Converti32u:
+	case wasm.OpcodeF64ConvertI32S, wasm.OpcodeF64ConvertI32U:
 		return signature_I32_F64, nil
-	case wasm.OptCodeF64Converti64s, wasm.OptCodeF64Converti64u:
+	case wasm.OpcodeF64ConvertI64S, wasm.OpcodeF64ConvertI64U:
 		return signature_I64_F64, nil
-	case wasm.OptCodeF64Promotef32:
+	case wasm.OpcodeF64PromoteF32:
 		return signature_F32_F64, nil
-	case wasm.OptCodeI32Reinterpretf32:
+	case wasm.OpcodeI32ReinterpretF32:
 		return signature_F32_I32, nil
-	case wasm.OptCodeI64Reinterpretf64:
+	case wasm.OpcodeI64ReinterpretF64:
 		return signature_F64_I64, nil
-	case wasm.OptCodeF32Reinterpreti32:
+	case wasm.OpcodeF32ReinterpretI32:
 		return signature_I32_F32, nil
-	case wasm.OptCodeF64Reinterpreti64:
+	case wasm.OpcodeF64ReinterpretI64:
 		return signature_I64_F64, nil
 	default:
 		return nil, fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
