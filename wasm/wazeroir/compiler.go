@@ -186,7 +186,7 @@ func (c *compiler) handleInstruction() error {
 	op := c.f.Body[c.pc]
 	if buildoptions.IsDebugMode {
 		fmt.Printf("handling %s, unreachable_state(on=%v,depth=%d)\n",
-			buildoptions.OptcodeStrs[op],
+			wasm.InstructionName(op),
 			c.unreachableState.on, c.unreachableState.depth,
 		)
 	}
@@ -203,14 +203,14 @@ func (c *compiler) handleInstruction() error {
 	// emit the corresponding wazeroir operations to the results.
 operatorSwitch:
 	switch op {
-	case wasm.OptCodeUnreachable:
+	case wasm.OpcodeUnreachable:
 		c.emit(
 			&OperationUnreachable{},
 		)
 		c.markUnreachable()
-	case wasm.OptCodeNop:
+	case wasm.OpcodeNop:
 		// Nop is noop!
-	case wasm.OptCodeBlock:
+	case wasm.OpcodeBlock:
 		bt, num, err := wasm.ReadBlockType(c.f.ModuleInstance.Types,
 			bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
@@ -236,7 +236,7 @@ operatorSwitch:
 		}
 		c.controlFrames.push(frame)
 
-	case wasm.OptCodeLoop:
+	case wasm.OpcodeLoop:
 		bt, num, err := wasm.ReadBlockType(c.f.ModuleInstance.Types,
 			bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
@@ -274,7 +274,7 @@ operatorSwitch:
 			&OperationLabel{Label: loopLabel},
 		)
 
-	case wasm.OptCodeIf:
+	case wasm.OpcodeIf:
 		bt, num, err := wasm.ReadBlockType(c.f.ModuleInstance.Types,
 			bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
@@ -294,7 +294,7 @@ operatorSwitch:
 			frameID:          c.nextID(),
 			originalStackLen: len(c.stack),
 			// Note this will be set to controlFrameKindIfWithElse
-			// when else optcode found later.
+			// when else opcode found later.
 			kind: controlFrameKindIfWithoutElse,
 		}
 		for _, t := range bt.ReturnTypes {
@@ -318,7 +318,7 @@ operatorSwitch:
 				Label: thenLabel,
 			},
 		)
-	case wasm.OptCodeElse:
+	case wasm.OpcodeElse:
 		frame := c.controlFrames.top()
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
 			// If it is currently in unreachable, and the nested if,
@@ -365,7 +365,7 @@ operatorSwitch:
 			// Initiate the else block.
 			&OperationLabel{Label: elseLabel},
 		)
-	case wasm.OptCodeEnd:
+	case wasm.OpcodeEnd:
 		if c.unreachableState.on && c.unreachableState.depth > 0 {
 			c.unreachableState.depth--
 			break operatorSwitch
@@ -459,7 +459,7 @@ operatorSwitch:
 			panic(fmt.Errorf("bug: invalid control frame kind: 0x%x", frame.kind))
 		}
 
-	case wasm.OptCodeBr:
+	case wasm.OpcodeBr:
 		targetIndex, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
@@ -479,7 +479,7 @@ operatorSwitch:
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
 		c.markUnreachable()
-	case wasm.OptCodeBrIf:
+	case wasm.OpcodeBrIf:
 		targetIndex, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
@@ -504,7 +504,7 @@ operatorSwitch:
 				Label: continuationLabel,
 			},
 		)
-	case wasm.OptCodeBrTable:
+	case wasm.OpcodeBrTable:
 		r := bytes.NewBuffer(c.f.Body[c.pc+1:])
 		numTargets, n, err := leb128.DecodeUint32(r)
 		if err != nil {
@@ -552,7 +552,7 @@ operatorSwitch:
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
 		c.markUnreachable()
-	case wasm.OptCodeReturn:
+	case wasm.OpcodeReturn:
 		functionFrame := c.controlFrames.functionFrame()
 		dropOp := &OperationDrop{Range: c.getFrameDropRange(functionFrame)}
 
@@ -566,14 +566,14 @@ operatorSwitch:
 		// That means subsequent instructions in the current control frame are "unreachable"
 		// and can be safely removed.
 		c.markUnreachable()
-	case wasm.OptCodeCall:
+	case wasm.OpcodeCall:
 		if index == nil {
 			return fmt.Errorf("index does not exist for function call")
 		}
 		c.emit(
 			&OperationCall{FunctionIndex: *index},
 		)
-	case wasm.OptCodeCallIndirect:
+	case wasm.OpcodeCallIndirect:
 		if index == nil {
 			return fmt.Errorf("index does not exist for indirect function call")
 		}
@@ -585,15 +585,15 @@ operatorSwitch:
 		c.emit(
 			&OperationCallIndirect{TypeIndex: *index, TableIndex: tableIndex},
 		)
-	case wasm.OptCodeDrop:
+	case wasm.OpcodeDrop:
 		c.emit(
 			&OperationDrop{Range: &InclusiveRange{Start: 0, End: 0}},
 		)
-	case wasm.OptCodeSelect:
+	case wasm.OpcodeSelect:
 		c.emit(
 			&OperationSelect{},
 		)
-	case wasm.OptCodeLocalGet:
+	case wasm.OpcodeLocalGet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.get")
 		}
@@ -603,7 +603,7 @@ operatorSwitch:
 			// called localDepth ^^.
 			&OperationPick{Depth: depth - 1},
 		)
-	case wasm.OptCodeLocalSet:
+	case wasm.OpcodeLocalSet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.set")
 		}
@@ -614,7 +614,7 @@ operatorSwitch:
 			&OperationSwap{Depth: depth + 1},
 			&OperationDrop{Range: &InclusiveRange{Start: 0, End: 0}},
 		)
-	case wasm.OptCodeLocalTee:
+	case wasm.OpcodeLocalTee:
 		if index == nil {
 			return fmt.Errorf("index does not exist for local.tee")
 		}
@@ -624,21 +624,21 @@ operatorSwitch:
 			&OperationSwap{Depth: depth + 1},
 			&OperationDrop{Range: &InclusiveRange{Start: 0, End: 0}},
 		)
-	case wasm.OptCodeGlobalGet:
+	case wasm.OpcodeGlobalGet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for global.get")
 		}
 		c.emit(
 			&OperationGlobalGet{Index: *index},
 		)
-	case wasm.OptCodeGlobalSet:
+	case wasm.OpcodeGlobalSet:
 		if index == nil {
 			return fmt.Errorf("index does not exist for global.set")
 		}
 		c.emit(
 			&OperationGlobalSet{Index: *index},
 		)
-	case wasm.OptCodeI32Load:
+	case wasm.OpcodeI32Load:
 		imm, err := c.readMemoryImmediate("i32.load")
 		if err != nil {
 			return err
@@ -646,7 +646,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad{Type: SignLessTypeI32, Arg: imm},
 		)
-	case wasm.OptCodeI64Load:
+	case wasm.OpcodeI64Load:
 		imm, err := c.readMemoryImmediate("i64.load")
 		if err != nil {
 			return err
@@ -654,7 +654,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad{Type: SignLessTypeI64, Arg: imm},
 		)
-	case wasm.OptCodeF32Load:
+	case wasm.OpcodeF32Load:
 		imm, err := c.readMemoryImmediate("f32.load")
 		if err != nil {
 			return err
@@ -662,7 +662,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad{Type: SignLessTypeF32, Arg: imm},
 		)
-	case wasm.OptCodeF64Load:
+	case wasm.OpcodeF64Load:
 		imm, err := c.readMemoryImmediate("f64.load")
 		if err != nil {
 			return err
@@ -670,7 +670,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad{Type: SignLessTypeF64, Arg: imm},
 		)
-	case wasm.OptCodeI32Load8s:
+	case wasm.OpcodeI32Load8S:
 		imm, err := c.readMemoryImmediate("i32.load8_s")
 		if err != nil {
 			return err
@@ -678,7 +678,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad8{Type: SignFulInt32, Arg: imm},
 		)
-	case wasm.OptCodeI32Load8u:
+	case wasm.OpcodeI32Load8U:
 		imm, err := c.readMemoryImmediate("i32.load8_u")
 		if err != nil {
 			return err
@@ -686,7 +686,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad8{Type: SignFulUint32, Arg: imm},
 		)
-	case wasm.OptCodeI32Load16s:
+	case wasm.OpcodeI32Load16S:
 		imm, err := c.readMemoryImmediate("i32.load16_s")
 		if err != nil {
 			return err
@@ -694,7 +694,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad16{Type: SignFulInt32, Arg: imm},
 		)
-	case wasm.OptCodeI32Load16u:
+	case wasm.OpcodeI32Load16U:
 		imm, err := c.readMemoryImmediate("i32.load16_u")
 		if err != nil {
 			return err
@@ -702,7 +702,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad16{Type: SignFulUint32, Arg: imm},
 		)
-	case wasm.OptCodeI64Load8s:
+	case wasm.OpcodeI64Load8S:
 		imm, err := c.readMemoryImmediate("i64.load8_s")
 		if err != nil {
 			return err
@@ -710,7 +710,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad8{Type: SignFulInt64, Arg: imm},
 		)
-	case wasm.OptCodeI64Load8u:
+	case wasm.OpcodeI64Load8U:
 		imm, err := c.readMemoryImmediate("i64.load8_u")
 		if err != nil {
 			return err
@@ -718,7 +718,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad8{Type: SignFulUint64, Arg: imm},
 		)
-	case wasm.OptCodeI64Load16s:
+	case wasm.OpcodeI64Load16S:
 		imm, err := c.readMemoryImmediate("i64.load16_s")
 		if err != nil {
 			return err
@@ -726,7 +726,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad16{Type: SignFulInt64, Arg: imm},
 		)
-	case wasm.OptCodeI64Load16u:
+	case wasm.OpcodeI64Load16U:
 		imm, err := c.readMemoryImmediate("i64.load16_u")
 		if err != nil {
 			return err
@@ -734,7 +734,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad16{Type: SignFulUint64, Arg: imm},
 		)
-	case wasm.OptCodeI64Load32s:
+	case wasm.OpcodeI64Load32S:
 		imm, err := c.readMemoryImmediate("i64.load32_s")
 		if err != nil {
 			return err
@@ -742,7 +742,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad32{Signed: true, Arg: imm},
 		)
-	case wasm.OptCodeI64Load32u:
+	case wasm.OpcodeI64Load32U:
 		imm, err := c.readMemoryImmediate("i64.load32_s")
 		if err != nil {
 			return err
@@ -750,7 +750,7 @@ operatorSwitch:
 		c.emit(
 			&OperationLoad32{Signed: false, Arg: imm},
 		)
-	case wasm.OptCodeI32Store:
+	case wasm.OpcodeI32Store:
 		imm, err := c.readMemoryImmediate("i32.store")
 		if err != nil {
 			return err
@@ -758,7 +758,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore{Type: SignLessTypeI32, Arg: imm},
 		)
-	case wasm.OptCodeI64Store:
+	case wasm.OpcodeI64Store:
 		imm, err := c.readMemoryImmediate("i64.store")
 		if err != nil {
 			return err
@@ -766,7 +766,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore{Type: SignLessTypeI64, Arg: imm},
 		)
-	case wasm.OptCodeF32Store:
+	case wasm.OpcodeF32Store:
 		imm, err := c.readMemoryImmediate("f32.store")
 		if err != nil {
 			return err
@@ -774,7 +774,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore{Type: SignLessTypeF32, Arg: imm},
 		)
-	case wasm.OptCodeF64Store:
+	case wasm.OpcodeF64Store:
 		imm, err := c.readMemoryImmediate("f64.store")
 		if err != nil {
 			return err
@@ -782,7 +782,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore{Type: SignLessTypeF64, Arg: imm},
 		)
-	case wasm.OptCodeI32Store8:
+	case wasm.OpcodeI32Store8:
 		imm, err := c.readMemoryImmediate("i32.store8")
 		if err != nil {
 			return err
@@ -790,7 +790,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore8{Type: SignLessInt32, Arg: imm},
 		)
-	case wasm.OptCodeI32Store16:
+	case wasm.OpcodeI32Store16:
 		imm, err := c.readMemoryImmediate("i32.store16")
 		if err != nil {
 			return err
@@ -798,7 +798,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore16{Type: SignLessInt32, Arg: imm},
 		)
-	case wasm.OptCodeI64Store8:
+	case wasm.OpcodeI64Store8:
 		imm, err := c.readMemoryImmediate("i64.store8")
 		if err != nil {
 			return err
@@ -806,7 +806,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore8{Type: SignLessInt64, Arg: imm},
 		)
-	case wasm.OptCodeI64Store16:
+	case wasm.OpcodeI64Store16:
 		imm, err := c.readMemoryImmediate("i64.store16")
 		if err != nil {
 			return err
@@ -814,7 +814,7 @@ operatorSwitch:
 		c.emit(
 			&OperationStore16{Type: SignLessInt64, Arg: imm},
 		)
-	case wasm.OptCodeI64Store32:
+	case wasm.OpcodeI64Store32:
 		imm, err := c.readMemoryImmediate("i64.store32")
 		if err != nil {
 			return err
@@ -822,17 +822,17 @@ operatorSwitch:
 		c.emit(
 			&OperationStore32{Arg: imm},
 		)
-	case wasm.OptCodeMemorySize:
+	case wasm.OpcodeMemorySize:
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
 			&OperationMemorySize{},
 		)
-	case wasm.OptCodeMemoryGrow:
+	case wasm.OpcodeMemoryGrow:
 		c.pc++ // Skip the reserved one byte.
 		c.emit(
 			&OperationMemoryGrow{},
 		)
-	case wasm.OptCodeI32Const:
+	case wasm.OpcodeI32Const:
 		val, num, err := leb128.DecodeInt32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading i32.const value: %v", err)
@@ -841,7 +841,7 @@ operatorSwitch:
 		c.emit(
 			&OperationConstI32{Value: uint32(val)},
 		)
-	case wasm.OptCodeI64Const:
+	case wasm.OpcodeI64Const:
 		val, num, err := leb128.DecodeInt64(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading i64.const value: %v", err)
@@ -850,507 +850,507 @@ operatorSwitch:
 		c.emit(
 			&OperationConstI64{Value: uint64(val)},
 		)
-	case wasm.OptCodeF32Const:
+	case wasm.OpcodeF32Const:
 		v := math.Float32frombits(binary.LittleEndian.Uint32(c.f.Body[c.pc+1:]))
 		c.pc += 4
 		c.emit(
 			&OperationConstF32{Value: v},
 		)
-	case wasm.OptCodeF64Const:
+	case wasm.OpcodeF64Const:
 		v := math.Float64frombits(binary.LittleEndian.Uint64(c.f.Body[c.pc+1:]))
 		c.pc += 8
 		c.emit(
 			&OperationConstF64{Value: v},
 		)
-	case wasm.OptCodeI32eqz:
+	case wasm.OpcodeI32Eqz:
 		c.emit(
 			&OperationEqz{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32eq:
+	case wasm.OpcodeI32Eq:
 		c.emit(
 			&OperationEq{Type: SignLessTypeI32},
 		)
-	case wasm.OptCodeI32ne:
+	case wasm.OpcodeI32Ne:
 		c.emit(
 			&OperationNe{Type: SignLessTypeI32},
 		)
-	case wasm.OptCodeI32lts:
+	case wasm.OpcodeI32LtS:
 		c.emit(
 			&OperationLt{Type: SignFulTypeInt32},
 		)
-	case wasm.OptCodeI32ltu:
+	case wasm.OpcodeI32LtU:
 		c.emit(
 			&OperationLt{Type: SignFulTypeUint32},
 		)
-	case wasm.OptCodeI32gts:
+	case wasm.OpcodeI32GtS:
 		c.emit(
 			&OperationGt{Type: SignFulTypeInt32},
 		)
-	case wasm.OptCodeI32gtu:
+	case wasm.OpcodeI32GtU:
 		c.emit(
 			&OperationGt{Type: SignFulTypeUint32},
 		)
-	case wasm.OptCodeI32les:
+	case wasm.OpcodeI32LeS:
 		c.emit(
 			&OperationLe{Type: SignFulTypeInt32},
 		)
-	case wasm.OptCodeI32leu:
+	case wasm.OpcodeI32LeU:
 		c.emit(
 			&OperationLe{Type: SignFulTypeUint32},
 		)
-	case wasm.OptCodeI32ges:
+	case wasm.OpcodeI32GeS:
 		c.emit(
 			&OperationGe{Type: SignFulTypeInt32},
 		)
-	case wasm.OptCodeI32geu:
+	case wasm.OpcodeI32GeU:
 		c.emit(
 			&OperationGe{Type: SignFulTypeUint32},
 		)
-	case wasm.OptCodeI64eqz:
+	case wasm.OpcodeI64Eqz:
 		c.emit(
 			&OperationEqz{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64eq:
+	case wasm.OpcodeI64Eq:
 		c.emit(
 			&OperationEq{Type: SignLessTypeI64},
 		)
-	case wasm.OptCodeI64ne:
+	case wasm.OpcodeI64Ne:
 		c.emit(
 			&OperationNe{Type: SignLessTypeI64},
 		)
-	case wasm.OptCodeI64lts:
+	case wasm.OpcodeI64LtS:
 		c.emit(
 			&OperationLt{Type: SignFulTypeInt64},
 		)
-	case wasm.OptCodeI64ltu:
+	case wasm.OpcodeI64LtU:
 		c.emit(
 			&OperationLt{Type: SignFulTypeUint64},
 		)
-	case wasm.OptCodeI64gts:
+	case wasm.OpcodeI64GtS:
 		c.emit(
 			&OperationGt{Type: SignFulTypeInt64},
 		)
-	case wasm.OptCodeI64gtu:
+	case wasm.OpcodeI64GtU:
 		c.emit(
 			&OperationGt{Type: SignFulTypeUint64},
 		)
-	case wasm.OptCodeI64les:
+	case wasm.OpcodeI64LeS:
 		c.emit(
 			&OperationLe{Type: SignFulTypeInt64},
 		)
-	case wasm.OptCodeI64leu:
+	case wasm.OpcodeI64LeU:
 		c.emit(
 			&OperationLe{Type: SignFulTypeUint64},
 		)
-	case wasm.OptCodeI64ges:
+	case wasm.OpcodeI64GeS:
 		c.emit(
 			&OperationGe{Type: SignFulTypeInt64},
 		)
-	case wasm.OptCodeI64geu:
+	case wasm.OpcodeI64GeU:
 		c.emit(
 			&OperationGe{Type: SignFulTypeUint64},
 		)
-	case wasm.OptCodeF32eq:
+	case wasm.OpcodeF32Eq:
 		c.emit(
 			&OperationEq{Type: SignLessTypeF32},
 		)
-	case wasm.OptCodeF32ne:
+	case wasm.OpcodeF32Ne:
 		c.emit(
 			&OperationNe{Type: SignLessTypeF32},
 		)
-	case wasm.OptCodeF32lt:
+	case wasm.OpcodeF32Lt:
 		c.emit(
 			&OperationLt{Type: SignFulTypeFloat32},
 		)
-	case wasm.OptCodeF32gt:
+	case wasm.OpcodeF32Gt:
 		c.emit(
 			&OperationGt{Type: SignFulTypeFloat32},
 		)
-	case wasm.OptCodeF32le:
+	case wasm.OpcodeF32Le:
 		c.emit(
 			&OperationLe{Type: SignFulTypeFloat32},
 		)
-	case wasm.OptCodeF32ge:
+	case wasm.OpcodeF32Ge:
 		c.emit(
 			&OperationGe{Type: SignFulTypeFloat32},
 		)
-	case wasm.OptCodeF64eq:
+	case wasm.OpcodeF64Eq:
 		c.emit(
 			&OperationEq{Type: SignLessTypeF64},
 		)
-	case wasm.OptCodeF64ne:
+	case wasm.OpcodeF64Ne:
 		c.emit(
 			&OperationNe{Type: SignLessTypeF64},
 		)
-	case wasm.OptCodeF64lt:
+	case wasm.OpcodeF64Lt:
 		c.emit(
 			&OperationLt{Type: SignFulTypeFloat64},
 		)
-	case wasm.OptCodeF64gt:
+	case wasm.OpcodeF64Gt:
 		c.emit(
 			&OperationGt{Type: SignFulTypeFloat64},
 		)
-	case wasm.OptCodeF64le:
+	case wasm.OpcodeF64Le:
 		c.emit(
 			&OperationLe{Type: SignFulTypeFloat64},
 		)
-	case wasm.OptCodeF64ge:
+	case wasm.OpcodeF64Ge:
 		c.emit(
 			&OperationGe{Type: SignFulTypeFloat64},
 		)
-	case wasm.OptCodeI32clz:
+	case wasm.OpcodeI32Clz:
 		c.emit(
 			&OperationClz{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32ctz:
+	case wasm.OpcodeI32Ctz:
 		c.emit(
 			&OperationCtz{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32popcnt:
+	case wasm.OpcodeI32Popcnt:
 		c.emit(
 			&OperationPopcnt{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32add:
+	case wasm.OpcodeI32Add:
 		c.emit(
 			&OperationAdd{Type: SignLessTypeI32},
 		)
-	case wasm.OptCodeI32sub:
+	case wasm.OpcodeI32Sub:
 		c.emit(
 			&OperationSub{Type: SignLessTypeI32},
 		)
-	case wasm.OptCodeI32mul:
+	case wasm.OpcodeI32Mul:
 		c.emit(
 			&OperationMul{Type: SignLessTypeI32},
 		)
-	case wasm.OptCodeI32divs:
+	case wasm.OpcodeI32DivS:
 		c.emit(
 			&OperationDiv{Type: SignFulTypeInt32},
 		)
-	case wasm.OptCodeI32divu:
+	case wasm.OpcodeI32DivU:
 		c.emit(
 			&OperationDiv{Type: SignFulTypeUint32},
 		)
-	case wasm.OptCodeI32rems:
+	case wasm.OpcodeI32RemS:
 		c.emit(
 			&OperationRem{Type: SignFulInt32},
 		)
-	case wasm.OptCodeI32remu:
+	case wasm.OpcodeI32RemU:
 		c.emit(
 			&OperationRem{Type: SignFulUint32},
 		)
-	case wasm.OptCodeI32and:
+	case wasm.OpcodeI32And:
 		c.emit(
 			&OperationAnd{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32or:
+	case wasm.OpcodeI32Or:
 		c.emit(
 			&OperationOr{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32xor:
+	case wasm.OpcodeI32Xor:
 		c.emit(
 			&OperationXor{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI32shl:
+	case wasm.OpcodeI32Shl:
 		c.emit(
 			&OperationShl{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32shrs:
+	case wasm.OpcodeI32ShrS:
 		c.emit(
 			&OperationShr{Type: SignFulInt32},
 		)
-	case wasm.OptCodeI32shru:
+	case wasm.OpcodeI32ShrU:
 		c.emit(
 			&OperationShr{Type: SignFulUint32},
 		)
-	case wasm.OptCodeI32rotl:
+	case wasm.OpcodeI32Rotl:
 		c.emit(
 			&OperationRotl{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI32rotr:
+	case wasm.OpcodeI32Rotr:
 		c.emit(
 			&OperationRotr{Type: SignLessInt32},
 		)
-	case wasm.OptCodeI64clz:
+	case wasm.OpcodeI64Clz:
 		c.emit(
 			&OperationClz{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64ctz:
+	case wasm.OpcodeI64Ctz:
 		c.emit(
 			&OperationCtz{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64popcnt:
+	case wasm.OpcodeI64Popcnt:
 		c.emit(
 			&OperationPopcnt{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64add:
+	case wasm.OpcodeI64Add:
 		c.emit(
 			&OperationAdd{Type: SignLessTypeI64},
 		)
-	case wasm.OptCodeI64sub:
+	case wasm.OpcodeI64Sub:
 		c.emit(
 			&OperationSub{Type: SignLessTypeI64},
 		)
-	case wasm.OptCodeI64mul:
+	case wasm.OpcodeI64Mul:
 		c.emit(
 			&OperationMul{Type: SignLessTypeI64},
 		)
-	case wasm.OptCodeI64divs:
+	case wasm.OpcodeI64DivS:
 		c.emit(
 			&OperationDiv{Type: SignFulTypeInt64},
 		)
-	case wasm.OptCodeI64divu:
+	case wasm.OpcodeI64DivU:
 		c.emit(
 			&OperationDiv{Type: SignFulTypeUint64},
 		)
-	case wasm.OptCodeI64rems:
+	case wasm.OpcodeI64RemS:
 		c.emit(
 			&OperationRem{Type: SignFulInt64},
 		)
-	case wasm.OptCodeI64remu:
+	case wasm.OpcodeI64RemU:
 		c.emit(
 			&OperationRem{Type: SignFulUint64},
 		)
-	case wasm.OptCodeI64and:
+	case wasm.OpcodeI64And:
 		c.emit(
 			&OperationAnd{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64or:
+	case wasm.OpcodeI64Or:
 		c.emit(
 			&OperationOr{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64xor:
+	case wasm.OpcodeI64Xor:
 		c.emit(
 			&OperationXor{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64shl:
+	case wasm.OpcodeI64Shl:
 		c.emit(
 			&OperationShl{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64shrs:
+	case wasm.OpcodeI64ShrS:
 		c.emit(
 			&OperationShr{Type: SignFulInt64},
 		)
-	case wasm.OptCodeI64shru:
+	case wasm.OpcodeI64ShrU:
 		c.emit(
 			&OperationShr{Type: SignFulUint64},
 		)
-	case wasm.OptCodeI64rotl:
+	case wasm.OpcodeI64Rotl:
 		c.emit(
 			&OperationRotl{Type: SignLessInt64},
 		)
-	case wasm.OptCodeI64rotr:
+	case wasm.OpcodeI64Rotr:
 		c.emit(
 			&OperationRotr{Type: SignLessInt64},
 		)
-	case wasm.OptCodeF32abs:
+	case wasm.OpcodeF32Abs:
 		c.emit(
 			&OperationAbs{Type: Float32},
 		)
-	case wasm.OptCodeF32neg:
+	case wasm.OpcodeF32Neg:
 		c.emit(
 			&OperationNeg{Type: Float32},
 		)
-	case wasm.OptCodeF32ceil:
+	case wasm.OpcodeF32Ceil:
 		c.emit(
 			&OperationCeil{Type: Float32},
 		)
-	case wasm.OptCodeF32floor:
+	case wasm.OpcodeF32Floor:
 		c.emit(
 			&OperationFloor{Type: Float32},
 		)
-	case wasm.OptCodeF32trunc:
+	case wasm.OpcodeF32Trunc:
 		c.emit(
 			&OperationTrunc{Type: Float32},
 		)
-	case wasm.OptCodeF32nearest:
+	case wasm.OpcodeF32Nearest:
 		c.emit(
 			&OperationNearest{Type: Float32},
 		)
-	case wasm.OptCodeF32sqrt:
+	case wasm.OpcodeF32Sqrt:
 		c.emit(
 			&OperationSqrt{Type: Float32},
 		)
-	case wasm.OptCodeF32add:
+	case wasm.OpcodeF32Add:
 		c.emit(
 			&OperationAdd{Type: SignLessTypeF32},
 		)
-	case wasm.OptCodeF32sub:
+	case wasm.OpcodeF32Sub:
 		c.emit(
 			&OperationSub{Type: SignLessTypeF32},
 		)
-	case wasm.OptCodeF32mul:
+	case wasm.OpcodeF32Mul:
 		c.emit(
 			&OperationMul{Type: SignLessTypeF32},
 		)
-	case wasm.OptCodeF32div:
+	case wasm.OpcodeF32Div:
 		c.emit(
 			&OperationDiv{Type: SignFulTypeFloat32},
 		)
-	case wasm.OptCodeF32min:
+	case wasm.OpcodeF32Min:
 		c.emit(
 			&OperationMin{Type: Float32},
 		)
-	case wasm.OptCodeF32max:
+	case wasm.OpcodeF32Max:
 		c.emit(
 			&OperationMax{Type: Float32},
 		)
-	case wasm.OptCodeF32copysign:
+	case wasm.OpcodeF32Copysign:
 		c.emit(
 			&OperationCopysign{Type: Float32},
 		)
-	case wasm.OptCodeF64abs:
+	case wasm.OpcodeF64Abs:
 		c.emit(
 			&OperationAbs{Type: Float64},
 		)
-	case wasm.OptCodeF64neg:
+	case wasm.OpcodeF64Neg:
 		c.emit(
 			&OperationNeg{Type: Float64},
 		)
-	case wasm.OptCodeF64ceil:
+	case wasm.OpcodeF64Ceil:
 		c.emit(
 			&OperationCeil{Type: Float64},
 		)
-	case wasm.OptCodeF64floor:
+	case wasm.OpcodeF64Floor:
 		c.emit(
 			&OperationFloor{Type: Float64},
 		)
-	case wasm.OptCodeF64trunc:
+	case wasm.OpcodeF64Trunc:
 		c.emit(
 			&OperationTrunc{Type: Float64},
 		)
-	case wasm.OptCodeF64nearest:
+	case wasm.OpcodeF64Nearest:
 		c.emit(
 			&OperationNearest{Type: Float64},
 		)
-	case wasm.OptCodeF64sqrt:
+	case wasm.OpcodeF64Sqrt:
 		c.emit(
 			&OperationSqrt{Type: Float64},
 		)
-	case wasm.OptCodeF64add:
+	case wasm.OpcodeF64Add:
 		c.emit(
 			&OperationAdd{Type: SignLessTypeF64},
 		)
-	case wasm.OptCodeF64sub:
+	case wasm.OpcodeF64Sub:
 		c.emit(
 			&OperationSub{Type: SignLessTypeF64},
 		)
-	case wasm.OptCodeF64mul:
+	case wasm.OpcodeF64Mul:
 		c.emit(
 			&OperationMul{Type: SignLessTypeF64},
 		)
-	case wasm.OptCodeF64div:
+	case wasm.OpcodeF64Div:
 		c.emit(
 			&OperationDiv{Type: SignFulTypeFloat64},
 		)
-	case wasm.OptCodeF64min:
+	case wasm.OpcodeF64Min:
 		c.emit(
 			&OperationMin{Type: Float64},
 		)
-	case wasm.OptCodeF64max:
+	case wasm.OpcodeF64Max:
 		c.emit(
 			&OperationMax{Type: Float64},
 		)
-	case wasm.OptCodeF64copysign:
+	case wasm.OpcodeF64Copysign:
 		c.emit(
 			&OperationCopysign{Type: Float64},
 		)
-	case wasm.OptCodeI32wrapI64:
+	case wasm.OpcodeI32WrapI64:
 		c.emit(
 			&OperationI32WrapFromI64{},
 		)
-	case wasm.OptCodeI32truncf32s:
+	case wasm.OpcodeI32TruncF32S:
 		c.emit(
 			&OperationITruncFromF{InputType: Float32, OutputType: SignFulInt32},
 		)
-	case wasm.OptCodeI32truncf32u:
+	case wasm.OpcodeI32TruncF32U:
 		c.emit(
 			&OperationITruncFromF{InputType: Float32, OutputType: SignFulUint32},
 		)
-	case wasm.OptCodeI32truncf64s:
+	case wasm.OpcodeI32TruncF64S:
 		c.emit(
 			&OperationITruncFromF{InputType: Float64, OutputType: SignFulInt32},
 		)
-	case wasm.OptCodeI32truncf64u:
+	case wasm.OpcodeI32TruncF64U:
 		c.emit(
 			&OperationITruncFromF{InputType: Float64, OutputType: SignFulUint32},
 		)
-	case wasm.OptCodeI64Extendi32s:
+	case wasm.OpcodeI64ExtendI32S:
 		c.emit(
 			&OperationExtend{Signed: true},
 		)
-	case wasm.OptCodeI64Extendi32u:
+	case wasm.OpcodeI64ExtendI32U:
 		c.emit(
 			&OperationExtend{Signed: false},
 		)
-	case wasm.OptCodeI64TruncF32s:
+	case wasm.OpcodeI64TruncF32S:
 		c.emit(
 			&OperationITruncFromF{InputType: Float32, OutputType: SignFulInt64},
 		)
-	case wasm.OptCodeI64TruncF32u:
+	case wasm.OpcodeI64TruncF32U:
 		c.emit(
 			&OperationITruncFromF{InputType: Float32, OutputType: SignFulUint64},
 		)
-	case wasm.OptCodeI64Truncf64s:
+	case wasm.OpcodeI64TruncF64S:
 		c.emit(
 			&OperationITruncFromF{InputType: Float64, OutputType: SignFulInt64},
 		)
-	case wasm.OptCodeI64Truncf64u:
+	case wasm.OpcodeI64TruncF64U:
 		c.emit(
 			&OperationITruncFromF{InputType: Float64, OutputType: SignFulUint64},
 		)
-	case wasm.OptCodeF32Converti32s:
+	case wasm.OpcodeF32ConvertI32s:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulInt32, OutputType: Float32},
 		)
-	case wasm.OptCodeF32Converti32u:
+	case wasm.OpcodeF32ConvertI32U:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulUint32, OutputType: Float32},
 		)
-	case wasm.OptCodeF32Converti64s:
+	case wasm.OpcodeF32ConvertI64S:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulInt64, OutputType: Float32},
 		)
-	case wasm.OptCodeF32Converti64u:
+	case wasm.OpcodeF32ConvertI64U:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulUint64, OutputType: Float32},
 		)
-	case wasm.OptCodeF32Demotef64:
+	case wasm.OpcodeF32DemoteF64:
 		c.emit(
 			&OperationF32DemoteFromF64{},
 		)
-	case wasm.OptCodeF64Converti32s:
+	case wasm.OpcodeF64ConvertI32S:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulInt32, OutputType: Float64},
 		)
-	case wasm.OptCodeF64Converti32u:
+	case wasm.OpcodeF64ConvertI32U:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulUint32, OutputType: Float64},
 		)
-	case wasm.OptCodeF64Converti64s:
+	case wasm.OpcodeF64ConvertI64S:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulInt64, OutputType: Float64},
 		)
-	case wasm.OptCodeF64Converti64u:
+	case wasm.OpcodeF64ConvertI64U:
 		c.emit(
 			&OperationFConvertFromI{InputType: SignFulUint64, OutputType: Float64},
 		)
-	case wasm.OptCodeF64Promotef32:
+	case wasm.OpcodeF64PromoteF32:
 		c.emit(
 			&OperationF64PromoteFromF32{},
 		)
-	case wasm.OptCodeI32Reinterpretf32:
+	case wasm.OpcodeI32ReinterpretF32:
 		c.emit(
 			&OperationI32ReinterpretFromF32{},
 		)
-	case wasm.OptCodeI64Reinterpretf64:
+	case wasm.OpcodeI64ReinterpretF64:
 		c.emit(
 			&OperationI64ReinterpretFromF64{},
 		)
-	case wasm.OptCodeF32Reinterpreti32:
+	case wasm.OpcodeF32ReinterpretI32:
 		c.emit(
 			&OperationF32ReinterpretFromI32{},
 		)
-	case wasm.OptCodeF64Reinterpreti64:
+	case wasm.OpcodeF64ReinterpretI64:
 		c.emit(
 			&OperationF64ReinterpretFromI64{},
 		)
@@ -1369,21 +1369,21 @@ func (c *compiler) nextID() (id uint32) {
 	return
 }
 
-func (c *compiler) applyToStack(optCode wasm.OptCode) (*uint32, error) {
+func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 	var index uint32
 	var ptr *uint32
-	switch optCode {
+	switch opcode {
 	case
-		// These are the optcodes that is coupled with "index"　immediate
-		// and it DOES affect the signature of optcode.
-		wasm.OptCodeCall,
-		wasm.OptCodeCallIndirect,
-		wasm.OptCodeLocalGet,
-		wasm.OptCodeLocalSet,
-		wasm.OptCodeLocalTee,
-		wasm.OptCodeGlobalGet,
-		wasm.OptCodeGlobalSet:
-		// Assumes that we are at the optcode now so skip it before read immediates.
+		// These are the opcodes that is coupled with "index"　immediate
+		// and it DOES affect the signature of opcode.
+		wasm.OpcodeCall,
+		wasm.OpcodeCallIndirect,
+		wasm.OpcodeLocalGet,
+		wasm.OpcodeLocalSet,
+		wasm.OpcodeLocalTee,
+		wasm.OpcodeGlobalGet,
+		wasm.OpcodeGlobalSet:
+		// Assumes that we are at the opcode now so skip it before read immediates.
 		v, num, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return nil, fmt.Errorf("reading immediates: %w", err)
@@ -1392,9 +1392,9 @@ func (c *compiler) applyToStack(optCode wasm.OptCode) (*uint32, error) {
 		index = v
 		ptr = &index
 	default:
-		// Note that other optcodes are free of index
+		// Note that other opcodes are free of index
 		// as it doesn't affect the signature of opt code.
-		// In other words, the "index" argument of wasmOptcodeSignature
+		// In other words, the "index" argument of wasmOpcodeSignature
 		// is ignored there.
 	}
 
@@ -1402,8 +1402,8 @@ func (c *compiler) applyToStack(optCode wasm.OptCode) (*uint32, error) {
 		return ptr, nil
 	}
 
-	// Retrieve the signature of the optcode.
-	s, err := wasmOptcodeSignature(c.f, optCode, index)
+	// Retrieve the signature of the opcode.
+	s, err := wasmOpcodeSignature(c.f, opcode, index)
 	if err != nil {
 		return nil, err
 	}
