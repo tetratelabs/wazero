@@ -17,6 +17,11 @@ import (
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
+// jitcall is implemented in jit_amd64.s as a Go Assembler function.
+// This is used by engine.exec and the entrypoint to enter the JITed native code.
+// codeSegment is the pointer to the initial instruction of the compiled native code.
+// engine is the pointer to the "*engine" as uintptr.
+// memory is the pointer to the first byte of memoryInstance.Buffer slice to be used by the target function.
 func jitcall(codeSegment, engine, memory uintptr)
 
 // Reserved registers.
