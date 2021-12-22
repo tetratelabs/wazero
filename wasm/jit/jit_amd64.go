@@ -438,7 +438,8 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	getGlobalInstancePointer.From.Reg = intReg
 	b.addInstruction(getGlobalInstancePointer)
 
-	finalReg := intReg
+        // When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
+	valueReg := intReg
 	wasmType := b.f.ModuleInstance.Globals[o.Index].Type.ValType
 	switch wasmType {
 	case wasm.ValueTypeF32, wasm.ValueTypeF64:
