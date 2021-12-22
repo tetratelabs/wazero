@@ -1698,7 +1698,7 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			builder := requireNewBuilder(t)
 			globals := []*wasm.GlobalInstance{nil, {Val: 12345, Type: &wasm.GlobalType{ValType: tp}}, nil}
 			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
-			// Now emit the code.
+			// Emit the code.
 			builder.initializeReservedRegisters()
 			op := &wazeroir.OperationGlobalGet{Index: 1}
 			err := builder.handleGlobalGet(op)
