@@ -1700,7 +1700,8 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
 			// Now emit the code.
 			builder.initializeReservedRegisters()
-			err := builder.handleGlobalGet(&wazeroir.OperationGlobalGet{Index: 1})
+			op := &wazeroir.OperationGlobalGet{Index: 1}
+			err := builder.handleGlobalGet(op)
 			require.NoError(t, err)
 			// At this point, the top of stack must be the retrieved global on a register.
 			global := builder.locationStack.peek()
@@ -1729,7 +1730,7 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			)
 			// Check the stack.
 			require.Equal(t, uint64(1), eng.currentStackPointer)
-			require.Equal(t, uint64(12345), eng.stack[0])
+			require.Equal(t, globals[op.Index].Val, eng.stack[0])
 		})
 	}
 }
@@ -1747,7 +1748,8 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 			_ = builder.locationStack.pushValueOnStack() // where we place the set target value below.
 			// Now emit the code.
 			builder.initializeReservedRegisters()
-			err := builder.handleGlobalSet(&wazeroir.OperationGlobalSet{Index: 1})
+			op := &wazeroir.OperationGlobalSet{Index: 1}
+			err := builder.handleGlobalSet(op)
 			require.NoError(t, err)
 			builder.returnFunction()
 
@@ -1766,7 +1768,7 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 			)
 			// Check the value.
 			require.Equal(t, uint64(0), eng.currentStackPointer)
-			require.Equal(t, uint64(12345), globals[1].Val)
+			require.Equal(t, uint64(12345), globals[op.Index].Val)
 		})
 	}
 }
