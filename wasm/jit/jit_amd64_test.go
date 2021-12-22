@@ -1703,6 +1703,7 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			op := &wazeroir.OperationGlobalGet{Index: 1}
 			err := builder.handleGlobalGet(op)
 			require.NoError(t, err)
+
 			// At this point, the top of stack must be the retrieved global on a register.
 			global := builder.locationStack.peek()
 			require.True(t, global.onRegister())
