@@ -46,7 +46,7 @@ type engine struct {
 	compiledHostFunctionIndex map[*wasm.FunctionInstance]int64
 }
 
-// These consts are used in native codes to manipulate the engine's fields.
+// Native code manipulates the engine's fields with these constants.
 const (
 	engineStackSliceOffset                = 0
 	engineCurrentStackPointerOffset       = 24
