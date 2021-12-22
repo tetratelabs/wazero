@@ -438,12 +438,12 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	getGlobalInstancePointer.From.Reg = intReg
 	b.addInstruction(getGlobalInstancePointer)
 
-        // When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
+	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
 	wasmType := b.f.ModuleInstance.Globals[o.Index].Type.ValType
 	switch wasmType {
 	case wasm.ValueTypeF32, wasm.ValueTypeF64:
-		finalReg, err = b.allocateRegister(gpTypeFloat)
+		valueReg, err = b.allocateRegister(gpTypeFloat)
 		if err != nil {
 			return err
 		}
@@ -453,14 +453,14 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	moveValue := b.newProg()
 	moveValue.As = x86.AMOVQ
 	moveValue.To.Type = obj.TYPE_REG
-	moveValue.To.Reg = finalReg
+	moveValue.To.Reg = valueReg
 	moveValue.From.Type = obj.TYPE_MEM
 	moveValue.From.Reg = intReg
 	moveValue.From.Offset = globalInstanceValueOffset
 	b.addInstruction(moveValue)
 
 	// Record that the retrieved global value on the top of the stack is now in a register.
-	loc := b.locationStack.pushValueOnRegister(finalReg)
+	loc := b.locationStack.pushValueOnRegister(valueReg)
 	loc.setValueType(wazeroir.WasmValueTypeToSignless(wasmType))
 	return nil
 }
