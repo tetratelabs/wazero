@@ -307,7 +307,7 @@ type compiledWasmFunction struct {
 	codeInitialAddress uintptr
 	// The same purpose as codeInitialAddress, but for memory.Buffer.
 	memoryAddress uintptr
-	// The same purpose as codeInitialAddress, but for .globals.
+	// globalSliceAddress is like codeInitialAddress, but for .globals.
 	globalSliceAddress uintptr
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
