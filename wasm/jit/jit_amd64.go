@@ -483,7 +483,8 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	if err != nil {
 		return err
 	}
-	// First we move the pointer to the global slice to the allocated register.
+
+	// First, move the pointer to the global slice into the allocated register.
 	moveGlobalSlicePointer := b.newProg()
 	moveGlobalSlicePointer.As = x86.AMOVQ
 	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
