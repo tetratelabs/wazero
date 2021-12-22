@@ -1689,6 +1689,7 @@ func TestGlobalInstanceValueOffset(t *testing.T) {
 }
 
 func TestAmd64Builder_handleGlobalGet(t *testing.T) {
+	const globalValue uint64 = 12345
 	for i, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
@@ -1696,7 +1697,7 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			// Setup the globals.
 			builder := requireNewBuilder(t)
-			globals := []*wasm.GlobalInstance{nil, {Val: 12345, Type: &wasm.GlobalType{ValType: tp}}, nil}
+			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}, nil}
 			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
 			// Emit the code.
 			builder.initializeReservedRegisters()
@@ -1732,12 +1733,14 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			)
 			// Check the stack.
 			require.Equal(t, uint64(1), eng.currentStackPointer)
-			require.Equal(t, globals[op.Index].Val, eng.stack[0])
+			// Since we call global.get, the top of the stack must be the global value.
+			require.Equal(t, globalValue, eng.stack[0])
 		})
 	}
 }
 
 func TestAmd64Builder_handleGlobalSet(t *testing.T) {
+	const valueToSet uint64 = 12345
 	for i, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
@@ -1745,7 +1748,7 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			// Setup the globals.
 			builder := requireNewBuilder(t)
-			globals := []*wasm.GlobalInstance{nil, {Val: 0, Type: &wasm.GlobalType{ValType: tp}}, nil}
+			globals := []*wasm.GlobalInstance{nil, {Val: 40, Type: &wasm.GlobalType{ValType: tp}}, nil}
 			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
 			_ = builder.locationStack.pushValueOnStack() // where we place the set target value below.
 			// Now emit the code.
@@ -1761,7 +1764,7 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 			// Run code.
 			eng := newEngine()
 			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
-			eng.push(12345)
+			eng.push(valueToSet)
 			mem := newMemoryInst()
 			jitcall(
 				uintptr(unsafe.Pointer(&code[0])),
@@ -1770,7 +1773,8 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 			)
 			// Check the value.
 			require.Equal(t, uint64(0), eng.currentStackPointer)
-			require.Equal(t, uint64(12345), globals[op.Index].Val)
+			// The global value should be set to valueToSet.
+			require.Equal(t, valueToSet, globals[op.Index].Val)
 		})
 	}
 }
