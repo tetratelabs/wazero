@@ -1682,3 +1682,54 @@ func TestAmd64Builder_handleSwap(t *testing.T) {
 		})
 	}
 }
+
+// Ensures the globalInstanceValueOffset doesn't drift when we modify the struct (wasm.GlobalInstance).
+func TestGlobalInstanceValueOffset(t *testing.T) {
+	require.Equal(t, int(unsafe.Offsetof((&wasm.GlobalInstance{}).Val)), globalInstanceValueOffset)
+}
+
+func TestAmd64Builder_handleGlobalGet(t *testing.T) {
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			// Setup the globals.
+			builder := requireNewBuilder(t)
+			globals := []*wasm.GlobalInstance{nil, {Val: 12345, Type: &wasm.GlobalType{ValType: tp}}, nil}
+			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
+			// Now emit the code.
+			builder.initializeReservedRegisters()
+			builder.handleGlobalGet(&wazeroir.OperationGlobalGet{Index: 1})
+			// At this point, the top of stack must be the retrieved global on a register.
+			global := builder.locationStack.peek()
+			require.True(t, global.onRegister())
+			require.Len(t, builder.locationStack.usedRegisters, 1)
+			switch tp {
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
+				require.True(t, isFloatRegister(global.register))
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
+				require.True(t, isIntRegister(global.register))
+			}
+			builder.releaseAllRegistersToStack()
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			fmt.Println(hex.EncodeToString(code))
+			require.NoError(t, err)
+			// Run code.
+			eng := newEngine()
+			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the stack.
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(12345), eng.stack[0])
+		})
+	}
+}

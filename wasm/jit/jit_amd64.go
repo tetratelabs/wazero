@@ -96,9 +96,13 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling swap operation: %w", err)
 			}
 		case *wazeroir.OperationGlobalGet:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleGlobalGet(o); err != nil {
+				return nil, fmt.Errorf("error handling global.get operation: %w", err)
+			}
 		case *wazeroir.OperationGlobalSet:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleGlobalSet(o); err != nil {
+				return nil, fmt.Errorf("error handling global.set operation: %w", err)
+			}
 		case *wazeroir.OperationLoad:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLoad8:
@@ -395,6 +399,74 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 		b.locationStack.markRegisterUsed(reg)
 		_ = b.locationStack.pop() // Delete tmpStackLocation.
 	}
+	return nil
+}
+
+func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
+	return nil
+}
+
+const globalInstanceValueOffset = 8
+
+func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
+	intReg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// First we move the pointer to the global slice to the allocated register.
+	moveGlobalSlicePointer := b.newProg()
+	moveGlobalSlicePointer.As = x86.AMOVQ
+	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
+	moveGlobalSlicePointer.To.Reg = intReg
+	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
+	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
+	b.addInstruction(moveGlobalSlicePointer)
+
+	// Then get the memory location of the target global instance's pointer.
+	getGlobalInstanceLocation := b.newProg()
+	getGlobalInstanceLocation.As = x86.AADDQ
+	getGlobalInstanceLocation.To.Type = obj.TYPE_REG
+	getGlobalInstanceLocation.To.Reg = intReg
+	getGlobalInstanceLocation.From.Type = obj.TYPE_CONST
+	getGlobalInstanceLocation.From.Offset = 8 * int64(o.Index)
+	b.addInstruction(getGlobalInstanceLocation)
+
+	// Now move the global instance's location to the register.
+	getGlobalInstancePointer := b.newProg()
+	getGlobalInstancePointer.As = x86.AMOVQ
+	getGlobalInstancePointer.To.Type = obj.TYPE_REG
+	getGlobalInstancePointer.To.Reg = intReg
+	getGlobalInstancePointer.From.Type = obj.TYPE_MEM
+	getGlobalInstancePointer.From.Reg = intReg
+	b.addInstruction(getGlobalInstancePointer)
+
+	finalReg := intReg
+	wasmType := b.f.ModuleInstance.Globals[o.Index].Type.ValType
+	switch wasmType {
+	case wasm.ValueTypeF32, wasm.ValueTypeF64:
+		finalReg, err = b.allocateRegister(gpTypeFloat)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Now we have the pointer to the target instance in the allocated int register.
+	// So move the actual value to the register.
+	moveValue := b.newProg()
+	moveValue.As = x86.AMOVQ
+	moveValue.To.Type = obj.TYPE_REG
+	moveValue.To.Reg = finalReg
+	moveValue.From.Type = obj.TYPE_MEM
+	moveValue.From.Reg = intReg
+	moveValue.From.Offset = globalInstanceValueOffset
+	b.addInstruction(moveValue)
+
+	// Record that we have the retrieved global value on the top of the stack
+	// with the location = allocated register.
+	loc := b.locationStack.pushValueOnRegister(finalReg)
+	loc.setValueType(wazeroir.WasmValueTypeToSignless(wasmType))
 	return nil
 }
 
