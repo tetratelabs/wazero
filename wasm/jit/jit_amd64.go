@@ -402,10 +402,6 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 	return nil
 }
 
-func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
-	return nil
-}
-
 const globalInstanceValueOffset = 8
 
 func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
@@ -467,6 +463,63 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	// with the location = allocated register.
 	loc := b.locationStack.pushValueOnRegister(finalReg)
 	loc.setValueType(wazeroir.WasmValueTypeToSignless(wasmType))
+	return nil
+}
+
+func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
+	// We ensure that the value to set exists on a register at first.
+	val := b.locationStack.pop()
+	if val.onStack() {
+		b.moveStackToRegisterWithAllocation(val.registerType(), val)
+	} else if val.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(val); err != nil {
+			return err
+		}
+	}
+
+	// Next we get the memory location of target global instance.
+	intReg, err := b.allocateRegister(gpTypeInt)
+	if err != nil {
+		return err
+	}
+	// First we move the pointer to the global slice to the allocated register.
+	moveGlobalSlicePointer := b.newProg()
+	moveGlobalSlicePointer.As = x86.AMOVQ
+	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
+	moveGlobalSlicePointer.To.Reg = intReg
+	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
+	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
+	b.addInstruction(moveGlobalSlicePointer)
+	// Then get the memory location of the target global instance's pointer.
+	getGlobalInstanceLocation := b.newProg()
+	getGlobalInstanceLocation.As = x86.AADDQ
+	getGlobalInstanceLocation.To.Type = obj.TYPE_REG
+	getGlobalInstanceLocation.To.Reg = intReg
+	getGlobalInstanceLocation.From.Type = obj.TYPE_CONST
+	getGlobalInstanceLocation.From.Offset = 8 * int64(o.Index)
+	b.addInstruction(getGlobalInstanceLocation)
+	// Now move the global instance's location to the register.
+	getGlobalInstancePointer := b.newProg()
+	getGlobalInstancePointer.As = x86.AMOVQ
+	getGlobalInstancePointer.To.Type = obj.TYPE_REG
+	getGlobalInstancePointer.To.Reg = intReg
+	getGlobalInstancePointer.From.Type = obj.TYPE_MEM
+	getGlobalInstancePointer.From.Reg = intReg
+	b.addInstruction(getGlobalInstancePointer)
+
+	// Now ready to write the value to the global instance location.
+	moveValue := b.newProg()
+	moveValue.As = x86.AMOVQ
+	moveValue.From.Type = obj.TYPE_REG
+	moveValue.From.Reg = val.register
+	moveValue.To.Type = obj.TYPE_MEM
+	moveValue.To.Reg = intReg
+	moveValue.To.Offset = globalInstanceValueOffset
+	b.addInstruction(moveValue)
+
+	// We no longer need the top register.
+	b.locationStack.releaseRegister(val)
 	return nil
 }
 

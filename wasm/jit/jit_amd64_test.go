@@ -1733,3 +1733,40 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 		})
 	}
 }
+
+func TestAmd64Builder_handleGlobalSet(t *testing.T) {
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			// Setup the globals.
+			builder := requireNewBuilder(t)
+			globals := []*wasm.GlobalInstance{nil, {Val: 0, Type: &wasm.GlobalType{ValType: tp}}, nil}
+			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
+			_ = builder.locationStack.pushValueOnStack() // where we place the set target value below.
+			// Now emit the code.
+			builder.initializeReservedRegisters()
+			err := builder.handleGlobalSet(&wazeroir.OperationGlobalSet{Index: 1})
+			require.NoError(t, err)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			eng := newEngine()
+			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
+			eng.push(12345)
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Check the value.
+			require.Equal(t, uint64(0), eng.currentStackPointer)
+			require.Equal(t, uint64(12345), globals[1].Val)
+		})
+	}
+}
