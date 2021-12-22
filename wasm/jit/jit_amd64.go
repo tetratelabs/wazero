@@ -480,7 +480,7 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 		}
 	}
 
-	// Next we get the memory location of target global instance.
+	// Allocate a register to hold the memory location of the target global instance.
 	intReg, err := b.allocateRegister(gpTypeInt)
 	if err != nil {
 		return err
