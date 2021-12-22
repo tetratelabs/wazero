@@ -470,7 +470,9 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	// We ensure that the value to set exists on a register at first.
 	val := b.locationStack.pop()
 	if val.onStack() {
-		b.moveStackToRegisterWithAllocation(val.registerType(), val)
+		if err := b.moveStackToRegisterWithAllocation(val.registerType(), val); err != nil {
+			return err
+		}
 	} else if val.onConditionalRegister() {
 		if err := b.moveConditionalToGPRegister(val); err != nil {
 			return err
