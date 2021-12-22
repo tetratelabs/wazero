@@ -58,7 +58,7 @@ const (
 // and it has the information about where it exists in the physical machine.
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
-	valueType wazeroir.SignLeSsType
+	valueType wazeroir.SignLessType
 	// Set to -1 if the value is stored in the memory stack.
 	register int16
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
@@ -70,9 +70,9 @@ type valueLocation struct {
 
 func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
 	switch v.valueType {
-	case wazeroir.SignLeSsTypeI32, wazeroir.SignLeSsTypeI64:
+	case wazeroir.SignLessTypeI32, wazeroir.SignLessTypeI64:
 		t = gpTypeInt
-	case wazeroir.SignLeSsTypeF32, wazeroir.SignLeSsTypeF64:
+	case wazeroir.SignLessTypeF32, wazeroir.SignLessTypeF64:
 		t = gpTypeFloat
 	default:
 		panic("unreachable")
@@ -80,7 +80,7 @@ func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
 	return
 }
 
-func (v *valueLocation) setValueType(t wazeroir.SignLeSsType) {
+func (v *valueLocation) setValueType(t wazeroir.SignLessType) {
 	v.valueType = t
 }
 

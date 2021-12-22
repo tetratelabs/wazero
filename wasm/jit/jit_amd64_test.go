@@ -651,7 +651,7 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 	t.Run("on reg", func(t *testing.T) {
 		// Set up the pick target original value.
 		pickTargetLocation := builder.locationStack.pushValueOnRegister(int16(x86.REG_R10))
-		pickTargetLocation.setValueType(wazeroir.SignLeSsTypeI32)
+		pickTargetLocation.setValueType(wazeroir.SignLessTypeI32)
 		builder.locationStack.pushValueOnStack() // Dummy value!
 		builder.movConstToRegister(100, pickTargetLocation.register)
 		// Now insert pick code.
@@ -751,7 +751,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 			// To verify the behavior, we increment and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.SignLeSsTypeI64, loc.valueType)
+			require.Equal(t, wazeroir.SignLessTypeI64, loc.valueType)
 			prog := builder.newProg()
 			prog.As = x86.AINCQ
 			prog.To.Type = obj.TYPE_REG
@@ -781,7 +781,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 
 func TestAmd64Builder_handleAdd(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
-		o := &wazeroir.OperationAdd{Type: wazeroir.SignLeSsTypeI64}
+		o := &wazeroir.OperationAdd{Type: wazeroir.SignLessTypeI64}
 		t.Run("x1:reg,x2:reg", func(t *testing.T) {
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
@@ -1042,7 +1042,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 
 func TestAmd64Builder_handleSub(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
-		o := &wazeroir.OperationSub{Type: wazeroir.SignLeSsTypeI64}
+		o := &wazeroir.OperationSub{Type: wazeroir.SignLessTypeI64}
 		t.Run("x1:reg,x2:reg", func(t *testing.T) {
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
