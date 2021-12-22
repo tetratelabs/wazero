@@ -493,7 +493,8 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	moveGlobalSlicePointer.From.Reg = engineInstanceReg
 	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
 	b.addInstruction(moveGlobalSlicePointer)
-	// Then get the memory location of the target global instance's pointer.
+
+	// Then, get the memory location of the target global instance's pointer.
 	getGlobalInstanceLocation := b.newProg()
 	getGlobalInstanceLocation.As = x86.AADDQ
 	getGlobalInstanceLocation.To.Type = obj.TYPE_REG
