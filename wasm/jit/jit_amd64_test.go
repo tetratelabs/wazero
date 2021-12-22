@@ -1731,10 +1731,10 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 				uintptr(unsafe.Pointer(eng)),
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
-			// Check the stack.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
 			// Since we call global.get, the top of the stack must be the global value.
 			require.Equal(t, globalValue, eng.stack[0])
+			// Plus as we push the value, the stack pointer must be incremented.
+			require.Equal(t, uint64(1), eng.currentStackPointer)
 		})
 	}
 }
@@ -1771,10 +1771,10 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 				uintptr(unsafe.Pointer(eng)),
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
-			// Check the value.
-			require.Equal(t, uint64(0), eng.currentStackPointer)
 			// The global value should be set to valueToSet.
 			require.Equal(t, valueToSet, globals[op.Index].Val)
+			// Plus we consumed the top of the stack, the stack pointer must be decremented.
+			require.Equal(t, uint64(0), eng.currentStackPointer)
 		})
 	}
 }
