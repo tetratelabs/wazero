@@ -460,7 +460,6 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	b.addInstruction(moveValue)
 
 	// Record that the retrieved global value on the top of the stack is now in a register.
-	// with the location = allocated register.
 	loc := b.locationStack.pushValueOnRegister(finalReg)
 	loc.setValueType(wazeroir.WasmValueTypeToSignless(wasmType))
 	return nil
