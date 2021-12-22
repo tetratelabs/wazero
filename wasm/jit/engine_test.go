@@ -20,6 +20,7 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).jitCallStatusCode)), engineJITCallStatusCodeOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallIndex)), engineFunctionCallIndexOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).currentGlobalSliceAddress)), engineCurrentGlobalSliceAddressOffset)
 }
 
 func TestEngine_fibonacci(t *testing.T) {

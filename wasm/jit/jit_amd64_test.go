@@ -1682,3 +1682,99 @@ func TestAmd64Builder_handleSwap(t *testing.T) {
 		})
 	}
 }
+
+// TestGlobalInstanceValueOffset ensures the globalInstanceValueOffset doesn't drift when we modify the struct (wasm.GlobalInstance).
+func TestGlobalInstanceValueOffset(t *testing.T) {
+	require.Equal(t, int(unsafe.Offsetof((&wasm.GlobalInstance{}).Val)), globalInstanceValueOffset)
+}
+
+func TestAmd64Builder_handleGlobalGet(t *testing.T) {
+	const globalValue uint64 = 12345
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			// Setup the globals.
+			builder := requireNewBuilder(t)
+			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}, nil}
+			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
+			// Emit the code.
+			builder.initializeReservedRegisters()
+			op := &wazeroir.OperationGlobalGet{Index: 1}
+			err := builder.handleGlobalGet(op)
+			require.NoError(t, err)
+
+			// At this point, the top of stack must be the retrieved global on a register.
+			global := builder.locationStack.peek()
+			require.True(t, global.onRegister())
+			require.Len(t, builder.locationStack.usedRegisters, 1)
+			switch tp {
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
+				require.True(t, isFloatRegister(global.register))
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
+				require.True(t, isIntRegister(global.register))
+			}
+			builder.releaseAllRegistersToStack()
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+
+			// Run the code assembled above.
+			eng := newEngine()
+			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// Since we call global.get, the top of the stack must be the global value.
+			require.Equal(t, globalValue, eng.stack[0])
+			// Plus as we push the value, the stack pointer must be incremented.
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+		})
+	}
+}
+
+func TestAmd64Builder_handleGlobalSet(t *testing.T) {
+	const valueToSet uint64 = 12345
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			// Setup the globals.
+			builder := requireNewBuilder(t)
+			globals := []*wasm.GlobalInstance{nil, {Val: 40, Type: &wasm.GlobalType{ValType: tp}}, nil}
+			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
+			_ = builder.locationStack.pushValueOnStack() // where we place the set target value below.
+			// Now emit the code.
+			builder.initializeReservedRegisters()
+			op := &wazeroir.OperationGlobalSet{Index: 1}
+			err := builder.handleGlobalSet(op)
+			require.NoError(t, err)
+			builder.returnFunction()
+
+			// Assemble.
+			code, err := builder.assemble()
+			require.NoError(t, err)
+			// Run code.
+			eng := newEngine()
+			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
+			eng.push(valueToSet)
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+			// The global value should be set to valueToSet.
+			require.Equal(t, valueToSet, globals[op.Index].Val)
+			// Plus we consumed the top of the stack, the stack pointer must be decremented.
+			require.Equal(t, uint64(0), eng.currentStackPointer)
+		})
+	}
+}
