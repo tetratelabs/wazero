@@ -239,6 +239,9 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 	if cf.memory != nil {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
 	}
+	if len(b.f.ModuleInstance.Globals) > 0 {
+		cf.globalSliceAddress = uintptr(unsafe.Pointer(&b.f.ModuleInstance.Globals[0]))
+	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 	return cf
 }

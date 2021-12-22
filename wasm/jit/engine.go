@@ -12,6 +12,8 @@ import (
 )
 
 type engine struct {
+	// These fields are used and manipulated by JITed codes.
+
 	// The actual Go-allocated stack.
 	// Note that we NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
 	stack []uint64
@@ -29,8 +31,13 @@ type engine struct {
 	// Instructions after [base+continuationAddressOffset] must start with
 	// restoring reserved registeres.
 	continuationAddressOffset uintptr
+	// The address to the backing array of slice of global instances used by current function.
+	currentGlobalSliceAddress uintptr
 	// Function call frames in linked list
 	callFrameStack *callFrame
+
+	// Following fields are not used by JITed codes. Only used during compilation.
+
 	// Store the compiled functions and indexes.
 	compiledWasmFunctions     []*compiledWasmFunction
 	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int64
@@ -38,6 +45,17 @@ type engine struct {
 	compiledHostFunctions     []*compiledHostFunction
 	compiledHostFunctionIndex map[*wasm.FunctionInstance]int64
 }
+
+// These consts are used in native codes to manipulate the engine's fields.
+const (
+	engineStackSliceOffset                = 0
+	engineCurrentStackPointerOffset       = 24
+	engineCurrentBaseStackPointerOffset   = 32
+	engineJITCallStatusCodeOffset         = 40
+	engineFunctionCallIndexOffset         = 48
+	engineContinuationAddressOffset       = 56
+	engineCurrentGlobalSliceAddressOffset = 64
+)
 
 func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
 	prevFrame := e.callFrameStack
@@ -244,16 +262,6 @@ func (s jitCallStatusCode) String() (ret string) {
 	return
 }
 
-// These consts are used in native codes to manipulate the engine's fields.
-const (
-	engineStackSliceOffset              = 0
-	engineCurrentStackPointerOffset     = 24
-	engineCurrentBaseStackPointerOffset = 32
-	engineJITCallStatusCodeOffset       = 40
-	engineFunctionCallIndexOffset       = 48
-	engineContinuationAddressOffset     = 56
-)
-
 type callFrame struct {
 	continuationAddress      uintptr
 	continuationStackPointer uint64
@@ -299,6 +307,8 @@ type compiledWasmFunction struct {
 	codeInitialAddress uintptr
 	// The same purpose as codeInitialAddress, but for memory.Buffer.
 	memoryAddress uintptr
+	// The same purpose as codeInitialAddress, but for .globals.
+	globalSliceAddress uintptr
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
 }
@@ -332,6 +342,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		caller:                   nil,
 		continuationStackPointer: f.inputs,
 	}
+	e.currentGlobalSliceAddress = f.globalSliceAddress
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
 	for e.callFrameStack != nil {
@@ -386,6 +397,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.currentBaseStackPointer = frame.baseStackPointer
 			// Set the stack pointer so that base+sp would point to the top of function inputs.
 			e.currentStackPointer = nextFunc.inputs
+			e.currentGlobalSliceAddress = nextFunc.globalSliceAddress
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {
 			case builtinFunctionIndexGrowMemory:
@@ -399,7 +411,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Push the call frame for this host function.
 			e.callFrameStack = &callFrame{hostFunction: targetHostFunction, caller: currentFrame}
 			// Call into the host function.
-			targetHostFunction.f(&wasm.HostFunctionCallContext{Memory: f.memory})
+			targetHostFunction.f(&wasm.HostFunctionCallContext{Memory: currentFrame.wasmFunction.memory})
 			// Pop the call frame.
 			e.callFrameStack = currentFrame
 		case jitCallStatusCodeUnreachable:
