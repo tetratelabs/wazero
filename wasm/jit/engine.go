@@ -31,7 +31,7 @@ type engine struct {
 	// Instructions after [base+continuationAddressOffset] must start with
 	// restoring reserved registeres.
 	continuationAddressOffset uintptr
-	// The address to the backing array of slice of global instances used by current function.
+	// The current compiledWasmFunction.globalSliceAddress
 	currentGlobalSliceAddress uintptr
 	// Function call frames in linked list
 	callFrameStack *callFrame
