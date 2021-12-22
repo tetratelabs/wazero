@@ -753,8 +753,6 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 			o := &wazeroir.OperationConstI32{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
-			// Dummy value not used!
-			_ = builder.locationStack.pushValueOnStack()
 
 			// Now emit the const instruction.
 			err := builder.handleConstI32(o)
@@ -784,7 +782,7 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.currentStackPointer)
 			require.Equal(t, uint64(o.Value)+1, eng.stack[eng.currentStackPointer-1])
 		})
 	}
@@ -796,8 +794,6 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 			o := &wazeroir.OperationConstI64{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
-			// Dummy value not used!
-			_ = builder.locationStack.pushValueOnStack()
 
 			// Now emit the const instruction.
 			err := builder.handleConstI64(o)
@@ -827,7 +823,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.currentStackPointer)
 			require.Equal(t, o.Value+1, eng.stack[eng.currentStackPointer-1])
 		})
 	}
@@ -839,8 +835,6 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 			o := &wazeroir.OperationConstF32{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
-			// Dummy value not used!
-			_ = builder.locationStack.pushValueOnStack()
 
 			// Now emit the const instruction.
 			err := builder.handleConstF32(o)
@@ -872,7 +866,7 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.currentStackPointer)
 			require.Equal(t, o.Value*2, math.Float32frombits(uint32(eng.stack[eng.currentStackPointer-1])))
 		})
 	}
@@ -884,8 +878,6 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 			o := &wazeroir.OperationConstF64{Value: v}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
-			// Dummy value not used!
-			_ = builder.locationStack.pushValueOnStack()
 
 			// Now emit the const instruction.
 			err := builder.handleConstF64(o)
@@ -917,7 +909,7 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.currentStackPointer)
 			require.Equal(t, o.Value*2, math.Float64frombits(eng.stack[eng.currentStackPointer-1]))
 		})
 	}

@@ -1168,6 +1168,8 @@ func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
 	b.addInstruction(prog)
+	// We don't need to explicitly release tmpReg here
+	// as allocateRegister doesn't mark it used.
 	return nil
 }
 
@@ -1200,6 +1202,8 @@ func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
 	b.addInstruction(prog)
+	// We don't need to explicitly release tmpReg here
+	// as allocateRegister doesn't mark it used.
 	return nil
 }
 
