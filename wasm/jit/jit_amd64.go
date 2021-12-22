@@ -522,7 +522,7 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	moveValue.To.Offset = globalInstanceValueOffset
 	b.addInstruction(moveValue)
 
-	// We no longer need the top register.
+	// Since the value is now written to memory, release the value register.
 	b.locationStack.releaseRegister(val)
 	return nil
 }
