@@ -1297,6 +1297,10 @@ func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
 	return nil
 }
 
+// allocateRegister returns a unused register of the given type. The register will be taken
+// either from the free register pool or by stealing an used register.
+// Note that resulting registers are NOT marked as used so the call site should
+// mark it used if necessary.
 func (b *amd64Builder) allocateRegister(t generalPurposeRegisterType) (reg int16, err error) {
 	var ok bool
 	// Try to get the unused register.
