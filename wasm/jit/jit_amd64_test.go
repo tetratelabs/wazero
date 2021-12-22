@@ -1720,7 +1720,8 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			// Assemble.
 			code, err := builder.assemble()
 			require.NoError(t, err)
-			// Run code.
+
+			// Run the code assembled above.
 			eng := newEngine()
 			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
 			mem := newMemoryInst()
