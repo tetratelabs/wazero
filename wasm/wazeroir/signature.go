@@ -9,136 +9,136 @@ import (
 // signature represents how a Wasm opcode
 // manipulates the value stacks in terms of value types.
 type signature struct {
-	in, out []SignLessType
+	in, out []SignLeSsType
 }
 
 var (
 	signature_None_None    = &signature{}
 	signature_Unknown_None = &signature{
-		in: []SignLessType{SignLessTypeUnknown},
+		in: []SignLeSsType{SignLeSsTypeUnknown},
 	}
 	signature_None_I32 = &signature{
-		out: []SignLessType{SignLessTypeI32},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_None_I64 = &signature{
-		out: []SignLessType{SignLessTypeI64},
+		out: []SignLeSsType{SignLeSsTypeI64},
 	}
 	signature_None_F32 = &signature{
-		out: []SignLessType{SignLessTypeF32},
+		out: []SignLeSsType{SignLeSsTypeF32},
 	}
 	signature_None_F64 = &signature{
-		out: []SignLessType{SignLessTypeF64},
+		out: []SignLeSsType{SignLeSsTypeF64},
 	}
 	signature_I32_None = &signature{
-		in: []SignLessType{SignLessTypeI32},
+		in: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_I32_I32 = &signature{
-		in:  []SignLessType{SignLessTypeI32},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeI32},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_I32_I64 = &signature{
-		in:  []SignLessType{SignLessTypeI32},
-		out: []SignLessType{SignLessTypeI64},
+		in:  []SignLeSsType{SignLeSsTypeI32},
+		out: []SignLeSsType{SignLeSsTypeI64},
 	}
 	signature_I64_I64 = &signature{
-		in:  []SignLessType{SignLessTypeI64},
-		out: []SignLessType{SignLessTypeI64},
+		in:  []SignLeSsType{SignLeSsTypeI64},
+		out: []SignLeSsType{SignLeSsTypeI64},
 	}
 	signature_I32_F32 = &signature{
-		in:  []SignLessType{SignLessTypeI32},
-		out: []SignLessType{SignLessTypeF32},
+		in:  []SignLeSsType{SignLeSsTypeI32},
+		out: []SignLeSsType{SignLeSsTypeF32},
 	}
 	signature_I32_F64 = &signature{
-		in:  []SignLessType{SignLessTypeI32},
-		out: []SignLessType{SignLessTypeF64},
+		in:  []SignLeSsType{SignLeSsTypeI32},
+		out: []SignLeSsType{SignLeSsTypeF64},
 	}
 	signature_I64_I32 = &signature{
-		in:  []SignLessType{SignLessTypeI64},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeI64},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_I64_F32 = &signature{
-		in:  []SignLessType{SignLessTypeI64},
-		out: []SignLessType{SignLessTypeF32},
+		in:  []SignLeSsType{SignLeSsTypeI64},
+		out: []SignLeSsType{SignLeSsTypeF32},
 	}
 	signature_I64_F64 = &signature{
-		in:  []SignLessType{SignLessTypeI64},
-		out: []SignLessType{SignLessTypeF64},
+		in:  []SignLeSsType{SignLeSsTypeI64},
+		out: []SignLeSsType{SignLeSsTypeF64},
 	}
 	signature_F32_I32 = &signature{
-		in:  []SignLessType{SignLessTypeF32},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeF32},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_F32_I64 = &signature{
-		in:  []SignLessType{SignLessTypeF32},
-		out: []SignLessType{SignLessTypeI64},
+		in:  []SignLeSsType{SignLeSsTypeF32},
+		out: []SignLeSsType{SignLeSsTypeI64},
 	}
 	signature_F32_F64 = &signature{
-		in:  []SignLessType{SignLessTypeF32},
-		out: []SignLessType{SignLessTypeF64},
+		in:  []SignLeSsType{SignLeSsTypeF32},
+		out: []SignLeSsType{SignLeSsTypeF64},
 	}
 	signature_F32_F32 = &signature{
-		in:  []SignLessType{SignLessTypeF32},
-		out: []SignLessType{SignLessTypeF32},
+		in:  []SignLeSsType{SignLeSsTypeF32},
+		out: []SignLeSsType{SignLeSsTypeF32},
 	}
 	signature_F64_I32 = &signature{
-		in:  []SignLessType{SignLessTypeF64},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeF64},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_F64_F32 = &signature{
-		in:  []SignLessType{SignLessTypeF64},
-		out: []SignLessType{SignLessTypeF32},
+		in:  []SignLeSsType{SignLeSsTypeF64},
+		out: []SignLeSsType{SignLeSsTypeF32},
 	}
 	signature_F64_I64 = &signature{
-		in:  []SignLessType{SignLessTypeF64},
-		out: []SignLessType{SignLessTypeI64},
+		in:  []SignLeSsType{SignLeSsTypeF64},
+		out: []SignLeSsType{SignLeSsTypeI64},
 	}
 	signature_F64_F64 = &signature{
-		in:  []SignLessType{SignLessTypeF64},
-		out: []SignLessType{SignLessTypeF64},
+		in:  []SignLeSsType{SignLeSsTypeF64},
+		out: []SignLeSsType{SignLeSsTypeF64},
 	}
 	signature_I32I32_None = &signature{
-		in: []SignLessType{SignLessTypeI32, SignLessTypeI32},
+		in: []SignLeSsType{SignLeSsTypeI32, SignLeSsTypeI32},
 	}
 	signature_I32I32_I32 = &signature{
-		in:  []SignLessType{SignLessTypeI32, SignLessTypeI32},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeI32, SignLeSsTypeI32},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_I32I64_None = &signature{
-		in: []SignLessType{SignLessTypeI32, SignLessTypeI64},
+		in: []SignLeSsType{SignLeSsTypeI32, SignLeSsTypeI64},
 	}
 	signature_I32F32_None = &signature{
-		in: []SignLessType{SignLessTypeI32, SignLessTypeF32},
+		in: []SignLeSsType{SignLeSsTypeI32, SignLeSsTypeF32},
 	}
 	signature_I32F64_None = &signature{
-		in: []SignLessType{SignLessTypeI32, SignLessTypeF64},
+		in: []SignLeSsType{SignLeSsTypeI32, SignLeSsTypeF64},
 	}
 	signature_I64I64_I32 = &signature{
-		in:  []SignLessType{SignLessTypeI64, SignLessTypeI64},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeI64, SignLeSsTypeI64},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_I64I64_I64 = &signature{
-		in:  []SignLessType{SignLessTypeI64, SignLessTypeI64},
-		out: []SignLessType{SignLessTypeI64},
+		in:  []SignLeSsType{SignLeSsTypeI64, SignLeSsTypeI64},
+		out: []SignLeSsType{SignLeSsTypeI64},
 	}
 	signature_F32F32_I32 = &signature{
-		in:  []SignLessType{SignLessTypeF32, SignLessTypeF32},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeF32, SignLeSsTypeF32},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_F32F32_F32 = &signature{
-		in:  []SignLessType{SignLessTypeF32, SignLessTypeF32},
-		out: []SignLessType{SignLessTypeF32},
+		in:  []SignLeSsType{SignLeSsTypeF32, SignLeSsTypeF32},
+		out: []SignLeSsType{SignLeSsTypeF32},
 	}
 	signature_F64F64_I32 = &signature{
-		in:  []SignLessType{SignLessTypeF64, SignLessTypeF64},
-		out: []SignLessType{SignLessTypeI32},
+		in:  []SignLeSsType{SignLeSsTypeF64, SignLeSsTypeF64},
+		out: []SignLeSsType{SignLeSsTypeI32},
 	}
 	signature_F64F64_F64 = &signature{
-		in:  []SignLessType{SignLessTypeF64, SignLessTypeF64},
-		out: []SignLessType{SignLessTypeF64},
+		in:  []SignLeSsType{SignLeSsTypeF64, SignLeSsTypeF64},
+		out: []SignLeSsType{SignLeSsTypeF64},
 	}
 	signature_UnknownUnkownI32_Unknown = &signature{
-		in:  []SignLessType{SignLessTypeUnknown, SignLessTypeUnknown, SignLessTypeI32},
-		out: []SignLessType{SignLessTypeUnknown},
+		in:  []SignLeSsType{SignLeSsTypeUnknown, SignLeSsTypeUnknown, SignLeSsTypeI32},
+		out: []SignLeSsType{SignLeSsTypeUnknown},
 	}
 )
 
@@ -163,7 +163,7 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		return funcTypeToSignature(f.ModuleInstance.Functions[index].Signature), nil
 	case wasm.OpcodeCallIndirect:
 		ret := funcTypeToSignature(f.ModuleInstance.Types[index])
-		ret.in = append(ret.in, SignLessTypeI32)
+		ret.in = append(ret.in, SignLeSsTypeI32)
 		return ret, nil
 	case wasm.OpcodeDrop:
 		return signature_Unknown_None, nil
@@ -174,50 +174,50 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t SignLessType
+		var t SignLeSsType
 		if index < inputLen {
 			t = WasmValueTypeToSignless(f.Signature.InputTypes[index])
 		} else {
 			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
-		return &signature{out: []SignLessType{t}}, nil
+		return &signature{out: []SignLeSsType{t}}, nil
 	case wasm.OpcodeLocalSet:
 		inputLen := uint32(len(f.Signature.InputTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t SignLessType
+		var t SignLeSsType
 		if index < inputLen {
 			t = WasmValueTypeToSignless(f.Signature.InputTypes[index])
 		} else {
 			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
-		return &signature{in: []SignLessType{t}}, nil
+		return &signature{in: []SignLeSsType{t}}, nil
 	case wasm.OpcodeLocalTee:
 		inputLen := uint32(len(f.Signature.InputTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
-		var t SignLessType
+		var t SignLeSsType
 		if index < inputLen {
 			t = WasmValueTypeToSignless(f.Signature.InputTypes[index])
 		} else {
 			t = WasmValueTypeToSignless(f.LocalTypes[index-inputLen])
 		}
-		return &signature{in: []SignLessType{t}, out: []SignLessType{t}}, nil
+		return &signature{in: []SignLeSsType{t}, out: []SignLeSsType{t}}, nil
 	case wasm.OpcodeGlobalGet:
 		if len(f.ModuleInstance.Globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
-			out: []SignLessType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
+			out: []SignLeSsType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
 		}, nil
 	case wasm.OpcodeGlobalSet:
 		if len(f.ModuleInstance.Globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
-			in: []SignLessType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
+			in: []SignLeSsType{WasmValueTypeToSignless(f.ModuleInstance.Globals[index].Type.ValType)},
 		}, nil
 	case wasm.OpcodeI32Load:
 		return signature_I32_I32, nil
@@ -227,10 +227,10 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		return signature_I32_F32, nil
 	case wasm.OpcodeF64Load:
 		return signature_I32_F64, nil
-	case wasm.OpcodeI32Load8s, wasm.OpcodeI32Load8u, wasm.OpcodeI32Load16s, wasm.OpcodeI32Load16u:
+	case wasm.OpcodeI32Load8S, wasm.OpcodeI32Load8U, wasm.OpcodeI32Load16S, wasm.OpcodeI32Load16U:
 		return signature_I32_I32, nil
-	case wasm.OpcodeI64Load8s, wasm.OpcodeI64Load8u, wasm.OpcodeI64Load16s, wasm.OpcodeI64Load16u,
-		wasm.OpcodeI64Load32s, wasm.OpcodeI64Load32u:
+	case wasm.OpcodeI64Load8S, wasm.OpcodeI64Load8U, wasm.OpcodeI64Load16S, wasm.OpcodeI64Load16U,
+		wasm.OpcodeI64Load32S, wasm.OpcodeI64Load32U:
 		return signature_I32_I64, nil
 	case wasm.OpcodeI32Store:
 		return signature_I32I32_None, nil
@@ -262,89 +262,89 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		return signature_None_F32, nil
 	case wasm.OpcodeF64Const:
 		return signature_None_F64, nil
-	case wasm.OpcodeI32eqz:
+	case wasm.OpcodeI32Eqz:
 		return signature_I32_I32, nil
-	case wasm.OpcodeI32eq, wasm.OpcodeI32ne, wasm.OpcodeI32lts,
-		wasm.OpcodeI32ltu, wasm.OpcodeI32gts, wasm.OpcodeI32gtu,
-		wasm.OpcodeI32les, wasm.OpcodeI32leu, wasm.OpcodeI32ges,
-		wasm.OpcodeI32geu:
+	case wasm.OpcodeI32Eq, wasm.OpcodeI32Ne, wasm.OpcodeI32LtS,
+		wasm.OpcodeI32LtU, wasm.OpcodeI32GtS, wasm.OpcodeI32GtU,
+		wasm.OpcodeI32LeS, wasm.OpcodeI32LeU, wasm.OpcodeI32GeS,
+		wasm.OpcodeI32GeU:
 		return signature_I32I32_I32, nil
-	case wasm.OpcodeI64eqz:
+	case wasm.OpcodeI64Eqz:
 		return signature_I64_I32, nil
-	case wasm.OpcodeI64eq, wasm.OpcodeI64ne, wasm.OpcodeI64lts,
-		wasm.OpcodeI64ltu, wasm.OpcodeI64gts, wasm.OpcodeI64gtu,
-		wasm.OpcodeI64les, wasm.OpcodeI64leu, wasm.OpcodeI64ges,
-		wasm.OpcodeI64geu:
+	case wasm.OpcodeI64Eq, wasm.OpcodeI64Ne, wasm.OpcodeI64LtS,
+		wasm.OpcodeI64LtU, wasm.OpcodeI64GtS, wasm.OpcodeI64GtU,
+		wasm.OpcodeI64LeS, wasm.OpcodeI64LeU, wasm.OpcodeI64GeS,
+		wasm.OpcodeI64GeU:
 		return signature_I64I64_I32, nil
-	case wasm.OpcodeF32eq, wasm.OpcodeF32ne, wasm.OpcodeF32lt,
-		wasm.OpcodeF32gt, wasm.OpcodeF32le, wasm.OpcodeF32ge:
+	case wasm.OpcodeF32Eq, wasm.OpcodeF32Ne, wasm.OpcodeF32Lt,
+		wasm.OpcodeF32Gt, wasm.OpcodeF32Le, wasm.OpcodeF32Ge:
 		return signature_F32F32_I32, nil
-	case wasm.OpcodeF64eq, wasm.OpcodeF64ne, wasm.OpcodeF64lt,
-		wasm.OpcodeF64gt, wasm.OpcodeF64le, wasm.OpcodeF64ge:
+	case wasm.OpcodeF64Eq, wasm.OpcodeF64Ne, wasm.OpcodeF64Lt,
+		wasm.OpcodeF64Gt, wasm.OpcodeF64Le, wasm.OpcodeF64Ge:
 		return signature_F64F64_I32, nil
-	case wasm.OpcodeI32clz, wasm.OpcodeI32ctz, wasm.OpcodeI32popcnt:
+	case wasm.OpcodeI32Clz, wasm.OpcodeI32Ctz, wasm.OpcodeI32Popcnt:
 		return signature_I32_I32, nil
-	case wasm.OpcodeI32add, wasm.OpcodeI32sub, wasm.OpcodeI32mul,
-		wasm.OpcodeI32divs, wasm.OpcodeI32divu, wasm.OpcodeI32rems,
-		wasm.OpcodeI32remu, wasm.OpcodeI32and, wasm.OpcodeI32or,
-		wasm.OpcodeI32xor, wasm.OpcodeI32shl, wasm.OpcodeI32shrs,
-		wasm.OpcodeI32shru, wasm.OpcodeI32rotl, wasm.OpcodeI32rotr:
+	case wasm.OpcodeI32Add, wasm.OpcodeI32Sub, wasm.OpcodeI32Mul,
+		wasm.OpcodeI32DivS, wasm.OpcodeI32DivU, wasm.OpcodeI32RemS,
+		wasm.OpcodeI32RemU, wasm.OpcodeI32And, wasm.OpcodeI32Or,
+		wasm.OpcodeI32Xor, wasm.OpcodeI32Shl, wasm.OpcodeI32ShrS,
+		wasm.OpcodeI32ShrU, wasm.OpcodeI32Rotl, wasm.OpcodeI32Rotr:
 		return signature_I32I32_I32, nil
-	case wasm.OpcodeI64clz, wasm.OpcodeI64ctz, wasm.OpcodeI64popcnt:
+	case wasm.OpcodeI64Clz, wasm.OpcodeI64Ctz, wasm.OpcodeI64Popcnt:
 		return signature_I64_I64, nil
-	case wasm.OpcodeI64add, wasm.OpcodeI64sub, wasm.OpcodeI64mul,
-		wasm.OpcodeI64divs, wasm.OpcodeI64divu, wasm.OpcodeI64rems,
-		wasm.OpcodeI64remu, wasm.OpcodeI64and, wasm.OpcodeI64or,
-		wasm.OpcodeI64xor, wasm.OpcodeI64shl, wasm.OpcodeI64shrs,
-		wasm.OpcodeI64shru, wasm.OpcodeI64rotl, wasm.OpcodeI64rotr:
+	case wasm.OpcodeI64Add, wasm.OpcodeI64Sub, wasm.OpcodeI64Mul,
+		wasm.OpcodeI64DivS, wasm.OpcodeI64DivU, wasm.OpcodeI64RemS,
+		wasm.OpcodeI64RemU, wasm.OpcodeI64And, wasm.OpcodeI64Or,
+		wasm.OpcodeI64Xor, wasm.OpcodeI64Shl, wasm.OpcodeI64ShrS,
+		wasm.OpcodeI64ShrU, wasm.OpcodeI64Rotl, wasm.OpcodeI64Rotr:
 		return signature_I64I64_I64, nil
-	case wasm.OpcodeF32abs, wasm.OpcodeF32neg, wasm.OpcodeF32ceil,
-		wasm.OpcodeF32floor, wasm.OpcodeF32trunc, wasm.OpcodeF32nearest,
-		wasm.OpcodeF32sqrt:
+	case wasm.OpcodeF32Abs, wasm.OpcodeF32Neg, wasm.OpcodeF32Ceil,
+		wasm.OpcodeF32Floor, wasm.OpcodeF32Trunc, wasm.OpcodeF32Nearest,
+		wasm.OpcodeF32Sqrt:
 		return signature_F32_F32, nil
-	case wasm.OpcodeF32add, wasm.OpcodeF32sub, wasm.OpcodeF32mul,
-		wasm.OpcodeF32div, wasm.OpcodeF32min, wasm.OpcodeF32max,
-		wasm.OpcodeF32copysign:
+	case wasm.OpcodeF32Add, wasm.OpcodeF32Sub, wasm.OpcodeF32Mul,
+		wasm.OpcodeF32Div, wasm.OpcodeF32Min, wasm.OpcodeF32Max,
+		wasm.OpcodeF32Copysign:
 		return signature_F32F32_F32, nil
-	case wasm.OpcodeF64abs, wasm.OpcodeF64neg, wasm.OpcodeF64ceil,
-		wasm.OpcodeF64floor, wasm.OpcodeF64trunc, wasm.OpcodeF64nearest,
-		wasm.OpcodeF64sqrt:
+	case wasm.OpcodeF64Abs, wasm.OpcodeF64Neg, wasm.OpcodeF64Ceil,
+		wasm.OpcodeF64Floor, wasm.OpcodeF64Trunc, wasm.OpcodeF64Nearest,
+		wasm.OpcodeF64Sqrt:
 		return signature_F64_F64, nil
-	case wasm.OpcodeF64add, wasm.OpcodeF64sub, wasm.OpcodeF64mul,
-		wasm.OpcodeF64div, wasm.OpcodeF64min, wasm.OpcodeF64max,
-		wasm.OpcodeF64copysign:
+	case wasm.OpcodeF64Add, wasm.OpcodeF64Sub, wasm.OpcodeF64Mul,
+		wasm.OpcodeF64Div, wasm.OpcodeF64Min, wasm.OpcodeF64Max,
+		wasm.OpcodeF64Copysign:
 		return signature_F64F64_F64, nil
-	case wasm.OpcodeI32wrapI64:
+	case wasm.OpcodeI32WrapI64:
 		return signature_I64_I32, nil
-	case wasm.OpcodeI32truncf32s, wasm.OpcodeI32truncf32u:
+	case wasm.OpcodeI32TruncF32S, wasm.OpcodeI32TruncF32U:
 		return signature_F32_I32, nil
-	case wasm.OpcodeI32truncf64s, wasm.OpcodeI32truncf64u:
+	case wasm.OpcodeI32TruncF64S, wasm.OpcodeI32TruncF64U:
 		return signature_F64_I32, nil
-	case wasm.OpcodeI64Extendi32s, wasm.OpcodeI64Extendi32u:
+	case wasm.OpcodeI64ExtendI32S, wasm.OpcodeI64ExtendI32U:
 		return signature_I32_I64, nil
-	case wasm.OpcodeI64TruncF32s, wasm.OpcodeI64TruncF32u:
+	case wasm.OpcodeI64TruncF32S, wasm.OpcodeI64TruncF32U:
 		return signature_F32_I64, nil
-	case wasm.OpcodeI64Truncf64s, wasm.OpcodeI64Truncf64u:
+	case wasm.OpcodeI64TruncF64S, wasm.OpcodeI64TruncF64U:
 		return signature_F64_I64, nil
-	case wasm.OpcodeF32Converti32s, wasm.OpcodeF32Converti32u:
+	case wasm.OpcodeF32ConvertI32s, wasm.OpcodeF32ConvertI32U:
 		return signature_I32_F32, nil
-	case wasm.OpcodeF32Converti64s, wasm.OpcodeF32Converti64u:
+	case wasm.OpcodeF32ConvertI64S, wasm.OpcodeF32ConvertI64U:
 		return signature_I64_F32, nil
-	case wasm.OpcodeF32Demotef64:
+	case wasm.OpcodeF32DemoteF64:
 		return signature_F64_F32, nil
-	case wasm.OpcodeF64Converti32s, wasm.OpcodeF64Converti32u:
+	case wasm.OpcodeF64ConvertI32S, wasm.OpcodeF64ConvertI32U:
 		return signature_I32_F64, nil
-	case wasm.OpcodeF64Converti64s, wasm.OpcodeF64Converti64u:
+	case wasm.OpcodeF64ConvertI64S, wasm.OpcodeF64ConvertI64U:
 		return signature_I64_F64, nil
-	case wasm.OpcodeF64Promotef32:
+	case wasm.OpcodeF64PromoteF32:
 		return signature_F32_F64, nil
-	case wasm.OpcodeI32Reinterpretf32:
+	case wasm.OpcodeI32ReinterpretF32:
 		return signature_F32_I32, nil
-	case wasm.OpcodeI64Reinterpretf64:
+	case wasm.OpcodeI64ReinterpretF64:
 		return signature_F64_I64, nil
-	case wasm.OpcodeF32Reinterpreti32:
+	case wasm.OpcodeF32ReinterpretI32:
 		return signature_I32_F32, nil
-	case wasm.OpcodeF64Reinterpreti64:
+	case wasm.OpcodeF64ReinterpretI64:
 		return signature_I64_F64, nil
 	default:
 		return nil, fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
@@ -362,16 +362,16 @@ func funcTypeToSignature(tps *wasm.FunctionType) *signature {
 	return ret
 }
 
-func WasmValueTypeToSignless(vt wasm.ValueType) SignLessType {
+func WasmValueTypeToSignless(vt wasm.ValueType) SignLeSsType {
 	switch vt {
 	case wasm.ValueTypeI32:
-		return SignLessTypeI32
+		return SignLeSsTypeI32
 	case wasm.ValueTypeI64:
-		return SignLessTypeI64
+		return SignLeSsTypeI64
 	case wasm.ValueTypeF32:
-		return SignLessTypeF32
+		return SignLeSsTypeF32
 	case wasm.ValueTypeF64:
-		return SignLessTypeF64
+		return SignLeSsTypeF64
 	}
 	panic("unreachable")
 }

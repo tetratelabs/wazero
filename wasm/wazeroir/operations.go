@@ -2,18 +2,18 @@ package wazeroir
 
 import "fmt"
 
-type SignLessInt byte
+type SignLeSsInt byte
 
 const (
-	SignLessInt32 SignLessInt = iota
-	SignLessInt64
+	SignLeSsInt32 SignLeSsInt = iota
+	SignLeSsInt64
 )
 
-func (s SignLessInt) String() (ret string) {
+func (s SignLeSsInt) String() (ret string) {
 	switch s {
-	case SignLessInt32:
+	case SignLeSsInt32:
 		ret = "i32"
-	case SignLessInt64:
+	case SignLeSsInt64:
 		ret = "i64"
 	}
 	return
@@ -59,27 +59,27 @@ func (s Float) String() (ret string) {
 	return
 }
 
-type SignLessType byte
+type SignLeSsType byte
 
 const (
-	SignLessTypeI32 SignLessType = iota
-	SignLessTypeI64
-	SignLessTypeF32
-	SignLessTypeF64
-	SignLessTypeUnknown
+	SignLeSsTypeI32 SignLeSsType = iota
+	SignLeSsTypeI64
+	SignLeSsTypeF32
+	SignLeSsTypeF64
+	SignLeSsTypeUnknown
 )
 
-func (s SignLessType) String() (ret string) {
+func (s SignLeSsType) String() (ret string) {
 	switch s {
-	case SignLessTypeI32:
+	case SignLeSsTypeI32:
 		ret = "i32"
-	case SignLessTypeI64:
+	case SignLeSsTypeI64:
 		ret = "i64"
-	case SignLessTypeF32:
+	case SignLeSsTypeF32:
 		ret = "f32"
-	case SignLessTypeF64:
+	case SignLeSsTypeF64:
 		ret = "f64"
-	case SignLessTypeUnknown:
+	case SignLeSsTypeUnknown:
 		ret = "unknown"
 	}
 	return
@@ -507,7 +507,7 @@ type MemoryImmediate struct {
 }
 
 type OperationLoad struct {
-	Type SignLessType
+	Type SignLeSsType
 	Arg  *MemoryImmediate
 }
 
@@ -543,7 +543,7 @@ func (o *OperationLoad32) Kind() OperationKind {
 }
 
 type OperationStore struct {
-	Type SignLessType
+	Type SignLeSsType
 	Arg  *MemoryImmediate
 }
 
@@ -552,7 +552,7 @@ func (o *OperationStore) Kind() OperationKind {
 }
 
 type OperationStore8 struct {
-	Type SignLessInt
+	Type SignLeSsInt
 	Arg  *MemoryImmediate
 }
 
@@ -561,7 +561,7 @@ func (o *OperationStore8) Kind() OperationKind {
 }
 
 type OperationStore16 struct {
-	Type SignLessInt
+	Type SignLeSsInt
 	Arg  *MemoryImmediate
 }
 
@@ -613,19 +613,19 @@ func (o *OperationConstF64) Kind() OperationKind {
 	return OperationKindConstF64
 }
 
-type OperationEq struct{ Type SignLessType }
+type OperationEq struct{ Type SignLeSsType }
 
 func (o *OperationEq) Kind() OperationKind {
 	return OperationKindEq
 }
 
-type OperationNe struct{ Type SignLessType }
+type OperationNe struct{ Type SignLeSsType }
 
 func (o *OperationNe) Kind() OperationKind {
 	return OperationKindNe
 }
 
-type OperationEqz struct{ Type SignLessInt }
+type OperationEqz struct{ Type SignLeSsInt }
 
 func (o *OperationEqz) Kind() OperationKind {
 	return OperationKindEqz
@@ -655,37 +655,37 @@ func (o *OperationGe) Kind() OperationKind {
 	return OperationKindGe
 }
 
-type OperationAdd struct{ Type SignLessType }
+type OperationAdd struct{ Type SignLeSsType }
 
 func (o *OperationAdd) Kind() OperationKind {
 	return OperationKindAdd
 }
 
-type OperationSub struct{ Type SignLessType }
+type OperationSub struct{ Type SignLeSsType }
 
 func (o *OperationSub) Kind() OperationKind {
 	return OperationKindSub
 }
 
-type OperationMul struct{ Type SignLessType }
+type OperationMul struct{ Type SignLeSsType }
 
 func (o *OperationMul) Kind() OperationKind {
 	return OperationKindMul
 }
 
-type OperationClz struct{ Type SignLessInt }
+type OperationClz struct{ Type SignLeSsInt }
 
 func (o *OperationClz) Kind() OperationKind {
 	return OperationKindClz
 }
 
-type OperationCtz struct{ Type SignLessInt }
+type OperationCtz struct{ Type SignLeSsInt }
 
 func (o *OperationCtz) Kind() OperationKind {
 	return OperationKindCtz
 }
 
-type OperationPopcnt struct{ Type SignLessInt }
+type OperationPopcnt struct{ Type SignLeSsInt }
 
 func (o *OperationPopcnt) Kind() OperationKind {
 	return OperationKindPopcnt
@@ -703,25 +703,25 @@ func (o *OperationRem) Kind() OperationKind {
 	return OperationKindRem
 }
 
-type OperationAnd struct{ Type SignLessInt }
+type OperationAnd struct{ Type SignLeSsInt }
 
 func (o *OperationAnd) Kind() OperationKind {
 	return OperationKindAnd
 }
 
-type OperationOr struct{ Type SignLessInt }
+type OperationOr struct{ Type SignLeSsInt }
 
 func (o *OperationOr) Kind() OperationKind {
 	return OperationKindOr
 }
 
-type OperationXor struct{ Type SignLessInt }
+type OperationXor struct{ Type SignLeSsInt }
 
 func (o *OperationXor) Kind() OperationKind {
 	return OperationKindXor
 }
 
-type OperationShl struct{ Type SignLessInt }
+type OperationShl struct{ Type SignLeSsInt }
 
 func (o *OperationShl) Kind() OperationKind {
 	return OperationKindShl
@@ -733,13 +733,13 @@ func (o *OperationShr) Kind() OperationKind {
 	return OperationKindShr
 }
 
-type OperationRotl struct{ Type SignLessInt }
+type OperationRotl struct{ Type SignLeSsInt }
 
 func (o *OperationRotl) Kind() OperationKind {
 	return OperationKindRotl
 }
 
-type OperationRotr struct{ Type SignLessInt }
+type OperationRotr struct{ Type SignLeSsInt }
 
 func (o *OperationRotr) Kind() OperationKind {
 	return OperationKindRotr

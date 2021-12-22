@@ -777,18 +777,18 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 	var instruction obj.As
 	var tp generalPurposeRegisterType
 	switch o.Type {
-	case wazeroir.SignLessTypeI32:
+	case wazeroir.SignLeSsTypeI32:
 		instruction = x86.AADDL
 		tp = gpTypeInt
 		panic("add tests!")
-	case wazeroir.SignLessTypeI64:
+	case wazeroir.SignLeSsTypeI64:
 		instruction = x86.AADDQ
 		tp = gpTypeInt
-	case wazeroir.SignLessTypeF32:
+	case wazeroir.SignLeSsTypeF32:
 		instruction = x86.AADDSS
 		tp = gpTypeFloat
 		panic("add tests!")
-	case wazeroir.SignLessTypeF64:
+	case wazeroir.SignLeSsTypeF64:
 		instruction = x86.AADDSD
 		tp = gpTypeFloat
 		panic("add tests!")
@@ -838,18 +838,18 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 	var instruction obj.As
 	var tp generalPurposeRegisterType
 	switch o.Type {
-	case wazeroir.SignLessTypeI32:
+	case wazeroir.SignLeSsTypeI32:
 		instruction = x86.ASUBL
 		tp = gpTypeInt
 		panic("add tests!")
-	case wazeroir.SignLessTypeI64:
+	case wazeroir.SignLeSsTypeI64:
 		instruction = x86.ASUBQ
 		tp = gpTypeInt
-	case wazeroir.SignLessTypeF32:
+	case wazeroir.SignLeSsTypeF32:
 		instruction = x86.ASUBSS
 		tp = gpTypeFloat
 		panic("add tests!")
-	case wazeroir.SignLessTypeF64:
+	case wazeroir.SignLeSsTypeF64:
 		instruction = x86.ASUBSD
 		tp = gpTypeFloat
 		panic("add tests!")
@@ -960,7 +960,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	// Finally we have the result on the conditional register,
 	// so record it.
 	loc := b.locationStack.pushValueOnConditionalRegister(resultConditionState)
-	loc.setValueType(wazeroir.SignLessTypeI32)
+	loc.setValueType(wazeroir.SignLeSsTypeI32)
 	return nil
 }
 
@@ -970,7 +970,7 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.SignLessTypeI64)
+	loc.setValueType(wazeroir.SignLeSsTypeI64)
 	b.movConstToRegister(int64(o.Value), reg)
 	return nil
 }
