@@ -1421,9 +1421,7 @@ func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
-	// The function call must end with jitCallStatusCodeCallBuiltInFunction status.
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, eng.jitCallStatusCode)
-	// Plus the index of builtin function must be that of memoryGrow.
 	require.Equal(t, int64(builtinFunctionIndexMemoryGrow), eng.functionCallIndex)
 }
 
@@ -1448,9 +1446,7 @@ func TestAmd64Builder_handleMemorySize(t *testing.T) {
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
-	// The function call must end with jitCallStatusCodeCallBuiltInFunction status.
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, eng.jitCallStatusCode)
-	// Plus the index of builtin function must be that of memorySize.
 	require.Equal(t, int64(builtinFunctionIndexMemorySize), eng.functionCallIndex)
 }
 
