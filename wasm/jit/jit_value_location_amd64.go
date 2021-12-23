@@ -15,8 +15,8 @@ const (
 	reservedRegisterForEngine = x86.REG_R13
 	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.currentStackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointer = x86.REG_R14
-	// reservedRegisterMemoryPointer R15: pointer to memory space (i.e. *[]byte as uintptr).
-	reservedRegisterMemoryPointer = x86.REG_R15
+	// reservedRegisterForMemory R15: pointer to memory space (i.e. *[]byte as uintptr).
+	reservedRegisterForMemory = x86.REG_R15
 )
 
 var (

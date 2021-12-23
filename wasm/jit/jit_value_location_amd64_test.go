@@ -19,7 +19,7 @@ func TestReservedRegisters(t *testing.T) {
 	}
 	require.NotContains(t, unreserved, reservedRegisterForEngine)
 	require.NotContains(t, unreserved, reservedRegisterForStackBasePointer)
-	require.NotContains(t, unreserved, reservedRegisterMemoryPointer)
+	require.NotContains(t, unreserved, reservedRegisterForMemory)
 }
 
 func Test_isIntRegister(t *testing.T) {
