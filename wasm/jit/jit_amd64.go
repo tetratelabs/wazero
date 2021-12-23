@@ -114,9 +114,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationStore32:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationMemorySize:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			builder.handleMemorySize()
 		case *wazeroir.OperationMemoryGrow:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			builder.handleMemoryGrow()
 		case *wazeroir.OperationConstI32:
 			if err := builder.handleConstI32(o); err != nil {
 				return nil, fmt.Errorf("error handling i32.const operation: %w", err)
@@ -224,7 +224,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		}
 	}
 
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
 	}
@@ -240,7 +240,7 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 		memory:          b.f.ModuleInstance.Memory,
 		maxStackPointer: b.locationStack.maxStackPointer,
 	}
-	if cf.memory != nil {
+	if cf.memory != nil && len(cf.memory.Buffer) > 0 {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
 	}
 	if len(b.f.ModuleInstance.Globals) > 0 {
@@ -276,7 +276,7 @@ type amd64Builder struct {
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 }
 
-func (b *amd64Builder) assemble() ([]byte, error) {
+func (b *amd64Builder) compile() ([]byte, error) {
 	code, err := mmapCodeSegment(b.builder.Assemble())
 	if err != nil {
 		return nil, err
@@ -1096,6 +1096,27 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	return nil
 }
 
+func (b *amd64Builder) handleMemoryGrow() {
+	b.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemoryGrow)
+}
+
+func (b *amd64Builder) handleMemorySize() {
+	b.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize)
+	loc := b.locationStack.pushValueOnStack() // The size is pushed on the top.
+	loc.setValueType(wazeroir.SignLessTypeI32)
+}
+
+func (b *amd64Builder) callBuiltinFunctionFromConstIndex(index int64) {
+	b.setJITStatus(jitCallStatusCodeCallBuiltInFunction)
+	b.setFunctionCallIndexFromConst(index)
+	// Release all the registers as our calling convention requires the callee-save.
+	b.releaseAllRegistersToStack()
+	b.setContinuationOffsetAtNextInstructionAndReturn()
+	// Once we return from the function call,
+	// we must setup the reserved registers again.
+	b.initializeReservedRegisters()
+}
+
 func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
 	reg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
@@ -1315,7 +1336,7 @@ func (b *amd64Builder) allocateRegister(t generalPurposeRegisterType) (reg int16
 	return
 }
 
-func (b *amd64Builder) setJITStatus(status jitCallStatusCode) *obj.Prog {
+func (b *amd64Builder) setJITStatus(status jitCallStatusCode) {
 	prog := b.newProg()
 	prog.As = x86.AMOVL
 	prog.From.Type = obj.TYPE_CONST
@@ -1324,7 +1345,6 @@ func (b *amd64Builder) setJITStatus(status jitCallStatusCode) *obj.Prog {
 	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineJITCallStatusCodeOffset
 	b.addInstruction(prog)
-	return prog
 }
 
 func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
@@ -1355,7 +1375,7 @@ func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 	b.initializeReservedRegisters()
 }
 
-func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) {
+func (b *amd64Builder) callFunctionFromConstIndex(index int64) {
 	// Set the jit status as jitCallStatusCodeCallWasmFunction
 	b.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	// Set the function index.
@@ -1366,8 +1386,7 @@ func (b *amd64Builder) callFunctionFromConstIndex(index int64) (last *obj.Prog) 
 	b.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the returns from the function call,
 	// we must setup the reserved registers again.
-	last = b.initializeReservedRegisters()
-	return
+	b.initializeReservedRegisters()
 }
 
 func (b *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
@@ -1507,7 +1526,7 @@ func (b *amd64Builder) returnFunction() {
 // after-call continuations of JITed functions.
 // This caches the actual stack base pointer (engine.currentStackBasePointer*8+[engine.engineStackSliceOffset])
 // to cachedStackBasePointerReg
-func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
+func (b *amd64Builder) initializeReservedRegisters() {
 	// At first, make cachedStackBasePointerReg point to the beginning of the slice backing array.
 	// movq [engineInstanceReg+engineStackSliceOffset] cachedStackBasePointerReg
 	prog := b.newProg()
@@ -1554,5 +1573,4 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = reg
 	b.addInstruction(prog)
-	return prog
 }

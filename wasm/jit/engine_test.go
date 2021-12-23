@@ -63,6 +63,38 @@ wasm backtrace:
 	require.Equal(t, exp, err.Error())
 }
 
+func TestEngine_memory(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip()
+	}
+	buf, err := os.ReadFile("testdata/memory.wasm")
+	require.NoError(t, err)
+	mod, err := wasm.DecodeModule(buf)
+	require.NoError(t, err)
+	store := wasm.NewStore(NewEngine())
+	require.NoError(t, err)
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+	// First, we have zero-length memory instance.
+	out, _, err := store.CallFunction("test", "size")
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), out[0])
+	// Then grow the memory.
+	const newPages uint64 = 10
+	out, _, err = store.CallFunction("test", "grow", newPages)
+	require.NoError(t, err)
+	// Grow returns the previous number of memory pages, namely zero.
+	require.Equal(t, uint64(0), out[0])
+	// Now size should return the new pages -- 10.
+	out, _, err = store.CallFunction("test", "size")
+	require.NoError(t, err)
+	require.Equal(t, newPages, out[0])
+	// Growing memory with zero pages is valid but should be noop.
+	out, _, err = store.CallFunction("test", "grow", 0)
+	require.NoError(t, err)
+	require.Equal(t, newPages, out[0])
+}
+
 func TestEngine_PreCompile(t *testing.T) {
 	eng := newEngine()
 	hf := reflect.ValueOf(func(*wasm.HostFunctionCallContext) {})
