@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -110,7 +109,6 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	// Compile.
 	code, err := builder.assemble()
 	require.NoError(t, err)
-	fmt.Println(hex.EncodeToString(code))
 	// Setup engine.
 	mem := newMemoryInst()
 	compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputs: 1, returns: 1}
@@ -1402,6 +1400,54 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		require.Equal(t, uint64(3), eng.currentStackPointer)
 		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
 	})
+}
+
+func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
+	builder := requireNewBuilder(t)
+
+	builder.initializeReservedRegisters()
+	builder.handleMemoryGrow()
+
+	// Compile.
+	code, err := builder.assemble()
+	require.NoError(t, err)
+
+	// Run code.
+	eng := newEngine()
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+	// The function call must end with jitCallStatusCodeCallBuiltInFunction status.
+	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, eng.jitCallStatusCode)
+	// Plus the index of builtin function must be that of memoryGrow.
+	require.Equal(t, int64(builtinFunctionIndexMemoryGrow), eng.functionCallIndex)
+}
+
+func TestAmd64Builder_handleMemorySize(t *testing.T) {
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+	// Emit memory.size instructions.
+	builder.handleMemorySize()
+
+	// Compile.
+	code, err := builder.assemble()
+	require.NoError(t, err)
+
+	// Run code.
+	eng := newEngine()
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+	// The function call must end with jitCallStatusCodeCallBuiltInFunction status.
+	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, eng.jitCallStatusCode)
+	// Plus the index of builtin function must be that of memorySize.
+	require.Equal(t, int64(builtinFunctionIndexMemorySize), eng.functionCallIndex)
 }
 
 func TestAmd64Builder_handleDrop(t *testing.T) {

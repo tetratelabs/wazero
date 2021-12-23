@@ -314,7 +314,8 @@ type compiledWasmFunction struct {
 }
 
 const (
-	builtinFunctionIndexGrowMemory = iota
+	builtinFunctionIndexMemoryGrow = iota
+	builtinFunctionIndexMemorySize
 )
 
 // Grow the stack size according to maxStackPointer argument
@@ -400,9 +401,10 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.currentGlobalSliceAddress = nextFunc.globalSliceAddress
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {
-			case builtinFunctionIndexGrowMemory:
-				v := e.pop()
-				e.memoryGrow(currentFrame.wasmFunction.memory, v)
+			case builtinFunctionIndexMemoryGrow:
+				e.builtinFunctionMemoryGrow(currentFrame.wasmFunction)
+			case builtinFunctionIndexMemorySize:
+				e.builtinFunctionMemorySize(currentFrame.wasmFunction)
 			}
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeCallHostFunction:
@@ -420,17 +422,23 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	}
 }
 
-func (e *engine) memoryGrow(m *wasm.MemoryInstance, newPages uint64) {
+func (e *engine) builtinFunctionMemoryGrow(f *compiledWasmFunction) {
+	newPages := e.pop()
 	max := uint64(math.MaxUint32)
-	if m.Max != nil {
-		max = uint64(*m.Max) * wasm.PageSize
+	if f.memory.Max != nil {
+		max = uint64(*f.memory.Max) * wasm.PageSize
 	}
 	// If exceeds the max of memory size, we push -1 according to the spec
-	if uint64(newPages*wasm.PageSize+uint64(len(m.Buffer))) > max {
+	if uint64(newPages*wasm.PageSize+uint64(len(f.memory.Buffer))) > max {
 		v := int32(-1)
 		e.push(uint64(v))
 	} else {
-		e.push(uint64(uint64(len(m.Buffer)) / wasm.PageSize))
-		m.Buffer = append(m.Buffer, make([]byte, newPages*wasm.PageSize)...)
+		e.push(uint64(uint64(len(f.memory.Buffer)) / wasm.PageSize))
+		f.memory.Buffer = append(f.memory.Buffer, make([]byte, newPages*wasm.PageSize)...)
+		f.memoryAddress = uintptr(unsafe.Pointer(&f.memory.Buffer[0]))
 	}
+}
+
+func (e *engine) builtinFunctionMemorySize(f *compiledWasmFunction) {
+	e.push(uint64(len(f.memory.Buffer)) / wasm.PageSize)
 }

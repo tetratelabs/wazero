@@ -132,6 +132,20 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	if err != nil {
 		return fmt.Errorf("exports: %w", err)
 	}
+
+	// We compile functions after successfully finished building all instances.
+	// This is not only because we want to do early feedback on malicious binaries,
+	// but also during the compilation phase, the compilers have to see all the possible
+	// instances (function, memory, table) in the module instance.
+	if err = s.engine.PreCompile(instance.Functions); err != nil {
+		return fmt.Errorf("failed to precompile: %w", err)
+	}
+	for i, f := range instance.Functions {
+		if err := s.engine.Compile(f); err != nil {
+			return fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
+		}
+	}
+
 	// Check the start function is valid.
 	if module.StartSection != nil {
 		index := *module.StartSection
@@ -468,19 +482,6 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 		target.Functions = append(target.Functions, f)
 		s.Functions = append(s.Functions, f)
-	}
-
-	// We compile functions after successfully finished analyzing all functions.
-	// This is not only because we want to do early feedback on malicious binaries,
-	// but also during the compilation phase, the compilers have to see all the possible
-	// function signatures in the module instance.
-	if err = s.engine.PreCompile(target.Functions); err != nil {
-		return rollbackFuncs, fmt.Errorf("failed to precompile: %w", err)
-	}
-	for i, f := range target.Functions {
-		if err := s.engine.Compile(f); err != nil {
-			return rollbackFuncs, fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
-		}
 	}
 	return rollbackFuncs, nil
 }
