@@ -80,7 +80,6 @@ func TestEngine_memory(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), out[0])
 	// Then grow the memory.
-	// First, we have zero-length memory instance.
 	const newPages uint64 = 10
 	out, _, err = store.CallFunction("test", "grow", newPages)
 	require.NoError(t, err)
