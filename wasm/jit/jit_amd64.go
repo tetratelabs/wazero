@@ -1146,7 +1146,7 @@ func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 	}
 
 	if isIntType {
-		// For integer types, we just read the corresponding bytes from the offset to the memory
+		// For integer types, read the corresponding bytes from the offset to the memory
 		// and store the value to the int register.
 		moveFromMemory := b.newProg()
 		moveFromMemory.As = movInst
