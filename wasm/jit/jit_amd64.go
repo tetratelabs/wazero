@@ -98,7 +98,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling global.set operation: %w", err)
 			}
 		case *wazeroir.OperationLoad:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleLoad(o); err != nil {
+				return nil, fmt.Errorf("error handling load operation: %w", err)
+			}
 		case *wazeroir.OperationLoad8:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLoad16:
@@ -328,7 +330,7 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 	// If x1 is on the conditional register, we must move it to a gp
 	// register before swap.
 	if x1.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(x1); err != nil {
+		if err := b.moveConditionalToGeneralPurposeRegister(x1); err != nil {
 			return err
 		}
 	}
@@ -473,7 +475,7 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 			return err
 		}
 	} else if val.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(val); err != nil {
+		if err := b.moveConditionalToGeneralPurposeRegister(val); err != nil {
 			return err
 		}
 	}
@@ -768,7 +770,7 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 			if topIsConditional {
 				// If the top is conditional, and it's not target of drop,
 				// we must assign it to the register before we emit any instructions here.
-				if err := b.moveConditionalToGPRegister(top); err != nil {
+				if err := b.moveConditionalToGeneralPurposeRegister(top); err != nil {
 					return err
 				}
 				topIsConditional = false
@@ -801,7 +803,7 @@ func (b *amd64Builder) handleSelect() error {
 
 	// Ensure the conditional value lives in a gp register.
 	if c.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(c); err != nil {
+		if err := b.moveConditionalToGeneralPurposeRegister(c); err != nil {
 			return err
 		}
 	} else if c.onStack() {
@@ -932,7 +934,7 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 			return err
 		}
 	} else if x2.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(x2); err != nil {
+		if err := b.moveConditionalToGeneralPurposeRegister(x2); err != nil {
 			return err
 		}
 	}
@@ -993,7 +995,7 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 			return err
 		}
 	} else if x2.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(x2); err != nil {
+		if err := b.moveConditionalToGeneralPurposeRegister(x2); err != nil {
 			return err
 		}
 	}
@@ -1059,7 +1061,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 			return err
 		}
 	} else if x2.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(x2); err != nil {
+		if err := b.moveConditionalToGeneralPurposeRegister(x2); err != nil {
 			return err
 		}
 	}
@@ -1093,6 +1095,90 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	// so record it.
 	loc := b.locationStack.pushValueOnConditionalRegister(resultConditionState)
 	loc.setValueType(wazeroir.SignLessTypeI32)
+	return nil
+}
+
+func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
+	base := b.locationStack.pop()
+	if base.onStack() {
+		if err := b.moveStackToRegisterWithAllocation(generalPurposeRegisterTypeInt, base); err != nil {
+			return err
+		}
+	} else if base.onConditionalRegister() {
+		if err := b.moveConditionalToGeneralPurposeRegister(base); err != nil {
+			return err
+		}
+	}
+
+	// At this point, base's value is on the integer general purpose reg.
+	// We reuse the register below, so we alias it here for readability.
+	reg := base.register
+
+	// Then we have to calculate the offset on the memory region.
+	addOffsetToBase := b.newProg()
+	addOffsetToBase.As = x86.AADDL // 32-bit!
+	addOffsetToBase.To.Type = obj.TYPE_REG
+	addOffsetToBase.To.Reg = reg
+	addOffsetToBase.From.Type = obj.TYPE_CONST
+	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
+	b.addInstruction(addOffsetToBase)
+
+	// TODO: Emit instructions here to check memory out of bounds as
+	// potentially it would be an security risk.
+
+	var (
+		isIntType bool
+		movInst   obj.As
+	)
+	switch o.Type {
+	case wazeroir.SignLessTypeI32:
+		isIntType = true
+		movInst = x86.AMOVL
+	case wazeroir.SignLessTypeI64:
+		isIntType = true
+		movInst = x86.AMOVQ
+	case wazeroir.SignLessTypeF32:
+		isIntType = false
+		movInst = x86.AMOVL
+	case wazeroir.SignLessTypeF64:
+		isIntType = false
+		movInst = x86.AMOVQ
+	}
+
+	if isIntType {
+		// For integer types, read the corresponding bytes from the offset to the memory
+		// and store the value to the int register.
+		moveFromMemory := b.newProg()
+		moveFromMemory.As = movInst
+		moveFromMemory.To.Type = obj.TYPE_REG
+		moveFromMemory.To.Reg = reg
+		moveFromMemory.From.Type = obj.TYPE_MEM
+		moveFromMemory.From.Reg = reservedRegisterForMemory
+		moveFromMemory.From.Index = reg
+		moveFromMemory.From.Scale = 1
+		b.addInstruction(moveFromMemory)
+		top := b.locationStack.pushValueOnRegister(reg)
+		top.setValueType(o.Type)
+	} else {
+		// For float types, we read the value to the float register.
+		floatReg, err := b.allocateRegister(generalPurposeRegisterTypeFloat)
+		if err != nil {
+			return err
+		}
+		moveFromMemory := b.newProg()
+		moveFromMemory.As = movInst
+		moveFromMemory.To.Type = obj.TYPE_REG
+		moveFromMemory.To.Reg = floatReg
+		moveFromMemory.From.Type = obj.TYPE_MEM
+		moveFromMemory.From.Reg = reservedRegisterForMemory
+		moveFromMemory.From.Index = reg
+		moveFromMemory.From.Scale = 1
+		b.addInstruction(moveFromMemory)
+		top := b.locationStack.pushValueOnRegister(floatReg)
+		top.setValueType(o.Type)
+		// We no longer need the int register so mark it unused.
+		b.locationStack.markRegisterUnused(reg)
+	}
 	return nil
 }
 
@@ -1250,11 +1336,11 @@ func (b *amd64Builder) moveStackToRegister(loc *valueLocation) {
 	b.addInstruction(prog)
 }
 
-func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
+func (b *amd64Builder) moveConditionalToGeneralPurposeRegister(loc *valueLocation) error {
 	// Get the free register.
 	reg, ok := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	if !ok {
-		// This in theory should never be reached as moveConditionalToGPRegister
+		// This in theory should never be reached as moveConditionalToGeneralPurposeRegister
 		// is called right after comparison operations, meaning that
 		// at least two registers are free at the moment.
 		return fmt.Errorf("conditional register mov requires a free register")

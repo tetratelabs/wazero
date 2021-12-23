@@ -1092,7 +1092,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			// to the stack.
 			top := builder.locationStack.peek()
 			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = builder.moveConditionalToGPRegister(top)
+			err = builder.moveConditionalToGeneralPurposeRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
 			builder.releaseRegisterToStack(top)
@@ -1150,7 +1150,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			// to the stack.
 			top := builder.locationStack.peek()
 			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = builder.moveConditionalToGPRegister(top)
+			err = builder.moveConditionalToGeneralPurposeRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
 			builder.releaseRegisterToStack(top)
@@ -1400,6 +1400,103 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		require.Equal(t, uint64(3), eng.currentStackPointer)
 		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
 	})
+}
+
+func TestAmd64Builder_handleLoad(t *testing.T) {
+	for i, tp := range []wazeroir.SignLessType{
+		wazeroir.SignLessTypeI32,
+		wazeroir.SignLessTypeI64,
+		wazeroir.SignLessTypeF32,
+		wazeroir.SignLessTypeF64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			eng := newEngine()
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			// Before load operations, we must push the base offset value.
+			const baseOffset = 100 // For testing. Arbitrary number is fine.
+			base := builder.locationStack.pushValueOnStack()
+			eng.stack[base.stackPointer] = baseOffset
+
+			// Emit the memory load instructions.
+			o := &wazeroir.OperationLoad{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+			err := builder.handleLoad(o)
+			require.NoError(t, err)
+
+			// At this point, the loaded value must be on top of the stack, and placed on a register.
+			loadedValue := builder.locationStack.peek()
+			require.Equal(t, o.Type, loadedValue.valueType)
+			require.True(t, loadedValue.onRegister())
+
+			// Double the loaded value in order to verify the behavior.
+			var addInst obj.As
+			switch tp {
+			case wazeroir.SignLessTypeI32:
+				require.True(t, isIntRegister(loadedValue.register))
+				addInst = x86.AADDL
+			case wazeroir.SignLessTypeI64:
+				require.True(t, isIntRegister(loadedValue.register))
+				addInst = x86.AADDQ
+			case wazeroir.SignLessTypeF32:
+				require.True(t, isFloatRegister(loadedValue.register))
+				addInst = x86.AADDSS
+			case wazeroir.SignLessTypeF64:
+				require.True(t, isFloatRegister(loadedValue.register))
+				addInst = x86.AADDSD
+			}
+			doubleLoadedValue := builder.newProg()
+			doubleLoadedValue.As = addInst
+			doubleLoadedValue.To.Type = obj.TYPE_REG
+			doubleLoadedValue.To.Reg = loadedValue.register
+			doubleLoadedValue.From.Type = obj.TYPE_REG
+			doubleLoadedValue.From.Reg = loadedValue.register
+			builder.addInstruction(doubleLoadedValue)
+
+			// We need to write the result back to the memory stack.
+			builder.releaseRegisterToStack(loadedValue)
+
+			// Compile.
+			builder.returnFunction()
+			code, err := builder.compile()
+			require.NoError(t, err)
+
+			// Place the load target value to the memory.
+			mem := newMemoryInst()
+			targetRegion := mem.Buffer[baseOffset+o.Arg.Offest:]
+			var expValue uint64
+			switch tp {
+			case wazeroir.SignLessTypeI32:
+				original := uint32(100)
+				binary.LittleEndian.PutUint32(targetRegion, original)
+				expValue = uint64(original * 2)
+			case wazeroir.SignLessTypeI64:
+				original := uint64(math.MaxUint32 + 123) // The value exceeds 32-bit.
+				binary.LittleEndian.PutUint64(targetRegion, original)
+				expValue = original * 2
+			case wazeroir.SignLessTypeF32:
+				original := float32(1.234)
+				binary.LittleEndian.PutUint32(targetRegion, math.Float32bits(original))
+				expValue = uint64(math.Float32bits(original * 2))
+			case wazeroir.SignLessTypeF64:
+				original := float64(math.MaxFloat32 + 100.1) // The value exceeds 32-bit.
+				binary.LittleEndian.PutUint64(targetRegion, math.Float64bits(original))
+				expValue = math.Float64bits(original * 2)
+			}
+
+			// Run code.
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			// Load instruction must push the loaded value to the top of the stack,
+			// so the stack pointer must be incremented.
+			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, expValue, eng.stack[eng.currentStackPointer-1])
+		})
+	}
 }
 
 func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
