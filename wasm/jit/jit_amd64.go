@@ -99,7 +99,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 			}
 		case *wazeroir.OperationLoad:
 			if err := builder.handleLoad(o); err != nil {
-				return nil, fmt.Errorf("error handling global.set operation: %w", err)
+				return nil, fmt.Errorf("error handling load operation: %w", err)
 			}
 		case *wazeroir.OperationLoad8:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
