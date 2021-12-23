@@ -98,7 +98,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling global.set operation: %w", err)
 			}
 		case *wazeroir.OperationLoad:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleLoad(o); err != nil {
+				return nil, fmt.Errorf("error handling global.set operation: %w", err)
+			}
 		case *wazeroir.OperationLoad8:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationLoad16:
@@ -1093,6 +1095,90 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	// so record it.
 	loc := b.locationStack.pushValueOnConditionalRegister(resultConditionState)
 	loc.setValueType(wazeroir.SignLessTypeI32)
+	return nil
+}
+
+func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
+	base := b.locationStack.pop()
+	if base.onStack() {
+		if err := b.moveStackToRegisterWithAllocation(generalPurposeRegisterTypeInt, base); err != nil {
+			return err
+		}
+	} else if base.onConditionalRegister() {
+		if err := b.moveConditionalToGPRegister(base); err != nil {
+			return err
+		}
+	}
+
+	// At this point, base's value is on the integer general purpose reg.
+	// We reuse the register below, so we alias it here for readability.
+	reg := base.register
+
+	// Then we have to calculate the offset on the memory region.
+	addOffsetToBase := b.newProg()
+	addOffsetToBase.As = x86.AADDL // 32-bit!
+	addOffsetToBase.To.Type = obj.TYPE_REG
+	addOffsetToBase.To.Reg = reg
+	addOffsetToBase.From.Type = obj.TYPE_CONST
+	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
+	b.addInstruction(addOffsetToBase)
+
+	// TODO: Emit instructions here to check memory out of bounds as
+	// potentially it would be an security risk.
+
+	var (
+		isIntType bool
+		movInst   obj.As
+	)
+	switch o.Type {
+	case wazeroir.SignLessTypeI32:
+		isIntType = true
+		movInst = x86.AMOVL
+	case wazeroir.SignLessTypeI64:
+		isIntType = true
+		movInst = x86.AMOVQ
+	case wazeroir.SignLessTypeF32:
+		isIntType = false
+		movInst = x86.AMOVL
+	case wazeroir.SignLessTypeF64:
+		isIntType = false
+		movInst = x86.AMOVQ
+	}
+
+	if isIntType {
+		// For integer types, we just read the corresponding bytes from the offset to the memory
+		// and store the value to the int register.
+		moveFromMemory := b.newProg()
+		moveFromMemory.As = movInst
+		moveFromMemory.To.Type = obj.TYPE_REG
+		moveFromMemory.To.Reg = reg
+		moveFromMemory.From.Type = obj.TYPE_MEM
+		moveFromMemory.From.Reg = reservedRegisterForMemory
+		moveFromMemory.From.Index = reg
+		moveFromMemory.From.Scale = 1
+		b.addInstruction(moveFromMemory)
+		top := b.locationStack.pushValueOnRegister(reg)
+		top.setValueType(o.Type)
+	} else {
+		// For float types, we read the value to the float register.
+		floatReg, err := b.allocateRegister(generalPurposeRegisterTypeFloat)
+		if err != nil {
+			return err
+		}
+		moveFromMemory := b.newProg()
+		moveFromMemory.As = movInst
+		moveFromMemory.To.Type = obj.TYPE_REG
+		moveFromMemory.To.Reg = floatReg
+		moveFromMemory.From.Type = obj.TYPE_MEM
+		moveFromMemory.From.Reg = reservedRegisterForMemory
+		moveFromMemory.From.Index = reg
+		moveFromMemory.From.Scale = 1
+		b.addInstruction(moveFromMemory)
+		top := b.locationStack.pushValueOnRegister(floatReg)
+		top.setValueType(o.Type)
+		// We no longer need the int register so mark it unused.
+		b.locationStack.markRegisterUnused(reg)
+	}
 	return nil
 }
 
