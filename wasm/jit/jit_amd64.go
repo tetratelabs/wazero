@@ -24,18 +24,6 @@ import (
 // memory is the pointer to the first byte of memoryInstance.Buffer slice to be used by the target function.
 func jitcall(codeSegment, engine, memory uintptr)
 
-// Reserved registers.
-// Note that we don't use "call" instruction (See wasm/jit/RATIONALE.md#general-limitations-on-pure-go-jit-engines)
-const (
-	// engineInstanceReg R12: pointer to engine instance (i.e. *engine as uintptr)
-	engineInstanceReg = x86.REG_R12
-	// cachedStackBasePointerReg R14: cached stack base pointer (engine.currentStackBase) in the current function call.
-	cachedStackBasePointerReg = x86.REG_R14
-	// TODO: we use memoryReg later when we support the store/load memory operations.
-	// memoryReg R15: pointer to memory space (i.e. *[]byte as uintptr).
-	// memoryReg                 = x86.REG_R15
-)
-
 func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
 	ir, err := wazeroir.Compile(f)
 	if err != nil {
@@ -428,7 +416,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
-	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
 	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
 	b.addInstruction(moveGlobalSlicePointer)
 
@@ -502,7 +490,7 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
-	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
 	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
 	b.addInstruction(moveGlobalSlicePointer)
 
@@ -899,7 +887,7 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 		prog := b.newProg()
 		prog.As = x86.AMOVQ
 		prog.From.Type = obj.TYPE_MEM
-		prog.From.Reg = cachedStackBasePointerReg
+		prog.From.Reg = reservedRegisterForStackBasePointer
 		prog.From.Offset = int64(pickTarget.stackPointer) * 8
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = reg
@@ -1234,7 +1222,7 @@ func (b *amd64Builder) moveStackToRegister(loc *valueLocation) {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = cachedStackBasePointerReg
+	prog.From.Reg = reservedRegisterForStackBasePointer
 	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = loc.register
@@ -1333,7 +1321,7 @@ func (b *amd64Builder) setJITStatus(status jitCallStatusCode) *obj.Prog {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(status)
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineJITCallStatusCodeOffset
 	b.addInstruction(prog)
 	return prog
@@ -1438,7 +1426,7 @@ func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = tmpReg
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineContinuationAddressOffset
 	b.addInstruction(prog)
 	// Then return temporarily -- giving control to normal Go code.
@@ -1451,7 +1439,7 @@ func (b *amd64Builder) setFunctionCallIndexFromRegister(reg int16) {
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = reg
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineFunctionCallIndexOffset
 	b.addInstruction(prog)
 }
@@ -1462,7 +1450,7 @@ func (b *amd64Builder) setFunctionCallIndexFromConst(index int64) {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = index
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineFunctionCallIndexOffset
 	b.addInstruction(prog)
 }
@@ -1472,7 +1460,7 @@ func (b *amd64Builder) releaseRegisterToStack(loc *valueLocation) {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = cachedStackBasePointerReg
+	prog.To.Reg = reservedRegisterForStackBasePointer
 	prog.To.Offset = int64(loc.stackPointer) * 8
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = loc.register
@@ -1487,7 +1475,7 @@ func (b *amd64Builder) assignRegisterToValue(loc *valueLocation, reg int16) {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = cachedStackBasePointerReg
+	prog.From.Reg = reservedRegisterForStackBasePointer
 	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
@@ -1505,7 +1493,7 @@ func (b *amd64Builder) returnFunction() {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(b.locationStack.sp)
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineCurrentStackPointerOffset
 	b.addInstruction(prog)
 
@@ -1517,7 +1505,7 @@ func (b *amd64Builder) returnFunction() {
 
 // initializeReservedRegisters must be called at the very beginning and all the
 // after-call continuations of JITed functions.
-// This caches the actual stack base pointer (engine.currentBaseStackPointer*8+[engine.engineStackSliceOffset])
+// This caches the actual stack base pointer (engine.currentStackBasePointer*8+[engine.engineStackSliceOffset])
 // to cachedStackBasePointerReg
 func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	// At first, make cachedStackBasePointerReg point to the beginning of the slice backing array.
@@ -1525,24 +1513,24 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = engineInstanceReg
+	prog.From.Reg = reservedRegisterForEngine
 	prog.From.Offset = engineStackSliceOffset
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = cachedStackBasePointerReg
+	prog.To.Reg = reservedRegisterForStackBasePointer
 	b.addInstruction(prog)
 
 	// initializeReservedRegisters is called at the beginning of function calls
 	// or right after function returns so at this point we always have free registers.
 	reg, _ := b.locationStack.takeFreeRegister(gpTypeInt)
 
-	// Next we move the base pointer (engine.currentBaseStackPointer) to
+	// Next we move the base pointer (engine.currentStackBasePointer) to
 	// a temporary register.
 	// movq [engineInstanceReg+engineCurrentBaseStackPointerOffset] reg
 	prog = b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = engineInstanceReg
-	prog.From.Offset = engineCurrentBaseStackPointerOffset
+	prog.From.Reg = reservedRegisterForEngine
+	prog.From.Offset = engineCurrentStackBasePointerOffset
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
 	b.addInstruction(prog)
@@ -1562,7 +1550,7 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog = b.newProg()
 	prog.As = x86.AADDQ
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = cachedStackBasePointerReg
+	prog.To.Reg = reservedRegisterForStackBasePointer
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = reg
 	b.addInstruction(prog)

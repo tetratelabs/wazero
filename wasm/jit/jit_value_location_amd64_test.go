@@ -11,14 +11,25 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 )
 
+// TestReservedRegisters ensures that reserved registers are not contained in unreservedGeneralPurposeIntRegisters.
+func TestReservedRegisters(t *testing.T) {
+	unreserved := map[int16]struct{}{}
+	for _, r := range unreservedGeneralPurposeIntRegisters {
+		unreserved[r] = struct{}{}
+	}
+	require.NotContains(t, unreserved, reservedRegisterForEngine)
+	require.NotContains(t, unreserved, reservedRegisterForStackBasePointer)
+	require.NotContains(t, unreserved, reservedRegisterMemoryPointer)
+}
+
 func Test_isIntRegister(t *testing.T) {
-	for _, r := range gpIntRegisters {
+	for _, r := range unreservedGeneralPurposeIntRegisters {
 		require.True(t, isIntRegister(r))
 	}
 }
 
 func Test_isFloatRegister(t *testing.T) {
-	for _, r := range gpFloatRegisters {
+	for _, r := range generalPurposeFloatRegisters {
 		require.True(t, isFloatRegister(r))
 	}
 }
@@ -68,7 +79,7 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, isIntRegister(r))
 	// Mark all the int registers used.
-	for _, r := range gpIntRegisters {
+	for _, r := range unreservedGeneralPurposeIntRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for int.
@@ -79,7 +90,7 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, isFloatRegister(r))
 	// Mark all the float registers used.
-	for _, r := range gpFloatRegisters {
+	for _, r := range generalPurposeFloatRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for floats.

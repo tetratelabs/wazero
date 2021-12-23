@@ -9,8 +9,19 @@ import (
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
+// Reserved registers.
+const (
+	// reservedRegisterForEngine R12: pointer to engine instance (i.e. *engine as uintptr)
+	reservedRegisterForEngine = x86.REG_R12
+	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.currentStackBasePointer) in the current function call.
+	reservedRegisterForStackBasePointer = x86.REG_R14
+	// TODO: we use memoryReg later when we support the store/load memory operations.
+	// reservedRegisterMemoryPointer R15: pointer to memory space (i.e. *[]byte as uintptr).
+	reservedRegisterMemoryPointer = x86.REG_R15
+)
+
 var (
-	gpFloatRegisters = []int16{
+	generalPurposeFloatRegisters = []int16{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
 		x86.REG_X4, x86.REG_X5, x86.REG_X6, x86.REG_X7,
 		x86.REG_X8, x86.REG_X9, x86.REG_X10, x86.REG_X11,
@@ -21,7 +32,7 @@ var (
 	// TODO: Maybe it is safe just save rbp, rsp somewhere
 	// in Go-allocated variables, and reuse these registers
 	// in JITed functions and write them back before returns.
-	gpIntRegisters = []int16{
+	unreservedGeneralPurposeIntRegisters = []int16{
 		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
 		x86.REG_SI, x86.REG_DI, x86.REG_R8, x86.REG_R9,
 		x86.REG_R10, x86.REG_R11,
@@ -29,11 +40,11 @@ var (
 )
 
 func isIntRegister(r int16) bool {
-	return gpIntRegisters[0] <= r && r <= gpIntRegisters[len(gpIntRegisters)-1]
+	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
 }
 
 func isFloatRegister(r int16) bool {
-	return gpFloatRegisters[0] <= r && r <= gpFloatRegisters[len(gpFloatRegisters)-1]
+	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
 }
 
 type conditionalRegisterState byte
@@ -214,9 +225,9 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 	var targetRegs []int16
 	switch tp {
 	case gpTypeFloat:
-		targetRegs = gpFloatRegisters
+		targetRegs = generalPurposeFloatRegisters
 	case gpTypeInt:
-		targetRegs = gpIntRegisters
+		targetRegs = unreservedGeneralPurposeIntRegisters
 	}
 	for _, candidate := range targetRegs {
 		if _, ok := s.usedRegisters[candidate]; ok {
