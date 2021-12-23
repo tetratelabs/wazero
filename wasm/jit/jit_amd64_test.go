@@ -538,11 +538,11 @@ func Test_popFromStackToRegister(t *testing.T) {
 
 	// Call in.
 	eng := newEngine()
-	eng.currentBaseStackPointer = 1
-	eng.stack[eng.currentBaseStackPointer+2] = 10000
-	eng.stack[eng.currentBaseStackPointer+1] = 20000
+	eng.currentStackBasePointer = 1
+	eng.stack[eng.currentStackBasePointer+2] = 10000
+	eng.stack[eng.currentStackBasePointer+1] = 20000
 	mem := newMemoryInst()
-	require.Equal(t, []uint64{0, 20000, 10000}, eng.stack[eng.currentBaseStackPointer:eng.currentBaseStackPointer+3])
+	require.Equal(t, []uint64{0, 20000, 10000}, eng.stack[eng.currentStackBasePointer:eng.currentStackBasePointer+3])
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
@@ -550,7 +550,7 @@ func Test_popFromStackToRegister(t *testing.T) {
 	)
 	// Check the sp and value.
 	require.Equal(t, uint64(2), eng.currentStackPointer)
-	require.Equal(t, []uint64{0, 30000}, eng.stack[eng.currentBaseStackPointer:eng.currentBaseStackPointer+eng.currentStackPointer])
+	require.Equal(t, []uint64{0, 30000}, eng.stack[eng.currentStackBasePointer:eng.currentStackBasePointer+eng.currentStackPointer])
 }
 
 func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
@@ -575,10 +575,10 @@ func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
 func TestAmd64Builder_allocateRegister(t *testing.T) {
 	t.Run("free", func(t *testing.T) {
 		builder := requireNewBuilder(t)
-		reg, err := builder.allocateRegister(gpTypeInt)
+		reg, err := builder.allocateRegister(generalPurposeRegisterTypeInt)
 		require.NoError(t, err)
 		require.True(t, isIntRegister(reg))
-		reg, err = builder.allocateRegister(gpTypeFloat)
+		reg, err = builder.allocateRegister(generalPurposeRegisterTypeFloat)
 		require.NoError(t, err)
 		require.True(t, isFloatRegister(reg))
 	})
@@ -587,14 +587,14 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 		builder := requireNewBuilder(t)
 		builder.initializeReservedRegisters()
 		// Use up all the Int regs.
-		for _, r := range gpIntRegisters {
+		for _, r := range unreservedGeneralPurposeIntRegisters {
 			builder.locationStack.markRegisterUsed(r)
 		}
 		stealTargetLocation := builder.locationStack.pushValueOnRegister(stealTarget)
 		builder.movIntConstToRegister(int64(50), stealTargetLocation.register)
 		require.Equal(t, int16(stealTarget), stealTargetLocation.register)
 		require.True(t, stealTargetLocation.onRegister())
-		reg, err := builder.allocateRegister(gpTypeInt)
+		reg, err := builder.allocateRegister(generalPurposeRegisterTypeInt)
 		require.NoError(t, err)
 		require.True(t, isIntRegister(reg))
 		require.False(t, stealTargetLocation.onRegister())
@@ -611,7 +611,7 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 
 		// Run code.
 		eng := newEngine()
-		eng.currentBaseStackPointer = 10
+		eng.currentStackBasePointer = 10
 		mem := newMemoryInst()
 		jitcall(
 			uintptr(unsafe.Pointer(&code[0])),
@@ -621,7 +621,7 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 
 		// Check the sp and value.
 		require.Equal(t, uint64(2), eng.currentStackPointer)
-		require.Equal(t, []uint64{50, 2000}, eng.stack[eng.currentBaseStackPointer:eng.currentBaseStackPointer+eng.currentStackPointer])
+		require.Equal(t, []uint64{50, 2000}, eng.stack[eng.currentStackBasePointer:eng.currentStackBasePointer+eng.currentStackPointer])
 	})
 }
 
@@ -710,8 +710,8 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 		pickTargetLocation := builder.locationStack.pushValueOnStack()
 		builder.locationStack.pushValueOnStack() // Dummy value!
 		eng.currentStackPointer = 5
-		eng.currentBaseStackPointer = 1
-		eng.stack[eng.currentBaseStackPointer+pickTargetLocation.stackPointer] = 100
+		eng.currentStackBasePointer = 1
+		eng.stack[eng.currentStackBasePointer+pickTargetLocation.stackPointer] = 100
 
 		// Now insert pick code.
 		err := builder.handlePick(o)
@@ -741,9 +741,9 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
 		// Check the stack.
-		require.Equal(t, uint64(100), eng.stack[eng.currentBaseStackPointer+pickTargetLocation.stackPointer]) // Original value shouldn't be affected.
+		require.Equal(t, uint64(100), eng.stack[eng.currentStackBasePointer+pickTargetLocation.stackPointer]) // Original value shouldn't be affected.
 		require.Equal(t, uint64(3), eng.currentStackPointer)
-		require.Equal(t, uint64(101), eng.stack[eng.currentBaseStackPointer+eng.currentStackPointer-1])
+		require.Equal(t, uint64(101), eng.stack[eng.currentStackBasePointer+eng.currentStackPointer-1])
 	})
 }
 

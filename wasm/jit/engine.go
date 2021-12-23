@@ -17,9 +17,9 @@ type engine struct {
 	// The actual Go-allocated stack.
 	// Note that we NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
 	stack []uint64
-	// Wasm stack pointer on .stack field which is accessed by currentBaseStackPointer+currentStackPointer
+	// Wasm stack pointer on .stack field which is accessed by currentStackBasePointer+currentStackPointer
 	currentStackPointer     uint64
-	currentBaseStackPointer uint64
+	currentStackBasePointer uint64
 	// Where we store the status code of JIT execution.
 	jitCallStatusCode jitCallStatusCode
 	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
@@ -50,7 +50,7 @@ type engine struct {
 const (
 	engineStackSliceOffset                = 0
 	engineCurrentStackPointerOffset       = 24
-	engineCurrentBaseStackPointerOffset   = 32
+	engineCurrentStackBasePointerOffset   = 32
 	engineJITCallStatusCodeOffset         = 40
 	engineFunctionCallIndexOffset         = 48
 	engineContinuationAddressOffset       = 56
@@ -218,13 +218,13 @@ func newEngine() *engine {
 }
 
 func (e *engine) pop() (ret uint64) {
-	ret = e.stack[e.currentBaseStackPointer+e.currentStackPointer-1]
+	ret = e.stack[e.currentStackBasePointer+e.currentStackPointer-1]
 	e.currentStackPointer--
 	return
 }
 
 func (e *engine) push(v uint64) {
-	e.stack[e.currentBaseStackPointer+e.currentStackPointer] = v
+	e.stack[e.currentStackBasePointer+e.currentStackPointer] = v
 	e.currentStackPointer++
 }
 
@@ -265,7 +265,7 @@ func (s jitCallStatusCode) String() (ret string) {
 type callFrame struct {
 	continuationAddress      uintptr
 	continuationStackPointer uint64
-	baseStackPointer         uint64
+	stackBasePointer         uint64
 	wasmFunction             *compiledWasmFunction
 	hostFunction             *compiledHostFunction
 	caller                   *callFrame
@@ -273,8 +273,8 @@ type callFrame struct {
 
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
-		"[%s: continuation address=%d, continuation stack pointer=%d, base stack pointer=%d]",
-		c.getFunctionName(), c.continuationAddress, c.continuationStackPointer, c.baseStackPointer,
+		"[%s: continuation address=%d, continuation stack pointer=%d, stack base pointer=%d]",
+		c.getFunctionName(), c.continuationAddress, c.continuationStackPointer, c.stackBasePointer,
 	)
 }
 
@@ -322,13 +322,13 @@ const (
 // for the next function frame execution.
 func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 	currentLen := uint64(len(e.stack))
-	remained := currentLen - e.currentBaseStackPointer
+	remained := currentLen - e.currentStackBasePointer
 	if maxStackPointer > remained {
 		// This case we need to grow the stack as the empty slots
 		// are not able to store all the stack items.
 		// So we grow the stack with the new len = currentLen*2+maxStackPointer.
 		newStack := make([]uint64, currentLen*2+(maxStackPointer))
-		top := e.currentBaseStackPointer + e.currentStackPointer
+		top := e.currentStackBasePointer + e.currentStackPointer
 		copy(newStack[:top], e.stack[:top])
 		e.stack = newStack
 	}
@@ -348,9 +348,9 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
-			fmt.Printf("callframe=%s, currentBaseStackPointer: %d, currentStackPointer: %d, stack: %v\n",
-				currentFrame.String(), e.currentBaseStackPointer, e.currentStackPointer,
-				e.stack[:e.currentBaseStackPointer+e.currentStackPointer],
+			fmt.Printf("callframe=%s, currentStackBasePointer: %d, currentStackPointer: %d, stack: %v\n",
+				currentFrame.String(), e.currentStackBasePointer, e.currentStackPointer,
+				e.stack[:e.currentStackBasePointer+e.currentStackPointer],
 			)
 		}
 
@@ -369,7 +369,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			callerFrame := currentFrame.caller
 			e.callFrameStack = callerFrame
 			if callerFrame != nil {
-				e.currentBaseStackPointer = callerFrame.baseStackPointer
+				e.currentStackBasePointer = callerFrame.stackBasePointer
 				e.currentStackPointer = callerFrame.continuationStackPointer
 			}
 		case jitCallStatusCodeCallWasmFunction:
@@ -380,7 +380,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 			currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.returns - nextFunc.inputs
-			currentFrame.baseStackPointer = e.currentBaseStackPointer
+			currentFrame.stackBasePointer = e.currentStackBasePointer
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
@@ -388,13 +388,13 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				// Set the caller frame so we can return back to the current frame!
 				caller: currentFrame,
 				// Set the base pointer to the beginning of the function inputs
-				baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputs,
+				stackBasePointer: e.currentStackBasePointer + e.currentStackPointer - nextFunc.inputs,
 			}
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 			e.maybeGrowStack(nextFunc.maxStackPointer)
 			// Now move onto the callee function.
 			e.callFrameStack = frame
-			e.currentBaseStackPointer = frame.baseStackPointer
+			e.currentStackBasePointer = frame.stackBasePointer
 			// Set the stack pointer so that base+sp would point to the top of function inputs.
 			e.currentStackPointer = nextFunc.inputs
 			e.currentGlobalSliceAddress = nextFunc.globalSliceAddress

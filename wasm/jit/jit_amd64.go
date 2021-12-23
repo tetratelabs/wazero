@@ -24,18 +24,6 @@ import (
 // memory is the pointer to the first byte of memoryInstance.Buffer slice to be used by the target function.
 func jitcall(codeSegment, engine, memory uintptr)
 
-// Reserved registers.
-// Note that we don't use "call" instruction (See wasm/jit/RATIONALE.md#general-limitations-on-pure-go-jit-engines)
-const (
-	// engineInstanceReg R12: pointer to engine instance (i.e. *engine as uintptr)
-	engineInstanceReg = x86.REG_R12
-	// cachedStackBasePointerReg R14: cached stack base pointer (engine.currentStackBase) in the current function call.
-	cachedStackBasePointerReg = x86.REG_R14
-	// TODO: we use memoryReg later when we support the store/load memory operations.
-	// memoryReg R15: pointer to memory space (i.e. *[]byte as uintptr).
-	// memoryReg                 = x86.REG_R15
-)
-
 func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
 	ir, err := wazeroir.Compile(f)
 	if err != nil {
@@ -417,7 +405,7 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 const globalInstanceValueOffset = 8
 
 func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
-	intReg, err := b.allocateRegister(gpTypeInt)
+	intReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -428,7 +416,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
-	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
 	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
 	b.addInstruction(moveGlobalSlicePointer)
 
@@ -455,7 +443,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	wasmType := b.f.ModuleInstance.Globals[o.Index].Type.ValType
 	switch wasmType {
 	case wasm.ValueTypeF32, wasm.ValueTypeF64:
-		valueReg, err = b.allocateRegister(gpTypeFloat)
+		valueReg, err = b.allocateRegister(generalPurposeRegisterTypeFloat)
 		if err != nil {
 			return err
 		}
@@ -491,7 +479,7 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	}
 
 	// Allocate a register to hold the memory location of the target global instance.
-	intReg, err := b.allocateRegister(gpTypeInt)
+	intReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -502,7 +490,7 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
-	moveGlobalSlicePointer.From.Reg = engineInstanceReg
+	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
 	moveGlobalSlicePointer.From.Offset = engineCurrentGlobalSliceAddressOffset
 	b.addInstruction(moveGlobalSlicePointer)
 
@@ -899,7 +887,7 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 		prog := b.newProg()
 		prog.As = x86.AMOVQ
 		prog.From.Type = obj.TYPE_MEM
-		prog.From.Reg = cachedStackBasePointerReg
+		prog.From.Reg = reservedRegisterForStackBasePointer
 		prog.From.Offset = int64(pickTarget.stackPointer) * 8
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = reg
@@ -923,18 +911,18 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 	switch o.Type {
 	case wazeroir.SignLessTypeI32:
 		instruction = x86.AADDL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 		panic("add tests!")
 	case wazeroir.SignLessTypeI64:
 		instruction = x86.AADDQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignLessTypeF32:
 		instruction = x86.AADDSS
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	case wazeroir.SignLessTypeF64:
 		instruction = x86.AADDSD
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	}
 
@@ -984,18 +972,18 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 	switch o.Type {
 	case wazeroir.SignLessTypeI32:
 		instruction = x86.ASUBL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 		panic("add tests!")
 	case wazeroir.SignLessTypeI64:
 		instruction = x86.ASUBQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignLessTypeF32:
 		instruction = x86.ASUBSS
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	case wazeroir.SignLessTypeF64:
 		instruction = x86.ASUBSD
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	}
 
@@ -1044,24 +1032,24 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	case wazeroir.SignFulTypeInt32:
 		resultConditionState = conditionalRegisterStateLE
 		instruction = x86.ACMPL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeUint32:
 		resultConditionState = conditionalRegisterStateBE
 		instruction = x86.ACMPL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeInt64:
 		resultConditionState = conditionalRegisterStateLE
 		instruction = x86.ACMPQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeUint64:
 		resultConditionState = conditionalRegisterStateBE
 		instruction = x86.ACMPQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeFloat32:
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add test!")
 	case wazeroir.SignFulTypeFloat64:
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add test!")
 	}
 
@@ -1109,7 +1097,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 }
 
 func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
-	reg, err := b.allocateRegister(gpTypeInt)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1127,7 +1115,7 @@ func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
 }
 
 func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
-	reg, err := b.allocateRegister(gpTypeInt)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1145,7 +1133,7 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 }
 
 func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
-	reg, err := b.allocateRegister(gpTypeFloat)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
 		return err
 	}
@@ -1154,7 +1142,7 @@ func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
-	tmpReg, err := b.allocateRegister(gpTypeInt)
+	tmpReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1179,7 +1167,7 @@ func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
 }
 
 func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
-	reg, err := b.allocateRegister(gpTypeFloat)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
 		return err
 	}
@@ -1188,7 +1176,7 @@ func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
-	tmpReg, err := b.allocateRegister(gpTypeInt)
+	tmpReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1234,7 +1222,7 @@ func (b *amd64Builder) moveStackToRegister(loc *valueLocation) {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = cachedStackBasePointerReg
+	prog.From.Reg = reservedRegisterForStackBasePointer
 	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = loc.register
@@ -1243,7 +1231,7 @@ func (b *amd64Builder) moveStackToRegister(loc *valueLocation) {
 
 func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
 	// Get the free register.
-	reg, ok := b.locationStack.takeFreeRegister(gpTypeInt)
+	reg, ok := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	if !ok {
 		// This in theory should never be reached as moveConditionalToGPRegister
 		// is called right after comparison operations, meaning that
@@ -1333,7 +1321,7 @@ func (b *amd64Builder) setJITStatus(status jitCallStatusCode) *obj.Prog {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(status)
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineJITCallStatusCodeOffset
 	b.addInstruction(prog)
 	return prog
@@ -1414,7 +1402,7 @@ func (b *amd64Builder) releaseAllRegistersToStack() {
 func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
 	// all the registers, so at this point we always have free registers.
-	tmpReg, _ := b.locationStack.takeFreeRegister(gpTypeInt)
+	tmpReg, _ := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	// Create the instruction for setting offset.
 	// We use tmp register to store the const, not directly movq to memory
 	// as it is not valid to move 64-bit const to memory directly.
@@ -1438,7 +1426,7 @@ func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = tmpReg
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineContinuationAddressOffset
 	b.addInstruction(prog)
 	// Then return temporarily -- giving control to normal Go code.
@@ -1451,7 +1439,7 @@ func (b *amd64Builder) setFunctionCallIndexFromRegister(reg int16) {
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = reg
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineFunctionCallIndexOffset
 	b.addInstruction(prog)
 }
@@ -1462,7 +1450,7 @@ func (b *amd64Builder) setFunctionCallIndexFromConst(index int64) {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = index
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineFunctionCallIndexOffset
 	b.addInstruction(prog)
 }
@@ -1472,7 +1460,7 @@ func (b *amd64Builder) releaseRegisterToStack(loc *valueLocation) {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = cachedStackBasePointerReg
+	prog.To.Reg = reservedRegisterForStackBasePointer
 	prog.To.Offset = int64(loc.stackPointer) * 8
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = loc.register
@@ -1487,7 +1475,7 @@ func (b *amd64Builder) assignRegisterToValue(loc *valueLocation, reg int16) {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = cachedStackBasePointerReg
+	prog.From.Reg = reservedRegisterForStackBasePointer
 	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
@@ -1505,7 +1493,7 @@ func (b *amd64Builder) returnFunction() {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(b.locationStack.sp)
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = engineInstanceReg
+	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineCurrentStackPointerOffset
 	b.addInstruction(prog)
 
@@ -1517,7 +1505,7 @@ func (b *amd64Builder) returnFunction() {
 
 // initializeReservedRegisters must be called at the very beginning and all the
 // after-call continuations of JITed functions.
-// This caches the actual stack base pointer (engine.currentBaseStackPointer*8+[engine.engineStackSliceOffset])
+// This caches the actual stack base pointer (engine.currentStackBasePointer*8+[engine.engineStackSliceOffset])
 // to cachedStackBasePointerReg
 func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	// At first, make cachedStackBasePointerReg point to the beginning of the slice backing array.
@@ -1525,24 +1513,24 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = engineInstanceReg
+	prog.From.Reg = reservedRegisterForEngine
 	prog.From.Offset = engineStackSliceOffset
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = cachedStackBasePointerReg
+	prog.To.Reg = reservedRegisterForStackBasePointer
 	b.addInstruction(prog)
 
 	// initializeReservedRegisters is called at the beginning of function calls
 	// or right after function returns so at this point we always have free registers.
-	reg, _ := b.locationStack.takeFreeRegister(gpTypeInt)
+	reg, _ := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
-	// Next we move the base pointer (engine.currentBaseStackPointer) to
+	// Next we move the base pointer (engine.currentStackBasePointer) to
 	// a temporary register.
 	// movq [engineInstanceReg+engineCurrentBaseStackPointerOffset] reg
 	prog = b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = engineInstanceReg
-	prog.From.Offset = engineCurrentBaseStackPointerOffset
+	prog.From.Reg = reservedRegisterForEngine
+	prog.From.Offset = engineCurrentStackBasePointerOffset
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
 	b.addInstruction(prog)
@@ -1562,7 +1550,7 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 	prog = b.newProg()
 	prog.As = x86.AADDQ
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = cachedStackBasePointerReg
+	prog.To.Reg = reservedRegisterForStackBasePointer
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = reg
 	b.addInstruction(prog)

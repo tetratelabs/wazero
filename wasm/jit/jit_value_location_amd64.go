@@ -9,8 +9,18 @@ import (
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
+// Reserved registers.
+const (
+	// reservedRegisterForEngine R13: pointer to engine instance (i.e. *engine as uintptr)
+	reservedRegisterForEngine = x86.REG_R13
+	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.currentStackBasePointer) in the current function call.
+	reservedRegisterForStackBasePointer = x86.REG_R14
+	// reservedRegisterForMemory R15: pointer to memory space (i.e. *[]byte as uintptr).
+	reservedRegisterForMemory = x86.REG_R15
+)
+
 var (
-	gpFloatRegisters = []int16{
+	generalPurposeFloatRegisters = []int16{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
 		x86.REG_X4, x86.REG_X5, x86.REG_X6, x86.REG_X7,
 		x86.REG_X8, x86.REG_X9, x86.REG_X10, x86.REG_X11,
@@ -21,19 +31,19 @@ var (
 	// TODO: Maybe it is safe just save rbp, rsp somewhere
 	// in Go-allocated variables, and reuse these registers
 	// in JITed functions and write them back before returns.
-	gpIntRegisters = []int16{
+	unreservedGeneralPurposeIntRegisters = []int16{
 		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
 		x86.REG_SI, x86.REG_DI, x86.REG_R8, x86.REG_R9,
-		x86.REG_R10, x86.REG_R11,
+		x86.REG_R10, x86.REG_R11, x86.REG_R12,
 	}
 )
 
 func isIntRegister(r int16) bool {
-	return gpIntRegisters[0] <= r && r <= gpIntRegisters[len(gpIntRegisters)-1]
+	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
 }
 
 func isFloatRegister(r int16) bool {
-	return gpFloatRegisters[0] <= r && r <= gpFloatRegisters[len(gpFloatRegisters)-1]
+	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
 }
 
 type conditionalRegisterState byte
@@ -71,9 +81,9 @@ type valueLocation struct {
 func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
 	switch v.valueType {
 	case wazeroir.SignLessTypeI32, wazeroir.SignLessTypeI64:
-		t = gpTypeInt
+		t = generalPurposeRegisterTypeInt
 	case wazeroir.SignLessTypeF32, wazeroir.SignLessTypeF64:
-		t = gpTypeFloat
+		t = generalPurposeRegisterTypeFloat
 	default:
 		panic("unreachable")
 	}
@@ -204,8 +214,8 @@ func (s *valueLocationStack) markRegisterUsed(reg int16) {
 type generalPurposeRegisterType byte
 
 const (
-	gpTypeInt generalPurposeRegisterType = iota
-	gpTypeFloat
+	generalPurposeRegisterTypeInt generalPurposeRegisterType = iota
+	generalPurposeRegisterTypeFloat
 )
 
 // Search for unused registers, and if found, returns the register
@@ -213,10 +223,10 @@ const (
 func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {
 	var targetRegs []int16
 	switch tp {
-	case gpTypeFloat:
-		targetRegs = gpFloatRegisters
-	case gpTypeInt:
-		targetRegs = gpIntRegisters
+	case generalPurposeRegisterTypeFloat:
+		targetRegs = generalPurposeFloatRegisters
+	case generalPurposeRegisterTypeInt:
+		targetRegs = unreservedGeneralPurposeIntRegisters
 	}
 	for _, candidate := range targetRegs {
 		if _, ok := s.usedRegisters[candidate]; ok {
@@ -234,11 +244,11 @@ func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRe
 		loc := s.stack[i]
 		if loc.onRegister() {
 			switch tp {
-			case gpTypeFloat:
+			case generalPurposeRegisterTypeFloat:
 				if isFloatRegister(loc.register) {
 					return loc, true
 				}
-			case gpTypeInt:
+			case generalPurposeRegisterTypeInt:
 				if isIntRegister(loc.register) {
 					return loc, true
 				}

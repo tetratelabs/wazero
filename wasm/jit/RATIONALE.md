@@ -67,7 +67,7 @@ case jitCallStatusCodeCallWasmFunction:
     // we can resume this caller function frame.
     currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
     currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.outputNum - nextFunc.inputNum
-    currentFrame.baseStackPointer = e.currentBaseStackPointer
+    currentFrame.baseStackPointer = e.currentStackBasePointer
 ```
 
 and calling into another function in JIT engine's main loop:
@@ -80,7 +80,7 @@ and calling into another function in JIT engine's main loop:
         // Set the caller frame so we can return back to the current frame!
         caller: currentFrame,
         // Set the base pointer to the beginning of the function inputs
-        baseStackPointer: e.currentBaseStackPointer + e.currentStackPointer - nextFunc.inputNum,
+        baseStackPointer: e.currentStackBasePointer + e.currentStackPointer - nextFunc.inputNum,
     }
 ```
 
@@ -92,7 +92,7 @@ case jitStatusReturned:
     // so we just get back to the caller's frame.
     callerFrame := currentFrame.caller
     e.callFrameStack = callerFrame
-    e.currentBaseStackPointer = callerFrame.baseStackPointer
+    e.currentStackBasePointer = callerFrame.baseStackPointer
     e.currentStackPointer = callerFrame.continuationStackPointer
 ```
 
