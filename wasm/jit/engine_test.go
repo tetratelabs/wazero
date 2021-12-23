@@ -89,6 +89,10 @@ func TestEngine_memory(t *testing.T) {
 	out, _, err = store.CallFunction("test", "size")
 	require.NoError(t, err)
 	require.Equal(t, newPages, out[0])
+	// Growing memory with zero pages is valid but should be noop.
+	out, _, err = store.CallFunction("test", "grow", 0)
+	require.NoError(t, err)
+	require.Equal(t, newPages, out[0])
 }
 
 func TestEngine_PreCompile(t *testing.T) {
