@@ -1092,7 +1092,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			// to the stack.
 			top := builder.locationStack.peek()
 			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = builder.moveConditionalToGPRegister(top)
+			err = builder.moveConditionalToGeneralPurposeRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
 			builder.releaseRegisterToStack(top)
@@ -1150,7 +1150,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			// to the stack.
 			top := builder.locationStack.peek()
 			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = builder.moveConditionalToGPRegister(top)
+			err = builder.moveConditionalToGeneralPurposeRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
 			builder.releaseRegisterToStack(top)
