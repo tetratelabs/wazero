@@ -17,9 +17,9 @@ func TestReservedRegisters(t *testing.T) {
 	for _, r := range unreservedGeneralPurposeIntRegisters {
 		unreserved[r] = struct{}{}
 	}
-	require.NotContains(t, unreserved, reservedRegisterForEngine)
-	require.NotContains(t, unreserved, reservedRegisterForStackBasePointer)
-	require.NotContains(t, unreserved, reservedRegisterForMemory)
+	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForEngine)
+	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForStackBasePointer)
+	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForMemory)
 }
 
 func Test_isIntRegister(t *testing.T) {
