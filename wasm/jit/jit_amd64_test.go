@@ -1415,17 +1415,20 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
 			// Before load operations, we must push the base offset value.
-			const baseOffset = 100
+			const baseOffset = 100 // For testing. Arbitrary number is fine.
 			base := builder.locationStack.pushValueOnStack()
 			eng.stack[base.stackPointer] = baseOffset
+
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationLoad{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
 			err := builder.handleLoad(o)
 			require.NoError(t, err)
+
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
 			loadedValue := builder.locationStack.peek()
 			require.Equal(t, o.Type, loadedValue.valueType)
 			require.True(t, loadedValue.onRegister())
+
 			// Double the loaded value in order to verify the behavior.
 			var addInst obj.As
 			switch tp {
@@ -1450,31 +1453,34 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 			doubleLoadedValue.From.Reg = loadedValue.register
 			builder.addInstruction(doubleLoadedValue)
 
+			// We need to write the result back to the memory stack.
+			builder.releaseRegisterToStack(loadedValue)
+
 			// Compile.
-			builder.releaseAllRegistersToStack()
 			builder.returnFunction()
 			code, err := builder.compile()
 			require.NoError(t, err)
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
+			targetRegion := mem.Buffer[baseOffset+o.Arg.Offest:]
 			var expValue uint64
 			switch tp {
 			case wazeroir.SignLessTypeI32:
 				original := uint32(100)
-				binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], original)
+				binary.LittleEndian.PutUint32(targetRegion, original)
 				expValue = uint64(original * 2)
 			case wazeroir.SignLessTypeI64:
-				original := uint64(math.MaxUint32 + 123)
-				binary.LittleEndian.PutUint64(mem.Buffer[baseOffset+o.Arg.Offest:], original)
+				original := uint64(math.MaxUint32 + 123) // The value exceeds 32-bit.
+				binary.LittleEndian.PutUint64(targetRegion, original)
 				expValue = original * 2
 			case wazeroir.SignLessTypeF32:
 				original := float32(1.234)
-				binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], math.Float32bits(original))
+				binary.LittleEndian.PutUint32(targetRegion, math.Float32bits(original))
 				expValue = uint64(math.Float32bits(original * 2))
 			case wazeroir.SignLessTypeF64:
-				original := float64(math.MaxFloat32 + 100.1)
-				binary.LittleEndian.PutUint64(mem.Buffer[baseOffset+o.Arg.Offest:], math.Float64bits(original))
+				original := float64(math.MaxFloat32 + 100.1) // The value exceeds 32-bit.
+				binary.LittleEndian.PutUint64(targetRegion, math.Float64bits(original))
 				expValue = math.Float64bits(original * 2)
 			}
 
