@@ -11,8 +11,8 @@ import (
 
 // Reserved registers.
 const (
-	// reservedRegisterForEngine R12: pointer to engine instance (i.e. *engine as uintptr)
-	reservedRegisterForEngine = x86.REG_R12
+	// reservedRegisterForEngine R13: pointer to engine instance (i.e. *engine as uintptr)
+	reservedRegisterForEngine = x86.REG_R13
 	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.currentStackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointer = x86.REG_R14
 	// reservedRegisterMemoryPointer R15: pointer to memory space (i.e. *[]byte as uintptr).
@@ -34,7 +34,7 @@ var (
 	unreservedGeneralPurposeIntRegisters = []int16{
 		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
 		x86.REG_SI, x86.REG_DI, x86.REG_R8, x86.REG_R9,
-		x86.REG_R10, x86.REG_R11,
+		x86.REG_R10, x86.REG_R11, x86.REG_R12,
 	}
 )
 
