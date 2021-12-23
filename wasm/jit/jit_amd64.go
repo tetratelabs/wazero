@@ -255,7 +255,7 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 func (b *amd64Builder) pushFunctionInputs() {
 	for _, t := range b.f.Signature.InputTypes {
 		loc := b.locationStack.pushValueOnStack()
-		loc.setValueType(wazeroir.WasmValueTypeToSignless(t))
+		loc.setValueType(wazeroir.WasmValueTypeToUnsignedType(t))
 	}
 }
 
@@ -463,7 +463,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 	// Record that the retrieved global value on the top of the stack is now in a register.
 	loc := b.locationStack.pushValueOnRegister(valueReg)
-	loc.setValueType(wazeroir.WasmValueTypeToSignless(wasmType))
+	loc.setValueType(wazeroir.WasmValueTypeToUnsignedType(wasmType))
 	return nil
 }
 
@@ -911,18 +911,18 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 	var instruction obj.As
 	var tp generalPurposeRegisterType
 	switch o.Type {
-	case wazeroir.SignLessTypeI32:
+	case wazeroir.UnsignedTypeI32:
 		instruction = x86.AADDL
 		tp = generalPurposeRegisterTypeInt
 		panic("add tests!")
-	case wazeroir.SignLessTypeI64:
+	case wazeroir.UnsignedTypeI64:
 		instruction = x86.AADDQ
 		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignLessTypeF32:
+	case wazeroir.UnsignedTypeF32:
 		instruction = x86.AADDSS
 		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
-	case wazeroir.SignLessTypeF64:
+	case wazeroir.UnsignedTypeF64:
 		instruction = x86.AADDSD
 		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
@@ -972,18 +972,18 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 	var instruction obj.As
 	var tp generalPurposeRegisterType
 	switch o.Type {
-	case wazeroir.SignLessTypeI32:
+	case wazeroir.UnsignedTypeI32:
 		instruction = x86.ASUBL
 		tp = generalPurposeRegisterTypeInt
 		panic("add tests!")
-	case wazeroir.SignLessTypeI64:
+	case wazeroir.UnsignedTypeI64:
 		instruction = x86.ASUBQ
 		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignLessTypeF32:
+	case wazeroir.UnsignedTypeF32:
 		instruction = x86.ASUBSS
 		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
-	case wazeroir.SignLessTypeF64:
+	case wazeroir.UnsignedTypeF64:
 		instruction = x86.ASUBSD
 		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
@@ -1031,26 +1031,26 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	var instruction obj.As
 	var tp generalPurposeRegisterType
 	switch o.Type {
-	case wazeroir.SignFulTypeInt32:
+	case wazeroir.SignedTypeInt32:
 		resultConditionState = conditionalRegisterStateLE
 		instruction = x86.ACMPL
 		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignFulTypeUint32:
+	case wazeroir.SignedTypeUint32:
 		resultConditionState = conditionalRegisterStateBE
 		instruction = x86.ACMPL
 		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignFulTypeInt64:
+	case wazeroir.SignedTypeInt64:
 		resultConditionState = conditionalRegisterStateLE
 		instruction = x86.ACMPQ
 		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignFulTypeUint64:
+	case wazeroir.SignedTypeUint64:
 		resultConditionState = conditionalRegisterStateBE
 		instruction = x86.ACMPQ
 		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignFulTypeFloat32:
+	case wazeroir.SignedTypeFloat32:
 		tp = generalPurposeRegisterTypeFloat
 		panic("add test!")
-	case wazeroir.SignFulTypeFloat64:
+	case wazeroir.SignedTypeFloat64:
 		tp = generalPurposeRegisterTypeFloat
 		panic("add test!")
 	}
@@ -1094,7 +1094,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	// Finally we have the result on the conditional register,
 	// so record it.
 	loc := b.locationStack.pushValueOnConditionalRegister(resultConditionState)
-	loc.setValueType(wazeroir.SignLessTypeI32)
+	loc.setValueType(wazeroir.UnsignedTypeI32)
 	return nil
 }
 
@@ -1131,16 +1131,16 @@ func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 		movInst   obj.As
 	)
 	switch o.Type {
-	case wazeroir.SignLessTypeI32:
+	case wazeroir.UnsignedTypeI32:
 		isIntType = true
 		movInst = x86.AMOVL
-	case wazeroir.SignLessTypeI64:
+	case wazeroir.UnsignedTypeI64:
 		isIntType = true
 		movInst = x86.AMOVQ
-	case wazeroir.SignLessTypeF32:
+	case wazeroir.UnsignedTypeF32:
 		isIntType = false
 		movInst = x86.AMOVL
-	case wazeroir.SignLessTypeF64:
+	case wazeroir.UnsignedTypeF64:
 		isIntType = false
 		movInst = x86.AMOVQ
 	}
@@ -1189,7 +1189,7 @@ func (b *amd64Builder) handleMemoryGrow() {
 func (b *amd64Builder) handleMemorySize() {
 	b.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize)
 	loc := b.locationStack.pushValueOnStack() // The size is pushed on the top.
-	loc.setValueType(wazeroir.SignLessTypeI32)
+	loc.setValueType(wazeroir.UnsignedTypeI32)
 }
 
 func (b *amd64Builder) callBuiltinFunctionFromConstIndex(index int64) {
@@ -1209,7 +1209,7 @@ func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.SignLessTypeI32)
+	loc.setValueType(wazeroir.UnsignedTypeI32)
 
 	prog := b.newProg()
 	prog.As = x86.AMOVL // Note 32-bit move!
@@ -1227,7 +1227,7 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.SignLessTypeI64)
+	loc.setValueType(wazeroir.UnsignedTypeI64)
 
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
@@ -1245,7 +1245,7 @@ func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.SignLessTypeF32)
+	loc.setValueType(wazeroir.UnsignedTypeF32)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
@@ -1279,7 +1279,7 @@ func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.SignLessTypeF64)
+	loc.setValueType(wazeroir.UnsignedTypeF64)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.

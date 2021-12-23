@@ -661,7 +661,7 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 	t.Run("on reg", func(t *testing.T) {
 		// Set up the pick target original value.
 		pickTargetLocation := builder.locationStack.pushValueOnRegister(int16(x86.REG_R10))
-		pickTargetLocation.setValueType(wazeroir.SignLessTypeI32)
+		pickTargetLocation.setValueType(wazeroir.UnsignedTypeI32)
 		builder.locationStack.pushValueOnStack() // Dummy value!
 		builder.movIntConstToRegister(100, pickTargetLocation.register)
 		// Now insert pick code.
@@ -759,7 +759,7 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 			// To verify the behavior, we increment and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.SignLessTypeI32, loc.valueType)
+			require.Equal(t, wazeroir.UnsignedTypeI32, loc.valueType)
 			prog := builder.newProg()
 			prog.As = x86.AINCQ
 			prog.To.Type = obj.TYPE_REG
@@ -801,7 +801,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 			// To verify the behavior, we increment and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.SignLessTypeI64, loc.valueType)
+			require.Equal(t, wazeroir.UnsignedTypeI64, loc.valueType)
 			prog := builder.newProg()
 			prog.As = x86.AINCQ
 			prog.To.Type = obj.TYPE_REG
@@ -843,7 +843,7 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 			// To verify the behavior, we double and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.SignLessTypeF32, loc.valueType)
+			require.Equal(t, wazeroir.UnsignedTypeF32, loc.valueType)
 			prog := builder.newProg()
 			prog.As = x86.AADDSS
 			prog.To.Type = obj.TYPE_REG
@@ -887,7 +887,7 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 			// To verify the behavior, we double and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.SignLessTypeF64, loc.valueType)
+			require.Equal(t, wazeroir.UnsignedTypeF64, loc.valueType)
 			prog := builder.newProg()
 			prog.As = x86.AADDSD
 			prog.To.Type = obj.TYPE_REG
@@ -919,7 +919,7 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 
 func TestAmd64Builder_handleAdd(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
-		o := &wazeroir.OperationAdd{Type: wazeroir.SignLessTypeI64}
+		o := &wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64}
 		t.Run("x1:reg,x2:reg", func(t *testing.T) {
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
@@ -1071,9 +1071,9 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 		} {
 			var o *wazeroir.OperationLe
 			if tc.signed {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeInt32}
+				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32}
 			} else {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeUint32}
+				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32}
 			}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
@@ -1130,9 +1130,9 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 		} {
 			var o *wazeroir.OperationLe
 			if tc.signed {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeInt64}
+				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeInt64}
 			} else {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignFulTypeUint64}
+				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeUint64}
 			}
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
@@ -1180,7 +1180,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 
 func TestAmd64Builder_handleSub(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
-		o := &wazeroir.OperationSub{Type: wazeroir.SignLessTypeI64}
+		o := &wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI64}
 		t.Run("x1:reg,x2:reg", func(t *testing.T) {
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
@@ -1403,11 +1403,11 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 }
 
 func TestAmd64Builder_handleLoad(t *testing.T) {
-	for i, tp := range []wazeroir.SignLessType{
-		wazeroir.SignLessTypeI32,
-		wazeroir.SignLessTypeI64,
-		wazeroir.SignLessTypeF32,
-		wazeroir.SignLessTypeF64,
+	for i, tp := range []wazeroir.UnsignedType{
+		wazeroir.UnsignedTypeI32,
+		wazeroir.UnsignedTypeI64,
+		wazeroir.UnsignedTypeF32,
+		wazeroir.UnsignedTypeF64,
 	} {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -1432,16 +1432,16 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 			// Double the loaded value in order to verify the behavior.
 			var addInst obj.As
 			switch tp {
-			case wazeroir.SignLessTypeI32:
+			case wazeroir.UnsignedTypeI32:
 				require.True(t, isIntRegister(loadedValue.register))
 				addInst = x86.AADDL
-			case wazeroir.SignLessTypeI64:
+			case wazeroir.UnsignedTypeI64:
 				require.True(t, isIntRegister(loadedValue.register))
 				addInst = x86.AADDQ
-			case wazeroir.SignLessTypeF32:
+			case wazeroir.UnsignedTypeF32:
 				require.True(t, isFloatRegister(loadedValue.register))
 				addInst = x86.AADDSS
-			case wazeroir.SignLessTypeF64:
+			case wazeroir.UnsignedTypeF64:
 				require.True(t, isFloatRegister(loadedValue.register))
 				addInst = x86.AADDSD
 			}
@@ -1466,19 +1466,19 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 			targetRegion := mem.Buffer[baseOffset+o.Arg.Offest:]
 			var expValue uint64
 			switch tp {
-			case wazeroir.SignLessTypeI32:
+			case wazeroir.UnsignedTypeI32:
 				original := uint32(100)
 				binary.LittleEndian.PutUint32(targetRegion, original)
 				expValue = uint64(original * 2)
-			case wazeroir.SignLessTypeI64:
+			case wazeroir.UnsignedTypeI64:
 				original := uint64(math.MaxUint32 + 123) // The value exceeds 32-bit.
 				binary.LittleEndian.PutUint64(targetRegion, original)
 				expValue = original * 2
-			case wazeroir.SignLessTypeF32:
+			case wazeroir.UnsignedTypeF32:
 				original := float32(1.234)
 				binary.LittleEndian.PutUint32(targetRegion, math.Float32bits(original))
 				expValue = uint64(math.Float32bits(original * 2))
-			case wazeroir.SignLessTypeF64:
+			case wazeroir.UnsignedTypeF64:
 				original := float64(math.MaxFloat32 + 100.1) // The value exceeds 32-bit.
 				binary.LittleEndian.PutUint64(targetRegion, math.Float64bits(original))
 				expValue = math.Float64bits(original * 2)
@@ -1529,7 +1529,7 @@ func TestAmd64Builder_handleMemorySize(t *testing.T) {
 	builder.handleMemorySize()
 	// At this point, the size of memory should be pushed onto the stack.
 	require.Equal(t, uint64(1), builder.locationStack.sp)
-	require.Equal(t, wazeroir.SignLessTypeI32, builder.locationStack.peek().valueType)
+	require.Equal(t, wazeroir.UnsignedTypeI32, builder.locationStack.peek().valueType)
 
 	// Compile.
 	code, err := builder.compile()
