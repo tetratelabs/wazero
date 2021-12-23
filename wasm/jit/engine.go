@@ -428,12 +428,12 @@ func (e *engine) builtinFunctionMemoryGrow(f *compiledWasmFunction) {
 	if f.memory.Max != nil {
 		max = uint64(*f.memory.Max) * wasm.PageSize
 	}
-	// If exceeds the max of memory size, we push -1 according to the spec
+	// If exceeds the max of memory size, we push -1 according to the spec.
 	if uint64(newPages*wasm.PageSize+uint64(len(f.memory.Buffer))) > max {
 		v := int32(-1)
 		e.push(uint64(v))
 	} else {
-		e.push(uint64(uint64(len(f.memory.Buffer)) / wasm.PageSize))
+		e.builtinFunctionMemorySize(f) // Grow returns the prior memory size on change.
 		f.memory.Buffer = append(f.memory.Buffer, make([]byte, newPages*wasm.PageSize)...)
 		f.memoryAddress = uintptr(unsafe.Pointer(&f.memory.Buffer[0]))
 	}

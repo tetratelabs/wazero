@@ -1107,13 +1107,10 @@ func (b *amd64Builder) handleMemorySize() {
 }
 
 func (b *amd64Builder) callBuiltinFunctionFromConstIndex(index int64) {
-	// Set the jit status as jitCallStatusCodeCallBuiltInFunction
 	b.setJITStatus(jitCallStatusCodeCallBuiltInFunction)
-	// Set the function index.
 	b.setFunctionCallIndexFromConst(index)
 	// Release all the registers as our calling convention requires the callee-save.
 	b.releaseAllRegistersToStack()
-	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once we return from the function call,
 	// we must setup the reserved registers again.
