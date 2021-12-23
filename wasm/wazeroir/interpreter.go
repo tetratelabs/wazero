@@ -651,10 +651,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad:
 			{
 				base := op.us[1] + it.pop()
-				switch SignLessType(op.b1) {
-				case SignLessTypeI32, SignLessTypeF32:
+				switch UnsignedType(op.b1) {
+				case UnsignedTypeI32, UnsignedTypeF32:
 					it.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
-				case SignLessTypeI64, SignLessTypeF64:
+				case UnsignedTypeI64, UnsignedTypeF64:
 					it.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
 				}
 				frame.pc++
@@ -662,10 +662,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad8:
 			{
 				base := op.us[1] + it.pop()
-				switch SignFulInt(op.b1) {
-				case SignFulInt32, SignFulInt64:
+				switch SignedInt(op.b1) {
+				case SignedInt32, SignedInt64:
 					it.push(uint64(int8(memoryInst.Buffer[base])))
-				case SignFulUint32, SignFulUint64:
+				case SignedUint32, SignedUint64:
 					it.push(uint64(uint8(memoryInst.Buffer[base])))
 				}
 				frame.pc++
@@ -673,10 +673,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad16:
 			{
 				base := op.us[1] + it.pop()
-				switch SignFulInt(op.b1) {
-				case SignFulInt32, SignFulInt64:
+				switch SignedInt(op.b1) {
+				case SignedInt32, SignedInt64:
 					it.push(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
-				case SignFulUint32, SignFulUint64:
+				case SignedUint32, SignedUint64:
 					it.push(uint64(binary.LittleEndian.Uint16(memoryInst.Buffer[base:])))
 				}
 				frame.pc++
@@ -695,10 +695,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				val := it.pop()
 				base := op.us[1] + it.pop()
-				switch SignLessType(op.b1) {
-				case SignLessTypeI32, SignLessTypeF32:
+				switch UnsignedType(op.b1) {
+				case UnsignedTypeI32, UnsignedTypeF32:
 					binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], uint32(val))
-				case SignLessTypeI64, SignLessTypeF64:
+				case UnsignedTypeI64, UnsignedTypeF64:
 					binary.LittleEndian.PutUint64(memoryInst.Buffer[base:], val)
 				}
 				frame.pc++
@@ -755,14 +755,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindEq:
 			{
 				var b bool
-				switch SignLessType(op.b1) {
-				case SignLessTypeI32, SignLessTypeI64:
+				switch UnsignedType(op.b1) {
+				case UnsignedTypeI32, UnsignedTypeI64:
 					v2, v1 := it.pop(), it.pop()
 					b = v1 == v2
-				case SignLessTypeF32:
+				case UnsignedTypeF32:
 					v2, v1 := it.pop(), it.pop()
 					b = math.Float32frombits(uint32(v2)) == math.Float32frombits(uint32(v1))
-				case SignLessTypeF64:
+				case UnsignedTypeF64:
 					v2, v1 := it.pop(), it.pop()
 					b = math.Float64frombits(v2) == math.Float64frombits(v1)
 				}
@@ -776,14 +776,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindNe:
 			{
 				var b bool
-				switch SignLessType(op.b1) {
-				case SignLessTypeI32, SignLessTypeI64:
+				switch UnsignedType(op.b1) {
+				case UnsignedTypeI32, UnsignedTypeI64:
 					v2, v1 := it.pop(), it.pop()
 					b = v1 != v2
-				case SignLessTypeF32:
+				case UnsignedTypeF32:
 					v2, v1 := it.pop(), it.pop()
 					b = math.Float32frombits(uint32(v2)) != math.Float32frombits(uint32(v1))
-				case SignLessTypeF64:
+				case UnsignedTypeF64:
 					v2, v1 := it.pop(), it.pop()
 					b = math.Float64frombits(v2) != math.Float64frombits(v1)
 				}
@@ -808,16 +808,16 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				var b bool
-				switch SignFulType(op.b1) {
-				case SignFulTypeInt32:
+				switch SignedType(op.b1) {
+				case SignedTypeInt32:
 					b = int32(v1) < int32(v2)
-				case SignFulTypeInt64:
+				case SignedTypeInt64:
 					b = int64(v1) < int64(v2)
-				case SignFulTypeUint32, SignFulTypeUint64:
+				case SignedTypeUint32, SignedTypeUint64:
 					b = v1 < v2
-				case SignFulTypeFloat32:
+				case SignedTypeFloat32:
 					b = math.Float32frombits(uint32(v1)) < math.Float32frombits(uint32(v2))
-				case SignFulTypeFloat64:
+				case SignedTypeFloat64:
 					b = math.Float64frombits(v1) < math.Float64frombits(v2)
 				}
 				if b {
@@ -832,16 +832,16 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				var b bool
-				switch SignFulType(op.b1) {
-				case SignFulTypeInt32:
+				switch SignedType(op.b1) {
+				case SignedTypeInt32:
 					b = int32(v1) > int32(v2)
-				case SignFulTypeInt64:
+				case SignedTypeInt64:
 					b = int64(v1) > int64(v2)
-				case SignFulTypeUint32, SignFulTypeUint64:
+				case SignedTypeUint32, SignedTypeUint64:
 					b = v1 > v2
-				case SignFulTypeFloat32:
+				case SignedTypeFloat32:
 					b = math.Float32frombits(uint32(v1)) > math.Float32frombits(uint32(v2))
-				case SignFulTypeFloat64:
+				case SignedTypeFloat64:
 					b = math.Float64frombits(v1) > math.Float64frombits(v2)
 				}
 				if b {
@@ -856,16 +856,16 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				var b bool
-				switch SignFulType(op.b1) {
-				case SignFulTypeInt32:
+				switch SignedType(op.b1) {
+				case SignedTypeInt32:
 					b = int32(v1) <= int32(v2)
-				case SignFulTypeInt64:
+				case SignedTypeInt64:
 					b = int64(v1) <= int64(v2)
-				case SignFulTypeUint32, SignFulTypeUint64:
+				case SignedTypeUint32, SignedTypeUint64:
 					b = v1 <= v2
-				case SignFulTypeFloat32:
+				case SignedTypeFloat32:
 					b = math.Float32frombits(uint32(v1)) <= math.Float32frombits(uint32(v2))
-				case SignFulTypeFloat64:
+				case SignedTypeFloat64:
 					b = math.Float64frombits(v1) <= math.Float64frombits(v2)
 				}
 				if b {
@@ -880,16 +880,16 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				var b bool
-				switch SignFulType(op.b1) {
-				case SignFulTypeInt32:
+				switch SignedType(op.b1) {
+				case SignedTypeInt32:
 					b = int32(v1) >= int32(v2)
-				case SignFulTypeInt64:
+				case SignedTypeInt64:
 					b = int64(v1) >= int64(v2)
-				case SignFulTypeUint32, SignFulTypeUint64:
+				case SignedTypeUint32, SignedTypeUint64:
 					b = v1 >= v2
-				case SignFulTypeFloat32:
+				case SignedTypeFloat32:
 					b = math.Float32frombits(uint32(v1)) >= math.Float32frombits(uint32(v2))
-				case SignFulTypeFloat64:
+				case SignedTypeFloat64:
 					b = math.Float64frombits(v1) >= math.Float64frombits(v2)
 				}
 				if b {
@@ -903,16 +903,16 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				v2 := it.pop()
 				v1 := it.pop()
-				switch SignLessType(op.b1) {
-				case SignLessTypeI32:
+				switch UnsignedType(op.b1) {
+				case UnsignedTypeI32:
 					v := uint32(v1) + uint32(v2)
 					it.push(uint64(v))
-				case SignLessTypeI64:
+				case UnsignedTypeI64:
 					it.push(v1 + v2)
-				case SignLessTypeF32:
+				case UnsignedTypeF32:
 					v := math.Float32frombits(uint32(v1)) + math.Float32frombits(uint32(v2))
 					it.push(uint64(math.Float32bits(v)))
-				case SignLessTypeF64:
+				case UnsignedTypeF64:
 					v := math.Float64frombits(v1) + math.Float64frombits(v2)
 					it.push(math.Float64bits(v))
 				}
@@ -922,15 +922,15 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				v2 := it.pop()
 				v1 := it.pop()
-				switch SignLessType(op.b1) {
-				case SignLessTypeI32:
+				switch UnsignedType(op.b1) {
+				case UnsignedTypeI32:
 					it.push(uint64(uint32(v1) - uint32(v2)))
-				case SignLessTypeI64:
+				case UnsignedTypeI64:
 					it.push(v1 - v2)
-				case SignLessTypeF32:
+				case UnsignedTypeF32:
 					v := math.Float32frombits(uint32(v1)) - math.Float32frombits(uint32(v2))
 					it.push(uint64(math.Float32bits(v)))
-				case SignLessTypeF64:
+				case UnsignedTypeF64:
 					v := math.Float64frombits(v1) - math.Float64frombits(v2)
 					it.push(math.Float64bits(v))
 				}
@@ -940,15 +940,15 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				v2 := it.pop()
 				v1 := it.pop()
-				switch SignLessType(op.b1) {
-				case SignLessTypeI32:
+				switch UnsignedType(op.b1) {
+				case UnsignedTypeI32:
 					it.push(uint64(uint32(v1) * uint32(v2)))
-				case SignLessTypeI64:
+				case UnsignedTypeI64:
 					it.push(v1 * v2)
-				case SignLessTypeF32:
+				case UnsignedTypeF32:
 					v := math.Float32frombits(uint32(v2)) * math.Float32frombits(uint32(v1))
 					it.push(uint64(math.Float32bits(v)))
-				case SignLessTypeF64:
+				case UnsignedTypeF64:
 					v := math.Float64frombits(v2) * math.Float64frombits(v1)
 					it.push(math.Float64bits(v))
 				}
@@ -958,10 +958,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				v := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(bits.LeadingZeros32(uint32(v))))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(bits.LeadingZeros64(v)))
 				}
 				frame.pc++
@@ -970,10 +970,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				v := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(bits.TrailingZeros32(uint32(v))))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(bits.TrailingZeros64(v)))
 				}
 				frame.pc++
@@ -982,45 +982,45 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				v := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(bits.OnesCount32(uint32(v))))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(bits.OnesCount64(v)))
 				}
 				frame.pc++
 			}
 		case OperationKindDiv:
 			{
-				switch SignFulType(op.b1) {
-				case SignFulTypeInt32:
+				switch SignedType(op.b1) {
+				case SignedTypeInt32:
 					v2 := int32(it.pop())
 					v1 := int32(it.pop())
 					if v2 == 0 || (v1 == math.MinInt32 && v2 == -1) {
 						panic("undefined")
 					}
 					it.push(uint64(uint32(v1 / v2)))
-				case SignFulTypeInt64:
+				case SignedTypeInt64:
 					v2 := int64(it.pop())
 					v1 := int64(it.pop())
 					if v2 == 0 || (v1 == math.MinInt64 && v2 == -1) {
 						panic("undefined")
 					}
 					it.push(uint64(v1 / v2))
-				case SignFulTypeUint32:
+				case SignedTypeUint32:
 					v2 := uint32(it.pop())
 					v1 := uint32(it.pop())
 					it.push(uint64(v1 / v2))
-				case SignFulTypeUint64:
+				case SignedTypeUint64:
 					v2 := it.pop()
 					v1 := it.pop()
 					it.push(v1 / v2)
-				case SignFulTypeFloat32:
+				case SignedTypeFloat32:
 					v2 := it.pop()
 					v1 := it.pop()
 					v := math.Float32frombits(uint32(v1)) / math.Float32frombits(uint32(v2))
 					it.push(uint64(math.Float32bits(v)))
-				case SignFulTypeFloat64:
+				case SignedTypeFloat64:
 					v2 := it.pop()
 					v1 := it.pop()
 					v := math.Float64frombits(v1) / math.Float64frombits(v2)
@@ -1030,20 +1030,20 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case OperationKindRem:
 			{
-				switch SignFulInt(op.b1) {
-				case SignFulInt32:
+				switch SignedInt(op.b1) {
+				case SignedInt32:
 					v2 := int32(it.pop())
 					v1 := int32(it.pop())
 					it.push(uint64(uint32(v1 % v2)))
-				case SignFulInt64:
+				case SignedInt64:
 					v2 := int64(it.pop())
 					v1 := int64(it.pop())
 					it.push(uint64(v1 % v2))
-				case SignFulUint32:
+				case SignedUint32:
 					v2 := uint32(it.pop())
 					v1 := uint32(it.pop())
 					it.push(uint64(v1 % v2))
-				case SignFulUint64:
+				case SignedUint64:
 					v2 := it.pop()
 					v1 := it.pop()
 					it.push(v1 % v2)
@@ -1055,10 +1055,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(uint32(v2) & uint32(v1)))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(v2 & v1))
 				}
 				frame.pc++
@@ -1068,10 +1068,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(uint32(v2) | uint32(v1)))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(v2 | v1))
 				}
 				frame.pc++
@@ -1081,10 +1081,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(uint32(v2) ^ uint32(v1)))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(v2 ^ v1))
 				}
 				frame.pc++
@@ -1094,10 +1094,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(uint32(v1) << (uint32(v2) % 32)))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(v1 << (v2 % 64))
 				}
 				frame.pc++
@@ -1106,14 +1106,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				v2 := it.pop()
 				v1 := it.pop()
-				switch SignFulInt(op.b1) {
-				case SignFulInt32:
+				switch SignedInt(op.b1) {
+				case SignedInt32:
 					it.push(uint64(int32(v1) >> (uint32(v2) % 32)))
-				case SignFulInt64:
+				case SignedInt64:
 					it.push(uint64(int64(v1) >> (v2 % 64)))
-				case SignFulUint32:
+				case SignedUint32:
 					it.push(uint64(uint32(v1) >> (uint32(v2) % 32)))
-				case SignFulUint64:
+				case SignedUint64:
 					it.push(v1 >> (v2 % 64))
 				}
 				frame.pc++
@@ -1123,10 +1123,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(bits.RotateLeft32(uint32(v1), int(v2))))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(bits.RotateLeft64(v1, int(v2))))
 				}
 				frame.pc++
@@ -1136,10 +1136,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				v2 := it.pop()
 				v1 := it.pop()
 				if op.b1 == 0 {
-					// SignLessInt32
+					// UnsignedInt32
 					it.push(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
 				} else {
-					// SignLessInt64
+					// UnsignedInt64
 					it.push(uint64(bits.RotateLeft64(v1, -int(v2))))
 				}
 				frame.pc++
@@ -1316,8 +1316,8 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				if op.b1 == 0 {
 					// Float32
-					switch SignFulInt(op.b2) {
-					case SignFulInt32:
+					switch SignedInt(op.b2) {
+					case SignedInt32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						if math.IsNaN(v) {
 							panic("invalid conversion")
@@ -1325,7 +1325,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 							panic("integer overflow")
 						}
 						it.push(uint64(int32(v)))
-					case SignFulInt64:
+					case SignedInt64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := int64(v)
 						if math.IsNaN(v) {
@@ -1334,7 +1334,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 							panic("integer overflow")
 						}
 						it.push(uint64(res))
-					case SignFulUint32:
+					case SignedUint32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						if math.IsNaN(v) {
 							panic("invalid conversion")
@@ -1342,7 +1342,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 							panic("integer overflow")
 						}
 						it.push(uint64(uint32(v)))
-					case SignFulUint64:
+					case SignedUint64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := uint64(v)
 						if math.IsNaN(v) {
@@ -1354,8 +1354,8 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 					}
 				} else {
 					// Float64
-					switch SignFulInt(op.b2) {
-					case SignFulInt32:
+					switch SignedInt(op.b2) {
+					case SignedInt32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						if math.IsNaN(v) {
 							panic("invalid conversion")
@@ -1363,7 +1363,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 							panic("integer overflow")
 						}
 						it.push(uint64(int32(v)))
-					case SignFulInt64:
+					case SignedInt64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := int64(v)
 						if math.IsNaN(v) {
@@ -1372,7 +1372,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 							panic("integer overflow")
 						}
 						it.push(uint64(res))
-					case SignFulUint32:
+					case SignedUint32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						if math.IsNaN(v) {
 							panic("invalid conversion")
@@ -1380,7 +1380,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 							panic("integer overflow")
 						}
 						it.push(uint64(uint32(v)))
-					case SignFulUint64:
+					case SignedUint64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := uint64(v)
 						if math.IsNaN(v) {
@@ -1395,8 +1395,8 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case OperationKindFConvertFromI:
 			{
-				switch SignFulInt(op.b1) {
-				case SignFulInt32:
+				switch SignedInt(op.b1) {
+				case SignedInt32:
 					if op.b2 == 0 {
 						// Float32
 						v := float32(int32(it.pop()))
@@ -1406,7 +1406,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						v := float64(int32(it.pop()))
 						it.push(math.Float64bits(v))
 					}
-				case SignFulInt64:
+				case SignedInt64:
 					if op.b2 == 0 {
 						// Float32
 						v := float32(int64(it.pop()))
@@ -1416,7 +1416,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						v := float64(int64(it.pop()))
 						it.push(math.Float64bits(v))
 					}
-				case SignFulUint32:
+				case SignedUint32:
 					if op.b2 == 0 {
 						// Float32
 						v := float32(uint32(it.pop()))
@@ -1426,7 +1426,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						v := float64(uint32(it.pop()))
 						it.push(math.Float64bits(v))
 					}
-				case SignFulUint64:
+				case SignedUint64:
 					if op.b2 == 0 {
 						// Float32
 						v := float32(it.pop())
