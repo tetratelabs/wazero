@@ -66,8 +66,8 @@ case jitCallStatusCodeCallWasmFunction:
     // Calculate the continuation address so
     // we can resume this caller function frame.
     currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset
-    currentFrame.continuationStackPointer = e.currentStackPointer + nextFunc.outputNum - nextFunc.inputNum
-    currentFrame.baseStackPointer = e.currentStackBasePointer
+    currentFrame.continuationStackPointer = e.stackPointer + nextFunc.outputNum - nextFunc.inputNum
+    currentFrame.stackBasePointer = e.stackBasePointer
 ```
 
 and calling into another function in JIT engine's main loop:
@@ -80,7 +80,7 @@ and calling into another function in JIT engine's main loop:
         // Set the caller frame so we can return back to the current frame!
         caller: currentFrame,
         // Set the base pointer to the beginning of the function inputs
-        baseStackPointer: e.currentStackBasePointer + e.currentStackPointer - nextFunc.inputNum,
+        stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.inputNum,
     }
 ```
 
@@ -92,8 +92,8 @@ case jitStatusReturned:
     // so we just get back to the caller's frame.
     callerFrame := currentFrame.caller
     e.callFrameStack = callerFrame
-    e.currentStackBasePointer = callerFrame.baseStackPointer
-    e.currentStackPointer = callerFrame.continuationStackPointer
+    e.stackBasePointer = callerFrame.stackBasePointer
+    e.stackPointer = callerFrame.continuationStackPointer
 ```
 
 To summarize, every function call is achieved by returning back to Go code (`engine.exec`'s main loop) with some continuation infor, and enter the callee native code (or host functions) from there. That, of course, comes with a bit of overhead because each function call is implemented by two steps (returning back to `jitcall` callsite AND entering `jitcall` again) vs just `call` instruction (or `jmp`) in usual native codes.

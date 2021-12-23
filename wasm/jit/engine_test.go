@@ -15,12 +15,12 @@ import (
 // Ensures that the offset consts do not drift when we manipulate the engine struct.
 func TestEngine_veifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).stack)), engineStackSliceOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).currentStackPointer)), engineCurrentStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).currentStackBasePointer)), engineCurrentStackBasePointerOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).stackPointer)), enginestackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).stackBasePointer)), enginestackBasePointerOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).jitCallStatusCode)), engineJITCallStatusCodeOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallIndex)), engineFunctionCallIndexOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).currentGlobalSliceAddress)), engineCurrentGlobalSliceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).globalSliceAddress)), engineglobalSliceAddressOffset)
 }
 
 func TestEngine_fibonacci(t *testing.T) {
@@ -130,10 +130,10 @@ func TestEngine_PreCompile(t *testing.T) {
 func TestEngine_maybeGrowStack(t *testing.T) {
 	t.Run("grow", func(t *testing.T) {
 		eng := &engine{stack: make([]uint64, 10)}
-		eng.currentStackBasePointer = 5
+		eng.stackBasePointer = 5
 		eng.push(10)
-		require.Equal(t, uint64(1), eng.currentStackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.currentStackBasePointer+eng.currentStackPointer-1])
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
 		eng.maybeGrowStack(100)
 		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
 		// but we require 100 max stack pointer for the next function,
@@ -141,21 +141,21 @@ func TestEngine_maybeGrowStack(t *testing.T) {
 		require.Len(t, eng.stack, 120)
 		// maybeAdjustStack only shrink the stack,
 		// and must not modify neither stack pointer nor the values in the stack.
-		require.Equal(t, uint64(1), eng.currentStackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.currentStackBasePointer+eng.currentStackPointer-1])
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
 	})
 	t.Run("noop", func(t *testing.T) {
 		eng := &engine{stack: make([]uint64, 10)}
-		eng.currentStackBasePointer = 1
+		eng.stackBasePointer = 1
 		eng.push(10)
-		require.Equal(t, uint64(1), eng.currentStackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.currentStackBasePointer+eng.currentStackPointer-1])
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
 		eng.maybeGrowStack(6)
 		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
 		// and we only require 6 max stack pointer for the next function, so we have enough empty slots.
 		// so maybeGrowStack must not modify neither stack pointer, the values in the stack nor stack len.
 		require.Len(t, eng.stack, 10)
-		require.Equal(t, uint64(1), eng.currentStackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.currentStackBasePointer+eng.currentStackPointer-1])
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
 	})
 }

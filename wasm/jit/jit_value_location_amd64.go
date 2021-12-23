@@ -13,7 +13,7 @@ import (
 const (
 	// reservedRegisterForEngine R13: pointer to engine instance (i.e. *engine as uintptr)
 	reservedRegisterForEngine = x86.REG_R13
-	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.currentStackBasePointer) in the current function call.
+	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.stackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointer = x86.REG_R14
 	// reservedRegisterForMemory R15: pointer to memory space (i.e. *[]byte as uintptr).
 	reservedRegisterForMemory = x86.REG_R15
