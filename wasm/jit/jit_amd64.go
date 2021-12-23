@@ -405,7 +405,7 @@ func (b *amd64Builder) handleSwap(o *wazeroir.OperationSwap) error {
 const globalInstanceValueOffset = 8
 
 func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
-	intReg, err := b.allocateRegister(gpTypeInt)
+	intReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -443,7 +443,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	wasmType := b.f.ModuleInstance.Globals[o.Index].Type.ValType
 	switch wasmType {
 	case wasm.ValueTypeF32, wasm.ValueTypeF64:
-		valueReg, err = b.allocateRegister(gpTypeFloat)
+		valueReg, err = b.allocateRegister(generalPurposeRegisterTypeFloat)
 		if err != nil {
 			return err
 		}
@@ -479,7 +479,7 @@ func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	}
 
 	// Allocate a register to hold the memory location of the target global instance.
-	intReg, err := b.allocateRegister(gpTypeInt)
+	intReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -911,18 +911,18 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 	switch o.Type {
 	case wazeroir.SignLessTypeI32:
 		instruction = x86.AADDL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 		panic("add tests!")
 	case wazeroir.SignLessTypeI64:
 		instruction = x86.AADDQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignLessTypeF32:
 		instruction = x86.AADDSS
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	case wazeroir.SignLessTypeF64:
 		instruction = x86.AADDSD
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	}
 
@@ -972,18 +972,18 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 	switch o.Type {
 	case wazeroir.SignLessTypeI32:
 		instruction = x86.ASUBL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 		panic("add tests!")
 	case wazeroir.SignLessTypeI64:
 		instruction = x86.ASUBQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignLessTypeF32:
 		instruction = x86.ASUBSS
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	case wazeroir.SignLessTypeF64:
 		instruction = x86.ASUBSD
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add tests!")
 	}
 
@@ -1032,24 +1032,24 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	case wazeroir.SignFulTypeInt32:
 		resultConditionState = conditionalRegisterStateLE
 		instruction = x86.ACMPL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeUint32:
 		resultConditionState = conditionalRegisterStateBE
 		instruction = x86.ACMPL
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeInt64:
 		resultConditionState = conditionalRegisterStateLE
 		instruction = x86.ACMPQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeUint64:
 		resultConditionState = conditionalRegisterStateBE
 		instruction = x86.ACMPQ
-		tp = gpTypeInt
+		tp = generalPurposeRegisterTypeInt
 	case wazeroir.SignFulTypeFloat32:
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add test!")
 	case wazeroir.SignFulTypeFloat64:
-		tp = gpTypeFloat
+		tp = generalPurposeRegisterTypeFloat
 		panic("add test!")
 	}
 
@@ -1097,7 +1097,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 }
 
 func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
-	reg, err := b.allocateRegister(gpTypeInt)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1115,7 +1115,7 @@ func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
 }
 
 func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
-	reg, err := b.allocateRegister(gpTypeInt)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1133,7 +1133,7 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 }
 
 func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
-	reg, err := b.allocateRegister(gpTypeFloat)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
 		return err
 	}
@@ -1142,7 +1142,7 @@ func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
-	tmpReg, err := b.allocateRegister(gpTypeInt)
+	tmpReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1167,7 +1167,7 @@ func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
 }
 
 func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
-	reg, err := b.allocateRegister(gpTypeFloat)
+	reg, err := b.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
 		return err
 	}
@@ -1176,7 +1176,7 @@ func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
-	tmpReg, err := b.allocateRegister(gpTypeInt)
+	tmpReg, err := b.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -1231,7 +1231,7 @@ func (b *amd64Builder) moveStackToRegister(loc *valueLocation) {
 
 func (b *amd64Builder) moveConditionalToGPRegister(loc *valueLocation) error {
 	// Get the free register.
-	reg, ok := b.locationStack.takeFreeRegister(gpTypeInt)
+	reg, ok := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	if !ok {
 		// This in theory should never be reached as moveConditionalToGPRegister
 		// is called right after comparison operations, meaning that
@@ -1402,7 +1402,7 @@ func (b *amd64Builder) releaseAllRegistersToStack() {
 func (b *amd64Builder) setContinuationOffsetAtNextInstructionAndReturn() {
 	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
 	// all the registers, so at this point we always have free registers.
-	tmpReg, _ := b.locationStack.takeFreeRegister(gpTypeInt)
+	tmpReg, _ := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	// Create the instruction for setting offset.
 	// We use tmp register to store the const, not directly movq to memory
 	// as it is not valid to move 64-bit const to memory directly.
@@ -1521,7 +1521,7 @@ func (b *amd64Builder) initializeReservedRegisters() *obj.Prog {
 
 	// initializeReservedRegisters is called at the beginning of function calls
 	// or right after function returns so at this point we always have free registers.
-	reg, _ := b.locationStack.takeFreeRegister(gpTypeInt)
+	reg, _ := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
 	// Next we move the base pointer (engine.currentStackBasePointer) to
 	// a temporary register.

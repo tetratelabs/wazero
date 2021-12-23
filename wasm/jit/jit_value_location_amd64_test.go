@@ -71,7 +71,7 @@ func TestValueLocationStack_basic(t *testing.T) {
 func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	s := newValueLocationStack()
 	// For int registers.
-	r, ok := s.takeFreeRegister(gpTypeInt)
+	r, ok := s.takeFreeRegister(generalPurposeRegisterTypeInt)
 	require.True(t, ok)
 	require.True(t, isIntRegister(r))
 	// Mark all the int registers used.
@@ -79,10 +79,10 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for int.
-	_, ok = s.takeFreeRegister(gpTypeInt)
+	_, ok = s.takeFreeRegister(generalPurposeRegisterTypeInt)
 	require.False(t, ok)
 	// But we still should be able to take float regs.
-	r, ok = s.takeFreeRegister(gpTypeFloat)
+	r, ok = s.takeFreeRegister(generalPurposeRegisterTypeFloat)
 	require.True(t, ok)
 	require.True(t, isFloatRegister(r))
 	// Mark all the float registers used.
@@ -90,7 +90,7 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for floats.
-	_, ok = s.takeFreeRegister(gpTypeFloat)
+	_, ok = s.takeFreeRegister(generalPurposeRegisterTypeFloat)
 	require.False(t, ok)
 }
 
@@ -103,25 +103,25 @@ func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s.push(intLocation)
 	s.push(floatLocation)
 	// Take for float.
-	target, ok := s.takeStealTargetFromUsedRegister(gpTypeFloat)
+	target, ok := s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeFloat)
 	require.True(t, ok)
 	require.Equal(t, floatLocation, target)
 	// Take for ints.
-	target, ok = s.takeStealTargetFromUsedRegister(gpTypeInt)
+	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeInt)
 	require.True(t, ok)
 	require.Equal(t, intLocation, target)
 	// Pop float value.
 	popped := s.pop()
 	require.Equal(t, floatLocation, popped)
 	// Now we cannot find the steal target.
-	target, ok = s.takeStealTargetFromUsedRegister(gpTypeFloat)
+	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeFloat)
 	require.False(t, ok)
 	require.Nil(t, target)
 	// Pop int value.
 	popped = s.pop()
 	require.Equal(t, intLocation, popped)
 	// Now we cannot find the steal target.
-	target, ok = s.takeStealTargetFromUsedRegister(gpTypeInt)
+	target, ok = s.takeStealTargetFromUsedRegister(generalPurposeRegisterTypeInt)
 	require.False(t, ok)
 	require.Nil(t, target)
 }

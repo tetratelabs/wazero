@@ -81,9 +81,9 @@ type valueLocation struct {
 func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
 	switch v.valueType {
 	case wazeroir.SignLessTypeI32, wazeroir.SignLessTypeI64:
-		t = gpTypeInt
+		t = generalPurposeRegisterTypeInt
 	case wazeroir.SignLessTypeF32, wazeroir.SignLessTypeF64:
-		t = gpTypeFloat
+		t = generalPurposeRegisterTypeFloat
 	default:
 		panic("unreachable")
 	}
@@ -214,8 +214,8 @@ func (s *valueLocationStack) markRegisterUsed(reg int16) {
 type generalPurposeRegisterType byte
 
 const (
-	gpTypeInt generalPurposeRegisterType = iota
-	gpTypeFloat
+	generalPurposeRegisterTypeInt generalPurposeRegisterType = iota
+	generalPurposeRegisterTypeFloat
 )
 
 // Search for unused registers, and if found, returns the register
@@ -223,9 +223,9 @@ const (
 func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {
 	var targetRegs []int16
 	switch tp {
-	case gpTypeFloat:
+	case generalPurposeRegisterTypeFloat:
 		targetRegs = generalPurposeFloatRegisters
-	case gpTypeInt:
+	case generalPurposeRegisterTypeInt:
 		targetRegs = unreservedGeneralPurposeIntRegisters
 	}
 	for _, candidate := range targetRegs {
@@ -244,11 +244,11 @@ func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRe
 		loc := s.stack[i]
 		if loc.onRegister() {
 			switch tp {
-			case gpTypeFloat:
+			case generalPurposeRegisterTypeFloat:
 				if isFloatRegister(loc.register) {
 					return loc, true
 				}
-			case gpTypeInt:
+			case generalPurposeRegisterTypeInt:
 				if isIntRegister(loc.register) {
 					return loc, true
 				}

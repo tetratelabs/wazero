@@ -575,10 +575,10 @@ func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
 func TestAmd64Builder_allocateRegister(t *testing.T) {
 	t.Run("free", func(t *testing.T) {
 		builder := requireNewBuilder(t)
-		reg, err := builder.allocateRegister(gpTypeInt)
+		reg, err := builder.allocateRegister(generalPurposeRegisterTypeInt)
 		require.NoError(t, err)
 		require.True(t, isIntRegister(reg))
-		reg, err = builder.allocateRegister(gpTypeFloat)
+		reg, err = builder.allocateRegister(generalPurposeRegisterTypeFloat)
 		require.NoError(t, err)
 		require.True(t, isFloatRegister(reg))
 	})
@@ -594,7 +594,7 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 		builder.movIntConstToRegister(int64(50), stealTargetLocation.register)
 		require.Equal(t, int16(stealTarget), stealTargetLocation.register)
 		require.True(t, stealTargetLocation.onRegister())
-		reg, err := builder.allocateRegister(gpTypeInt)
+		reg, err := builder.allocateRegister(generalPurposeRegisterTypeInt)
 		require.NoError(t, err)
 		require.True(t, isIntRegister(reg))
 		require.False(t, stealTargetLocation.onRegister())
