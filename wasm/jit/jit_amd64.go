@@ -1630,7 +1630,7 @@ func (b *amd64Builder) initializeReservedRegisters() {
 
 	// Next we move the base pointer (engine.stackBasePointer) to
 	// a temporary register.
-	// movq [engineInstanceReg+engineCurrentBaseStackPointerOffset] reg
+	// movq [engineInstanceReg+engineCurrentstackBasePointerOffset] reg
 	prog = b.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
