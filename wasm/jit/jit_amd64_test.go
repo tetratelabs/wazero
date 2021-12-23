@@ -1426,7 +1426,7 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 			loadedValue := builder.locationStack.peek()
 			require.Equal(t, o.Type, loadedValue.valueType)
 			require.True(t, loadedValue.onRegister())
-			// Double the laoded value in order to verify the behavior.
+			// Double the loaded value in order to verify the behavior.
 			var addInst obj.As
 			switch tp {
 			case wazeroir.SignLessTypeI32:
