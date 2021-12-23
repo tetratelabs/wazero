@@ -107,7 +107,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	builder.setJITStatus(jitCallStatusCodeReturned)
 	builder.returnFunction()
 	// Compile.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 	// Setup engine.
 	mem := newMemoryInst()
@@ -172,7 +172,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 			builder.returnFunction()
 
 			// Compile.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 
 			eng := newEngine()
@@ -214,7 +214,7 @@ func Test_setJITStatus(t *testing.T) {
 			builder.setJITStatus(s)
 			builder.returnFunction()
 			// Compile.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run codes
 			eng := newEngine()
@@ -239,7 +239,7 @@ func Test_setFunctionCallIndexFromConst(t *testing.T) {
 		builder.setFunctionCallIndexFromConst(index)
 		builder.returnFunction()
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
@@ -264,7 +264,7 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 		builder.setFunctionCallIndexFromRegister(reg)
 		builder.returnFunction()
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
@@ -297,7 +297,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	builder.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	builder.returnFunction()
 	// Compile.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 
 	// Run codes
@@ -340,7 +340,7 @@ func Test_callFunction(t *testing.T) {
 		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
 		builder.returnFunction()
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -380,7 +380,7 @@ func Test_callFunction(t *testing.T) {
 		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
 		builder.returnFunction()
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -427,7 +427,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		builder.setJITStatus(jitCallStatusCodeReturned)
 		builder.returnFunction()
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -469,7 +469,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		builder.setJITStatus(jitCallStatusCodeReturned)
 		builder.returnFunction()
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -531,7 +531,7 @@ func Test_popFromStackToRegister(t *testing.T) {
 	builder.releaseRegisterToStack(result)
 	builder.returnFunction()
 	// Compile.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 
 	// Call in.
@@ -557,7 +557,7 @@ func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
 	builder.returnFunction()
 
 	// Assemble.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -604,7 +604,7 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 		builder.returnFunction()
 
 		// Assemble.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -640,7 +640,7 @@ func TestAmd64Builder_handleLabel(t *testing.T) {
 
 	// Assemble.
 	builder.returnFunction()
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -684,7 +684,7 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 		builder.returnFunction()
 
 		// Assemble.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 		// Run code.
 		eng := newEngine()
@@ -729,7 +729,7 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 		builder.returnFunction()
 
 		// Assemble.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 		// Run code.
 		mem := newMemoryInst()
@@ -769,7 +769,7 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -811,7 +811,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -855,7 +855,7 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -899,7 +899,7 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -940,7 +940,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -972,7 +972,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -1006,7 +1006,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -1040,7 +1040,7 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -1099,7 +1099,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -1157,7 +1157,7 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -1201,7 +1201,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -1233,7 +1233,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -1267,7 +1267,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -1301,7 +1301,7 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -1342,7 +1342,7 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		require.NoError(t, err)
 
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -1383,7 +1383,7 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		require.NoError(t, err)
 
 		// Compile.
-		code, err := builder.assemble()
+		code, err := builder.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -1410,7 +1410,7 @@ func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
 	builder.handleMemoryGrow()
 
 	// Compile.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -1437,7 +1437,7 @@ func TestAmd64Builder_handleMemorySize(t *testing.T) {
 	require.Equal(t, wazeroir.SignLessTypeI32, builder.locationStack.peek().valueType)
 
 	// Compile.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -1569,7 +1569,7 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 			builder.releaseRegisterToStack(top)
 			builder.returnFunction()
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			require.Equal(t, []uint64{0, 0, 5000}, eng.stack[:3])
@@ -1611,7 +1611,7 @@ func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {
 	builder.returnFunction()
 
 	// Assemble.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 	// Run code.
 	mem := newMemoryInst()
@@ -1636,7 +1636,7 @@ func TestAmd64Builder_assemble(t *testing.T) {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = x86.REG_R10
 	builder.addInstruction(prog)
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 	actual := binary.LittleEndian.Uint64(code[2:10])
 	require.Equal(t, uint64(prog.Pc), actual)
@@ -1654,7 +1654,7 @@ func TestAmd64Builder_handleUnreachable(t *testing.T) {
 	builder.handleUnreachable()
 
 	// Assemble.
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	require.NoError(t, err)
 	// Run code.
 	eng := newEngine()
@@ -1783,7 +1783,7 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 			builder.returnFunction()
 
 			// Run code.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			mem := newMemoryInst()
 			jitcall(
@@ -1856,7 +1856,7 @@ func TestAmd64Builder_handleSwap(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -1909,7 +1909,7 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 
 			// Run the code assembled above.
@@ -1949,7 +1949,7 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 			builder.returnFunction()
 
 			// Assemble.
-			code, err := builder.assemble()
+			code, err := builder.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()

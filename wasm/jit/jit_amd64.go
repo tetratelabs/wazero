@@ -224,7 +224,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		}
 	}
 
-	code, err := builder.assemble()
+	code, err := builder.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
 	}
@@ -276,7 +276,7 @@ type amd64Builder struct {
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 }
 
-func (b *amd64Builder) assemble() ([]byte, error) {
+func (b *amd64Builder) compile() ([]byte, error) {
 	code, err := mmapCodeSegment(b.builder.Assemble())
 	if err != nil {
 		return nil, err
