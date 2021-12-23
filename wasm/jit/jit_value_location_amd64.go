@@ -15,7 +15,6 @@ const (
 	reservedRegisterForEngine = x86.REG_R12
 	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.currentStackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointer = x86.REG_R14
-	// TODO: we use memoryReg later when we support the store/load memory operations.
 	// reservedRegisterMemoryPointer R15: pointer to memory space (i.e. *[]byte as uintptr).
 	reservedRegisterMemoryPointer = x86.REG_R15
 )
