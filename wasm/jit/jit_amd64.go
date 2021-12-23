@@ -1102,7 +1102,8 @@ func (b *amd64Builder) handleMemoryGrow() {
 
 func (b *amd64Builder) handleMemorySize() {
 	b.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize)
-	b.locationStack.pushValueOnStack() // The size is pushed on the top.
+	loc := b.locationStack.pushValueOnStack() // The size is pushed on the top.
+	loc.setValueType(wazeroir.SignLessTypeI32)
 }
 
 func (b *amd64Builder) callBuiltinFunctionFromConstIndex(index int64) {

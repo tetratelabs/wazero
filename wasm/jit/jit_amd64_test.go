@@ -1406,6 +1406,7 @@ func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
 	builder := requireNewBuilder(t)
 
 	builder.initializeReservedRegisters()
+	// Emit memory.grow instructions.
 	builder.handleMemoryGrow()
 
 	// Compile.
@@ -1431,6 +1432,9 @@ func TestAmd64Builder_handleMemorySize(t *testing.T) {
 	builder.initializeReservedRegisters()
 	// Emit memory.size instructions.
 	builder.handleMemorySize()
+	// At this point, the size of memory should be pushed onto the stack.
+	require.Equal(t, uint64(1), builder.locationStack.sp)
+	require.Equal(t, wazeroir.SignLessTypeI32, builder.locationStack.peek().valueType)
 
 	// Compile.
 	code, err := builder.assemble()
