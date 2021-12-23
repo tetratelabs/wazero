@@ -1105,7 +1105,7 @@ func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 			return err
 		}
 	} else if base.onConditionalRegister() {
-		if err := b.moveConditionalToGPRegister(base); err != nil {
+		if err := b.moveConditionalToGeneralPurposeRegister(base); err != nil {
 			return err
 		}
 	}
