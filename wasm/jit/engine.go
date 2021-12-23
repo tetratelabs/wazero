@@ -17,8 +17,15 @@ type engine struct {
 	// The actual Go-allocated stack.
 	// Note that we NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
 	stack []uint64
-	// Wasm stack pointer on .stack field which is accessed by stackBasePointer+stackPointer
-	stackPointer     uint64
+	// Stack pointer on .stack field which is accessed by [stackBasePointer] + [stackPointer].
+	stackPointer uint64
+	// stackBasePointer is set whenever we make function calls.
+	// Background: Functions might be compiled as if they use the stack from the bottom,
+	// however in reality, they have to use it from the middle of the stack depending on
+	// when these function calls are made. So instead of accessing stack via stackPointer alone,
+	// functions are compiled so they access the stack via [stackBasePointer](fixed for entire function) + [stackPointer].
+	// More precisely, stackBasePointer is set to [callee's stack pointer] + [callee's stack base pointer] - [caller's inputs].
+	// This way, compiled functions can be independent of the timing of functions calls made against them.
 	stackBasePointer uint64
 	// Where we store the status code of JIT execution.
 	jitCallStatusCode jitCallStatusCode
@@ -381,7 +388,6 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.returns - nextFunc.inputs
-			currentFrame.stackBasePointer = e.stackBasePointer
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
