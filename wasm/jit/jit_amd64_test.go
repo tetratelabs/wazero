@@ -185,7 +185,7 @@ func TestPushValueWithGoroutines(t *testing.T) {
 			eng.exec(f)
 
 			// Because we pushed the value, eng.sp must be incremented by 1
-			if eng.currentStackPointer != 2 {
+			if eng.stackPointer != 2 {
 				panic("eng.sp must be incremented.")
 			}
 
@@ -434,7 +434,7 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		eng := newEngine()
 		hostFunction := &compiledHostFunction{
 			f: func(ctx *wasm.HostFunctionCallContext) {
-				eng.stack[eng.currentStackPointer-1] *= 100
+				eng.stack[eng.stackPointer-1] *= 100
 			},
 		}
 		eng.compiledHostFunctions = append(eng.compiledHostFunctions, hostFunction)
@@ -536,19 +536,19 @@ func Test_popFromStackToRegister(t *testing.T) {
 
 	// Call in.
 	eng := newEngine()
-	eng.currentStackBasePointer = 1
-	eng.stack[eng.currentStackBasePointer+2] = 10000
-	eng.stack[eng.currentStackBasePointer+1] = 20000
+	eng.stackBasePointer = 1
+	eng.stack[eng.stackBasePointer+2] = 10000
+	eng.stack[eng.stackBasePointer+1] = 20000
 	mem := newMemoryInst()
-	require.Equal(t, []uint64{0, 20000, 10000}, eng.stack[eng.currentStackBasePointer:eng.currentStackBasePointer+3])
+	require.Equal(t, []uint64{0, 20000, 10000}, eng.stack[eng.stackBasePointer:eng.stackBasePointer+3])
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
 	// Check the sp and value.
-	require.Equal(t, uint64(2), eng.currentStackPointer)
-	require.Equal(t, []uint64{0, 30000}, eng.stack[eng.currentStackBasePointer:eng.currentStackBasePointer+eng.currentStackPointer])
+	require.Equal(t, uint64(2), eng.stackPointer)
+	require.Equal(t, []uint64{0, 30000}, eng.stack[eng.stackBasePointer:eng.stackBasePointer+eng.stackPointer])
 }
 
 func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
@@ -609,7 +609,7 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 
 		// Run code.
 		eng := newEngine()
-		eng.currentStackBasePointer = 10
+		eng.stackBasePointer = 10
 		mem := newMemoryInst()
 		jitcall(
 			uintptr(unsafe.Pointer(&code[0])),
@@ -618,8 +618,8 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 		)
 
 		// Check the sp and value.
-		require.Equal(t, uint64(2), eng.currentStackPointer)
-		require.Equal(t, []uint64{50, 2000}, eng.stack[eng.currentStackBasePointer:eng.currentStackBasePointer+eng.currentStackPointer])
+		require.Equal(t, uint64(2), eng.stackPointer)
+		require.Equal(t, []uint64{50, 2000}, eng.stack[eng.stackBasePointer:eng.stackBasePointer+eng.stackPointer])
 	})
 }
 
@@ -695,9 +695,9 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
 		// Check the stack.
-		require.Equal(t, uint64(3), eng.currentStackPointer)
-		require.Equal(t, uint64(101), eng.stack[eng.currentStackPointer-1])
-		require.Equal(t, uint64(100), eng.stack[eng.currentStackPointer-3])
+		require.Equal(t, uint64(3), eng.stackPointer)
+		require.Equal(t, uint64(101), eng.stack[eng.stackPointer-1])
+		require.Equal(t, uint64(100), eng.stack[eng.stackPointer-3])
 	})
 	// The case when the original value is in stack.
 	t.Run("on stack", func(t *testing.T) {
@@ -707,9 +707,9 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 		builder.locationStack.pushValueOnStack() // Dummy value!
 		pickTargetLocation := builder.locationStack.pushValueOnStack()
 		builder.locationStack.pushValueOnStack() // Dummy value!
-		eng.currentStackPointer = 5
-		eng.currentStackBasePointer = 1
-		eng.stack[eng.currentStackBasePointer+pickTargetLocation.stackPointer] = 100
+		eng.stackPointer = 5
+		eng.stackBasePointer = 1
+		eng.stack[eng.stackBasePointer+pickTargetLocation.stackPointer] = 100
 
 		// Now insert pick code.
 		err := builder.handlePick(o)
@@ -739,9 +739,9 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 			uintptr(unsafe.Pointer(&mem.Buffer[0])),
 		)
 		// Check the stack.
-		require.Equal(t, uint64(100), eng.stack[eng.currentStackBasePointer+pickTargetLocation.stackPointer]) // Original value shouldn't be affected.
-		require.Equal(t, uint64(3), eng.currentStackPointer)
-		require.Equal(t, uint64(101), eng.stack[eng.currentStackBasePointer+eng.currentStackPointer-1])
+		require.Equal(t, uint64(100), eng.stack[eng.stackBasePointer+pickTargetLocation.stackPointer]) // Original value shouldn't be affected.
+		require.Equal(t, uint64(3), eng.stackPointer)
+		require.Equal(t, uint64(101), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
 	})
 }
 
@@ -780,9 +780,9 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// As we push the constant to the stack, the stack pointer must be incremented.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the const plus one.
-			require.Equal(t, uint64(o.Value)+1, eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(o.Value)+1, eng.stack[eng.stackPointer-1])
 		})
 	}
 }
@@ -822,9 +822,9 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// As we push the constant to the stack, the stack pointer must be incremented.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the const plus one.
-			require.Equal(t, o.Value+1, eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, o.Value+1, eng.stack[eng.stackPointer-1])
 		})
 	}
 }
@@ -866,9 +866,9 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// As we push the constant to the stack, the stack pointer must be incremented.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the squared const.
-			require.Equal(t, o.Value*2, math.Float32frombits(uint32(eng.stack[eng.currentStackPointer-1])))
+			require.Equal(t, o.Value*2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
 		})
 	}
 }
@@ -910,9 +910,9 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// As we push the constant to the stack, the stack pointer must be incremented.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the squared const.
-			require.Equal(t, o.Value*2, math.Float64frombits(eng.stack[eng.currentStackPointer-1]))
+			require.Equal(t, o.Value*2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
 		})
 	}
 }
@@ -951,8 +951,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
-			require.Equal(t, uint64(400), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(1), eng.stackPointer)
+			require.Equal(t, uint64(400), eng.stack[eng.stackPointer-1])
 		})
 		t.Run("x1:stack,x2:reg", func(t *testing.T) {
 			eng := newEngine()
@@ -982,8 +982,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
-			require.Equal(t, uint64(5300), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(2), eng.stackPointer)
+			require.Equal(t, uint64(5300), eng.stack[eng.stackPointer-1])
 		})
 		t.Run("x1:stack,x2:stack", func(t *testing.T) {
 			eng := newEngine()
@@ -1016,8 +1016,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
-			require.Equal(t, uint64(5013), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(2), eng.stackPointer)
+			require.Equal(t, uint64(5013), eng.stack[eng.stackPointer-1])
 		})
 		t.Run("x1:reg,x2:stack", func(t *testing.T) {
 			eng := newEngine()
@@ -1050,8 +1050,8 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
-			require.Equal(t, uint64(5132), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(2), eng.stackPointer)
+			require.Equal(t, uint64(5132), eng.stack[eng.stackPointer-1])
 		})
 	})
 }
@@ -1110,11 +1110,11 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 			if tc.exp {
-				require.Equal(t, uint64(1), eng.stack[eng.currentStackPointer-1])
+				require.Equal(t, uint64(1), eng.stack[eng.stackPointer-1])
 			} else {
-				require.Equal(t, uint64(0), eng.stack[eng.currentStackPointer-1])
+				require.Equal(t, uint64(0), eng.stack[eng.stackPointer-1])
 			}
 		}
 	})
@@ -1168,11 +1168,11 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 			if tc.exp {
-				require.Equal(t, uint64(1), eng.stack[eng.currentStackPointer-1])
+				require.Equal(t, uint64(1), eng.stack[eng.stackPointer-1])
 			} else {
-				require.Equal(t, uint64(0), eng.stack[eng.currentStackPointer-1])
+				require.Equal(t, uint64(0), eng.stack[eng.stackPointer-1])
 			}
 		}
 	})
@@ -1212,8 +1212,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
-			require.Equal(t, uint64(249), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(1), eng.stackPointer)
+			require.Equal(t, uint64(249), eng.stack[eng.stackPointer-1])
 		})
 		t.Run("x1:stack,x2:reg", func(t *testing.T) {
 			eng := newEngine()
@@ -1243,8 +1243,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
-			require.Equal(t, uint64(4700), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(2), eng.stackPointer)
+			require.Equal(t, uint64(4700), eng.stack[eng.stackPointer-1])
 		})
 		t.Run("x1:stack,x2:stack", func(t *testing.T) {
 			eng := newEngine()
@@ -1277,8 +1277,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
-			require.Equal(t, uint64(4987), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(2), eng.stackPointer)
+			require.Equal(t, uint64(4987), eng.stack[eng.stackPointer-1])
 		})
 		t.Run("x1:reg,x2:stack", func(t *testing.T) {
 			eng := newEngine()
@@ -1311,8 +1311,8 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
-			require.Equal(t, uint64(4868), eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(2), eng.stackPointer)
+			require.Equal(t, uint64(4868), eng.stack[eng.stackPointer-1])
 		})
 	})
 }
@@ -1356,8 +1356,8 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		require.Equal(t, jitCallStatusCodeCallHostFunction, eng.jitCallStatusCode)
 		require.Equal(t, int64(functionIndex), eng.functionCallIndex)
 		// All the registers must be written back to stack.
-		require.Equal(t, uint64(2), eng.currentStackPointer)
-		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
+		require.Equal(t, uint64(2), eng.stackPointer)
+		require.Equal(t, uint64(50), eng.stack[eng.stackPointer-1])
 	})
 	t.Run("wasm function", func(t *testing.T) {
 		const functionIndex = 20
@@ -1397,8 +1397,8 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 		require.Equal(t, jitCallStatusCodeCallWasmFunction, eng.jitCallStatusCode)
 		require.Equal(t, int64(functionIndex), eng.functionCallIndex)
 		// All the registers must be written back to stack.
-		require.Equal(t, uint64(3), eng.currentStackPointer)
-		require.Equal(t, uint64(50), eng.stack[eng.currentStackPointer-1])
+		require.Equal(t, uint64(3), eng.stackPointer)
+		require.Equal(t, uint64(50), eng.stack[eng.stackPointer-1])
 	})
 }
 
@@ -1493,8 +1493,8 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 
 			// Load instruction must push the loaded value to the top of the stack,
 			// so the stack pointer must be incremented.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
-			require.Equal(t, expValue, eng.stack[eng.currentStackPointer-1])
+			require.Equal(t, uint64(1), eng.stackPointer)
+			require.Equal(t, expValue, eng.stack[eng.stackPointer-1])
 		})
 	}
 }
@@ -1673,11 +1673,11 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 			// Check the stack.
-			require.Equal(t, uint64(2), eng.currentStackPointer)
+			require.Equal(t, uint64(2), eng.stackPointer)
 			require.Equal(t, []uint64{
 				300,
 				5000, // top value should be moved to the dropped position.
-			}, eng.stack[:eng.currentStackPointer])
+			}, eng.stack[:eng.stackPointer])
 		})
 	})
 }
@@ -1714,11 +1714,11 @@ func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {
 		uintptr(unsafe.Pointer(&mem.Buffer[0])),
 	)
 	// Check the stack.
-	require.Equal(t, uint64(4), eng.currentStackPointer)
-	require.Equal(t, uint64(123), eng.stack[eng.currentStackPointer-1])
-	require.Equal(t, uint64(51), eng.stack[eng.currentStackPointer-2])
-	require.Equal(t, uint64(300), eng.stack[eng.currentStackPointer-3])
-	require.Equal(t, uint64(100), eng.stack[eng.currentStackPointer-4])
+	require.Equal(t, uint64(4), eng.stackPointer)
+	require.Equal(t, uint64(123), eng.stack[eng.stackPointer-1])
+	require.Equal(t, uint64(51), eng.stack[eng.stackPointer-2])
+	require.Equal(t, uint64(300), eng.stack[eng.stackPointer-3])
+	require.Equal(t, uint64(100), eng.stack[eng.stackPointer-4])
 }
 
 func TestAmd64Builder_assemble(t *testing.T) {
@@ -1886,7 +1886,7 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 			)
 
 			// Check the selected value.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 			if tc.selectX1 {
 				require.Equal(t, eng.stack[x1.stackPointer], uint64(x1Value))
 			} else {
@@ -1958,7 +1958,7 @@ func TestAmd64Builder_handleSwap(t *testing.T) {
 				uintptr(unsafe.Pointer(eng)),
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
-			require.Equal(t, uint64(3), eng.currentStackPointer)
+			require.Equal(t, uint64(3), eng.stackPointer)
 			// Check values are swapped.
 			require.Equal(t, uint64(x1Value), eng.stack[0])
 			require.Equal(t, uint64(x2Value), eng.stack[2])
@@ -2007,7 +2007,7 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 
 			// Run the code assembled above.
 			eng := newEngine()
-			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
+			eng.globalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
 			mem := newMemoryInst()
 			jitcall(
 				uintptr(unsafe.Pointer(&code[0])),
@@ -2017,7 +2017,7 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 			// Since we call global.get, the top of the stack must be the global value.
 			require.Equal(t, globalValue, eng.stack[0])
 			// Plus as we push the value, the stack pointer must be incremented.
-			require.Equal(t, uint64(1), eng.currentStackPointer)
+			require.Equal(t, uint64(1), eng.stackPointer)
 		})
 	}
 }
@@ -2046,7 +2046,7 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
-			eng.currentGlobalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
+			eng.globalSliceAddress = uintptr(unsafe.Pointer(&globals[0]))
 			eng.push(valueToSet)
 			mem := newMemoryInst()
 			jitcall(
@@ -2057,7 +2057,7 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 			// The global value should be set to valueToSet.
 			require.Equal(t, valueToSet, globals[op.Index].Val)
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
-			require.Equal(t, uint64(0), eng.currentStackPointer)
+			require.Equal(t, uint64(0), eng.stackPointer)
 		})
 	}
 }
