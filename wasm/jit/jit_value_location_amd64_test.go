@@ -13,10 +13,6 @@ import (
 
 // TestReservedRegisters ensures that reserved registers are not contained in unreservedGeneralPurposeIntRegisters.
 func TestReservedRegisters(t *testing.T) {
-	unreserved := map[int16]struct{}{}
-	for _, r := range unreservedGeneralPurposeIntRegisters {
-		unreserved[r] = struct{}{}
-	}
 	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForEngine)
 	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForStackBasePointer)
 	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForMemory)
