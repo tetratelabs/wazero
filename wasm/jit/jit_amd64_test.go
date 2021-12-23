@@ -1414,8 +1414,7 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 			eng := newEngine()
 			builder := requireNewBuilder(t)
 			builder.initializeReservedRegisters()
-			// Before load operations, we must push the base offset value. Here we
-			// just push the zero value.
+			// Before load operations, we must push the base offset value.
 			const baseOffset = 100
 			base := builder.locationStack.pushValueOnStack()
 			eng.stack[base.stackPointer] = baseOffset
@@ -1423,7 +1422,7 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 			o := &wazeroir.OperationLoad{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
 			err := builder.handleLoad(o)
 			require.NoError(t, err)
-			// At this point, the loaded value must be on top of the register, and placed on a register.
+			// At this point, the loaded value must be on top of the stack, and placed on a register.
 			loadedValue := builder.locationStack.peek()
 			require.Equal(t, o.Type, loadedValue.valueType)
 			require.True(t, loadedValue.onRegister())
@@ -1466,7 +1465,7 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 				binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], original)
 				expValue = uint64(original * 2)
 			case wazeroir.SignLessTypeI64:
-				original := uint64(1 << 34)
+				original := uint64(math.MaxUint32 + 123)
 				binary.LittleEndian.PutUint64(mem.Buffer[baseOffset+o.Arg.Offest:], original)
 				expValue = original * 2
 			case wazeroir.SignLessTypeF32:
@@ -1474,7 +1473,7 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 				binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], math.Float32bits(original))
 				expValue = uint64(math.Float32bits(original * 2))
 			case wazeroir.SignLessTypeF64:
-				original := float64(1.234)
+				original := float64(math.MaxFloat32 + 100.1)
 				binary.LittleEndian.PutUint64(mem.Buffer[baseOffset+o.Arg.Offest:], math.Float64bits(original))
 				expValue = math.Float64bits(original * 2)
 			}
