@@ -11,15 +11,15 @@ func TestTokenType_String(t *testing.T) {
 		input    tokenType
 		expected string
 	}{
-		{tokenKeyword, "tokenKeyword"},
-		{tokenUN, "tokenUN"},
-		{tokenSN, "tokenSN"},
-		{tokenFN, "tokenFN"},
-		{tokenString, "tokenString"},
-		{tokenID, "tokenID"},
-		{tokenLParen, "tokenLParen"},
-		{tokenRParen, "tokenRParen"},
-		{tokenReserved, "tokenReserved"},
+		{tokenKeyword, "keyword"},
+		{tokenUN, "uN"},
+		{tokenSN, "sN"},
+		{tokenFN, "fN"},
+		{tokenString, "string"},
+		{tokenID, "id"},
+		{tokenLParen, "("},
+		{tokenRParen, ")"},
+		{tokenReserved, "reserved"},
 	}
 
 	for _, tt := range tests {
