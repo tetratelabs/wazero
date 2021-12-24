@@ -149,7 +149,7 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 
 	// Push function arguments.
 	for _, t := range f.Signature.InputTypes {
-		c.stackPush(WasmValueTypeToUnsignedType(t))
+		c.stackPush(wasmValueTypeToUnsignedType(t))
 	}
 	// Emit const expressions for locals.
 	// Note that here we don't take function arguments
@@ -162,7 +162,7 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 	// Insert the function control frame.
 	returns := make([]UnsignedType, 0, len(f.Signature.ReturnTypes))
 	for _, t := range f.Signature.ReturnTypes {
-		returns = append(returns, WasmValueTypeToUnsignedType(t))
+		returns = append(returns, wasmValueTypeToUnsignedType(t))
 	}
 	c.controlFrames.push(&controlFrame{
 		frameID:          c.nextID(),
@@ -232,7 +232,7 @@ operatorSwitch:
 			kind:             controlFrameKindBlockWithoutContinuationLabel,
 		}
 		for _, t := range bt.ReturnTypes {
-			frame.returns = append(frame.returns, WasmValueTypeToUnsignedType(t))
+			frame.returns = append(frame.returns, wasmValueTypeToUnsignedType(t))
 		}
 		c.controlFrames.push(frame)
 
@@ -258,7 +258,7 @@ operatorSwitch:
 			kind:             controlFrameKindLoop,
 		}
 		for _, t := range bt.ReturnTypes {
-			frame.returns = append(frame.returns, WasmValueTypeToUnsignedType(t))
+			frame.returns = append(frame.returns, wasmValueTypeToUnsignedType(t))
 		}
 		c.controlFrames.push(frame)
 
@@ -298,7 +298,7 @@ operatorSwitch:
 			kind: controlFrameKindIfWithoutElse,
 		}
 		for _, t := range bt.ReturnTypes {
-			frame.returns = append(frame.returns, WasmValueTypeToUnsignedType(t))
+			frame.returns = append(frame.returns, wasmValueTypeToUnsignedType(t))
 		}
 		c.controlFrames.push(frame)
 

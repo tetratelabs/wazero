@@ -661,7 +661,7 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 	t.Run("on reg", func(t *testing.T) {
 		// Set up the pick target original value.
 		pickTargetLocation := builder.locationStack.pushValueOnRegister(int16(x86.REG_R10))
-		pickTargetLocation.setValueType(wazeroir.UnsignedTypeI32)
+		pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
 		builder.locationStack.pushValueOnStack() // Dummy value!
 		builder.movIntConstToRegister(100, pickTargetLocation.register)
 		// Now insert pick code.
@@ -759,7 +759,7 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 			// To verify the behavior, we increment and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.UnsignedTypeI32, loc.valueType)
+			require.Equal(t, generalPurposeRegisterTypeInt, loc.registerType())
 			prog := builder.newProg()
 			prog.As = x86.AINCQ
 			prog.To.Type = obj.TYPE_REG
@@ -801,7 +801,7 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 			// To verify the behavior, we increment and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.UnsignedTypeI64, loc.valueType)
+			require.Equal(t, generalPurposeRegisterTypeInt, loc.registerType())
 			prog := builder.newProg()
 			prog.As = x86.AINCQ
 			prog.To.Type = obj.TYPE_REG
@@ -843,7 +843,7 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 			// To verify the behavior, we double and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.UnsignedTypeF32, loc.valueType)
+			require.Equal(t, generalPurposeRegisterTypeFloat, loc.registerType())
 			prog := builder.newProg()
 			prog.As = x86.AADDSS
 			prog.To.Type = obj.TYPE_REG
@@ -887,7 +887,7 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 			// To verify the behavior, we double and push the const value
 			// to the stack.
 			loc := builder.locationStack.peek()
-			require.Equal(t, wazeroir.UnsignedTypeF64, loc.valueType)
+			require.Equal(t, generalPurposeRegisterTypeFloat, loc.registerType())
 			prog := builder.newProg()
 			prog.As = x86.AADDSD
 			prog.To.Type = obj.TYPE_REG
@@ -1426,22 +1426,25 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
 			loadedValue := builder.locationStack.peek()
-			require.Equal(t, o.Type, loadedValue.valueType)
 			require.True(t, loadedValue.onRegister())
 
 			// Double the loaded value in order to verify the behavior.
 			var addInst obj.As
 			switch tp {
 			case wazeroir.UnsignedTypeI32:
+				require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 				require.True(t, isIntRegister(loadedValue.register))
 				addInst = x86.AADDL
 			case wazeroir.UnsignedTypeI64:
+				require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 				require.True(t, isIntRegister(loadedValue.register))
 				addInst = x86.AADDQ
 			case wazeroir.UnsignedTypeF32:
+				require.Equal(t, generalPurposeRegisterTypeFloat, loadedValue.registerType())
 				require.True(t, isFloatRegister(loadedValue.register))
 				addInst = x86.AADDSS
 			case wazeroir.UnsignedTypeF64:
+				require.Equal(t, generalPurposeRegisterTypeFloat, loadedValue.registerType())
 				require.True(t, isFloatRegister(loadedValue.register))
 				addInst = x86.AADDSD
 			}
@@ -1523,14 +1526,7 @@ func TestAmd64Builder_handleLoad8(t *testing.T) {
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
 			loadedValue := builder.locationStack.peek()
-
-			switch o.Type {
-			case wazeroir.SignedInt32, wazeroir.SignedUint32:
-				require.Equal(t, wazeroir.UnsignedTypeI32, loadedValue.valueType)
-			case wazeroir.SignedInt64, wazeroir.SignedUint64:
-				require.Equal(t, wazeroir.UnsignedTypeI64, loadedValue.valueType)
-
-			}
+			require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 			require.True(t, loadedValue.onRegister())
 
 			// Increment the loaded value in order to verify the behavior.
@@ -1594,14 +1590,7 @@ func TestAmd64Builder_handleLoad16(t *testing.T) {
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
 			loadedValue := builder.locationStack.peek()
-
-			switch o.Type {
-			case wazeroir.SignedInt32, wazeroir.SignedUint32:
-				require.Equal(t, wazeroir.UnsignedTypeI32, loadedValue.valueType)
-			case wazeroir.SignedInt64, wazeroir.SignedUint64:
-				require.Equal(t, wazeroir.UnsignedTypeI64, loadedValue.valueType)
-
-			}
+			require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 			require.True(t, loadedValue.onRegister())
 
 			// Increment the loaded value in order to verify the behavior.
@@ -1657,7 +1646,7 @@ func TestAmd64Builder_handleLoad32(t *testing.T) {
 
 	// At this point, the loaded value must be on top of the stack, and placed on a register.
 	loadedValue := builder.locationStack.peek()
-	require.Equal(t, wazeroir.UnsignedTypeI64, loadedValue.valueType)
+	require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 	require.True(t, loadedValue.onRegister())
 
 	// Increment the loaded value in order to verify the behavior.
@@ -1725,7 +1714,7 @@ func TestAmd64Builder_handleMemorySize(t *testing.T) {
 	builder.handleMemorySize()
 	// At this point, the size of memory should be pushed onto the stack.
 	require.Equal(t, uint64(1), builder.locationStack.sp)
-	require.Equal(t, wazeroir.UnsignedTypeI32, builder.locationStack.peek().valueType)
+	require.Equal(t, generalPurposeRegisterTypeInt, builder.locationStack.peek().registerType())
 
 	// Compile.
 	code, err := builder.compile()
