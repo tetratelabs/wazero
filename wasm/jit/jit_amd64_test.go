@@ -1563,6 +1563,7 @@ func TestAmd64Builder_handleLoad8(t *testing.T) {
 			// Load instruction must push the loaded value to the top of the stack,
 			// so the stack pointer must be incremented.
 			require.Equal(t, uint64(1), eng.stackPointer)
+			// If the load failed, increment (x86.AINCB) would result in 1 (0+1)
 			require.Equal(t, original+1, byte(eng.stack[eng.stackPointer-1]))
 		})
 	}
