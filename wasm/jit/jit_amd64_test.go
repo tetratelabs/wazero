@@ -1568,6 +1568,127 @@ func TestAmd64Builder_handleLoad8(t *testing.T) {
 	}
 }
 
+func TestAmd64Builder_handleLoad16(t *testing.T) {
+	for i, tp := range []wazeroir.SignedInt{
+		wazeroir.SignedInt32,
+		wazeroir.SignedInt64,
+		wazeroir.SignedUint32,
+		wazeroir.SignedUint64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			eng := newEngine()
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+			// Before load operations, we must push the base offset value.
+			const baseOffset = 100 // For testing. Arbitrary number is fine.
+			base := builder.locationStack.pushValueOnStack()
+			eng.stack[base.stackPointer] = baseOffset
+
+			// Emit the memory load instructions.
+			o := &wazeroir.OperationLoad16{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+			err := builder.handleLoad16(o)
+			require.NoError(t, err)
+
+			// At this point, the loaded value must be on top of the stack, and placed on a register.
+			loadedValue := builder.locationStack.peek()
+
+			switch o.Type {
+			case wazeroir.SignedInt32, wazeroir.SignedUint32:
+				require.Equal(t, wazeroir.UnsignedTypeI32, loadedValue.valueType)
+			case wazeroir.SignedInt64, wazeroir.SignedUint64:
+				require.Equal(t, wazeroir.UnsignedTypeI64, loadedValue.valueType)
+
+			}
+			require.True(t, loadedValue.onRegister())
+
+			// Increment the loaded value in order to verify the behavior.
+			doubleLoadedValue := builder.newProg()
+			doubleLoadedValue.As = x86.AINCB
+			doubleLoadedValue.To.Type = obj.TYPE_REG
+			doubleLoadedValue.To.Reg = loadedValue.register
+			builder.addInstruction(doubleLoadedValue)
+
+			// We need to write the result back to the memory stack.
+			builder.releaseRegisterToStack(loadedValue)
+
+			// Compile.
+			builder.returnFunction()
+			code, err := builder.compile()
+			require.NoError(t, err)
+
+			// Place the load target value to the memory.
+			mem := newMemoryInst()
+			original := uint16(0xff_fe)
+			binary.LittleEndian.PutUint16(mem.Buffer[baseOffset+o.Arg.Offest:], original)
+
+			// Run code.
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			// Load instruction must push the loaded value to the top of the stack,
+			// so the stack pointer must be incremented.
+			require.Equal(t, uint64(1), eng.stackPointer)
+			require.Equal(t, original+1, uint16(eng.stack[eng.stackPointer-1]))
+		})
+	}
+}
+
+func TestAmd64Builder_handleLoad32(t *testing.T) {
+	eng := newEngine()
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+	// Before load operations, we must push the base offset value.
+	const baseOffset = 100 // For testing. Arbitrary number is fine.
+	base := builder.locationStack.pushValueOnStack()
+	eng.stack[base.stackPointer] = baseOffset
+
+	// Emit the memory load instructions.
+	o := &wazeroir.OperationLoad32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	err := builder.handleLoad32(o)
+	require.NoError(t, err)
+
+	// At this point, the loaded value must be on top of the stack, and placed on a register.
+	loadedValue := builder.locationStack.peek()
+	require.Equal(t, wazeroir.UnsignedTypeI64, loadedValue.valueType)
+	require.True(t, loadedValue.onRegister())
+
+	// Increment the loaded value in order to verify the behavior.
+	doubleLoadedValue := builder.newProg()
+	doubleLoadedValue.As = x86.AINCB
+	doubleLoadedValue.To.Type = obj.TYPE_REG
+	doubleLoadedValue.To.Reg = loadedValue.register
+	builder.addInstruction(doubleLoadedValue)
+
+	// We need to write the result back to the memory stack.
+	builder.releaseRegisterToStack(loadedValue)
+
+	// Compile.
+	builder.returnFunction()
+	code, err := builder.compile()
+	require.NoError(t, err)
+
+	// Place the load target value to the memory.
+	mem := newMemoryInst()
+	original := uint32(0xff_ff_fe)
+	binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], original)
+
+	// Run code.
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+
+	// Load instruction must push the loaded value to the top of the stack,
+	// so the stack pointer must be incremented.
+	require.Equal(t, uint64(1), eng.stackPointer)
+	require.Equal(t, original+1, uint32(eng.stack[eng.stackPointer-1]))
+}
+
 func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
 	builder := requireNewBuilder(t)
 
