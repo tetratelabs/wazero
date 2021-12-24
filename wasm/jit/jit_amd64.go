@@ -102,11 +102,17 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling load operation: %w", err)
 			}
 		case *wazeroir.OperationLoad8:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleLoad8(o); err != nil {
+				return nil, fmt.Errorf("error handling load8 operation: %w", err)
+			}
 		case *wazeroir.OperationLoad16:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleLoad16(o); err != nil {
+				return nil, fmt.Errorf("error handling load16 operation: %w", err)
+			}
 		case *wazeroir.OperationLoad32:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleLoad32(o); err != nil {
+				return nil, fmt.Errorf("error handling load16 operation: %w", err)
+			}
 		case *wazeroir.OperationStore:
 			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
 		case *wazeroir.OperationStore8:
@@ -255,7 +261,12 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 func (b *amd64Builder) pushFunctionInputs() {
 	for _, t := range b.f.Signature.InputTypes {
 		loc := b.locationStack.pushValueOnStack()
-		loc.setValueType(wazeroir.WasmValueTypeToUnsignedType(t))
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
 	}
 }
 
@@ -463,21 +474,20 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 	// Record that the retrieved global value on the top of the stack is now in a register.
 	loc := b.locationStack.pushValueOnRegister(valueReg)
-	loc.setValueType(wazeroir.WasmValueTypeToUnsignedType(wasmType))
+	switch wasmType {
+	case wasm.ValueTypeI32, wasm.ValueTypeI64:
+		loc.setRegisterType(generalPurposeRegisterTypeInt)
+	case wasm.ValueTypeF32, wasm.ValueTypeF64:
+		loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	}
 	return nil
 }
 
 func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	// First, move the value to set into a temporary register.
 	val := b.locationStack.pop()
-	if val.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(val.registerType(), val); err != nil {
-			return err
-		}
-	} else if val.onConditionalRegister() {
-		if err := b.moveConditionalToGeneralPurposeRegister(val); err != nil {
-			return err
-		}
+	if err := b.ensureOnGeneralPurposeRegister(val); err != nil {
+		return err
 	}
 
 	// Allocate a register to hold the memory location of the target global instance.
@@ -796,21 +806,14 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 // the physical registers or memory stack, or maybe conditional register.
 func (b *amd64Builder) handleSelect() error {
 	c := b.locationStack.pop()
+	if err := b.ensureOnGeneralPurposeRegister(c); err != nil {
+		return err
+	}
+
 	x2 := b.locationStack.pop()
 	// We do not consume x1 here, but modify the value according to
 	// the conditional value "c" above.
 	peekedX1 := b.locationStack.peek()
-
-	// Ensure the conditional value lives in a gp register.
-	if c.onConditionalRegister() {
-		if err := b.moveConditionalToGeneralPurposeRegister(c); err != nil {
-			return err
-		}
-	} else if c.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(c.registerType(), c); err != nil {
-			return err
-		}
-	}
 
 	// Compare the conditional value with zero.
 	cmpZero := b.newProg()
@@ -900,7 +903,7 @@ func (b *amd64Builder) handlePick(o *wazeroir.OperationPick) error {
 	// Now we already placed the picked value on the register,
 	// so push the location onto the stack.
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(pickTarget.valueType)
+	loc.setRegisterType(pickTarget.registerType())
 	return nil
 }
 
@@ -1094,20 +1097,14 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 	// Finally we have the result on the conditional register,
 	// so record it.
 	loc := b.locationStack.pushValueOnConditionalRegister(resultConditionState)
-	loc.setValueType(wazeroir.UnsignedTypeI32)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
 func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 	base := b.locationStack.pop()
-	if base.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(generalPurposeRegisterTypeInt, base); err != nil {
-			return err
-		}
-	} else if base.onConditionalRegister() {
-		if err := b.moveConditionalToGeneralPurposeRegister(base); err != nil {
-			return err
-		}
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
+		return err
 	}
 
 	// At this point, base's value is on the integer general purpose reg.
@@ -1158,7 +1155,7 @@ func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.From.Scale = 1
 		b.addInstruction(moveFromMemory)
 		top := b.locationStack.pushValueOnRegister(reg)
-		top.setValueType(o.Type)
+		top.setRegisterType(generalPurposeRegisterTypeInt)
 	} else {
 		// For float types, we read the value to the float register.
 		floatReg, err := b.allocateRegister(generalPurposeRegisterTypeFloat)
@@ -1175,10 +1172,120 @@ func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.From.Scale = 1
 		b.addInstruction(moveFromMemory)
 		top := b.locationStack.pushValueOnRegister(floatReg)
-		top.setValueType(o.Type)
+		top.setRegisterType(generalPurposeRegisterTypeFloat)
 		// We no longer need the int register so mark it unused.
 		b.locationStack.markRegisterUnused(reg)
 	}
+	return nil
+}
+
+func (b *amd64Builder) handleLoad8(o *wazeroir.OperationLoad8) error {
+	base := b.locationStack.pop()
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
+		return err
+	}
+
+	// At this point, base's value is on the integer general purpose reg.
+	// We reuse the register below, so we alias it here for readability.
+	reg := base.register
+
+	// We have to calculate the offset on the memory region.
+	addOffsetToBase := b.newProg()
+	addOffsetToBase.As = x86.AADDL // 32-bit!
+	addOffsetToBase.To.Type = obj.TYPE_REG
+	addOffsetToBase.To.Reg = reg
+	addOffsetToBase.From.Type = obj.TYPE_CONST
+	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
+	b.addInstruction(addOffsetToBase)
+
+	// Then move a byte at the offset to the register.
+	// Note that Load8 is only for integer types.
+	moveFromMemory := b.newProg()
+	moveFromMemory.As = x86.AMOVB // 1 byte!
+	moveFromMemory.To.Type = obj.TYPE_REG
+	moveFromMemory.To.Reg = reg
+	moveFromMemory.From.Type = obj.TYPE_MEM
+	moveFromMemory.From.Reg = reservedRegisterForMemory
+	moveFromMemory.From.Index = reg
+	moveFromMemory.From.Scale = 1
+	b.addInstruction(moveFromMemory)
+	top := b.locationStack.pushValueOnRegister(reg)
+
+	// The result of load8 is always int type.
+	top.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+func (b *amd64Builder) handleLoad16(o *wazeroir.OperationLoad16) error {
+	base := b.locationStack.pop()
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
+		return err
+	}
+
+	// At this point, base's value is on the integer general purpose reg.
+	// We reuse the register below, so we alias it here for readability.
+	reg := base.register
+
+	// We have to calculate the offset on the memory region.
+	addOffsetToBase := b.newProg()
+	addOffsetToBase.As = x86.AADDL // 32-bit!
+	addOffsetToBase.To.Type = obj.TYPE_REG
+	addOffsetToBase.To.Reg = reg
+	addOffsetToBase.From.Type = obj.TYPE_CONST
+	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
+	b.addInstruction(addOffsetToBase)
+
+	// Then move a byte at the offset to the register.
+	// Note that Load16 is only for integer types.
+	moveFromMemory := b.newProg()
+	moveFromMemory.As = x86.AMOVW // 2 byte!
+	moveFromMemory.To.Type = obj.TYPE_REG
+	moveFromMemory.To.Reg = reg
+	moveFromMemory.From.Type = obj.TYPE_MEM
+	moveFromMemory.From.Reg = reservedRegisterForMemory
+	moveFromMemory.From.Index = reg
+	moveFromMemory.From.Scale = 1
+	b.addInstruction(moveFromMemory)
+	top := b.locationStack.pushValueOnRegister(reg)
+
+	// The result of load16 is always int type.
+	top.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+func (b *amd64Builder) handleLoad32(o *wazeroir.OperationLoad32) error {
+	base := b.locationStack.pop()
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
+		return err
+	}
+
+	// At this point, base's value is on the integer general purpose reg.
+	// We reuse the register below, so we alias it here for readability.
+	reg := base.register
+
+	// We have to calculate the offset on the memory region.
+	addOffsetToBase := b.newProg()
+	addOffsetToBase.As = x86.AADDL // 32-bit!
+	addOffsetToBase.To.Type = obj.TYPE_REG
+	addOffsetToBase.To.Reg = reg
+	addOffsetToBase.From.Type = obj.TYPE_CONST
+	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
+	b.addInstruction(addOffsetToBase)
+
+	// Then move a byte at the offset to the register.
+	moveFromMemory := b.newProg()
+	moveFromMemory.As = x86.AMOVL // 3 byte!
+	moveFromMemory.To.Type = obj.TYPE_REG
+	moveFromMemory.To.Reg = reg
+	moveFromMemory.From.Type = obj.TYPE_MEM
+	moveFromMemory.From.Reg = reservedRegisterForMemory
+	moveFromMemory.From.Index = reg
+	moveFromMemory.From.Scale = 1
+	b.addInstruction(moveFromMemory)
+	top := b.locationStack.pushValueOnRegister(reg)
+
+	// The result of load32 is always int type.
+	top.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
@@ -1189,7 +1296,7 @@ func (b *amd64Builder) handleMemoryGrow() {
 func (b *amd64Builder) handleMemorySize() {
 	b.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize)
 	loc := b.locationStack.pushValueOnStack() // The size is pushed on the top.
-	loc.setValueType(wazeroir.UnsignedTypeI32)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
 }
 
 func (b *amd64Builder) callBuiltinFunctionFromConstIndex(index int64) {
@@ -1209,7 +1316,7 @@ func (b *amd64Builder) handleConstI32(o *wazeroir.OperationConstI32) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.UnsignedTypeI32)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
 	prog := b.newProg()
 	prog.As = x86.AMOVL // Note 32-bit move!
@@ -1227,7 +1334,7 @@ func (b *amd64Builder) handleConstI64(o *wazeroir.OperationConstI64) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.UnsignedTypeI64)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
 	prog := b.newProg()
 	prog.As = x86.AMOVQ
@@ -1245,7 +1352,7 @@ func (b *amd64Builder) handleConstF32(o *wazeroir.OperationConstF32) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.UnsignedTypeF32)
+	loc.setRegisterType(generalPurposeRegisterTypeFloat)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
@@ -1279,7 +1386,7 @@ func (b *amd64Builder) handleConstF64(o *wazeroir.OperationConstF64) error {
 		return err
 	}
 	loc := b.locationStack.pushValueOnRegister(reg)
-	loc.setValueType(wazeroir.UnsignedTypeF64)
+	loc.setRegisterType(generalPurposeRegisterTypeFloat)
 
 	// We cannot directly load the value from memory to float regs,
 	// so we move it to int reg temporarily.
@@ -1659,4 +1766,19 @@ func (b *amd64Builder) initializeReservedRegisters() {
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = reg
 	b.addInstruction(prog)
+}
+
+// ensureOnGeneralPurposeRegister ensures that the given value is located on a
+// general purpose register of an appropriate type.
+func (b *amd64Builder) ensureOnGeneralPurposeRegister(loc *valueLocation) error {
+	if loc.onStack() {
+		if err := b.moveStackToRegisterWithAllocation(loc.registerType(), loc); err != nil {
+			return err
+		}
+	} else if loc.onConditionalRegister() {
+		if err := b.moveConditionalToGeneralPurposeRegister(loc); err != nil {
+			return err
+		}
+	}
+	return nil
 }

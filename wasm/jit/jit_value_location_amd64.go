@@ -5,8 +5,6 @@ package jit
 
 import (
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
-
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 // Reserved registers.
@@ -68,7 +66,7 @@ const (
 // and it has the information about where it exists in the physical machine.
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
-	valueType wazeroir.UnsignedType
+	regType generalPurposeRegisterType
 	// Set to -1 if the value is stored in the memory stack.
 	register int16
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
@@ -79,19 +77,11 @@ type valueLocation struct {
 }
 
 func (v *valueLocation) registerType() (t generalPurposeRegisterType) {
-	switch v.valueType {
-	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
-		t = generalPurposeRegisterTypeInt
-	case wazeroir.UnsignedTypeF32, wazeroir.UnsignedTypeF64:
-		t = generalPurposeRegisterTypeFloat
-	default:
-		panic("unreachable")
-	}
-	return
+	return v.regType
 }
 
-func (v *valueLocation) setValueType(t wazeroir.UnsignedType) {
-	v.valueType = t
+func (v *valueLocation) setRegisterType(t generalPurposeRegisterType) {
+	v.regType = t
 }
 
 func (v *valueLocation) setRegister(reg int16) {
@@ -147,7 +137,7 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 	ret.stack = make([]*valueLocation, len(s.stack))
 	for i, v := range s.stack {
 		ret.stack[i] = &valueLocation{
-			valueType:           v.valueType,
+			regType:             v.regType,
 			conditionalRegister: v.conditionalRegister,
 			stackPointer:        v.stackPointer,
 			register:            v.register,
