@@ -1331,15 +1331,11 @@ func (b *amd64Builder) moveToMemory(offsetConst uint32, moveInstruction obj.As) 
 		return err
 	}
 
-	// At this point, base's value is on the integer general purpose reg.
-	// We reuse the register below, so we alias it here for readability.
-	reg := base.register
-
 	// Then we have to calculate the offset on the memory region.
 	addOffsetToBase := b.newProg()
 	addOffsetToBase.As = x86.AADDL // 32-bit!
 	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = reg
+	addOffsetToBase.To.Reg = base.register
 	addOffsetToBase.From.Type = obj.TYPE_CONST
 	addOffsetToBase.From.Offset = int64(offsetConst)
 	b.addInstruction(addOffsetToBase)
@@ -1353,9 +1349,13 @@ func (b *amd64Builder) moveToMemory(offsetConst uint32, moveInstruction obj.As) 
 	moveToMemory.From.Reg = val.register
 	moveToMemory.To.Type = obj.TYPE_MEM
 	moveToMemory.To.Reg = reservedRegisterForMemory
-	moveToMemory.To.Index = reg
+	moveToMemory.To.Index = base.register
 	moveToMemory.To.Scale = 1
 	b.addInstruction(moveToMemory)
+
+	// We no longer need both the value and base registers.
+	b.locationStack.releaseRegister(val)
+	b.locationStack.releaseRegister(base)
 	return nil
 }
 
