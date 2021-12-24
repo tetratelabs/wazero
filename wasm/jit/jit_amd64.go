@@ -1230,7 +1230,7 @@ func (b *amd64Builder) handleLoad16(o *wazeroir.OperationLoad16) error {
 	b.addInstruction(addOffsetToBase)
 
 	// Then move a byte at the offset to the register.
-	// Note that Load8 is only for integer types.
+	// Note that Load16 is only for integer types.
 	moveFromMemory := b.newProg()
 	moveFromMemory.As = x86.AMOVW // 2 byte!
 	moveFromMemory.To.Type = obj.TYPE_REG
