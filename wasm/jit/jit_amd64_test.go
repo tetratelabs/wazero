@@ -1887,7 +1887,7 @@ func TestAmd64Builder_handleStore32(t *testing.T) {
 	// Check the stored value.
 	offset := o.Arg.Offest + baseOffset
 	require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem.Buffer[offset:]))
-	// The traiing bytes must be intact since this is only moving 4 byte.
+	// The trailing bytes must be intact since this is only moving 4 byte.
 	require.Equal(t, []byte{0, 0, 0, 0}, mem.Buffer[offset+4:offset+8])
 }
 
