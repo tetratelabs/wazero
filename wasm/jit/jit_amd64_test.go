@@ -1685,6 +1685,210 @@ func TestAmd64Builder_handleLoad32(t *testing.T) {
 }
 
 func TestAmd64Builder_handleStore(t *testing.T) {
+	for i, tp := range []wazeroir.UnsignedType{
+		wazeroir.UnsignedTypeI32,
+		wazeroir.UnsignedTypeI64,
+		wazeroir.UnsignedTypeF32,
+		wazeroir.UnsignedTypeF64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			eng := newEngine()
+			builder := requireNewBuilder(t)
+			builder.initializeReservedRegisters()
+
+			// Before store operations, we must push the base offset, and the store target values.
+			const baseOffset = 100 // For testing. Arbitrary number is fine.
+			base := builder.locationStack.pushValueOnStack()
+			eng.stack[base.stackPointer] = baseOffset
+			storeTargetValue := uint64(math.MaxUint64)
+			storeTarget := builder.locationStack.pushValueOnStack()
+			eng.stack[storeTarget.stackPointer] = storeTargetValue
+			switch tp {
+			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
+				storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
+			case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
+				storeTarget.setRegisterType(generalPurposeRegisterTypeFloat)
+			}
+
+			// Emit the memory load instructions.
+			o := &wazeroir.OperationStore{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+			err := builder.handleStore(o)
+			require.NoError(t, err)
+
+			// At this point, two values are popped so the stack pointer must be zero.
+			require.Equal(t, uint64(0), builder.locationStack.sp)
+			// Plus there should be no used registers.
+			require.Len(t, builder.locationStack.usedRegisters, 0)
+
+			// Compile.
+			builder.returnFunction()
+			code, err := builder.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			mem := newMemoryInst()
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			// All the values are popped, so the stack pointer must be zero.
+			require.Equal(t, uint64(0), eng.stackPointer)
+			// Check the stored value.
+			offset := o.Arg.Offest + baseOffset
+			switch o.Type {
+			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
+				v := binary.LittleEndian.Uint32(mem.Buffer[offset : offset+4])
+				require.Equal(t, uint32(storeTargetValue), v)
+				// The trailing bytes must be intact since this is 32-bit mov.
+				v = binary.LittleEndian.Uint32(mem.Buffer[offset+4 : offset+8])
+				require.Equal(t, uint32(0), v)
+			case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
+				v := binary.LittleEndian.Uint64(mem.Buffer[offset : offset+8])
+				require.Equal(t, storeTargetValue, v)
+			}
+		})
+	}
+}
+
+func TestAmd64Builder_handleStore8(t *testing.T) {
+	eng := newEngine()
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+
+	// Before store operations, we must push the base offset, and the store target values.
+	const baseOffset = 100 // For testing. Arbitrary number is fine.
+	base := builder.locationStack.pushValueOnStack()
+	eng.stack[base.stackPointer] = baseOffset
+	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
+	storeTarget := builder.locationStack.pushValueOnStack()
+	eng.stack[storeTarget.stackPointer] = storeTargetValue
+	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
+
+	// Emit the memory load instructions.
+	o := &wazeroir.OperationStore8{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	err := builder.handleStore8(o)
+	require.NoError(t, err)
+
+	// At this point, two values are popped so the stack pointer must be zero.
+	require.Equal(t, uint64(0), builder.locationStack.sp)
+	// Plus there should be no used registers.
+	require.Len(t, builder.locationStack.usedRegisters, 0)
+
+	// Compile.
+	builder.returnFunction()
+	code, err := builder.compile()
+	require.NoError(t, err)
+
+	// Run code.
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+
+	// All the values are popped, so the stack pointer must be zero.
+	require.Equal(t, uint64(0), eng.stackPointer)
+	// Check the stored value.
+	offset := o.Arg.Offest + baseOffset
+	require.Equal(t, byte(storeTargetValue), mem.Buffer[offset])
+	// The trailing bytes must be intact since this is only moving one byte.
+	require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0}, mem.Buffer[offset+1:offset+8])
+}
+
+func TestAmd64Builder_handleStore16(t *testing.T) {
+	eng := newEngine()
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+
+	// Before store operations, we must push the base offset, and the store target values.
+	const baseOffset = 100 // For testing. Arbitrary number is fine.
+	base := builder.locationStack.pushValueOnStack()
+	eng.stack[base.stackPointer] = baseOffset
+	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
+	storeTarget := builder.locationStack.pushValueOnStack()
+	eng.stack[storeTarget.stackPointer] = storeTargetValue
+	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
+
+	// Emit the memory load instructions.
+	o := &wazeroir.OperationStore16{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	err := builder.handleStore16(o)
+	require.NoError(t, err)
+
+	// At this point, two values are popped so the stack pointer must be zero.
+	require.Equal(t, uint64(0), builder.locationStack.sp)
+	// Plus there should be no used registers.
+	require.Len(t, builder.locationStack.usedRegisters, 0)
+
+	// Compile.
+	builder.returnFunction()
+	code, err := builder.compile()
+	require.NoError(t, err)
+
+	// Run code.
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+
+	// All the values are popped, so the stack pointer must be zero.
+	require.Equal(t, uint64(0), eng.stackPointer)
+	// Check the stored value.
+	offset := o.Arg.Offest + baseOffset
+	require.Equal(t, uint16(storeTargetValue), binary.LittleEndian.Uint16(mem.Buffer[offset:]))
+	// The trailing bytes must be intact since this is only moving 2 byte.
+	require.Equal(t, []byte{0, 0, 0, 0, 0, 0}, mem.Buffer[offset+2:offset+8])
+}
+
+func TestAmd64Builder_handleStore32(t *testing.T) {
+	eng := newEngine()
+	builder := requireNewBuilder(t)
+	builder.initializeReservedRegisters()
+
+	// Before store operations, we must push the base offset, and the store target values.
+	const baseOffset = 100 // For testing. Arbitrary number is fine.
+	base := builder.locationStack.pushValueOnStack()
+	eng.stack[base.stackPointer] = baseOffset
+	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
+	storeTarget := builder.locationStack.pushValueOnStack()
+	eng.stack[storeTarget.stackPointer] = storeTargetValue
+	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
+
+	// Emit the memory load instructions.
+	o := &wazeroir.OperationStore32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	err := builder.handleStore32(o)
+	require.NoError(t, err)
+
+	// At this point, two values are popped so the stack pointer must be zero.
+	require.Equal(t, uint64(0), builder.locationStack.sp)
+	// Plus there should be no used registers.
+	require.Len(t, builder.locationStack.usedRegisters, 0)
+
+	// Compile.
+	builder.returnFunction()
+	code, err := builder.compile()
+	require.NoError(t, err)
+
+	// Run code.
+	mem := newMemoryInst()
+	jitcall(
+		uintptr(unsafe.Pointer(&code[0])),
+		uintptr(unsafe.Pointer(eng)),
+		uintptr(unsafe.Pointer(&mem.Buffer[0])),
+	)
+
+	// All the values are popped, so the stack pointer must be zero.
+	require.Equal(t, uint64(0), eng.stackPointer)
+	// Check the stored value.
+	offset := o.Arg.Offest + baseOffset
+	require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem.Buffer[offset:]))
+	// The traiing bytes must be intact since this is only moving 4 byte.
+	require.Equal(t, []byte{0, 0, 0, 0}, mem.Buffer[offset+4:offset+8])
 }
 
 func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
