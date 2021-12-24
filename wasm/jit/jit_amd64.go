@@ -476,7 +476,7 @@ func (b *amd64Builder) handleGlobalGet(o *wazeroir.OperationGlobalGet) error {
 func (b *amd64Builder) handleGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	// First, move the value to set into a temporary register.
 	val := b.locationStack.pop()
-	if err := b.ensureLocatedOnGeneralPurposeRegister(val); err != nil {
+	if err := b.ensureOnGeneralPurposeRegister(val); err != nil {
 		return err
 	}
 
@@ -796,7 +796,7 @@ func (b *amd64Builder) emitDropRange(r *wazeroir.InclusiveRange) error {
 // the physical registers or memory stack, or maybe conditional register.
 func (b *amd64Builder) handleSelect() error {
 	c := b.locationStack.pop()
-	if err := b.ensureLocatedOnGeneralPurposeRegister(c); err != nil {
+	if err := b.ensureOnGeneralPurposeRegister(c); err != nil {
 		return err
 	}
 
@@ -1093,7 +1093,7 @@ func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
 
 func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 	base := b.locationStack.pop()
-	if err := b.ensureLocatedOnGeneralPurposeRegister(base); err != nil {
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
 		return err
 	}
 
@@ -1171,7 +1171,7 @@ func (b *amd64Builder) handleLoad(o *wazeroir.OperationLoad) error {
 
 func (b *amd64Builder) handleLoad8(o *wazeroir.OperationLoad8) error {
 	base := b.locationStack.pop()
-	if err := b.ensureLocatedOnGeneralPurposeRegister(base); err != nil {
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
 		return err
 	}
 
@@ -1212,7 +1212,7 @@ func (b *amd64Builder) handleLoad8(o *wazeroir.OperationLoad8) error {
 
 func (b *amd64Builder) handleLoad16(o *wazeroir.OperationLoad16) error {
 	base := b.locationStack.pop()
-	if err := b.ensureLocatedOnGeneralPurposeRegister(base); err != nil {
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
 		return err
 	}
 
@@ -1253,7 +1253,7 @@ func (b *amd64Builder) handleLoad16(o *wazeroir.OperationLoad16) error {
 
 func (b *amd64Builder) handleLoad32(o *wazeroir.OperationLoad32) error {
 	base := b.locationStack.pop()
-	if err := b.ensureLocatedOnGeneralPurposeRegister(base); err != nil {
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
 		return err
 	}
 
@@ -1764,9 +1764,9 @@ func (b *amd64Builder) initializeReservedRegisters() {
 	b.addInstruction(prog)
 }
 
-// ensureLocatedOnGeneralPurposeRegister ensures that the given value is located on a
+// ensureOnGeneralPurposeRegister ensures that the given value is located on a
 // general purpose register of an appropriate type.
-func (b *amd64Builder) ensureLocatedOnGeneralPurposeRegister(loc *valueLocation) error {
+func (b *amd64Builder) ensureOnGeneralPurposeRegister(loc *valueLocation) error {
 	if loc.onStack() {
 		if err := b.moveStackToRegisterWithAllocation(loc.registerType(), loc); err != nil {
 			return err

@@ -1550,6 +1550,7 @@ func TestAmd64Builder_handleLoad8(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
+			// For testing, arbitrary byte is be fine.
 			original := byte(0x10)
 			mem.Buffer[baseOffset+o.Arg.Offest] = byte(original)
 
@@ -1620,6 +1621,7 @@ func TestAmd64Builder_handleLoad16(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
+			// For testing, arbitrary uint16 is be fine.
 			original := uint16(0xff_fe)
 			binary.LittleEndian.PutUint16(mem.Buffer[baseOffset+o.Arg.Offest:], original)
 
@@ -1675,6 +1677,7 @@ func TestAmd64Builder_handleLoad32(t *testing.T) {
 
 	// Place the load target value to the memory.
 	mem := newMemoryInst()
+	// For testing, arbitrary uint32 is be fine.
 	original := uint32(0xff_ff_fe)
 	binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], original)
 
@@ -1688,8 +1691,8 @@ func TestAmd64Builder_handleLoad32(t *testing.T) {
 	// Load instruction must push the loaded value to the top of the stack,
 	// so the stack pointer must be incremented.
 	require.Equal(t, uint64(1), eng.stackPointer)
-			// If the load failed, increment (x86.AINCB) would result in 1 (0+1)
-			require.Equal(t, original+1, uint32(eng.stack[eng.stackPointer-1]))
+	// If the load failed, increment (x86.AINCB) would result in 1 (0+1)
+	require.Equal(t, original+1, uint32(eng.stack[eng.stackPointer-1]))
 }
 
 func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
