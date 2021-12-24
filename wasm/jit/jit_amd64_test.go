@@ -1564,7 +1564,7 @@ func TestAmd64Builder_handleLoad8(t *testing.T) {
 			// Load instruction must push the loaded value to the top of the stack,
 			// so the stack pointer must be incremented.
 			require.Equal(t, uint64(1), eng.stackPointer)
-			// If the load failed, increment (x86.AINCB) would result in 1 (0+1)
+			// The loaded value must be incremented via x86.AINCB.
 			require.Equal(t, original+1, byte(eng.stack[eng.stackPointer-1]))
 		})
 	}
@@ -1606,7 +1606,7 @@ func TestAmd64Builder_handleLoad16(t *testing.T) {
 
 			// Increment the loaded value in order to verify the behavior.
 			doubleLoadedValue := builder.newProg()
-			doubleLoadedValue.As = x86.AINCB
+			doubleLoadedValue.As = x86.AINCW
 			doubleLoadedValue.To.Type = obj.TYPE_REG
 			doubleLoadedValue.To.Reg = loadedValue.register
 			builder.addInstruction(doubleLoadedValue)
@@ -1635,7 +1635,7 @@ func TestAmd64Builder_handleLoad16(t *testing.T) {
 			// Load instruction must push the loaded value to the top of the stack,
 			// so the stack pointer must be incremented.
 			require.Equal(t, uint64(1), eng.stackPointer)
-			// If the load failed, increment (x86.AINCB) would result in 1 (0+1)
+			// The loaded value must be incremented via x86.AINCW.
 			require.Equal(t, original+1, uint16(eng.stack[eng.stackPointer-1]))
 		})
 	}
@@ -1662,7 +1662,7 @@ func TestAmd64Builder_handleLoad32(t *testing.T) {
 
 	// Increment the loaded value in order to verify the behavior.
 	doubleLoadedValue := builder.newProg()
-	doubleLoadedValue.As = x86.AINCB
+	doubleLoadedValue.As = x86.AINCL
 	doubleLoadedValue.To.Type = obj.TYPE_REG
 	doubleLoadedValue.To.Reg = loadedValue.register
 	builder.addInstruction(doubleLoadedValue)
@@ -1691,7 +1691,7 @@ func TestAmd64Builder_handleLoad32(t *testing.T) {
 	// Load instruction must push the loaded value to the top of the stack,
 	// so the stack pointer must be incremented.
 	require.Equal(t, uint64(1), eng.stackPointer)
-	// If the load failed, increment (x86.AINCB) would result in 1 (0+1)
+	// The loaded value must be incremented via x86.AINCL.
 	require.Equal(t, original+1, uint32(eng.stack[eng.stackPointer-1]))
 }
 
