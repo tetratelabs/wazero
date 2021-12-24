@@ -68,7 +68,7 @@ const (
 
 	// tokenID is a sequence of idChar characters prefixed by a '$':
 	//
-	// For example, in the below, '$y' is an id:
+	// For example, in the below, '$y' is an ID:
 	//		local.get $y
 	//		i32.const 6
 	//		i32.lt_s
@@ -91,17 +91,18 @@ const (
 )
 
 // tokenNames is index-coordinated with tokenType
+// See https://www.w3.org/TR/wasm-core-1/#tokens%E2%91%A0 for the naming choices.
 var tokenNames = [...]string{
-	"tokenInvalid",
-	"tokenKeyword",
-	"tokenUN",
-	"tokenSN",
-	"tokenFN",
-	"tokenString",
-	"tokenID",
-	"tokenLParen",
-	"tokenRParen",
-	"tokenReserved",
+	"invalid",
+	"keyword",
+	"uN",
+	"sN",
+	"fN",
+	"string",
+	"id",
+	"(",
+	")",
+	"reserved",
 }
 
 // String returns the string name of this token.
