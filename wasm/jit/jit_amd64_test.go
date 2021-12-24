@@ -1684,6 +1684,9 @@ func TestAmd64Builder_handleLoad32(t *testing.T) {
 	require.Equal(t, original+1, uint32(eng.stack[eng.stackPointer-1]))
 }
 
+func TestAmd64Builder_handleStore(t *testing.T) {
+}
+
 func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
 	builder := requireNewBuilder(t)
 

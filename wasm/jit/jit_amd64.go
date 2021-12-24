@@ -114,13 +114,21 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 				return nil, fmt.Errorf("error handling load16 operation: %w", err)
 			}
 		case *wazeroir.OperationStore:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleStore(o); err != nil {
+				return nil, fmt.Errorf("error handling store operation: %w", err)
+			}
 		case *wazeroir.OperationStore8:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleStore8(o); err != nil {
+				return nil, fmt.Errorf("error handling store8 operation: %w", err)
+			}
 		case *wazeroir.OperationStore16:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleStore16(o); err != nil {
+				return nil, fmt.Errorf("error handling store16 operation: %w", err)
+			}
 		case *wazeroir.OperationStore32:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			if err := builder.handleStore32(o); err != nil {
+				return nil, fmt.Errorf("error handling store32 operation: %w", err)
+			}
 		case *wazeroir.OperationMemorySize:
 			builder.handleMemorySize()
 		case *wazeroir.OperationMemoryGrow:
@@ -1286,6 +1294,68 @@ func (b *amd64Builder) handleLoad32(o *wazeroir.OperationLoad32) error {
 
 	// The result of load32 is always int type.
 	top.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+func (b *amd64Builder) handleStore(o *wazeroir.OperationStore) error {
+	var movInst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
+		movInst = x86.AMOVL
+	case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
+		movInst = x86.AMOVQ
+	}
+	return b.moveToMemory(o.Arg.Offest, movInst)
+}
+
+func (b *amd64Builder) handleStore8(o *wazeroir.OperationStore8) error {
+	return b.moveToMemory(o.Arg.Offest, x86.AMOVB)
+}
+
+func (b *amd64Builder) handleStore16(o *wazeroir.OperationStore16) error {
+	return b.moveToMemory(o.Arg.Offest, x86.AMOVW)
+}
+
+func (b *amd64Builder) handleStore32(o *wazeroir.OperationStore32) error {
+	return b.moveToMemory(o.Arg.Offest, x86.AMOVL)
+}
+
+func (b *amd64Builder) moveToMemory(offsetConst uint32, moveInstruction obj.As) error {
+	val := b.locationStack.pop()
+	if err := b.ensureOnGeneralPurposeRegister(val); err != nil {
+		return err
+	}
+
+	base := b.locationStack.pop()
+	if err := b.ensureOnGeneralPurposeRegister(base); err != nil {
+		return err
+	}
+
+	// At this point, base's value is on the integer general purpose reg.
+	// We reuse the register below, so we alias it here for readability.
+	reg := base.register
+
+	// Then we have to calculate the offset on the memory region.
+	addOffsetToBase := b.newProg()
+	addOffsetToBase.As = x86.AADDL // 32-bit!
+	addOffsetToBase.To.Type = obj.TYPE_REG
+	addOffsetToBase.To.Reg = reg
+	addOffsetToBase.From.Type = obj.TYPE_CONST
+	addOffsetToBase.From.Offset = int64(offsetConst)
+	b.addInstruction(addOffsetToBase)
+
+	// TODO: Emit instructions here to check memory out of bounds as
+	// potentially it would be an security risk.
+
+	moveToMemory := b.newProg()
+	moveToMemory.As = moveInstruction
+	moveToMemory.From.Type = obj.TYPE_REG
+	moveToMemory.From.Reg = val.register
+	moveToMemory.To.Type = obj.TYPE_MEM
+	moveToMemory.To.Reg = reservedRegisterForMemory
+	moveToMemory.To.Index = reg
+	moveToMemory.To.Scale = 1
+	b.addInstruction(moveToMemory)
 	return nil
 }
 
