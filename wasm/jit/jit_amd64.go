@@ -1201,7 +1201,7 @@ func (b *amd64Builder) handleLoad8(o *wazeroir.OperationLoad8) error {
 	// Then move a byte at the offset to the register.
 	// Note that Load8 is only for integer types.
 	moveFromMemory := b.newProg()
-	moveFromMemory.As = x86.AMOVB // 1 byte!
+	moveFromMemory.As = x86.AMOVB
 	moveFromMemory.To.Type = obj.TYPE_REG
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
@@ -1235,10 +1235,10 @@ func (b *amd64Builder) handleLoad16(o *wazeroir.OperationLoad16) error {
 	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
 	b.addInstruction(addOffsetToBase)
 
-	// Then move a byte at the offset to the register.
+	// Then move 2 bytes at the offset to the register.
 	// Note that Load16 is only for integer types.
 	moveFromMemory := b.newProg()
-	moveFromMemory.As = x86.AMOVW // 2 byte!
+	moveFromMemory.As = x86.AMOVW
 	moveFromMemory.To.Type = obj.TYPE_REG
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
@@ -1272,9 +1272,9 @@ func (b *amd64Builder) handleLoad32(o *wazeroir.OperationLoad32) error {
 	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
 	b.addInstruction(addOffsetToBase)
 
-	// Then move a byte at the offset to the register.
+	// Then move 4 bytes at the offset to the register.
 	moveFromMemory := b.newProg()
-	moveFromMemory.As = x86.AMOVL // 3 byte!
+	moveFromMemory.As = x86.AMOVL
 	moveFromMemory.To.Type = obj.TYPE_REG
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
