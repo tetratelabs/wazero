@@ -109,7 +109,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 		return
 	}
 	// Note the top value is the tail of the results,
-	// so we assign the results in reverse order.
+	// so we assign them in reverse order.
 	results = make([]uint64, len(f.Signature.ResultTypes))
 	for i := range results {
 		results[len(results)-1-i] = e.pop()
