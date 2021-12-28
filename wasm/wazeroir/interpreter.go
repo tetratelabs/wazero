@@ -449,8 +449,8 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 	return ret, nil
 }
 
-// Implements wasm.Engine for interpreter.
-func (it *interpreter) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
+// Call implements an interpreted wasm.Engine.
+func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	prevFrameLen := len(it.frames)
 	defer func() {
 		if v := recover(); v != nil {
@@ -488,21 +488,21 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, args ...uint64) (returns [
 	}
 
 	if g.hostFn != nil {
-		it.callHostFunc(g, args...)
+		it.callHostFunc(g, params...)
 	} else {
-		for _, arg := range args {
-			it.push(arg)
+		for _, param := range params {
+			it.push(param)
 		}
 		it.callNativeFunc(g)
 	}
-	returns = make([]uint64, len(f.Signature.ReturnTypes))
-	for i := range returns {
-		returns[len(returns)-1-i] = it.pop()
+	results = make([]uint64, len(f.Signature.ResultTypes))
+	for i := range results {
+		results[len(results)-1-i] = it.pop()
 	}
 	return
 }
 
-func (it *interpreter) callHostFunc(f *interpreterFunction, args ...uint64) {
+func (it *interpreter) callHostFunc(f *interpreterFunction, _ ...uint64) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 	for i := len(in) - 1; i >= 1; i-- {
@@ -554,7 +554,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
 		op := frame.f.body[frame.pc]
-		// TODO: add descriptino of each operation/case
+		// TODO: add description of each operation/case
 		// on, for example, how many args are used,
 		// how the stack is modified, etc.
 		switch op.kind {
@@ -588,7 +588,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCall:
 			{
 				if op.f.hostFn != nil {
-					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.signature.InputTypes):]...)
+					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.signature.ParamTypes):]...)
 				} else {
 					it.callNativeFunc(op.f)
 				}
@@ -604,7 +604,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				}
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(target.signature.InputTypes):]...)
+					it.callHostFunc(target, it.stack[len(it.stack)-len(target.signature.ParamTypes):]...)
 				} else {
 					it.callNativeFunc(target)
 				}
@@ -1473,8 +1473,8 @@ func funcTypeString(t *wasm.FunctionType) string {
 		// Fast stringification of byte slice.
 		// This is safe anyway as the results are copied
 		// into the return value string.
-		*(*string)(unsafe.Pointer(&t.InputTypes)),
-		*(*string)(unsafe.Pointer(&t.ReturnTypes)),
+		*(*string)(unsafe.Pointer(&t.ParamTypes)),
+		*(*string)(unsafe.Pointer(&t.ResultTypes)),
 	)
 }
 

@@ -212,8 +212,7 @@ const (
 	generalPurposeRegisterTypeFloat
 )
 
-// Search for unused registers, and if found, returns the register
-// and mark it used.
+// takeFreeRegister searches for unused registers. Any found are marked used and returned.
 func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {
 	var targetRegs []int16
 	switch tp {

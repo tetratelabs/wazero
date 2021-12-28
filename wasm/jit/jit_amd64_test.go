@@ -49,11 +49,11 @@ func (b *amd64Builder) movIntConstToRegister(val int64, targetRegister int16) *o
 
 func TestAmd64Builder_pushFunctionInputs(t *testing.T) {
 	f := &wasm.FunctionInstance{Signature: &wasm.FunctionType{
-		InputTypes: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
+		ParamTypes: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
 	}}
 	builder := &amd64Builder{locationStack: newValueLocationStack(), f: f}
-	builder.pushFunctionInputs()
-	require.Equal(t, uint64(len(f.Signature.InputTypes)), builder.locationStack.sp)
+	builder.pushFunctionParams()
+	require.Equal(t, uint64(len(f.Signature.ParamTypes)), builder.locationStack.sp)
 	loc := builder.locationStack.pop()
 	require.Equal(t, uint64(1), loc.stackPointer)
 	loc = builder.locationStack.pop()
@@ -111,7 +111,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	require.NoError(t, err)
 	// Setup engine.
 	mem := newMemoryInst()
-	compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputs: 1, returns: 1}
+	compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, params: 1, results: 1}
 	compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 	eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 	// Call into the function
@@ -136,7 +136,7 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 			mem := newMemoryInst()
 			eng := newEngine()
 			eng.stack[0] = 10 // We call recursively 10 times.
-			compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, inputs: 1, returns: 1}
+			compiledFunc := &compiledWasmFunction{codeSegment: code, memory: mem, params: 1, results: 1}
 			compiledFunc.codeInitialAddress = uintptr(unsafe.Pointer(&compiledFunc.codeSegment[0]))
 			eng.compiledWasmFunctions = []*compiledWasmFunction{compiledFunc}
 			// Call into the function
@@ -480,8 +480,8 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		hostFunctionInstance := &wasm.FunctionInstance{
 			HostFunction: &hostFunc,
 			Signature: &wasm.FunctionType{
-				InputTypes:  []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
-				ReturnTypes: []wasm.ValueType{wasm.ValueTypeI64},
+				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
+				ResultTypes: []wasm.ValueType{wasm.ValueTypeI64},
 			},
 		}
 		eng.compiledHostFunctionIndex[hostFunctionInstance] = 1

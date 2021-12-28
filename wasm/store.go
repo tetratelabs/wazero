@@ -153,7 +153,7 @@ func (s *Store) Instantiate(module *Module, name string) error {
 			return fmt.Errorf("invalid start function index: %d", index)
 		}
 		signature := instance.Functions[index].Signature
-		if len(signature.InputTypes) != 0 || len(signature.ReturnTypes) != 0 {
+		if len(signature.ParamTypes) != 0 || len(signature.ResultTypes) != 0 {
 			return fmt.Errorf("start function must have the empty signature")
 		}
 	}
@@ -171,7 +171,7 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	return nil
 }
 
-func (s *Store) CallFunction(moduleName, funcName string, args ...uint64) (returns []uint64, returnTypes []ValueType, err error) {
+func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
 	m, ok := s.ModuleInstances[moduleName]
 	if !ok {
 		return nil, nil, fmt.Errorf("module '%s' not instantiated", moduleName)
@@ -187,12 +187,12 @@ func (s *Store) CallFunction(moduleName, funcName string, args ...uint64) (retur
 	}
 
 	f := exp.Function
-	if len(f.Signature.InputTypes) != len(args) {
-		return nil, nil, fmt.Errorf("invalid number of arguments")
+	if len(f.Signature.ParamTypes) != len(params) {
+		return nil, nil, fmt.Errorf("invalid number of parameters")
 	}
 
-	ret, err := s.engine.Call(f, args...)
-	return ret, f.Signature.ReturnTypes, err
+	ret, err := s.engine.Call(f, params...)
+	return ret, f.Signature.ResultTypes, err
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
@@ -252,10 +252,10 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndexPtr *uint32
 		return fmt.Errorf("unknown type for function import")
 	}
 	iSig := target.Types[typeIndex]
-	if !HasSameSignature(iSig.ReturnTypes, f.Signature.ReturnTypes) {
-		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.ReturnTypes, f.Signature.ReturnTypes)
-	} else if !HasSameSignature(iSig.InputTypes, f.Signature.InputTypes) {
-		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.InputTypes, f.Signature.InputTypes)
+	if !HasSameSignature(iSig.ResultTypes, f.Signature.ResultTypes) {
+		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.ResultTypes, f.Signature.ResultTypes)
+	} else if !HasSameSignature(iSig.ParamTypes, f.Signature.ParamTypes) {
+		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.ParamTypes, f.Signature.ParamTypes)
 	}
 	target.Functions = append(target.Functions, f)
 	return nil
@@ -429,7 +429,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			tableDeclarations = append(tableDeclarations, imp.Desc.TableTypePtr)
 		}
 	}
-	importedFunctionNum := len(functionDeclarations)
+	importedFunctionCount := len(functionDeclarations)
 	functionDeclarations = append(functionDeclarations, module.FunctionSection...)
 	for _, g := range module.GlobalSection {
 		globalDecalarations = append(globalDecalarations, g.Type)
@@ -437,11 +437,11 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	memoryDeclarations = append(memoryDeclarations, module.MemorySection...)
 	tableDeclarations = append(tableDeclarations, module.TableSection...)
 
-	functionNames, _ := module.GetFunctionNames()
+	functionNames, _ := module.DecodeCustomNameSection()
 	if functionNames == nil {
 		// We cannot guarantee the existence of "name" custom section
 		// in the binary. That is because the custom section is optional
-		// in the sepc and some compiler optimize it out to reduce
+		// in the spec. Also, some compilers optimize it out to reduce
 		// the binary size.
 		functionNames = map[uint32]string{}
 	}
@@ -454,12 +454,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
-		// Get the function name if it exists.
-		// The function index includes imports, skip them here.
-		name, ok := functionNames[uint32(codeIndex)+uint32(importedFunctionNum)]
-		if !ok {
-			name = "unknown"
-		}
+		name := getFunctionName(functionNames, importedFunctionCount, codeIndex)
 
 		f := &FunctionInstance{
 			Name:           name,
@@ -484,6 +479,18 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		s.Functions = append(s.Functions, f)
 	}
 	return rollbackFuncs, nil
+}
+
+// getFunctionName gets the name of the function corresponding to the codeIndex.
+func getFunctionName(functionNames map[uint32]string, importedFunctionCount int, codeIndex int) string {
+	// Per spec: "... function indices, starting with the smallest index not referencing a function import."
+	// This means we have to add an offset of the imported function count to resolve the correct function index.
+	// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A0
+	name, ok := functionNames[uint32(importedFunctionCount)+uint32(codeIndex)]
+	if !ok {
+		name = "unknown"
+	}
+	return name
 }
 
 func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
@@ -1027,23 +1034,23 @@ func analyzeFunction(
 			pc += num - 1
 			switch Opcode(op) {
 			case OpcodeLocalGet:
-				inputLen := uint32(len(f.Signature.InputTypes))
+				inputLen := uint32(len(f.Signature.ParamTypes))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				if index < inputLen {
-					valueTypeStack.push(f.Signature.InputTypes[index])
+					valueTypeStack.push(f.Signature.ParamTypes[index])
 				} else {
 					valueTypeStack.push(f.LocalTypes[index-inputLen])
 				}
 			case OpcodeLocalSet:
-				inputLen := uint32(len(f.Signature.InputTypes))
+				inputLen := uint32(len(f.Signature.ParamTypes))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.InputTypes[index]
+					expType = f.Signature.ParamTypes[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1051,13 +1058,13 @@ func analyzeFunction(
 					return err
 				}
 			case OpcodeLocalTee:
-				inputLen := uint32(len(f.Signature.InputTypes))
+				inputLen := uint32(len(f.Signature.ParamTypes))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.InputTypes[index]
+					expType = f.Signature.ParamTypes[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1091,7 +1098,7 @@ func analyzeFunction(
 			pc += num - 1
 			// Check type soundness.
 			target := labelStack[len(labelStack)-int(index)-1]
-			targetResultType := target.BlockType.ReturnTypes
+			targetResultType := target.BlockType.ResultTypes
 			if target.IsLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
@@ -1118,7 +1125,7 @@ func analyzeFunction(
 			}
 			// Check type soundness.
 			target := labelStack[len(labelStack)-int(index)-1]
-			targetResultType := target.BlockType.ReturnTypes
+			targetResultType := target.BlockType.ResultTypes
 			if target.IsLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
@@ -1162,7 +1169,7 @@ func analyzeFunction(
 				return fmt.Errorf("cannot pop the required operand for br_table")
 			}
 			lnLabel := labelStack[len(labelStack)-1-int(ln)]
-			expType := lnLabel.BlockType.ReturnTypes
+			expType := lnLabel.BlockType.ResultTypes
 			if lnLabel.IsLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
@@ -1173,7 +1180,7 @@ func analyzeFunction(
 					return fmt.Errorf("invalid l param given for br_table")
 				}
 				label := labelStack[len(labelStack)-1-int(l)]
-				expType2 := label.BlockType.ReturnTypes
+				expType2 := label.BlockType.ResultTypes
 				if label.IsLoop {
 					// Loop operation doesn't require results since the continuation is
 					// the beginning of the loop.
@@ -1204,12 +1211,12 @@ func analyzeFunction(
 				return fmt.Errorf("invalid function index")
 			}
 			funcType := module.TypeSection[functionDeclarations[index]]
-			for i := 0; i < len(funcType.InputTypes); i++ {
-				if err := valueTypeStack.popAndVerifyType(funcType.InputTypes[len(funcType.InputTypes)-1-i]); err != nil {
-					return fmt.Errorf("type mismatch on call operation input type")
+			for i := 0; i < len(funcType.ParamTypes); i++ {
+				if err := valueTypeStack.popAndVerifyType(funcType.ParamTypes[len(funcType.ParamTypes)-1-i]); err != nil {
+					return fmt.Errorf("type mismatch on call operation param type")
 				}
 			}
-			for _, exp := range funcType.ReturnTypes {
+			for _, exp := range funcType.ResultTypes {
 				valueTypeStack.push(exp)
 			}
 		} else if op == OpcodeCallIndirect {
@@ -1233,12 +1240,12 @@ func analyzeFunction(
 				return fmt.Errorf("invalid type index at call_indirect: %d", typeIndex)
 			}
 			funcType := module.TypeSection[typeIndex]
-			for i := 0; i < len(funcType.InputTypes); i++ {
-				if err := valueTypeStack.popAndVerifyType(funcType.InputTypes[len(funcType.InputTypes)-1-i]); err != nil {
+			for i := 0; i < len(funcType.ParamTypes); i++ {
+				if err := valueTypeStack.popAndVerifyType(funcType.ParamTypes[len(funcType.ParamTypes)-1-i]); err != nil {
 					return fmt.Errorf("type mismatch on call_indirect operation input type")
 				}
 			}
-			for _, exp := range funcType.ReturnTypes {
+			for _, exp := range funcType.ResultTypes {
 				valueTypeStack.push(exp)
 			}
 		} else if OpcodeI32Eqz <= op && op <= OpcodeF64ReinterpretI64 {
@@ -1483,7 +1490,7 @@ func analyzeFunction(
 			bl := labelStack[len(labelStack)-1]
 			bl.ElseAt = pc
 			// Check the type soundness of the instructions *before*　 entering this Eles Op.
-			if err := valueTypeStack.popResults(bl.BlockType.ReturnTypes, true); err != nil {
+			if err := valueTypeStack.popResults(bl.BlockType.ResultTypes, true); err != nil {
 				return fmt.Errorf("invalid instruction results in then instructions")
 			}
 			// Before entring instructions inside else, we pop all the values pushed by
@@ -1494,7 +1501,7 @@ func analyzeFunction(
 			bl.EndAt = pc
 			labelStack = labelStack[:len(labelStack)-1]
 			if bl.IsIf && bl.ElseAt <= bl.StartAt {
-				if len(bl.BlockType.ReturnTypes) > 0 {
+				if len(bl.BlockType.ResultTypes) > 0 {
 					return fmt.Errorf("type mismatch between then and else blocks")
 				}
 				// To handle if block without else properly,
@@ -1502,20 +1509,20 @@ func analyzeFunction(
 				bl.ElseAt = bl.EndAt - 1
 			}
 			// Check type soundness.
-			if err := valueTypeStack.popResults(bl.BlockType.ReturnTypes, true); err != nil {
-				return fmt.Errorf("invalid instruction results at end instruction; expected %v: %v", bl.BlockType.ReturnTypes, err)
+			if err := valueTypeStack.popResults(bl.BlockType.ResultTypes, true); err != nil {
+				return fmt.Errorf("invalid instruction results at end instruction; expected %v: %v", bl.BlockType.ResultTypes, err)
 			}
 			// Put the result types at the end after resetting at the stack limit
 			// since we might have Any type between the limit and the current top.
 			valueTypeStack.resetAtStackLimit()
-			for _, exp := range bl.BlockType.ReturnTypes {
+			for _, exp := range bl.BlockType.ResultTypes {
 				valueTypeStack.push(exp)
 			}
 			// We exit if/loop/block, so reset the constraints on the stack manipulation
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			expTypes := f.Signature.ReturnTypes
+			expTypes := f.Signature.ResultTypes
 			for i := 0; i < len(expTypes); i++ {
 				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
 					return fmt.Errorf("return type mismatch on return: %v; want %v", err, expTypes)
@@ -1575,13 +1582,13 @@ func ReadBlockType(types []*FunctionType, r io.Reader) (*BlockType, uint64, erro
 	case -64: // 0x40 in original byte = nil
 		ret = &BlockType{}
 	case -1: // 0x7f in original byte = i32
-		ret = &BlockType{ReturnTypes: []ValueType{ValueTypeI32}}
+		ret = &BlockType{ResultTypes: []ValueType{ValueTypeI32}}
 	case -2: // 0x7e in original byte = i64
-		ret = &BlockType{ReturnTypes: []ValueType{ValueTypeI64}}
+		ret = &BlockType{ResultTypes: []ValueType{ValueTypeI64}}
 	case -3: // 0x7d in original byte = f32
-		ret = &BlockType{ReturnTypes: []ValueType{ValueTypeF32}}
+		ret = &BlockType{ResultTypes: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
-		ret = &BlockType{ReturnTypes: []ValueType{ValueTypeF64}}
+		ret = &BlockType{ResultTypes: []ValueType{ValueTypeF64}}
 	default:
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
@@ -1611,22 +1618,22 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		if p.NumIn() == 0 {
 			return nil, fmt.Errorf("host function must accept *wasm.HostFunctionCallContext as the first param")
 		}
-		in := make([]ValueType, p.NumIn()-1)
-		for i := range in {
-			in[i], err = getTypeOf(p.In(i + 1).Kind())
+		paramTypes := make([]ValueType, p.NumIn()-1)
+		for i := range paramTypes {
+			paramTypes[i], err = getTypeOf(p.In(i + 1).Kind())
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		out := make([]ValueType, p.NumOut())
-		for i := range out {
-			out[i], err = getTypeOf(p.Out(i).Kind())
+		resultTypes := make([]ValueType, p.NumOut())
+		for i := range resultTypes {
+			resultTypes[i], err = getTypeOf(p.Out(i).Kind())
 			if err != nil {
 				return nil, err
 			}
 		}
-		return &FunctionType{InputTypes: in, ReturnTypes: out}, nil
+		return &FunctionType{ParamTypes: paramTypes, ResultTypes: resultTypes}, nil
 	}
 
 	m, ok := s.ModuleInstances[moduleName]

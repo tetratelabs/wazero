@@ -24,7 +24,7 @@ type engine struct {
 	// however in reality, they have to use it from the middle of the stack depending on
 	// when these function calls are made. So instead of accessing stack via stackPointer alone,
 	// functions are compiled so they access the stack via [stackBasePointer](fixed for entire function) + [stackPointer].
-	// More precisely, stackBasePointer is set to [callee's stack pointer] + [callee's stack base pointer] - [caller's inputs].
+	// More precisely, stackBasePointer is set to [callee's stack pointer] + [callee's stack base pointer] - [caller's params].
 	// This way, compiled functions can be independent of the timing of functions calls made against them.
 	stackBasePointer uint64
 	// Where we store the status code of JIT execution.
@@ -64,12 +64,12 @@ const (
 	engineglobalSliceAddressOffset  = 64
 )
 
-func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint64, err error) {
+func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	prevFrame := e.callFrameStack
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside
-	// host functions, will be capatured as errors, not panics.
+	// host functions, will be captured as errors, not panics.
 	defer func() {
 		if v := recover(); v != nil {
 			top := e.callFrameStack
@@ -94,8 +94,8 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 		}
 	}()
 
-	for _, arg := range args {
-		e.push(arg)
+	for _, param := range params {
+		e.push(param)
 	}
 	// Note that there's no conflict between e.hostFunctionIndex and e.compiledWasmFunctionIndex,
 	// meaning that each *wasm.FunctionInstance is assigned to either host function index or wasm function one.
@@ -108,11 +108,11 @@ func (e *engine) Call(f *wasm.FunctionInstance, args ...uint64) (returns []uint6
 		err = fmt.Errorf("function not compiled")
 		return
 	}
-	// Note the top value is the tail of the returns,
-	// so we assign the returns in reverse order.
-	returns = make([]uint64, len(f.Signature.ReturnTypes))
-	for i := range returns {
-		returns[len(returns)-1-i] = e.pop()
+	// Note the top value is the tail of the results,
+	// so we assign them in reverse order.
+	results = make([]uint64, len(f.Signature.ResultTypes))
+	for i := range results {
+		results[len(results)-1-i] = e.pop()
 	}
 	return
 }
@@ -300,9 +300,8 @@ type compiledHostFunction = struct {
 
 type compiledWasmFunction struct {
 	// The source function instance from which this is compiled.
-	source *wasm.FunctionInstance
-	// inputs,returns represents the number of input/returns of function.
-	inputs, returns uint64
+	source          *wasm.FunctionInstance
+	params, results uint64
 	// codeSegment is holding the compiled native code as a byte slice.
 	codeSegment []byte
 	// memory is the pointer to a memory instance which the original function instance refers to.
@@ -348,7 +347,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		continuationAddress:      f.codeInitialAddress,
 		wasmFunction:             f,
 		caller:                   nil,
-		continuationStackPointer: f.inputs,
+		continuationStackPointer: f.params,
 	}
 	e.globalSliceAddress = f.globalSliceAddress
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
@@ -384,26 +383,25 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// This never panics as we made sure that the index exists for all the referenced functions
 			// in a module.
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
-			// Calculate the continuation address so
-			// we can resume this caller function frame.
+			// Calculate the continuation address so we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
-			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.returns - nextFunc.inputs
+			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.results - nextFunc.params
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
 				wasmFunction:        nextFunc,
 				// Set the caller frame so we can return back to the current frame!
 				caller: currentFrame,
-				// Set the base pointer to the beginning of the function inputs
-				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.inputs,
+				// Set the base pointer to the beginning of the function params
+				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.params,
 			}
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 			e.maybeGrowStack(nextFunc.maxStackPointer)
 			// Now move onto the callee function.
 			e.callFrameStack = frame
 			e.stackBasePointer = frame.stackBasePointer
-			// Set the stack pointer so that base+sp would point to the top of function inputs.
-			e.stackPointer = nextFunc.inputs
+			// Set the stack pointer so that base+sp would point to the top of function params.
+			e.stackPointer = nextFunc.params
 			e.globalSliceAddress = nextFunc.globalSliceAddress
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {

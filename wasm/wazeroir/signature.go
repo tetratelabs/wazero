@@ -170,37 +170,37 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 	case wasm.OpcodeSelect:
 		return signature_UnknownUnkownI32_Unknown, nil
 	case wasm.OpcodeLocalGet:
-		inputLen := uint32(len(f.Signature.InputTypes))
+		inputLen := uint32(len(f.Signature.ParamTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(f.Signature.InputTypes[index])
+			t = wasmValueTypeToUnsignedType(f.Signature.ParamTypes[index])
 		} else {
 			t = wasmValueTypeToUnsignedType(f.LocalTypes[index-inputLen])
 		}
 		return &signature{out: []UnsignedType{t}}, nil
 	case wasm.OpcodeLocalSet:
-		inputLen := uint32(len(f.Signature.InputTypes))
+		inputLen := uint32(len(f.Signature.ParamTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(f.Signature.InputTypes[index])
+			t = wasmValueTypeToUnsignedType(f.Signature.ParamTypes[index])
 		} else {
 			t = wasmValueTypeToUnsignedType(f.LocalTypes[index-inputLen])
 		}
 		return &signature{in: []UnsignedType{t}}, nil
 	case wasm.OpcodeLocalTee:
-		inputLen := uint32(len(f.Signature.InputTypes))
+		inputLen := uint32(len(f.Signature.ParamTypes))
 		if l := f.NumLocals + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
 		if index < inputLen {
-			t = wasmValueTypeToUnsignedType(f.Signature.InputTypes[index])
+			t = wasmValueTypeToUnsignedType(f.Signature.ParamTypes[index])
 		} else {
 			t = wasmValueTypeToUnsignedType(f.LocalTypes[index-inputLen])
 		}
@@ -353,10 +353,10 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 
 func funcTypeToSignature(tps *wasm.FunctionType) *signature {
 	ret := &signature{}
-	for _, vt := range tps.InputTypes {
+	for _, vt := range tps.ParamTypes {
 		ret.in = append(ret.in, wasmValueTypeToUnsignedType(vt))
 	}
-	for _, vt := range tps.ReturnTypes {
+	for _, vt := range tps.ResultTypes {
 		ret.out = append(ret.out, wasmValueTypeToUnsignedType(vt))
 	}
 	return ret

@@ -78,7 +78,7 @@ func DecodeModule(binary []byte) (*Module, error) {
 	return ret, nil
 }
 
-func (m *Module) GetFunctionNames() (map[uint32]string, error) {
+func (m *Module) DecodeCustomNameSection() (map[uint32]string, error) {
 	namesec, ok := m.CustomSections["name"]
 	if !ok {
 		return nil, fmt.Errorf("'name' %w", ErrCustomSectionNotFound)
