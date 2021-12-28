@@ -41,10 +41,10 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		labelInitialInstructions: make(map[string]*obj.Prog),
 		onLabelStartCallbacks:    make(map[string][]func(*obj.Prog)),
 	}
-	// Move the function inputs onto stack, as we assume that
-	// all the function inputs (parameters) are already pushed on the stack
-	// by the caller.
-	builder.pushFunctionInputs()
+
+	// We assume all function parameters are already pushed onto the stack by
+	// the caller.
+	builder.pushFunctionParams()
 
 	// Initialize the reserved registers first of all.
 	builder.initializeReservedRegisters()
@@ -251,8 +251,8 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 	cf := &compiledWasmFunction{
 		source:          b.f,
 		codeSegment:     code,
-		inputs:          uint64(len(b.f.Signature.InputTypes)),
-		returns:         uint64(len(b.f.Signature.ReturnTypes)),
+		params:          uint64(len(b.f.Signature.ParamTypes)),
+		results:         uint64(len(b.f.Signature.ResultTypes)),
 		memory:          b.f.ModuleInstance.Memory,
 		maxStackPointer: b.locationStack.maxStackPointer,
 	}
@@ -266,8 +266,8 @@ func (b *amd64Builder) newCompiledWasmFunction(code []byte) *compiledWasmFunctio
 	return cf
 }
 
-func (b *amd64Builder) pushFunctionInputs() {
-	for _, t := range b.f.Signature.InputTypes {
+func (b *amd64Builder) pushFunctionParams() {
+	for _, t := range b.f.Signature.ParamTypes {
 		loc := b.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -1619,8 +1619,7 @@ func (b *amd64Builder) callHostFunctionFromConstIndex(index int64) {
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
-	// Once the returns from the function call,
-	// we must setup the reserved registers again.
+	// Once the function call returns, we must re-initialize the reserved registers.
 	b.initializeReservedRegisters()
 }
 
@@ -1633,8 +1632,7 @@ func (b *amd64Builder) callHostFunctionFromRegisterIndex(reg int16) {
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
-	// Once the returns from the function call,
-	// we must setup the reserved registers again.
+	// Once the function call returns, we must re-initialize the reserved registers..
 	b.initializeReservedRegisters()
 }
 
@@ -1647,8 +1645,7 @@ func (b *amd64Builder) callFunctionFromConstIndex(index int64) {
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
-	// Once the returns from the function call,
-	// we must setup the reserved registers again.
+	// Once the function call returns, we must re-initialize the reserved registers.
 	b.initializeReservedRegisters()
 }
 
@@ -1661,8 +1658,7 @@ func (b *amd64Builder) callFunctionFromRegisterIndex(reg int16) {
 	b.releaseAllRegistersToStack()
 	// Set the continuation offset on the next instruction.
 	b.setContinuationOffsetAtNextInstructionAndReturn()
-	// Once the returns from the function call,
-	// we must setup the reserved registers again.
+	// Once the function call returns, we must re-initialize the reserved registers.
 	b.initializeReservedRegisters()
 }
 
@@ -1801,8 +1797,8 @@ func (b *amd64Builder) initializeReservedRegisters() {
 	prog.To.Reg = reservedRegisterForStackBasePointer
 	b.addInstruction(prog)
 
-	// initializeReservedRegisters is called at the beginning of function calls
-	// or right after function returns so at this point we always have free registers.
+	// Since initializeReservedRegisters is called at the beginning of function
+	// calls (or right after they return), we have free registers at this point.
 	reg, _ := b.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
 	// Next we move the base pointer (engine.stackBasePointer) to

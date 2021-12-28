@@ -8,7 +8,7 @@ import (
 )
 
 type FunctionType struct {
-	InputTypes, ReturnTypes []ValueType
+	ParamTypes, ResultTypes []ValueType
 }
 
 func readFunctionType(r io.Reader) (*FunctionType, error) {
@@ -26,7 +26,7 @@ func readFunctionType(r io.Reader) (*FunctionType, error) {
 		return nil, fmt.Errorf("get the size of input value types: %w", err)
 	}
 
-	ip, err := readValueTypes(r, s)
+	paramTypes, err := readValueTypes(r, s)
 	if err != nil {
 		return nil, fmt.Errorf("read value types of inputs: %w", err)
 	}
@@ -38,14 +38,14 @@ func readFunctionType(r io.Reader) (*FunctionType, error) {
 		return nil, fmt.Errorf("multi value results not supported")
 	}
 
-	op, err := readValueTypes(r, s)
+	resultTypes, err := readValueTypes(r, s)
 	if err != nil {
 		return nil, fmt.Errorf("read value types of outputs: %w", err)
 	}
 
 	return &FunctionType{
-		InputTypes:  ip,
-		ReturnTypes: op,
+		ParamTypes:  paramTypes,
+		ResultTypes: resultTypes,
 	}, nil
 }
 
