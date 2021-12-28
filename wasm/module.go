@@ -35,11 +35,16 @@ type Module struct {
 	MemorySection   []*MemoryType
 	GlobalSection   []*GlobalSegment
 	ExportSection   map[string]*ExportSegment
-	StartSection    *uint32
-	ElementSection  []*ElementSegment
-	CodeSection     []*CodeSegment
-	DataSection     []*DataSegment
-	CustomSections  map[string][]byte
+	// StartSection is a function index value when set.
+	//
+	// Note: The function index space is preceded by imported functions, but not all elements in the ImportSection are
+	// functions. The index space is ImportSection narrowed to ImportKindFunction plus the FunctionSection.
+	// Note: This is a pointer to avoid conflating no start section with the valid index zero.
+	StartSection   *uint32
+	ElementSection []*ElementSegment
+	CodeSection    []*CodeSegment
+	DataSection    []*DataSegment
+	CustomSections map[string][]byte
 }
 
 // DecodeModule decodes a `raw` module from io.Reader whose index spaces are yet to be initialized
