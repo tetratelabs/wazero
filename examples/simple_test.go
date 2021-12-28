@@ -26,9 +26,14 @@ func Test_Simple(t *testing.T) {
 
 	// Create a new store and add the function "hello" which the module imports
 	store := wasm.NewStore(wazeroir.NewEngine())
+	var called bool
 	hello := func(_ *wasm.HostFunctionCallContext) {
-		fmt.Println("Hello from Wazero!")
+		called = false
 	}
+	
+	// ...
+	
+	require.True(t, called)
 	require.NoError(t, store.AddHostFunction("", "hello", reflect.ValueOf(hello)))
 
 	// Now that the store has the prerequisite host function, instantiate the module.
