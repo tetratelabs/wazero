@@ -28,7 +28,7 @@ func TestParseModule(t *testing.T) {
 		{
 			name:     "import func empty",
 			input:    "(module (import \"foo\" \"bar\" (func)))", // ok empty sig
-			expected: &textModule{imports: []*textImport{{module: "foo", name: "bar", desc: &textFunc{}}}},
+			expected: &textModule{imports: []*textImport{{module: "foo", name: "bar", desc: &textImportFunc{}}}},
 		},
 		{
 			name: "start imported function by name",
@@ -37,7 +37,7 @@ func TestParseModule(t *testing.T) {
 	(start $hello)
 )`,
 			expected: &textModule{
-				imports:       []*textImport{{name: "hello", desc: &textFunc{name: "$hello"}}},
+				imports:       []*textImport{{name: "hello", desc: &textImportFunc{name: "$hello"}}},
 				startFunction: "$hello",
 			},
 		},
@@ -48,7 +48,7 @@ func TestParseModule(t *testing.T) {
 	(start 0)
 )`,
 			expected: &textModule{
-				imports:       []*textImport{{name: "hello", desc: &textFunc{}}},
+				imports:       []*textImport{{name: "hello", desc: &textImportFunc{}}},
 				startFunction: "0",
 			},
 		},

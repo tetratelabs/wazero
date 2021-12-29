@@ -19,7 +19,7 @@ type textModule struct {
 	// imports are the module textImport added in insertion order.
 	imports []*textImport
 
-	// startFunction is the function to call during wasm.Store Instantiate. The value is a textFunc.name, such as "$main",
+	// startFunction is the function to call during wasm.Store Instantiate. The value is a textImportFunc.name, such as "$main",
 	// or its equivalent raw numeric index, such as "2".
 	//
 	// Note: When in raw numeric form, this is relative to Import functions.
@@ -27,12 +27,12 @@ type textModule struct {
 	startFunction string
 }
 
-// textFunc corresponds to the text format of a WebAssembly textFunc.
+// textImportFunc corresponds to the text format of a WebAssembly function import description.
 //
 // Note: nothing is required per specification. Ex `(func)` is valid!
 //
-// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
-type textFunc struct {
+// See https://www.w3.org/TR/wasm-core-1/#imports%E2%91%A0
+type textImportFunc struct {
 	// name is optional and starts with '$'. For example, "$main".
 	//
 	// This name is only used for debugging. At runtime, functions are called based on raw numeric index. The function
@@ -54,9 +54,9 @@ type textImport struct {
 	module string
 	// name is the possibly empty entity name to import. Ex. "" or "PI"
 	//
-	// Note: This is not necessarily the actual entity name (ex. textFunc.name), so it does not need to begin with '$'!
+	// Note: This is not necessarily the entity name defined in this module, so it does not need to begin with '$'!
 	name string
-	desc *textFunc // TODO: oneOf textFunc,textTable,textMem,textGlobal
+	desc *textImportFunc // TODO: oneOf func, table, mem, global
 }
 
 // textFormatError allows control over the format of textFormatError.Error

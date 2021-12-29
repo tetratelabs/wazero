@@ -18,7 +18,6 @@ type ModuleParser struct {
 	// TODO: https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A8
 	afterInlining tokenParser
 	currentImport *textImport
-	currentFunc   *textFunc
 }
 
 // ParseModule parses the configured source into a module. This function returns when the source is exhausted or an
@@ -136,33 +135,24 @@ func (p *ModuleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ int) e
 func (p *ModuleParser) startImportField(fieldName []byte) (tokenParser, error) {
 	switch string(fieldName) {
 	case "func":
-		p.currentFunc = &textFunc{}
-		p.currentImport.desc = p.currentFunc
+		p.currentImport.desc = &textImportFunc{}
 		p.afterInlining = p.parseImport
-		return p.parseFunc, nil
+		return p.parseImportFunc, nil
 	}
 	return nil, fmt.Errorf("unexpected field: %s", string(fieldName))
 }
 
-func (p *ModuleParser) parseFunc(tok tokenType, tokenBytes []byte, _, _ int) error {
+func (p *ModuleParser) parseImportFunc(tok tokenType, tokenBytes []byte, _, _ int) error {
 	switch tok {
 	case tokenID: // Ex. $main
 		name := string(tokenBytes)
-		if p.currentFunc.name != "" {
+		if p.currentImport.desc.name != "" {
 			return fmt.Errorf("redundant name: %s", name)
 		}
-		p.currentFunc.name = name
+		p.currentImport.desc.name = name
 	case tokenRParen: // end of this func
-		p.currentFunc = nil
-		// There are two places a func ends: after inlining or after its module field.
-		// Ex. (module (import "" "hello" (func $hello)) (func $goodbye))
-		//                                    inlined ^   module field ^
-		if p.afterInlining != nil {
-			p.tokenParser = p.afterInlining
-			p.afterInlining = nil
-		} else {
-			p.tokenParser = p.parseModule
-		}
+		p.tokenParser = p.afterInlining
+		p.afterInlining = nil
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
