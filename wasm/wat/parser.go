@@ -7,7 +7,7 @@ import (
 
 type ModuleParser struct {
 	source []byte
-	tm     *textModule
+	module *textModule
 	// currentStringCount allows us to unquote the textImport.module and textImport.name fields, differentiating empty
 	// from never set, without making textImport.module and textImport.name pointers.
 	currentStringCount int
@@ -24,16 +24,16 @@ type ModuleParser struct {
 // error occurs.
 //
 // Here's a description of the return values:
-// * tm is the result of parsing or nil on error
+// * module is the result of parsing or nil on error
 // * err is a textFormatError invoking the parser, dangling block comments or unexpected characters.
 func ParseModule(source []byte) (*textModule, error) {
-	p := ModuleParser{source: source, tm: &textModule{}}
+	p := ModuleParser{source: source, module: &textModule{}}
 	p.tokenParser = p.startFile
 	line, col, err := lex(p.parse, p.source)
 	if err != nil {
 		return nil, &textFormatError{line, col, p.errorContext(), err}
 	}
-	return p.tm, nil
+	return p.module, nil
 }
 
 // fieldHandler returns a tokenParser that resumes parsing after "($fieldName". This must handle all tokens until
@@ -70,10 +70,10 @@ func (p *ModuleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ int) e
 	switch tok {
 	case tokenID:
 		name := string(tokenBytes)
-		if p.tm.name != "" {
+		if p.module.name != "" {
 			return fmt.Errorf("redundant name: %s", name)
 		}
-		p.tm.name = name
+		p.module.name = name
 	case tokenLParen:
 		p.tokenParser = p.startField        // after this look for a field name
 		p.fieldHandler = p.startModuleField // this defines the field names accepted
@@ -89,7 +89,7 @@ func (p *ModuleParser) startModuleField(fieldName []byte) (tokenParser, error) {
 	switch string(fieldName) {
 	case "import":
 		p.currentImport = &textImport{}
-		p.tm.imports = append(p.tm.imports, p.currentImport)
+		p.module.imports = append(p.module.imports, p.currentImport)
 		return p.parseImport, nil
 	case "start": // TODO: only one is allowed
 		return p.parseStart, nil
@@ -163,12 +163,12 @@ func (p *ModuleParser) parseStart(tok tokenType, tokenBytes []byte, _, _ int) er
 	switch tok {
 	case tokenUN, tokenID: // Ex. $main or 2
 		funcidx := string(tokenBytes)
-		if p.tm.startFunction != "" {
+		if p.module.startFunction != "" {
 			return fmt.Errorf("redundant funcidx: %s", funcidx)
 		}
-		p.tm.startFunction = funcidx
+		p.module.startFunction = funcidx
 	case tokenRParen: // end of this start
-		if p.tm.startFunction == "" {
+		if p.module.startFunction == "" {
 			return errors.New("missing funcidx")
 		}
 		p.tokenParser = p.parseModule
@@ -196,12 +196,12 @@ func (p *ModuleParser) unexpectedToken(tok tokenType, tokenBytes []byte) error {
 
 func (p *ModuleParser) errorContext() string {
 	if p.currentImport != nil {
-		i := len(p.tm.imports) - 1
+		i := len(p.module.imports) - 1
 		if p.currentImport.desc != nil {
 			return fmt.Sprintf("import[%d].func", i) // TODO: func, table, memory or global
 		}
 		return fmt.Sprintf("import[%d]", i)
-	} else if p.tm.startFunction != "" {
+	} else if p.module.startFunction != "" {
 		return "start"
 	}
 	return "module"
