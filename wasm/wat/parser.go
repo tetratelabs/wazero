@@ -9,8 +9,8 @@ type ModuleParser struct {
 	source                     []byte
 	tm                         *textModule
 	parenDepth, skipUntilDepth int
-	// currentStringCount allows us to unquote the Import.module and Import.name fields, differentiating empty from
-	// never set, without making Import.module and Import.name pointers.
+	// currentStringCount allows us to unquote the textImport.module and textImport.name fields, differentiating empty
+	// from never set, without making textImport.module and textImport.name pointers.
 	currentStringCount int
 	fieldHandler       fieldHandler
 	tokenParser        tokenParser
@@ -20,6 +20,22 @@ type ModuleParser struct {
 	afterInlining tokenParser
 	currentImport *textImport
 	currentFunc   *textFunc
+}
+
+// ParseModule parses the configured source into a module. This function returns when the source is exhausted or an
+// error occurs.
+//
+// Here's a description of the return values:
+// * tm is the result of parsing or nil on error
+// * err is a textFormatError invoking the parser, dangling block comments or unexpected characters.
+func ParseModule(source []byte) (*textModule, error) {
+	p := ModuleParser{source: source, tm: &textModule{}}
+	p.tokenParser = p.startFile
+	line, col, err := lex(p.parse, p.source)
+	if err != nil {
+		return nil, &textFormatError{line, col, p.errorContext(), err}
+	}
+	return p.tm, nil
 }
 
 // fieldHandler returns a tokenParser that resumes parsing after "($fieldName". This must handle all tokens until
@@ -191,22 +207,6 @@ func (p *ModuleParser) startFile(tok tokenType, _ []byte, _, _ int) error {
 	p.tokenParser = p.startField
 	p.fieldHandler = p.startModule
 	return nil
-}
-
-// ParseModule parses the configured source into a module. This function returns when the source is exhausted or an
-// error occurs.
-//
-// Here's a description of the return values:
-// * tm is the result of parsing or nil on error
-// * err is a textFormatError invoking the parser, dangling block comments or unexpected characters.
-func ParseModule(source []byte) (*textModule, error) {
-	p := ModuleParser{source: source, tm: &textModule{}}
-	p.tokenParser = p.startFile
-	line, col, err := lex(p.parse, p.source)
-	if err != nil {
-		return nil, &textFormatError{line, col, p.errorContext(), err}
-	}
-	return p.tm, nil
 }
 
 func (p *ModuleParser) unexpectedToken(tok tokenType, tokenBytes []byte) error {
