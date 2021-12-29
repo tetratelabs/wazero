@@ -77,7 +77,7 @@ type Module struct {
 	// Note: This is a pointer to avoid conflating no start section with the valid index zero.
 	StartSection   *uint32
 	ElementSection []*ElementSegment
-	// CodeSection is index-correlated with FunctionSection and contains each functions' locals and body.
+	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
 	// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
 	CodeSection    []*CodeSegment
 	DataSection    []*DataSegment
