@@ -58,8 +58,8 @@ func TestParseModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, line, col, err := ParseModule([]byte(tc.input))
-			require.NoError(t, err, "%d:%d: %s", line, col, err)
+			m, err := ParseModule([]byte(tc.input))
+			require.NoError(t, err)
 			require.Equal(t, tc.expected, m)
 		})
 	}
@@ -67,95 +67,69 @@ func TestParseModule(t *testing.T) {
 
 func TestParseModule_Errors(t *testing.T) {
 	tests := []struct {
-		name         string
-		input        []byte
-		expectedLine int
-		expectedCol  int
-		expectedErr  string
+		name        string
+		input       []byte
+		expectedErr string
 	}{
 		{
-			name:         "no module",
-			input:        []byte("()"),
-			expectedLine: 1,
-			expectedCol:  2,
-			expectedErr:  "module has a ) where a field name was expected",
+			name:        "no module",
+			input:       []byte("()"),
+			expectedErr: "1:2: expected field, but found ) in module",
 		},
 		{
-			name:         "module invalid name",
-			input:        []byte("(module test)"), // must start with $
-			expectedLine: 1,
-			expectedCol:  9,
-			expectedErr:  "module has an unexpected keyword: test",
+			name:        "module invalid name",
+			input:       []byte("(module test)"), // must start with $
+			expectedErr: "1:9: unexpected keyword: test in module",
 		},
 		{
-			name:         "module double name",
-			input:        []byte("(module $foo $bar)"),
-			expectedLine: 1,
-			expectedCol:  14,
-			expectedErr:  "module has a redundant name: $bar",
+			name:        "module double name",
+			input:       []byte("(module $foo $bar)"),
+			expectedErr: "1:14: redundant name: $bar in module",
 		},
 		{
-			name:         "module empty field",
-			input:        []byte("(module $foo ())"),
-			expectedLine: 1,
-			expectedCol:  15,
-			expectedErr:  "module has a ) where a field name was expected",
+			name:        "module empty field",
+			input:       []byte("(module $foo ())"),
+			expectedErr: "1:15: expected field, but found ) in module",
 		},
 		{
-			name:         "module trailing )",
-			input:        []byte("(module $foo ))"),
-			expectedLine: 1,
-			expectedCol:  15,
-			expectedErr:  "found ')' before '('",
+			name:        "module trailing )",
+			input:       []byte("(module $foo ))"),
+			expectedErr: "1:15: found ')' before '(' in module",
 		},
 		{
-			name:         "import missing module",
-			input:        []byte("(module (import))"),
-			expectedLine: 1,
-			expectedCol:  16,
-			expectedErr:  "import[1] is missing its module and name",
+			name:        "import missing module",
+			input:       []byte("(module (import))"),
+			expectedErr: "1:16: expected module and name in import[0]",
 		},
 		{
-			name:         "import missing name",
-			input:        []byte("(module (import \"\"))"),
-			expectedLine: 1,
-			expectedCol:  19,
-			expectedErr:  "import[1] is missing its name",
+			name:        "import missing name",
+			input:       []byte("(module (import \"\"))"),
+			expectedErr: "1:19: expected name in import[0]",
 		},
 		{
-			name:         "import unquoted module",
-			input:        []byte("(module (import foo bar))"),
-			expectedLine: 1,
-			expectedCol:  17,
-			expectedErr:  "import[1] has an unexpected keyword: foo",
+			name:        "import unquoted module",
+			input:       []byte("(module (import foo bar))"),
+			expectedErr: "1:17: unexpected keyword: foo in import[0]",
 		},
 		{
-			name:         "import double name",
-			input:        []byte("(module (import \"foo\" \"bar\" \"baz\")"),
-			expectedLine: 1,
-			expectedCol:  29,
-			expectedErr:  "import[1] has a redundant name: baz",
+			name:        "import double name",
+			input:       []byte("(module (import \"foo\" \"bar\" \"baz\")"),
+			expectedErr: "1:29: redundant name: baz in import[0]",
 		},
 		{
-			name:         "import missing desc",
-			input:        []byte("(module (import \"foo\" \"bar\"))"),
-			expectedLine: 1,
-			expectedCol:  28,
-			expectedErr:  "import[1] is missing its descripton",
+			name:        "import missing desc",
+			input:       []byte("(module (import \"foo\" \"bar\"))"),
+			expectedErr: "1:28: expected descripton in import[0]",
 		},
 		{
-			name:         "import desc empty",
-			input:        []byte("(module (import \"foo\" \"bar\"())"),
-			expectedLine: 1,
-			expectedCol:  29,
-			expectedErr:  "import[1] has a ) where a field name was expected",
+			name:        "import desc empty",
+			input:       []byte("(module (import \"foo\" \"bar\"())"),
+			expectedErr: "1:29: expected field, but found ) in import[0]",
 		},
 		{
-			name:         "import func invalid name",
-			input:        []byte("(module (import \"foo\" \"bar\" (func baz)))"),
-			expectedLine: 1,
-			expectedCol:  35,
-			expectedErr:  "import[1].func has an unexpected keyword: baz",
+			name:        "import func invalid name",
+			input:       []byte("(module (import \"foo\" \"bar\" (func baz)))"),
+			expectedErr: "1:35: unexpected keyword: baz in import[0].func",
 		},
 	}
 
@@ -163,9 +137,7 @@ func TestParseModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, line, col, err := ParseModule(tc.input)
-			require.Equal(t, tc.expectedLine, line)
-			require.Equal(t, tc.expectedCol, col)
+			_, err := ParseModule(tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -199,7 +171,7 @@ func BenchmarkParseExample(b *testing.B) {
 	b.Run("vs wat.lex(noop)", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			line, col, err := lex(noopParseToken, simpleExample)
+			line, col, err := lex(noopTokenParser, simpleExample)
 			if err != nil {
 				panic(fmt.Errorf("%d:%d: %w", line, col, err))
 			}
@@ -208,9 +180,9 @@ func BenchmarkParseExample(b *testing.B) {
 	b.Run("ParseModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, line, col, err := ParseModule(simpleExample)
+			_, err := ParseModule(simpleExample)
 			if err != nil {
-				panic(fmt.Errorf("%d:%d: %w", line, col, err))
+				panic(err)
 			}
 		}
 	})

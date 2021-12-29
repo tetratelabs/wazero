@@ -1,5 +1,7 @@
 package wat
 
+import "fmt"
+
 // textModule corresponds to the text format of a WebAssembly module, and is an intermediate representation prior to
 // wasm.Module.
 //
@@ -55,4 +57,23 @@ type textImport struct {
 	// Note: This is not necessarily the actual entity name (ex. textFunc.name), so it does not need to begin with '$'!
 	name string
 	desc *textFunc // TODO: oneOf textFunc,textTable,textMem,textGlobal
+}
+
+// textFormatError allows control over the format of textFormatError.Error
+type textFormatError struct {
+	// line is the source line number determined by unescaped '\n' characters of the error or EOF
+	line int
+	// Col is the UTF-8 column number of the error or EOF
+	col int
+	// Context is where symbolically the error occurred. Ex "imports[1].desc"
+	context string
+	cause   error
+}
+
+func (e *textFormatError) Error() string {
+	return fmt.Sprintf("%d:%d: %v in %s", e.line, e.col, e.cause, e.context)
+}
+
+func (e *textFormatError) Unwrap() error {
+	return e.cause
 }
