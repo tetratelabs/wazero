@@ -29,9 +29,11 @@ func (r *reader) Read(p []byte) (n int, err error) {
 // See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A8
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
+	//
 	// See https://www.w3.org/TR/wasm-core-1/#type-section%E2%91%A0
 	TypeSection []*FunctionType
 	// ImportSection contains any types, tables, memories or globals imported into this module.
+	//
 	// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
 	ImportSection []*ImportSegment
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
@@ -81,9 +83,12 @@ type Module struct {
 	// Note: The function index space begins with any ImportKindFunction in ImportSection, then the FunctionSection.
 	// For example, if there are two imported functions and three defined in this module, the index space is five.
 	// Note: This is a pointer to avoid conflating no start section with the valid index zero.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
 	StartSection   *uint32
 	ElementSection []*ElementSegment
 	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
+	//
 	// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
 	CodeSection    []*CodeSegment
 	DataSection    []*DataSegment
