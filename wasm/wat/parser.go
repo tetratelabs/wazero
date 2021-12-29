@@ -6,9 +6,8 @@ import (
 )
 
 type ModuleParser struct {
-	source                     []byte
-	tm                         *textModule
-	parenDepth, skipUntilDepth int
+	source []byte
+	tm     *textModule
 	// currentStringCount allows us to unquote the textImport.module and textImport.name fields, differentiating empty
 	// from never set, without making textImport.module and textImport.name pointers.
 	currentStringCount int
@@ -42,19 +41,9 @@ func ParseModule(source []byte) (*textModule, error) {
 // reaching a final tokenRParen. This implies nested paren handling.
 type fieldHandler func(fieldName []byte) (tokenParser, error)
 
+// parse calls the delegate ModuleParser.tokenParser
 func (p *ModuleParser) parse(tok tokenType, tokenBytes []byte, line, col int) error {
-	if p.skipUntilDepth == 0 {
-		return p.tokenParser(tok, tokenBytes, line, col)
-	}
-	if tok == tokenLParen {
-		p.parenDepth = p.parenDepth + 1
-	} else if tok == tokenRParen {
-		if p.parenDepth == p.skipUntilDepth {
-			p.skipUntilDepth = 0
-		}
-		p.parenDepth = p.parenDepth - 1
-	}
-	return nil
+	return p.tokenParser(tok, tokenBytes, line, col)
 }
 
 func (p *ModuleParser) startField(tok tokenType, tokenBytes []byte, _, _ int) error {
@@ -203,7 +192,6 @@ func (p *ModuleParser) startFile(tok tokenType, _ []byte, _, _ int) error {
 	if tok != tokenLParen {
 		return fmt.Errorf("expected '(', but found %s", tok)
 	}
-	p.parenDepth = p.parenDepth + 1
 	p.tokenParser = p.startField
 	p.fieldHandler = p.startModule
 	return nil
