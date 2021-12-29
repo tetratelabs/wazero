@@ -3,7 +3,7 @@ package wat
 import "fmt"
 
 // textModule corresponds to the text format of a WebAssembly module, and is an intermediate representation prior to
-// wasm.Module.
+// wasm.Module. This is primarily needed to resolve symbolic indexes like "$main" to raw numeric ones.
 //
 // Note: nothing is required per specification. Ex `(module)` is valid!
 //
@@ -16,13 +16,14 @@ type textModule struct {
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	name string
 
-	// imports are the module textImport added in insertion order.
+	// imports are added in insertion order.
 	imports []*textImport
 
-	// startFunction is the function to call during wasm.Store Instantiate. The value is a textImportFunc.name, such as "$main",
-	// or its equivalent raw numeric index, such as "2".
+	// startFunction is the function to call during wasm.Store Instantiate. The value is a textImportFunc.name, such as
+	// "$main", or its equivalent raw numeric index, such as "2".
 	//
-	// Note: When in raw numeric form, this is relative to Import functions.
+	// Note: When in raw numeric form, this is relative to imports. See wasm.Module StartSection for more.
+	//
 	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
 	startFunction string
 }
