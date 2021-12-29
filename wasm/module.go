@@ -48,16 +48,22 @@ type Module struct {
 	// TableSection contains each table defined in this module.
 	//
 	// Table indexes are offset by any imported tables because the table index space begins with imports, followed by
-	// ones defined in this module. For example, if there are two imported tables and three defined in this module, the
-	// table at index 3 to be defined in this module at TableSection[0].
+	// ones defined in this module. For example, if there are two imported tables and one defined in this module, the
+	// table at index 3 is defined in this module at TableSection[0].
+	//
+	// Note: Version 1.0 (MVP) of the WebAssembly spec allows at most one table definition per module, so the lenght of
+	// the TableSection can be zero or one.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#table-section%E2%91%A0
 	TableSection []*TableType
 	// MemorySection contains each memory defined in this module.
 	//
 	// Memory indexes are offset by any imported memories because the memory index space begins with imports, followed
-	// by ones defined in this module. For example, if there are two imported memories and three defined in this module,
+	// by ones defined in this module. For example, if there are two imported memories and one defined in this module,
 	// the memory at index 3 is defined in this module at MemorySection[0].
+	//
+	// Note: Version 1.0 (MVP) of the WebAssembly spec allows at most one memory definition per module, so the lenght of
+	// the MemorySection can be zero or one.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#memory-section%E2%91%A0
 	MemorySection []*MemoryType
