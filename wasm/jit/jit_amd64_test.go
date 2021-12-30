@@ -918,141 +918,177 @@ func TestAmd64Builder_handleConstF64(t *testing.T) {
 }
 
 func TestAmd64Builder_handleAdd(t *testing.T) {
+	t.Run("int32", func(t *testing.T) {
+		const x1Value uint32 = 113
+		const x2Value uint32 = 41
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		err := builder.handleConstI32(&wazeroir.OperationConstI32{Value: x1Value})
+		require.NoError(t, err)
+		x1 := builder.locationStack.peek()
+		err = builder.handleConstI32(&wazeroir.OperationConstI32{Value: x2Value})
+		require.NoError(t, err)
+		x2 := builder.locationStack.peek()
+
+		err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+		require.NoError(t, err)
+		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+
+		// To verify the behavior, we push the value
+		// to the stack.
+		builder.releaseRegisterToStack(x1)
+		builder.returnFunction()
+
+		// Assemble.
+		code, err := builder.compile()
+		require.NoError(t, err)
+		// Run code.
+		eng := newEngine()
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the stack.
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, uint64(x1Value+x2Value), eng.stack[eng.stackPointer-1])
+	})
 	t.Run("int64", func(t *testing.T) {
-		o := &wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64}
-		t.Run("x1:reg,x2:reg", func(t *testing.T) {
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			x1Reg := int16(x86.REG_AX)
-			x2Reg := int16(x86.REG_R10)
-			x1Location := builder.locationStack.pushValueOnRegister(x1Reg)
-			builder.locationStack.pushValueOnRegister(x2Reg)
-			builder.movIntConstToRegister(100, x1Reg)
-			builder.movIntConstToRegister(300, x2Reg)
-			err := builder.handleAdd(o)
-			require.NoError(t, err)
-			require.Contains(t, builder.locationStack.usedRegisters, x1Reg)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
+		const x1Value uint64 = 1 << 35
+		const x2Value uint64 = 41
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		err := builder.handleConstI64(&wazeroir.OperationConstI64{Value: x1Value})
+		require.NoError(t, err)
+		x1 := builder.locationStack.peek()
+		err = builder.handleConstI64(&wazeroir.OperationConstI64{Value: x2Value})
+		require.NoError(t, err)
+		x2 := builder.locationStack.peek()
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(x1Location)
-			builder.returnFunction()
+		err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
+		require.NoError(t, err)
+		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			eng := newEngine()
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(1), eng.stackPointer)
-			require.Equal(t, uint64(400), eng.stack[eng.stackPointer-1])
-		})
-		t.Run("x1:stack,x2:reg", func(t *testing.T) {
-			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			_ = builder.locationStack.pushValueOnStack() // dummy value!
-			x1Location := builder.locationStack.pushValueOnStack()
-			x2Location := builder.locationStack.pushValueOnRegister(x86.REG_R10)
-			eng.stack[x1Location.stackPointer] = 5000
-			builder.movIntConstToRegister(300, x2Location.register)
-			err := builder.handleAdd(o)
-			require.NoError(t, err)
+		// To verify the behavior, we push the value
+		// to the stack.
+		builder.releaseRegisterToStack(x1)
+		builder.returnFunction()
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(builder.locationStack.peek())
-			builder.returnFunction()
+		// Assemble.
+		code, err := builder.compile()
+		require.NoError(t, err)
+		// Run code.
+		eng := newEngine()
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the stack.
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, uint64(x1Value+x2Value), eng.stack[eng.stackPointer-1])
+	})
+	t.Run("float32", func(t *testing.T) {
+		for i, tc := range []struct {
+			v1, v2 float32
+		}{
+			{v1: 1.1, v2: 2.3},
+			{v1: 1.1, v2: -2.3},
+			{v1: float32(math.Inf(1)), v2: -2.1},
+			{v1: float32(math.Inf(1)), v2: 2.1},
+			{v1: float32(math.Inf(-1)), v2: -2.1},
+			{v1: float32(math.Inf(-1)), v2: 2.1},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				builder := requireNewBuilder(t)
+				builder.initializeReservedRegisters()
+				err := builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
+				require.NoError(t, err)
+				x1 := builder.locationStack.peek()
+				err = builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
+				require.NoError(t, err)
+				x2 := builder.locationStack.peek()
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(2), eng.stackPointer)
-			require.Equal(t, uint64(5300), eng.stack[eng.stackPointer-1])
-		})
-		t.Run("x1:stack,x2:stack", func(t *testing.T) {
-			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			_ = builder.locationStack.pushValueOnStack() // dummy value!
-			x1Location := builder.locationStack.pushValueOnStack()
-			x2Location := builder.locationStack.pushValueOnStack()
-			eng.stack[x1Location.stackPointer] = 5000
-			eng.stack[x2Location.stackPointer] = 13
-			err := builder.handleAdd(o)
-			require.NoError(t, err)
-			require.True(t, x1Location.onRegister())
-			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
+				err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF32})
+				require.NoError(t, err)
+				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(builder.locationStack.peek())
-			builder.returnFunction()
+				// To verify the behavior, we push the value
+				// to the stack.
+				builder.releaseRegisterToStack(x1)
+				builder.returnFunction()
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(2), eng.stackPointer)
-			require.Equal(t, uint64(5013), eng.stack[eng.stackPointer-1])
-		})
-		t.Run("x1:reg,x2:stack", func(t *testing.T) {
-			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			_ = builder.locationStack.pushValueOnStack() // dummy value!
-			x1Location := builder.locationStack.pushValueOnRegister(x86.REG_R10)
-			x2Location := builder.locationStack.pushValueOnStack()
-			eng.stack[x2Location.stackPointer] = 5000
-			builder.movIntConstToRegister(132, x1Location.register)
-			err := builder.handleAdd(o)
-			require.NoError(t, err)
-			require.True(t, x1Location.onRegister())
-			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
+				// Assemble.
+				code, err := builder.compile()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.v1+tc.v2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+			})
+		}
+	})
+	t.Run("float64", func(t *testing.T) {
+		for i, tc := range []struct {
+			v1, v2 float64
+		}{
+			{v1: 1.1, v2: 2.3},
+			{v1: 1.1, v2: -2.3},
+			{v1: math.Inf(1), v2: -2.1},
+			{v1: math.Inf(1), v2: 2.1},
+			{v1: math.Inf(-1), v2: -2.1},
+			{v1: math.Inf(-1), v2: 2.1},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				builder := requireNewBuilder(t)
+				builder.initializeReservedRegisters()
+				err := builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
+				require.NoError(t, err)
+				x1 := builder.locationStack.peek()
+				err = builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
+				require.NoError(t, err)
+				x2 := builder.locationStack.peek()
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(builder.locationStack.peek())
-			builder.returnFunction()
+				err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF64})
+				require.NoError(t, err)
+				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(2), eng.stackPointer)
-			require.Equal(t, uint64(5132), eng.stack[eng.stackPointer-1])
-		})
+				// To verify the behavior, we push the value
+				// to the stack.
+				builder.releaseRegisterToStack(x1)
+				builder.returnFunction()
+
+				// Assemble.
+				code, err := builder.compile()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.v1+tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+			})
+		}
 	})
 }
 
@@ -1179,141 +1215,177 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 }
 
 func TestAmd64Builder_handleSub(t *testing.T) {
+	t.Run("int32", func(t *testing.T) {
+		const x1Value uint32 = 1 << 31
+		const x2Value uint32 = 51
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		err := builder.handleConstI32(&wazeroir.OperationConstI32{Value: x1Value})
+		require.NoError(t, err)
+		x1 := builder.locationStack.peek()
+		err = builder.handleConstI32(&wazeroir.OperationConstI32{Value: x2Value})
+		require.NoError(t, err)
+		x2 := builder.locationStack.peek()
+
+		err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI32})
+		require.NoError(t, err)
+		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+
+		// To verify the behavior, we push the value
+		// to the stack.
+		builder.releaseRegisterToStack(x1)
+		builder.returnFunction()
+
+		// Assemble.
+		code, err := builder.compile()
+		require.NoError(t, err)
+		// Run code.
+		eng := newEngine()
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the stack.
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, uint64(x1Value-x2Value), eng.stack[eng.stackPointer-1])
+	})
 	t.Run("int64", func(t *testing.T) {
-		o := &wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI64}
-		t.Run("x1:reg,x2:reg", func(t *testing.T) {
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			x1Reg := int16(x86.REG_AX)
-			x2Reg := int16(x86.REG_R10)
-			x1Location := builder.locationStack.pushValueOnRegister(x1Reg)
-			builder.locationStack.pushValueOnRegister(x2Reg)
-			builder.movIntConstToRegister(300, x1Reg)
-			builder.movIntConstToRegister(51, x2Reg)
-			err := builder.handleSub(o)
-			require.NoError(t, err)
-			require.Contains(t, builder.locationStack.usedRegisters, x1Reg)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
+		const x1Value uint64 = 1 << 35
+		const x2Value uint64 = 51
+		builder := requireNewBuilder(t)
+		builder.initializeReservedRegisters()
+		err := builder.handleConstI64(&wazeroir.OperationConstI64{Value: x1Value})
+		require.NoError(t, err)
+		x1 := builder.locationStack.peek()
+		err = builder.handleConstI64(&wazeroir.OperationConstI64{Value: x2Value})
+		require.NoError(t, err)
+		x2 := builder.locationStack.peek()
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(x1Location)
-			builder.returnFunction()
+		err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI64})
+		require.NoError(t, err)
+		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			eng := newEngine()
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(1), eng.stackPointer)
-			require.Equal(t, uint64(249), eng.stack[eng.stackPointer-1])
-		})
-		t.Run("x1:stack,x2:reg", func(t *testing.T) {
-			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			_ = builder.locationStack.pushValueOnStack() // dummy value!
-			x1Location := builder.locationStack.pushValueOnStack()
-			x2Location := builder.locationStack.pushValueOnRegister(x86.REG_R10)
-			eng.stack[x1Location.stackPointer] = 5000
-			builder.movIntConstToRegister(300, x2Location.register)
-			err := builder.handleSub(o)
-			require.NoError(t, err)
+		// To verify the behavior, we push the value
+		// to the stack.
+		builder.releaseRegisterToStack(x1)
+		builder.returnFunction()
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(builder.locationStack.peek())
-			builder.returnFunction()
+		// Assemble.
+		code, err := builder.compile()
+		require.NoError(t, err)
+		// Run code.
+		eng := newEngine()
+		mem := newMemoryInst()
+		jitcall(
+			uintptr(unsafe.Pointer(&code[0])),
+			uintptr(unsafe.Pointer(eng)),
+			uintptr(unsafe.Pointer(&mem.Buffer[0])),
+		)
+		// Check the stack.
+		require.Equal(t, uint64(1), eng.stackPointer)
+		require.Equal(t, x1Value-x2Value, eng.stack[eng.stackPointer-1])
+	})
+	t.Run("float32", func(t *testing.T) {
+		for i, tc := range []struct {
+			v1, v2 float32
+		}{
+			{v1: 1.1, v2: 2.3},
+			{v1: 1.1, v2: -2.3},
+			{v1: float32(math.Inf(1)), v2: -2.1},
+			{v1: float32(math.Inf(1)), v2: 2.1},
+			{v1: float32(math.Inf(-1)), v2: -2.1},
+			{v1: float32(math.Inf(-1)), v2: 2.1},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				builder := requireNewBuilder(t)
+				builder.initializeReservedRegisters()
+				err := builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
+				require.NoError(t, err)
+				x1 := builder.locationStack.peek()
+				err = builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
+				require.NoError(t, err)
+				x2 := builder.locationStack.peek()
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(2), eng.stackPointer)
-			require.Equal(t, uint64(4700), eng.stack[eng.stackPointer-1])
-		})
-		t.Run("x1:stack,x2:stack", func(t *testing.T) {
-			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			_ = builder.locationStack.pushValueOnStack() // dummy value!
-			x1Location := builder.locationStack.pushValueOnStack()
-			x2Location := builder.locationStack.pushValueOnStack()
-			eng.stack[x1Location.stackPointer] = 5000
-			eng.stack[x2Location.stackPointer] = 13
-			err := builder.handleSub(o)
-			require.NoError(t, err)
-			require.True(t, x1Location.onRegister())
-			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
+				err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeF32})
+				require.NoError(t, err)
+				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(builder.locationStack.peek())
-			builder.returnFunction()
+				// To verify the behavior, we push the value
+				// to the stack.
+				builder.releaseRegisterToStack(x1)
+				builder.returnFunction()
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(2), eng.stackPointer)
-			require.Equal(t, uint64(4987), eng.stack[eng.stackPointer-1])
-		})
-		t.Run("x1:reg,x2:stack", func(t *testing.T) {
-			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			_ = builder.locationStack.pushValueOnStack() // dummy value!
-			x1Location := builder.locationStack.pushValueOnRegister(x86.REG_R10)
-			x2Location := builder.locationStack.pushValueOnStack()
-			eng.stack[x2Location.stackPointer] = 132
-			builder.movIntConstToRegister(5000, x1Location.register)
-			err := builder.handleSub(o)
-			require.NoError(t, err)
-			require.True(t, x1Location.onRegister())
-			require.Contains(t, builder.locationStack.usedRegisters, x1Location.register)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Location.register)
+				// Assemble.
+				code, err := builder.compile()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.v1-tc.v2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+			})
+		}
+	})
+	t.Run("float64", func(t *testing.T) {
+		for i, tc := range []struct {
+			v1, v2 float64
+		}{
+			{v1: 1.1, v2: 2.3},
+			{v1: 1.1, v2: -2.3},
+			{v1: math.Inf(1), v2: -2.1},
+			{v1: math.Inf(1), v2: 2.1},
+			{v1: math.Inf(-1), v2: -2.1},
+			{v1: math.Inf(-1), v2: 2.1},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				builder := requireNewBuilder(t)
+				builder.initializeReservedRegisters()
+				err := builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
+				require.NoError(t, err)
+				x1 := builder.locationStack.peek()
+				err = builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
+				require.NoError(t, err)
+				x2 := builder.locationStack.peek()
 
-			// To verify the behavior, we push the value
-			// to the stack.
-			builder.releaseRegisterToStack(builder.locationStack.peek())
-			builder.returnFunction()
+				err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeF64})
+				require.NoError(t, err)
+				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
 
-			// Assemble.
-			code, err := builder.compile()
-			require.NoError(t, err)
-			// Run code.
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(2), eng.stackPointer)
-			require.Equal(t, uint64(4868), eng.stack[eng.stackPointer-1])
-		})
+				// To verify the behavior, we push the value
+				// to the stack.
+				builder.releaseRegisterToStack(x1)
+				builder.returnFunction()
+
+				// Assemble.
+				code, err := builder.compile()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.v1-tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+			})
+		}
 	})
 }
 
