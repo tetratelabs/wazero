@@ -47,7 +47,7 @@ type importFunc struct {
 	// Note: This is not necessarily the funcName, so it does not need to begin with '$'!
 	name string
 
-	// name is optional and starts with '$'. For example, "$main".
+	// funcName starts with '$'. For example, "$main".
 	//
 	// This name is only used for debugging. At runtime, functions are called based on raw numeric index. The function
 	// index space begins with imported functions, followed by any defined in this module.
