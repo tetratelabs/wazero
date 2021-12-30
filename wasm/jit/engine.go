@@ -301,8 +301,8 @@ type compiledHostFunction = struct {
 
 type compiledWasmFunction struct {
 	// The source function instance from which this is compiled.
-	source          *wasm.FunctionInstance
-	params, results uint64
+	source                  *wasm.FunctionInstance
+	paramCount, resultCount uint64
 	// codeSegment is holding the compiled native code as a byte slice.
 	codeSegment []byte
 	// memory is the pointer to a memory instance which the original function instance refers to.
@@ -348,7 +348,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		continuationAddress:      f.codeInitialAddress,
 		wasmFunction:             f,
 		caller:                   nil,
-		continuationStackPointer: f.params,
+		continuationStackPointer: f.paramCount,
 	}
 	e.globalSliceAddress = f.globalSliceAddress
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
@@ -386,7 +386,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
-			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.results - nextFunc.params
+			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
@@ -394,7 +394,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				// Set the caller frame so we can return back to the current frame!
 				caller: currentFrame,
 				// Set the base pointer to the beginning of the function params
-				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.params,
+				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
 			}
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 			e.maybeGrowStack(nextFunc.maxStackPointer)
@@ -402,7 +402,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.callFrameStack = frame
 			e.stackBasePointer = frame.stackBasePointer
 			// Set the stack pointer so that base+sp would point to the top of function params.
-			e.stackPointer = nextFunc.params
+			e.stackPointer = nextFunc.paramCount
 			e.globalSliceAddress = nextFunc.globalSliceAddress
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {
@@ -612,8 +612,8 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	cf := &compiledWasmFunction{
 		source:          f,
 		codeSegment:     code,
-		params:          uint64(len(f.Signature.ParamTypes)),
-		results:         uint64(len(f.Signature.ResultTypes)),
+		paramCount:      uint64(len(f.Signature.ParamTypes)),
+		resultCount:     uint64(len(f.Signature.ResultTypes)),
 		memory:          f.ModuleInstance.Memory,
 		maxStackPointer: maxStackPointer,
 	}

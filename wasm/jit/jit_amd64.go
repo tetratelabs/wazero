@@ -57,7 +57,6 @@ type amd64Compiler struct {
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 }
 
-// Implements compiler.emitPreamble for amd64Compiler.
 func (c *amd64Compiler) emitPreamble() {
 	// We assume all function parameters are already pushed onto the stack by
 	// the caller.
@@ -66,7 +65,6 @@ func (c *amd64Compiler) emitPreamble() {
 	c.initializeReservedRegisters()
 }
 
-// Implements compiler.compile for amd64Compiler.
 func (c *amd64Compiler) compile() ([]byte, uint64, error) {
 	code, err := mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
