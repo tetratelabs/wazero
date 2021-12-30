@@ -3,6 +3,10 @@
 
 package jit
 
+// This file implements the compiler for amd64/x86_64 target.
+// Please refer to https://www.felixcloutier.com/x86/index.html
+// if unfamiliar with amd64 instructions used here.
+
 import (
 	"encoding/binary"
 	"fmt"
