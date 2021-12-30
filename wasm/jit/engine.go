@@ -9,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 type engine struct {
@@ -300,8 +301,8 @@ type compiledHostFunction = struct {
 
 type compiledWasmFunction struct {
 	// The source function instance from which this is compiled.
-	source          *wasm.FunctionInstance
-	params, results uint64
+	source                  *wasm.FunctionInstance
+	paramCount, resultCount uint64
 	// codeSegment is holding the compiled native code as a byte slice.
 	codeSegment []byte
 	// memory is the pointer to a memory instance which the original function instance refers to.
@@ -347,7 +348,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		continuationAddress:      f.codeInitialAddress,
 		wasmFunction:             f,
 		caller:                   nil,
-		continuationStackPointer: f.params,
+		continuationStackPointer: f.paramCount,
 	}
 	e.globalSliceAddress = f.globalSliceAddress
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
@@ -385,7 +386,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
 			// Calculate the continuation address so we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
-			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.results - nextFunc.params
+			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
 			// Create the callee frame.
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
@@ -393,7 +394,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 				// Set the caller frame so we can return back to the current frame!
 				caller: currentFrame,
 				// Set the base pointer to the beginning of the function params
-				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.params,
+				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
 			}
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 			e.maybeGrowStack(nextFunc.maxStackPointer)
@@ -401,7 +402,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.callFrameStack = frame
 			e.stackBasePointer = frame.stackBasePointer
 			// Set the stack pointer so that base+sp would point to the top of function params.
-			e.stackPointer = nextFunc.params
+			e.stackPointer = nextFunc.paramCount
 			e.globalSliceAddress = nextFunc.globalSliceAddress
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {
@@ -445,4 +446,183 @@ func (e *engine) builtinFunctionMemoryGrow(f *compiledWasmFunction) {
 
 func (e *engine) builtinFunctionMemorySize(f *compiledWasmFunction) {
 	e.push(uint64(len(f.memory.Buffer)) / wasm.PageSize)
+}
+
+func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
+	ir, err := wazeroir.Compile(f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
+	}
+
+	compiler, err := newCompiler(e, f, ir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
+	}
+
+	compiler.emitPreamble()
+
+	for _, op := range ir.Operations {
+		var err error
+		switch o := op.(type) {
+		case *wazeroir.OperationUnreachable:
+			compiler.compileUnreachable()
+		case *wazeroir.OperationLabel:
+			err = compiler.compileLabel(o)
+		case *wazeroir.OperationBr:
+			err = compiler.compileBr(o)
+		case *wazeroir.OperationBrIf:
+			err = compiler.compileBrIf(o)
+		case *wazeroir.OperationBrTable:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationCall:
+			err = compiler.compileCall(o)
+		case *wazeroir.OperationCallIndirect:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationDrop:
+			err = compiler.compileDrop(o)
+		case *wazeroir.OperationSelect:
+			err = compiler.compileSelect()
+		case *wazeroir.OperationPick:
+			err = compiler.compilePick(o)
+		case *wazeroir.OperationSwap:
+			err = compiler.compileSwap(o)
+		case *wazeroir.OperationGlobalGet:
+			err = compiler.compileGlobalGet(o)
+		case *wazeroir.OperationGlobalSet:
+			err = compiler.compileGlobalSet(o)
+		case *wazeroir.OperationLoad:
+			err = compiler.compileLoad(o)
+		case *wazeroir.OperationLoad8:
+			err = compiler.compileLoad8(o)
+		case *wazeroir.OperationLoad16:
+			err = compiler.compileLoad16(o)
+		case *wazeroir.OperationLoad32:
+			err = compiler.compileLoad32(o)
+		case *wazeroir.OperationStore:
+			err = compiler.compileStore(o)
+		case *wazeroir.OperationStore8:
+			err = compiler.compileStore8(o)
+		case *wazeroir.OperationStore16:
+			err = compiler.compileStore16(o)
+		case *wazeroir.OperationStore32:
+			err = compiler.compileStore32(o)
+		case *wazeroir.OperationMemorySize:
+			compiler.compileMemorySize()
+		case *wazeroir.OperationMemoryGrow:
+			compiler.compileMemoryGrow()
+		case *wazeroir.OperationConstI32:
+			err = compiler.compileConstI32(o)
+		case *wazeroir.OperationConstI64:
+			err = compiler.compileConstI64(o)
+		case *wazeroir.OperationConstF32:
+			err = compiler.compileConstF32(o)
+		case *wazeroir.OperationConstF64:
+			err = compiler.compileConstF64(o)
+		case *wazeroir.OperationEq:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationNe:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationEqz:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationLt:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationGt:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationLe:
+			err = compiler.compileLe(o)
+		case *wazeroir.OperationGe:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationAdd:
+			err = compiler.compileAdd(o)
+		case *wazeroir.OperationSub:
+			err = compiler.compileSub(o)
+		case *wazeroir.OperationMul:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationClz:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationCtz:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationPopcnt:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationDiv:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationRem:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationAnd:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationOr:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationXor:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationShl:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationShr:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationRotl:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationRotr:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationAbs:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationNeg:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationCeil:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationFloor:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationTrunc:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationNearest:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationSqrt:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationMin:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationMax:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationCopysign:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationI32WrapFromI64:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationITruncFromF:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationFConvertFromI:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationF32DemoteFromF64:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationF64PromoteFromF32:
+		case *wazeroir.OperationI32ReinterpretFromF32,
+			*wazeroir.OperationI64ReinterpretFromF64,
+			*wazeroir.OperationF32ReinterpretFromI32,
+			*wazeroir.OperationF64ReinterpretFromI64:
+			err = fmt.Errorf("unsupported operation")
+		case *wazeroir.OperationExtend:
+			err = fmt.Errorf("unsupported operation")
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile operation %s: %w", op.Kind().String(), err)
+		}
+	}
+
+	code, maxStackPointer, err := compiler.compile()
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile: %w", err)
+	}
+
+	cf := &compiledWasmFunction{
+		source:          f,
+		codeSegment:     code,
+		paramCount:      uint64(len(f.Signature.ParamTypes)),
+		resultCount:     uint64(len(f.Signature.ResultTypes)),
+		memory:          f.ModuleInstance.Memory,
+		maxStackPointer: maxStackPointer,
+	}
+	if cf.memory != nil && len(cf.memory.Buffer) > 0 {
+		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
+	}
+	if len(f.ModuleInstance.Globals) > 0 {
+		cf.globalSliceAddress = uintptr(unsafe.Pointer(&f.ModuleInstance.Globals[0]))
+	}
+	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
+	return cf, nil
 }
