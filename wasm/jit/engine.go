@@ -606,7 +606,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 
 	code, maxStackPointer, err := compiler.compile()
 	if err != nil {
-		return nil, fmt.Errorf("failed to assemble: %w", err)
+		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
 	cf := &compiledWasmFunction{
