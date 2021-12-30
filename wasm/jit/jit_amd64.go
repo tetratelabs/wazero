@@ -1038,64 +1038,56 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 }
 
 func (b *amd64Builder) handleLe(o *wazeroir.OperationLe) error {
-	var resultConditionState conditionalRegisterState
-	var instruction obj.As
-	var tp generalPurposeRegisterType
-	switch o.Type {
-	case wazeroir.SignedTypeInt32:
-		resultConditionState = conditionalRegisterStateLE
-		instruction = x86.ACMPL
-		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignedTypeUint32:
-		resultConditionState = conditionalRegisterStateBE
-		instruction = x86.ACMPL
-		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignedTypeInt64:
-		resultConditionState = conditionalRegisterStateLE
-		instruction = x86.ACMPQ
-		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignedTypeUint64:
-		resultConditionState = conditionalRegisterStateBE
-		instruction = x86.ACMPQ
-		tp = generalPurposeRegisterTypeInt
-	case wazeroir.SignedTypeFloat32:
-		tp = generalPurposeRegisterTypeFloat
-		panic("add test!")
-	case wazeroir.SignedTypeFloat64:
-		tp = generalPurposeRegisterTypeFloat
-		panic("add test!")
-	}
-
 	x2 := b.locationStack.pop()
-	if x2.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(tp, x2); err != nil {
-			return err
-		}
-	} else if x2.onConditionalRegister() {
-		if err := b.moveConditionalToGeneralPurposeRegister(x2); err != nil {
-			return err
-		}
+	if err := b.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
 	}
 
 	x1 := b.locationStack.pop()
-	if x1.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(tp, x1); err != nil {
-			return err
-		}
-	} else if x1.onConditionalRegister() {
-		// This shouldn't happen as the conditional
-		// register must be on top of the stack.
-		panic("a bug in jit compiler")
+	if err := b.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
 	}
 
-	// Compare: set the flag based on x1-x2.
+	// Emit the compare instruction.
 	prog := b.newProg()
-	prog.As = instruction
 	prog.From.Type = obj.TYPE_REG
-	prog.From.Reg = x1.register
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = x2.register
+	var resultConditionState conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeInt32:
+		resultConditionState = conditionalRegisterStateLE
+		prog.As = x86.ACMPL
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeUint32:
+		resultConditionState = conditionalRegisterStateBE
+		prog.As = x86.ACMPL
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeInt64:
+		resultConditionState = conditionalRegisterStateLE
+		prog.As = x86.ACMPQ
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeUint64:
+		resultConditionState = conditionalRegisterStateBE
+		prog.As = x86.ACMPQ
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeFloat32:
+		resultConditionState = conditionalRegisterStateBE
+		prog.As = x86.ACOMISS
+		prog.From.Reg = x2.register
+		prog.To.Reg = x1.register
+	case wazeroir.SignedTypeFloat64:
+		resultConditionState = conditionalRegisterStateBE
+		prog.As = x86.ACOMISD
+		prog.From.Reg = x2.register
+		prog.To.Reg = x1.register
+	}
 	b.addInstruction(prog)
+
+	// TODO: emit NaN value handings for floats.
 
 	// We no longer need x1,x2 register after cmp operation here,
 	// so we release it.
