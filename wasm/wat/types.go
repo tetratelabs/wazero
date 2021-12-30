@@ -75,6 +75,9 @@ type formatError struct {
 }
 
 func (e *formatError) Error() string {
+	if e.context == "" { // error starting the file
+		return fmt.Sprintf("%d:%d: %v", e.line, e.col, e.cause)
+	}
 	return fmt.Sprintf("%d:%d: %v in %s", e.line, e.col, e.cause, e.context)
 }
 

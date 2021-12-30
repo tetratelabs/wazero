@@ -31,6 +31,11 @@ func TestParseModule(t *testing.T) {
 			expected: &module{imports: []*_import{{module: "foo", name: "bar", importFunc: &importFunc{}}}},
 		},
 		{
+			name:     "start function", // TODO: this is pointing to a funcidx not in the source!
+			input:    "(module (start $main))",
+			expected: &module{startFunction: "$main"},
+		},
+		{
 			name: "start imported function by name",
 			input: `(module
 	(import "" "hello" (func $hello))
@@ -74,7 +79,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "no module",
 			input:       []byte("()"),
-			expectedErr: "1:2: expected field, but found ) in module",
+			expectedErr: "1:2: expected field, but found )",
 		},
 		{
 			name:        "module invalid name",
@@ -94,42 +99,57 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "module trailing )",
 			input:       []byte("(module $foo ))"),
-			expectedErr: "1:15: found ')' before '(' in module",
+			expectedErr: "1:15: found ')' before '('",
 		},
 		{
 			name:        "import missing module",
 			input:       []byte("(module (import))"),
-			expectedErr: "1:16: expected module and name in import[0]",
+			expectedErr: "1:16: expected module and name in module.import[0]",
 		},
 		{
 			name:        "import missing name",
 			input:       []byte("(module (import \"\"))"),
-			expectedErr: "1:19: expected name in import[0]",
+			expectedErr: "1:19: expected name in module.import[0]",
 		},
 		{
 			name:        "import unquoted module",
 			input:       []byte("(module (import foo bar))"),
-			expectedErr: "1:17: unexpected keyword: foo in import[0]",
+			expectedErr: "1:17: unexpected keyword: foo in module.import[0]",
 		},
 		{
 			name:        "import double name",
 			input:       []byte("(module (import \"foo\" \"bar\" \"baz\")"),
-			expectedErr: "1:29: redundant name: baz in import[0]",
+			expectedErr: "1:29: redundant name: baz in module.import[0]",
 		},
 		{
 			name:        "import missing importFunc",
 			input:       []byte("(module (import \"foo\" \"bar\"))"),
-			expectedErr: "1:28: expected descripton in import[0]",
+			expectedErr: "1:28: expected description in module.import[0]",
 		},
 		{
 			name:        "import importFunc empty",
 			input:       []byte("(module (import \"foo\" \"bar\"())"),
-			expectedErr: "1:29: expected field, but found ) in import[0]",
+			expectedErr: "1:29: expected field, but found ) in module.import[0]",
 		},
 		{
 			name:        "import func invalid name",
 			input:       []byte("(module (import \"foo\" \"bar\" (func baz)))"),
-			expectedErr: "1:35: unexpected keyword: baz in import[0].func",
+			expectedErr: "1:35: unexpected keyword: baz in module.import[0].func",
+		},
+		{
+			name:        "start missing funcidx",
+			input:       []byte("(module (start))"),
+			expectedErr: "1:15: missing funcidx in module.start",
+		},
+		{
+			name:        "start double funcidx",
+			input:       []byte("(module (start $main $main))"),
+			expectedErr: "1:22: redundant funcidx: $main in module.start",
+		},
+		{
+			name:        "double start",
+			input:       []byte("(module (start $main) (start $main))"),
+			expectedErr: "1:30: redundant funcidx: $main in module.start",
 		},
 	}
 
