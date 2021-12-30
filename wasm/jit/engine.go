@@ -462,193 +462,145 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	compiler.emitPreamble()
 
 	for _, op := range ir.Operations {
+		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
 			compiler.compileUnreachable()
 		case *wazeroir.OperationLabel:
-			if err := compiler.compileLabel(o); err != nil {
-				return nil, fmt.Errorf("error handling label operation: %w", err)
-			}
+			err = compiler.compileLabel(o)
 		case *wazeroir.OperationBr:
-			if err := compiler.compileBr(o); err != nil {
-				return nil, fmt.Errorf("error handling br operation: %w", err)
-			}
+			err = compiler.compileBr(o)
 		case *wazeroir.OperationBrIf:
-			if err := compiler.compileBrIf(o); err != nil {
-				return nil, fmt.Errorf("error handling br_if operation: %w", err)
-			}
+			err = compiler.compileBrIf(o)
 		case *wazeroir.OperationBrTable:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationCall:
-			if err := compiler.compileCall(o); err != nil {
-				return nil, fmt.Errorf("error handling call operation: %w", err)
-			}
+			err = compiler.compileCall(o)
 		case *wazeroir.OperationCallIndirect:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationDrop:
-			if err := compiler.compileDrop(o); err != nil {
-				return nil, fmt.Errorf("error handling drop operation: %w", err)
-			}
+			err = compiler.compileDrop(o)
 		case *wazeroir.OperationSelect:
-			if err := compiler.compileSelect(); err != nil {
-				return nil, fmt.Errorf("error handling select operation: %w", err)
-			}
+			err = compiler.compileSelect()
 		case *wazeroir.OperationPick:
-			if err := compiler.compilePick(o); err != nil {
-				return nil, fmt.Errorf("error handling pick operation: %w", err)
-			}
+			err = compiler.compilePick(o)
 		case *wazeroir.OperationSwap:
-			if err := compiler.compileSwap(o); err != nil {
-				return nil, fmt.Errorf("error handling swap operation: %w", err)
-			}
+			err = compiler.compileSwap(o)
 		case *wazeroir.OperationGlobalGet:
-			if err := compiler.compileGlobalGet(o); err != nil {
-				return nil, fmt.Errorf("error handling global.get operation: %w", err)
-			}
+			err = compiler.compileGlobalGet(o)
 		case *wazeroir.OperationGlobalSet:
-			if err := compiler.compileGlobalSet(o); err != nil {
-				return nil, fmt.Errorf("error handling global.set operation: %w", err)
-			}
+			err = compiler.compileGlobalSet(o)
 		case *wazeroir.OperationLoad:
-			if err := compiler.compileLoad(o); err != nil {
-				return nil, fmt.Errorf("error handling load operation: %w", err)
-			}
+			err = compiler.compileLoad(o)
 		case *wazeroir.OperationLoad8:
-			if err := compiler.compileLoad8(o); err != nil {
-				return nil, fmt.Errorf("error handling load8 operation: %w", err)
-			}
+			err = compiler.compileLoad8(o)
 		case *wazeroir.OperationLoad16:
-			if err := compiler.compileLoad16(o); err != nil {
-				return nil, fmt.Errorf("error handling load16 operation: %w", err)
-			}
+			err = compiler.compileLoad16(o)
 		case *wazeroir.OperationLoad32:
-			if err := compiler.compileLoad32(o); err != nil {
-				return nil, fmt.Errorf("error handling load16 operation: %w", err)
-			}
+			err = compiler.compileLoad32(o)
 		case *wazeroir.OperationStore:
-			if err := compiler.compileStore(o); err != nil {
-				return nil, fmt.Errorf("error handling store operation: %w", err)
-			}
+			err = compiler.compileStore(o)
 		case *wazeroir.OperationStore8:
-			if err := compiler.compileStore8(o); err != nil {
-				return nil, fmt.Errorf("error handling store8 operation: %w", err)
-			}
+			err = compiler.compileStore8(o)
 		case *wazeroir.OperationStore16:
-			if err := compiler.compileStore16(o); err != nil {
-				return nil, fmt.Errorf("error handling store16 operation: %w", err)
-			}
+			err = compiler.compileStore16(o)
 		case *wazeroir.OperationStore32:
-			if err := compiler.compileStore32(o); err != nil {
-				return nil, fmt.Errorf("error handling store32 operation: %w", err)
-			}
+			err = compiler.compileStore32(o)
 		case *wazeroir.OperationMemorySize:
 			compiler.compileMemorySize()
 		case *wazeroir.OperationMemoryGrow:
 			compiler.compileMemoryGrow()
 		case *wazeroir.OperationConstI32:
-			if err := compiler.compileConstI32(o); err != nil {
-				return nil, fmt.Errorf("error handling i32.const operation: %w", err)
-			}
+			err = compiler.compileConstI32(o)
 		case *wazeroir.OperationConstI64:
-			if err := compiler.compileConstI64(o); err != nil {
-				return nil, fmt.Errorf("error handling i64.const operation: %w", err)
-			}
+			err = compiler.compileConstI64(o)
 		case *wazeroir.OperationConstF32:
-			if err := compiler.compileConstF32(o); err != nil {
-				return nil, fmt.Errorf("error handling f32.const operation: %w", err)
-			}
+			err = compiler.compileConstF32(o)
 		case *wazeroir.OperationConstF64:
-			if err := compiler.compileConstF64(o); err != nil {
-				return nil, fmt.Errorf("error handling f64.const operation: %w", err)
-			}
+			err = compiler.compileConstF64(o)
 		case *wazeroir.OperationEq:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationNe:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationEqz:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationLt:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationGt:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationLe:
-			if err := compiler.compileLe(o); err != nil {
-				return nil, fmt.Errorf("error handling le operation: %w", err)
-			}
+			err = compiler.compileLe(o)
 		case *wazeroir.OperationGe:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationAdd:
-			if err := compiler.compileAdd(o); err != nil {
-				return nil, fmt.Errorf("error handling add operation: %w", err)
-			}
+			err = compiler.compileAdd(o)
 		case *wazeroir.OperationSub:
-			if err := compiler.compileSub(o); err != nil {
-				return nil, fmt.Errorf("error handling sub operation: %w", err)
-			}
+			err = compiler.compileSub(o)
 		case *wazeroir.OperationMul:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationClz:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationCtz:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationPopcnt:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationDiv:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationRem:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationAnd:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationOr:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationXor:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationShl:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationShr:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationRotl:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationRotr:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationAbs:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationNeg:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationCeil:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationFloor:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationTrunc:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationNearest:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationSqrt:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationMin:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationMax:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationCopysign:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationI32WrapFromI64:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationITruncFromF:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationFConvertFromI:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationF32DemoteFromF64:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationF64PromoteFromF32:
 		case *wazeroir.OperationI32ReinterpretFromF32,
 			*wazeroir.OperationI64ReinterpretFromF64,
 			*wazeroir.OperationF32ReinterpretFromI32,
 			*wazeroir.OperationF64ReinterpretFromI64:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
+			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationExtend:
-			return nil, fmt.Errorf("unsupported operation in JIT compiler: %v", o)
-		default:
-			return nil, fmt.Errorf("unreachable: a bug in JIT compiler")
+			err = fmt.Errorf("unsupported operation")
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile operation %s: %w", op.Kind().String(), err)
 		}
 	}
 
