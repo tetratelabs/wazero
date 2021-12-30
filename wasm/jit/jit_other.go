@@ -3,12 +3,15 @@
 
 package jit
 
-import "github.com/tetratelabs/wazero/wasm"
+import (
+	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
+)
 
 func jitcall(codeSegment, engine, memory uintptr) {
 	panic("unsupported GOARCH")
 }
 
-func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
+func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	panic("unsupported GOARCH")
 }

@@ -26,24 +26,24 @@ func newMemoryInst() *wasm.MemoryInstance {
 	return &wasm.MemoryInstance{Buffer: make([]byte, 1024)}
 }
 
-func requireNewBuilder(t *testing.T) *amd64Builder {
+func requireNewCompiler(t *testing.T) *amd64Compiler {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
-	return &amd64Builder{eng: nil, builder: b,
+	return &amd64Compiler{eng: nil, builder: b,
 		locationStack:            newValueLocationStack(),
 		onLabelStartCallbacks:    map[string][]func(*obj.Prog){},
 		labelInitialInstructions: map[string]*obj.Prog{},
 	}
 }
 
-func (b *amd64Builder) movIntConstToRegister(val int64, targetRegister int16) *obj.Prog {
-	prog := b.newProg()
+func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *obj.Prog {
+	prog := c.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = val
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = targetRegister
-	b.addInstruction(prog)
+	c.addInstruction(prog)
 	return prog
 }
 
@@ -51,12 +51,12 @@ func TestAmd64Builder_pushFunctionInputs(t *testing.T) {
 	f := &wasm.FunctionInstance{Signature: &wasm.FunctionType{
 		ParamTypes: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
 	}}
-	builder := &amd64Builder{locationStack: newValueLocationStack(), f: f}
-	builder.pushFunctionParams()
-	require.Equal(t, uint64(len(f.Signature.ParamTypes)), builder.locationStack.sp)
-	loc := builder.locationStack.pop()
+	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
+	compiler.pushFunctionParams()
+	require.Equal(t, uint64(len(f.Signature.ParamTypes)), compiler.locationStack.sp)
+	loc := compiler.locationStack.pop()
 	require.Equal(t, uint64(1), loc.stackPointer)
-	loc = builder.locationStack.pop()
+	loc = compiler.locationStack.pop()
 	require.Equal(t, uint64(0), loc.stackPointer)
 }
 
@@ -67,47 +67,47 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	// Build a function that decrements top of stack,
 	// and recursively call itself until the top value becomes zero,
 	// and if the value becomes zero, add 5 onto the top and return.
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	// Setup the initial value.
 	eng.stack[0] = 10 // We call recursively 10 times.
-	loc := builder.locationStack.pushValueOnStack()
-	builder.assignRegisterToValue(loc, tmpReg)
-	require.Contains(t, builder.locationStack.usedRegisters, loc.register)
+	loc := compiler.locationStack.pushValueOnStack()
+	compiler.assignRegisterToValue(loc, tmpReg)
+	require.Contains(t, compiler.locationStack.usedRegisters, loc.register)
 	// Decrement tha value.
-	prog := builder.builder.NewProg()
+	prog := compiler.builder.NewProg()
 	prog.As = x86.ADECQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = loc.register
-	builder.addInstruction(prog)
+	compiler.addInstruction(prog)
 	// Check if the value equals zero
-	prog = builder.newProg()
+	prog = compiler.newProg()
 	prog.As = x86.ACMPQ
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = loc.register
 	prog.To.Type = obj.TYPE_CONST
 	prog.To.Offset = 0
-	builder.addInstruction(prog)
+	compiler.addInstruction(prog)
 	// If zero, jump to ::End
-	jmp := builder.newProg()
+	jmp := compiler.newProg()
 	jmp.As = x86.AJEQ
 	jmp.To.Type = obj.TYPE_BRANCH
-	builder.addInstruction(jmp)
+	compiler.addInstruction(jmp)
 	// If not zero, we call push back the value to the stack
 	// and call itself recursively.
-	builder.releaseRegisterToStack(loc)
-	require.NotContains(t, builder.locationStack.usedRegisters, loc.register)
-	builder.callFunctionFromConstIndex(0)
+	compiler.releaseRegisterToStack(loc)
+	require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
+	compiler.callFunctionFromConstIndex(0)
 	// ::End
 	// If zero, we return from this function after pushing 5.
-	builder.assignRegisterToValue(loc, tmpReg)
-	prog = builder.movIntConstToRegister(5, loc.register)
+	compiler.assignRegisterToValue(loc, tmpReg)
+	prog = compiler.movIntConstToRegister(5, loc.register)
 	jmp.To.SetTarget(prog) // the above mov instruction is the jump target of the JEQ.
-	builder.releaseRegisterToStack(loc)
-	builder.setJITStatus(jitCallStatusCodeReturned)
-	builder.returnFunction()
+	compiler.releaseRegisterToStack(loc)
+	compiler.setJITStatus(jitCallStatusCodeReturned)
+	compiler.returnFunction()
 	// Compile.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	// Setup engine.
 	mem := newMemoryInst()
@@ -160,19 +160,19 @@ func TestPushValueWithGoroutines(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Build native codes.
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 			// Push consts to pushTargetRegister.
-			_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-			loc := builder.locationStack.pushValueOnRegister(pushTargetRegister)
-			builder.movIntConstToRegister(int64(targetValue), pushTargetRegister)
+			_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+			loc := compiler.locationStack.pushValueOnRegister(pushTargetRegister)
+			compiler.movIntConstToRegister(int64(targetValue), pushTargetRegister)
 			// Push pushTargetRegister into the engine.stack[engine.sp].
-			builder.releaseRegisterToStack(loc)
+			compiler.releaseRegisterToStack(loc)
 			// Finally increment the stack pointer and write it back to the eng.sp
-			builder.returnFunction()
+			compiler.returnFunction()
 
 			// Compile.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			eng := newEngine()
@@ -209,12 +209,12 @@ func Test_setJITStatus(t *testing.T) {
 		t.Run(s.String(), func(t *testing.T) {
 
 			// Build codes.
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			builder.setJITStatus(s)
-			builder.returnFunction()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
+			compiler.setJITStatus(s)
+			compiler.returnFunction()
 			// Compile.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run codes
 			eng := newEngine()
@@ -234,12 +234,12 @@ func Test_setFunctionCallIndexFromConst(t *testing.T) {
 	// Build codes.
 	for _, index := range []int64{1, 5, 20} {
 		// Build codes.
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		builder.setFunctionCallIndexFromConst(index)
-		builder.returnFunction()
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		compiler.setFunctionCallIndexFromConst(index)
+		compiler.returnFunction()
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
@@ -258,13 +258,13 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 	reg := int16(x86.REG_R10)
 	for _, index := range []int64{1, 5, 20} {
 		// Build codes.
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		builder.movIntConstToRegister(index, reg)
-		builder.setFunctionCallIndexFromRegister(reg)
-		builder.returnFunction()
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		compiler.movIntConstToRegister(index, reg)
+		compiler.setFunctionCallIndexFromRegister(reg)
+		compiler.returnFunction()
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run codes
 		eng := newEngine()
@@ -282,22 +282,22 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 func Test_setContinuationAtNextInstruction(t *testing.T) {
 	const tmpReg = x86.REG_AX
 	// Build codes.
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
-	builder.setContinuationOffsetAtNextInstructionAndReturn()
-	exp := uintptr(len(builder.builder.Assemble()))
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
+	compiler.setContinuationOffsetAtNextInstructionAndReturn()
+	exp := uintptr(len(compiler.builder.Assemble()))
 	// On the continuation, we have to setup the registers again.
-	builder.initializeReservedRegisters()
+	compiler.initializeReservedRegisters()
 	// The continuation after function calls.
-	_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-	loc := builder.locationStack.pushValueOnRegister(tmpReg)
-	builder.movIntConstToRegister(int64(50), tmpReg)
-	builder.releaseRegisterToStack(loc)
-	require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
-	builder.setJITStatus(jitCallStatusCodeCallWasmFunction)
-	builder.returnFunction()
+	_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+	loc := compiler.locationStack.pushValueOnRegister(tmpReg)
+	compiler.movIntConstToRegister(int64(50), tmpReg)
+	compiler.releaseRegisterToStack(loc)
+	require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
+	compiler.setJITStatus(jitCallStatusCodeCallWasmFunction)
+	compiler.returnFunction()
 	// Compile.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run codes
@@ -328,19 +328,19 @@ func Test_callFunction(t *testing.T) {
 	)
 	t.Run("from const", func(t *testing.T) {
 		// Build codes.
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		builder.callFunctionFromConstIndex(functionIndex)
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		compiler.callFunctionFromConstIndex(functionIndex)
 		// On the continuation after function call,
 		// We push the value onto stack
-		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := builder.locationStack.pushValueOnRegister(tmpReg)
-		builder.movIntConstToRegister(int64(50), tmpReg)
-		builder.releaseRegisterToStack(loc)
-		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
-		builder.returnFunction()
+		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := compiler.locationStack.pushValueOnRegister(tmpReg)
+		compiler.movIntConstToRegister(int64(50), tmpReg)
+		compiler.releaseRegisterToStack(loc)
+		require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
+		compiler.returnFunction()
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -367,20 +367,20 @@ func Test_callFunction(t *testing.T) {
 	t.Run("from reg", func(t *testing.T) {
 		const functionIndex int64 = 10
 		// Build codes.
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		builder.movIntConstToRegister(functionIndex, tmpReg)
-		builder.callFunctionFromRegisterIndex(tmpReg)
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		compiler.movIntConstToRegister(functionIndex, tmpReg)
+		compiler.callFunctionFromRegisterIndex(tmpReg)
 		// On the continuation after function call,
 		// We push the value onto stack
-		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := builder.locationStack.pushValueOnRegister(tmpReg)
-		builder.movIntConstToRegister(int64(50), tmpReg)
-		builder.releaseRegisterToStack(loc)
-		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
-		builder.returnFunction()
+		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := compiler.locationStack.pushValueOnRegister(tmpReg)
+		compiler.movIntConstToRegister(int64(50), tmpReg)
+		compiler.releaseRegisterToStack(loc)
+		require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
+		compiler.returnFunction()
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -413,21 +413,21 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 			tmpReg              = x86.REG_AX
 		)
 		// Build codes.
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
 		// Push the value onto stack.
-		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := builder.locationStack.pushValueOnRegister(tmpReg)
-		builder.movIntConstToRegister(int64(50), tmpReg)
-		builder.releaseRegisterToStack(loc)
-		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
-		builder.callHostFunctionFromConstIndex(functionIndex)
+		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := compiler.locationStack.pushValueOnRegister(tmpReg)
+		compiler.movIntConstToRegister(int64(50), tmpReg)
+		compiler.releaseRegisterToStack(loc)
+		require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
+		compiler.callHostFunctionFromConstIndex(functionIndex)
 		// On the continuation after function call,
 		// We push the value onto stack
-		builder.setJITStatus(jitCallStatusCodeReturned)
-		builder.returnFunction()
+		compiler.setJITStatus(jitCallStatusCodeReturned)
+		compiler.returnFunction()
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -453,23 +453,23 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 			tmpReg               = x86.REG_AX
 		)
 		// Build codes.
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
 		// Push the value onto stack.
-		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
-		builder.movIntConstToRegister(int64(50), tmpReg)
-		builder.releaseRegisterToStack(loc)
-		require.NotContains(t, builder.locationStack.usedRegisters, tmpReg)
+		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
+		compiler.movIntConstToRegister(int64(50), tmpReg)
+		compiler.releaseRegisterToStack(loc)
+		require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
 		// Set the function index
-		builder.movIntConstToRegister(int64(1), tmpReg)
-		builder.callHostFunctionFromRegisterIndex(tmpReg)
+		compiler.movIntConstToRegister(int64(1), tmpReg)
+		compiler.callHostFunctionFromRegisterIndex(tmpReg)
 		// On the continuation after function call,
 		// We push the value onto stack
-		builder.setJITStatus(jitCallStatusCodeReturned)
-		builder.returnFunction()
+		compiler.setJITStatus(jitCallStatusCodeReturned)
+		compiler.returnFunction()
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Setup.
@@ -506,32 +506,32 @@ func Test_popFromStackToRegister(t *testing.T) {
 	// Build function.
 	// Pop the value from the top twice, add two values,
 	// and push it back to the top.
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	// Create three values on the stack.
-	builder.locationStack.pushValueOnStack()
-	loc1 := builder.locationStack.pushValueOnRegister(targetRegister1)
-	loc2 := builder.locationStack.pushValueOnRegister(targetRegister2)
-	builder.assignRegisterToValue(loc1, targetRegister1)
-	builder.assignRegisterToValue(loc2, targetRegister2)
+	compiler.locationStack.pushValueOnStack()
+	loc1 := compiler.locationStack.pushValueOnRegister(targetRegister1)
+	loc2 := compiler.locationStack.pushValueOnRegister(targetRegister2)
+	compiler.assignRegisterToValue(loc1, targetRegister1)
+	compiler.assignRegisterToValue(loc2, targetRegister2)
 	// Increment the popped value on the register.
-	prog := builder.newProg()
+	prog := compiler.newProg()
 	prog.As = x86.AADDQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = targetRegister1
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = targetRegister2
 	// Now we used the two values so pop twice.
-	builder.locationStack.pop()
-	builder.locationStack.pop()
+	compiler.locationStack.pop()
+	compiler.locationStack.pop()
 	// Ready to push the result location.
-	result := builder.locationStack.pushValueOnRegister(targetRegister1)
-	builder.addInstruction(prog)
+	result := compiler.locationStack.pushValueOnRegister(targetRegister1)
+	compiler.addInstruction(prog)
 	// Push it back to the stack.
-	builder.releaseRegisterToStack(result)
-	builder.returnFunction()
+	compiler.releaseRegisterToStack(result)
+	compiler.returnFunction()
 	// Compile.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Call in.
@@ -552,12 +552,12 @@ func Test_popFromStackToRegister(t *testing.T) {
 }
 
 func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
-	builder.returnFunction()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
+	compiler.returnFunction()
 
 	// Assemble.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -572,39 +572,39 @@ func TestAmd64Builder_initializeReservedRegisters(t *testing.T) {
 
 func TestAmd64Builder_allocateRegister(t *testing.T) {
 	t.Run("free", func(t *testing.T) {
-		builder := requireNewBuilder(t)
-		reg, err := builder.allocateRegister(generalPurposeRegisterTypeInt)
+		compiler := requireNewCompiler(t)
+		reg, err := compiler.allocateRegister(generalPurposeRegisterTypeInt)
 		require.NoError(t, err)
 		require.True(t, isIntRegister(reg))
-		reg, err = builder.allocateRegister(generalPurposeRegisterTypeFloat)
+		reg, err = compiler.allocateRegister(generalPurposeRegisterTypeFloat)
 		require.NoError(t, err)
 		require.True(t, isFloatRegister(reg))
 	})
 	t.Run("steal", func(t *testing.T) {
 		const stealTarget = x86.REG_AX
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
 		// Use up all the Int regs.
 		for _, r := range unreservedGeneralPurposeIntRegisters {
-			builder.locationStack.markRegisterUsed(r)
+			compiler.locationStack.markRegisterUsed(r)
 		}
-		stealTargetLocation := builder.locationStack.pushValueOnRegister(stealTarget)
-		builder.movIntConstToRegister(int64(50), stealTargetLocation.register)
+		stealTargetLocation := compiler.locationStack.pushValueOnRegister(stealTarget)
+		compiler.movIntConstToRegister(int64(50), stealTargetLocation.register)
 		require.Equal(t, int16(stealTarget), stealTargetLocation.register)
 		require.True(t, stealTargetLocation.onRegister())
-		reg, err := builder.allocateRegister(generalPurposeRegisterTypeInt)
+		reg, err := compiler.allocateRegister(generalPurposeRegisterTypeInt)
 		require.NoError(t, err)
 		require.True(t, isIntRegister(reg))
 		require.False(t, stealTargetLocation.onRegister())
 
 		// Create new value using the stolen register.
-		loc := builder.locationStack.pushValueOnRegister(reg)
-		builder.movIntConstToRegister(int64(2000), loc.register)
-		builder.releaseRegisterToStack(loc)
-		builder.returnFunction()
+		loc := compiler.locationStack.pushValueOnRegister(reg)
+		compiler.movIntConstToRegister(int64(2000), loc.register)
+		compiler.releaseRegisterToStack(loc)
+		compiler.returnFunction()
 
 		// Assemble.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -624,23 +624,23 @@ func TestAmd64Builder_allocateRegister(t *testing.T) {
 }
 
 func TestAmd64Builder_handleLabel(t *testing.T) {
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
 
 	var called bool
-	builder.onLabelStartCallbacks[label.String()] = append(builder.onLabelStartCallbacks[label.String()],
+	compiler.onLabelStartCallbacks[label.String()] = append(compiler.onLabelStartCallbacks[label.String()],
 		func(p *obj.Prog) { called = true },
 	)
-	err := builder.handleLabel(&wazeroir.OperationLabel{Label: label})
+	err := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
 	require.NoError(t, err)
-	require.Len(t, builder.onLabelStartCallbacks, 0)
-	require.Contains(t, builder.labelInitialInstructions, label.String())
+	require.Len(t, compiler.onLabelStartCallbacks, 0)
+	require.Contains(t, compiler.labelInitialInstructions, label.String())
 	require.True(t, called)
 
 	// Assemble.
-	builder.returnFunction()
-	code, err := builder.compile()
+	compiler.returnFunction()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -655,36 +655,36 @@ func TestAmd64Builder_handleLabel(t *testing.T) {
 
 func TestAmd64Builder_handlePick(t *testing.T) {
 	o := &wazeroir.OperationPick{Depth: 1}
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	// The case when the original value is already in register.
 	t.Run("on reg", func(t *testing.T) {
 		// Set up the pick target original value.
-		pickTargetLocation := builder.locationStack.pushValueOnRegister(int16(x86.REG_R10))
+		pickTargetLocation := compiler.locationStack.pushValueOnRegister(int16(x86.REG_R10))
 		pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
-		builder.locationStack.pushValueOnStack() // Dummy value!
-		builder.movIntConstToRegister(100, pickTargetLocation.register)
+		compiler.locationStack.pushValueOnStack() // Dummy value!
+		compiler.movIntConstToRegister(100, pickTargetLocation.register)
 		// Now insert pick code.
-		err := builder.handlePick(o)
+		err := compiler.compilePick(o)
 		require.NoError(t, err)
 		// Increment the picked value.
-		pickedLocation := builder.locationStack.peek()
+		pickedLocation := compiler.locationStack.peek()
 		require.True(t, pickedLocation.onRegister())
 		require.NotEqual(t, pickedLocation.register, pickTargetLocation.register)
-		prog := builder.newProg()
+		prog := compiler.newProg()
 		prog.As = x86.AINCQ
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = pickedLocation.register
-		builder.addInstruction(prog)
+		compiler.addInstruction(prog)
 		// To verify the behavior, we push the incremented picked value
 		// to the stack.
-		builder.releaseRegisterToStack(pickedLocation)
+		compiler.releaseRegisterToStack(pickedLocation)
 		// Also write the original location back to the stack.
-		builder.releaseRegisterToStack(pickTargetLocation)
-		builder.returnFunction()
+		compiler.releaseRegisterToStack(pickTargetLocation)
+		compiler.returnFunction()
 
 		// Assemble.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run code.
 		eng := newEngine()
@@ -704,32 +704,32 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 		eng := newEngine()
 
 		// Setup the original value.
-		builder.locationStack.pushValueOnStack() // Dummy value!
-		pickTargetLocation := builder.locationStack.pushValueOnStack()
-		builder.locationStack.pushValueOnStack() // Dummy value!
+		compiler.locationStack.pushValueOnStack() // Dummy value!
+		pickTargetLocation := compiler.locationStack.pushValueOnStack()
+		compiler.locationStack.pushValueOnStack() // Dummy value!
 		eng.stackPointer = 5
 		eng.stackBasePointer = 1
 		eng.stack[eng.stackBasePointer+pickTargetLocation.stackPointer] = 100
 
 		// Now insert pick code.
-		err := builder.handlePick(o)
+		err := compiler.compilePick(o)
 		require.NoError(t, err)
 
 		// Increment the picked value.
-		pickedLocation := builder.locationStack.peek()
-		prog := builder.newProg()
+		pickedLocation := compiler.locationStack.peek()
+		prog := compiler.newProg()
 		prog.As = x86.AINCQ
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = pickedLocation.register
-		builder.addInstruction(prog)
+		compiler.addInstruction(prog)
 
 		// To verify the behavior, we push the incremented picked value
 		// to the stack.
-		builder.releaseRegisterToStack(pickedLocation)
-		builder.returnFunction()
+		compiler.releaseRegisterToStack(pickedLocation)
+		compiler.returnFunction()
 
 		// Assemble.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run code.
 		mem := newMemoryInst()
@@ -748,28 +748,28 @@ func TestAmd64Builder_handlePick(t *testing.T) {
 func TestAmd64Builder_handleConstI32(t *testing.T) {
 	for _, v := range []uint32{1, 1 << 5, 1 << 31} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstI32{Value: v}
-			err := builder.handleConstI32(o)
+			err := compiler.compileConstI32(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we increment and push the const value
 			// to the stack.
-			loc := builder.locationStack.peek()
+			loc := compiler.locationStack.peek()
 			require.Equal(t, generalPurposeRegisterTypeInt, loc.registerType())
-			prog := builder.newProg()
+			prog := compiler.newProg()
 			prog.As = x86.AINCQ
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = loc.register
-			builder.addInstruction(prog)
-			builder.releaseRegisterToStack(loc)
-			builder.returnFunction()
+			compiler.addInstruction(prog)
+			compiler.releaseRegisterToStack(loc)
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -790,28 +790,28 @@ func TestAmd64Builder_handleConstI32(t *testing.T) {
 func TestAmd64Builder_handleConstI64(t *testing.T) {
 	for _, v := range []uint64{1, 1 << 5, 1 << 35, 1 << 63} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstI64{Value: v}
-			err := builder.handleConstI64(o)
+			err := compiler.compileConstI64(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we increment and push the const value
 			// to the stack.
-			loc := builder.locationStack.peek()
+			loc := compiler.locationStack.peek()
 			require.Equal(t, generalPurposeRegisterTypeInt, loc.registerType())
-			prog := builder.newProg()
+			prog := compiler.newProg()
 			prog.As = x86.AINCQ
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = loc.register
-			builder.addInstruction(prog)
-			builder.releaseRegisterToStack(loc)
-			builder.returnFunction()
+			compiler.addInstruction(prog)
+			compiler.releaseRegisterToStack(loc)
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -832,30 +832,30 @@ func TestAmd64Builder_handleConstI64(t *testing.T) {
 func TestAmd64Builder_handleConstF32(t *testing.T) {
 	for _, v := range []float32{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstF32{Value: v}
-			err := builder.handleConstF32(o)
+			err := compiler.compileConstF32(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we double and push the const value
 			// to the stack.
-			loc := builder.locationStack.peek()
+			loc := compiler.locationStack.peek()
 			require.Equal(t, generalPurposeRegisterTypeFloat, loc.registerType())
-			prog := builder.newProg()
+			prog := compiler.newProg()
 			prog.As = x86.AADDSS
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = loc.register
 			prog.From.Type = obj.TYPE_REG
 			prog.From.Reg = loc.register
-			builder.addInstruction(prog)
-			builder.releaseRegisterToStack(loc)
-			builder.returnFunction()
+			compiler.addInstruction(prog)
+			compiler.releaseRegisterToStack(loc)
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -876,30 +876,30 @@ func TestAmd64Builder_handleConstF32(t *testing.T) {
 func TestAmd64Builder_handleConstF64(t *testing.T) {
 	for _, v := range []float64{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstF64{Value: v}
-			err := builder.handleConstF64(o)
+			err := compiler.compileConstF64(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we double and push the const value
 			// to the stack.
-			loc := builder.locationStack.peek()
+			loc := compiler.locationStack.peek()
 			require.Equal(t, generalPurposeRegisterTypeFloat, loc.registerType())
-			prog := builder.newProg()
+			prog := compiler.newProg()
 			prog.As = x86.AADDSD
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = loc.register
 			prog.From.Type = obj.TYPE_REG
 			prog.From.Reg = loc.register
-			builder.addInstruction(prog)
-			builder.releaseRegisterToStack(loc)
-			builder.returnFunction()
+			compiler.addInstruction(prog)
+			compiler.releaseRegisterToStack(loc)
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -921,27 +921,27 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		const x1Value uint32 = 113
 		const x2Value uint32 = 41
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		err := builder.handleConstI32(&wazeroir.OperationConstI32{Value: x1Value})
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
 		require.NoError(t, err)
-		x1 := builder.locationStack.peek()
-		err = builder.handleConstI32(&wazeroir.OperationConstI32{Value: x2Value})
+		x1 := compiler.locationStack.peek()
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2Value})
 		require.NoError(t, err)
-		x2 := builder.locationStack.peek()
+		x2 := compiler.locationStack.peek()
 
-		err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+		err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 		require.NoError(t, err)
-		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+		require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		builder.releaseRegisterToStack(x1)
-		builder.returnFunction()
+		compiler.releaseRegisterToStack(x1)
+		compiler.returnFunction()
 
 		// Assemble.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run code.
 		eng := newEngine()
@@ -958,27 +958,27 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
 		const x1Value uint64 = 1 << 35
 		const x2Value uint64 = 41
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		err := builder.handleConstI64(&wazeroir.OperationConstI64{Value: x1Value})
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
 		require.NoError(t, err)
-		x1 := builder.locationStack.peek()
-		err = builder.handleConstI64(&wazeroir.OperationConstI64{Value: x2Value})
+		x1 := compiler.locationStack.peek()
+		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2Value})
 		require.NoError(t, err)
-		x2 := builder.locationStack.peek()
+		x2 := compiler.locationStack.peek()
 
-		err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
+		err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
 		require.NoError(t, err)
-		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+		require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		builder.releaseRegisterToStack(x1)
-		builder.returnFunction()
+		compiler.releaseRegisterToStack(x1)
+		compiler.returnFunction()
 
 		// Assemble.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run code.
 		eng := newEngine()
@@ -1005,27 +1005,27 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				builder := requireNewBuilder(t)
-				builder.initializeReservedRegisters()
-				err := builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
 				require.NoError(t, err)
-				x1 := builder.locationStack.peek()
-				err = builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
 				require.NoError(t, err)
-				x2 := builder.locationStack.peek()
+				x2 := compiler.locationStack.peek()
 
-				err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF32})
+				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF32})
 				require.NoError(t, err)
-				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				builder.releaseRegisterToStack(x1)
-				builder.returnFunction()
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
 
 				// Assemble.
-				code, err := builder.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
 				eng := newEngine()
@@ -1054,27 +1054,27 @@ func TestAmd64Builder_handleAdd(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				builder := requireNewBuilder(t)
-				builder.initializeReservedRegisters()
-				err := builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
 				require.NoError(t, err)
-				x1 := builder.locationStack.peek()
-				err = builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
 				require.NoError(t, err)
-				x2 := builder.locationStack.peek()
+				x2 := compiler.locationStack.peek()
 
-				err = builder.handleAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF64})
+				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeF64})
 				require.NoError(t, err)
-				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				builder.releaseRegisterToStack(x1)
-				builder.returnFunction()
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
 
 				// Assemble.
-				code, err := builder.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
 				eng := newEngine()
@@ -1111,31 +1111,31 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			} else {
 				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32}
 			}
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 			x1Reg := int16(x86.REG_R9)
 			x2Reg := int16(x86.REG_R10)
-			builder.locationStack.pushValueOnRegister(x1Reg)
-			builder.locationStack.pushValueOnRegister(x2Reg)
-			builder.movIntConstToRegister(int64(tc.x1), x1Reg)
-			builder.movIntConstToRegister(int64(tc.x2), x2Reg)
-			err := builder.handleLe(o)
+			compiler.locationStack.pushValueOnRegister(x1Reg)
+			compiler.locationStack.pushValueOnRegister(x2Reg)
+			compiler.movIntConstToRegister(int64(tc.x1), x1Reg)
+			compiler.movIntConstToRegister(int64(tc.x2), x2Reg)
+			err := compiler.compileLe(o)
 			require.NoError(t, err)
 
-			require.NotContains(t, builder.locationStack.usedRegisters, x1Reg)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
+			require.NotContains(t, compiler.locationStack.usedRegisters, x1Reg)
+			require.NotContains(t, compiler.locationStack.usedRegisters, x2Reg)
 			// To verify the behavior, we push the flag value
 			// to the stack.
-			top := builder.locationStack.peek()
+			top := compiler.locationStack.peek()
 			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = builder.moveConditionalToGeneralPurposeRegister(top)
+			err = compiler.moveConditionalToGeneralPurposeRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
-			builder.releaseRegisterToStack(top)
-			builder.returnFunction()
+			compiler.releaseRegisterToStack(top)
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -1174,30 +1174,30 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			} else {
 				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeUint64}
 			}
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 			x1Reg := int16(x86.REG_R9)
 			x2Reg := int16(x86.REG_R10)
-			builder.locationStack.pushValueOnRegister(x1Reg)
-			builder.locationStack.pushValueOnRegister(x2Reg)
-			builder.movIntConstToRegister(tc.x1, x1Reg)
-			builder.movIntConstToRegister(tc.x2, x2Reg)
-			err := builder.handleLe(o)
+			compiler.locationStack.pushValueOnRegister(x1Reg)
+			compiler.locationStack.pushValueOnRegister(x2Reg)
+			compiler.movIntConstToRegister(tc.x1, x1Reg)
+			compiler.movIntConstToRegister(tc.x2, x2Reg)
+			err := compiler.compileLe(o)
 			require.NoError(t, err)
-			require.NotContains(t, builder.locationStack.usedRegisters, x1Reg)
-			require.NotContains(t, builder.locationStack.usedRegisters, x2Reg)
+			require.NotContains(t, compiler.locationStack.usedRegisters, x1Reg)
+			require.NotContains(t, compiler.locationStack.usedRegisters, x2Reg)
 			// To verify the behavior, we push the flag value
 			// to the stack.
-			top := builder.locationStack.peek()
+			top := compiler.locationStack.peek()
 			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = builder.moveConditionalToGeneralPurposeRegister(top)
+			err = compiler.moveConditionalToGeneralPurposeRegister(top)
 			require.NoError(t, err)
 			require.True(t, !top.onConditionalRegister() && top.onRegister())
-			builder.releaseRegisterToStack(top)
-			builder.returnFunction()
+			compiler.releaseRegisterToStack(top)
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
@@ -1232,37 +1232,37 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 		} {
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				// Prepare operands.
-				builder := requireNewBuilder(t)
-				builder.initializeReservedRegisters()
-				err := builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 				require.NoError(t, err)
-				x1 := builder.locationStack.peek()
-				err = builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
 				require.NoError(t, err)
-				x2 := builder.locationStack.peek()
+				x2 := compiler.locationStack.peek()
 
 				// Emit the Le instructions,
-				err = builder.handleLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat32})
+				err = compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat32})
 				require.NoError(t, err)
 
 				// At this point, these registers must be consumed.
-				require.NotContains(t, builder.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 				// Plus the result must be pushed.
-				require.Equal(t, uint64(1), builder.locationStack.sp)
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
 
 				// To verify the behavior, we push the flag value
 				// to the stack.
-				flag := builder.locationStack.peek()
+				flag := compiler.locationStack.peek()
 				require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-				err = builder.moveConditionalToGeneralPurposeRegister(flag)
+				err = compiler.moveConditionalToGeneralPurposeRegister(flag)
 				require.NoError(t, err)
 				require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-				builder.releaseRegisterToStack(flag)
-				builder.returnFunction()
+				compiler.releaseRegisterToStack(flag)
+				compiler.returnFunction()
 
 				// Assemble.
-				code, err := builder.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
 				eng := newEngine()
@@ -1300,37 +1300,37 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 		} {
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				// Prepare operands.
-				builder := requireNewBuilder(t)
-				builder.initializeReservedRegisters()
-				err := builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
-				x1 := builder.locationStack.peek()
-				err = builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
 				require.NoError(t, err)
-				x2 := builder.locationStack.peek()
+				x2 := compiler.locationStack.peek()
 
 				// Emit the Le instructions,
-				err = builder.handleLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat64})
+				err = compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat64})
 				require.NoError(t, err)
 
 				// At this point, these registers must be consumed.
-				require.NotContains(t, builder.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 				// Plus the result must be pushed.
-				require.Equal(t, uint64(1), builder.locationStack.sp)
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
 
 				// To verify the behavior, we push the flag value
 				// to the stack.
-				flag := builder.locationStack.peek()
+				flag := compiler.locationStack.peek()
 				require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-				err = builder.moveConditionalToGeneralPurposeRegister(flag)
+				err = compiler.moveConditionalToGeneralPurposeRegister(flag)
 				require.NoError(t, err)
 				require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-				builder.releaseRegisterToStack(flag)
-				builder.returnFunction()
+				compiler.releaseRegisterToStack(flag)
+				compiler.returnFunction()
 
 				// Assemble.
-				code, err := builder.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
 				eng := newEngine()
@@ -1356,27 +1356,27 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		const x1Value uint32 = 1 << 31
 		const x2Value uint32 = 51
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		err := builder.handleConstI32(&wazeroir.OperationConstI32{Value: x1Value})
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
 		require.NoError(t, err)
-		x1 := builder.locationStack.peek()
-		err = builder.handleConstI32(&wazeroir.OperationConstI32{Value: x2Value})
+		x1 := compiler.locationStack.peek()
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2Value})
 		require.NoError(t, err)
-		x2 := builder.locationStack.peek()
+		x2 := compiler.locationStack.peek()
 
-		err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI32})
+		err = compiler.compileSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI32})
 		require.NoError(t, err)
-		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+		require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		builder.releaseRegisterToStack(x1)
-		builder.returnFunction()
+		compiler.releaseRegisterToStack(x1)
+		compiler.returnFunction()
 
 		// Assemble.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run code.
 		eng := newEngine()
@@ -1393,27 +1393,27 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
 		const x1Value uint64 = 1 << 35
 		const x2Value uint64 = 51
-		builder := requireNewBuilder(t)
-		builder.initializeReservedRegisters()
-		err := builder.handleConstI64(&wazeroir.OperationConstI64{Value: x1Value})
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+		err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
 		require.NoError(t, err)
-		x1 := builder.locationStack.peek()
-		err = builder.handleConstI64(&wazeroir.OperationConstI64{Value: x2Value})
+		x1 := compiler.locationStack.peek()
+		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2Value})
 		require.NoError(t, err)
-		x2 := builder.locationStack.peek()
+		x2 := compiler.locationStack.peek()
 
-		err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI64})
+		err = compiler.compileSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeI64})
 		require.NoError(t, err)
-		require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-		require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+		require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+		require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		builder.releaseRegisterToStack(x1)
-		builder.returnFunction()
+		compiler.releaseRegisterToStack(x1)
+		compiler.returnFunction()
 
 		// Assemble.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 		// Run code.
 		eng := newEngine()
@@ -1440,27 +1440,27 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				builder := requireNewBuilder(t)
-				builder.initializeReservedRegisters()
-				err := builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
 				require.NoError(t, err)
-				x1 := builder.locationStack.peek()
-				err = builder.handleConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
 				require.NoError(t, err)
-				x2 := builder.locationStack.peek()
+				x2 := compiler.locationStack.peek()
 
-				err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeF32})
+				err = compiler.compileSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeF32})
 				require.NoError(t, err)
-				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				builder.releaseRegisterToStack(x1)
-				builder.returnFunction()
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
 
 				// Assemble.
-				code, err := builder.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
 				eng := newEngine()
@@ -1489,27 +1489,27 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				builder := requireNewBuilder(t)
-				builder.initializeReservedRegisters()
-				err := builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
 				require.NoError(t, err)
-				x1 := builder.locationStack.peek()
-				err = builder.handleConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
 				require.NoError(t, err)
-				x2 := builder.locationStack.peek()
+				x2 := compiler.locationStack.peek()
 
-				err = builder.handleSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeF64})
+				err = compiler.compileSub(&wazeroir.OperationSub{Type: wazeroir.UnsignedTypeF64})
 				require.NoError(t, err)
-				require.Contains(t, builder.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, builder.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				builder.releaseRegisterToStack(x1)
-				builder.returnFunction()
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
 
 				// Assemble.
-				code, err := builder.compile()
+				code, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
 				eng := newEngine()
@@ -1530,29 +1530,29 @@ func TestAmd64Builder_handleSub(t *testing.T) {
 func TestAmd64Builder_handleCall(t *testing.T) {
 	t.Run("host function", func(t *testing.T) {
 		const functionIndex = 5
-		builder := requireNewBuilder(t)
-		builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
+		compiler := requireNewCompiler(t)
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
 
 		// Setup.
 		eng := newEngine()
-		builder.eng = eng
+		compiler.eng = eng
 		hostFuncRefValue := reflect.ValueOf(func() {})
 		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue}
-		builder.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
-		builder.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
+		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
+		compiler.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
 		eng.compiledHostFunctionIndex[hostFuncInstance] = functionIndex
 
 		// Build codes.
-		builder.initializeReservedRegisters()
+		compiler.initializeReservedRegisters()
 		// Push the value onto stack.
-		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
-		builder.movIntConstToRegister(int64(50), loc.register)
-		err := builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
+		compiler.movIntConstToRegister(int64(50), loc.register)
+		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
 		require.NoError(t, err)
 
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -1571,29 +1571,29 @@ func TestAmd64Builder_handleCall(t *testing.T) {
 	})
 	t.Run("wasm function", func(t *testing.T) {
 		const functionIndex = 20
-		builder := requireNewBuilder(t)
-		builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
+		compiler := requireNewCompiler(t)
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
 
 		// Setup.
 		eng := newEngine()
-		builder.eng = eng
+		compiler.eng = eng
 		wasmFuncInstance := &wasm.FunctionInstance{}
-		builder.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
-		builder.f.ModuleInstance.Functions[functionIndex] = wasmFuncInstance
+		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
+		compiler.f.ModuleInstance.Functions[functionIndex] = wasmFuncInstance
 		eng.compiledWasmFunctionIndex[wasmFuncInstance] = functionIndex
 
 		// Build codes.
-		builder.initializeReservedRegisters()
+		compiler.initializeReservedRegisters()
 		// Push the value onto stack.
-		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-		_ = builder.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := builder.locationStack.pushValueOnRegister(x86.REG_AX)
-		builder.movIntConstToRegister(int64(50), loc.register)
-		err := builder.handleCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
+		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
+		compiler.movIntConstToRegister(int64(50), loc.register)
+		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
 		require.NoError(t, err)
 
 		// Compile.
-		code, err := builder.compile()
+		code, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -1622,20 +1622,20 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := builder.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueOnStack()
 			eng.stack[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationLoad{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := builder.handleLoad(o)
+			err := compiler.compileLoad(o)
 			require.NoError(t, err)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
-			loadedValue := builder.locationStack.peek()
+			loadedValue := compiler.locationStack.peek()
 			require.True(t, loadedValue.onRegister())
 
 			// Double the loaded value in order to verify the behavior.
@@ -1658,20 +1658,20 @@ func TestAmd64Builder_handleLoad(t *testing.T) {
 				require.True(t, isFloatRegister(loadedValue.register))
 				addInst = x86.AADDSD
 			}
-			doubleLoadedValue := builder.newProg()
+			doubleLoadedValue := compiler.newProg()
 			doubleLoadedValue.As = addInst
 			doubleLoadedValue.To.Type = obj.TYPE_REG
 			doubleLoadedValue.To.Reg = loadedValue.register
 			doubleLoadedValue.From.Type = obj.TYPE_REG
 			doubleLoadedValue.From.Reg = loadedValue.register
-			builder.addInstruction(doubleLoadedValue)
+			compiler.addInstruction(doubleLoadedValue)
 
 			// We need to write the result back to the memory stack.
-			builder.releaseRegisterToStack(loadedValue)
+			compiler.releaseRegisterToStack(loadedValue)
 
 			// Compile.
-			builder.returnFunction()
-			code, err := builder.compile()
+			compiler.returnFunction()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Place the load target value to the memory.
@@ -1722,36 +1722,36 @@ func TestAmd64Builder_handleLoad8(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := builder.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueOnStack()
 			eng.stack[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationLoad8{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := builder.handleLoad8(o)
+			err := compiler.compileLoad8(o)
 			require.NoError(t, err)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
-			loadedValue := builder.locationStack.peek()
+			loadedValue := compiler.locationStack.peek()
 			require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 			require.True(t, loadedValue.onRegister())
 
 			// Increment the loaded value in order to verify the behavior.
-			doubleLoadedValue := builder.newProg()
+			doubleLoadedValue := compiler.newProg()
 			doubleLoadedValue.As = x86.AINCB
 			doubleLoadedValue.To.Type = obj.TYPE_REG
 			doubleLoadedValue.To.Reg = loadedValue.register
-			builder.addInstruction(doubleLoadedValue)
+			compiler.addInstruction(doubleLoadedValue)
 
 			// We need to write the result back to the memory stack.
-			builder.releaseRegisterToStack(loadedValue)
+			compiler.releaseRegisterToStack(loadedValue)
 
 			// Compile.
-			builder.returnFunction()
-			code, err := builder.compile()
+			compiler.returnFunction()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Place the load target value to the memory.
@@ -1786,36 +1786,36 @@ func TestAmd64Builder_handleLoad16(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := builder.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueOnStack()
 			eng.stack[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationLoad16{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := builder.handleLoad16(o)
+			err := compiler.compileLoad16(o)
 			require.NoError(t, err)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
-			loadedValue := builder.locationStack.peek()
+			loadedValue := compiler.locationStack.peek()
 			require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 			require.True(t, loadedValue.onRegister())
 
 			// Increment the loaded value in order to verify the behavior.
-			doubleLoadedValue := builder.newProg()
+			doubleLoadedValue := compiler.newProg()
 			doubleLoadedValue.As = x86.AINCW
 			doubleLoadedValue.To.Type = obj.TYPE_REG
 			doubleLoadedValue.To.Reg = loadedValue.register
-			builder.addInstruction(doubleLoadedValue)
+			compiler.addInstruction(doubleLoadedValue)
 
 			// We need to write the result back to the memory stack.
-			builder.releaseRegisterToStack(loadedValue)
+			compiler.releaseRegisterToStack(loadedValue)
 
 			// Compile.
-			builder.returnFunction()
-			code, err := builder.compile()
+			compiler.returnFunction()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Place the load target value to the memory.
@@ -1842,36 +1842,36 @@ func TestAmd64Builder_handleLoad16(t *testing.T) {
 
 func TestAmd64Builder_handleLoad32(t *testing.T) {
 	eng := newEngine()
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	// Before load operations, we must push the base offset value.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := builder.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueOnStack()
 	eng.stack[base.stackPointer] = baseOffset
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationLoad32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := builder.handleLoad32(o)
+	err := compiler.compileLoad32(o)
 	require.NoError(t, err)
 
 	// At this point, the loaded value must be on top of the stack, and placed on a register.
-	loadedValue := builder.locationStack.peek()
+	loadedValue := compiler.locationStack.peek()
 	require.Equal(t, generalPurposeRegisterTypeInt, loadedValue.registerType())
 	require.True(t, loadedValue.onRegister())
 
 	// Increment the loaded value in order to verify the behavior.
-	doubleLoadedValue := builder.newProg()
+	doubleLoadedValue := compiler.newProg()
 	doubleLoadedValue.As = x86.AINCL
 	doubleLoadedValue.To.Type = obj.TYPE_REG
 	doubleLoadedValue.To.Reg = loadedValue.register
-	builder.addInstruction(doubleLoadedValue)
+	compiler.addInstruction(doubleLoadedValue)
 
 	// We need to write the result back to the memory stack.
-	builder.releaseRegisterToStack(loadedValue)
+	compiler.releaseRegisterToStack(loadedValue)
 
 	// Compile.
-	builder.returnFunction()
-	code, err := builder.compile()
+	compiler.returnFunction()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Place the load target value to the memory.
@@ -1904,15 +1904,15 @@ func TestAmd64Builder_handleStore(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 
 			// Before store operations, we must push the base offset, and the store target values.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := builder.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueOnStack()
 			eng.stack[base.stackPointer] = baseOffset
 			storeTargetValue := uint64(math.MaxUint64)
-			storeTarget := builder.locationStack.pushValueOnStack()
+			storeTarget := compiler.locationStack.pushValueOnStack()
 			eng.stack[storeTarget.stackPointer] = storeTargetValue
 			switch tp {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
@@ -1923,17 +1923,17 @@ func TestAmd64Builder_handleStore(t *testing.T) {
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationStore{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := builder.handleStore(o)
+			err := compiler.compileStore(o)
 			require.NoError(t, err)
 
 			// At this point, two values are popped so the stack pointer must be zero.
-			require.Equal(t, uint64(0), builder.locationStack.sp)
+			require.Equal(t, uint64(0), compiler.locationStack.sp)
 			// Plus there should be no used registers.
-			require.Len(t, builder.locationStack.usedRegisters, 0)
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 			// Compile.
-			builder.returnFunction()
-			code, err := builder.compile()
+			compiler.returnFunction()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -1965,31 +1965,31 @@ func TestAmd64Builder_handleStore(t *testing.T) {
 
 func TestAmd64Builder_handleStore8(t *testing.T) {
 	eng := newEngine()
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := builder.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueOnStack()
 	eng.stack[base.stackPointer] = baseOffset
 	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
-	storeTarget := builder.locationStack.pushValueOnStack()
+	storeTarget := compiler.locationStack.pushValueOnStack()
 	eng.stack[storeTarget.stackPointer] = storeTargetValue
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationStore8{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := builder.handleStore8(o)
+	err := compiler.compileStore8(o)
 	require.NoError(t, err)
 
 	// At this point, two values are popped so the stack pointer must be zero.
-	require.Equal(t, uint64(0), builder.locationStack.sp)
+	require.Equal(t, uint64(0), compiler.locationStack.sp)
 	// Plus there should be no used registers.
-	require.Len(t, builder.locationStack.usedRegisters, 0)
+	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Compile.
-	builder.returnFunction()
-	code, err := builder.compile()
+	compiler.returnFunction()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -2011,31 +2011,31 @@ func TestAmd64Builder_handleStore8(t *testing.T) {
 
 func TestAmd64Builder_handleStore16(t *testing.T) {
 	eng := newEngine()
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := builder.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueOnStack()
 	eng.stack[base.stackPointer] = baseOffset
 	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
-	storeTarget := builder.locationStack.pushValueOnStack()
+	storeTarget := compiler.locationStack.pushValueOnStack()
 	eng.stack[storeTarget.stackPointer] = storeTargetValue
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationStore16{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := builder.handleStore16(o)
+	err := compiler.compileStore16(o)
 	require.NoError(t, err)
 
 	// At this point, two values are popped so the stack pointer must be zero.
-	require.Equal(t, uint64(0), builder.locationStack.sp)
+	require.Equal(t, uint64(0), compiler.locationStack.sp)
 	// Plus there should be no used registers.
-	require.Len(t, builder.locationStack.usedRegisters, 0)
+	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Compile.
-	builder.returnFunction()
-	code, err := builder.compile()
+	compiler.returnFunction()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -2057,31 +2057,31 @@ func TestAmd64Builder_handleStore16(t *testing.T) {
 
 func TestAmd64Builder_handleStore32(t *testing.T) {
 	eng := newEngine()
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := builder.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueOnStack()
 	eng.stack[base.stackPointer] = baseOffset
 	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
-	storeTarget := builder.locationStack.pushValueOnStack()
+	storeTarget := compiler.locationStack.pushValueOnStack()
 	eng.stack[storeTarget.stackPointer] = storeTargetValue
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationStore32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := builder.handleStore32(o)
+	err := compiler.compileStore32(o)
 	require.NoError(t, err)
 
 	// At this point, two values are popped so the stack pointer must be zero.
-	require.Equal(t, uint64(0), builder.locationStack.sp)
+	require.Equal(t, uint64(0), compiler.locationStack.sp)
 	// Plus there should be no used registers.
-	require.Len(t, builder.locationStack.usedRegisters, 0)
+	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Compile.
-	builder.returnFunction()
-	code, err := builder.compile()
+	compiler.returnFunction()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -2102,14 +2102,14 @@ func TestAmd64Builder_handleStore32(t *testing.T) {
 }
 
 func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
-	builder := requireNewBuilder(t)
+	compiler := requireNewCompiler(t)
 
-	builder.initializeReservedRegisters()
+	compiler.initializeReservedRegisters()
 	// Emit memory.grow instructions.
-	builder.handleMemoryGrow()
+	compiler.compileMemoryGrow()
 
 	// Compile.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -2125,16 +2125,16 @@ func TestAmd64Builder_handleMemoryGrow(t *testing.T) {
 }
 
 func TestAmd64Builder_handleMemorySize(t *testing.T) {
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	// Emit memory.size instructions.
-	builder.handleMemorySize()
+	compiler.compileMemorySize()
 	// At this point, the size of memory should be pushed onto the stack.
-	require.Equal(t, uint64(1), builder.locationStack.sp)
-	require.Equal(t, generalPurposeRegisterTypeInt, builder.locationStack.peek().registerType())
+	require.Equal(t, uint64(1), compiler.locationStack.sp)
+	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
 
 	// Compile.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -2151,25 +2151,25 @@ func TestAmd64Builder_handleMemorySize(t *testing.T) {
 
 func TestAmd64Builder_handleDrop(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
-		builder := requireNewBuilder(t)
-		err := builder.handleDrop(&wazeroir.OperationDrop{})
+		compiler := requireNewCompiler(t)
+		err := compiler.compileDrop(&wazeroir.OperationDrop{})
 		require.NoError(t, err)
 	})
 	t.Run("zero start", func(t *testing.T) {
-		builder := requireNewBuilder(t)
-		shouldPeek := builder.locationStack.pushValueOnStack()
+		compiler := requireNewCompiler(t)
+		shouldPeek := compiler.locationStack.pushValueOnStack()
 		const numReg = 10
 		for i := int16(0); i < numReg; i++ {
-			builder.locationStack.pushValueOnRegister(i)
+			compiler.locationStack.pushValueOnRegister(i)
 		}
-		err := builder.handleDrop(&wazeroir.OperationDrop{
+		err := compiler.compileDrop(&wazeroir.OperationDrop{
 			Range: &wazeroir.InclusiveRange{Start: 0, End: numReg},
 		})
 		require.NoError(t, err)
 		for i := int16(0); i < numReg; i++ {
-			require.NotContains(t, builder.locationStack.usedRegisters, i)
+			require.NotContains(t, compiler.locationStack.usedRegisters, i)
 		}
-		actualPeek := builder.locationStack.peek()
+		actualPeek := compiler.locationStack.peek()
 		require.Equal(t, shouldPeek, actualPeek)
 	})
 	t.Run("live all on register", func(t *testing.T) {
@@ -2177,31 +2177,31 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 			numLive = 3
 			dropNum = 5
 		)
-		builder := requireNewBuilder(t)
-		shouldBottom := builder.locationStack.pushValueOnStack()
+		compiler := requireNewCompiler(t)
+		shouldBottom := compiler.locationStack.pushValueOnStack()
 		for i := int16(0); i < dropNum; i++ {
-			builder.locationStack.pushValueOnRegister(i)
+			compiler.locationStack.pushValueOnRegister(i)
 		}
 		for i := int16(dropNum); i < numLive+dropNum; i++ {
-			builder.locationStack.pushValueOnRegister(i)
+			compiler.locationStack.pushValueOnRegister(i)
 		}
-		err := builder.handleDrop(&wazeroir.OperationDrop{
+		err := compiler.compileDrop(&wazeroir.OperationDrop{
 			Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
 		})
 		require.NoError(t, err)
 		for i := int16(0); i < dropNum; i++ {
-			require.NotContains(t, builder.locationStack.usedRegisters, i)
+			require.NotContains(t, compiler.locationStack.usedRegisters, i)
 		}
 		for i := int16(dropNum); i < numLive+dropNum; i++ {
-			require.Contains(t, builder.locationStack.usedRegisters, i)
+			require.Contains(t, compiler.locationStack.usedRegisters, i)
 		}
 		for i := int16(0); i < numLive; i++ {
-			actual := builder.locationStack.pop()
+			actual := compiler.locationStack.pop()
 			require.True(t, actual.onRegister())
 			require.Equal(t, numLive+dropNum-1-i, actual.register)
 		}
-		require.Equal(t, uint64(1), builder.locationStack.sp)
-		require.Equal(t, shouldBottom, builder.locationStack.pop())
+		require.Equal(t, uint64(1), compiler.locationStack.sp)
+		require.Equal(t, shouldBottom, compiler.locationStack.pop())
 	})
 	t.Run("live on stack", func(t *testing.T) {
 		// This is for testing all the edge cases with fake registers.
@@ -2211,60 +2211,60 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 				dropNum        = 5
 				liveRegisterID = 10
 			)
-			builder := requireNewBuilder(t)
-			bottom := builder.locationStack.pushValueOnStack()
+			compiler := requireNewCompiler(t)
+			bottom := compiler.locationStack.pushValueOnStack()
 			for i := int16(0); i < dropNum; i++ {
-				builder.locationStack.pushValueOnRegister(i)
+				compiler.locationStack.pushValueOnRegister(i)
 			}
 			// The bottom live value is on the stack.
-			bottomLive := builder.locationStack.pushValueOnStack()
+			bottomLive := compiler.locationStack.pushValueOnStack()
 			// The second live value is on the register.
-			LiveRegister := builder.locationStack.pushValueOnRegister(liveRegisterID)
+			LiveRegister := compiler.locationStack.pushValueOnRegister(liveRegisterID)
 			// The top live value is on the conditional.
-			topLive := builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateAE)
+			topLive := compiler.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateAE)
 			require.True(t, topLive.onConditionalRegister())
-			err := builder.handleDrop(&wazeroir.OperationDrop{
+			err := compiler.compileDrop(&wazeroir.OperationDrop{
 				Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
 			})
 			require.NoError(t, err)
-			require.Equal(t, uint64(4), builder.locationStack.sp)
+			require.Equal(t, uint64(4), compiler.locationStack.sp)
 			for i := int16(0); i < dropNum; i++ {
-				require.NotContains(t, builder.locationStack.usedRegisters, i)
+				require.NotContains(t, compiler.locationStack.usedRegisters, i)
 			}
 			// Top value should be on the register.
-			actualTopLive := builder.locationStack.pop()
+			actualTopLive := compiler.locationStack.pop()
 			require.True(t, actualTopLive.onRegister() && !actualTopLive.onConditionalRegister())
 			require.Equal(t, topLive, actualTopLive)
 			// Second one should be on the same register.
-			actualLiveRegister := builder.locationStack.pop()
+			actualLiveRegister := compiler.locationStack.pop()
 			require.Equal(t, LiveRegister, actualLiveRegister)
 			// The bottom live value should be moved onto the stack.
-			actualBottomLive := builder.locationStack.pop()
+			actualBottomLive := compiler.locationStack.pop()
 			require.Equal(t, bottomLive, actualBottomLive)
 			require.True(t, actualBottomLive.onRegister() && !actualBottomLive.onStack())
 			// The bottom after drop should stay on stack.
-			actualBottom := builder.locationStack.pop()
+			actualBottom := compiler.locationStack.pop()
 			require.Equal(t, bottom, actualBottom)
 			require.True(t, bottom.onStack())
 		})
 		t.Run("real", func(t *testing.T) {
 			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
-			bottom := builder.locationStack.pushValueOnRegister(x86.REG_R10)
-			builder.locationStack.pushValueOnRegister(x86.REG_R9)
-			top := builder.locationStack.pushValueOnStack()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
+			bottom := compiler.locationStack.pushValueOnRegister(x86.REG_R10)
+			compiler.locationStack.pushValueOnRegister(x86.REG_R9)
+			top := compiler.locationStack.pushValueOnStack()
 			eng.stack[top.stackPointer] = 5000
-			builder.movIntConstToRegister(300, bottom.register)
-			err := builder.handleDrop(&wazeroir.OperationDrop{
+			compiler.movIntConstToRegister(300, bottom.register)
+			err := compiler.compileDrop(&wazeroir.OperationDrop{
 				Range: &wazeroir.InclusiveRange{Start: 1, End: 1},
 			})
 			require.NoError(t, err)
-			builder.releaseRegisterToStack(bottom)
-			builder.releaseRegisterToStack(top)
-			builder.returnFunction()
+			compiler.releaseRegisterToStack(bottom)
+			compiler.releaseRegisterToStack(top)
+			compiler.returnFunction()
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			require.Equal(t, []uint64{0, 0, 5000}, eng.stack[:3])
@@ -2286,27 +2286,27 @@ func TestAmd64Builder_handleDrop(t *testing.T) {
 
 func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {
 	eng := newEngine()
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	x1Reg := int16(x86.REG_AX)
 	x2Reg := int16(x86.REG_R10)
-	_ = builder.locationStack.pushValueOnStack()
+	_ = compiler.locationStack.pushValueOnStack()
 	eng.stack[0] = 100
-	builder.locationStack.pushValueOnRegister(x1Reg)
-	builder.locationStack.pushValueOnRegister(x2Reg)
-	_ = builder.locationStack.pushValueOnStack()
+	compiler.locationStack.pushValueOnRegister(x1Reg)
+	compiler.locationStack.pushValueOnRegister(x2Reg)
+	_ = compiler.locationStack.pushValueOnStack()
 	eng.stack[3] = 123
-	require.Len(t, builder.locationStack.usedRegisters, 2)
+	require.Len(t, compiler.locationStack.usedRegisters, 2)
 
 	// Set the values supposed to be released to stack memory space.
-	builder.movIntConstToRegister(300, x1Reg)
-	builder.movIntConstToRegister(51, x2Reg)
-	builder.releaseAllRegistersToStack()
-	require.Len(t, builder.locationStack.usedRegisters, 0)
-	builder.returnFunction()
+	compiler.movIntConstToRegister(300, x1Reg)
+	compiler.movIntConstToRegister(51, x2Reg)
+	compiler.releaseAllRegistersToStack()
+	require.Len(t, compiler.locationStack.usedRegisters, 0)
+	compiler.returnFunction()
 
 	// Assemble.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	// Run code.
 	mem := newMemoryInst()
@@ -2324,32 +2324,32 @@ func TestAmd64Builder_releaseAllRegistersToStack(t *testing.T) {
 }
 
 func TestAmd64Builder_assemble(t *testing.T) {
-	builder := requireNewBuilder(t)
-	builder.setContinuationOffsetAtNextInstructionAndReturn()
-	prog := builder.newProg()
+	compiler := requireNewCompiler(t)
+	compiler.setContinuationOffsetAtNextInstructionAndReturn()
+	prog := compiler.newProg()
 	prog.As = x86.AINCQ
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = x86.REG_R10
-	builder.addInstruction(prog)
-	code, err := builder.compile()
+	compiler.addInstruction(prog)
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	actual := binary.LittleEndian.Uint64(code[2:10])
 	require.Equal(t, uint64(prog.Pc), actual)
 }
 
 func TestAmd64Builder_handleUnreachable(t *testing.T) {
-	builder := requireNewBuilder(t)
-	builder.initializeReservedRegisters()
+	compiler := requireNewCompiler(t)
+	compiler.initializeReservedRegisters()
 	x1Reg := int16(x86.REG_AX)
 	x2Reg := int16(x86.REG_R10)
-	builder.locationStack.pushValueOnRegister(x1Reg)
-	builder.locationStack.pushValueOnRegister(x2Reg)
-	builder.movIntConstToRegister(300, x1Reg)
-	builder.movIntConstToRegister(51, x2Reg)
-	builder.handleUnreachable()
+	compiler.locationStack.pushValueOnRegister(x1Reg)
+	compiler.locationStack.pushValueOnRegister(x2Reg)
+	compiler.movIntConstToRegister(300, x1Reg)
+	compiler.movIntConstToRegister(51, x2Reg)
+	compiler.compileUnreachable()
 
 	// Assemble.
-	code, err := builder.compile()
+	code, err := compiler.compile()
 	require.NoError(t, err)
 	// Run code.
 	eng := newEngine()
@@ -2415,41 +2415,41 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			builder := requireNewBuilder(t)
+			compiler := requireNewCompiler(t)
 			eng := newEngine()
-			builder.initializeReservedRegisters()
+			compiler.initializeReservedRegisters()
 			var x1, x2, c *valueLocation
 			if tc.x1OnRegister {
-				x1 = builder.locationStack.pushValueOnRegister(x86.REG_AX)
-				builder.movIntConstToRegister(x1Value, x1.register)
+				x1 = compiler.locationStack.pushValueOnRegister(x86.REG_AX)
+				compiler.movIntConstToRegister(x1Value, x1.register)
 			} else {
-				x1 = builder.locationStack.pushValueOnStack()
+				x1 = compiler.locationStack.pushValueOnStack()
 				eng.stack[x1.stackPointer] = x1Value
 			}
 			if tc.x2OnRegister {
-				x2 = builder.locationStack.pushValueOnRegister(x86.REG_R10)
-				builder.movIntConstToRegister(x2Value, x2.register)
+				x2 = compiler.locationStack.pushValueOnRegister(x86.REG_R10)
+				compiler.movIntConstToRegister(x2Value, x2.register)
 			} else {
-				x2 = builder.locationStack.pushValueOnStack()
+				x2 = compiler.locationStack.pushValueOnStack()
 				eng.stack[x2.stackPointer] = x2Value
 			}
 			if tc.condlValueOnStack {
-				c = builder.locationStack.pushValueOnStack()
+				c = compiler.locationStack.pushValueOnStack()
 				if tc.selectX1 {
 					eng.stack[c.stackPointer] = 1
 				} else {
 					eng.stack[c.stackPointer] = 0
 				}
 			} else if tc.condValueOnGPRegister {
-				c = builder.locationStack.pushValueOnRegister(x86.REG_R9)
+				c = compiler.locationStack.pushValueOnRegister(x86.REG_R9)
 				if tc.selectX1 {
-					builder.movIntConstToRegister(1, c.register)
+					compiler.movIntConstToRegister(1, c.register)
 				} else {
-					builder.movIntConstToRegister(0, c.register)
+					compiler.movIntConstToRegister(0, c.register)
 				}
 			} else if tc.condValueOnCondRegister {
-				builder.movIntConstToRegister(0, x86.REG_CX)
-				cmp := builder.newProg()
+				compiler.movIntConstToRegister(0, x86.REG_CX)
+				cmp := compiler.newProg()
 				cmp.As = x86.ACMPQ
 				cmp.From.Type = obj.TYPE_REG
 				cmp.From.Reg = x86.REG_CX
@@ -2459,26 +2459,26 @@ func TestAmd64Builder_handleSelect(t *testing.T) {
 				} else {
 					cmp.To.Offset = 1
 				}
-				builder.addInstruction(cmp)
-				builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+				compiler.addInstruction(cmp)
+				compiler.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
 			}
 
 			// Now emit code for select.
-			err := builder.handleSelect()
+			err := compiler.compileSelect()
 			require.NoError(t, err)
 			// The code generation should not affect the x1's placement in any case.
 			require.Equal(t, tc.x1OnRegister, x1.onRegister())
 			// Plus x1 is top of the stack.
-			require.Equal(t, x1, builder.locationStack.peek())
+			require.Equal(t, x1, compiler.locationStack.peek())
 
 			// Now write back the x1 to the memory if it is on a register.
 			if tc.x1OnRegister {
-				builder.releaseRegisterToStack(x1)
+				compiler.releaseRegisterToStack(x1)
 			}
-			builder.returnFunction()
+			compiler.returnFunction()
 
 			// Run code.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			mem := newMemoryInst()
 			jitcall(
@@ -2513,45 +2513,45 @@ func TestAmd64Builder_handleSwap(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			eng := newEngine()
-			builder := requireNewBuilder(t)
-			builder.initializeReservedRegisters()
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
 			if tc.x2OnRegister {
-				x2 := builder.locationStack.pushValueOnRegister(x86.REG_R10)
-				builder.movIntConstToRegister(x2Value, x2.register)
+				x2 := compiler.locationStack.pushValueOnRegister(x86.REG_R10)
+				compiler.movIntConstToRegister(x2Value, x2.register)
 			} else {
-				x2 := builder.locationStack.pushValueOnStack()
+				x2 := compiler.locationStack.pushValueOnStack()
 				eng.stack[x2.stackPointer] = uint64(x2Value)
 			}
-			_ = builder.locationStack.pushValueOnStack() // Dummy value!
+			_ = compiler.locationStack.pushValueOnStack() // Dummy value!
 			if tc.x1OnRegister && !tc.x1OnConditionalRegister {
-				x1 := builder.locationStack.pushValueOnRegister(x86.REG_AX)
-				builder.movIntConstToRegister(x1Value, x1.register)
+				x1 := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
+				compiler.movIntConstToRegister(x1Value, x1.register)
 			} else if !tc.x1OnConditionalRegister {
-				x1 := builder.locationStack.pushValueOnStack()
+				x1 := compiler.locationStack.pushValueOnStack()
 				eng.stack[x1.stackPointer] = uint64(x1Value)
 			} else {
-				builder.movIntConstToRegister(0, x86.REG_AX)
-				cmp := builder.newProg()
+				compiler.movIntConstToRegister(0, x86.REG_AX)
+				cmp := compiler.newProg()
 				cmp.As = x86.ACMPQ
 				cmp.From.Type = obj.TYPE_REG
 				cmp.From.Reg = x86.REG_AX
 				cmp.To.Type = obj.TYPE_CONST
 				cmp.To.Offset = 0
 				cmp.To.Offset = 0
-				builder.addInstruction(cmp)
-				builder.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+				compiler.addInstruction(cmp)
+				compiler.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
 				x1Value = 1
 			}
 
 			// Swap x1 and x2.
-			err := builder.handleSwap(&wazeroir.OperationSwap{Depth: 2})
+			err := compiler.compileSwap(&wazeroir.OperationSwap{Depth: 2})
 			require.NoError(t, err)
 			// To verify the behavior, we release all the registers to stack locations.
-			builder.releaseAllRegistersToStack()
-			builder.returnFunction()
+			compiler.releaseAllRegistersToStack()
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			mem := newMemoryInst()
@@ -2581,30 +2581,30 @@ func TestAmd64Builder_handleGlobalGet(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			// Setup the globals.
-			builder := requireNewBuilder(t)
+			compiler := requireNewCompiler(t)
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}, nil}
-			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
+			compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
 			// Emit the code.
-			builder.initializeReservedRegisters()
+			compiler.initializeReservedRegisters()
 			op := &wazeroir.OperationGlobalGet{Index: 1}
-			err := builder.handleGlobalGet(op)
+			err := compiler.compileGlobalGet(op)
 			require.NoError(t, err)
 
 			// At this point, the top of stack must be the retrieved global on a register.
-			global := builder.locationStack.peek()
+			global := compiler.locationStack.peek()
 			require.True(t, global.onRegister())
-			require.Len(t, builder.locationStack.usedRegisters, 1)
+			require.Len(t, compiler.locationStack.usedRegisters, 1)
 			switch tp {
 			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				require.True(t, isFloatRegister(global.register))
 			case wasm.ValueTypeI32, wasm.ValueTypeI64:
 				require.True(t, isIntRegister(global.register))
 			}
-			builder.releaseAllRegistersToStack()
-			builder.returnFunction()
+			compiler.releaseAllRegistersToStack()
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run the code assembled above.
@@ -2632,19 +2632,19 @@ func TestAmd64Builder_handleGlobalSet(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			// Setup the globals.
-			builder := requireNewBuilder(t)
+			compiler := requireNewCompiler(t)
 			globals := []*wasm.GlobalInstance{nil, {Val: 40, Type: &wasm.GlobalType{ValType: tp}}, nil}
-			builder.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
-			_ = builder.locationStack.pushValueOnStack() // where we place the set target value below.
+			compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
+			_ = compiler.locationStack.pushValueOnStack() // where we place the set target value below.
 			// Now emit the code.
-			builder.initializeReservedRegisters()
+			compiler.initializeReservedRegisters()
 			op := &wazeroir.OperationGlobalSet{Index: 1}
-			err := builder.handleGlobalSet(op)
+			err := compiler.compileGlobalSet(op)
 			require.NoError(t, err)
-			builder.returnFunction()
+			compiler.returnFunction()
 
 			// Assemble.
-			code, err := builder.compile()
+			code, err := compiler.compile()
 			require.NoError(t, err)
 			// Run code.
 			eng := newEngine()
