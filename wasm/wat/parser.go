@@ -8,8 +8,8 @@ import (
 type currentField byte
 
 const (
-	// fieldSource is the first position in the source being parsed.
-	fieldSource currentField = iota
+	// fieldInitial is the first position in the source being parsed.
+	fieldInitial currentField = iota
 	fieldModule
 	fieldModuleImport
 	fieldModuleImportFunc
@@ -25,17 +25,20 @@ type ModuleParser struct {
 	// currentField is the parser and error context.
 	// This is set after reading a field name, ex "module", or after reaching the end of one, ex ')'.
 	currentField
+	// tokenParser is called by lex, and changes based on the currentField.
+	// The initial tokenParser is ensureLParen because %.wat files must begin with a '(' token (ignoring whitespace).
 	tokenParser
+	// currentImport lets us avoid looking up the last import each time we encounter a token when parsing an import.
 	currentImport *_import
 }
 
-// ParseModule parses the configured source into a module. This function returns when the source is exhausted or an
+// parseModule parses the configured source into a module. This function returns when the source is exhausted or an
 // error occurs.
 //
 // Here's a description of the return values:
 // * module is the result of parsing or nil on error
 // * err is a formatError invoking the parser, dangling block comments or unexpected characters.
-func ParseModule(source []byte) (*module, error) {
+func parseModule(source []byte) (*module, error) {
 	p := ModuleParser{source: source, module: &module{}}
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
@@ -70,20 +73,20 @@ func (p *ModuleParser) startField(tok tokenType, tokenBytes []byte, _, _ int) (e
 	// Each case must return a tokenParser that consumes the rest of the field up to the ')'.
 	// Note: each branch must handle any nesting concerns. Ex. "(module (import" nests further to "(func".
 	switch p.currentField {
-	case fieldSource:
-		p.tokenParser, err = p.startFileField(tokenBytes)
+	case fieldInitial:
+		p.tokenParser, err = p.initialFieldHandler(tokenBytes)
 	case fieldModule:
-		p.tokenParser, err = p.startModuleField(tokenBytes)
+		p.tokenParser, err = p.moduleFieldHandler(tokenBytes)
 	case fieldModuleImport:
-		p.tokenParser, err = p.startImportField(tokenBytes)
+		p.tokenParser, err = p.importFieldHandler(tokenBytes)
 	default:
 		return fmt.Errorf("unexpected current field %d", p.currentField)
 	}
 	return
 }
 
-// startFileField parses the top-level fields in the WebAssembly source.
-func (p *ModuleParser) startFileField(fieldName []byte) (tokenParser, error) {
+// initialFieldHandler parses the top-level fields in the WebAssembly source.
+func (p *ModuleParser) initialFieldHandler(fieldName []byte) (tokenParser, error) {
 	if string(fieldName) == "module" {
 		p.currentField = fieldModule
 		return p.parseModule, nil
@@ -104,14 +107,14 @@ func (p *ModuleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ int) e
 		p.tokenParser = p.startField // after this look for a field name
 		return nil
 	case tokenRParen: // end of module
-		p.currentField = fieldSource
+		p.currentField = fieldInitial
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
 	return nil
 }
 
-func (p *ModuleParser) startModuleField(fieldName []byte) (tokenParser, error) {
+func (p *ModuleParser) moduleFieldHandler(fieldName []byte) (tokenParser, error) {
 	switch string(fieldName) {
 	case "import":
 		p.currentField = fieldModuleImport
@@ -166,7 +169,7 @@ func (p *ModuleParser) importFieldHandler(fieldName []byte) (tokenParser, error)
 		p.currentField = fieldModuleImportFunc
 		p.currentImport.importFunc = &importFunc{}
 		return p.parseImportFunc, nil
-	}
+	} // TODO: table, memory or global
 	return nil, fmt.Errorf("unexpected field: %s", string(fieldName))
 }
 
@@ -178,6 +181,7 @@ func (p *ModuleParser) parseImportFunc(tok tokenType, tokenBytes []byte, _, _ in
 			return fmt.Errorf("redundant name: %s", name)
 		}
 		p.currentImport.importFunc.name = name
+		// TODO: lParen to handle import types!
 	case tokenRParen: // end of this import func
 		p.currentField = fieldModuleImport
 		p.tokenParser = p.parseImport
@@ -216,7 +220,7 @@ func (p *ModuleParser) unexpectedToken(tok tokenType, tokenBytes []byte) error {
 
 func (p *ModuleParser) errorContext() string {
 	switch p.currentField {
-	case fieldSource:
+	case fieldInitial:
 		return ""
 	case fieldModule:
 		return "module"

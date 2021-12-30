@@ -63,7 +63,7 @@ func TestParseModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := ParseModule([]byte(tc.input))
+			m, err := parseModule([]byte(tc.input))
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m)
 		})
@@ -157,7 +157,7 @@ func TestParseModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ParseModule(tc.input)
+			_, err := parseModule(tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -197,10 +197,10 @@ func BenchmarkParseExample(b *testing.B) {
 			}
 		}
 	})
-	b.Run("ParseModule", func(b *testing.B) {
+	b.Run("parseModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := ParseModule(simpleExample)
+			_, err := parseModule(simpleExample)
 			if err != nil {
 				panic(err)
 			}
