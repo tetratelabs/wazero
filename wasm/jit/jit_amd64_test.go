@@ -1127,6 +1127,10 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			{x1: -1, x2: 100, signed: false, exp: false},
 			{x1: 100, x2: 200, signed: true, exp: true},
 			{x1: 200, x2: 100, signed: true, exp: false},
+			{x1: 1 << 56, x2: 100, signed: true, exp: false},
+			{x1: 1 << 56, x2: 1 << 61, signed: true, exp: true},
+			{x1: math.MaxInt64, x2: 100, signed: true, exp: false},
+			{x1: math.MinInt64, x2: 100, signed: true, exp: true},
 		} {
 			var o *wazeroir.OperationLe
 			if tc.signed {
@@ -1253,6 +1257,8 @@ func TestAmd64Builder_handleLe(t *testing.T) {
 			{x1: 100.01234124, x2: 100.01234124, exp: true},
 			{x1: 100.01234124, x2: -100.01234124, exp: false},
 			{x1: 200.12315, x2: 100, exp: false},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100, exp: false},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/, exp: true},
 			{x1: math.Inf(1), x2: 100, exp: false},
 			{x1: math.Inf(-1), x2: 100, exp: true},
 		} {
