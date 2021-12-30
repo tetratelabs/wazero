@@ -841,6 +841,70 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	return nil
 }
 
+func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// Emit the compare instruction.
+	prog := c.newProg()
+	prog.From.Type = obj.TYPE_REG
+	prog.To.Type = obj.TYPE_REG
+	var resultConditionState conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeInt32:
+		resultConditionState = conditionalRegisterStateGE
+		prog.As = x86.ACMPL
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeUint32:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACMPL
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeInt64:
+		resultConditionState = conditionalRegisterStateGE
+		prog.As = x86.ACMPQ
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeUint64:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACMPQ
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeFloat32:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACOMISS
+		prog.From.Reg = x2.register
+		prog.To.Reg = x1.register
+	case wazeroir.SignedTypeFloat64:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACOMISD
+		prog.From.Reg = x2.register
+		prog.To.Reg = x1.register
+	}
+	c.addInstruction(prog)
+
+	// TODO: emit NaN value handings for floats.
+
+	// We no longer need x1,x2 register after cmp operation here,
+	// so we release it.
+	c.locationStack.releaseRegister(x1)
+	c.locationStack.releaseRegister(x2)
+
+	// Finally we have the result on the conditional register,
+	// so record it.
+	loc := c.locationStack.pushValueOnConditionalRegister(resultConditionState)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
 func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	base := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
