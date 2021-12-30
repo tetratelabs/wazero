@@ -134,7 +134,8 @@ func (p *ModuleParser) moduleFieldHandler(fieldName []byte) (tokenParser, error)
 
 func (p *ModuleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ int) error {
 	switch tok {
-	case tokenString: // Ex. "" or "foo" including quotes!
+	case tokenString:
+		// Note: tokenString is minimum length two on account of quotes. Ex. "" or "foo"
 		name := string(tokenBytes[1 : len(tokenBytes)-1]) // unquote
 		if p.currentStringCount == 0 {
 			p.currentImportModule = name
