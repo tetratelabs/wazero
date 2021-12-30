@@ -920,45 +920,25 @@ func (b *amd64Builder) handleAdd(o *wazeroir.OperationAdd) error {
 	// this can be optimized. Same goes for other arithmetic instructions.
 
 	var instruction obj.As
-	var tp generalPurposeRegisterType
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		instruction = x86.AADDL
-		tp = generalPurposeRegisterTypeInt
-		panic("add tests!")
 	case wazeroir.UnsignedTypeI64:
 		instruction = x86.AADDQ
-		tp = generalPurposeRegisterTypeInt
 	case wazeroir.UnsignedTypeF32:
 		instruction = x86.AADDSS
-		tp = generalPurposeRegisterTypeFloat
-		panic("add tests!")
 	case wazeroir.UnsignedTypeF64:
 		instruction = x86.AADDSD
-		tp = generalPurposeRegisterTypeFloat
-		panic("add tests!")
 	}
 
 	x2 := b.locationStack.pop()
-	if x2.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(tp, x2); err != nil {
-			return err
-		}
-	} else if x2.onConditionalRegister() {
-		if err := b.moveConditionalToGeneralPurposeRegister(x2); err != nil {
-			return err
-		}
+	if err := b.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
 	}
 
 	x1 := b.locationStack.peek() // Note this is peek, pop!
-	if x1.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(tp, x1); err != nil {
-			return err
-		}
-	} else if x1.onConditionalRegister() {
-		// This shouldn't happen as the conditional
-		// register must be on top of the stack.
-		panic("a bug in jit compiler")
+	if err := b.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
 	}
 
 	// x1 += x2.
@@ -981,45 +961,25 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 	// this can be optimized. Same goes for other arithmetic instructions.
 
 	var instruction obj.As
-	var tp generalPurposeRegisterType
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		instruction = x86.ASUBL
-		tp = generalPurposeRegisterTypeInt
-		panic("add tests!")
 	case wazeroir.UnsignedTypeI64:
 		instruction = x86.ASUBQ
-		tp = generalPurposeRegisterTypeInt
 	case wazeroir.UnsignedTypeF32:
 		instruction = x86.ASUBSS
-		tp = generalPurposeRegisterTypeFloat
-		panic("add tests!")
 	case wazeroir.UnsignedTypeF64:
 		instruction = x86.ASUBSD
-		tp = generalPurposeRegisterTypeFloat
-		panic("add tests!")
 	}
 
 	x2 := b.locationStack.pop()
-	if x2.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(tp, x2); err != nil {
-			return err
-		}
-	} else if x2.onConditionalRegister() {
-		if err := b.moveConditionalToGeneralPurposeRegister(x2); err != nil {
-			return err
-		}
+	if err := b.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
 	}
 
 	x1 := b.locationStack.peek() // Note this is peek, pop!
-	if x1.onStack() {
-		if err := b.moveStackToRegisterWithAllocation(tp, x1); err != nil {
-			return err
-		}
-	} else if x1.onConditionalRegister() {
-		// This shouldn't happen as the conditional
-		// register must be on top of the stack.
-		panic("a bug in jit compiler")
+	if err := b.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
 	}
 
 	// x1 += x2.
