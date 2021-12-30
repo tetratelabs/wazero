@@ -91,7 +91,7 @@ func (p *ModuleParser) startField(tok tokenType, tokenBytes []byte, _, _ int) (e
 	return
 }
 
-// initialFieldHandler parses the top-level fields in the WebAssembly source.
+// initialFieldHandler returns a tokenParser for the top-level fields in the WebAssembly source.
 func (p *ModuleParser) initialFieldHandler(fieldName []byte) (tokenParser, error) {
 	if string(fieldName) == "module" {
 		p.currentField = fieldModule
