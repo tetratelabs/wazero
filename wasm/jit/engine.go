@@ -652,7 +652,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		}
 	}
 
-	code, err := compiler.compile()
+	code, maxStackPointer, err := compiler.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to assemble: %w", err)
 	}
@@ -663,7 +663,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		params:          uint64(len(f.Signature.ParamTypes)),
 		results:         uint64(len(f.Signature.ResultTypes)),
 		memory:          f.ModuleInstance.Memory,
-		maxStackPointer: compiler.getMaxStackPointer(),
+		maxStackPointer: maxStackPointer,
 	}
 	if cf.memory != nil && len(cf.memory.Buffer) > 0 {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))

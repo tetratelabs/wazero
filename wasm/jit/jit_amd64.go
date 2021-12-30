@@ -38,32 +38,6 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 	}, nil
 }
 
-// Implements compiler.emitPreamble for amd64Compiler.
-func (c *amd64Compiler) emitPreamble() {
-	// We assume all function parameters are already pushed onto the stack by
-	// the caller.
-	c.pushFunctionParams()
-	// Initialize the reserved registers first of all.
-	c.initializeReservedRegisters()
-}
-
-// Implements compiler.getMaxStackPointer for amd64Compiler.
-func (c *amd64Compiler) getMaxStackPointer() uint64 {
-	return c.locationStack.maxStackPointer
-}
-
-func (c *amd64Compiler) pushFunctionParams() {
-	for _, t := range c.f.Signature.ParamTypes {
-		loc := c.locationStack.pushValueOnStack()
-		switch t {
-		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
-		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
-		}
-	}
-}
-
 type amd64Compiler struct {
 	eng *engine
 	f   *wasm.FunctionInstance
@@ -83,10 +57,20 @@ type amd64Compiler struct {
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 }
 
-func (c *amd64Compiler) compile() ([]byte, error) {
+// Implements compiler.emitPreamble for amd64Compiler.
+func (c *amd64Compiler) emitPreamble() {
+	// We assume all function parameters are already pushed onto the stack by
+	// the caller.
+	c.pushFunctionParams()
+	// Initialize the reserved registers first of all.
+	c.initializeReservedRegisters()
+}
+
+// Implements compiler.compile for amd64Compiler.
+func (c *amd64Compiler) compile() ([]byte, uint64, error) {
 	code, err := mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	// As we cannot read RIP register directly,
 	// we calculate now the offset to the next instruction
@@ -102,7 +86,19 @@ func (c *amd64Compiler) compile() ([]byte, error) {
 		afterReturnInst := obj.Link.Link.Link.Link
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
-	return code, nil
+	return code, c.locationStack.maxStackPointer, nil
+}
+
+func (c *amd64Compiler) pushFunctionParams() {
+	for _, t := range c.f.Signature.ParamTypes {
+		loc := c.locationStack.pushValueOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
 }
 
 func (c *amd64Compiler) addInstruction(prog *obj.Prog) {
