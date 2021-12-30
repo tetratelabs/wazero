@@ -28,8 +28,14 @@ type ModuleParser struct {
 	// tokenParser is called by lex, and changes based on the currentField.
 	// The initial tokenParser is ensureLParen because %.wat files must begin with a '(' token (ignoring whitespace).
 	tokenParser
-	// currentImport lets us avoid looking up the last import each time we encounter a token when parsing an import.
-	currentImport *_import
+	// currentImportIndex allows us to track the relative position of imports regardless of what they describe
+	currentImportIndex int
+	// currentImportModule is the first string of the current import. Ex. "Math" if (import "Math" "PI" (func))
+	currentImportModule string
+	// currentImportName is the second string of the current import. Ex. "PI" if (import "Math" "PI" (func))
+	currentImportName string
+	// currentImportHasDesc tracks if we found a description (Ex. (func)) of the current import.
+	currentImportHasDesc bool
 }
 
 // parseModule parses the configured source into a module. This function returns when the source is exhausted or an
@@ -118,8 +124,6 @@ func (p *ModuleParser) moduleFieldHandler(fieldName []byte) (tokenParser, error)
 	switch string(fieldName) {
 	case "import":
 		p.currentField = fieldModuleImport
-		p.currentImport = &_import{}
-		p.module.imports = append(p.module.imports, p.currentImport)
 		return p.parseImport, nil
 	case "start":
 		p.currentField = fieldModuleStart
@@ -133,29 +137,30 @@ func (p *ModuleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ int) e
 	case tokenString: // Ex. "" or "foo" including quotes!
 		name := string(tokenBytes[1 : len(tokenBytes)-1]) // unquote
 		if p.currentStringCount == 0 {
-			p.currentImport.module = name
-		} else if p.currentImport.name != "" {
+			p.currentImportModule = name
+		} else if p.currentImportName != "" {
 			return fmt.Errorf("redundant name: %s", name)
 		} else {
-			p.currentImport.name = name
+			p.currentImportName = name
 		}
 		p.currentStringCount = p.currentStringCount + 1
 	case tokenLParen: // start fields, ex. (func
 		p.tokenParser = p.startField
 		return nil
 	case tokenRParen: // end of this import
-		switch p.currentStringCount {
+		switch p.currentStringCount { // names precede desc
 		case 0:
-			return errors.New("expected module and name")
+			return errors.New("missing module and name")
 		case 1:
-			return errors.New("expected name")
+			return errors.New("missing name")
 		}
-		if p.currentImport.importFunc == nil {
-			return errors.New("expected description")
+		if !p.currentImportHasDesc {
+			return errors.New("missing description")
 		}
 		p.currentField = fieldModule
-		p.currentImport = nil
+		p.currentImportIndex = p.currentImportIndex + 1
 		p.currentStringCount = 0
+		p.currentImportHasDesc = false
 		p.tokenParser = p.parseModule
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
@@ -164,10 +169,15 @@ func (p *ModuleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ int) e
 }
 
 func (p *ModuleParser) importFieldHandler(fieldName []byte) (tokenParser, error) {
+	if p.currentImportHasDesc {
+		return nil, fmt.Errorf("redundant field: %s", string(fieldName))
+	}
 	switch string(fieldName) {
 	case "func":
+		p.currentImportHasDesc = true
 		p.currentField = fieldModuleImportFunc
-		p.currentImport.importFunc = &importFunc{}
+		desc := &importFunc{module: p.currentImportModule, name: p.currentImportName, importIndex: p.currentImportIndex}
+		p.module.importFuncs = append(p.module.importFuncs, desc)
 		return p.parseImportFunc, nil
 	} // TODO: table, memory or global
 	return nil, fmt.Errorf("unexpected field: %s", string(fieldName))
@@ -177,10 +187,11 @@ func (p *ModuleParser) parseImportFunc(tok tokenType, tokenBytes []byte, _, _ in
 	switch tok {
 	case tokenID: // Ex. $main
 		name := string(tokenBytes)
-		if p.currentImport.importFunc.name != "" {
+		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
+		if fn.funcName != "" {
 			return fmt.Errorf("redundant name: %s", name)
 		}
-		p.currentImport.importFunc.name = name
+		fn.funcName = name
 		// TODO: lParen to handle import types!
 	case tokenRParen: // end of this import func
 		p.currentField = fieldModuleImport
@@ -227,12 +238,11 @@ func (p *ModuleParser) errorContext() string {
 	case fieldModuleStart:
 		return "module.start"
 	case fieldModuleImport, fieldModuleImportFunc:
-		i := len(p.module.imports) - 1
 		if p.currentField == fieldModuleImportFunc {
-			return fmt.Sprintf("module.import[%d].func", i)
+			return fmt.Sprintf("module.import[%d].func", p.currentImportIndex)
 		}
 		// TODO: table, memory or global
-		return fmt.Sprintf("module.import[%d]", i)
+		return fmt.Sprintf("module.import[%d]", p.currentImportIndex)
 	}
 	return ""
 }

@@ -16,8 +16,8 @@ type module struct {
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	name string
 
-	// imports are added in insertion order.
-	imports []*_import
+	// importFuncs are imports describing functions "(import... (func...))" added in insertion order.
+	importFuncs []*importFunc
 
 	// startFunction is the function to call during wasm.Store Instantiate. The value is a importFunc.name, such as
 	// "$main", or its equivalent raw numeric index, such as "2".
@@ -28,12 +28,25 @@ type module struct {
 	startFunction string
 }
 
-// importFunc corresponds to the text format of a WebAssembly function import description.
+// importFunc corresponds to the text format of a WebAssembly function import.
 //
-// Note: nothing is required per specification. Ex `(func)` is valid!
+// Note: nothing is required per specification. Ex `(import "" "" (func))` is valid!
 //
 // See https://www.w3.org/TR/wasm-core-1/#imports%E2%91%A0
 type importFunc struct {
+	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
+	importIndex int
+
+	// module is the possibly empty module name to import. Ex. "" or "Math"
+	//
+	// Note: This is not necessarily the module.name, so it does not need to begin with '$'!
+	module string
+
+	// name is the possibly empty entity name to import. Ex. "" or "PI"
+	//
+	// Note: This is not necessarily the funcName, so it does not need to begin with '$'!
+	name string
+
 	// name is optional and starts with '$'. For example, "$main".
 	//
 	// This name is only used for debugging. At runtime, functions are called based on raw numeric index. The function
@@ -42,25 +55,9 @@ type importFunc struct {
 	//
 	// Note: The name may also be stored in the wasm.Module CustomSection under the key "name" subsection 1.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-	name string
+	funcName string
 
 	// TODO: typeuse https://www.w3.org/TR/wasm-core-1/#text-typeuse
-}
-
-// _import corresponds to the text format of a WebAssembly import.
-//
-// See https://www.w3.org/TR/wasm-core-1/#imports%E2%91%A0
-type _import struct { // note: this is named _import because import is reserved in golang
-	// module is the possibly empty module name to import. Ex. "" or "Math"
-	//
-	// Note: This is not necessarily the module.name, so it does not need to begin with '$'!
-	module string
-	// name is the possibly empty entity name to import. Ex. "" or "PI"
-	//
-	// Note: This is not necessarily the entity name defined in this module, so it does not need to begin with '$'!
-	name string
-	// importFunc is set when the "import" field is
-	importFunc *importFunc // TODO: oneOf func, table, mem, global
 }
 
 // formatError allows control over the format of formatError.Error
