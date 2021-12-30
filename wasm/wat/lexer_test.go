@@ -440,7 +440,7 @@ func TestLex(t *testing.T) {
 func TestLex_Errors(t *testing.T) {
 	tests := []struct {
 		name         string
-		parser       parseToken
+		parser       tokenParser
 		input        []byte
 		expectedLine int
 		expectedCol  int
@@ -591,7 +591,7 @@ func TestLex_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			parser := tc.parser
 			if parser == nil {
-				parser = noopParseToken
+				parser = noopTokenParser
 			}
 			line, col, err := lex(parser, tc.input)
 			require.Equal(t, tc.expectedLine, line)
@@ -611,7 +611,7 @@ func lexTokens(t *testing.T, input string) []*token {
 	return tokens
 }
 
-var noopParseToken parseToken = func(_ tokenType, _ []byte, _, _ int) error {
+var noopTokenParser tokenParser = func(_ tokenType, _ []byte, _, _ int) error {
 	return nil
 }
 
@@ -647,7 +647,7 @@ func BenchmarkLex(b *testing.B) {
 		b.Run(bm.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				line, col, err := lex(noopParseToken, bm.data)
+				line, col, err := lex(noopTokenParser, bm.data)
 				if err != nil {
 					panic(fmt.Errorf("%d:%d: %w", line, col, err))
 				}

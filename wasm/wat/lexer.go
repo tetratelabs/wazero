@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// parseToken allows a parser to inspect a token without necessarily allocating strings
+// tokenParser is what the lexer calls for each token in the input.
 //
 // * tokenType is the token type
 // * tokenBytes are the UTF-8 bytes representing the token. Do not modify this.
@@ -17,7 +17,7 @@ import (
 //
 // Note: Do not include the line and column number in a parsing error as that will be attached automatically. Line and
 // column are here for storing the source location, such as for use in runtime stack traces.
-type parseToken func(tok tokenType, tokenBytes []byte, line, col int) error
+type tokenParser func(tok tokenType, tokenBytes []byte, line, col int) error
 
 var (
 	constantLParen = []byte{'('}
@@ -31,7 +31,7 @@ var (
 // * line is the source line number determined by unescaped '\n' characters of the error or EOF
 // * col is the UTF-8 column number of the error or EOF
 // * err is an error invoking the parser, dangling block comments or unexpected characters.
-func lex(parser parseToken, source []byte) (line int, col int, err error) {
+func lex(parser tokenParser, source []byte) (line int, col int, err error) {
 	// i is the source index to begin reading, inclusive.
 	i := 0
 	// end is the source index to stop reading, exclusive.
