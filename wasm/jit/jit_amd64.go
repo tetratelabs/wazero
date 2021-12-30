@@ -964,7 +964,6 @@ func (b *amd64Builder) handleSub(o *wazeroir.OperationSub) error {
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		instruction = x86.ASUBL
-		panic("add tests!")
 	case wazeroir.UnsignedTypeI64:
 		instruction = x86.ASUBQ
 	case wazeroir.UnsignedTypeF32:
