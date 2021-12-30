@@ -160,7 +160,7 @@ func (p *ModuleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ int) e
 	return nil
 }
 
-func (p *ModuleParser) startImportField(fieldName []byte) (tokenParser, error) {
+func (p *ModuleParser) importFieldHandler(fieldName []byte) (tokenParser, error) {
 	switch string(fieldName) {
 	case "func":
 		p.currentField = fieldModuleImportFunc
