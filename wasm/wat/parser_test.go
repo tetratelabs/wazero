@@ -13,22 +13,22 @@ func TestParseModule(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected *textModule
+		expected *module
 	}{
 		{
 			name:     "empty",
 			input:    "(module)",
-			expected: &textModule{},
+			expected: &module{},
 		},
 		{
 			name:     "only name",
 			input:    "(module $tools)",
-			expected: &textModule{name: "$tools"},
+			expected: &module{name: "$tools"},
 		},
 		{
 			name:     "import func empty",
 			input:    "(module (import \"foo\" \"bar\" (func)))", // ok empty sig
-			expected: &textModule{imports: []*textImport{{module: "foo", name: "bar", desc: &textImportFunc{}}}},
+			expected: &module{imports: []*_import{{module: "foo", name: "bar", importFunc: &importFunc{}}}},
 		},
 		{
 			name: "start imported function by name",
@@ -36,8 +36,8 @@ func TestParseModule(t *testing.T) {
 	(import "" "hello" (func $hello))
 	(start $hello)
 )`,
-			expected: &textModule{
-				imports:       []*textImport{{name: "hello", desc: &textImportFunc{name: "$hello"}}},
+			expected: &module{
+				imports:       []*_import{{name: "hello", importFunc: &importFunc{name: "$hello"}}},
 				startFunction: "$hello",
 			},
 		},
@@ -47,8 +47,8 @@ func TestParseModule(t *testing.T) {
 	(import "" "hello" (func))
 	(start 0)
 )`,
-			expected: &textModule{
-				imports:       []*textImport{{name: "hello", desc: &textImportFunc{}}},
+			expected: &module{
+				imports:       []*_import{{name: "hello", importFunc: &importFunc{}}},
 				startFunction: "0",
 			},
 		},
@@ -117,12 +117,12 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:29: redundant name: baz in import[0]",
 		},
 		{
-			name:        "import missing desc",
+			name:        "import missing importFunc",
 			input:       []byte("(module (import \"foo\" \"bar\"))"),
 			expectedErr: "1:28: expected descripton in import[0]",
 		},
 		{
-			name:        "import desc empty",
+			name:        "import importFunc empty",
 			input:       []byte("(module (import \"foo\" \"bar\"())"),
 			expectedErr: "1:29: expected field, but found ) in import[0]",
 		},

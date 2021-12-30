@@ -7,9 +7,9 @@ import (
 
 type ModuleParser struct {
 	source []byte
-	module *textModule
-	// currentStringCount allows us to unquote the textImport.module and textImport.name fields, differentiating empty
-	// from never set, without making textImport.module and textImport.name pointers.
+	module *module
+	// currentStringCount allows us to unquote the _import.module and _import.name fields, differentiating empty
+	// from never set, without making _import.module and _import.name pointers.
 	currentStringCount int
 	fieldHandler       fieldHandler
 	tokenParser        tokenParser
@@ -17,7 +17,7 @@ type ModuleParser struct {
 	// This is needed because a function can be defined at module scope or an inlined scope such as an import.
 	// TODO: https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A8
 	afterInlining tokenParser
-	currentImport *textImport
+	currentImport *_import
 }
 
 // ParseModule parses the configured source into a module. This function returns when the source is exhausted or an
@@ -25,13 +25,13 @@ type ModuleParser struct {
 //
 // Here's a description of the return values:
 // * module is the result of parsing or nil on error
-// * err is a textFormatError invoking the parser, dangling block comments or unexpected characters.
-func ParseModule(source []byte) (*textModule, error) {
-	p := ModuleParser{source: source, module: &textModule{}}
+// * err is a formatError invoking the parser, dangling block comments or unexpected characters.
+func ParseModule(source []byte) (*module, error) {
+	p := ModuleParser{source: source, module: &module{}}
 	p.tokenParser = p.startFile
 	line, col, err := lex(p.parse, p.source)
 	if err != nil {
-		return nil, &textFormatError{line, col, p.errorContext(), err}
+		return nil, &formatError{line, col, p.errorContext(), err}
 	}
 	return p.module, nil
 }
@@ -88,7 +88,7 @@ func (p *ModuleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ int) e
 func (p *ModuleParser) startModuleField(fieldName []byte) (tokenParser, error) {
 	switch string(fieldName) {
 	case "import":
-		p.currentImport = &textImport{}
+		p.currentImport = &_import{}
 		p.module.imports = append(p.module.imports, p.currentImport)
 		return p.parseImport, nil
 	case "start": // TODO: only one is allowed
@@ -120,8 +120,8 @@ func (p *ModuleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ int) e
 		case 1:
 			return errors.New("expected name")
 		}
-		if p.currentImport.desc == nil {
-			return errors.New("expected descripton")
+		if p.currentImport.importFunc == nil {
+			return errors.New("expected description")
 		}
 		p.currentImport = nil
 		p.currentStringCount = 0
@@ -135,7 +135,7 @@ func (p *ModuleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ int) e
 func (p *ModuleParser) startImportField(fieldName []byte) (tokenParser, error) {
 	switch string(fieldName) {
 	case "func":
-		p.currentImport.desc = &textImportFunc{}
+		p.currentImport.importFunc = &importFunc{}
 		p.afterInlining = p.parseImport
 		return p.parseImportFunc, nil
 	}
@@ -146,10 +146,10 @@ func (p *ModuleParser) parseImportFunc(tok tokenType, tokenBytes []byte, _, _ in
 	switch tok {
 	case tokenID: // Ex. $main
 		name := string(tokenBytes)
-		if p.currentImport.desc.name != "" {
+		if p.currentImport.importFunc.name != "" {
 			return fmt.Errorf("redundant name: %s", name)
 		}
-		p.currentImport.desc.name = name
+		p.currentImport.importFunc.name = name
 	case tokenRParen: // end of this func
 		p.tokenParser = p.afterInlining
 		p.afterInlining = nil
@@ -197,9 +197,10 @@ func (p *ModuleParser) unexpectedToken(tok tokenType, tokenBytes []byte) error {
 func (p *ModuleParser) errorContext() string {
 	if p.currentImport != nil {
 		i := len(p.module.imports) - 1
-		if p.currentImport.desc != nil {
-			return fmt.Sprintf("import[%d].func", i) // TODO: func, table, memory or global
+		if p.currentImport.importFunc != nil {
+			return fmt.Sprintf("import[%d].func", i)
 		}
+		// TODO: table, memory or global
 		return fmt.Sprintf("import[%d]", i)
 	} else if p.module.startFunction != "" {
 		return "start"
