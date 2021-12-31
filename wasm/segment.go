@@ -20,7 +20,9 @@ const (
 type ImportDesc struct {
 	Kind byte
 
-	TypeIndexPtr  *uint32
+	// FuncTypeIndex is the index in Module.TypeSection corresponding to this import's FunctionType.
+	// This is only valid when Kind equals ImportKindFunction
+	FuncTypeIndex uint32
 	TableTypePtr  *TableType
 	MemTypePtr    *MemoryType
 	GlobalTypePtr *GlobalType
@@ -39,8 +41,8 @@ func readImportDesc(r io.Reader) (*ImportDesc, error) {
 			return nil, fmt.Errorf("read typeindex: %v", err)
 		}
 		return &ImportDesc{
-			Kind:         ImportKindFunction,
-			TypeIndexPtr: &tID,
+			Kind:          ImportKindFunction,
+			FuncTypeIndex: tID,
 		}, nil
 	case ImportKindTable:
 		tt, err := readTableType(r)
