@@ -69,7 +69,7 @@ func (c *amd64Compiler) emitPreamble() {
 	c.initializeReservedRegisters()
 }
 
-func (c *amd64Compiler) compile() ([]byte, uint64, error) {
+func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	code, err := mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
 		return nil, 0, err

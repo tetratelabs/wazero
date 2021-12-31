@@ -604,7 +604,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		}
 	}
 
-	code, maxStackPointer, err := compiler.compile()
+	code, maxStackPointer, err := compiler.generate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
