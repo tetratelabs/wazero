@@ -495,7 +495,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		}
 		it.callNativeFunc(g)
 	}
-	results = make([]uint64, len(f.Signature.ResultTypes))
+	results = make([]uint64, len(f.Signature.Results))
 	for i := range results {
 		results[len(results)-1-i] = it.pop()
 	}
@@ -588,7 +588,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCall:
 			{
 				if op.f.hostFn != nil {
-					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.signature.ParamTypes):]...)
+					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.signature.Params):]...)
 				} else {
 					it.callNativeFunc(op.f)
 				}
@@ -604,7 +604,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				}
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(target.signature.ParamTypes):]...)
+					it.callHostFunc(target, it.stack[len(it.stack)-len(target.signature.Params):]...)
 				} else {
 					it.callNativeFunc(target)
 				}
@@ -1473,8 +1473,8 @@ func funcTypeString(t *wasm.FunctionType) string {
 		// Fast stringification of byte slice.
 		// This is safe anyway as the results are copied
 		// into the return value string.
-		*(*string)(unsafe.Pointer(&t.ParamTypes)),
-		*(*string)(unsafe.Pointer(&t.ResultTypes)),
+		*(*string)(unsafe.Pointer(&t.Params)),
+		*(*string)(unsafe.Pointer(&t.Results)),
 	)
 }
 

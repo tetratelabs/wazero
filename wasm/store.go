@@ -153,7 +153,7 @@ func (s *Store) Instantiate(module *Module, name string) error {
 			return fmt.Errorf("invalid start function index: %d", index)
 		}
 		signature := instance.Functions[index].Signature
-		if len(signature.ParamTypes) != 0 || len(signature.ResultTypes) != 0 {
+		if len(signature.Params) != 0 || len(signature.Results) != 0 {
 			return fmt.Errorf("start function must have the empty signature")
 		}
 	}
@@ -187,12 +187,12 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 	}
 
 	f := exp.Function
-	if len(f.Signature.ParamTypes) != len(params) {
+	if len(f.Signature.Params) != len(params) {
 		return nil, nil, fmt.Errorf("invalid number of parameters")
 	}
 
 	ret, err := s.engine.Call(f, params...)
-	return ret, f.Signature.ResultTypes, err
+	return ret, f.Signature.Results, err
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
@@ -252,10 +252,10 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndexPtr *uint32
 		return fmt.Errorf("unknown type for function import")
 	}
 	iSig := target.Types[typeIndex]
-	if !HasSameSignature(iSig.ResultTypes, f.Signature.ResultTypes) {
-		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.ResultTypes, f.Signature.ResultTypes)
-	} else if !HasSameSignature(iSig.ParamTypes, f.Signature.ParamTypes) {
-		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.ParamTypes, f.Signature.ParamTypes)
+	if !HasSameSignature(iSig.Results, f.Signature.Results) {
+		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.Results, f.Signature.Results)
+	} else if !HasSameSignature(iSig.Params, f.Signature.Params) {
+		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.Params, f.Signature.Params)
 	}
 	target.Functions = append(target.Functions, f)
 	return nil
@@ -1034,23 +1034,23 @@ func analyzeFunction(
 			pc += num - 1
 			switch Opcode(op) {
 			case OpcodeLocalGet:
-				inputLen := uint32(len(f.Signature.ParamTypes))
+				inputLen := uint32(len(f.Signature.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				if index < inputLen {
-					valueTypeStack.push(f.Signature.ParamTypes[index])
+					valueTypeStack.push(f.Signature.Params[index])
 				} else {
 					valueTypeStack.push(f.LocalTypes[index-inputLen])
 				}
 			case OpcodeLocalSet:
-				inputLen := uint32(len(f.Signature.ParamTypes))
+				inputLen := uint32(len(f.Signature.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.ParamTypes[index]
+					expType = f.Signature.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1058,13 +1058,13 @@ func analyzeFunction(
 					return err
 				}
 			case OpcodeLocalTee:
-				inputLen := uint32(len(f.Signature.ParamTypes))
+				inputLen := uint32(len(f.Signature.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.ParamTypes[index]
+					expType = f.Signature.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1098,7 +1098,7 @@ func analyzeFunction(
 			pc += num - 1
 			// Check type soundness.
 			target := labelStack[len(labelStack)-int(index)-1]
-			targetResultType := target.BlockType.ResultTypes
+			targetResultType := target.BlockType.Results
 			if target.IsLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
@@ -1125,7 +1125,7 @@ func analyzeFunction(
 			}
 			// Check type soundness.
 			target := labelStack[len(labelStack)-int(index)-1]
-			targetResultType := target.BlockType.ResultTypes
+			targetResultType := target.BlockType.Results
 			if target.IsLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
@@ -1169,7 +1169,7 @@ func analyzeFunction(
 				return fmt.Errorf("cannot pop the required operand for br_table")
 			}
 			lnLabel := labelStack[len(labelStack)-1-int(ln)]
-			expType := lnLabel.BlockType.ResultTypes
+			expType := lnLabel.BlockType.Results
 			if lnLabel.IsLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
@@ -1180,7 +1180,7 @@ func analyzeFunction(
 					return fmt.Errorf("invalid l param given for br_table")
 				}
 				label := labelStack[len(labelStack)-1-int(l)]
-				expType2 := label.BlockType.ResultTypes
+				expType2 := label.BlockType.Results
 				if label.IsLoop {
 					// Loop operation doesn't require results since the continuation is
 					// the beginning of the loop.
@@ -1211,12 +1211,12 @@ func analyzeFunction(
 				return fmt.Errorf("invalid function index")
 			}
 			funcType := module.TypeSection[functionDeclarations[index]]
-			for i := 0; i < len(funcType.ParamTypes); i++ {
-				if err := valueTypeStack.popAndVerifyType(funcType.ParamTypes[len(funcType.ParamTypes)-1-i]); err != nil {
+			for i := 0; i < len(funcType.Params); i++ {
+				if err := valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
 					return fmt.Errorf("type mismatch on call operation param type")
 				}
 			}
-			for _, exp := range funcType.ResultTypes {
+			for _, exp := range funcType.Results {
 				valueTypeStack.push(exp)
 			}
 		} else if op == OpcodeCallIndirect {
@@ -1240,12 +1240,12 @@ func analyzeFunction(
 				return fmt.Errorf("invalid type index at call_indirect: %d", typeIndex)
 			}
 			funcType := module.TypeSection[typeIndex]
-			for i := 0; i < len(funcType.ParamTypes); i++ {
-				if err := valueTypeStack.popAndVerifyType(funcType.ParamTypes[len(funcType.ParamTypes)-1-i]); err != nil {
+			for i := 0; i < len(funcType.Params); i++ {
+				if err := valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
 					return fmt.Errorf("type mismatch on call_indirect operation input type")
 				}
 			}
-			for _, exp := range funcType.ResultTypes {
+			for _, exp := range funcType.Results {
 				valueTypeStack.push(exp)
 			}
 		} else if OpcodeI32Eqz <= op && op <= OpcodeF64ReinterpretI64 {
@@ -1490,7 +1490,7 @@ func analyzeFunction(
 			bl := labelStack[len(labelStack)-1]
 			bl.ElseAt = pc
 			// Check the type soundness of the instructions *before*　 entering this Eles Op.
-			if err := valueTypeStack.popResults(bl.BlockType.ResultTypes, true); err != nil {
+			if err := valueTypeStack.popResults(bl.BlockType.Results, true); err != nil {
 				return fmt.Errorf("invalid instruction results in then instructions")
 			}
 			// Before entring instructions inside else, we pop all the values pushed by
@@ -1501,7 +1501,7 @@ func analyzeFunction(
 			bl.EndAt = pc
 			labelStack = labelStack[:len(labelStack)-1]
 			if bl.IsIf && bl.ElseAt <= bl.StartAt {
-				if len(bl.BlockType.ResultTypes) > 0 {
+				if len(bl.BlockType.Results) > 0 {
 					return fmt.Errorf("type mismatch between then and else blocks")
 				}
 				// To handle if block without else properly,
@@ -1509,20 +1509,20 @@ func analyzeFunction(
 				bl.ElseAt = bl.EndAt - 1
 			}
 			// Check type soundness.
-			if err := valueTypeStack.popResults(bl.BlockType.ResultTypes, true); err != nil {
-				return fmt.Errorf("invalid instruction results at end instruction; expected %v: %v", bl.BlockType.ResultTypes, err)
+			if err := valueTypeStack.popResults(bl.BlockType.Results, true); err != nil {
+				return fmt.Errorf("invalid instruction results at end instruction; expected %v: %v", bl.BlockType.Results, err)
 			}
 			// Put the result types at the end after resetting at the stack limit
 			// since we might have Any type between the limit and the current top.
 			valueTypeStack.resetAtStackLimit()
-			for _, exp := range bl.BlockType.ResultTypes {
+			for _, exp := range bl.BlockType.Results {
 				valueTypeStack.push(exp)
 			}
 			// We exit if/loop/block, so reset the constraints on the stack manipulation
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			expTypes := f.Signature.ResultTypes
+			expTypes := f.Signature.Results
 			for i := 0; i < len(expTypes); i++ {
 				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
 					return fmt.Errorf("return type mismatch on return: %v; want %v", err, expTypes)
@@ -1582,13 +1582,13 @@ func ReadBlockType(types []*FunctionType, r io.Reader) (*BlockType, uint64, erro
 	case -64: // 0x40 in original byte = nil
 		ret = &BlockType{}
 	case -1: // 0x7f in original byte = i32
-		ret = &BlockType{ResultTypes: []ValueType{ValueTypeI32}}
+		ret = &BlockType{Results: []ValueType{ValueTypeI32}}
 	case -2: // 0x7e in original byte = i64
-		ret = &BlockType{ResultTypes: []ValueType{ValueTypeI64}}
+		ret = &BlockType{Results: []ValueType{ValueTypeI64}}
 	case -3: // 0x7d in original byte = f32
-		ret = &BlockType{ResultTypes: []ValueType{ValueTypeF32}}
+		ret = &BlockType{Results: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
-		ret = &BlockType{ResultTypes: []ValueType{ValueTypeF64}}
+		ret = &BlockType{Results: []ValueType{ValueTypeF64}}
 	default:
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
@@ -1633,7 +1633,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 				return nil, err
 			}
 		}
-		return &FunctionType{ParamTypes: paramTypes, ResultTypes: resultTypes}, nil
+		return &FunctionType{Params: paramTypes, Results: resultTypes}, nil
 	}
 
 	m, ok := s.ModuleInstances[moduleName]
