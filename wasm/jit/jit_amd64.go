@@ -92,7 +92,7 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
-	for _, t := range c.f.Signature.ParamTypes {
+	for _, t := range c.f.Signature.Params {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
