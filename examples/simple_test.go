@@ -3,25 +3,22 @@ package examples
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/wat"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 // Test_Simple implements a basic function in go: hello. This is imported as the Wasm name "$hello" and run on start.
-//	(module
-//		(import "" "hello" (func $hello))
-//		(start $hello)
-//	)
 func Test_Simple(t *testing.T) {
-	buf, err := os.ReadFile("testdata/simple.wasm")
-	require.NoError(t, err)
-	mod, err := wasm.DecodeModule(buf)
+	mod, err := wat.TextToBinary([]byte(`(module
+	(import "" "hello" (func $hello))
+	(start $hello)
+)`))
 	require.NoError(t, err)
 
 	// Create a new store and add the function "hello" which the module imports
