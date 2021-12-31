@@ -22,6 +22,8 @@ import (
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
+// TODO: have some utility functions to reduce loc here: https://github.com/tetratelabs/wazero/issues/100
+
 func newMemoryInst() *wasm.MemoryInstance {
 	return &wasm.MemoryInstance{Buffer: make([]byte, 1024)}
 }
