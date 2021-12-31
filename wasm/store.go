@@ -410,7 +410,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		s.Functions = s.Functions[:prevLen]
 	})
 	var functionDeclarations []uint32
-	var globalDecalarations []*GlobalType
+	var globalDeclarations []*GlobalType
 	var memoryDeclarations []*MemoryType
 	var tableDeclarations []*TableType
 	for _, imp := range module.ImportSection {
@@ -418,7 +418,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		case ImportKindFunction:
 			functionDeclarations = append(functionDeclarations, imp.Desc.FuncTypeIndex)
 		case ImportKindGlobal:
-			globalDecalarations = append(globalDecalarations, imp.Desc.GlobalTypePtr)
+			globalDeclarations = append(globalDeclarations, imp.Desc.GlobalTypePtr)
 		case ImportKindMemory:
 			memoryDeclarations = append(memoryDeclarations, imp.Desc.MemTypePtr)
 		case ImportKindTable:
@@ -428,7 +428,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	importedFunctionCount := len(functionDeclarations)
 	functionDeclarations = append(functionDeclarations, module.FunctionSection...)
 	for _, g := range module.GlobalSection {
-		globalDecalarations = append(globalDecalarations, g.Type)
+		globalDeclarations = append(globalDeclarations, g.Type)
 	}
 	memoryDeclarations = append(memoryDeclarations, module.MemorySection...)
 	tableDeclarations = append(tableDeclarations, module.TableSection...)
@@ -463,7 +463,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 		if _, ok := analysisCache[codeIndex]; !ok {
 			err := analyzeFunction(
-				module, f, functionDeclarations, globalDecalarations,
+				module, f, functionDeclarations, globalDeclarations,
 				memoryDeclarations, tableDeclarations,
 			)
 			if err != nil {
