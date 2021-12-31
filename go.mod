@@ -5,8 +5,8 @@ go 1.16
 
 require (
 	// only used in wat benchmarks
-	github.com/bytecodealliance/wasmtime-go v0.31.0
-	github.com/stretchr/testify v1.5.1
+	github.com/bytecodealliance/wasmtime-go v0.32.0
+	github.com/stretchr/testify v1.7.0
 	// Once we reach some maturity, remove this dep and implement our own assembler.
 	github.com/twitchyliquid64/golang-asm v0.15.1
 )
