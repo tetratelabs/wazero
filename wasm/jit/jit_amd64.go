@@ -836,6 +836,50 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 	return nil
 }
 
+func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
+	v := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(v); err != nil {
+		return err
+	}
+
+	// Take the temporary register for holding the zero value.
+	zeroRegister, err := c.allocateRegister(v.registerType())
+	if err != nil {
+		return err
+	}
+
+	// First, we have to clear the register so the value becomes zero via XOR on itself.
+	xorZero := c.newProg()
+	xorZero.As = x86.AXORQ
+	xorZero.From.Type = obj.TYPE_REG
+	xorZero.From.Reg = zeroRegister
+	xorZero.To.Type = obj.TYPE_REG
+	xorZero.To.Reg = zeroRegister
+	c.addInstruction(xorZero)
+
+	// Emit the compare instruction.
+	prog := c.newProg()
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = zeroRegister
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = v.register
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		prog.As = x86.ACMPL
+	case wazeroir.UnsignedInt64:
+		prog.As = x86.ACMPQ
+	}
+	c.addInstruction(prog)
+
+	// v is consumed by the cmp operation so Release it.
+	c.locationStack.releaseRegister(v)
+
+	// Finally, record that the result is on the conditional register.
+	loc := c.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
 func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {

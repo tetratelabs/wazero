@@ -1376,6 +1376,105 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 	}
 }
 
+func TestAmd64Compiler_compileEqz(t *testing.T) {
+	t.Run("int32", func(t *testing.T) {
+		for i, v := range []uint32{
+			0, 1 << 16, math.MaxUint32,
+		} {
+			v := v
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+
+				// Push the cmp target value.
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
+				require.NoError(t, err)
+				loc := compiler.locationStack.peek()
+
+				// Emit the eqz instructions.
+				err = compiler.compileEqz(&wazeroir.OperationEqz{Type: wazeroir.UnsignedInt32})
+				require.NoError(t, err)
+				// At this point, the target value must be consumed
+				// so the corresponding register must be marked unused.
+				require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
+
+				// To verify the behavior, we push the flag value
+				// to the stack.
+				top := compiler.locationStack.peek()
+				require.True(t, top.onConditionalRegister() && !top.onRegister())
+				err = compiler.moveConditionalToGeneralPurposeRegister(top)
+				require.NoError(t, err)
+				require.True(t, !top.onConditionalRegister() && top.onRegister())
+				compiler.releaseRegisterToStack(top)
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, v == uint32(0), eng.stack[eng.stackPointer-1] == 1)
+			})
+		}
+	})
+	t.Run("int64", func(t *testing.T) {
+		for i, v := range []uint64{
+			0, 1 << 16, 1 << 36, math.MaxUint64,
+		} {
+			v := v
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+
+				// Push the cmp target value.
+				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+				require.NoError(t, err)
+				loc := compiler.locationStack.peek()
+
+				// Emit the eqz instructions.
+				err = compiler.compileEqz(&wazeroir.OperationEqz{Type: wazeroir.UnsignedInt64})
+				require.NoError(t, err)
+				// At this point, the target value must be consumed
+				// so the corresponding register must be marked unused.
+				require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
+
+				// To verify the behavior, we push the flag value
+				// to the stack.
+				top := compiler.locationStack.peek()
+				require.True(t, top.onConditionalRegister() && !top.onRegister())
+				err = compiler.moveConditionalToGeneralPurposeRegister(top)
+				require.NoError(t, err)
+				require.True(t, !top.onConditionalRegister() && top.onRegister())
+				compiler.releaseRegisterToStack(top)
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, v == uint64(0), eng.stack[eng.stackPointer-1] == 1)
+			})
+		}
+	})
+}
+
 func TestAmd64Compiler_compileLe(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		for _, tc := range []struct {

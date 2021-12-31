@@ -27,6 +27,7 @@ type compiler interface {
 	compileSub(o *wazeroir.OperationSub) error
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
+	compileEqz(o *wazeroir.OperationEqz) error
 	compileLe(o *wazeroir.OperationLe) error
 	compileGe(o *wazeroir.OperationGe) error
 	compileLoad(o *wazeroir.OperationLoad) error
