@@ -1514,7 +1514,8 @@ func TestAmd64Compiler_compileGe(t *testing.T) {
 				compiler.releaseRegisterToStack(flag)
 				compiler.returnFunction()
 
-				// Assemble.
+				// Generate the code under test (constants declaration and comparison)
+				// and the verification code (moving the result to the stack so we can assert against it)
 				code, _, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
