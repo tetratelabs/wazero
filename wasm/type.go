@@ -8,7 +8,7 @@ import (
 )
 
 type FunctionType struct {
-	ParamTypes, ResultTypes []ValueType
+	Params, Results []ValueType
 }
 
 func readFunctionType(r io.Reader) (*FunctionType, error) {
@@ -44,8 +44,8 @@ func readFunctionType(r io.Reader) (*FunctionType, error) {
 	}
 
 	return &FunctionType{
-		ParamTypes:  paramTypes,
-		ResultTypes: resultTypes,
+		Params:  paramTypes,
+		Results: resultTypes,
 	}, nil
 }
 

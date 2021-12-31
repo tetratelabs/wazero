@@ -51,11 +51,11 @@ func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *
 
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 	f := &wasm.FunctionInstance{Signature: &wasm.FunctionType{
-		ParamTypes: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
+		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
 	}}
 	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
 	compiler.pushFunctionParams()
-	require.Equal(t, uint64(len(f.Signature.ParamTypes)), compiler.locationStack.sp)
+	require.Equal(t, uint64(len(f.Signature.Params)), compiler.locationStack.sp)
 	loc := compiler.locationStack.pop()
 	require.Equal(t, uint64(1), loc.stackPointer)
 	loc = compiler.locationStack.pop()
@@ -482,8 +482,8 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		hostFunctionInstance := &wasm.FunctionInstance{
 			HostFunction: &hostFunc,
 			Signature: &wasm.FunctionType{
-				ParamTypes:  []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
-				ResultTypes: []wasm.ValueType{wasm.ValueTypeI64},
+				Params:  []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI64},
+				Results: []wasm.ValueType{wasm.ValueTypeI64},
 			},
 		}
 		eng.compiledHostFunctionIndex[hostFunctionInstance] = 1
