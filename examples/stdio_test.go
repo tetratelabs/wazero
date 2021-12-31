@@ -14,7 +14,7 @@ import (
 )
 
 func Test_stdio(t *testing.T) {
-	buf, err := os.ReadFile("wasm/stdio.wasm")
+	buf, err := os.ReadFile("testdata/stdio.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)
