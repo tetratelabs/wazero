@@ -1099,7 +1099,7 @@ func TestAmd64Compiler_compileLe(t *testing.T) {
 			signed bool
 		}{
 			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint32
-			{x1: -1, x2: -1, signed: false}, // interpret x1 and x2 as max uint32
+			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
 			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint32
 			{x1: 100, x2: 200, signed: true},
 			{x1: 100, x2: 100, signed: true},
@@ -1160,6 +1160,7 @@ func TestAmd64Compiler_compileLe(t *testing.T) {
 			signed bool
 		}{
 			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint64
+			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
 			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint64
 			{x1: 100, x2: 200, signed: true},
 			{x1: 200, x2: 100, signed: true},
@@ -1349,7 +1350,7 @@ func TestAmd64Compiler_compileGe(t *testing.T) {
 			signed bool
 		}{
 			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint32
-			{x1: -1, x2: -1, signed: false}, // interpret x1 and x2 as max uint32
+			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
 			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint32
 			{x1: 100, x2: 200, signed: true},
 			{x1: 100, x2: 100, signed: true},
@@ -1413,7 +1414,8 @@ func TestAmd64Compiler_compileGe(t *testing.T) {
 			signed bool
 		}{
 			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint64
-			{x1: -1, x2: 100, signed: false},  // interpret x1 as max uint64
+			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
+			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint64
 			{x1: 100, x2: 200, signed: true},
 			{x1: 200, x2: 100, signed: true},
 			{x1: 1 << 56, x2: 100, signed: true},

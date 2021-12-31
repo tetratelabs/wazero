@@ -833,13 +833,11 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 
 	// TODO: emit NaN value handings for floats.
 
-	// We no longer need x1,x2 register after cmp operation here,
-	// so we release it.
+	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
 
-	// Finally we have the result on the conditional register,
-	// so record it.
+	// Finally, record that the result is on the conditional register.
 	loc := c.locationStack.pushValueOnConditionalRegister(resultConditionState)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
@@ -897,13 +895,11 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 
 	// TODO: emit NaN value handings for floats.
 
-	// We no longer need x1,x2 register after cmp operation here,
-	// so we release it.
+	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
 
-	// Finally we have the result on the conditional register,
-	// so record it.
+	// Finally, record that the result is on the conditional register.
 	loc := c.locationStack.pushValueOnConditionalRegister(resultConditionState)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
