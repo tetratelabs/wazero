@@ -12,7 +12,7 @@ import (
 )
 
 func Test_fibonacci(t *testing.T) {
-	buf, err := os.ReadFile("wasm/fibonacci.wasm")
+	buf, err := os.ReadFile("testdata/fibonacci.wasm")
 	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule(buf)

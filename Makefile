@@ -15,11 +15,11 @@ build.lib: # TODO: replace "./wasm/..." with "./...".
 
 .PHONY: build.bench
 build.bench:
-	tinygo build -o bench/case/case.wasm -scheduler=none -target=wasi bench/case/case.go
+	tinygo build -o bench/testdata/case.wasm -scheduler=none -target=wasi bench/testdata/case.go
 
 .PHONY: build.examples
 build.examples:
-	@find ./examples/wasm -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
+	@find ./examples/testdata -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
 
 spectests_cases_dir := wasm/spectests/cases
 spec_version := wg-1.0

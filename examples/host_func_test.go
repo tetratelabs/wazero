@@ -15,7 +15,7 @@ import (
 )
 
 func Test_hostFunc(t *testing.T) {
-	buf, err := os.ReadFile("wasm/host_func.wasm")
+	buf, err := os.ReadFile("testdata/host_func.wasm")
 	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule((buf))
