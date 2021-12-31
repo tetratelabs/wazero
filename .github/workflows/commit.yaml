@@ -41,7 +41,7 @@ jobs:
       - run: make check
 
   test:
-    name: Test (${{ matrix.os }}, go-${{ matrix.go-version }})"
+    name: Test (${{ matrix.os }}, go-${{ matrix.go-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
