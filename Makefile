@@ -5,6 +5,14 @@ golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 bench:
 	@go test -benchmem -bench=. ./bench/*bench_test.go
 
+.PHONY: build.lib
+build.lib: # TODO: replace "./wasm/..." with "./...".
+	@echo "Ensuring that the wazero library can be compiled on primary platforms..."
+	@GOOS=linux GOARCH=arm64 go build ./wasm/...
+	@GOOS=linux GOARCH=amd64 go build ./wasm/...
+	@GOOS=darwin GOARCH=arm64 go build ./wasm/...
+	@GOOS=darwin GOARCH=amd64 go build ./wasm/...
+
 .PHONY: build.bench
 build.bench:
 	tinygo build -o bench/case/case.wasm -scheduler=none -target=wasi bench/case/case.go
