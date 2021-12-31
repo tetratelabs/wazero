@@ -1118,21 +1118,26 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
 						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
 						require.NoError(t, err)
 						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions.
 						if instruction.isEq {
 							err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
 						} else {
 							err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
 						}
 						require.NoError(t, err)
-
+						// At this point, these registers must be consumed.
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
 						// To verify the behavior, we push the flag value
 						// to the stack.
 						top := compiler.locationStack.peek()
@@ -1180,20 +1185,26 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
 						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
 						require.NoError(t, err)
 						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions.
 						if instruction.isEq {
 							err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI64})
 						} else {
 							err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI64})
 						}
 						require.NoError(t, err)
+						// At this point, these registers must be consumed.
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
 						// To verify the behavior, we push the flag value
 						// to the stack.
 						top := compiler.locationStack.peek()
@@ -1244,9 +1255,10 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						// Prepare operands.
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
 						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
@@ -1261,7 +1273,6 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 							err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF32})
 						}
 						require.NoError(t, err)
-
 						// At this point, these registers must be consumed.
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
@@ -1316,9 +1327,10 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: math.Inf(-1), x2: 100},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						// Prepare operands.
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
 						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
@@ -1434,7 +1446,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 
-				// Push the cmp target value.
+				// Push the cmp target values.
 				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
 				require.NoError(t, err)
 				loc := compiler.locationStack.peek()
@@ -1792,7 +1804,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_compileGe(t *testing.T) {
+func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 	for _, instruction := range []struct {
 		name      string
 		inclusive bool
