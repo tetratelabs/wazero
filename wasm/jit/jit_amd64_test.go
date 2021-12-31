@@ -1817,9 +1817,9 @@ func TestAmd64Compiler_compileGe(t *testing.T) {
 				x2 := compiler.locationStack.peek()
 				var o *wazeroir.OperationGe
 				if tc.signed {
-					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeInt64}
+					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeInt32}
 				} else {
-					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeUint64}
+					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeUint32}
 				}
 				err = compiler.compileGe(o)
 				require.NoError(t, err)
