@@ -1348,7 +1348,7 @@ func TestAmd64Compiler_compileGe(t *testing.T) {
 			x1, x2 int32
 			signed bool
 		}{
-			{x1: 100, x2: -1, signed: false},
+			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint32
 			{x1: -1, x2: -1, signed: false},
 			{x1: -1, x2: 100, signed: false},
 			{x1: 100, x2: 200, signed: true},
