@@ -519,15 +519,15 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationConstF64:
 			err = compiler.compileConstF64(o)
 		case *wazeroir.OperationEq:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileEq(o)
 		case *wazeroir.OperationNe:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileNe(o)
 		case *wazeroir.OperationEqz:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileEqz(o)
 		case *wazeroir.OperationLt:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileLt(o)
 		case *wazeroir.OperationGt:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileGt(o)
 		case *wazeroir.OperationLe:
 			err = compiler.compileLe(o)
 		case *wazeroir.OperationGe:

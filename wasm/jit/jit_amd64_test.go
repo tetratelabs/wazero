@@ -1094,173 +1094,330 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 	})
 }
 
-func TestAmd64Compiler_compileLe(t *testing.T) {
+func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
+	for _, instruction := range []struct {
+		name string
+		isEq bool
+	}{
+		{name: "eq", isEq: true},
+		{name: "ne", isEq: false},
+	} {
+		instruction := instruction
+		t.Run(instruction.name, func(t *testing.T) {
+			t.Run("int32", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 uint32
+				}{
+					{x1: 100, x2: math.MaxUint32},
+					{x1: math.MaxUint32, x2: math.MaxUint32},
+					{x1: math.MaxUint32, x2: 100},
+					{x1: 100, x2: 200},
+					{x1: 100, x2: 100},
+					{x1: 200, x2: 100},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
+						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions.
+						if instruction.isEq {
+							err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+						} else {
+							err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+						}
+						require.NoError(t, err)
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						top := compiler.locationStack.peek()
+						require.True(t, top.onConditionalRegister() && !top.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						require.NoError(t, err)
+						require.True(t, !top.onConditionalRegister() && top.onRegister())
+						compiler.releaseRegisterToStack(top)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						if instruction.isEq {
+							require.Equal(t, tc.x1 == tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						} else {
+							require.Equal(t, tc.x1 != tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						}
+					})
+				}
+			})
+			t.Run("int64", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 uint64
+				}{
+					{x1: 1, x2: math.MaxUint64},
+					{x1: 100, x2: 200},
+					{x1: 200, x2: 100},
+					{x1: 1 << 56, x2: 100},
+					{x1: 1 << 56, x2: 1 << 61},
+					{x1: math.MaxUint64, x2: 100},
+					{x1: 0, x2: 100},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
+						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions.
+						if instruction.isEq {
+							err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI64})
+						} else {
+							err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI64})
+						}
+						require.NoError(t, err)
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						top := compiler.locationStack.peek()
+						require.True(t, top.onConditionalRegister() && !top.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						require.NoError(t, err)
+						require.True(t, !top.onConditionalRegister() && top.onRegister())
+						compiler.releaseRegisterToStack(top)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						if instruction.isEq {
+							require.Equal(t, tc.x1 == tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						} else {
+							require.Equal(t, tc.x1 != tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						}
+					})
+				}
+			})
+			t.Run("float32", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 float32
+				}{
+					{x1: 100, x2: -1.1},
+					{x1: -1, x2: 100},
+					{x1: 100, x2: 200},
+					{x1: 100.01234124, x2: 100.01234124},
+					{x1: 100.01234124, x2: -100.01234124},
+					{x1: 200.12315, x2: 100},
+					{x1: float32(math.Inf(1)), x2: 100},
+					{x1: 100, x2: float32(math.Inf(1))},
+					{x1: float32(math.Inf(1)), x2: float32(math.Inf(1))},
+					{x1: float32(math.Inf(-1)), x2: 100},
+					{x1: 100, x2: float32(math.Inf(-1))},
+					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
+						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions.
+						if instruction.isEq {
+							err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF32})
+						} else {
+							err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF32})
+						}
+						require.NoError(t, err)
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+						// Plus the result must be pushed.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						flag := compiler.locationStack.peek()
+						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						require.NoError(t, err)
+						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
+						compiler.releaseRegisterToStack(flag)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						if instruction.isEq {
+							require.Equal(t, tc.x1 == tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						} else {
+							require.Equal(t, tc.x1 != tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						}
+					})
+				}
+			})
+			t.Run("float64", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 float64
+				}{
+					{x1: 100, x2: -1.1},
+					{x1: -1, x2: 100},
+					{x1: 100, x2: 200},
+					{x1: 100.01234124, x2: 100.01234124},
+					{x1: 100.01234124, x2: -100.01234124},
+					{x1: 200.12315, x2: 100},
+					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
+					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
+					{x1: math.Inf(1), x2: 100},
+					{x1: math.Inf(-1), x2: 100},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+
+						// Push the cmp target values.
+						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions
+						if instruction.isEq {
+							err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF64})
+						} else {
+							err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF64})
+						}
+						require.NoError(t, err)
+
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+						// Plus the result must be pushed.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						flag := compiler.locationStack.peek()
+						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						require.NoError(t, err)
+						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
+						compiler.releaseRegisterToStack(flag)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						if instruction.isEq {
+							require.Equal(t, tc.x1 == tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						} else {
+							require.Equal(t, tc.x1 != tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						}
+					})
+				}
+			})
+		})
+	}
+}
+
+func TestAmd64Compiler_compileEqz(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
-		for _, tc := range []struct {
-			x1, x2 int32
-			signed bool
-		}{
-			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint32
-			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
-			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint32
-			{x1: 100, x2: 200, signed: true},
-			{x1: 100, x2: 100, signed: true},
-			{x1: 200, x2: 100, signed: true},
+		for i, v := range []uint32{
+			0, 1 << 16, math.MaxUint32,
 		} {
-			var o *wazeroir.OperationLe
-			if tc.signed {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32}
-			} else {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32}
-			}
-			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
-			x1Reg := int16(x86.REG_R9)
-			x2Reg := int16(x86.REG_R10)
-			compiler.locationStack.pushValueOnRegister(x1Reg)
-			compiler.locationStack.pushValueOnRegister(x2Reg)
-			compiler.movIntConstToRegister(int64(tc.x1), x1Reg)
-			compiler.movIntConstToRegister(int64(tc.x2), x2Reg)
-			err := compiler.compileLe(o)
-			require.NoError(t, err)
-
-			require.NotContains(t, compiler.locationStack.usedRegisters, x1Reg)
-			require.NotContains(t, compiler.locationStack.usedRegisters, x2Reg)
-			// To verify the behavior, we push the flag value
-			// to the stack.
-			top := compiler.locationStack.peek()
-			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = compiler.moveConditionalToGeneralPurposeRegister(top)
-			require.NoError(t, err)
-			require.True(t, !top.onConditionalRegister() && top.onRegister())
-			compiler.releaseRegisterToStack(top)
-			compiler.returnFunction()
-
-			// Generate the code under test.
-			code, _, err := compiler.generate()
-			require.NoError(t, err)
-			// Run code.
-			eng := newEngine()
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(1), eng.stackPointer)
-			if tc.signed {
-				require.Equal(t, int32(tc.x1) <= int32(tc.x2), eng.stack[eng.stackPointer-1] == 1)
-			} else {
-				require.Equal(t, uint32(tc.x1) <= uint32(tc.x2), eng.stack[eng.stackPointer-1] == 1)
-			}
-		}
-	})
-	t.Run("int64", func(t *testing.T) {
-		for _, tc := range []struct {
-			x1, x2 int64
-			signed bool
-		}{
-			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint64
-			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
-			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint64
-			{x1: 100, x2: 200, signed: true},
-			{x1: 200, x2: 100, signed: true},
-			{x1: 1 << 56, x2: 100, signed: true},
-			{x1: 1 << 56, x2: 1 << 61, signed: true},
-			{x1: math.MaxInt64, x2: 100, signed: true},
-			{x1: math.MinInt64, x2: 100, signed: true},
-		} {
-			var o *wazeroir.OperationLe
-			if tc.signed {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeInt64}
-			} else {
-				o = &wazeroir.OperationLe{Type: wazeroir.SignedTypeUint64}
-			}
-			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
-			x1Reg := int16(x86.REG_R9)
-			x2Reg := int16(x86.REG_R10)
-			compiler.locationStack.pushValueOnRegister(x1Reg)
-			compiler.locationStack.pushValueOnRegister(x2Reg)
-			compiler.movIntConstToRegister(tc.x1, x1Reg)
-			compiler.movIntConstToRegister(tc.x2, x2Reg)
-			err := compiler.compileLe(o)
-			require.NoError(t, err)
-			require.NotContains(t, compiler.locationStack.usedRegisters, x1Reg)
-			require.NotContains(t, compiler.locationStack.usedRegisters, x2Reg)
-			// To verify the behavior, we push the flag value
-			// to the stack.
-			top := compiler.locationStack.peek()
-			require.True(t, top.onConditionalRegister() && !top.onRegister())
-			err = compiler.moveConditionalToGeneralPurposeRegister(top)
-			require.NoError(t, err)
-			require.True(t, !top.onConditionalRegister() && top.onRegister())
-			compiler.releaseRegisterToStack(top)
-			compiler.returnFunction()
-
-			// Generate the code under test.
-			code, _, err := compiler.generate()
-			require.NoError(t, err)
-			// Run code.
-			eng := newEngine()
-			mem := newMemoryInst()
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
-			// Check the stack.
-			require.Equal(t, uint64(1), eng.stackPointer)
-			if tc.signed {
-				require.Equal(t, tc.x1 <= tc.x2, eng.stack[eng.stackPointer-1] == 1)
-			} else {
-				require.Equal(t, uint64(tc.x1) <= uint64(tc.x2), eng.stack[eng.stackPointer-1] == 1)
-			}
-		}
-	})
-	t.Run("float32", func(t *testing.T) {
-		for i, tc := range []struct {
-			x1, x2 float32
-		}{
-			{x1: 100, x2: -1.1},
-			{x1: -1, x2: 100},
-			{x1: 100, x2: 200},
-			{x1: 100.01234124, x2: 100.01234124},
-			{x1: 100.01234124, x2: -100.01234124},
-			{x1: 200.12315, x2: 100},
-			{x1: float32(math.Inf(1)), x2: 100},
-			{x1: float32(math.Inf(-1)), x2: 100},
-		} {
+			v := v
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				// Prepare operands.
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
-				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
-				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
 
-				// Emit the Le instructions,
-				err = compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat32})
+				// Push the cmp target value.
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
 				require.NoError(t, err)
+				loc := compiler.locationStack.peek()
 
-				// At this point, these registers must be consumed.
-				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
-				// Plus the result must be pushed.
-				require.Equal(t, uint64(1), compiler.locationStack.sp)
+				// Emit the eqz instructions.
+				err = compiler.compileEqz(&wazeroir.OperationEqz{Type: wazeroir.UnsignedInt32})
+				require.NoError(t, err)
+				// At this point, the target value must be consumed
+				// so the corresponding register must be marked unused.
+				require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
 
 				// To verify the behavior, we push the flag value
 				// to the stack.
-				flag := compiler.locationStack.peek()
-				require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+				top := compiler.locationStack.peek()
+				require.True(t, top.onConditionalRegister() && !top.onRegister())
+				err = compiler.moveConditionalToGeneralPurposeRegister(top)
 				require.NoError(t, err)
-				require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-				compiler.releaseRegisterToStack(flag)
+				require.True(t, !top.onConditionalRegister() && top.onRegister())
+				compiler.releaseRegisterToStack(top)
 				compiler.returnFunction()
 
 				// Generate the code under test.
@@ -1276,54 +1433,39 @@ func TestAmd64Compiler_compileLe(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1 <= tc.x2, eng.stack[eng.stackPointer-1] == 1)
+				require.Equal(t, v == uint32(0), eng.stack[eng.stackPointer-1] == 1)
 			})
 		}
 	})
-	t.Run("float64", func(t *testing.T) {
-		for i, tc := range []struct {
-			x1, x2 float64
-		}{
-			{x1: 100, x2: -1.1},
-			{x1: -1, x2: 100},
-			{x1: 100, x2: 200},
-			{x1: 100.01234124, x2: 100.01234124},
-			{x1: 100.01234124, x2: -100.01234124},
-			{x1: 200.12315, x2: 100},
-			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
-			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
-			{x1: math.Inf(1), x2: 100},
-			{x1: math.Inf(-1), x2: 100},
+	t.Run("int64", func(t *testing.T) {
+		for i, v := range []uint64{
+			0, 1 << 16, 1 << 36, math.MaxUint64,
 		} {
+			v := v
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				// Prepare operands.
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
-				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
-				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
 
-				// Emit the Le instructions,
-				err = compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat64})
+				// Push the cmp target values.
+				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
 				require.NoError(t, err)
+				loc := compiler.locationStack.peek()
 
-				// At this point, these registers must be consumed.
-				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
-				// Plus the result must be pushed.
-				require.Equal(t, uint64(1), compiler.locationStack.sp)
+				// Emit the eqz instructions.
+				err = compiler.compileEqz(&wazeroir.OperationEqz{Type: wazeroir.UnsignedInt64})
+				require.NoError(t, err)
+				// At this point, the target value must be consumed
+				// so the corresponding register must be marked unused.
+				require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
 
 				// To verify the behavior, we push the flag value
 				// to the stack.
-				flag := compiler.locationStack.peek()
-				require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+				top := compiler.locationStack.peek()
+				require.True(t, top.onConditionalRegister() && !top.onRegister())
+				err = compiler.moveConditionalToGeneralPurposeRegister(top)
 				require.NoError(t, err)
-				require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-				compiler.releaseRegisterToStack(flag)
+				require.True(t, !top.onConditionalRegister() && top.onRegister())
+				compiler.releaseRegisterToStack(top)
 				compiler.returnFunction()
 
 				// Generate the code under test.
@@ -1339,269 +1481,649 @@ func TestAmd64Compiler_compileLe(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1 <= tc.x2, eng.stack[eng.stackPointer-1] == 1)
+				require.Equal(t, v == uint64(0), eng.stack[eng.stackPointer-1] == 1)
 			})
 		}
 	})
 }
 
-func TestAmd64Compiler_compileGe(t *testing.T) {
-	t.Run("int32", func(t *testing.T) {
-		for i, tc := range []struct {
-			x1, x2 int32
-			signed bool
-		}{
-			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint32
-			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
-			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint32
-			{x1: 100, x2: 200, signed: true},
-			{x1: 100, x2: 100, signed: true},
-			{x1: 200, x2: 100, signed: true},
-		} {
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
-				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
-				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
-				var o *wazeroir.OperationGe
-				if tc.signed {
-					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeInt64}
-				} else {
-					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeUint64}
-				}
-				err = compiler.compileGe(o)
-				require.NoError(t, err)
+func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
+	for _, instruction := range []struct {
+		name      string
+		inclusive bool
+	}{
+		{name: "less_than_or_equal", inclusive: true},
+		{name: "less_than", inclusive: false},
+	} {
+		instruction := instruction
+		t.Run(instruction.name, func(t *testing.T) {
+			t.Run("int32", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 int32
+					signed bool
+				}{
+					{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint32
+					{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
+					{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint32
+					{x1: 100, x2: 200, signed: true},
+					{x1: 100, x2: 100, signed: true},
+					{x1: 200, x2: 100, signed: true},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
 
-				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
-				// To verify the behavior, we push the flag value
-				// to the stack.
-				top := compiler.locationStack.peek()
-				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(top)
-				require.NoError(t, err)
-				require.True(t, !top.onConditionalRegister() && top.onRegister())
-				compiler.releaseRegisterToStack(top)
-				compiler.returnFunction()
+						// Push the target values.
+						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
 
-				// Generate the code under test.
-				// and the verification code (moving the result to the stack so we can assert against it)
-				code, _, err := compiler.generate()
-				require.NoError(t, err)
-				// Run code.
-				eng := newEngine()
-				mem := newMemoryInst()
-				jitcall(
-					uintptr(unsafe.Pointer(&code[0])),
-					uintptr(unsafe.Pointer(eng)),
-					uintptr(unsafe.Pointer(&mem.Buffer[0])),
-				)
-				// Check the stack.
-				require.Equal(t, uint64(1), eng.stackPointer)
-				if tc.signed {
-					require.Equal(t, int32(tc.x1) >= int32(tc.x2), eng.stack[eng.stackPointer-1] == 1)
-				} else {
-					require.Equal(t, uint32(tc.x1) >= uint32(tc.x2), eng.stack[eng.stackPointer-1] == 1)
-				}
-			})
-		}
-	})
-	t.Run("int64", func(t *testing.T) {
-		for i, tc := range []struct {
-			x1, x2 int64
-			signed bool
-		}{
-			{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint64
-			{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
-			{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint64
-			{x1: 100, x2: 200, signed: true},
-			{x1: 200, x2: 100, signed: true},
-			{x1: 1 << 56, x2: 100, signed: true},
-			{x1: 1 << 56, x2: 1 << 61, signed: true},
-			{x1: math.MaxInt64, x2: 100, signed: true},
-			{x1: math.MinInt64, x2: 100, signed: true},
-		} {
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
-				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
-				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
-				var o *wazeroir.OperationGe
-				if tc.signed {
-					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeInt64}
-				} else {
-					o = &wazeroir.OperationGe{Type: wazeroir.SignedTypeUint64}
-				}
-				err = compiler.compileGe(o)
-				require.NoError(t, err)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
-				// To verify the behavior, we push the flag value
-				// to the stack.
-				top := compiler.locationStack.peek()
-				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(top)
-				require.NoError(t, err)
-				require.True(t, !top.onConditionalRegister() && top.onRegister())
-				compiler.releaseRegisterToStack(top)
-				compiler.returnFunction()
+						// Emit the cmp instructions.
+						var targetType wazeroir.SignedType
+						if tc.signed {
+							targetType = wazeroir.SignedTypeInt32
+						} else {
+							targetType = wazeroir.SignedTypeUint32
+						}
+						if instruction.inclusive {
+							err = compiler.compileLe(&wazeroir.OperationLe{Type: targetType})
+						} else {
+							err = compiler.compileLt(&wazeroir.OperationLt{Type: targetType})
+						}
+						require.NoError(t, err)
 
-				// Generate the code under test.
-				// and the verification code (moving the result to the stack so we can assert against it)
-				code, _, err := compiler.generate()
-				require.NoError(t, err)
-				// Run code.
-				eng := newEngine()
-				mem := newMemoryInst()
-				jitcall(
-					uintptr(unsafe.Pointer(&code[0])),
-					uintptr(unsafe.Pointer(eng)),
-					uintptr(unsafe.Pointer(&mem.Buffer[0])),
-				)
-				// Check the stack.
-				require.Equal(t, uint64(1), eng.stackPointer)
-				if tc.signed {
-					require.Equal(t, tc.x1 >= tc.x2, eng.stack[eng.stackPointer-1] == 1)
-				} else {
-					require.Equal(t, uint64(tc.x1) >= uint64(tc.x2), eng.stack[eng.stackPointer-1] == 1)
+						// At this point, all the registesr must be consumed by cmp
+						// so they should be marked as unused.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						top := compiler.locationStack.peek()
+						require.True(t, top.onConditionalRegister() && !top.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						require.NoError(t, err)
+						require.True(t, !top.onConditionalRegister() && top.onRegister())
+						compiler.releaseRegisterToStack(top)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						var exp bool
+						if tc.signed {
+							exp = tc.x1 < tc.x2
+						} else {
+							exp = uint32(tc.x1) < uint32(tc.x2)
+						}
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
 				}
 			})
-		}
-	})
-	t.Run("float32", func(t *testing.T) {
-		for i, tc := range []struct {
-			x1, x2 float32
-		}{
-			{x1: 100, x2: -1.1},
-			{x1: -1, x2: 100},
-			{x1: 100, x2: 200},
-			{x1: 100.01234124, x2: 100.01234124},
-			{x1: 100.01234124, x2: -100.01234124},
-			{x1: 200.12315, x2: 100},
-			{x1: float32(math.Inf(1)), x2: 100},
-			{x1: float32(math.Inf(-1)), x2: 100},
-		} {
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				// Prepare operands.
-				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
-				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
-				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
+			t.Run("int64", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 int64
+					signed bool
+				}{
+					{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint64
+					{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
+					{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint64
+					{x1: 100, x2: 200, signed: true},
+					{x1: 200, x2: 100, signed: true},
+					{x1: 1 << 56, x2: 100, signed: true},
+					{x1: 1 << 56, x2: 1 << 61, signed: true},
+					{x1: math.MaxInt64, x2: 100, signed: true},
+					{x1: math.MinInt64, x2: 100, signed: true},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
 
-				// Emit the Ge instructions,
-				err = compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeFloat32})
-				require.NoError(t, err)
+						// Push the target values.
+						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
 
-				// At this point, these registers must be consumed.
-				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
-				// Plus the result must be pushed.
-				require.Equal(t, uint64(1), compiler.locationStack.sp)
+						// Emit the cmp instructions.
+						var targetType wazeroir.SignedType
+						if tc.signed {
+							targetType = wazeroir.SignedTypeInt64
+						} else {
+							targetType = wazeroir.SignedTypeUint64
+						}
+						if instruction.inclusive {
+							err = compiler.compileLe(&wazeroir.OperationLe{Type: targetType})
+						} else {
+							err = compiler.compileLt(&wazeroir.OperationLt{Type: targetType})
+						}
+						require.NoError(t, err)
 
-				// To verify the behavior, we push the flag value
-				// to the stack.
-				flag := compiler.locationStack.peek()
-				require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(flag)
-				require.NoError(t, err)
-				require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-				compiler.releaseRegisterToStack(flag)
-				compiler.returnFunction()
+						// At this point, all the registesr must be consumed by cmp
+						// so they should be marked as unused.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
-				// Generate the code under test.
-				// and the verification code (moving the result to the stack so we can assert against it)
-				code, _, err := compiler.generate()
-				require.NoError(t, err)
-				// Run code.
-				eng := newEngine()
-				mem := newMemoryInst()
-				jitcall(
-					uintptr(unsafe.Pointer(&code[0])),
-					uintptr(unsafe.Pointer(eng)),
-					uintptr(unsafe.Pointer(&mem.Buffer[0])),
-				)
-				// Check the stack.
-				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1 >= tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						top := compiler.locationStack.peek()
+						require.True(t, top.onConditionalRegister() && !top.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						require.NoError(t, err)
+						require.True(t, !top.onConditionalRegister() && top.onRegister())
+						compiler.releaseRegisterToStack(top)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						var exp bool
+						if tc.signed {
+							exp = tc.x1 < tc.x2
+						} else {
+							exp = uint64(tc.x1) < uint64(tc.x2)
+						}
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
+				}
 			})
-		}
-	})
-	t.Run("float64", func(t *testing.T) {
-		for i, tc := range []struct {
-			x1, x2 float64
-		}{
-			{x1: 100, x2: -1.1},
-			{x1: -1, x2: 100},
-			{x1: 100, x2: 200},
-			{x1: 100.01234124, x2: 100.01234124},
-			{x1: 100.01234124, x2: -100.01234124},
-			{x1: 200.12315, x2: 100},
-			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
-			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
-			{x1: math.Inf(1), x2: 100},
-			{x1: math.Inf(-1), x2: 100},
-		} {
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				// Prepare operands.
-				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
-				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
-				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
+			t.Run("float32", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 float32
+				}{
+					{x1: 100, x2: -1.1},
+					{x1: -1, x2: 100},
+					{x1: 100, x2: 200},
+					{x1: 100.01234124, x2: 100.01234124},
+					{x1: 100.01234124, x2: -100.01234124},
+					{x1: 200.12315, x2: 100},
+					{x1: float32(math.Inf(1)), x2: 100},
+					{x1: float32(math.Inf(-1)), x2: 100},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						// Prepare operands.
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
 
-				// Emit the Ge instructions,
-				err = compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeFloat64})
-				require.NoError(t, err)
+						// Emit the cmp instructions
+						if instruction.inclusive {
+							err = compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat32})
+						} else {
+							err = compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat32})
+						}
+						require.NoError(t, err)
 
-				// At this point, these registers must be consumed.
-				require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
-				// Plus the result must be pushed.
-				require.Equal(t, uint64(1), compiler.locationStack.sp)
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+						// Plus the result must be pushed.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-				// To verify the behavior, we push the flag value
-				// to the stack.
-				flag := compiler.locationStack.peek()
-				require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(flag)
-				require.NoError(t, err)
-				require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-				compiler.releaseRegisterToStack(flag)
-				compiler.returnFunction()
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						flag := compiler.locationStack.peek()
+						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						require.NoError(t, err)
+						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
+						compiler.releaseRegisterToStack(flag)
+						compiler.returnFunction()
 
-				// Generate the code under test.
-				// and the verification code (moving the result to the stack so we can assert against it)
-				code, _, err := compiler.generate()
-				require.NoError(t, err)
-				// Run code.
-				eng := newEngine()
-				mem := newMemoryInst()
-				jitcall(
-					uintptr(unsafe.Pointer(&code[0])),
-					uintptr(unsafe.Pointer(eng)),
-					uintptr(unsafe.Pointer(&mem.Buffer[0])),
-				)
-				// Check the stack.
-				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1 >= tc.x2, eng.stack[eng.stackPointer-1] == 1)
+						// Generate the code under test.
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						exp := tc.x1 < tc.x2
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
+				}
 			})
-		}
-	})
+			t.Run("float64", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 float64
+				}{
+					{x1: 100, x2: -1.1},
+					{x1: -1, x2: 100},
+					{x1: 100, x2: 200},
+					{x1: 100.01234124, x2: 100.01234124},
+					{x1: 100.01234124, x2: -100.01234124},
+					{x1: 200.12315, x2: 100},
+					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
+					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
+					{x1: math.Inf(1), x2: 100},
+					{x1: math.Inf(-1), x2: 100},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						// Prepare operands.
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions,
+						if instruction.inclusive {
+							err = compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeFloat64})
+						} else {
+							err = compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat64})
+						}
+						require.NoError(t, err)
+
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+						// Plus the result must be pushed.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						flag := compiler.locationStack.peek()
+						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						require.NoError(t, err)
+						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
+						compiler.releaseRegisterToStack(flag)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						exp := tc.x1 < tc.x2
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
+				}
+			})
+		})
+	}
+}
+
+func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
+	for _, instruction := range []struct {
+		name      string
+		inclusive bool
+	}{
+		{name: "greater_than_or_equal", inclusive: true},
+		{name: "greater_than", inclusive: false},
+	} {
+		instruction := instruction
+		t.Run(instruction.name, func(t *testing.T) {
+			t.Run("int32", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 int32
+					signed bool
+				}{
+					{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint32
+					{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
+					{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint32
+					{x1: 100, x2: 200, signed: true},
+					{x1: 100, x2: 100, signed: true},
+					{x1: 200, x2: 100, signed: true},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+
+						// Push the target values.
+						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions.
+						var targetType wazeroir.SignedType
+						if tc.signed {
+							targetType = wazeroir.SignedTypeInt32
+						} else {
+							targetType = wazeroir.SignedTypeUint32
+						}
+						if instruction.inclusive {
+							err = compiler.compileGe(&wazeroir.OperationGe{Type: targetType})
+						} else {
+							err = compiler.compileGt(&wazeroir.OperationGt{Type: targetType})
+						}
+						require.NoError(t, err)
+
+						// At this point, all the registesr must be consumed by cmp
+						// so they should be marked as unused.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						top := compiler.locationStack.peek()
+						require.True(t, top.onConditionalRegister() && !top.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						require.NoError(t, err)
+						require.True(t, !top.onConditionalRegister() && top.onRegister())
+						compiler.releaseRegisterToStack(top)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						var exp bool
+						if tc.signed {
+							exp = tc.x1 > tc.x2
+						} else {
+							exp = uint32(tc.x1) > uint32(tc.x2)
+						}
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
+				}
+			})
+			t.Run("int64", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 int64
+					signed bool
+				}{
+					{x1: 100, x2: -1, signed: false}, // interpret x2 as max uint64
+					{x1: -1, x2: -1, signed: false},  // interpret x1 and x2 as max uint32
+					{x1: -1, x2: 100, signed: false}, // interpret x1 as max uint64
+					{x1: 100, x2: 200, signed: true},
+					{x1: 200, x2: 100, signed: true},
+					{x1: 1 << 56, x2: 100, signed: true},
+					{x1: 1 << 56, x2: 1 << 61, signed: true},
+					{x1: math.MaxInt64, x2: 100, signed: true},
+					{x1: math.MinInt64, x2: 100, signed: true},
+				} {
+
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+
+						// Push the target values.
+						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions.
+						var targetType wazeroir.SignedType
+						if tc.signed {
+							targetType = wazeroir.SignedTypeInt64
+						} else {
+							targetType = wazeroir.SignedTypeUint64
+						}
+						if instruction.inclusive {
+							err = compiler.compileGe(&wazeroir.OperationGe{Type: targetType})
+						} else {
+							err = compiler.compileGt(&wazeroir.OperationGt{Type: targetType})
+						}
+						require.NoError(t, err)
+
+						// At this point, all the registesr must be consumed by cmp
+						// so they should be marked as unused.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						top := compiler.locationStack.peek()
+						require.True(t, top.onConditionalRegister() && !top.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						require.NoError(t, err)
+						require.True(t, !top.onConditionalRegister() && top.onRegister())
+						compiler.releaseRegisterToStack(top)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						var exp bool
+						if tc.signed {
+							exp = tc.x1 > tc.x2
+						} else {
+							exp = uint64(tc.x1) > uint64(tc.x2)
+						}
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
+				}
+			})
+			t.Run("float32", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 float32
+				}{
+					{x1: 100, x2: -1.1},
+					{x1: -1, x2: 100},
+					{x1: 100, x2: 200},
+					{x1: 100.01234124, x2: 100.01234124},
+					{x1: 100.01234124, x2: -100.01234124},
+					{x1: 200.12315, x2: 100},
+					{x1: float32(math.Inf(1)), x2: 100},
+					{x1: float32(math.Inf(-1)), x2: 100},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						// Prepare operands.
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions,
+						if instruction.inclusive {
+							err = compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeFloat32})
+						} else {
+							err = compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeFloat32})
+						}
+						require.NoError(t, err)
+
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+						// Plus the result must be pushed.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						flag := compiler.locationStack.peek()
+						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						require.NoError(t, err)
+						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
+						compiler.releaseRegisterToStack(flag)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						exp := tc.x1 > tc.x2
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
+				}
+			})
+			t.Run("float64", func(t *testing.T) {
+				for i, tc := range []struct {
+					x1, x2 float64
+				}{
+					{x1: 100, x2: -1.1},
+					{x1: -1, x2: 100},
+					{x1: 100, x2: 200},
+					{x1: 100.01234124, x2: 100.01234124},
+					{x1: 100.01234124, x2: -100.01234124},
+					{x1: 200.12315, x2: 100},
+					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
+					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
+					{x1: math.Inf(1), x2: 100},
+					{x1: math.Inf(-1), x2: 100},
+				} {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						// Prepare operands.
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+						require.NoError(t, err)
+						x1 := compiler.locationStack.peek()
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
+						require.NoError(t, err)
+						x2 := compiler.locationStack.peek()
+
+						// Emit the cmp instructions,
+						if instruction.inclusive {
+							err = compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeFloat64})
+						} else {
+							err = compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeFloat64})
+						}
+						require.NoError(t, err)
+
+						// At this point, these registers must be consumed.
+						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
+						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+						// Plus the result must be pushed.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						// To verify the behavior, we push the flag value
+						// to the stack.
+						flag := compiler.locationStack.peek()
+						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
+						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						require.NoError(t, err)
+						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
+						compiler.releaseRegisterToStack(flag)
+						compiler.returnFunction()
+
+						// Generate the code under test.
+						// and the verification code (moving the result to the stack so we can assert against it)
+						code, _, err := compiler.generate()
+						require.NoError(t, err)
+						// Run code.
+						eng := newEngine()
+						mem := newMemoryInst()
+						jitcall(
+							uintptr(unsafe.Pointer(&code[0])),
+							uintptr(unsafe.Pointer(eng)),
+							uintptr(unsafe.Pointer(&mem.Buffer[0])),
+						)
+
+						// Check the stack.
+						require.Equal(t, uint64(1), eng.stackPointer)
+						exp := tc.x1 > tc.x2
+						if instruction.inclusive {
+							exp = exp || tc.x1 == tc.x2
+						}
+						require.Equal(t, exp, eng.stack[eng.stackPointer-1] == 1)
+					})
+				}
+			})
+		})
+	}
 }
 
 func TestAmd64Compiler_compileSub(t *testing.T) {
