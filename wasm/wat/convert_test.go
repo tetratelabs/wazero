@@ -1,7 +1,6 @@
 package wat
 
 import (
-	"fmt"
 	"os"
 	"testing"
 	"unicode/utf8"
@@ -145,15 +144,21 @@ func TestTextToBinary_Errors(t *testing.T) {
 }
 
 func BenchmarkTextToBinaryExample(b *testing.B) {
-	simpleExample := []byte(`(module
+	simpleExampleText := []byte(`(module
 	(import "" "hello" (func $hello))
 	(start $hello)
 )`)
+	var simpleExampleBinary []byte
+	if bin, err := os.ReadFile("testdata/simple.wasm"); err != nil {
+		b.Fatal(err)
+	} else {
+		simpleExampleBinary = bin
+	}
 
 	b.Run("vs utf8.Valid", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if !utf8.Valid(simpleExample) {
+			if !utf8.Valid(simpleExampleText) {
 				panic("unexpected")
 			}
 		}
@@ -163,7 +168,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wasmtime.Wat2Wasm", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := wasmtime.Wat2Wasm(string(simpleExample))
+			_, err := wasmtime.Wat2Wasm(string(simpleExampleText))
 			if err != nil {
 				panic(err)
 			}
@@ -173,41 +178,33 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	// Note: This will be more similar once TextToBinary writes CustomSection["name"]
 	b.Run("vs wasm.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
-		bin, err := os.ReadFile("testdata/simple.wasm")
-		if err != nil {
-			panic(err)
-		}
 		for i := 0; i < b.N; i++ {
-			_, err = wasm.DecodeModule(bin)
-			if err != nil {
-				panic(err)
+			if _, err := wasm.DecodeModule(simpleExampleBinary); err != nil {
+				b.Fatal(err)
 			}
 		}
 	})
 	b.Run("vs wat.lex", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			line, col, err := lex(noopTokenParser, simpleExample)
-			if err != nil {
-				panic(fmt.Errorf("%d:%d: %w", line, col, err))
+			if line, col, err := lex(noopTokenParser, simpleExampleText); err != nil {
+				b.Fatalf("%d:%d: %s", line, col, err)
 			}
 		}
 	})
 	b.Run("vs wat.parseModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := parseModule(simpleExample)
-			if err != nil {
-				panic(err)
+			if _, err := parseModule(simpleExampleText); err != nil {
+				b.Fatal(err)
 			}
 		}
 	})
 	b.Run("TextToBinary", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := TextToBinary(simpleExample)
-			if err != nil {
-				panic(err)
+			if _, err := TextToBinary(simpleExampleText); err != nil {
+				b.Fatal(err)
 			}
 		}
 	})
