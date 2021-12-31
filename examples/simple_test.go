@@ -19,7 +19,7 @@ import (
 //		(start $hello)
 //	)
 func Test_Simple(t *testing.T) {
-	buf, err := os.ReadFile("wasm/simple.wasm")
+	buf, err := os.ReadFile("testdata/simple.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)

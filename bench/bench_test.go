@@ -22,7 +22,7 @@ func BenchmarkEngines(b *testing.B) {
 }
 
 func setUpStore(store *wasm.Store) {
-	buf, err := os.ReadFile("case/case.wasm")
+	buf, err := os.ReadFile("testdata/case.wasm")
 	if err != nil {
 		panic(err)
 	}

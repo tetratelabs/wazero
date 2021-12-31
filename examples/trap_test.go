@@ -12,7 +12,7 @@ import (
 )
 
 func Test_trap(t *testing.T) {
-	buf, err := os.ReadFile("wasm/trap.wasm")
+	buf, err := os.ReadFile("testdata/trap.wasm")
 	require.NoError(t, err)
 
 	mod, err := wasm.DecodeModule((buf))
