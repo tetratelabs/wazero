@@ -28,6 +28,8 @@ type compiler interface {
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
 	compileEqz(o *wazeroir.OperationEqz) error
+	compileLt(o *wazeroir.OperationLt) error
+	compileGt(o *wazeroir.OperationGt) error
 	compileLe(o *wazeroir.OperationLe) error
 	compileGe(o *wazeroir.OperationGe) error
 	compileLoad(o *wazeroir.OperationLoad) error
