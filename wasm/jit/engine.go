@@ -531,7 +531,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationLe:
 			err = compiler.compileLe(o)
 		case *wazeroir.OperationGe:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileGe(o)
 		case *wazeroir.OperationAdd:
 			err = compiler.compileAdd(o)
 		case *wazeroir.OperationSub:
@@ -604,7 +604,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		}
 	}
 
-	code, maxStackPointer, err := compiler.compile()
+	code, maxStackPointer, err := compiler.generate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}

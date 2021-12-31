@@ -8,9 +8,9 @@ type compiler interface {
 	// emitPreamble is called before compiling any wazeroir operation.
 	// This is used, for example, to initilize the reserved registers, etc.
 	emitPreamble()
-	// Finilizes the compilation, and returns the byte slice of native codes.
+	// Generates the byte slice of native codes.
 	// maxStackPointer is the max stack pointer that the target function would reach.
-	compile() (code []byte, maxStackPointer uint64, err error)
+	generate() (code []byte, maxStackPointer uint64, err error)
 	// Followings are resinposible for compiling each wazeroir operation.
 	compileUnreachable()
 	compileSwap(o *wazeroir.OperationSwap) error
@@ -26,6 +26,7 @@ type compiler interface {
 	compileAdd(o *wazeroir.OperationAdd) error
 	compileSub(o *wazeroir.OperationSub) error
 	compileLe(o *wazeroir.OperationLe) error
+	compileGe(o *wazeroir.OperationGe) error
 	compileLoad(o *wazeroir.OperationLoad) error
 	compileLoad8(o *wazeroir.OperationLoad8) error
 	compileLoad16(o *wazeroir.OperationLoad16) error

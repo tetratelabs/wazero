@@ -3,6 +3,10 @@
 
 package jit
 
+// This file implements the compiler for amd64/x86_64 target.
+// Please refer to https://www.felixcloutier.com/x86/index.html
+// if unfamiliar with amd64 instructions used here.
+
 import (
 	"encoding/binary"
 	"fmt"
@@ -65,7 +69,7 @@ func (c *amd64Compiler) emitPreamble() {
 	c.initializeReservedRegisters()
 }
 
-func (c *amd64Compiler) compile() ([]byte, uint64, error) {
+func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	code, err := mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
 		return nil, 0, err
@@ -829,13 +833,73 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 
 	// TODO: emit NaN value handings for floats.
 
-	// We no longer need x1,x2 register after cmp operation here,
-	// so we release it.
+	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
 
-	// Finally we have the result on the conditional register,
-	// so record it.
+	// Finally, record that the result is on the conditional register.
+	loc := c.locationStack.pushValueOnConditionalRegister(resultConditionState)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// Emit the compare instruction.
+	prog := c.newProg()
+	prog.From.Type = obj.TYPE_REG
+	prog.To.Type = obj.TYPE_REG
+	var resultConditionState conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeInt32:
+		resultConditionState = conditionalRegisterStateGE
+		prog.As = x86.ACMPL
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeUint32:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACMPL
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeInt64:
+		resultConditionState = conditionalRegisterStateGE
+		prog.As = x86.ACMPQ
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeUint64:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACMPQ
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
+	case wazeroir.SignedTypeFloat32:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACOMISS
+		prog.From.Reg = x2.register
+		prog.To.Reg = x1.register
+	case wazeroir.SignedTypeFloat64:
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.ACOMISD
+		prog.From.Reg = x2.register
+		prog.To.Reg = x1.register
+	}
+	c.addInstruction(prog)
+
+	// TODO: emit NaN value handings for floats.
+
+	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
+	c.locationStack.releaseRegister(x1)
+	c.locationStack.releaseRegister(x2)
+
+	// Finally, record that the result is on the conditional register.
 	loc := c.locationStack.pushValueOnConditionalRegister(resultConditionState)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
