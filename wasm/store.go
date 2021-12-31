@@ -219,19 +219,19 @@ func (s *Store) resolveImport(target *ModuleInstance, is *ImportSegment) error {
 		return fmt.Errorf("type mismatch on export: got %#x but want %#x", e.Kind, is.Desc.Kind)
 	}
 	switch is.Desc.Kind {
-	case 0x00: // function
-		if err := s.applyFunctionImport(target, is.Desc.TypeIndexPtr, e); err != nil {
+	case ImportKindFunction:
+		if err := s.applyFunctionImport(target, is.Desc.FuncTypeIndex, e); err != nil {
 			return fmt.Errorf("applyFunctionImport: %w", err)
 		}
-	case 0x01: // table
+	case ImportKindTable:
 		if err := s.applyTableImport(target, is.Desc.TableTypePtr, e); err != nil {
 			return fmt.Errorf("applyTableImport: %w", err)
 		}
-	case 0x02: // mem
+	case ImportKindMemory:
 		if err := s.applyMemoryImport(target, is.Desc.MemTypePtr, e); err != nil {
 			return fmt.Errorf("applyMemoryImport: %w", err)
 		}
-	case 0x03: // global
+	case ImportKindGlobal:
 		if err := s.applyGlobalImport(target, is.Desc.GlobalTypePtr, e); err != nil {
 			return fmt.Errorf("applyGlobalImport: %w", err)
 		}
@@ -242,12 +242,8 @@ func (s *Store) resolveImport(target *ModuleInstance, is *ImportSegment) error {
 	return nil
 }
 
-func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndexPtr *uint32, externModuleExportIsntance *ExportInstance) error {
-	if typeIndexPtr == nil {
-		return fmt.Errorf("type index is invalid")
-	}
+func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex uint32, externModuleExportIsntance *ExportInstance) error {
 	f := externModuleExportIsntance.Function
-	typeIndex := *typeIndexPtr
 	if int(typeIndex) >= len(target.Types) {
 		return fmt.Errorf("unknown type for function import")
 	}
@@ -420,7 +416,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	for _, imp := range module.ImportSection {
 		switch imp.Desc.Kind {
 		case ImportKindFunction:
-			functionDeclarations = append(functionDeclarations, *imp.Desc.TypeIndexPtr)
+			functionDeclarations = append(functionDeclarations, imp.Desc.FuncTypeIndex)
 		case ImportKindGlobal:
 			globalDecalarations = append(globalDecalarations, imp.Desc.GlobalTypePtr)
 		case ImportKindMemory:
