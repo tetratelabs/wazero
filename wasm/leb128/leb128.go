@@ -17,6 +17,30 @@ var (
 	errOverflow64 = errors.New("overflows a 64-bit integer")
 )
 
+// EncodeUint32 encodes the value into a buffer in LEB128 format
+//
+// See https://en.wikipedia.org/wiki/LEB128#Encode_unsigned_integer
+func EncodeUint32(value uint32) (buf []byte) {
+	// This is effectively a do/while loop where we take 7 bits of the value and encode them until it is zero.
+	for {
+		// Take 7 remaining low-order bits from the value into b.
+		b := uint8(value & 0x7f)
+		value = value >> 7
+
+		// If there are remaining bits, the value won't be zero: Set the high-
+		// order bit to tell the reader there are more bytes in this uint32.
+		if value != 0 {
+			b |= 0x80
+		}
+
+		// Append b into the buffer
+		buf = append(buf, b)
+		if b&0x80 == 0 {
+			return buf
+		}
+	}
+}
+
 func DecodeUint32(r io.Reader) (ret uint32, num uint64, err error) {
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	// with the modification on the overflow handling tailored for 32-bits.
