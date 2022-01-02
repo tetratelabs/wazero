@@ -843,15 +843,17 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 		}
 	}
 
-	// We have to save the value on RDX as the overflowed value is stored there after operation.
-	c.ensureRegisterUnused(reservedRegister)
-
 	// We have to make sure that at this point the operands must be on registers.
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return err
 	}
 	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
 		return err
+	}
+
+	// We have to save the existing value on RDX.
+	if x1.register != reservedRegister && x2.register != reservedRegister {
+		c.ensureRegisterUnused(reservedRegister)
 	}
 
 	// Now ready to emit the mul instruction.

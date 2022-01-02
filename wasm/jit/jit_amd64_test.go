@@ -2410,7 +2410,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 	})
 	t.Run("int64", func(t *testing.T) {
 		for _, tc := range []struct {
-			name         string
+			name string
+			// Interpret -1 as stack.
 			x1Reg, x2Reg int16
 		}{
 			{
