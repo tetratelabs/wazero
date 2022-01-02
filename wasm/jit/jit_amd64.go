@@ -590,7 +590,7 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	return nil
 }
 
-// handleSelect uses top three values on the stack:
+// compileSelect uses top three values on the stack:
 // Assume we have stack as [..., x1, x2, c], if the value of c
 // equals zero, then the stack results in [..., x1]
 // otherwise, [..., x2].
@@ -804,13 +804,13 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 	x2 := c.locationStack.pop()
 	x1 := c.locationStack.pop()
 
-	var onAXRegisterValue *valueLocation
+	var valueOnAX *valueLocation
 	if x1.register == resultRegister {
-		onAXRegisterValue = x1
+		valueOnAX = x1
 	} else if x2.register == resultRegister {
-		onAXRegisterValue = x2
+		valueOnAX = x2
 	} else {
-		onAXRegisterValue = x2
+		valueOnAX = x2
 		// This case we  move x2 to AX register.
 		c.ensureRegisterUnused(resultRegister)
 		if x2.onConditionalRegister() {
@@ -818,6 +818,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 		} else if x2.onStack() {
 			x2.setRegister(resultRegister)
 			c.moveStackToRegister(x2)
+			c.locationStack.markRegisterUsed(resultRegister)
 		} else {
 			moveX2ToAX := c.newProg()
 			if is32Bit {
@@ -833,6 +834,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 			// We no longer uses the prev register of x2.
 			c.locationStack.releaseRegister(x2)
 			x2.setRegister(resultRegister)
+			c.locationStack.markRegisterUsed(resultRegister)
 		}
 	}
 
@@ -852,7 +854,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 	mul.As = mulInstruction
 	mul.To.Type = obj.TYPE_NONE
 	mul.From.Type = obj.TYPE_REG
-	if x1 == onAXRegisterValue {
+	if x1 == valueOnAX {
 		mul.From.Reg = x2.register
 		c.locationStack.markRegisterUnused(x2.register)
 	} else {
@@ -1810,7 +1812,7 @@ func (c *amd64Compiler) callFunctionFromRegisterIndex(reg int16) {
 
 func (c *amd64Compiler) releaseAllRegistersToStack() {
 	used := len(c.locationStack.usedRegisters)
-	for i := len(c.locationStack.stack) - 1; i >= 0 && used > 0; i-- {
+	for i := uint64(0); i < c.locationStack.sp && used > 0; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
 			c.releaseRegisterToStack(loc)
 			used--

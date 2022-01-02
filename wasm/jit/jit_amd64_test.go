@@ -2303,78 +2303,216 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 
 func TestAmd64Compiler_compileMul(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
-		const x1Value uint32 = 1 << 11
-		const x2Value uint32 = 51
-		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
-		require.NoError(t, err)
-		x1 := compiler.locationStack.peek()
-		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2Value})
-		require.NoError(t, err)
-		x2 := compiler.locationStack.peek()
+		for _, tc := range []struct {
+			name         string
+			x1Reg, x2Reg int16
+		}{
+			{
+				name:  "x1:rax,x2:random_reg",
+				x1Reg: x86.REG_AX,
+				x2Reg: x86.REG_R10,
+			},
+			{
+				name:  "x1:rax,x2:stack",
+				x1Reg: x86.REG_AX,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:random_reg,x2:rax",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:staack,x2:rax",
+				x1Reg: -1,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:random_reg,x2:random_reg",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:stack,x2:random_reg",
+				x1Reg: -1,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:random_reg,x2:stack",
+				x1Reg: x86.REG_R9,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:stack,x2:stack",
+				x1Reg: -1,
+				x2Reg: -1,
+			},
+		} {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				const x1Value uint32 = 1 << 11
+				const x2Value uint32 = 51
+				const dxValue uint64 = 111111
 
-		err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
-		require.NoError(t, err)
-		require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
-		require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+				eng := newEngine()
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
 
-		// To verify the behavior, we push the value
-		// to the stack.
-		compiler.releaseRegisterToStack(x1)
-		compiler.returnFunction()
+				// Put the value on DX register -- the value must be saved to memory in compileMul.
+				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
+				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
-		// Run code.
-		eng := newEngine()
-		mem := newMemoryInst()
-		jitcall(
-			uintptr(unsafe.Pointer(&code[0])),
-			uintptr(unsafe.Pointer(eng)),
-			uintptr(unsafe.Pointer(&mem.Buffer[0])),
-		)
-		// Check the stack.
-		require.Equal(t, uint64(1), eng.stackPointer)
-		require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
+				// Setup values.
+				if tc.x1Reg != -1 {
+					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x1Value)
+				}
+				if tc.x2Reg != -1 {
+					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x2Value)
+				}
+
+				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+				require.Equal(t, uint64(2), compiler.locationStack.sp)
+				require.Len(t, compiler.locationStack.usedRegisters, 1)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseAllRegistersToStack()
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					0,
+				)
+				fmt.Println(eng.stack[:3])
+
+				// Check the stack.
+				require.Equal(t, uint64(2), eng.stackPointer)
+				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
+				// The value on DX must be saved to stack.
+				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
+			})
+		}
 	})
 	t.Run("int64", func(t *testing.T) {
-		const x1Value uint64 = 1 << 35
-		const x2Value uint64 = 51
-		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
-		require.NoError(t, err)
-		x1 := compiler.locationStack.peek()
-		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2Value})
-		require.NoError(t, err)
-		x2 := compiler.locationStack.peek()
+		for _, tc := range []struct {
+			name         string
+			x1Reg, x2Reg int16
+		}{
+			{
+				name:  "x1:rax,x2:random_reg",
+				x1Reg: x86.REG_AX,
+				x2Reg: x86.REG_R10,
+			},
+			{
+				name:  "x1:rax,x2:stack",
+				x1Reg: x86.REG_AX,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:random_reg,x2:rax",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:stack,x2:rax",
+				x1Reg: -1,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:random_reg,x2:random_reg",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:stack,x2:random_reg",
+				x1Reg: -1,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:random_reg,x2:stack",
+				x1Reg: x86.REG_R9,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:stack,x2:stack",
+				x1Reg: -1,
+				x2Reg: -1,
+			},
+		} {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				const x1Value uint64 = 1 << 35
+				const x2Value uint64 = 51
+				const dxValue uint64 = 111111
 
-		err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
-		require.NoError(t, err)
-		require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
-		require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+				eng := newEngine()
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
 
-		// To verify the behavior, we push the value
-		// to the stack.
-		compiler.releaseRegisterToStack(x1)
-		compiler.returnFunction()
+				// Put the value on DX register. The value must be saved to memory in compileMul.
+				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
+				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
-		// Run code.
-		eng := newEngine()
-		mem := newMemoryInst()
-		jitcall(
-			uintptr(unsafe.Pointer(&code[0])),
-			uintptr(unsafe.Pointer(eng)),
-			uintptr(unsafe.Pointer(&mem.Buffer[0])),
-		)
-		// Check the stack.
-		require.Equal(t, uint64(1), eng.stackPointer)
-		require.Equal(t, x1Value*x2Value, eng.stack[eng.stackPointer-1])
+				// Setup values.
+				if tc.x1Reg != -1 {
+					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x1Value)
+				}
+				if tc.x2Reg != -1 {
+					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x2Value)
+				}
+
+				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
+				require.NoError(t, err)
+				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+				require.Equal(t, uint64(2), compiler.locationStack.sp)
+				require.Len(t, compiler.locationStack.usedRegisters, 1)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseAllRegistersToStack()
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					0,
+				)
+				fmt.Println(eng.stack[:3])
+
+				// Check the stack.
+				require.Equal(t, uint64(2), eng.stackPointer)
+				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
+				// The value on DX register must be saved to stack.
+				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
+			})
+		}
 	})
 	t.Run("float32", func(t *testing.T) {
 		for i, tc := range []struct {
