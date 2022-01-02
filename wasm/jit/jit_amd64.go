@@ -796,6 +796,11 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 }
 
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) error {
+	// See https://www.felixcloutier.com/x86/mul if unfamiliar with the convension for
+	// integer multiplication. In summary, The destination operand must be on RAX
+	// register and the overflow info is stored in RDX. So, we have to ensure that
+	// 1) Previously located value on RDX must be saved to memory stack.
+	// 2) One of the operands (x1 or x2) must be on RAX register.
 	const (
 		resultRegister   = x86.REG_AX
 		reservedRegister = x86.REG_DX
@@ -838,16 +843,16 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 		}
 	}
 
-	// We have to make sure that at this point the operands must be on registers.
-	if err := c.ensureOnGeneralPurposeRegisterWithExclusion(x2, reservedRegister); err != nil {
-		return err
-	}
-	if err := c.ensureOnGeneralPurposeRegisterWithExclusion(x1, reservedRegister); err != nil {
-		return err
-	}
-
-	// Also we have to save the value on RDX as the overflowed value is stored there after operation.
+	// We have to save the value on RDX as the overflowed value is stored there after operation.
 	c.ensureRegisterUnused(reservedRegister)
+
+	// We have to make sure that at this point the operands must be on registers.
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
 
 	// Now ready to emit the mul instruction.
 	mul := c.newProg()
@@ -1619,12 +1624,8 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 
 // TODO: maybe split this function as this is doing too much at once to say at once.
 func (c *amd64Compiler) moveStackToRegisterWithAllocation(tp generalPurposeRegisterType, loc *valueLocation) error {
-	return c.moveStackToRegisterWithAllocationAndExclusion(tp, loc, -1)
-}
-
-func (c *amd64Compiler) moveStackToRegisterWithAllocationAndExclusion(tp generalPurposeRegisterType, loc *valueLocation, exclude int16) error {
 	// Allocate the register.
-	reg, err := c.allocateRegisterWithExclusion(tp, exclude)
+	reg, err := c.allocateRegister(tp)
 	if err != nil {
 		return err
 	}
@@ -1653,7 +1654,7 @@ func (c *amd64Compiler) moveStackToRegister(loc *valueLocation) {
 // Move the valuie on a conditional register to a free general purpose register.
 func (c *amd64Compiler) moveConditionalToGeneralPurposeRegister(loc *valueLocation) error {
 	// Get the free register.
-	reg, ok := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt, -1)
+	reg, ok := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	if !ok {
 		// This in theory should never be reached as moveConditionalToGeneralPurposeRegister
 		// is called right after comparison operations, meaning that
@@ -1723,19 +1724,15 @@ func (c *amd64Compiler) moveConditionalRegister(loc *valueLocation, reg int16) {
 // Note that resulting registers are NOT marked as used so the call site should
 // mark it used if necessary.
 func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int16, err error) {
-	return c.allocateRegisterWithExclusion(t, -1)
-}
-
-func (c *amd64Compiler) allocateRegisterWithExclusion(t generalPurposeRegisterType, exclude int16) (reg int16, err error) {
 	var ok bool
 	// Try to get the unused register.
-	reg, ok = c.locationStack.takeFreeRegister(t, exclude)
+	reg, ok = c.locationStack.takeFreeRegister(t)
 	if ok {
 		return
 	}
 
 	// If not found, we have to steal the register.
-	stealTarget, ok := c.locationStack.takeStealTargetFromUsedRegister(t, exclude)
+	stealTarget, ok := c.locationStack.takeStealTargetFromUsedRegister(t)
 	if !ok {
 		err = fmt.Errorf("cannot steal register")
 		return
@@ -1828,7 +1825,7 @@ func (c *amd64Compiler) releaseAllRegistersToStack() {
 func (c *amd64Compiler) setContinuationOffsetAtNextInstructionAndReturn() {
 	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
 	// all the registers, so at this point we always have free registers.
-	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt, -1)
+	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	// Create the instruction for setting offset.
 	// We use tmp register to store the const, not directly movq to memory
 	// as it is not valid to move 64-bit const to memory directly.
@@ -1959,7 +1956,7 @@ func (c *amd64Compiler) initializeReservedRegisters() {
 
 	// Since initializeReservedRegisters is called at the beginning of function
 	// calls (or right after they return), we have free registers at this point.
-	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt, -1)
+	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
 	// Next we move the base pointer (engine.stackBasePointer) to
 	// a temporary register.
@@ -1997,12 +1994,8 @@ func (c *amd64Compiler) initializeReservedRegisters() {
 // ensureOnGeneralPurposeRegister ensures that the given value is located on a
 // general purpose register of an appropriate type.
 func (c *amd64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) error {
-	return c.ensureOnGeneralPurposeRegisterWithExclusion(loc, -1)
-}
-
-func (c *amd64Compiler) ensureOnGeneralPurposeRegisterWithExclusion(loc *valueLocation, exclude int16) error {
 	if loc.onStack() {
-		if err := c.moveStackToRegisterWithAllocationAndExclusion(loc.registerType(), loc, exclude); err != nil {
+		if err := c.moveStackToRegisterWithAllocation(loc.registerType(), loc); err != nil {
 			return err
 		}
 	} else if loc.onConditionalRegister() {
