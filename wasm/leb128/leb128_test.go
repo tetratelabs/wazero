@@ -9,6 +9,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEncodeUint32(t *testing.T) {
+	for _, c := range []struct {
+		input    uint32
+		expected []byte
+	}{
+		{input: 0, expected: []byte{0x00}},
+		{input: 1, expected: []byte{0x01}},
+		{input: 4, expected: []byte{0x04}},
+		{input: 16256, expected: []byte{0x80, 0x7f}},
+		{input: 624485, expected: []byte{0xe5, 0x8e, 0x26}},
+		{input: 165675008, expected: []byte{0x80, 0x80, 0x80, 0x4f}},
+		{input: 0xffffffff, expected: []byte{0xff, 0xff, 0xff, 0xff, 0xf}},
+	} {
+		require.Equal(t, c.expected, EncodeUint32(c.input))
+	}
+}
+
 func TestDecodeUint32(t *testing.T) {
 	for _, c := range []struct {
 		bytes  []byte

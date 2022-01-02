@@ -143,11 +143,12 @@ func TestTextToBinary_Errors(t *testing.T) {
 	}
 }
 
-func BenchmarkTextToBinaryExample(b *testing.B) {
-	simpleExampleText := []byte(`(module
+var simpleExample = []byte(`(module $simple
 	(import "" "hello" (func $hello))
 	(start $hello)
 )`)
+
+func BenchmarkTextToBinaryExample(b *testing.B) {
 	var simpleExampleBinary []byte
 	if bin, err := os.ReadFile("testdata/simple.wasm"); err != nil {
 		b.Fatal(err)
@@ -158,7 +159,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs utf8.Valid", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if !utf8.Valid(simpleExampleText) {
+			if !utf8.Valid(simpleExample) {
 				panic("unexpected")
 			}
 		}
@@ -168,7 +169,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wasmtime.Wat2Wasm", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := wasmtime.Wat2Wasm(string(simpleExampleText))
+			_, err := wasmtime.Wat2Wasm(string(simpleExample))
 			if err != nil {
 				panic(err)
 			}
@@ -187,7 +188,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wat.lex", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if line, col, err := lex(noopTokenParser, simpleExampleText); err != nil {
+			if line, col, err := lex(noopTokenParser, simpleExample); err != nil {
 				b.Fatalf("%d:%d: %s", line, col, err)
 			}
 		}
@@ -195,7 +196,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wat.parseModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := parseModule(simpleExampleText); err != nil {
+			if _, err := parseModule(simpleExample); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -203,7 +204,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("TextToBinary", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := TextToBinary(simpleExampleText); err != nil {
+			if _, err := TextToBinary(simpleExample); err != nil {
 				b.Fatal(err)
 			}
 		}
