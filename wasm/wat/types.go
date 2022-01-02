@@ -1,6 +1,10 @@
 package wat
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tetratelabs/wazero/wasm"
+)
 
 // module corresponds to the text format of a WebAssembly module, and is an intermediate representation prior to
 // wasm.Module. This is primarily needed to resolve symbolic indexes like "$main" to raw numeric ones.
@@ -16,17 +20,60 @@ type module struct {
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	name string
 
-	// importFuncs are imports describing functions "(import... (func...))" added in insertion order.
+	// types are the unique function signatures of this module added in insertion order. Ex. (type... (func...))
+	//
+	// Note: Currently, there is no type ambiguity in the index as WebAssembly 1.0 only defines function type.
+	// In the future, other types may be introduced to support features such as module linking.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#types%E2%91%A0%E2%91%A0
+	types []*typeFunc
+
+	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
 
-	// startFunction is the function to call during wasm.Store Instantiate. The value is a importFunc.name, such as
-	// "$main", or its equivalent raw numeric index, such as "2".
-	//
-	// Note: When in raw numeric form, this is relative to imports. See wasm.Module StartSection for more.
-	//
-	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
-	startFunction string
+	startFunction *startFunction
 }
+
+// startFunction is the function to call during wasm.Store Instantiate.
+//
+// Note: line and col used for lazy validation of index. These are attached to an error if later found to be invalid
+// (ex an unknown function or out-of-bound index).
+//
+// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
+type startFunction struct {
+	// index is a importFunc.name, such as "$main", or its equivalent numeric index in module.importFuncs, such as "2".
+	//
+	// See wasm.Module StartSection for more.
+	index string
+
+	// line is the line in the source where the index was defined.
+	line uint32
+
+	// col is the column on the line where the index was defined.
+	col uint32
+}
+
+// typeFunc corresponds to the text format of a WebAssembly type use.
+//
+// Note: nothing is required per specification. Ex `(type (func))` is valid!
+//
+// See https://www.w3.org/TR/wasm-core-1/#text-functype
+type typeFunc struct {
+	// params are the possibly empty sequence of value types accepted by a function with this signature.
+	//
+	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
+	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
+	params []wasm.ValueType
+
+	// results are the possibly empty sequence of value types returned by a function with this signature.
+	//
+	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
+	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
+	results []wasm.ValueType
+}
+
+// typeFuncEmpty represents a nullary function type. Ex. `(type (func))`
+var typeFuncEmpty = &typeFunc{}
 
 // importFunc corresponds to the text format of a WebAssembly function import.
 //
@@ -36,6 +83,9 @@ type module struct {
 type importFunc struct {
 	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
 	importIndex int
+
+	// typeIndex is the zero-based index in module.types representing this function signature.
+	typeIndex int
 
 	// module is the possibly empty module name to import. Ex. "" or "Math"
 	//
@@ -49,35 +99,37 @@ type importFunc struct {
 
 	// funcName starts with '$'. For example, "$main".
 	//
-	// This name is only used for debugging. At runtime, functions are called based on raw numeric index. The function
+	// funcName is only used for debugging. At runtime, functions are called based on raw numeric index. The function
 	// index space begins with imported functions, followed by any defined in this module.
 	// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
 	//
-	// Note: The name may also be stored in the wasm.Module CustomSection under the key "name" subsection 1.
+	// Note: funcName may be stored in the wasm.Module CustomSection under the key "name" subsection 1. For example,
+	// `wat2wasm --debug-names` will do this.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	funcName string
 
 	// TODO: typeuse https://www.w3.org/TR/wasm-core-1/#text-typeuse
+	// TODO: inlined type https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
 }
 
-// formatError allows control over the format of formatError.Error
-type formatError struct {
-	// line is the source line number determined by unescaped '\n' characters of the error or EOF
-	line int
+// FormatError allows control over the format of errors parsing the WebAssembly Text Format.
+type FormatError struct {
+	// Line is the source line number determined by unescaped '\n' characters of the error or EOF
+	Line uint32
 	// Col is the UTF-8 column number of the error or EOF
-	col int
+	Col uint32
 	// Context is where symbolically the error occurred. Ex "imports[1].func"
-	context string
+	Context string
 	cause   error
 }
 
-func (e *formatError) Error() string {
-	if e.context == "" { // error starting the file
-		return fmt.Sprintf("%d:%d: %v", e.line, e.col, e.cause)
+func (e *FormatError) Error() string {
+	if e.Context == "" { // error starting the file
+		return fmt.Sprintf("%d:%d: %v", e.Line, e.Col, e.cause)
 	}
-	return fmt.Sprintf("%d:%d: %v in %s", e.line, e.col, e.cause, e.context)
+	return fmt.Sprintf("%d:%d: %v in %s", e.Line, e.Col, e.cause, e.Context)
 }
 
-func (e *formatError) Unwrap() error {
+func (e *FormatError) Unwrap() error {
 	return e.cause
 }

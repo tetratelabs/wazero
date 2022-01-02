@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-	"unicode/utf8"
 
-	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -439,12 +437,11 @@ func TestLex(t *testing.T) {
 
 func TestLex_Errors(t *testing.T) {
 	tests := []struct {
-		name         string
-		parser       tokenParser
-		input        []byte
-		expectedLine int
-		expectedCol  int
-		expectedErr  string
+		name                      string
+		parser                    tokenParser
+		input                     []byte
+		expectedLine, expectedCol uint32
+		expectedErr               string
 	}{
 		{
 			name:         "close paren before open paren",
@@ -548,7 +545,7 @@ func TestLex_Errors(t *testing.T) {
 		{
 			name:  "parser error: lParen",
 			input: []byte(" (module)"),
-			parser: func(tok tokenType, tokenBytes []byte, _, _ int) error {
+			parser: func(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 				if tok != tokenLParen {
 					return nil
 				}
@@ -561,7 +558,7 @@ func TestLex_Errors(t *testing.T) {
 		{
 			name:  "parser error: keyword",
 			input: []byte(" (module)"),
-			parser: func(tok tokenType, tokenBytes []byte, _, _ int) error {
+			parser: func(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 				if tok != tokenKeyword {
 					return nil
 				}
@@ -574,7 +571,7 @@ func TestLex_Errors(t *testing.T) {
 		{
 			name:  "parser error: rParen",
 			input: []byte(" (module)"),
-			parser: func(tok tokenType, tokenBytes []byte, _, _ int) error {
+			parser: func(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 				if tok != tokenRParen {
 					return nil
 				}
@@ -603,7 +600,7 @@ func TestLex_Errors(t *testing.T) {
 
 func lexTokens(t *testing.T, input string) []*token {
 	var tokens []*token
-	line, col, err := lex(func(tok tokenType, tokenUTF8 []byte, line, col int) error {
+	line, col, err := lex(func(tok tokenType, tokenUTF8 []byte, line, col uint32) error {
 		tokens = append(tokens, &token{tok, line, col, string(tokenUTF8)})
 		return nil
 	}, []byte(input))
@@ -611,54 +608,13 @@ func lexTokens(t *testing.T, input string) []*token {
 	return tokens
 }
 
-var noopTokenParser tokenParser = func(_ tokenType, _ []byte, _, _ int) error {
+var noopTokenParser tokenParser = func(_ tokenType, _ []byte, _, _ uint32) error {
 	return nil
-}
-
-func BenchmarkLex(b *testing.B) {
-	benchmarks := []struct {
-		name string
-		data []byte
-	}{
-		{"example", []byte(exampleWat)},
-		{"whitespace chars", []byte("(                        \nmodule)\n")}, // 34 bytes
-		{"unicode line comment", []byte("( ;; брэд-ЛГТМ   \nmodule)\n")},     // 28 bytes
-		{"unicode block comment", []byte("( (; брэд-ЛГТМ ;)\nmodule)\n")},    // 28 bytes
-	}
-
-	for _, bm := range benchmarks {
-		b.Run(bm.name+" vs utf8.ValidString", func(b *testing.B) {
-			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
-				utf8.ValidString(string(bm.data))
-			}
-		})
-		// Not a fair comparison as we are only lexing and not writing back %.wasm
-		// If possible, we should find a way to isolate only the lexing C functions.
-		b.Run(bm.name+" vs wasmtime.Wat2Wasm", func(b *testing.B) {
-			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
-				_, err := wasmtime.Wat2Wasm(string(bm.data))
-				if err != nil {
-					panic(err)
-				}
-			}
-		})
-		b.Run(bm.name, func(b *testing.B) {
-			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
-				line, col, err := lex(noopTokenParser, bm.data)
-				if err != nil {
-					panic(fmt.Errorf("%d:%d: %w", line, col, err))
-				}
-			}
-		})
-	}
 }
 
 type token struct {
 	tokenType
-	line, col int
+	line, col uint32
 	token     string
 }
 
