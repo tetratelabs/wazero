@@ -2378,23 +2378,25 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 	})
 	t.Run("float32", func(t *testing.T) {
 		for i, tc := range []struct {
-			v1, v2 float32
+			x1, x2 float32
 		}{
-			{v1: 1.1, v2: 2.3},
-			{v1: 1.1, v2: -2.3},
-			{v1: float32(math.Inf(1)), v2: -2.1},
-			{v1: float32(math.Inf(1)), v2: 2.1},
-			{v1: float32(math.Inf(-1)), v2: -2.1},
-			{v1: float32(math.Inf(-1)), v2: 2.1},
+			{x1: 100, x2: -1.1},
+			{x1: -1, x2: 100},
+			{x1: 100, x2: 200},
+			{x1: 100.01234124, x2: 100.01234124},
+			{x1: 100.01234124, x2: -100.01234124},
+			{x1: 200.12315, x2: 100},
+			{x1: float32(math.Inf(1)), x2: 100},
+			{x1: float32(math.Inf(-1)), x2: 100},
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
+				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
 				require.NoError(t, err)
 				x2 := compiler.locationStack.peek()
 
@@ -2421,29 +2423,33 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1*tc.v2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+				require.Equal(t, tc.x1*tc.x2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
 			})
 		}
 	})
 	t.Run("float64", func(t *testing.T) {
 		for i, tc := range []struct {
-			v1, v2 float64
+			x1, x2 float64
 		}{
-			{v1: 1.1, v2: 2.3},
-			{v1: 1.1, v2: -2.3},
-			{v1: math.Inf(1), v2: -2.1},
-			{v1: math.Inf(1), v2: 2.1},
-			{v1: math.Inf(-1), v2: -2.1},
-			{v1: math.Inf(-1), v2: 2.1},
+			{x1: 100, x2: -1.1},
+			{x1: -1, x2: 100},
+			{x1: 100, x2: 200},
+			{x1: 100.01234124, x2: 100.01234124},
+			{x1: 100.01234124, x2: -100.01234124},
+			{x1: 200.12315, x2: 100},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
+			{x1: math.Inf(1), x2: 100},
+			{x1: math.Inf(-1), x2: 100},
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
+				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
-				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
 				require.NoError(t, err)
 				x2 := compiler.locationStack.peek()
 
@@ -2470,7 +2476,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1*tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.x1*tc.x2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
 			})
 		}
 	})

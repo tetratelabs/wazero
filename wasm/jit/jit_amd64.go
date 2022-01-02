@@ -1879,7 +1879,7 @@ func (c *amd64Compiler) setFunctionCallIndexFromConst(index int64) {
 	c.addInstruction(prog)
 }
 
-// evictRegisterToStack ensures that a given register is not used by
+// ensureRegisterUnused ensures that a given register is not used by
 // any value. If the register is currently used, release the value
 // to the stack.
 func (c *amd64Compiler) ensureRegisterUnused(reg int16) {
