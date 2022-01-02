@@ -30,7 +30,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ env.GITHUB_WORKFLOW }}-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
 
       - run: make lint
 
@@ -66,7 +66,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ matrix.os }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ env.GITHUB_WORKFLOW }}-${{ runner.os }}-go-${{ matrix.go-version }}-${{ matrix.os }}-${{ hashFiles('**/go.sum') }}
 
       - run: make test
 
@@ -86,6 +86,6 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          key: ${{ env.GITHUB_WORKFLOW }}-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
 
       - run: make bench
