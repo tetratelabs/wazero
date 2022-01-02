@@ -213,7 +213,7 @@ const (
 )
 
 // takeFreeRegister searches for unused registers. Any found are marked used and returned.
-func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {
+func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType, exclude int16) (reg int16, found bool) {
 	var targetRegs []int16
 	switch tp {
 	case generalPurposeRegisterTypeFloat:
@@ -222,7 +222,7 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 		targetRegs = unreservedGeneralPurposeIntRegisters
 	}
 	for _, candidate := range targetRegs {
-		if _, ok := s.usedRegisters[candidate]; ok {
+		if _, ok := s.usedRegisters[candidate]; ok || candidate == exclude {
 			continue
 		}
 		return candidate, true
@@ -232,13 +232,13 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
-func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {
+func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType, exclude int16) (*valueLocation, bool) {
 	for i := uint64(0); i < s.sp; i++ {
 		loc := s.stack[i]
 		if loc.onRegister() {
 			switch tp {
 			case generalPurposeRegisterTypeFloat:
-				if isFloatRegister(loc.register) {
+				if isFloatRegister(loc.register) && exclude != loc.register {
 					return loc, true
 				}
 			case generalPurposeRegisterTypeInt:
@@ -249,4 +249,16 @@ func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRe
 		}
 	}
 	return nil, false
+}
+
+// findValueForRegister finds the valueLocation which uses the given register.
+// If not found, return nil.
+func (s *valueLocationStack) findValueForRegister(reg int16) *valueLocation {
+	for i := uint64(0); i < s.sp; i++ {
+		loc := s.stack[i]
+		if loc.register == reg {
+			return loc
+		}
+	}
+	return nil
 }
