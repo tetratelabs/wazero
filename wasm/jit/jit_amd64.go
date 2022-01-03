@@ -1667,7 +1667,6 @@ func (c *amd64Compiler) moveConditionalToFreeGeneralPurposeRegister(loc *valueLo
 	return nil
 }
 
-// Move the valuie on a conditional register to the given general purpose register.
 func (c *amd64Compiler) moveConditionalRegister(loc *valueLocation, reg int16) {
 	// Set the flag bit to the destination.
 	prog := c.newProg()
