@@ -7,7 +7,7 @@ package jit
 // Please refer to https://www.felixcloutier.com/x86/index.html
 // if unfamiliar with amd64 instructions used here.
 // Note that x86 pkg used here prefixes all the instructions with "A"
-// e.g. MOVQ will be given as x86.AMOVQ
+// e.g. MOVQ will be given as x86.AMOVQ.
 
 import (
 	"encoding/binary"
@@ -783,6 +783,8 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	return nil
 }
 
+// compileMul adds instructions to multiply two operands which may be on the stack or registers.
+// After execution, the result of multiplication pushed onto the stack.
 func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
