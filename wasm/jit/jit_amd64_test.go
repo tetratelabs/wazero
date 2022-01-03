@@ -2510,7 +2510,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// Check the stack.
 				require.Equal(t, uint64(2), eng.stackPointer)
 				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
-				// The value on DX register must be saved to stack.
+				// Verify the previous DX register value was saved to the stack.
 				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
 			})
 		}
