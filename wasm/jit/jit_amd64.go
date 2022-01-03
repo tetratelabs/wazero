@@ -784,7 +784,7 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
-		err = c.compileMulForInts(true, x86.AMULQ)
+		err = c.compileMulForInts(true, x86.AMULL)
 	case wazeroir.UnsignedTypeI64:
 		err = c.compileMulForInts(false, x86.AMULQ)
 	case wazeroir.UnsignedTypeF32:
