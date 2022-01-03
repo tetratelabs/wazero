@@ -1653,7 +1653,6 @@ func (c *amd64Compiler) moveStackToRegister(loc *valueLocation) {
 	c.addInstruction(prog)
 }
 
-// Move the valuie on a conditional register to a free general purpose register.
 func (c *amd64Compiler) moveConditionalToFreeGeneralPurposeRegister(loc *valueLocation) error {
 	// Get the free register.
 	reg, ok := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
