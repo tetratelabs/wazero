@@ -6,6 +6,8 @@ package jit
 // This file implements the compiler for amd64/x86_64 target.
 // Please refer to https://www.felixcloutier.com/x86/index.html
 // if unfamiliar with amd64 instructions used here.
+// Note that x86 pkg used here prefixes all the instructions with "A"
+// e.g. MOVQ will be given as x86.AMOVQ.
 
 import (
 	"encoding/binary"
@@ -133,7 +135,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	// If x1 is on the conditional register, we must move it to a gp
 	// register before swap.
 	if x1.onConditionalRegister() {
-		if err := c.moveConditionalToGeneralPurposeRegister(x1); err != nil {
+		if err := c.moveConditionalToFreeGeneralPurposeRegister(x1); err != nil {
 			return err
 		}
 	}
@@ -572,7 +574,7 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 			if topIsConditional {
 				// If the top is conditional, and it's not target of drop,
 				// we must assign it to the register before we emit any instructions here.
-				if err := c.moveConditionalToGeneralPurposeRegister(top); err != nil {
+				if err := c.moveConditionalToFreeGeneralPurposeRegister(top); err != nil {
 					return err
 				}
 				topIsConditional = false
@@ -590,7 +592,7 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	return nil
 }
 
-// handleSelect uses top three values on the stack:
+// compileSelect uses top three values on the stack:
 // Assume we have stack as [..., x1, x2, c], if the value of c
 // equals zero, then the stack results in [..., x1]
 // otherwise, [..., x2].
@@ -766,7 +768,7 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 		return err
 	}
 
-	// x1 += x2.
+	// x1 -= x2.
 	prog := c.newProg()
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = x2.register
@@ -776,6 +778,129 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	c.addInstruction(prog)
 
 	// We no longer need x2 register after ADD operation here,
+	// so we release it.
+	c.locationStack.releaseRegister(x2)
+	return nil
+}
+
+// compileMul adds instructions to multiply two operands which may be on the stack or registers.
+// After execution, the result of multiplication pushed onto the stack.
+func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		err = c.compileMulForInts(true, x86.AMULL)
+	case wazeroir.UnsignedTypeI64:
+		err = c.compileMulForInts(false, x86.AMULQ)
+	case wazeroir.UnsignedTypeF32:
+		err = c.compileMulForFloats(x86.AMULSS)
+	case wazeroir.UnsignedTypeF64:
+		err = c.compileMulForFloats(x86.AMULSD)
+	}
+	return
+}
+
+func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) error {
+	// See https://www.felixcloutier.com/x86/mul if unfamiliar with the convention for
+	// integer multiplication. In summary, the destination operand must be on the AX
+	// register and the overflow info is stored in RDX. So, we have to ensure that
+	// 1) Previously located value on RDX must be saved to memory stack.
+	// 2) One of the operands (x1 or x2) must be on RAX (the AX register).
+	const (
+		resultRegister   = x86.REG_AX
+		reservedRegister = x86.REG_DX
+	)
+
+	x2 := c.locationStack.pop()
+	x1 := c.locationStack.pop()
+
+	var valueOnAX *valueLocation
+	if x1.register == resultRegister {
+		valueOnAX = x1
+	} else if x2.register == resultRegister {
+		valueOnAX = x2
+	} else {
+		valueOnAX = x2
+		// This case we  move x2 to AX register.
+		c.onValueReleaseRegisterToStack(resultRegister)
+		if x2.onConditionalRegister() {
+			c.moveConditionalToGeneralPurposeRegister(x2, resultRegister)
+		} else if x2.onStack() {
+			x2.setRegister(resultRegister)
+			c.moveStackToRegister(x2)
+			c.locationStack.markRegisterUsed(resultRegister)
+		} else {
+			moveX2ToAX := c.newProg()
+			if is32Bit {
+				moveX2ToAX.As = x86.AMOVL
+			} else {
+				moveX2ToAX.As = x86.AMOVQ
+			}
+			moveX2ToAX.To.Reg = resultRegister
+			moveX2ToAX.To.Type = obj.TYPE_REG
+			moveX2ToAX.From.Reg = x2.register
+			moveX2ToAX.From.Type = obj.TYPE_REG
+			c.addInstruction(moveX2ToAX)
+			// We no longer uses the prev register of x2.
+			c.locationStack.releaseRegister(x2)
+			x2.setRegister(resultRegister)
+			c.locationStack.markRegisterUsed(resultRegister)
+		}
+	}
+
+	// We have to make sure that at this point the operands must be on registers.
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// We have to save the existing value on RDX.
+	if x1.register != reservedRegister && x2.register != reservedRegister {
+		c.onValueReleaseRegisterToStack(reservedRegister)
+	}
+
+	// Now ready to emit the mul instruction.
+	mul := c.newProg()
+	mul.As = mulInstruction
+	mul.To.Type = obj.TYPE_NONE
+	mul.From.Type = obj.TYPE_REG
+	if x1 == valueOnAX {
+		mul.From.Reg = x2.register
+		c.locationStack.markRegisterUnused(x2.register)
+	} else {
+		mul.From.Reg = x1.register
+		c.locationStack.markRegisterUnused(x1.register)
+	}
+	c.addInstruction(mul)
+
+	// Now we have the result in the AX register,
+	// so we record it.
+	c.locationStack.pushValueOnRegister(resultRegister)
+	return nil
+}
+
+func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// x1 *= x2.
+	prog := c.newProg()
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = x2.register
+	prog.To.Type = obj.TYPE_REG
+	prog.To.Reg = x1.register
+	prog.As = instruction
+	c.addInstruction(prog)
+
+	// We no longer need x2 register after MUL operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
 	return nil
@@ -1532,7 +1657,7 @@ func (c *amd64Compiler) moveStackToRegister(loc *valueLocation) {
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) moveConditionalToGeneralPurposeRegister(loc *valueLocation) error {
+func (c *amd64Compiler) moveConditionalToFreeGeneralPurposeRegister(loc *valueLocation) error {
 	// Get the free register.
 	reg, ok := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	if !ok {
@@ -1542,10 +1667,16 @@ func (c *amd64Compiler) moveConditionalToGeneralPurposeRegister(loc *valueLocati
 		return fmt.Errorf("conditional register mov requires a free register")
 	}
 
+	c.moveConditionalToGeneralPurposeRegister(loc, reg)
+	return nil
+}
+
+func (c *amd64Compiler) moveConditionalToGeneralPurposeRegister(loc *valueLocation, reg int16) {
 	// Set the flag bit to the destination.
 	prog := c.newProg()
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = reg
+
 	// See
 	// - https://c9x.me/x86/html/file_module_x86_id_288.html
 	// - https://github.com/golang/go/blob/master/src/cmd/internal/obj/x86/asm6.go#L1453-L1468
@@ -1590,7 +1721,6 @@ func (c *amd64Compiler) moveConditionalToGeneralPurposeRegister(loc *valueLocati
 	// Mark it uses the register.
 	loc.setRegister(reg)
 	c.locationStack.markRegisterUsed(reg)
-	return nil
 }
 
 // allocateRegister returns an unused register of the given type. The register will be taken
@@ -1683,7 +1813,7 @@ func (c *amd64Compiler) callFunctionFromRegisterIndex(reg int16) {
 
 func (c *amd64Compiler) releaseAllRegistersToStack() {
 	used := len(c.locationStack.usedRegisters)
-	for i := len(c.locationStack.stack) - 1; i >= 0 && used > 0; i-- {
+	for i := uint64(0); i < c.locationStack.sp && used > 0; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
 			c.releaseRegisterToStack(loc)
 			used--
@@ -1750,6 +1880,15 @@ func (c *amd64Compiler) setFunctionCallIndexFromConst(index int64) {
 	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineFunctionCallIndexOffset
 	c.addInstruction(prog)
+}
+
+func (c *amd64Compiler) onValueReleaseRegisterToStack(reg int16) {
+	prevValue := c.locationStack.findValueForRegister(reg)
+	if prevValue == nil {
+		// This case the target register is not used by any value.
+		return
+	}
+	c.releaseRegisterToStack(prevValue)
 }
 
 func (c *amd64Compiler) releaseRegisterToStack(loc *valueLocation) {
@@ -1861,7 +2000,7 @@ func (c *amd64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) error
 			return err
 		}
 	} else if loc.onConditionalRegister() {
-		if err := c.moveConditionalToGeneralPurposeRegister(loc); err != nil {
+		if err := c.moveConditionalToFreeGeneralPurposeRegister(loc); err != nil {
 			return err
 		}
 	}

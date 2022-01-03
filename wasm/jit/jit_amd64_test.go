@@ -1142,7 +1142,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1209,7 +1209,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1283,7 +1283,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1356,7 +1356,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1414,7 +1414,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				// to the stack.
 				top := compiler.locationStack.peek()
 				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(top)
+				err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 				require.NoError(t, err)
 				require.True(t, !top.onConditionalRegister() && top.onRegister())
 				compiler.releaseRegisterToStack(top)
@@ -1462,7 +1462,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				// to the stack.
 				top := compiler.locationStack.peek()
 				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(top)
+				err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 				require.NoError(t, err)
 				require.True(t, !top.onConditionalRegister() && top.onRegister())
 				compiler.releaseRegisterToStack(top)
@@ -1544,7 +1544,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1627,7 +1627,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1702,7 +1702,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1773,7 +1773,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1861,7 +1861,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1945,7 +1945,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -2020,7 +2020,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -2093,7 +2093,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -2296,6 +2296,327 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
 				require.Equal(t, tc.v1-tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+			})
+		}
+	})
+}
+
+func TestAmd64Compiler_compileMul(t *testing.T) {
+	t.Run("int32", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			// Interpret -1 as stack.
+			x1Reg, x2Reg int16
+		}{
+			{
+				name:  "x1:rax,x2:random_reg",
+				x1Reg: x86.REG_AX,
+				x2Reg: x86.REG_R10,
+			},
+			{
+				name:  "x1:rax,x2:stack",
+				x1Reg: x86.REG_AX,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:random_reg,x2:rax",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:staack,x2:rax",
+				x1Reg: -1,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:random_reg,x2:random_reg",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:stack,x2:random_reg",
+				x1Reg: -1,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:random_reg,x2:stack",
+				x1Reg: x86.REG_R9,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:stack,x2:stack",
+				x1Reg: -1,
+				x2Reg: -1,
+			},
+		} {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				const x1Value uint32 = 1 << 11
+				const x2Value uint32 = 51
+				const dxValue uint64 = 111111
+
+				eng := newEngine()
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+
+				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
+				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
+				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+
+				// Setup values.
+				if tc.x1Reg != -1 {
+					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x1Value)
+				}
+				if tc.x2Reg != -1 {
+					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x2Value)
+				}
+
+				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+				require.Equal(t, uint64(2), compiler.locationStack.sp)
+				require.Len(t, compiler.locationStack.usedRegisters, 1)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseAllRegistersToStack()
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					0,
+				)
+				fmt.Println(eng.stack[:3])
+
+				// Check the stack.
+				require.Equal(t, uint64(2), eng.stackPointer)
+				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
+				// Verify the previous DX register value was saved to the stack.
+				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
+			})
+		}
+	})
+	t.Run("int64", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			// Interpret -1 as stack.
+			x1Reg, x2Reg int16
+		}{
+			{
+				name:  "x1:rax,x2:random_reg",
+				x1Reg: x86.REG_AX,
+				x2Reg: x86.REG_R10,
+			},
+			{
+				name:  "x1:rax,x2:stack",
+				x1Reg: x86.REG_AX,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:random_reg,x2:rax",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:stack,x2:rax",
+				x1Reg: -1,
+				x2Reg: x86.REG_AX,
+			},
+			{
+				name:  "x1:random_reg,x2:random_reg",
+				x1Reg: x86.REG_R10,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:stack,x2:random_reg",
+				x1Reg: -1,
+				x2Reg: x86.REG_R9,
+			},
+			{
+				name:  "x1:random_reg,x2:stack",
+				x1Reg: x86.REG_R9,
+				x2Reg: -1,
+			},
+			{
+				name:  "x1:stack,x2:stack",
+				x1Reg: -1,
+				x2Reg: -1,
+			},
+		} {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				const x1Value uint64 = 1 << 35
+				const x2Value uint64 = 51
+				const dxValue uint64 = 111111
+
+				eng := newEngine()
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+
+				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
+				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
+				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+
+				// Setup values.
+				if tc.x1Reg != -1 {
+					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x1Value)
+				}
+				if tc.x2Reg != -1 {
+					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
+					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+				} else {
+					loc := compiler.locationStack.pushValueOnStack()
+					eng.stack[loc.stackPointer] = uint64(x2Value)
+				}
+
+				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
+				require.NoError(t, err)
+				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+				require.Equal(t, uint64(2), compiler.locationStack.sp)
+				require.Len(t, compiler.locationStack.usedRegisters, 1)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseAllRegistersToStack()
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					0,
+				)
+				fmt.Println(eng.stack[:3])
+
+				// Check the stack.
+				require.Equal(t, uint64(2), eng.stackPointer)
+				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
+				// Verify the previous DX register value was saved to the stack.
+				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
+			})
+		}
+	})
+	t.Run("float32", func(t *testing.T) {
+		for i, tc := range []struct {
+			x1, x2 float32
+		}{
+			{x1: 100, x2: -1.1},
+			{x1: -1, x2: 100},
+			{x1: 100, x2: 200},
+			{x1: 100.01234124, x2: 100.01234124},
+			{x1: 100.01234124, x2: -100.01234124},
+			{x1: 200.12315, x2: 100},
+			{x1: float32(math.Inf(1)), x2: 100},
+			{x1: float32(math.Inf(-1)), x2: 100},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+				require.NoError(t, err)
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
+				require.NoError(t, err)
+				x2 := compiler.locationStack.peek()
+
+				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeF32})
+				require.NoError(t, err)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.x1*tc.x2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+			})
+		}
+	})
+	t.Run("float64", func(t *testing.T) {
+		for i, tc := range []struct {
+			x1, x2 float64
+		}{
+			{x1: 100, x2: -1.1},
+			{x1: -1, x2: 100},
+			{x1: 100, x2: 200},
+			{x1: 100.01234124, x2: 100.01234124},
+			{x1: 100.01234124, x2: -100.01234124},
+			{x1: 200.12315, x2: 100},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
+			{x1: math.Inf(1), x2: 100},
+			{x1: math.Inf(-1), x2: 100},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+				require.NoError(t, err)
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
+				require.NoError(t, err)
+				x2 := compiler.locationStack.peek()
+
+				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeF64})
+				require.NoError(t, err)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.x1*tc.x2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
 			})
 		}
 	})
