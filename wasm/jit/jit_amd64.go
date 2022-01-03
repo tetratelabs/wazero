@@ -797,7 +797,7 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) error {
 	// See https://www.felixcloutier.com/x86/mul if unfamiliar with the convention for
-	// integer multiplication. In summary, the destination operand must be on RAX
+	// integer multiplication. In summary, the destination operand must be on the AX
 	// register and the overflow info is stored in RDX. So, we have to ensure that
 	// 1) Previously located value on RDX must be saved to memory stack.
 	// 2) One of the operands (x1 or x2) must be on RAX register.
