@@ -1881,7 +1881,7 @@ func (c *amd64Compiler) setFunctionCallIndexFromConst(index int64) {
 // ensureRegisterUnused ensures that a given register is not used by
 // any value. If the register is currently used, release the value
 // to the stack.
-func (c *amd64Compiler) ensureRegisterUnused(reg int16) {
+func (c *amd64Compiler) onValueReleaseRegisterToStack(reg int16) {
 	prevValue := c.locationStack.findValueForRegister(reg)
 	if prevValue == nil {
 		// This case the target register is not used by any value.
