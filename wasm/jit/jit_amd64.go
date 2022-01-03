@@ -799,7 +799,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 	// See https://www.felixcloutier.com/x86/mul if unfamiliar with the convention for
 	// integer multiplication. In summary, the destination operand must be on the AX
 	// register and the overflow info is stored in REG_DX. So, we have to ensure that
-	// 1) Previously located value on RDX must be saved to memory stack.
+	// 1) Previously located value on REG_DX must be saved to memory stack.
 	// 2) One of the operands (x1 or x2) must be on RAX register.
 	const (
 		resultRegister   = x86.REG_AX
