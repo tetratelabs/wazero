@@ -1667,7 +1667,7 @@ func (c *amd64Compiler) moveConditionalToFreeGeneralPurposeRegister(loc *valueLo
 	return nil
 }
 
-func (c *amd64Compiler) moveConditionalRegister(loc *valueLocation, reg int16) {
+func (c *amd64Compiler) moveConditionalToGeneralPurposeRegister(loc *valueLocation, reg int16) {
 	// Set the flag bit to the destination.
 	prog := c.newProg()
 	prog.To.Type = obj.TYPE_REG
