@@ -1142,7 +1142,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1209,7 +1209,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1283,7 +1283,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1356,7 +1356,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1414,7 +1414,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				// to the stack.
 				top := compiler.locationStack.peek()
 				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(top)
+				err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 				require.NoError(t, err)
 				require.True(t, !top.onConditionalRegister() && top.onRegister())
 				compiler.releaseRegisterToStack(top)
@@ -1462,7 +1462,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				// to the stack.
 				top := compiler.locationStack.peek()
 				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToGeneralPurposeRegister(top)
+				err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 				require.NoError(t, err)
 				require.True(t, !top.onConditionalRegister() && top.onRegister())
 				compiler.releaseRegisterToStack(top)
@@ -1544,7 +1544,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1627,7 +1627,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1702,7 +1702,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1773,7 +1773,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -1861,7 +1861,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -1945,7 +1945,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(top)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
@@ -2020,7 +2020,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -2093,7 +2093,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToGeneralPurposeRegister(flag)
+						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
@@ -2304,7 +2304,8 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 func TestAmd64Compiler_compileMul(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		for _, tc := range []struct {
-			name         string
+			name string
+			// Interpret -1 as stack.
 			x1Reg, x2Reg int16
 		}{
 			{
