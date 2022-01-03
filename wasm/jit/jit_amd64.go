@@ -851,7 +851,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 		return err
 	}
 
-	// We have to save the existing value on RDX.
+	// We have to save the existing value on REG_DX.
 	if x1.register != reservedRegister && x2.register != reservedRegister {
 		c.ensureRegisterUnused(reservedRegister)
 	}
