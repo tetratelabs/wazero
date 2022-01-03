@@ -886,7 +886,7 @@ func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
 		return err
 	}
 
-	x1 := c.locationStack.peek() // Note this is peek, pop!
+	x1 := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
 		return err
 	}
@@ -900,7 +900,7 @@ func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
 	prog.As = instruction
 	c.addInstruction(prog)
 
-	// We no longer need x2 register after ADD operation here,
+	// We no longer need x2 register after MUL operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
 	return nil
