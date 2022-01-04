@@ -2467,6 +2467,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 
+				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
