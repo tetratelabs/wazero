@@ -946,7 +946,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 		// "Replace Raw Assembly Code with Builtin Intrinsics" section in:
 		// https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code.
 
-		// First, we have to check if the targe is non-zero as bsrl is undefined
+		// First, we have to check if the targe is non-zero as BSR is undefined
 		// on zero. See https://www.felixcloutier.com/x86/bsr.
 		cmpZero := c.newProg()
 		cmpZero.As = x86.ACMPQ
@@ -963,15 +963,15 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 
 		// If the value is zero, we just push the const value.
 		ifZeroConst := c.newProg()
-		ifZeroConst.From.Type = obj.TYPE_REG
-		ifZeroConst.From.Reg = target.register
-		ifZeroConst.To.Type = obj.TYPE_CONST
+		ifZeroConst.To.Type = obj.TYPE_REG
+		ifZeroConst.To.Reg = target.register
+		ifZeroConst.From.Type = obj.TYPE_CONST
 		if o.Type == wazeroir.UnsignedInt32 {
 			ifZeroConst.As = x86.AMOVL
-			ifZeroConst.To.Offset = 32
+			ifZeroConst.From.Offset = 32
 		} else {
 			ifZeroConst.As = x86.AMOVQ
-			ifZeroConst.To.Offset = 64
+			ifZeroConst.From.Offset = 64
 		}
 		c.addInstruction(ifZeroConst)
 
@@ -1000,14 +1000,15 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 
 		// Now we XOR the value with the bit length.
 		xorWithBitLength := c.newProg()
-		xorWithBitLength.From.Type = obj.TYPE_REG
-		xorWithBitLength.From.Reg = target.register
 		xorWithBitLength.To.Type = obj.TYPE_REG
 		xorWithBitLength.To.Reg = target.register
+		xorWithBitLength.From.Type = obj.TYPE_CONST
 		if o.Type == wazeroir.UnsignedInt32 {
-			mostSignificantSetBit.As = x86.AXORL
+			xorWithBitLength.As = x86.AXORL
+			xorWithBitLength.From.Offset = 1<<5 - 1
 		} else {
-			mostSignificantSetBit.As = x86.AXORQ
+			xorWithBitLength.As = x86.AXORQ
+			xorWithBitLength.From.Offset = 1<<6 - 1
 		}
 		c.addInstruction(xorWithBitLength)
 
