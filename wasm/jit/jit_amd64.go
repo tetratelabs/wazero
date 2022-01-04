@@ -1109,7 +1109,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	return nil
 }
 
-// compilePopcnt emits instructions to count up the number of one bits in the
+// compilePopcnt emits instructions to count up the number of set bits in the
 // current top of the stack, and push the count result.
 // For example, stack of [..., 0b00_00_00_11] results in [..., 2].
 func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {

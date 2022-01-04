@@ -2641,18 +2641,18 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 
 func TestAmd64Compiler_compilClz(t *testing.T) {
 	t.Run("32bit", func(t *testing.T) {
-		for _, tc := range []struct{ in, exp uint32 }{
-			{in: 0xff_ff_ff_ff, exp: 0},
-			{in: 0xf0_00_00_00, exp: 0},
-			{in: 0x00_ff_ff_ff, exp: 8},
-			{in: 0, exp: 32},
+		for _, tc := range []struct{ input, expectedLeadingZeros uint32 }{
+			{input: 0xff_ff_ff_ff, expectedLeadingZeros: 0},
+			{input: 0xf0_00_00_00, expectedLeadingZeros: 0},
+			{input: 0x00_ff_ff_ff, expectedLeadingZeros: 8},
+			{input: 0, expectedLeadingZeros: 32},
 		} {
 			tc := tc
-			t.Run(fmt.Sprintf("%032b", tc.in), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 				// Setup the target value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.in})
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2685,25 +2685,25 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.exp, uint32(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.expectedLeadingZeros, uint32(eng.stack[eng.stackPointer-1]))
 			})
 		}
 	})
 	t.Run("64bit", func(t *testing.T) {
-		for _, tc := range []struct{ in, exp uint64 }{
-			{in: 0xf0_00_00_00_00_00_00_00, exp: 0},
-			{in: 0xff_ff_ff_ff_ff_ff_ff_ff, exp: 0},
-			{in: 0x00_ff_ff_ff_ff_ff_ff_ff, exp: 8},
-			{in: 0x00_00_00_00_ff_ff_ff_ff, exp: 32},
-			{in: 0x00_00_00_00_00_ff_ff_ff, exp: 40},
-			{in: 0, exp: 64},
+		for _, tc := range []struct{ input, expectedLeadingZeros uint64 }{
+			{input: 0xf0_00_00_00_00_00_00_00, expectedLeadingZeros: 0},
+			{input: 0xff_ff_ff_ff_ff_ff_ff_ff, expectedLeadingZeros: 0},
+			{input: 0x00_ff_ff_ff_ff_ff_ff_ff, expectedLeadingZeros: 8},
+			{input: 0x00_00_00_00_ff_ff_ff_ff, expectedLeadingZeros: 32},
+			{input: 0x00_00_00_00_00_ff_ff_ff, expectedLeadingZeros: 40},
+			{input: 0, expectedLeadingZeros: 64},
 		} {
 			tc := tc
-			t.Run(fmt.Sprintf("%064b", tc.in), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%064b", tc.expectedLeadingZeros), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 				// Setup the target value.
-				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.in})
+				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2736,7 +2736,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.exp, eng.stack[eng.stackPointer-1])
+				require.Equal(t, tc.expectedLeadingZeros, eng.stack[eng.stackPointer-1])
 			})
 		}
 	})
@@ -2744,18 +2744,18 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 
 func TestAmd64Compiler_compilCtz(t *testing.T) {
 	t.Run("32bit", func(t *testing.T) {
-		for _, tc := range []struct{ in, exp uint32 }{
-			{in: 0xff_ff_ff_ff, exp: 0},
-			{in: 0x00_00_00_01, exp: 0},
-			{in: 0xff_ff_ff_00, exp: 8},
-			{in: 0, exp: 32},
+		for _, tc := range []struct{ input, expectedTrailingZeros uint32 }{
+			{input: 0xff_ff_ff_ff, expectedTrailingZeros: 0},
+			{input: 0x00_00_00_01, expectedTrailingZeros: 0},
+			{input: 0xff_ff_ff_00, expectedTrailingZeros: 8},
+			{input: 0, expectedTrailingZeros: 32},
 		} {
 			tc := tc
-			t.Run(fmt.Sprintf("%032b", tc.in), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 				// Setup the target value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.in})
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2788,25 +2788,25 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.exp, uint32(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.expectedTrailingZeros, uint32(eng.stack[eng.stackPointer-1]))
 			})
 		}
 	})
 	t.Run("64bit", func(t *testing.T) {
-		for _, tc := range []struct{ in, exp uint64 }{
-			{in: 0xff_ff_ff_ff_ff_ff_ff_ff, exp: 0},
-			{in: 0x00_00_00_00_00_00_00_01, exp: 0},
-			{in: 0xff_ff_ff_ff_ff_ff_ff_00, exp: 8},
-			{in: 0xff_ff_ff_ff_00_00_00_00, exp: 32},
-			{in: 0xff_ff_ff_00_00_00_00_00, exp: 40},
-			{in: 0, exp: 64},
+		for _, tc := range []struct{ input, expectedTrailingZeros uint64 }{
+			{input: 0xff_ff_ff_ff_ff_ff_ff_ff, expectedTrailingZeros: 0},
+			{input: 0x00_00_00_00_00_00_00_01, expectedTrailingZeros: 0},
+			{input: 0xff_ff_ff_ff_ff_ff_ff_00, expectedTrailingZeros: 8},
+			{input: 0xff_ff_ff_ff_00_00_00_00, expectedTrailingZeros: 32},
+			{input: 0xff_ff_ff_00_00_00_00_00, expectedTrailingZeros: 40},
+			{input: 0, expectedTrailingZeros: 64},
 		} {
 			tc := tc
-			t.Run(fmt.Sprintf("%064b", tc.in), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%064b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 				// Setup the target value.
-				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.in})
+				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2839,28 +2839,28 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.exp, eng.stack[eng.stackPointer-1])
+				require.Equal(t, tc.expectedTrailingZeros, eng.stack[eng.stackPointer-1])
 			})
 		}
 	})
 }
 func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 	t.Run("32bit", func(t *testing.T) {
-		for _, tc := range []struct{ in, exp uint32 }{
-			{in: 0xff_ff_ff_ff, exp: 32},
-			{in: 0x00_00_00_01, exp: 1},
-			{in: 0x10_00_00_00, exp: 1},
-			{in: 0x00_00_10_00, exp: 1},
-			{in: 0x00_01_00_01, exp: 2},
-			{in: 0xff_ff_00_ff, exp: 24},
-			{in: 0, exp: 0},
+		for _, tc := range []struct{ input, expectedSetBits uint32 }{
+			{input: 0xff_ff_ff_ff, expectedSetBits: 32},
+			{input: 0x00_00_00_01, expectedSetBits: 1},
+			{input: 0x10_00_00_00, expectedSetBits: 1},
+			{input: 0x00_00_10_00, expectedSetBits: 1},
+			{input: 0x00_01_00_01, expectedSetBits: 2},
+			{input: 0xff_ff_00_ff, expectedSetBits: 24},
+			{input: 0, expectedSetBits: 0},
 		} {
 			tc := tc
-			t.Run(fmt.Sprintf("%032b", tc.in), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 				// Setup the target value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.in})
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2890,7 +2890,7 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.exp, uint32(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.expectedSetBits, uint32(eng.stack[eng.stackPointer-1]))
 			})
 		}
 	})
