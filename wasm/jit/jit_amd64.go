@@ -946,7 +946,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 		// "Replace Raw Assembly Code with Builtin Intrinsics" section in:
 		// https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code.
 
-		// First, we have to check if the targe is non-zero as BSR is undefined
+		// First, we have to check if the target is non-zero as BSR is undefined
 		// on zero. See https://www.felixcloutier.com/x86/bsr.
 		cmpZero := c.newProg()
 		cmpZero.As = x86.ACMPQ
