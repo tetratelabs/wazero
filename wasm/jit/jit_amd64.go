@@ -998,17 +998,17 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 		mostSignificantSetBit.To.Reg = target.register
 		c.addInstruction(mostSignificantSetBit)
 
-		// Now we XOR the value with the bit length.
+		// Now we XOR the value with the bit length minus one.
 		xorWithBitLength := c.newProg()
 		xorWithBitLength.To.Type = obj.TYPE_REG
 		xorWithBitLength.To.Reg = target.register
 		xorWithBitLength.From.Type = obj.TYPE_CONST
 		if o.Type == wazeroir.UnsignedInt32 {
 			xorWithBitLength.As = x86.AXORL
-			xorWithBitLength.From.Offset = 1<<5 - 1
+			xorWithBitLength.From.Offset = 31
 		} else {
 			xorWithBitLength.As = x86.AXORQ
-			xorWithBitLength.From.Offset = 1<<6 - 1
+			xorWithBitLength.From.Offset = 63
 		}
 		c.addInstruction(xorWithBitLength)
 
