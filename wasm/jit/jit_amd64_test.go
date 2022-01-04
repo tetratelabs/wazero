@@ -2766,6 +2766,9 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				require.Equal(t, uint64(1), compiler.locationStack.sp)
 				// Also the location must be register.
 				require.True(t, compiler.locationStack.peek().onRegister())
+				// On darwin, we have two branches and one must jump to the next
+				// instruction after compileClz.
+				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
 
 				// To verify the behavior, we release the value
 				// to the stack.
@@ -2814,6 +2817,9 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				require.Equal(t, uint64(1), compiler.locationStack.sp)
 				// Also the location must be register.
 				require.True(t, compiler.locationStack.peek().onRegister())
+				// On darwin, we have two branches and one must jump to the next
+				// instruction after compileClz.
+				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
 
 				// To verify the behavior, we release the value
 				// to the stack.

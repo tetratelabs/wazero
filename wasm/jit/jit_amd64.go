@@ -1032,17 +1032,76 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		return err
 	}
 
-	countZeros := c.newProg()
-	countZeros.From.Type = obj.TYPE_REG
-	countZeros.From.Reg = target.register
-	countZeros.To.Type = obj.TYPE_REG
-	countZeros.To.Reg = target.register
-	if o.Type == wazeroir.UnsignedInt32 {
-		countZeros.As = x86.ATZCNTL
+	if runtime.GOOS != "darwin" {
+		countZeros := c.newProg()
+		countZeros.From.Type = obj.TYPE_REG
+		countZeros.From.Reg = target.register
+		countZeros.To.Type = obj.TYPE_REG
+		countZeros.To.Reg = target.register
+		if o.Type == wazeroir.UnsignedInt32 {
+			countZeros.As = x86.ATZCNTL
+		} else {
+			countZeros.As = x86.ATZCNTQ
+		}
+		c.addInstruction(countZeros)
 	} else {
-		countZeros.As = x86.ATZCNTQ
+		// Somehow if the target value is zero, TZCNT always returs zero which is wrong,
+		// so we have the branches for non-zero and zero cases on macos.
+		// TODO: find the reference to this behavior and put the link here.
+
+		// First we compare the target with zero.
+		cmpZero := c.newProg()
+		cmpZero.As = x86.ACMPQ
+		cmpZero.From.Type = obj.TYPE_REG
+		cmpZero.From.Reg = target.register
+		cmpZero.To.Type = obj.TYPE_CONST
+		cmpZero.To.Offset = 0
+		c.addInstruction(cmpZero)
+
+		jmpIfNonZero := c.newProg()
+		jmpIfNonZero.As = x86.AJNE
+		jmpIfNonZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpIfNonZero)
+
+		// If the value is zero, we just push the const value.
+		ifZeroConst := c.newProg()
+		ifZeroConst.To.Type = obj.TYPE_REG
+		ifZeroConst.To.Reg = target.register
+		ifZeroConst.From.Type = obj.TYPE_CONST
+		if o.Type == wazeroir.UnsignedInt32 {
+			ifZeroConst.As = x86.AMOVL
+			ifZeroConst.From.Offset = 32
+		} else {
+			ifZeroConst.As = x86.AMOVQ
+			ifZeroConst.From.Offset = 64
+		}
+		c.addInstruction(ifZeroConst)
+
+		// Emit the jmp instruction to jump to the position right after
+		// the non-zero case.
+		jmpAtEndOfZero := c.newProg()
+		jmpAtEndOfZero.As = obj.AJMP
+		jmpAtEndOfZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpAtEndOfZero)
+
+		// Otherwise, emit the TZCNT.
+		countZeros := c.newProg()
+		jmpIfNonZero.To.SetTarget(countZeros)
+		countZeros.From.Type = obj.TYPE_REG
+		countZeros.From.Reg = target.register
+		countZeros.To.Type = obj.TYPE_REG
+		countZeros.To.Reg = target.register
+		if o.Type == wazeroir.UnsignedInt32 {
+			countZeros.As = x86.ATZCNTL
+		} else {
+			countZeros.As = x86.ATZCNTQ
+		}
+		c.addInstruction(countZeros)
+
+		// Finally the end jump instruction of zero case must target towards
+		// the next instruction.
+		c.setJmpOrigin = jmpAtEndOfZero
 	}
-	c.addInstruction(countZeros)
 
 	// We reused the same register of target for the result.
 	result := c.locationStack.pushValueOnRegister(target.register)
