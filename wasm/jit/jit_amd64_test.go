@@ -2767,7 +2767,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				// Also the location must be register.
 				require.True(t, compiler.locationStack.peek().onRegister())
 				// On darwin, we have two branches and one must jump to the next
-				// instruction after compileClz.
+				// instruction after compileCtz.
 				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
 
 				// To verify the behavior, we release the value
@@ -2818,7 +2818,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				// Also the location must be register.
 				require.True(t, compiler.locationStack.peek().onRegister())
 				// On darwin, we have two branches and one must jump to the next
-				// instruction after compileClz.
+				// instruction after compileCtz.
 				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
 
 				// To verify the behavior, we release the value
