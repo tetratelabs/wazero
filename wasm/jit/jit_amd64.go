@@ -799,7 +799,7 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 	return
 }
 
-// compileMulForInts emits instructions to perform interger multiplications for
+// compileMulForInts emits instructions to perform integer multiplication for
 // top two values on the stack. If unfamiliar with the convention for integer
 // multiplication on x86, see https://www.felixcloutier.com/x86/mul.
 //
