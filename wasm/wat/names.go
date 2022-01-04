@@ -49,19 +49,19 @@ func encodeNameMapEntry(i uint32, name string) []byte {
 //
 // The WebAssembly 1.0 specification includes support for naming modules, functions, locals and tables via the custom
 // 'name' section: https://www.w3.org/TR/wasm-core-1/#binary-namesec However, how this round-trips between the text and
-// binary format are not discussed.
+// binary format is not discussed.
 //
 // We know that in the text format names must be dollar-sign prefixed to conform with tokenID conventions. However, we
 // don't know if the user's intent was a dollar-sign or not. For example, a function written in a higher level language,
 // targeting the binary format may end up prefixed with '$' for other reasons.
 //
-// The round-tripping concern materializes when a function written in the text format is transpiled into the binary
-// format (ex via `wat2wasm --debug-names). For example, if we set the custom name for a text formatted function "$main"
-// literally, wabt reads it back as the name "$$main", as it doesn't expect any name to begin with '$'.
+// This round-tripping concern materializes when a function written in the text format is transpiled into the binary
+// format (ex via `wat2wasm --debug-names`). For example, if a module name was encoded literally in the binary custom
+// 'name' section as "$Math", wabt tools would prefix it again, resulting in "$$Math".
 // https://github.com/WebAssembly/wabt/blob/e59cf9369004a521814222afbc05ae6b59446cd5/src/binary-reader-ir.cc#L1279
 //
 // Until the standard clarifies round-tripping concerns between the text and binary format, we chop off the leading '$'
-// when reading any names from the text format.
+// when reading any names from the text format. This prevents awkwardness while wabt tools are in use.
 func encodeName(name string) []byte {
 	nameBytes := []byte(name[1:])
 	nameSize := leb128.EncodeUint32(uint32(len(nameBytes)))
