@@ -2309,22 +2309,22 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			x1Reg, x2Reg int16
 		}{
 			{
-				name:  "x1:rax,x2:random_reg",
+				name:  "x1:ax,x2:random_reg",
 				x1Reg: x86.REG_AX,
 				x2Reg: x86.REG_R10,
 			},
 			{
-				name:  "x1:rax,x2:stack",
+				name:  "x1:ax,x2:stack",
 				x1Reg: x86.REG_AX,
 				x2Reg: -1,
 			},
 			{
-				name:  "x1:random_reg,x2:rax",
+				name:  "x1:random_reg,x2:ax",
 				x1Reg: x86.REG_R10,
 				x2Reg: x86.REG_AX,
 			},
 			{
-				name:  "x1:staack,x2:rax",
+				name:  "x1:staack,x2:ax",
 				x1Reg: -1,
 				x2Reg: x86.REG_AX,
 			},
@@ -2417,22 +2417,22 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			x1Reg, x2Reg int16
 		}{
 			{
-				name:  "x1:rax,x2:random_reg",
+				name:  "x1:ax,x2:random_reg",
 				x1Reg: x86.REG_AX,
 				x2Reg: x86.REG_R10,
 			},
 			{
-				name:  "x1:rax,x2:stack",
+				name:  "x1:ax,x2:stack",
 				x1Reg: x86.REG_AX,
 				x2Reg: -1,
 			},
 			{
-				name:  "x1:random_reg,x2:rax",
+				name:  "x1:random_reg,x2:ax",
 				x1Reg: x86.REG_R10,
 				x2Reg: x86.REG_AX,
 			},
 			{
-				name:  "x1:stack,x2:rax",
+				name:  "x1:stack,x2:ax",
 				x1Reg: -1,
 				x2Reg: x86.REG_AX,
 			},
