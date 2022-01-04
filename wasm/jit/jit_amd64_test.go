@@ -2815,6 +2815,109 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 		}
 	})
 }
+func TestAmd64Compiler_compilPopcnt(t *testing.T) {
+	t.Run("32bit", func(t *testing.T) {
+		for _, tc := range []struct{ in, exp uint32 }{
+			{in: 0xff_ff_ff_ff, exp: 32},
+			{in: 0x00_00_00_01, exp: 1},
+			{in: 0x10_00_00_00, exp: 1},
+			{in: 0x00_00_10_00, exp: 1},
+			{in: 0x00_01_00_01, exp: 2},
+			{in: 0xff_ff_00_ff, exp: 24},
+			{in: 0, exp: 0},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%032b", tc.in), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				// Setup the target value.
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.in})
+				require.NoError(t, err)
+
+				// Emit the clz instruction.
+				err = compiler.compilePopcnt(&wazeroir.OperationPopcnt{Type: wazeroir.UnsignedInt32})
+				require.NoError(t, err)
+				// Verify that the result is pushed, meaning that
+				// stack pointer must not be changed.
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
+				// Also the location must be register.
+				require.True(t, compiler.locationStack.peek().onRegister())
+
+				// To verify the behavior, we release the value
+				// to the stack.
+				compiler.releaseAllRegistersToStack()
+				compiler.returnFunction()
+
+				// Generate and run the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.exp, uint32(eng.stack[eng.stackPointer-1]))
+			})
+		}
+	})
+	t.Run("64bit", func(t *testing.T) {
+		for _, tc := range []struct{ in, exp uint64 }{
+			{in: 0xff_ff_ff_ff_ff_ff_ff_ff, exp: 64},
+			{in: 0x00_00_00_00_00_00_00_01, exp: 1},
+			{in: 0x00_00_00_01_00_00_00_00, exp: 1},
+			{in: 0x10_00_00_00_00_00_00_00, exp: 1},
+			{in: 0xf0_00_00_00_00_00_01_00, exp: 5},
+			{in: 0xff_ff_ff_ff_ff_ff_ff_00, exp: 56},
+			{in: 0xff_ff_ff_00_ff_ff_ff_ff, exp: 56},
+			{in: 0xff_ff_ff_ff_00_00_00_00, exp: 32},
+			{in: 0xff_ff_ff_00_00_00_00_00, exp: 24},
+			{in: 0, exp: 0},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%064b", tc.in), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				// Setup the target value.
+				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.in})
+				require.NoError(t, err)
+
+				// Emit the clz instruction.
+				err = compiler.compilePopcnt(&wazeroir.OperationPopcnt{Type: wazeroir.UnsignedInt64})
+				require.NoError(t, err)
+				// Verify that the result is pushed, meaning that
+				// stack pointer must not be changed.
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
+				// Also the location must be register.
+				require.True(t, compiler.locationStack.peek().onRegister())
+
+				// To verify the behavior, we release the value
+				// to the stack.
+				compiler.releaseAllRegistersToStack()
+				compiler.returnFunction()
+
+				// Generate and run the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+
+				// Check the stack.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, tc.exp, eng.stack[eng.stackPointer-1])
+			})
+		}
+	})
+}
 
 func TestAmd64Compiler_compileCall(t *testing.T) {
 	t.Run("host function", func(t *testing.T) {

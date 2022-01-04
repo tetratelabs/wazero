@@ -961,6 +961,33 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	return nil
 }
 
+// compilePopcnt emits instructions to count up the number of one bits in the
+// current top of the stack, and push the count result.
+// For example, stack of [..., 0b00_00_00_11] results in [..., 2].
+func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
+	target := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	countBits := c.newProg()
+	countBits.From.Type = obj.TYPE_REG
+	countBits.From.Reg = target.register
+	countBits.To.Type = obj.TYPE_REG
+	countBits.To.Reg = target.register
+	if o.Type == wazeroir.UnsignedInt32 {
+		countBits.As = x86.APOPCNTL
+	} else {
+		countBits.As = x86.APOPCNTQ
+	}
+	c.addInstruction(countBits)
+
+	// We reused the same register of target for the result.
+	result := c.locationStack.pushValueOnRegister(target.register)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
 func (c *amd64Compiler) compileEq(o *wazeroir.OperationEq) error {
 	return c.emitEqOrNe(o.Type, true)
 }

@@ -543,7 +543,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationCtz:
 			err = compiler.compileCtz(o)
 		case *wazeroir.OperationPopcnt:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compilePopcnt(o)
 		case *wazeroir.OperationDiv:
 			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationRem:
