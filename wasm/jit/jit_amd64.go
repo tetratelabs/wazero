@@ -802,9 +802,9 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) error {
 	// See https://www.felixcloutier.com/x86/mul if unfamiliar with the convention for
 	// integer multiplication. In summary, the destination operand must be on the AX
-	// register and the overflow info is stored in RDX. So, we have to ensure that
-	// 1) Previously located value on RDX must be saved to memory stack.
-	// 2) One of the operands (x1 or x2) must be on RAX (the AX register).
+	// register and the overflow info is stored in DX. So, we have to ensure that
+	// 1) Previously located value on DX must be saved to memory stack.
+	// 2) One of the operands (x1 or x2) must be on AX.
 	const (
 		resultRegister   = x86.REG_AX
 		reservedRegister = x86.REG_DX
@@ -876,7 +876,8 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 
 	// Now we have the result in the AX register,
 	// so we record it.
-	c.locationStack.pushValueOnRegister(resultRegister)
+	result := c.locationStack.pushValueOnRegister(resultRegister)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
@@ -903,6 +904,37 @@ func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
 	// We no longer need x2 register after MUL operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
+	return nil
+}
+
+// compileClz emits instructions to count up the leading zeros in the
+// current top of the stack, and push the count result.
+// For example, stack of [..., 0x00_ff_ff_ff] results in [..., 0x0008].
+func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
+	target := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	countZeros := c.newProg()
+	countZeros.From.Type = obj.TYPE_REG
+	countZeros.From.Reg = target.register
+	countZeros.To.Type = obj.TYPE_REG
+	countZeros.To.Reg = target.register
+	if o.Type == wazeroir.UnsignedInt32 {
+		countZeros.As = x86.ALZCNTL
+	} else {
+		countZeros.As = x86.ALZCNTQ
+	}
+	c.addInstruction(countZeros)
+
+	// We reused the same register of target for the result.
+	result := c.locationStack.pushValueOnRegister(target.register)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	return nil
 }
 
