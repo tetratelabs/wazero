@@ -962,18 +962,11 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 		c.addInstruction(jmpIfNonZero)
 
 		// If the value is zero, we just push the const value.
-		ifZeroConst := c.newProg()
-		ifZeroConst.To.Type = obj.TYPE_REG
-		ifZeroConst.To.Reg = target.register
-		ifZeroConst.From.Type = obj.TYPE_CONST
 		if o.Type == wazeroir.UnsignedInt32 {
-			ifZeroConst.As = x86.AMOVL
-			ifZeroConst.From.Offset = 32
+			c.emitConstI32(32, target.register)
 		} else {
-			ifZeroConst.As = x86.AMOVQ
-			ifZeroConst.From.Offset = 64
+			c.emitConstI64(64, target.register)
 		}
-		c.addInstruction(ifZeroConst)
 
 		// Emit the jmp instruction to jump to the position right after
 		// the non-zero case.
@@ -1064,18 +1057,11 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		c.addInstruction(jmpIfNonZero)
 
 		// If the value is zero, we just push the const value.
-		ifZeroConst := c.newProg()
-		ifZeroConst.To.Type = obj.TYPE_REG
-		ifZeroConst.To.Reg = target.register
-		ifZeroConst.From.Type = obj.TYPE_CONST
 		if o.Type == wazeroir.UnsignedInt32 {
-			ifZeroConst.As = x86.AMOVL
-			ifZeroConst.From.Offset = 32
+			c.emitConstI32(32, target.register)
 		} else {
-			ifZeroConst.As = x86.AMOVQ
-			ifZeroConst.From.Offset = 64
+			c.emitConstI64(64, target.register)
 		}
-		c.addInstruction(ifZeroConst)
 
 		// Emit the jmp instruction to jump to the position right after
 		// the non-zero case.
@@ -1762,14 +1748,18 @@ func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 	loc := c.locationStack.pushValueOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
+	c.emitConstI32(o.Value, reg)
+	return nil
+}
+
+func (c *amd64Compiler) emitConstI32(val uint32, register int16) {
 	prog := c.newProg()
 	prog.As = x86.AMOVL // Note 32-bit move!
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(o.Value)
+	prog.From.Offset = int64(val)
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = reg
+	prog.To.Reg = register
 	c.addInstruction(prog)
-	return nil
 }
 
 func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
@@ -1780,14 +1770,18 @@ func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	loc := c.locationStack.pushValueOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
+	c.emitConstI64(o.Value, reg)
+	return nil
+}
+
+func (c *amd64Compiler) emitConstI64(val uint64, register int16) {
 	prog := c.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(o.Value)
+	prog.From.Offset = int64(val)
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = reg
+	prog.To.Reg = register
 	c.addInstruction(prog)
-	return nil
 }
 
 func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
