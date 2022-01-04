@@ -2309,22 +2309,22 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			x1Reg, x2Reg int16
 		}{
 			{
-				name:  "x1:rax,x2:random_reg",
+				name:  "x1:ax,x2:random_reg",
 				x1Reg: x86.REG_AX,
 				x2Reg: x86.REG_R10,
 			},
 			{
-				name:  "x1:rax,x2:stack",
+				name:  "x1:ax,x2:stack",
 				x1Reg: x86.REG_AX,
 				x2Reg: -1,
 			},
 			{
-				name:  "x1:random_reg,x2:rax",
+				name:  "x1:random_reg,x2:ax",
 				x1Reg: x86.REG_R10,
 				x2Reg: x86.REG_AX,
 			},
 			{
-				name:  "x1:staack,x2:rax",
+				name:  "x1:staack,x2:ax",
 				x1Reg: -1,
 				x2Reg: x86.REG_AX,
 			},
@@ -2360,8 +2360,10 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.initializeReservedRegisters()
 
 				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
+				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
+				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+				prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 				// Setup values.
 				if tc.x1Reg != -1 {
@@ -2385,6 +2387,14 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
 				require.Equal(t, uint64(2), compiler.locationStack.sp)
 				require.Len(t, compiler.locationStack.usedRegisters, 1)
+				// At this point, the previous value on the DX register is saved to the stack.
+				require.True(t, prevOnDX.onStack())
+
+				// We add the value previously on the DX with the multiplication result
+				// in order to ensure that not saving existing DX value would cause
+				// the failure in a subsequent instruction.
+				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
 
 				// To verify the behavior, we push the value
 				// to the stack.
@@ -2401,11 +2411,9 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 					0,
 				)
 
-				// Check the stack.
-				require.Equal(t, uint64(2), eng.stackPointer)
-				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
-				// Verify the previous DX register value was saved to the stack.
-				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
+				// Verify the stack is in the form of ["any value previously used by DX" + x1 * x2]
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, uint64(x1Value*x2Value)+dxValue, eng.stack[eng.stackPointer-1])
 			})
 		}
 	})
@@ -2416,22 +2424,22 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			x1Reg, x2Reg int16
 		}{
 			{
-				name:  "x1:rax,x2:random_reg",
+				name:  "x1:ax,x2:random_reg",
 				x1Reg: x86.REG_AX,
 				x2Reg: x86.REG_R10,
 			},
 			{
-				name:  "x1:rax,x2:stack",
+				name:  "x1:ax,x2:stack",
 				x1Reg: x86.REG_AX,
 				x2Reg: -1,
 			},
 			{
-				name:  "x1:random_reg,x2:rax",
+				name:  "x1:random_reg,x2:ax",
 				x1Reg: x86.REG_R10,
 				x2Reg: x86.REG_AX,
 			},
 			{
-				name:  "x1:stack,x2:rax",
+				name:  "x1:stack,x2:ax",
 				x1Reg: -1,
 				x2Reg: x86.REG_AX,
 			},
@@ -2467,8 +2475,10 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.initializeReservedRegisters()
 
 				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
+				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
+				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+				prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 				// Setup values.
 				if tc.x1Reg != -1 {
@@ -2492,6 +2502,14 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
 				require.Equal(t, uint64(2), compiler.locationStack.sp)
 				require.Len(t, compiler.locationStack.usedRegisters, 1)
+				// At this point, the previous value on the DX register is saved to the stack.
+				require.True(t, prevOnDX.onStack())
+
+				// We add the value previously on the DX with the multiplication result
+				// in order to ensure that not saving existing DX value would cause
+				// the failure in a subsequent instruction.
+				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
+				require.NoError(t, err)
 
 				// To verify the behavior, we push the value
 				// to the stack.
@@ -2508,11 +2526,9 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 					0,
 				)
 
-				// Check the stack.
-				require.Equal(t, uint64(2), eng.stackPointer)
-				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
-				// Verify the previous DX register value was saved to the stack.
-				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
+				// Verify the stack is in the form of ["any value previously used by DX" + x1 * x2]
+				require.Equal(t, uint64(1), eng.stackPointer)
+				require.Equal(t, uint64(x1Value*x2Value)+dxValue, eng.stack[eng.stackPointer-1])
 			})
 		}
 	})
