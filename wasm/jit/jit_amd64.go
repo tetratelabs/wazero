@@ -802,6 +802,7 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 // compileMulForInts emits instructions to perform interger multiplications for
 // top two values on the stack. If unfamiliar with the convention for integer
 // multiplication on x86, see https://www.felixcloutier.com/x86/mul.
+//
 // In summary, one of the values must be on the AX register,
 // and the mul instruction stores the overflow info in DX register which we don't use.
 // Here, we mean "the overflow info" by 65 bit or higher part of the result for 64 bit case.
