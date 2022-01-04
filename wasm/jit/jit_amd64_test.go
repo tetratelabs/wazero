@@ -2360,6 +2360,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.initializeReservedRegisters()
 
 				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
+				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
+				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
 				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
@@ -2401,10 +2403,9 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				fmt.Println(eng.stack[:3])
 
-				// Check the stack.
+				// Verify the stack is in the form of ["any value previously used by DX", x1 * x2]
 				require.Equal(t, uint64(2), eng.stackPointer)
 				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
-				// Verify the previous DX register value was saved to the stack.
 				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
 			})
 		}
@@ -2466,7 +2467,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler := requireNewCompiler(t)
 				compiler.initializeReservedRegisters()
 
-				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
+				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
+				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
 				compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
@@ -2508,10 +2510,9 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				fmt.Println(eng.stack[:3])
 
-				// Check the stack.
+				// Verify the stack is in the form of ["any value used by DX", x1 * x2]
 				require.Equal(t, uint64(2), eng.stackPointer)
 				require.Equal(t, uint64(x1Value*x2Value), eng.stack[eng.stackPointer-1])
-				// Verify the previous DX register value was saved to the stack.
 				require.Equal(t, dxValue, eng.stack[eng.stackPointer-2])
 			})
 		}

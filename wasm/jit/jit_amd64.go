@@ -799,12 +799,18 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 	return
 }
 
+// compileMulForInts emits instructions to perform interger multiplications for
+// top two values on the stack. If unfamiliar with the convention for integer
+// multiplication on x86, see https://www.felixcloutier.com/x86/mul.
+// In summary, one of the values must be on the AX register,
+// and the mul instruction stores the overflow info in DX register which we don't use.
+// Here, we mean "the overflow info" by 65 bit or hight part of the result for 64 bit case.
+// So, we have to ensure that
+// 1) Previously located value on DX must be saved to memory stack. That is because
+//    the existing value will be overriden after the mul execution.
+// 2) One of the operands (x1 or x2) must be on AX register.
+// See https://www.felixcloutier.com/x86/mul#description for detail semantics.
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) error {
-	// See https://www.felixcloutier.com/x86/mul if unfamiliar with the convention for
-	// integer multiplication. In summary, the destination operand must be on the AX
-	// register and the overflow info is stored in RDX. So, we have to ensure that
-	// 1) Previously located value on RDX must be saved to memory stack.
-	// 2) One of the operands (x1 or x2) must be on RAX (the AX register).
 	const (
 		resultRegister   = x86.REG_AX
 		reservedRegister = x86.REG_DX
