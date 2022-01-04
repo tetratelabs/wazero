@@ -13,6 +13,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"runtime"
 
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
@@ -926,17 +927,94 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 		return err
 	}
 
-	countZeros := c.newProg()
-	countZeros.From.Type = obj.TYPE_REG
-	countZeros.From.Reg = target.register
-	countZeros.To.Type = obj.TYPE_REG
-	countZeros.To.Reg = target.register
-	if o.Type == wazeroir.UnsignedInt32 {
-		countZeros.As = x86.ALZCNTL
+	if runtime.GOOS != "darwin" {
+		countZeros := c.newProg()
+		countZeros.From.Type = obj.TYPE_REG
+		countZeros.From.Reg = target.register
+		countZeros.To.Type = obj.TYPE_REG
+		countZeros.To.Reg = target.register
+		if o.Type == wazeroir.UnsignedInt32 {
+			countZeros.As = x86.ALZCNTL
+		} else {
+			countZeros.As = x86.ALZCNTQ
+		}
+		c.addInstruction(countZeros)
 	} else {
-		countZeros.As = x86.ALZCNTQ
+		// On x86 mac, we cannot use LZCNT as it always results in zero.
+		// Instead we conbine BSR (calculating most significant set bit)
+		// with XOR. This logic is described in
+		// "Replace Raw Assembly Code with Builtin Intrinsics" section in:
+		// https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code.
+
+		// First, we have to check if the targe is non-zero as bsrl is undefined
+		// on zero. See https://www.felixcloutier.com/x86/bsr.
+		cmpZero := c.newProg()
+		cmpZero.As = x86.ACMPQ
+		cmpZero.From.Type = obj.TYPE_REG
+		cmpZero.From.Reg = target.register
+		cmpZero.To.Type = obj.TYPE_CONST
+		cmpZero.To.Offset = 0
+		c.addInstruction(cmpZero)
+
+		jmpIfNonZero := c.newProg()
+		jmpIfNonZero.As = x86.AJNE
+		jmpIfNonZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpIfNonZero)
+
+		// If the value is zero, we just push the const value.
+		ifZeroConst := c.newProg()
+		ifZeroConst.From.Type = obj.TYPE_REG
+		ifZeroConst.From.Reg = target.register
+		ifZeroConst.To.Type = obj.TYPE_CONST
+		if o.Type == wazeroir.UnsignedInt32 {
+			ifZeroConst.As = x86.AMOVL
+			ifZeroConst.To.Offset = 32
+		} else {
+			ifZeroConst.As = x86.AMOVQ
+			ifZeroConst.To.Offset = 64
+		}
+		c.addInstruction(ifZeroConst)
+
+		// Emit the jmp instruction to jump to the position right after
+		// the non-zero case.
+		jmpAtEndOfZero := c.newProg()
+		jmpAtEndOfZero.As = obj.AJMP
+		jmpAtEndOfZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpAtEndOfZero)
+
+		// Start emitting non-zero case.
+		// First, we calculate the most significant set bit.
+		mostSignificantSetBit := c.newProg()
+		// Set the jump target of the first non-zero check.
+		jmpIfNonZero.To.SetTarget(mostSignificantSetBit)
+		if o.Type == wazeroir.UnsignedInt32 {
+			mostSignificantSetBit.As = x86.ABSRL
+		} else {
+			mostSignificantSetBit.As = x86.ABSRQ
+		}
+		mostSignificantSetBit.From.Type = obj.TYPE_REG
+		mostSignificantSetBit.From.Reg = target.register
+		mostSignificantSetBit.To.Type = obj.TYPE_REG
+		mostSignificantSetBit.To.Reg = target.register
+		c.addInstruction(mostSignificantSetBit)
+
+		// Now we XOR the value with the bit length.
+		xorWithBitLength := c.newProg()
+		xorWithBitLength.From.Type = obj.TYPE_REG
+		xorWithBitLength.From.Reg = target.register
+		xorWithBitLength.To.Type = obj.TYPE_REG
+		xorWithBitLength.To.Reg = target.register
+		if o.Type == wazeroir.UnsignedInt32 {
+			mostSignificantSetBit.As = x86.AXORL
+		} else {
+			mostSignificantSetBit.As = x86.AXORQ
+		}
+		c.addInstruction(xorWithBitLength)
+
+		// Finally the end jump instruction of zero case must target towards
+		// the next instruction.
+		c.setJmpOrigin = jmpAtEndOfZero
 	}
-	c.addInstruction(countZeros)
 
 	// We reused the same register of target for the result.
 	result := c.locationStack.pushValueOnRegister(target.register)
