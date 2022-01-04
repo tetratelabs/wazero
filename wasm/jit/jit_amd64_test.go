@@ -2382,6 +2382,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
 				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
 				require.Equal(t, uint64(2), compiler.locationStack.sp)
 				require.Len(t, compiler.locationStack.usedRegisters, 1)
 
@@ -2399,7 +2400,6 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 					uintptr(unsafe.Pointer(eng)),
 					0,
 				)
-				fmt.Println(eng.stack[:3])
 
 				// Check the stack.
 				require.Equal(t, uint64(2), eng.stackPointer)
@@ -2489,6 +2489,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
 				require.NoError(t, err)
 				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
 				require.Equal(t, uint64(2), compiler.locationStack.sp)
 				require.Len(t, compiler.locationStack.usedRegisters, 1)
 
@@ -2506,7 +2507,6 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 					uintptr(unsafe.Pointer(eng)),
 					0,
 				)
-				fmt.Println(eng.stack[:3])
 
 				// Check the stack.
 				require.Equal(t, uint64(2), eng.stackPointer)
