@@ -861,7 +861,9 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 		return err
 	}
 
-	// We have to save the existing value on RDX.
+	// We have to save the existing value on DX.
+	// If the DX register is used by either x1 or x2, we don't need to
+	// save the value because it is consumed by mul anyway.
 	if x1.register != reservedRegister && x2.register != reservedRegister {
 		c.onValueReleaseRegisterToStack(reservedRegister)
 	}
