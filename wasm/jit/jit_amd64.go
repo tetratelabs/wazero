@@ -806,6 +806,7 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 // In summary, one of the values must be on the AX register,
 // and the mul instruction stores the overflow info in DX register which we don't use.
 // Here, we mean "the overflow info" by 65 bit or higher part of the result for 64 bit case.
+//
 // So, we have to ensure that
 // 1) Previously located value on DX must be saved to memory stack. That is because
 //    the existing value will be overriden after the mul execution.
