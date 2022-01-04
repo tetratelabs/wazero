@@ -1046,7 +1046,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		c.addInstruction(countZeros)
 	} else {
 		// Somehow, if the target value is zero, TZCNT always returns zero: this is wrong.
-		// so we have the branches for non-zero and zero cases on macos.
+		// Meanwhile, we need branches for non-zero and zero cases on macos.
 		// TODO: find the reference to this behavior and put the link here.
 
 		// First we compare the target with zero.
