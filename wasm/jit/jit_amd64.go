@@ -909,7 +909,7 @@ func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
 
 // compileClz emits instructions to count up the leading zeros in the
 // current top of the stack, and push the count result.
-// For example, stack of [..., 0x00_ff_ff_ff] results in [..., 0x0008].
+// For example, stack of [..., 0x00_ff_ff_ff] results in [..., 8].
 func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	target := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -934,7 +934,30 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	return nil
 }
 
+// compileCtz emits instructions to count up the trailing zeros in the
+// current top of the stack, and push the count result.
+// For example, stack of [..., 0xff_ff_ff_00] results in [..., 8].
 func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
+	target := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	countZeros := c.newProg()
+	countZeros.From.Type = obj.TYPE_REG
+	countZeros.From.Reg = target.register
+	countZeros.To.Type = obj.TYPE_REG
+	countZeros.To.Reg = target.register
+	if o.Type == wazeroir.UnsignedInt32 {
+		countZeros.As = x86.ATZCNTL
+	} else {
+		countZeros.As = x86.ATZCNTQ
+	}
+	c.addInstruction(countZeros)
+
+	// We reused the same register of target for the result.
+	result := c.locationStack.pushValueOnRegister(target.register)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
