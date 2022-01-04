@@ -13,6 +13,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"runtime"
 
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
@@ -886,7 +887,8 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 
 	// Now we have the result in the AX register,
 	// so we record it.
-	c.locationStack.pushValueOnRegister(resultRegister)
+	result := c.locationStack.pushValueOnRegister(resultRegister)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
@@ -913,6 +915,210 @@ func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
 	// We no longer need x2 register after MUL operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
+	return nil
+}
+
+// compileClz emits instructions to count up the leading zeros in the
+// current top of the stack, and push the count result.
+// For example, stack of [..., 0x00_ff_ff_ff] results in [..., 8].
+func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
+	target := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	if runtime.GOOS != "darwin" {
+		countZeros := c.newProg()
+		countZeros.From.Type = obj.TYPE_REG
+		countZeros.From.Reg = target.register
+		countZeros.To.Type = obj.TYPE_REG
+		countZeros.To.Reg = target.register
+		if o.Type == wazeroir.UnsignedInt32 {
+			countZeros.As = x86.ALZCNTL
+		} else {
+			countZeros.As = x86.ALZCNTQ
+		}
+		c.addInstruction(countZeros)
+	} else {
+		// On x86 mac, we cannot use LZCNT as it always results in zero.
+		// Instead we combine BSR (calculating most significant set bit)
+		// with XOR. This logic is described in
+		// "Replace Raw Assembly Code with Builtin Intrinsics" section in:
+		// https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code.
+
+		// First, we have to check if the target is non-zero as BSR is undefined
+		// on zero. See https://www.felixcloutier.com/x86/bsr.
+		cmpZero := c.newProg()
+		cmpZero.As = x86.ACMPQ
+		cmpZero.From.Type = obj.TYPE_REG
+		cmpZero.From.Reg = target.register
+		cmpZero.To.Type = obj.TYPE_CONST
+		cmpZero.To.Offset = 0
+		c.addInstruction(cmpZero)
+
+		jmpIfNonZero := c.newProg()
+		jmpIfNonZero.As = x86.AJNE
+		jmpIfNonZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpIfNonZero)
+
+		// If the value is zero, we just push the const value.
+		if o.Type == wazeroir.UnsignedInt32 {
+			c.emitConstI32(32, target.register)
+		} else {
+			c.emitConstI64(64, target.register)
+		}
+
+		// Emit the jmp instruction to jump to the position right after
+		// the non-zero case.
+		jmpAtEndOfZero := c.newProg()
+		jmpAtEndOfZero.As = obj.AJMP
+		jmpAtEndOfZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpAtEndOfZero)
+
+		// Start emitting non-zero case.
+		// First, we calculate the most significant set bit.
+		mostSignificantSetBit := c.newProg()
+		// Set the jump target of the first non-zero check.
+		jmpIfNonZero.To.SetTarget(mostSignificantSetBit)
+		if o.Type == wazeroir.UnsignedInt32 {
+			mostSignificantSetBit.As = x86.ABSRL
+		} else {
+			mostSignificantSetBit.As = x86.ABSRQ
+		}
+		mostSignificantSetBit.From.Type = obj.TYPE_REG
+		mostSignificantSetBit.From.Reg = target.register
+		mostSignificantSetBit.To.Type = obj.TYPE_REG
+		mostSignificantSetBit.To.Reg = target.register
+		c.addInstruction(mostSignificantSetBit)
+
+		// Now we XOR the value with the bit length minus one.
+		xorWithBitLength := c.newProg()
+		xorWithBitLength.To.Type = obj.TYPE_REG
+		xorWithBitLength.To.Reg = target.register
+		xorWithBitLength.From.Type = obj.TYPE_CONST
+		if o.Type == wazeroir.UnsignedInt32 {
+			xorWithBitLength.As = x86.AXORL
+			xorWithBitLength.From.Offset = 31
+		} else {
+			xorWithBitLength.As = x86.AXORQ
+			xorWithBitLength.From.Offset = 63
+		}
+		c.addInstruction(xorWithBitLength)
+
+		// Finally the end jump instruction of zero case must target towards
+		// the next instruction.
+		c.setJmpOrigin = jmpAtEndOfZero
+	}
+
+	// We reused the same register of target for the result.
+	result := c.locationStack.pushValueOnRegister(target.register)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+// compileCtz emits instructions to count up the trailing zeros in the
+// current top of the stack, and push the count result.
+// For example, stack of [..., 0xff_ff_ff_00] results in [..., 8].
+func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
+	target := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	if runtime.GOOS != "darwin" {
+		countZeros := c.newProg()
+		countZeros.From.Type = obj.TYPE_REG
+		countZeros.From.Reg = target.register
+		countZeros.To.Type = obj.TYPE_REG
+		countZeros.To.Reg = target.register
+		if o.Type == wazeroir.UnsignedInt32 {
+			countZeros.As = x86.ATZCNTL
+		} else {
+			countZeros.As = x86.ATZCNTQ
+		}
+		c.addInstruction(countZeros)
+	} else {
+		// Somehow, if the target value is zero, TZCNT always returns zero: this is wrong.
+		// Meanwhile, we need branches for non-zero and zero cases on macos.
+		// TODO: find the reference to this behavior and put the link here.
+
+		// First we compare the target with zero.
+		cmpZero := c.newProg()
+		cmpZero.As = x86.ACMPQ
+		cmpZero.From.Type = obj.TYPE_REG
+		cmpZero.From.Reg = target.register
+		cmpZero.To.Type = obj.TYPE_CONST
+		cmpZero.To.Offset = 0
+		c.addInstruction(cmpZero)
+
+		jmpIfNonZero := c.newProg()
+		jmpIfNonZero.As = x86.AJNE
+		jmpIfNonZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpIfNonZero)
+
+		// If the value is zero, we just push the const value.
+		if o.Type == wazeroir.UnsignedInt32 {
+			c.emitConstI32(32, target.register)
+		} else {
+			c.emitConstI64(64, target.register)
+		}
+
+		// Emit the jmp instruction to jump to the position right after
+		// the non-zero case.
+		jmpAtEndOfZero := c.newProg()
+		jmpAtEndOfZero.As = obj.AJMP
+		jmpAtEndOfZero.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpAtEndOfZero)
+
+		// Otherwise, emit the TZCNT.
+		countZeros := c.newProg()
+		jmpIfNonZero.To.SetTarget(countZeros)
+		countZeros.From.Type = obj.TYPE_REG
+		countZeros.From.Reg = target.register
+		countZeros.To.Type = obj.TYPE_REG
+		countZeros.To.Reg = target.register
+		if o.Type == wazeroir.UnsignedInt32 {
+			countZeros.As = x86.ATZCNTL
+		} else {
+			countZeros.As = x86.ATZCNTQ
+		}
+		c.addInstruction(countZeros)
+
+		// Finally the end jump instruction of zero case must target towards
+		// the next instruction.
+		c.setJmpOrigin = jmpAtEndOfZero
+	}
+
+	// We reused the same register of target for the result.
+	result := c.locationStack.pushValueOnRegister(target.register)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+// compilePopcnt emits instructions to count up the number of set bits in the
+// current top of the stack, and push the count result.
+// For example, stack of [..., 0b00_00_00_11] results in [..., 2].
+func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
+	target := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	countBits := c.newProg()
+	countBits.From.Type = obj.TYPE_REG
+	countBits.From.Reg = target.register
+	countBits.To.Type = obj.TYPE_REG
+	countBits.To.Reg = target.register
+	if o.Type == wazeroir.UnsignedInt32 {
+		countBits.As = x86.APOPCNTL
+	} else {
+		countBits.As = x86.APOPCNTQ
+	}
+	c.addInstruction(countBits)
+
+	// We reused the same register of target for the result.
+	result := c.locationStack.pushValueOnRegister(target.register)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
@@ -1542,14 +1748,18 @@ func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 	loc := c.locationStack.pushValueOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
+	c.emitConstI32(o.Value, reg)
+	return nil
+}
+
+func (c *amd64Compiler) emitConstI32(val uint32, register int16) {
 	prog := c.newProg()
 	prog.As = x86.AMOVL // Note 32-bit move!
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(o.Value)
+	prog.From.Offset = int64(val)
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = reg
+	prog.To.Reg = register
 	c.addInstruction(prog)
-	return nil
 }
 
 func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
@@ -1560,14 +1770,18 @@ func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	loc := c.locationStack.pushValueOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
+	c.emitConstI64(o.Value, reg)
+	return nil
+}
+
+func (c *amd64Compiler) emitConstI64(val uint64, register int16) {
 	prog := c.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = int64(o.Value)
+	prog.From.Offset = int64(val)
 	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = reg
+	prog.To.Reg = register
 	c.addInstruction(prog)
-	return nil
 }
 
 func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
