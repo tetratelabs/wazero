@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestEncodeNameSection(t *testing.T) {
@@ -24,6 +26,34 @@ func TestEncodeNameSection(t *testing.T) {
 		0x05, /* the function name hello is 5 characters long */
 		'h', 'e', 'l', 'l', 'o',
 	}, encodeNameSection(m))
+}
+
+// TestEncodeNameSection_OnlyFuncName shows that we don't rely on the module name being present. For example, this isn't
+// encoded in TinyGo.
+func TestEncodeNameSection_OnlyFuncName(t *testing.T) {
+	func0, func1 := "runtime.fd_write", "runtime.args_sizes_get" // note: no leading '$'
+	i32 := wasm.ValueTypeI32
+	m := &module{
+		types: []*typeFunc{
+			{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}},
+			{params: []wasm.ValueType{i32, i32}, results: []wasm.ValueType{i32}},
+		},
+		importFuncs: []*importFunc{
+			{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$" + func0},
+			{importIndex: 1, typeIndex: 1, module: "wasi_snapshot_preview1", name: "args_sizes_get", funcName: "$" + func1},
+		},
+	}
+
+	expected := append(append([]byte{
+		0x01, // function subsection ID one
+		// length includes 1 byte overhead for the function name count, and 2 bytes (index + length prefix) per name
+		byte(1 + 2 + 2 + len(func0) + len(func1)),
+		0x02, // two function names
+	},
+		append([]byte{0x00 /* funcIndex */, byte(len(func0))}, func0...)...),
+		append([]byte{0x01 /* funcIndex */, byte(len(func1))}, func1...)...)
+
+	require.Equal(t, expected, encodeNameSection(m))
 }
 
 func TestEncodeNameSubsection(t *testing.T) {
