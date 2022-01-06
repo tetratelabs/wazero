@@ -1319,6 +1319,8 @@ func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 	}
 }
 
+// compileShr emits instructions to perform and operation on
+// top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -1329,6 +1331,8 @@ func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 	return
 }
 
+// compileShr emits instructions to perform or operation on
+// top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -1339,6 +1343,8 @@ func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 	return
 }
 
+// compileShr emits instructions to perform xor operation on
+// top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -1349,6 +1355,8 @@ func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 	return
 }
 
+// compileShr emits instructions to perform shift-left operation on
+// top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -1359,6 +1367,8 @@ func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	return
 }
 
+// compileShr emits instructions to perform shift-right operation on
+// top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
@@ -1373,13 +1383,16 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	return
 }
 
+// emitSimpleBinaryOp emits instructions to pop two values from the stack
+// and perform the given instruction on these two values and push the result
+// onto the stack.
 func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return err
 	}
 
-	x1 := c.locationStack.peek() // Note this is peek!
+	x1 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
 		return err
 	}
@@ -1395,6 +1408,9 @@ func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 	// We consumed x2 register after the operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
+
+	result := c.locationStack.pushValueOnRegister(x1.register)
+	result.setRegisterType(x1.registerType())
 	return nil
 }
 
