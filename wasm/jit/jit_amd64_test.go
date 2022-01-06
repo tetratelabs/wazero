@@ -2948,6 +2948,17 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 	})
 }
 
+// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
+func getDivisionByZeroErrorRecoverFunc(t *testing.T) func() {
+	return func() {
+		if e := recover(); e != nil {
+			err, ok := e.(error)
+			require.True(t, ok)
+			require.Equal(t, "runtime error: integer divide by zero", err.Error())
+		}
+	}
+}
+
 func TestAmd64Compiler_compileDiv(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		for _, signed := range []struct {
@@ -3067,15 +3078,6 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 								require.NoError(t, err)
 
-								// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
-								defer func() {
-									if e := recover(); e != nil {
-										err, ok := e.(error)
-										require.True(t, ok)
-										require.Equal(t, "runtime error: integer divide by zero", err.Error())
-									}
-								}()
-
 								// To verify the behavior, we push the value
 								// to the stack.
 								compiler.releaseAllRegistersToStack()
@@ -3085,6 +3087,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								code, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
+								defer getDivisionByZeroErrorRecoverFunc(t)()
 								jitcall(
 									uintptr(unsafe.Pointer(&code[0])),
 									uintptr(unsafe.Pointer(eng)),
@@ -3226,15 +3229,6 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
 								require.NoError(t, err)
 
-								// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
-								defer func() {
-									if e := recover(); e != nil {
-										err, ok := e.(error)
-										require.True(t, ok)
-										require.Equal(t, "runtime error: integer divide by zero", err.Error())
-									}
-								}()
-
 								// To verify the behavior, we push the value
 								// to the stack.
 								compiler.releaseAllRegistersToStack()
@@ -3244,6 +3238,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								code, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
+								defer getDivisionByZeroErrorRecoverFunc(t)()
 								jitcall(
 									uintptr(unsafe.Pointer(&code[0])),
 									uintptr(unsafe.Pointer(eng)),
@@ -3523,15 +3518,6 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 								require.NoError(t, err)
 
-								// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
-								defer func() {
-									if e := recover(); e != nil {
-										err, ok := e.(error)
-										require.True(t, ok)
-										require.Equal(t, "runtime error: integer divide by zero", err.Error())
-									}
-								}()
-
 								// To verify the behavior, we push the value
 								// to the stack.
 								compiler.releaseAllRegistersToStack()
@@ -3541,6 +3527,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								code, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
+								defer getDivisionByZeroErrorRecoverFunc(t)()
 								jitcall(
 									uintptr(unsafe.Pointer(&code[0])),
 									uintptr(unsafe.Pointer(eng)),
@@ -3682,15 +3669,6 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
 								require.NoError(t, err)
 
-								// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
-								defer func() {
-									if e := recover(); e != nil {
-										err, ok := e.(error)
-										require.True(t, ok)
-										require.Equal(t, "runtime error: integer divide by zero", err.Error())
-									}
-								}()
-
 								// To verify the behavior, we push the value
 								// to the stack.
 								compiler.releaseAllRegistersToStack()
@@ -3700,6 +3678,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								code, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
+								defer getDivisionByZeroErrorRecoverFunc(t)()
 								jitcall(
 									uintptr(unsafe.Pointer(&code[0])),
 									uintptr(unsafe.Pointer(eng)),
