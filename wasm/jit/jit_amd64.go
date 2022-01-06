@@ -1159,8 +1159,10 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	return nil
 }
 
-// compileRem emits the instructions to perform division on the top two int values on the stack,
-// and push the remainder of the division result onto the stack.
+// compileRem emits the instructions to perform division on the top
+// two values of integer type on the stack and put the remainder of the result
+// onto the stack. For example, stack [..., 8, 3] results in [..., 2] where
+// the quotient is discarded. See compileDivForInts for how to acquire quotient, not remainder.
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
