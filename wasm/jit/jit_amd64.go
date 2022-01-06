@@ -1146,7 +1146,7 @@ func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
 // onto the stack. For example, stack [..., 4, 3] results in [..., 1] where
 // the remainder is discarded. See compileRem for how to acquire remainder, not quotient.
 func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
-	if err := c.emitDivForInts(is32Bit, signed); err != nil {
+	if err := c.performDivisionOnInts(is32Bit, signed); err != nil {
 		return err
 	}
 	// Now we have the quotient of the division result in the AX register,
@@ -1164,13 +1164,13 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		err = c.emitDivForInts(true, true)
+		err = c.performDivisionOnInts(true, true)
 	case wazeroir.SignedInt64:
-		err = c.emitDivForInts(false, true)
+		err = c.performDivisionOnInts(false, true)
 	case wazeroir.SignedUint32:
-		err = c.emitDivForInts(true, false)
+		err = c.performDivisionOnInts(true, false)
 	case wazeroir.SignedUint64:
-		err = c.emitDivForInts(false, false)
+		err = c.performDivisionOnInts(false, false)
 	}
 	if err != nil {
 		return err
@@ -1186,17 +1186,21 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 	return
 }
 
-func (c *amd64Compiler) emitDivForInts(is32Bit bool, signed bool) error {
-	// See the following explanation of DIV (unsigned div) and IDIV (signed div) instructions' semantics
-	// from https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
-	//
-	// >> Division requires special arrangements: idiv (signed) and div (unsigned) operate on a 2n-byte dividend and
-	// >> an n-byte divisor to produce an n-byte quotient and n-byte remainder. The dividend always lives in a fixed pair of
-	// >> registers (%edx and %eax for the 32-bit case; %rdx and %rax for the 64-bit case); the divisor is specified as the
-	// >> source operand in the instruction. The quotient goes in %eax (resp. %rax); the remainder in %edx (resp. %rdx). For
-	// >> signed division, the cltd (resp. ctqo) instruction is used to prepare %edx (resp. %rdx) with the sign extension of
-	// >> %eax (resp. %rax). For example, if a,b, c are memory locations holding quad words, then we could set c = a/b
-	// >> using the sequence: movq a(%rip), %rax; ctqo; idivq b(%rip); movq %rax, c(%rip).
+// performDivisionOnInts emits the instructions to do divisions on top two integers on the stack
+// via DIV (unsigned div) and IDIV (signed div) instructions.
+// See the following explanation of these instructions' semantics from https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
+//
+// >> Division requires special arrangements: idiv (signed) and div (unsigned) operate on a 2n-byte dividend and
+// >> an n-byte divisor to produce an n-byte quotient and n-byte remainder. The dividend always lives in a fixed pair of
+// >> registers (%edx and %eax for the 32-bit case; %rdx and %rax for the 64-bit case); the divisor is specified as the
+// >> source operand in the instruction. The quotient goes in %eax (resp. %rax); the remainder in %edx (resp. %rdx). For
+// >> signed division, the cltd (resp. ctqo) instruction is used to prepare %edx (resp. %rdx) with the sign extension of
+// >> %eax (resp. %rax). For example, if a,b, c are memory locations holding quad words, then we could set c = a/b
+// >> using the sequence: movq a(%rip), %rax; ctqo; idivq b(%rip); movq %rax, c(%rip).
+//
+// tl;dr is that the division result is placed in AX and DX registers after instructions emitted by this function
+// where AX is holding the quotiend while DX holding remainder of the division result.
+func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 
 	const (
 		quotientRegister  = x86.REG_AX
