@@ -1319,7 +1319,7 @@ func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 	}
 }
 
-// compileShr emits instructions to perform and operation on
+// compileAnd emits instructions to perform an "and" operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 	switch o.Type {
@@ -1331,7 +1331,7 @@ func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 	return
 }
 
-// compileShr emits instructions to perform or operation on
+// compileOr emits instructions to perform an "or" operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 	switch o.Type {
@@ -1343,7 +1343,7 @@ func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 	return
 }
 
-// compileShr emits instructions to perform xor operation on
+// compileXor emits instructions to perform an xor operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 	switch o.Type {
@@ -1355,7 +1355,7 @@ func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 	return
 }
 
-// compileShr emits instructions to perform shift-left operation on
+// compileShl emits instructions to perform a shift-left operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	switch o.Type {
@@ -1367,7 +1367,7 @@ func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	return
 }
 
-// compileShr emits instructions to perform shift-right operation on
+// compileShr emits instructions to perform a shift-right operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	switch o.Type {
@@ -1383,7 +1383,7 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	return
 }
 
-// compileShr emits instructions to perform rotate-left operation on
+// compileRotl emits instructions to perform a rotate-left operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	switch o.Type {
@@ -1395,7 +1395,7 @@ func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	return
 }
 
-// compileShr emits instructions to perform rotate-right operation on
+// compileRotr emits instructions to perform a rotate-right operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
 	switch o.Type {
