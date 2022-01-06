@@ -15,15 +15,15 @@ func TestEncodeNameSection(t *testing.T) {
 	// TIP: the below is the binary suffix of `wat2wasm --debug-names --debug-parser -v simple.wat` where simple.wat
 	// contains the same text as simpleExample
 	require.Equal(t, []byte{
-		0x00, /* module subsection ID zero */
-		0x07, /* 7 bytes to follow */
-		0x06, /* the module name simple is 6 characters long */
+		0x00, // module subsection ID zero
+		0x07, // 7 bytes to follow
+		0x06, // the module name simple is 6 characters long
 		's', 'i', 'm', 'p', 'l', 'e',
-		0x01, /* function subsection ID one */
-		0x08, /* 8 bytes to follow */
-		0x01, /* one function name */
-		0x00, /* the function index is zero */
-		0x05, /* the function name hello is 5 characters long */
+		0x01, // function subsection ID one
+		0x08, // 8 bytes to follow
+		0x01, // one function name
+		0x00, // the function index is zero
+		0x05, // the function name hello is 5 characters long
 		'h', 'e', 'l', 'l', 'o',
 	}, encodeNameSection(m))
 }
@@ -46,7 +46,7 @@ func TestEncodeNameSection_OnlyFuncName(t *testing.T) {
 
 	expected := append(append([]byte{
 		0x01, // function subsection ID one
-		// length includes 1 byte overhead for the function name count, and 2 bytes (index + length prefix) per name
+		// length includes overhead for size in bytes of the function name count, plus index + length prefix per name
 		byte(1 + 2 + 2 + len(func0) + len(func1)),
 		0x02, // two function names
 	},
