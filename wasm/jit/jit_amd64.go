@@ -1257,7 +1257,7 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 	// Now ready to emit the div instruction.
 	div := c.newProg()
 	div.To.Type = obj.TYPE_NONE
-	// Since the div instructions takes 2n byte dividend placed in DX:AX registers,
+	// Since the div instructions takes 2n byte dividend placed in DX:AX registers...
 	// * signed case - we need to sign-extend the dividend into DX register via CDQ (32 bit) or CQO (64 bit).
 	// * unsigned case - we need to zero DX register via "XOR DX DX"
 	if is32Bit && signed {
