@@ -5,37 +5,51 @@ import (
 	"fmt"
 )
 
+// currentField holds the positional state of parser. Values are also useful as they allow you to do a reference search
+// for all related code including parsers of that position.
 type currentField byte
 
 const (
 	// fieldInitial is the first position in the source being parsed.
 	fieldInitial currentField = iota
+	// fieldModule is a top-level field named "module"
 	fieldModule
+	// fieldModuleImport is a field named "import" enclosed by the top-level field "module"
+	//
+	// At the start of the field, moduleParser.currentValue0 tracks importFunc.module while moduleParser.currentValue1
+	// tracks importFunc.name. If a field named "func" is encountered, these names are recorded while
+	// fieldModuleImportFunc takes over parsing.
 	fieldModuleImport
+	// fieldModuleImportFunc is a field named "func" enclosed by a field named "import"
 	fieldModuleImportFunc
+	// fieldModuleStart is a field named "start" enclosed by the top-level field "module"
 	fieldModuleStart
 )
 
 type moduleParser struct {
+	// source is the entire WebAssembly text format source code being parsed.
 	source []byte
+	// module holds the fields incrementally parsed from tokens in the source.
 	module *module
-	// currentStringCount allows us to unquote the _import.module and _import.name fields, differentiating empty
-	// from never set, without making _import.module and _import.name pointers.
-	currentStringCount int
+
 	// currentField is the parser and error context.
 	// This is set after reading a field name, ex "module", or after reaching the end of one, ex ')'.
 	currentField
+
 	// tokenParser is called by lex, and changes based on the currentField.
 	// The initial tokenParser is ensureLParen because %.wat files must begin with a '(' token (ignoring whitespace).
 	tokenParser
+
+	// currentValue0 is a currentField-specific place to stash a string when parsing a field.
+	// Ex. for fieldModuleImport, this would be Math if (import "Math" "PI" ...)
+	currentValue0 []byte
+
+	// currentValue1 is a currentField-specific place to stash a string when parsing a field.
+	// Ex. for fieldModuleImport, this would be PI if (import "Math" "PI" ...)
+	currentValue1 []byte
+
 	// currentImportIndex allows us to track the relative position of imports regardless of what they describe
-	currentImportIndex int
-	// currentImportModule is the first string of the current import. Ex. "Math" if (import "Math" "PI" (func))
-	currentImportModule string
-	// currentImportName is the second string of the current import. Ex. "PI" if (import "Math" "PI" (func))
-	currentImportName string
-	// currentImportHasDesc tracks if we found a description (Ex. (func)) of the current import.
-	currentImportHasDesc bool
+	currentImportIndex uint32
 }
 
 // parseModule parses the configured source into a module. This function returns when the source is exhausted or an
@@ -140,34 +154,27 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 	switch tok {
 	case tokenString:
 		// Note: tokenString is minimum length two on account of quotes. Ex. "" or "foo"
-		name := string(tokenBytes[1 : len(tokenBytes)-1]) // unquote
-		if p.currentStringCount == 0 {
-			p.currentImportModule = name
-		} else if p.currentImportName != "" {
+		name := tokenBytes[1 : len(tokenBytes)-1] // unquote
+		if p.currentValue0 == nil {               // Ex. (module ""
+			p.currentValue0 = name
+		} else if p.currentValue1 == nil { // Ex. (module "" ""
+			p.currentValue1 = name
+		} else { // Ex. (module "" "" ""
 			return fmt.Errorf("redundant name: %s", name)
-		} else {
-			p.currentImportName = name
 		}
-		p.currentStringCount = p.currentStringCount + 1
 	case tokenLParen: // start fields, ex. (func
 		p.tokenParser = p.startField
 		return nil
 	case tokenRParen: // end of this import
-		switch p.currentStringCount { // names precede desc
-		case 0:
-			return errors.New("missing module and name")
-		case 1:
-			return errors.New("missing name")
-		}
-		if !p.currentImportHasDesc {
-			return errors.New("missing description")
+		// If we've not yet added the current import, determine the best error message.
+		if uint32(len(p.module.importFuncs)) == p.currentImportIndex {
+			if err := p.validateImportModuleAndName(); err != nil {
+				return err // Ex. (module) or (module "Math")
+			}
+			return errors.New("missing description field") // Ex. (module "Math" "Pi")
 		}
 		p.currentField = fieldModule
-		p.currentImportIndex = p.currentImportIndex + 1
-		p.currentStringCount = 0
-		p.currentImportModule = ""
-		p.currentImportName = ""
-		p.currentImportHasDesc = false
+		p.currentImportIndex++
 		p.tokenParser = p.parseModule
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
@@ -176,18 +183,34 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 }
 
 func (p *moduleParser) importFieldHandler(fieldName []byte) (tokenParser, error) {
-	if p.currentImportHasDesc {
+	if uint32(len(p.module.importFuncs)) > p.currentImportIndex {
 		return nil, fmt.Errorf("redundant field: %s", string(fieldName))
 	}
 	switch string(fieldName) {
 	case "func":
-		p.currentImportHasDesc = true
+		if err := p.validateImportModuleAndName(); err != nil {
+			return nil, err
+		}
 		p.currentField = fieldModuleImportFunc
-		desc := &importFunc{module: p.currentImportModule, name: p.currentImportName, importIndex: p.currentImportIndex}
+		desc := &importFunc{
+			module:      string(p.currentValue0),
+			name:        string(p.currentValue1),
+			importIndex: p.currentImportIndex,
+		}
+		p.currentValue0, p.currentValue1 = nil, nil
 		p.module.importFuncs = append(p.module.importFuncs, desc)
 		return p.parseImportFunc, nil
 	} // TODO: table, memory or global
 	return nil, fmt.Errorf("unexpected field: %s", string(fieldName))
+}
+
+func (p *moduleParser) validateImportModuleAndName() error {
+	if p.currentValue0 == nil && p.currentValue1 == nil {
+		return errors.New("missing module and name")
+	} else if p.currentValue1 == nil {
+		return errors.New("missing name")
+	}
+	return nil
 }
 
 func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, _, _ uint32) error {

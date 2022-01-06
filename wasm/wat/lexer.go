@@ -54,7 +54,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 		// The spec does not consider newlines apart from '\n'. Notably, a bare '\r' is not a newline here.
 		// See https://www.w3.org/TR/wasm-core-1/#text-comment
 		if b1 == '\n' {
-			line = line + 1
+			line++
 			col = 0  // for loop will + 1
 			continue // next line
 		}
@@ -72,14 +72,14 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 			}
 			if source[peek] == ';' { // next block comment
 				i = peek // continue after "(;"
-				col = col + 1
-				blockCommentDepth = blockCommentDepth + 1
+				col++
+				blockCommentDepth++
 				continue
 			} else if blockCommentDepth == 0 { // Fast path left paren token at the expense of code duplication.
 				if e := parser(tokenLParen, constantLParen, line, col); e != nil {
 					return line, col, e
 				}
-				parenDepth = parenDepth + 1
+				parenDepth++
 				continue
 			}
 		case ')':
@@ -90,7 +90,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 				if e := parser(tokenRParen, constantRParen, line, col); e != nil {
 					return line, col, e
 				}
-				parenDepth = parenDepth - 1
+				parenDepth--
 				continue
 			}
 		case ';': // possible line comment or block comment end
@@ -99,15 +99,15 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 				b2 := source[peek]
 				if blockCommentDepth > 0 && b2 == ')' {
 					i = peek // continue after ";)"
-					col = col + 1
-					blockCommentDepth = blockCommentDepth - 1
+					col++
+					blockCommentDepth--
 					continue
 				}
 
 				if b2 == ';' { // line comment
 					// Start after ";;" and run until the end. Note UTF-8 (multi-byte) characters are allowed.
-					peek = peek + 1
-					col = col + 1
+					peek++
+					col++
 
 				LineComment:
 					for peek < end {
@@ -116,7 +116,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 							break LineComment // EOL bookkeeping will proceed on the next iteration
 						}
 
-						col = col + 1
+						col++
 						s := utf8Size[peeked] // While unlikely, it is possible the byte peeked is invalid unicode
 						if s == 0 {
 							return line, col, fmt.Errorf("found an invalid byte in line comment: 0x%x", peeked)
@@ -167,11 +167,11 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 				}
 			Number:
 				// Start after the number and run until the end. Note all allowed characters are single byte.
-				for ; peek < end; peek = peek + 1 {
+				for ; peek < end; peek++ {
 					switch source[peek] {
 					case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '_':
 						i = peek
-						col = col + 1
+						col++
 					default:
 						break Number // end of this token (or malformed, which the next loop will notice)
 					}
@@ -188,7 +188,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 					break String
 				}
 
-				col = col + 1
+				col++
 				s := utf8Size[peeked] // While unlikely, it is possible the current byte is invalid unicode
 				if s == 0 {
 					return line, col, fmt.Errorf("found an invalid byte in string token: 0x%x", peeked)
@@ -202,16 +202,16 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 
 			i = peek
 			// set the position to after the quote
-			peek = peek + 1
-			col = col + 1
+			peek++
+			col++
 		case tokenKeyword, tokenID, tokenReserved: // min 1 byte; end with zero or more idChar
 			// Start after the first character and run until the end. Note all allowed characters are single byte.
 		IdChars:
-			for ; peek < end; peek = peek + 1 {
+			for ; peek < end; peek++ {
 				if !idChar[source[peek]] {
 					break IdChars // end of this token (or malformed, which the next loop will notice)
 				}
-				col = col + 1
+				col++
 			}
 			i = peek - 1
 		default:
