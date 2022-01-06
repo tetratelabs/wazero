@@ -2960,7 +2960,7 @@ func getDivisionByZeroErrorRecoverFunc(t *testing.T) func() {
 	}
 }
 
-func TestAmd64Compiler_compileAnd_Or_Xor_Shl_Shr(t *testing.T) {
+func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		op   wazeroir.Operation
