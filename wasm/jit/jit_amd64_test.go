@@ -2948,6 +2948,462 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_compileDiv(t *testing.T) {
+	t.Run("int32", func(t *testing.T) {
+		for _, signed := range []struct {
+			name   string
+			signed bool
+		}{{name: "signed", signed: true}, {name: "unsigned", signed: false}} {
+			signed := signed
+			t.Run(signed.name, func(t *testing.T) {
+				for _, tc := range []struct {
+					name string
+					// Interpret -1 as stack.
+					x1Reg, x2Reg int16
+				}{
+					{
+						name:  "x1:ax,x2:random_reg",
+						x1Reg: x86.REG_AX,
+						x2Reg: x86.REG_R10,
+					},
+					{
+						name:  "x1:ax,x2:stack",
+						x1Reg: x86.REG_AX,
+						x2Reg: -1,
+					},
+					{
+						name:  "x1:random_reg,x2:ax",
+						x1Reg: x86.REG_R10,
+						x2Reg: x86.REG_AX,
+					},
+					{
+						name:  "x1:staack,x2:ax",
+						x1Reg: -1,
+						x2Reg: x86.REG_AX,
+					},
+					{
+						name:  "x1:random_reg,x2:random_reg",
+						x1Reg: x86.REG_R10,
+						x2Reg: x86.REG_R9,
+					},
+					{
+						name:  "x1:stack,x2:random_reg",
+						x1Reg: -1,
+						x2Reg: x86.REG_R9,
+					},
+					{
+						name:  "x1:random_reg,x2:stack",
+						x1Reg: x86.REG_R9,
+						x2Reg: -1,
+					},
+					{
+						name:  "x1:stack,x2:stack",
+						x1Reg: -1,
+						x2Reg: -1,
+					},
+				} {
+					tc := tc
+					t.Run(tc.name, func(t *testing.T) {
+						const dxValue uint64 = 111111
+						for i, vs := range []struct {
+							x1Value, x2Value uint32
+						}{
+							{x1Value: 2, x2Value: 1},
+							{x1Value: 1, x2Value: 2},
+							{x1Value: 0, x2Value: 2},
+							{x1Value: 1, x2Value: 0},
+							{x1Value: 0, x2Value: 0},
+							// Following cases produce different resulting bit patterns for signed and unsigned.
+							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 1},
+							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 0xfffffffe /* -2 in signed 32bit */},
+						} {
+							vs := vs
+							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+
+								eng := newEngine()
+								compiler := requireNewCompiler(t)
+								compiler.initializeReservedRegisters()
+
+								// Pretend there was an existing value on the DX register. We expect compileDivForInts to save this to the stack.
+								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
+								// but in reality, it can exist in any position of stack.
+								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
+								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+
+								// Setup values.
+								if tc.x1Reg != -1 {
+									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
+									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+								} else {
+									loc := compiler.locationStack.pushValueOnStack()
+									eng.stack[loc.stackPointer] = uint64(vs.x1Value)
+								}
+								if tc.x2Reg != -1 {
+									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
+									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+								} else {
+									loc := compiler.locationStack.pushValueOnStack()
+									eng.stack[loc.stackPointer] = uint64(vs.x2Value)
+								}
+
+								var err error
+								if signed.signed {
+									err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeInt32})
+								} else {
+									err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeUint32})
+								}
+								require.NoError(t, err)
+
+								require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+								require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
+								require.Equal(t, uint64(2), compiler.locationStack.sp)
+								require.Len(t, compiler.locationStack.usedRegisters, 1)
+								// At this point, the previous value on the DX register is saved to the stack.
+								require.True(t, prevOnDX.onStack())
+
+								// We add the value previously on the DX with the multiplication result
+								// in order to ensure that not saving existing DX value would cause
+								// the failure in a subsequent instruction.
+								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+								require.NoError(t, err)
+
+								// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
+								defer func() {
+									if e := recover(); e != nil {
+										err, ok := e.(error)
+										require.True(t, ok)
+										require.Equal(t, "runtime error: integer divide by zero", err.Error())
+									}
+								}()
+
+								// To verify the behavior, we push the value
+								// to the stack.
+								compiler.releaseAllRegistersToStack()
+								compiler.returnFunction()
+
+								// Generate the code under test.
+								code, _, err := compiler.generate()
+								require.NoError(t, err)
+								// Run code.
+								jitcall(
+									uintptr(unsafe.Pointer(&code[0])),
+									uintptr(unsafe.Pointer(eng)),
+									0,
+								)
+
+								// Verify the stack is in the form of ["any value previously used by DX" + x1 / x2]
+								require.Equal(t, uint64(1), eng.stackPointer)
+								if signed.signed {
+									require.Equal(t, int32(vs.x1Value)/int32(vs.x2Value)+int32(dxValue), int32(eng.stack[eng.stackPointer-1]))
+								} else {
+									require.Equal(t, vs.x1Value/vs.x2Value+uint32(dxValue), uint32(eng.stack[eng.stackPointer-1]))
+								}
+							})
+						}
+					})
+				}
+			})
+		}
+	})
+	t.Run("int64", func(t *testing.T) {
+		for _, signed := range []struct {
+			name   string
+			signed bool
+		}{
+			{name: "signed", signed: true},
+			{name: "unsigned", signed: false},
+		} {
+			signed := signed
+			t.Run(signed.name, func(t *testing.T) {
+				for _, tc := range []struct {
+					name string
+					// Interpret -1 as stack.
+					x1Reg, x2Reg int16
+				}{
+					{
+						name:  "x1:ax,x2:random_reg",
+						x1Reg: x86.REG_AX,
+						x2Reg: x86.REG_R10,
+					},
+					{
+						name:  "x1:ax,x2:stack",
+						x1Reg: x86.REG_AX,
+						x2Reg: -1,
+					},
+					{
+						name:  "x1:random_reg,x2:ax",
+						x1Reg: x86.REG_R10,
+						x2Reg: x86.REG_AX,
+					},
+					{
+						name:  "x1:staack,x2:ax",
+						x1Reg: -1,
+						x2Reg: x86.REG_AX,
+					},
+					{
+						name:  "x1:random_reg,x2:random_reg",
+						x1Reg: x86.REG_R10,
+						x2Reg: x86.REG_R9,
+					},
+					{
+						name:  "x1:stack,x2:random_reg",
+						x1Reg: -1,
+						x2Reg: x86.REG_R9,
+					},
+					{
+						name:  "x1:random_reg,x2:stack",
+						x1Reg: x86.REG_R9,
+						x2Reg: -1,
+					},
+					{
+						name:  "x1:stack,x2:stack",
+						x1Reg: -1,
+						x2Reg: -1,
+					},
+				} {
+					tc := tc
+					t.Run(tc.name, func(t *testing.T) {
+						const dxValue uint64 = 111111
+						for i, vs := range []struct {
+							x1Value, x2Value uint64
+						}{
+							{x1Value: 2, x2Value: 1},
+							{x1Value: 1, x2Value: 2},
+							{x1Value: 0, x2Value: 1},
+							{x1Value: 1, x2Value: 0},
+							{x1Value: 0, x2Value: 0},
+							// Following cases produce different resulting bit patterns for signed and unsigned.
+							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 1},
+							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 0xfffffffffffffffe /* -2 in signed 64bit */},
+						} {
+							vs := vs
+							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+
+								eng := newEngine()
+								compiler := requireNewCompiler(t)
+								compiler.initializeReservedRegisters()
+
+								// Pretend there was an existing value on the DX register. We expect compileDivForInts to save this to the stack.
+								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
+								// but in reality, it can exist in any position of stack.
+								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
+								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+
+								// Setup values.
+								if tc.x1Reg != -1 {
+									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
+									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+								} else {
+									loc := compiler.locationStack.pushValueOnStack()
+									eng.stack[loc.stackPointer] = uint64(vs.x1Value)
+								}
+								if tc.x2Reg != -1 {
+									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
+									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+								} else {
+									loc := compiler.locationStack.pushValueOnStack()
+									eng.stack[loc.stackPointer] = uint64(vs.x2Value)
+								}
+
+								var err error
+								if signed.signed {
+									err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeInt64})
+								} else {
+									err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeUint64})
+								}
+								require.NoError(t, err)
+
+								require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
+								require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
+								require.Equal(t, uint64(2), compiler.locationStack.sp)
+								require.Len(t, compiler.locationStack.usedRegisters, 1)
+								// At this point, the previous value on the DX register is saved to the stack.
+								require.True(t, prevOnDX.onStack())
+
+								// We add the value previously on the DX with the quotiont of the division result
+								// in order to ensure that not saving existing DX value would cause
+								// the failure in a subsequent instruction.
+								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
+								require.NoError(t, err)
+
+								// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
+								defer func() {
+									if e := recover(); e != nil {
+										err, ok := e.(error)
+										require.True(t, ok)
+										require.Equal(t, "runtime error: integer divide by zero", err.Error())
+									}
+								}()
+
+								// To verify the behavior, we push the value
+								// to the stack.
+								compiler.releaseAllRegistersToStack()
+								compiler.returnFunction()
+
+								// Generate the code under test.
+								code, _, err := compiler.generate()
+								require.NoError(t, err)
+								// Run code.
+								jitcall(
+									uintptr(unsafe.Pointer(&code[0])),
+									uintptr(unsafe.Pointer(eng)),
+									0,
+								)
+
+								// Verify the stack is in the form of ["any value previously used by DX" + x1 / x2]
+								require.Equal(t, uint64(1), eng.stackPointer)
+								if signed.signed {
+									require.Equal(t, int64(vs.x1Value)/int64(vs.x2Value)+int64(dxValue), int64(eng.stack[eng.stackPointer-1]))
+								} else {
+									require.Equal(t, vs.x1Value/vs.x2Value+dxValue, eng.stack[eng.stackPointer-1])
+								}
+							})
+						}
+					})
+				}
+			})
+		}
+	})
+	t.Run("float32", func(t *testing.T) {
+		for i, tc := range []struct {
+			x1, x2 float32
+		}{
+			{x1: 100, x2: 0},
+			{x1: 0, x2: 100},
+			{x1: 100, x2: -1.1},
+			{x1: -1, x2: 100},
+			{x1: 100, x2: 200},
+			{x1: 100.01234124, x2: 100.01234124},
+			{x1: 100.01234124, x2: -100.01234124},
+			{x1: 200.12315, x2: 100},
+			{x1: float32(math.Inf(1)), x2: 100},
+			{x1: float32(math.Inf(-1)), x2: -100},
+			{x1: 100, x2: float32(math.Inf(1))},
+			{x1: -100, x2: float32(math.Inf(-1))},
+			{x1: float32(math.Inf(1)), x2: 0},
+			{x1: float32(math.Inf(-1)), x2: 0},
+			{x1: 0, x2: float32(math.Inf(1))},
+			{x1: 0, x2: float32(math.Inf(-1))},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+				require.NoError(t, err)
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
+				require.NoError(t, err)
+				x2 := compiler.locationStack.peek()
+
+				err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeFloat32})
+				require.NoError(t, err)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+
+				// Check the result.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				exp := tc.x1 / tc.x2
+				actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, tc.x1/tc.x2, actual)
+				}
+			})
+		}
+	})
+	t.Run("float64", func(t *testing.T) {
+		for i, tc := range []struct {
+			x1, x2 float64
+		}{
+			{x1: 100, x2: -1.1},
+			{x1: 100, x2: 0},
+			{x1: 0, x2: 0},
+			{x1: -1, x2: 100},
+			{x1: 100, x2: 200},
+			{x1: 100.01234124, x2: 100.01234124},
+			{x1: 100.01234124, x2: -100.01234124},
+			{x1: 200.12315, x2: 100},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
+			{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
+			{x1: math.Inf(1), x2: 100},
+			{x1: math.Inf(1), x2: -100},
+			{x1: 100, x2: math.Inf(1)},
+			{x1: -100, x2: math.Inf(1)},
+			{x1: math.Inf(-1), x2: 100},
+			{x1: math.Inf(-1), x2: -100},
+			{x1: 100, x2: math.Inf(-1)},
+			{x1: -100, x2: math.Inf(-1)},
+			{x1: math.Inf(1), x2: 0},
+			{x1: math.Inf(-1), x2: 0},
+			{x1: 0, x2: math.Inf(1)},
+			{x1: 0, x2: math.Inf(-1)},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				compiler := requireNewCompiler(t)
+				compiler.initializeReservedRegisters()
+				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+				require.NoError(t, err)
+				x1 := compiler.locationStack.peek()
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
+				require.NoError(t, err)
+				x2 := compiler.locationStack.peek()
+
+				err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeFloat64})
+				require.NoError(t, err)
+				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
+				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+
+				// To verify the behavior, we push the value
+				// to the stack.
+				compiler.releaseRegisterToStack(x1)
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+				// Run code.
+				eng := newEngine()
+				mem := newMemoryInst()
+				jitcall(
+					uintptr(unsafe.Pointer(&code[0])),
+					uintptr(unsafe.Pointer(eng)),
+					uintptr(unsafe.Pointer(&mem.Buffer[0])),
+				)
+
+				// Check the result.
+				require.Equal(t, uint64(1), eng.stackPointer)
+				exp := tc.x1 / tc.x2
+				actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, tc.x1/tc.x2, actual)
+				}
+			})
+		}
+	})
+}
+
 func TestAmd64Compiler_compileCall(t *testing.T) {
 	t.Run("host function", func(t *testing.T) {
 		const functionIndex = 5

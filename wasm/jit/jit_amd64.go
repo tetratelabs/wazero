@@ -1122,6 +1122,179 @@ func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	return nil
 }
 
+// compileDiv emits the instructions to perform division on the top two values on the stack.
+func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		err = c.compileDivForInts(true, false)
+	case wazeroir.SignedTypeUint64:
+		err = c.compileDivForInts(false, false)
+	case wazeroir.SignedTypeInt32:
+		err = c.compileDivForInts(true, true)
+	case wazeroir.SignedTypeInt64:
+		err = c.compileDivForInts(false, true)
+	case wazeroir.SignedTypeFloat32:
+		err = c.compileDivForFloats(true)
+	case wazeroir.SignedTypeFloat64:
+		err = c.compileDivForFloats(false)
+	}
+	return
+}
+
+// compileDivForInts emits the instructions to perform division on the top
+// two values of integer type on the stack and put the quotient of the result
+// onto the stack. For example, stack [..., 4, 3] results in [..., 1] where
+// the remainder is discarded. See compileRem for how to acquire remainder, not quotient.
+func (c *amd64Compiler) compileDivForInts(is32Bit bool, isSigned bool) error {
+	const (
+		quotientRegister  = x86.REG_AX
+		remainderRegister = x86.REG_DX
+	)
+
+	x2 := c.locationStack.pop()
+	if x2.onConditionalRegister() {
+		if err := c.moveConditionalToFreeGeneralPurposeRegister(x2); err != nil {
+			return err
+		}
+	}
+	// If x2 is placed in the AX, we just release it to the memory stack
+	// as AX must be set to the x1's value below.
+	if x2.register == quotientRegister {
+		c.releaseRegisterToStack(x2)
+	}
+
+	x1 := c.locationStack.pop()
+	// Ensure that x1 is placed on the AX register.
+	if x1.register != quotientRegister {
+		c.onValueReleaseRegisterToStack(quotientRegister)
+		if x2.onConditionalRegister() {
+			c.moveConditionalToGeneralPurposeRegister(x1, quotientRegister)
+		} else if x1.onStack() {
+			x1.setRegister(quotientRegister)
+			c.moveStackToRegister(x1)
+			c.locationStack.markRegisterUsed(quotientRegister)
+		} else {
+			moveX1ToQuotientRegister := c.newProg()
+			if is32Bit {
+				moveX1ToQuotientRegister.As = x86.AMOVL
+			} else {
+				moveX1ToQuotientRegister.As = x86.AMOVQ
+			}
+			moveX1ToQuotientRegister.To.Reg = quotientRegister
+			moveX1ToQuotientRegister.To.Type = obj.TYPE_REG
+			moveX1ToQuotientRegister.From.Reg = x1.register
+			moveX1ToQuotientRegister.From.Type = obj.TYPE_REG
+			c.addInstruction(moveX1ToQuotientRegister)
+			// We no longer uses the prev register of x1.
+			c.locationStack.releaseRegister(x1)
+			x1.setRegister(quotientRegister)
+			c.locationStack.markRegisterUsed(quotientRegister)
+		}
+	}
+
+	// We have to save the existing value on DX as the division instruction
+	// place the remainder of the result there.
+	c.onValueReleaseRegisterToStack(remainderRegister)
+
+	// Now ready to emit the div instruction.
+	div := c.newProg()
+	div.To.Type = obj.TYPE_NONE
+	// Since the div instructions takes 2n byte dividend placed in DX:AX register,
+	// 1) For signed case, we need to sign-extend the dividend into DX register via CDQ (32 bit) or CQO (64 bit).
+	// 1) For unsigned case, we need to zero DX register via "XOR DX DX"
+	if is32Bit && isSigned {
+		// Singed 32 bit.
+		div.As = x86.AIDIVL
+		// Emit sign-extension to have 64 bit dividend over DX and AX registers.
+		extIntoDX := c.newProg()
+		extIntoDX.As = x86.ACDQ
+		c.addInstruction(extIntoDX)
+	} else if is32Bit && !isSigned {
+		// Un-singed 32 bit.
+		div.As = x86.ADIVL
+		// Zeros DX register to have 64 bit dividend over DX and AX registers.
+		zerosDX := c.newProg()
+		zerosDX.As = x86.AXORQ
+		zerosDX.From.Type = obj.TYPE_REG
+		zerosDX.From.Reg = x86.REG_DX
+		zerosDX.To.Type = obj.TYPE_REG
+		zerosDX.To.Reg = x86.REG_DX
+		c.addInstruction(zerosDX)
+	} else if !is32Bit && isSigned {
+		// Singed 64 bit.
+		div.As = x86.AIDIVQ
+		// Emit sign-extension to have 128 bit dividend over DX and AX registers.
+		extIntoDX := c.newProg()
+		extIntoDX.As = x86.ACQO
+		c.addInstruction(extIntoDX)
+	} else if !is32Bit && !isSigned {
+		// Un-singed 64 bit.
+		div.As = x86.ADIVQ
+		// Zeros DX register to have 128 bit dividend over DX and AX registers.
+		zerosDX := c.newProg()
+		zerosDX.As = x86.AXORQ
+		zerosDX.From.Type = obj.TYPE_REG
+		zerosDX.From.Reg = x86.REG_DX
+		zerosDX.To.Type = obj.TYPE_REG
+		zerosDX.To.Reg = x86.REG_DX
+		c.addInstruction(zerosDX)
+	}
+
+	if x2.onRegister() {
+		div.From.Reg = x2.register
+		div.From.Type = obj.TYPE_REG
+		c.locationStack.markRegisterUnused(x2.register)
+	} else {
+		// On stack case.
+		div.From.Type = obj.TYPE_MEM
+		div.From.Reg = reservedRegisterForStackBasePointer
+		div.From.Offset = int64(x2.stackPointer) * 8
+	}
+	c.addInstruction(div)
+
+	// Now we have the result in the AX register,
+	// so we record it.
+	result := c.locationStack.pushValueOnRegister(quotientRegister)
+	result.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+// compileDivForFloats emits the instructions to perform division
+// on the top two values of float type on the stack.
+// For example, stack [..., 1.0, 4.0] results in [..., 0.25].
+func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	div := c.newProg()
+	div.From.Type = obj.TYPE_REG
+	div.From.Reg = x2.register
+	div.To.Type = obj.TYPE_REG
+	div.To.Reg = x1.register
+	if is32Bit {
+		div.As = x86.ADIVSS
+	} else {
+		div.As = x86.ADIVSD
+	}
+	c.addInstruction(div)
+
+	// We consumed x2 register after DIV operation here,
+	// so we release it.
+	c.locationStack.releaseRegister(x2)
+	return nil
+}
+
+func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) error {
+	return nil
+}
+
 func (c *amd64Compiler) compileEq(o *wazeroir.OperationEq) error {
 	return c.emitEqOrNe(o.Type, true)
 }
