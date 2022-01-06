@@ -1383,6 +1383,8 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	return
 }
 
+// compileShr emits instructions to perform rotate-left operation on
+// top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -1393,6 +1395,8 @@ func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	return
 }
 
+// compileShr emits instructions to perform rotate-right operation on
+// top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
