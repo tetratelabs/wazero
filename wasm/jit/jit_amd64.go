@@ -1142,7 +1142,7 @@ func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
 }
 
 // compileDivForInts emits the instructions to perform division on the top
-// two values of integer type on the stack and put the quotient of the result
+// two values of integer type on the stack and puts the quotient of the result
 // onto the stack. For example, stack [..., 4, 3] results in [..., 1] where
 // the remainder is discarded. See compileRem for how to acquire remainder, not quotient.
 func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
@@ -1160,7 +1160,7 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 }
 
 // compileRem emits the instructions to perform division on the top
-// two values of integer type on the stack and put the remainder of the result
+// two values of integer type on the stack and puts the remainder of the result
 // onto the stack. For example, stack [..., 8, 3] results in [..., 2] where
 // the quotient is discarded. See compileDivForInts for how to acquire quotient, not remainder.
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
@@ -1201,7 +1201,7 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 // >> using the sequence: movq a(%rip), %rax; ctqo; idivq b(%rip); movq %rax, c(%rip).
 //
 // tl;dr is that the division result is placed in AX and DX registers after instructions emitted by this function
-// where AX is holding the quotiend while DX holding remainder of the division result.
+// where AX holds the quotient while DX the remainder of the division result.
 func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 
 	const (
@@ -1222,7 +1222,7 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 	}
 
 	x1 := c.locationStack.pop()
-	// Ensure that x1 is placed on the AX register.
+	// Ensure that x1 is placed on the quotient (AX) register.
 	if x1.register != quotientRegister {
 		c.onValueReleaseRegisterToStack(quotientRegister)
 		if x2.onConditionalRegister() {
@@ -1258,18 +1258,16 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 	div := c.newProg()
 	div.To.Type = obj.TYPE_NONE
 	// Since the div instructions takes 2n byte dividend placed in DX:AX registers,
-	// signed case) we need to sign-extend the dividend into DX register via CDQ (32 bit) or CQO (64 bit).
-	// unsigned case) we need to zero DX register via "XOR DX DX"
+	// * signed case - we need to sign-extend the dividend into DX register via CDQ (32 bit) or CQO (64 bit).
+	// * unsigned case - we need to zero DX register via "XOR DX DX"
 	if is32Bit && signed {
-		// Singed 32 bit.
-		div.As = x86.AIDIVL
+		div.As = x86.AIDIVL // Signed 32-bit
 		// Emit sign-extension to have 64 bit dividend over DX and AX registers.
 		extIntoDX := c.newProg()
 		extIntoDX.As = x86.ACDQ
 		c.addInstruction(extIntoDX)
 	} else if is32Bit && !signed {
-		// Un-singed 32 bit.
-		div.As = x86.ADIVL
+		div.As = x86.ADIVL // Unsigned 32-bit
 		// Zeros DX register to have 64 bit dividend over DX and AX registers.
 		zerosDX := c.newProg()
 		zerosDX.As = x86.AXORQ
@@ -1279,15 +1277,13 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 		zerosDX.To.Reg = x86.REG_DX
 		c.addInstruction(zerosDX)
 	} else if !is32Bit && signed {
-		// Singed 64 bit.
-		div.As = x86.AIDIVQ
-		// Emit sign-extension to have 128 bit dividend over DX and AX registers.
+		div.As = x86.AIDIVQ // Signed 64-bit
+		// Emits sign-extension to have 128 bit dividend over DX and AX registers.
 		extIntoDX := c.newProg()
 		extIntoDX.As = x86.ACQO
 		c.addInstruction(extIntoDX)
 	} else if !is32Bit && !signed {
-		// Un-singed 64 bit.
-		div.As = x86.ADIVQ
+		div.As = x86.ADIVQ // Unsigned 64-bit
 		// Zeros DX register to have 128 bit dividend over DX and AX registers.
 		zerosDX := c.newProg()
 		zerosDX.As = x86.AXORQ
@@ -1313,7 +1309,7 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 }
 
 // compileDivForFloats emits the instructions to perform division
-// on the top two values of float type on the stack.
+// on the top two values of float type on the stack, placing the result back onto the stack.
 // For example, stack [..., 1.0, 4.0] results in [..., 0.25].
 func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 	x2 := c.locationStack.pop()
