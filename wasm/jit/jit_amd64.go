@@ -1312,31 +1312,131 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 // on the top two values of float type on the stack, placing the result back onto the stack.
 // For example, stack [..., 1.0, 4.0] results in [..., 0.25].
 func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
+	if is32Bit {
+		return c.emitSimpleBinaryOp(x86.ADIVSS)
+	} else {
+		return c.emitSimpleBinaryOp(x86.ADIVSD)
+	}
+}
+
+// compileAnd emits instructions to perform an "and" operation on
+// top two values on the stack, and pushes the result.
+func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.AANDL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.AANDQ)
+	}
+	return
+}
+
+// compileOr emits instructions to perform an "or" operation on
+// top two values on the stack, and pushes the result.
+func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.AORL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.AORQ)
+	}
+	return
+}
+
+// compileXor emits instructions to perform an xor operation on
+// top two values on the stack, and pushes the result.
+func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.AXORL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.AXORQ)
+	}
+	return
+}
+
+// compileShl emits instructions to perform a shift-left operation on
+// top two values on the stack, and pushes the result.
+func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.ASHLL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.ASHLQ)
+	}
+	return
+}
+
+// compileShr emits instructions to perform a shift-right operation on
+// top two values on the stack, and pushes the result.
+func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
+	switch o.Type {
+	case wazeroir.SignedInt32:
+		err = c.emitSimpleBinaryOp(x86.ASARL)
+	case wazeroir.SignedInt64:
+		err = c.emitSimpleBinaryOp(x86.ASARQ)
+	case wazeroir.SignedUint32:
+		err = c.emitSimpleBinaryOp(x86.ASHRL)
+	case wazeroir.SignedUint64:
+		err = c.emitSimpleBinaryOp(x86.ASHRQ)
+	}
+	return
+}
+
+// compileRotl emits instructions to perform a rotate-left operation on
+// top two values on the stack, and pushes the result.
+func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.AROLL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.AROLQ)
+	}
+	return
+}
+
+// compileRotr emits instructions to perform a rotate-right operation on
+// top two values on the stack, and pushes the result.
+func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.ARORL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.ARORQ)
+	}
+	return
+}
+
+// emitSimpleBinaryOp emits instructions to pop two values from the stack
+// and perform the given instruction on these two values and push the result
+// onto the stack.
+func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return err
 	}
 
-	x1 := c.locationStack.peek() // Note this is peek!
+	x1 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
 		return err
 	}
 
-	div := c.newProg()
-	div.From.Type = obj.TYPE_REG
-	div.From.Reg = x2.register
-	div.To.Type = obj.TYPE_REG
-	div.To.Reg = x1.register
-	if is32Bit {
-		div.As = x86.ADIVSS
-	} else {
-		div.As = x86.ADIVSD
-	}
-	c.addInstruction(div)
+	inst := c.newProg()
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = x2.register
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = x1.register
+	inst.As = instruction
+	c.addInstruction(inst)
 
-	// We consumed x2 register after DIV operation here,
+	// We consumed x2 register after the operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
+
+	// We already stored the result in the register used by x1
+	// so we record it.
+	result := c.locationStack.pushValueOnRegister(x1.register)
+	result.setRegisterType(x1.registerType())
 	return nil
 }
 
