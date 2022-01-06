@@ -2983,14 +2983,19 @@ func TestAmd64Compiler_compileAnd_Or_Xor_Shl_Shr(t *testing.T) {
 				x1, x2 uint64
 			}{
 				{x1: 0, x2: 0},
+				{x1: 0, x2: 1},
+				{x1: 1, x2: 0},
+				{x1: 1, x2: 1},
 				{x1: 1 << 31, x2: 1},
-				{x1: 1 << 56, x2: 1},
-				{x1: 2, x2: 1 << 31},
+				{x1: 1, x2: 1 << 31},
+				{x1: 1 << 31, x2: 1 << 31},
+				{x1: 1 << 63, x2: 1},
+				{x1: 1, x2: 1 << 63},
+				{x1: 1 << 63, x2: 1 << 63},
 			} {
 				t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
 					compiler.initializeReservedRegisters()
-					eng := newEngine()
 
 					var is32Bit bool
 					var expectedValue uint64
@@ -3082,6 +3087,7 @@ func TestAmd64Compiler_compileAnd_Or_Xor_Shl_Shr(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, err := compiler.generate()
 					require.NoError(t, err)
+					eng := newEngine()
 					mem := newMemoryInst()
 					jitcall(
 						uintptr(unsafe.Pointer(&code[0])),
@@ -3091,7 +3097,11 @@ func TestAmd64Compiler_compileAnd_Or_Xor_Shl_Shr(t *testing.T) {
 
 					// Check the result.
 					require.Equal(t, uint64(1), eng.stackPointer)
-					require.Equal(t, expectedValue, eng.stack[eng.stackPointer-1])
+					if is32Bit {
+						require.Equal(t, uint32(expectedValue), uint32(eng.stack[eng.stackPointer-1]))
+					} else {
+						require.Equal(t, expectedValue, eng.stack[eng.stackPointer-1])
+					}
 				})
 			}
 		})
