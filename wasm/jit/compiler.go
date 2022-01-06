@@ -29,6 +29,8 @@ type compiler interface {
 	compileClz(o *wazeroir.OperationClz) error
 	compileCtz(o *wazeroir.OperationCtz) error
 	compilePopcnt(o *wazeroir.OperationPopcnt) error
+	compileDiv(o *wazeroir.OperationDiv) error
+	compileRem(o *wazeroir.OperationRem) error
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
 	compileEqz(o *wazeroir.OperationEqz) error
