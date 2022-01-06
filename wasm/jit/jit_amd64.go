@@ -1143,7 +1143,7 @@ func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
 
 // compileDivForInts emits the instructions to perform division on the top
 // two values of integer type on the stack and puts the quotient of the result
-// onto the stack. For example, stack [..., 4, 3] results in [..., 1] where
+// onto the stack. For example, stack [..., 10, 3] results in [..., 3] where
 // the remainder is discarded. See compileRem for how to acquire remainder, not quotient.
 func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	if err := c.performDivisionOnInts(is32Bit, signed); err != nil {
@@ -1161,7 +1161,7 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 
 // compileRem emits the instructions to perform division on the top
 // two values of integer type on the stack and puts the remainder of the result
-// onto the stack. For example, stack [..., 8, 3] results in [..., 2] where
+// onto the stack. For example, stack [..., 10, 3] results in [..., 1] where
 // the quotient is discarded. See compileDivForInts for how to acquire quotient, not remainder.
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 	switch o.Type {
