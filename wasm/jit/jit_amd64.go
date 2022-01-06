@@ -1409,6 +1409,8 @@ func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
 
+	// We already stored the result in the register used by x1
+	// so we record it.
 	result := c.locationStack.pushValueOnRegister(x1.register)
 	result.setRegisterType(x1.registerType())
 	return nil

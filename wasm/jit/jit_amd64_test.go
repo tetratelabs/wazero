@@ -2959,6 +2959,145 @@ func getDivisionByZeroErrorRecoverFunc(t *testing.T) func() {
 	}
 }
 
+func TestAmd64Compiler_compileAnd_Or_Xor_Shl_Shr(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		op   wazeroir.Operation
+	}{
+		{name: "and-32-bit", op: &wazeroir.OperationAnd{Type: wazeroir.UnsignedInt32}},
+		{name: "and-64-bit", op: &wazeroir.OperationAnd{Type: wazeroir.UnsignedInt64}},
+		{name: "or-32-bit", op: &wazeroir.OperationOr{Type: wazeroir.UnsignedInt32}},
+		{name: "or-64-bit", op: &wazeroir.OperationOr{Type: wazeroir.UnsignedInt64}},
+		{name: "xor-32-bit", op: &wazeroir.OperationXor{Type: wazeroir.UnsignedInt32}},
+		{name: "xor-64-bit", op: &wazeroir.OperationXor{Type: wazeroir.UnsignedInt64}},
+		{name: "shl-32-bit", op: &wazeroir.OperationShl{Type: wazeroir.UnsignedInt32}},
+		{name: "shl-64-bit", op: &wazeroir.OperationShl{Type: wazeroir.UnsignedInt64}},
+		{name: "shr-signed-32-bit", op: &wazeroir.OperationShr{Type: wazeroir.SignedInt32}},
+		{name: "shr-signed-64-bit", op: &wazeroir.OperationShr{Type: wazeroir.SignedInt64}},
+		{name: "shr-unsigned-32-bit", op: &wazeroir.OperationShr{Type: wazeroir.SignedUint32}},
+		{name: "shr-unsigned-64-bit", op: &wazeroir.OperationShr{Type: wazeroir.SignedUint64}},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			for i, vs := range []struct {
+				x1, x2 uint64
+			}{
+				{x1: 0, x2: 0},
+				{x1: 1 << 31, x2: 1},
+				{x1: 1 << 56, x2: 1},
+				{x1: 2, x2: 1 << 31},
+			} {
+				t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
+					eng := newEngine()
+
+					var is32Bit bool
+					var expectedValue uint64
+					var compileOperationFunc func()
+					switch o := tc.op.(type) {
+					case *wazeroir.OperationAnd:
+						compileOperationFunc = func() {
+							err := compiler.compileAnd(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.UnsignedInt32
+						if is32Bit {
+							expectedValue = uint64(uint32(vs.x1) & uint32(vs.x2))
+						} else {
+							expectedValue = vs.x1 & vs.x2
+						}
+					case *wazeroir.OperationOr:
+						compileOperationFunc = func() {
+							err := compiler.compileOr(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.UnsignedInt32
+						if is32Bit {
+							expectedValue = uint64(uint32(vs.x1) | uint32(vs.x2))
+						} else {
+							expectedValue = vs.x1 | vs.x2
+						}
+					case *wazeroir.OperationXor:
+						compileOperationFunc = func() {
+							err := compiler.compileXor(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.UnsignedInt32
+						if is32Bit {
+							expectedValue = uint64(uint32(vs.x1) ^ uint32(vs.x2))
+						} else {
+							expectedValue = vs.x1 ^ vs.x2
+						}
+					case *wazeroir.OperationShl:
+						compileOperationFunc = func() {
+							err := compiler.compileShl(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.UnsignedInt32
+						if is32Bit {
+							expectedValue = uint64(uint32(vs.x1) << uint32(vs.x2%32))
+						} else {
+							expectedValue = vs.x1 << (vs.x2 % 64)
+						}
+					case *wazeroir.OperationShr:
+						compileOperationFunc = func() {
+							err := compiler.compileShr(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.SignedInt32 || o.Type == wazeroir.SignedUint32
+						switch o.Type {
+						case wazeroir.SignedInt32:
+							expectedValue = uint64(int32(vs.x1) >> (uint32(vs.x2) % 32))
+						case wazeroir.SignedInt64:
+							expectedValue = uint64(int64(vs.x1) >> (vs.x2 % 64))
+						case wazeroir.SignedUint32:
+							expectedValue = uint64(uint32(vs.x1) >> (uint32(vs.x2) % 32))
+						case wazeroir.SignedUint64:
+							expectedValue = vs.x1 >> (vs.x2 % 64)
+						}
+					}
+
+					// Setup the target values.
+					if is32Bit {
+						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(vs.x1)})
+						require.NoError(t, err)
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(vs.x2)})
+						require.NoError(t, err)
+					} else {
+						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: vs.x1})
+						require.NoError(t, err)
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: vs.x2})
+						require.NoError(t, err)
+					}
+
+					// Compile the operation.
+					compileOperationFunc()
+
+					// To verify the behavior, we release the value
+					// to the stack.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+
+					// Generate and run the code under test.
+					code, _, err := compiler.generate()
+					require.NoError(t, err)
+					mem := newMemoryInst()
+					jitcall(
+						uintptr(unsafe.Pointer(&code[0])),
+						uintptr(unsafe.Pointer(eng)),
+						uintptr(unsafe.Pointer(&mem.Buffer[0])),
+					)
+
+					// Check the result.
+					require.Equal(t, uint64(1), eng.stackPointer)
+					require.Equal(t, expectedValue, eng.stack[eng.stackPointer-1])
+				})
+			}
+		})
+	}
+}
+
 func TestAmd64Compiler_compileDiv(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		for _, signed := range []struct {
