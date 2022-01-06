@@ -1215,7 +1215,7 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 			return err
 		}
 	}
-	// If x2 is placed in the AX, we just release it to the memory stack
+	// If x2 is placed in the quotient (AX) register, we just release it to the memory stack
 	// as AX must be set to the x1's value below.
 	if x2.register == quotientRegister {
 		c.releaseRegisterToStack(x2)
