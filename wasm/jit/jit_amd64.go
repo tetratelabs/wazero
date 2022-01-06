@@ -1383,6 +1383,26 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	return
 }
 
+func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.AROLL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.AROLQ)
+	}
+	return
+}
+
+func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		err = c.emitSimpleBinaryOp(x86.ARORL)
+	case wazeroir.UnsignedInt64:
+		err = c.emitSimpleBinaryOp(x86.ARORQ)
+	}
+	return
+}
+
 // emitSimpleBinaryOp emits instructions to pop two values from the stack
 // and perform the given instruction on these two values and push the result
 // onto the stack.

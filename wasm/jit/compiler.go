@@ -36,6 +36,8 @@ type compiler interface {
 	compileXor(o *wazeroir.OperationXor) error
 	compileShl(o *wazeroir.OperationShl) error
 	compileShr(o *wazeroir.OperationShr) error
+	compileRotl(o *wazeroir.OperationRotl) error
+	compileRotr(o *wazeroir.OperationRotr) error
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
 	compileEqz(o *wazeroir.OperationEqz) error

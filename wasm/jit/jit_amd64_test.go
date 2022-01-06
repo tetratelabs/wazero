@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/bits"
 	"reflect"
 	"runtime"
 	"sync"
@@ -2976,6 +2977,10 @@ func TestAmd64Compiler_compileAnd_Or_Xor_Shl_Shr(t *testing.T) {
 		{name: "shr-signed-64-bit", op: &wazeroir.OperationShr{Type: wazeroir.SignedInt64}},
 		{name: "shr-unsigned-32-bit", op: &wazeroir.OperationShr{Type: wazeroir.SignedUint32}},
 		{name: "shr-unsigned-64-bit", op: &wazeroir.OperationShr{Type: wazeroir.SignedUint64}},
+		{name: "rotl-32-bit", op: &wazeroir.OperationRotl{Type: wazeroir.UnsignedInt32}},
+		{name: "rotl-64-bit", op: &wazeroir.OperationRotl{Type: wazeroir.UnsignedInt64}},
+		{name: "rotr-32-bit", op: &wazeroir.OperationRotr{Type: wazeroir.UnsignedInt32}},
+		{name: "rotr-64-bit", op: &wazeroir.OperationRotr{Type: wazeroir.UnsignedInt64}},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -3060,6 +3065,28 @@ func TestAmd64Compiler_compileAnd_Or_Xor_Shl_Shr(t *testing.T) {
 							expectedValue = uint64(uint32(vs.x1) >> (uint32(vs.x2) % 32))
 						case wazeroir.SignedUint64:
 							expectedValue = vs.x1 >> (vs.x2 % 64)
+						}
+					case *wazeroir.OperationRotl:
+						compileOperationFunc = func() {
+							err := compiler.compileRotl(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.UnsignedInt32
+						if is32Bit {
+							expectedValue = uint64(bits.RotateLeft32(uint32(vs.x1), int(vs.x2)))
+						} else {
+							expectedValue = uint64(bits.RotateLeft64(vs.x1, int(vs.x2)))
+						}
+					case *wazeroir.OperationRotr:
+						compileOperationFunc = func() {
+							err := compiler.compileRotr(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.UnsignedInt32
+						if is32Bit {
+							expectedValue = uint64(bits.RotateLeft32(uint32(vs.x1), -int(vs.x2)))
+						} else {
+							expectedValue = uint64(bits.RotateLeft64(vs.x1, -int(vs.x2)))
 						}
 					}
 
