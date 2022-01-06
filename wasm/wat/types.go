@@ -82,10 +82,10 @@ var typeFuncEmpty = &typeFunc{}
 // See https://www.w3.org/TR/wasm-core-1/#imports%E2%91%A0
 type importFunc struct {
 	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
-	importIndex int
+	importIndex uint32
 
 	// typeIndex is the zero-based index in module.types representing this function signature.
-	typeIndex int
+	typeIndex uint32
 
 	// module is the possibly empty module name to import. Ex. "" or "Math"
 	//

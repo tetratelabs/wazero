@@ -133,7 +133,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "import missing desc",
 			input:       "(module (import \"foo\" \"bar\"))",
-			expectedErr: "1:28: missing description in module.import[0]",
+			expectedErr: "1:28: missing description field in module.import[0]",
 		},
 		{
 			name:        "import empty desc",
