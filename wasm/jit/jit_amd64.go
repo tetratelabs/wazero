@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
@@ -22,6 +23,21 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
+
+var (
+	float32SignBitMask        int64 = 1 << 31
+	float32SignBitMaskAddress uintptr
+	// float64SignBitMask equals 1 << 63 but Go compiler errors as the number doesn't fit into
+	// the range of "signed" 64bit int, so we have the literal signed 64-bit integer
+	// whose bit pattern equals 1 << 63 here.
+	float64SignBitMask        int64 = -9223372036854775808
+	float64SignBitMaskAddress uintptr
+)
+
+func init() {
+	float32SignBitMaskAddress = uintptr(unsafe.Pointer(&float32SignBitMask))
+	float64SignBitMaskAddress = uintptr(unsafe.Pointer(&float64SignBitMask))
+}
 
 // jitcall is implemented in jit_amd64.s as a Go Assembler function.
 // This is used by engine.exec and the entrypoint to enter the JITed native code.
@@ -1437,6 +1453,193 @@ func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 	// so we record it.
 	result := c.locationStack.pushValueOnRegister(x1.register)
 	result.setRegisterType(x1.registerType())
+	return nil
+}
+
+// compileAbs adds instructions to replace the top value of float type on the stack with its absolute value.
+// For example, stack [..., -1.123] results in [..., 1.123].
+// See the following discussions for how we could take the abs of floats on x86 assembly.
+// https://stackoverflow.com/questions/32408665/fastest-way-to-compute-absolute-value-using-sse/32422471#32422471
+// https://stackoverflow.com/questions/44630015/how-would-fabsdouble-be-implemented-on-x86-is-it-an-expensive-operation
+func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	// First shift left by one to clear the sign bit.
+	shiftLeftByOne := c.newProg()
+	if o.Type == wazeroir.Float32 {
+		shiftLeftByOne.As = x86.APSLLL
+	} else {
+		shiftLeftByOne.As = x86.APSLLQ
+	}
+	shiftLeftByOne.To.Type = obj.TYPE_REG
+	shiftLeftByOne.To.Reg = target.register
+	shiftLeftByOne.From.Type = obj.TYPE_CONST
+	shiftLeftByOne.From.Offset = 1
+	c.addInstruction(shiftLeftByOne)
+
+	// Then shift right by one.
+	shiftRightByOne := c.newProg()
+	if o.Type == wazeroir.Float32 {
+		shiftRightByOne.As = x86.APSRLL
+	} else {
+		shiftRightByOne.As = x86.APSRLQ
+	}
+	shiftRightByOne.To.Type = obj.TYPE_REG
+	shiftRightByOne.To.Reg = target.register
+	shiftRightByOne.From.Type = obj.TYPE_CONST
+	shiftRightByOne.From.Offset = 1
+	c.addInstruction(shiftRightByOne)
+	return nil
+}
+
+// compileNeg adds instructions to replace the top value of float type on the stack with its negated value.
+// For example, stack [..., -1.123] results in [..., 1.123].
+func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	// First we move the sign-bit mask (placed in memory) to the tmp register,
+	// since we cannot take XOR directly with float reg and const.
+	movToTmp := c.newProg()
+	var maskAddr uintptr
+	if o.Type == wazeroir.Float32 {
+		movToTmp.As = x86.AMOVL
+		maskAddr = float32SignBitMaskAddress
+	} else {
+		movToTmp.As = x86.AMOVQ
+		maskAddr = float64SignBitMaskAddress
+	}
+	movToTmp.From.Type = obj.TYPE_MEM
+	movToTmp.From.Offset = int64(maskAddr)
+	movToTmp.To.Type = obj.TYPE_REG
+	movToTmp.To.Reg = tmpReg
+	c.addInstruction(movToTmp)
+
+	// Negate the value by XOR it with the sign-bit mask.
+	negate := c.newProg()
+	if o.Type == wazeroir.Float32 {
+		negate.As = x86.AXORPS
+	} else {
+		negate.As = x86.AXORPD
+	}
+	negate.From.Type = obj.TYPE_REG
+	negate.From.Reg = tmpReg
+	negate.To.Type = obj.TYPE_REG
+	negate.To.Reg = target.register
+	c.addInstruction(negate)
+	return nil
+}
+
+// compileCeil adds instructions to replace the top value of float type on the stack with its ceiling value.
+// For example, stack [..., 1.123] results in [..., 2.0]. This is equivalent to math.Ceil.
+func (c *amd64Compiler) compileCeil(o *wazeroir.OperationCeil) (err error) {
+	// Internally, ceil can be performed via ROUND instruction with 0x02 mode.
+	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/ceilf.S for example.
+	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x02)
+}
+
+// compileFloor adds instructions to replace the top value of float type on the stack with its floor value.
+// For example, stack [..., 1.123] results in [..., 1.0]. This is equivalent to math.Floor.
+func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
+	// Internally, floor can be performed via ROUND instruction with 0x01 mode.
+	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/floorf.S for example.
+	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x01)
+}
+
+// compileTrunc adds instructions to replace the top value of float type on the stack with its truncated value.
+// For example, stack [..., 1.9] results in [..., 1.0]. This is equivalent to math.Trunc.
+func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
+	// Internally, trunc can be performed via ROUND instruction with 0x03 mode.
+	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/truncf.S for example.
+	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x03)
+}
+
+// compileNearest adds instructions to replace the top value of float type on the stack with its nearest integer value.
+// For example, stack [..., 1.9] results in [..., 2.0]. This is NOT equivalent to math.Round and instead has the same
+// the semantics of LLVM's rint instrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
+// For example, math.Round(-4.5) produces -5 while ROUND with 0x00 mode produces -4.
+func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
+	// Internally, nearest can be performed via ROUND instruction with 0x00 mode.
+	// If we compile the following Wat by "wasmtime wasm2obj",
+	//
+	// (module
+	//   (func (export "nearest_f32") (param $x f32) (result f32) (f32.nearest (local.get $x)))
+	//   (func (export "nearest_f64") (param $x f64) (result f64) (f64.nearest (local.get $x)))
+	// )
+	//
+	// we see a disassemble of the object via "objdump --disassemble-all" like:
+	//
+	// 0000000000000000 <_wasm_function_0>:
+	// 	0:       55                      push   %rbp
+	// 	1:       48 89 e5                mov    %rsp,%rbp
+	// 	4:       66 0f 3a 0a c0 00       roundss $0x0,%xmm0,%xmm0
+	// 	a:       48 89 ec                mov    %rbp,%rsp
+	// 	d:       5d                      pop    %rbp
+	// 	e:       c3                      retq
+	//
+	// 000000000000000f <_wasm_function_1>:
+	// 	f:        55                      push   %rbp
+	//  10:       48 89 e5                mov    %rsp,%rbp
+	//  13:       66 0f 3a 0b c0 00       roundsd $0x0,%xmm0,%xmm0
+	//  19:       48 89 ec                mov    %rbp,%rsp
+	//  1c:       5d                      pop    %rbp
+	//  1d:       c3                      retq
+	//
+	// Below, we use the same implementation: "rounds{s,d} $0x0,%xmm0,%xmm0" where the mode is set to zero.
+	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x00)
+}
+
+func (c *amd64Compiler) emitRoundInstruction(is32Bit bool, mode int64) error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	round := c.newProg()
+	if is32Bit {
+		round.As = x86.AROUNDSS
+	} else {
+		round.As = x86.AROUNDSD
+	}
+	round.To.Type = obj.TYPE_REG
+	round.To.Reg = target.register
+	round.From.Type = obj.TYPE_CONST
+	round.From.Offset = mode
+	round.RestArgs = append(round.RestArgs,
+		obj.Addr{Reg: target.register, Type: obj.TYPE_REG})
+	c.addInstruction(round)
+	return nil
+}
+
+// compileSqrt adds instructions to replace the top value of float type on the stack with its square root.
+// For example, stack [..., 9.0] results in [..., 3.0]. This is equivalent to "math.Sqrt".
+func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	sqrt := c.newProg()
+	if o.Type == wazeroir.Float32 {
+		sqrt.As = x86.ASQRTSS
+	} else {
+		sqrt.As = x86.ASQRTSD
+	}
+	sqrt.From.Type = obj.TYPE_REG
+	sqrt.From.Reg = target.register
+	sqrt.To.Type = obj.TYPE_REG
+	sqrt.To.Reg = target.register
+	c.addInstruction(sqrt)
 	return nil
 }
 

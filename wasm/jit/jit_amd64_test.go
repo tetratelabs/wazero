@@ -3877,6 +3877,216 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		op   wazeroir.Operation
+	}{
+		{name: "abs-32-bit", op: &wazeroir.OperationAbs{Type: wazeroir.Float32}},
+		{name: "abs-64-bit", op: &wazeroir.OperationAbs{Type: wazeroir.Float64}},
+		{name: "neg-32-bit", op: &wazeroir.OperationNeg{Type: wazeroir.Float32}},
+		{name: "neg-64-bit", op: &wazeroir.OperationNeg{Type: wazeroir.Float64}},
+		{name: "ceil-32-bit", op: &wazeroir.OperationCeil{Type: wazeroir.Float32}},
+		{name: "ceil-64-bit", op: &wazeroir.OperationCeil{Type: wazeroir.Float64}},
+		{name: "floor-32-bit", op: &wazeroir.OperationFloor{Type: wazeroir.Float32}},
+		{name: "floor-64-bit", op: &wazeroir.OperationFloor{Type: wazeroir.Float64}},
+		{name: "trunc-32-bit", op: &wazeroir.OperationTrunc{Type: wazeroir.Float32}},
+		{name: "trunc-64-bit", op: &wazeroir.OperationTrunc{Type: wazeroir.Float64}},
+		{name: "sqrt-32-bit", op: &wazeroir.OperationSqrt{Type: wazeroir.Float32}},
+		{name: "sqrt-64-bit", op: &wazeroir.OperationSqrt{Type: wazeroir.Float64}},
+		{name: "nearest-32-bit", op: &wazeroir.OperationNearest{Type: wazeroir.Float32}},
+		{name: "nearest-64-bit", op: &wazeroir.OperationNearest{Type: wazeroir.Float64}},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			for i, v := range []uint64{
+				0,
+				1 << 63,
+				1<<63 | 12345,
+				1 << 31,
+				1<<31 | 123455,
+				6.8719476736e+10,
+				math.Float64bits(-4.5), // This produces the different result between math.Round and ROUND with 0x00 mode.
+				1.37438953472e+11,
+				math.Float64bits(-1.3),
+				uint64(math.Float32bits(-1231.123)),
+				math.Float64bits(1.3),
+				math.Float64bits(100.3),
+				math.Float64bits(-100.3),
+				uint64(math.Float32bits(1231.123)),
+				math.Float64bits(math.Inf(1)),
+				math.Float64bits(math.Inf(-1)),
+				math.Float64bits(math.NaN()),
+			} {
+				t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
+					eng := newEngine()
+
+					var is32Bit bool
+					var expFloat32 float32
+					var expFloat64 float64
+					var compileOperationFunc func()
+					switch o := tc.op.(type) {
+					case *wazeroir.OperationAbs:
+						compileOperationFunc = func() {
+							err := compiler.compileAbs(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(math.Abs(float64(math.Float32frombits(uint32(v)))))
+						} else {
+							expFloat64 = math.Abs(math.Float64frombits(v))
+						}
+					case *wazeroir.OperationNeg:
+						compileOperationFunc = func() {
+							err := compiler.compileNeg(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = -math.Float32frombits(uint32(v))
+						} else {
+							expFloat64 = -math.Float64frombits(v)
+						}
+					case *wazeroir.OperationCeil:
+						compileOperationFunc = func() {
+							err := compiler.compileCeil(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(math.Ceil(float64(math.Float32frombits(uint32(v)))))
+						} else {
+							expFloat64 = math.Ceil(math.Float64frombits(v))
+						}
+					case *wazeroir.OperationFloor:
+						compileOperationFunc = func() {
+							err := compiler.compileFloor(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(math.Floor(float64(math.Float32frombits(uint32(v)))))
+						} else {
+							expFloat64 = math.Floor(math.Float64frombits(v))
+						}
+					case *wazeroir.OperationTrunc:
+						compileOperationFunc = func() {
+							err := compiler.compileTrunc(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(math.Trunc(float64(math.Float32frombits(uint32(v)))))
+						} else {
+							expFloat64 = math.Trunc(math.Float64frombits(v))
+						}
+					case *wazeroir.OperationSqrt:
+						compileOperationFunc = func() {
+							err := compiler.compileSqrt(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(math.Sqrt(float64(math.Float32frombits(uint32(v)))))
+						} else {
+							expFloat64 = math.Sqrt(math.Float64frombits(v))
+						}
+					case *wazeroir.OperationNearest:
+						compileOperationFunc = func() {
+							err := compiler.compileNearest(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						// The same algorithm as in wazeroir/interpreter.go.
+						if is32Bit {
+							expFloat32 = math.Float32frombits(uint32(v))
+							f64 := float64(expFloat32)
+							if expFloat32 != -0 && expFloat32 != 0 {
+								ceil := float32(math.Ceil(f64))
+								floor := float32(math.Floor(f64))
+								distToCeil := math.Abs(float64(expFloat32 - ceil))
+								distToFloor := math.Abs(float64(expFloat32 - floor))
+								h := ceil / 2.0
+								if distToCeil < distToFloor {
+									expFloat32 = ceil
+								} else if distToCeil == distToFloor && float32(math.Floor(float64(h))) == h {
+									expFloat32 = ceil
+								} else {
+									expFloat32 = floor
+								}
+							}
+						} else {
+							expFloat64 = math.Float64frombits(v)
+							if expFloat64 != -0 && expFloat64 != 0 {
+								ceil := math.Ceil(expFloat64)
+								floor := math.Floor(expFloat64)
+								distToCeil := math.Abs(expFloat64 - ceil)
+								distToFloor := math.Abs(expFloat64 - floor)
+								h := ceil / 2.0
+								if distToCeil < distToFloor {
+									expFloat64 = ceil
+								} else if distToCeil == distToFloor && math.Floor(h) == h {
+									expFloat64 = ceil
+								} else {
+									expFloat64 = floor
+								}
+							}
+						}
+					}
+
+					// Setup the target values.
+					var err error
+					if is32Bit {
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+					} else {
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+					}
+					require.NoError(t, err)
+
+					// Compile the operation.
+					compileOperationFunc()
+
+					// To verify the behavior, we release the value
+					// to the stack.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+
+					// Generate and run the code under test.
+					code, _, err := compiler.generate()
+					require.NoError(t, err)
+					mem := newMemoryInst()
+					jitcall(
+						uintptr(unsafe.Pointer(&code[0])),
+						uintptr(unsafe.Pointer(eng)),
+						uintptr(unsafe.Pointer(&mem.Buffer[0])),
+					)
+
+					// Check the result.
+					require.Equal(t, uint64(1), eng.stackPointer)
+					if is32Bit {
+						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						if math.IsNaN(float64(expFloat32)) {
+							require.True(t, math.IsNaN(float64(actual)))
+						} else {
+							require.Equal(t, actual, expFloat32)
+						}
+					} else {
+						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						if math.IsNaN(expFloat64) {
+							require.True(t, math.IsNaN(actual))
+						} else {
+							require.Equal(t, expFloat64, actual)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestAmd64Compiler_compileCall(t *testing.T) {
 	t.Run("host function", func(t *testing.T) {
 		const functionIndex = 5
