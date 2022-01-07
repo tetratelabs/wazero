@@ -1246,7 +1246,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 							f = d
 						}
 					}
-					it.push(math.Float64bits(math.Round(f)))
+					it.push(math.Float64bits(f))
 				}
 				frame.pc++
 			}
