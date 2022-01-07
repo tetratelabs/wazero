@@ -1541,7 +1541,7 @@ func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 }
 
 // compileCeil adds instructions to replace the top value of float type on the stack with its ceiling value.
-// For example, stack [..., 1.123] results in [..., 2.0]. This is equivalent to "math.Ceil".
+// For example, stack [..., 1.123] results in [..., 2.0]. This is equivalent to math.Ceil.
 func (c *amd64Compiler) compileCeil(o *wazeroir.OperationCeil) (err error) {
 	// Internally, ceil can be performed via ROUND instruction with 0x02 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/ceilf.S for example.
@@ -1549,7 +1549,7 @@ func (c *amd64Compiler) compileCeil(o *wazeroir.OperationCeil) (err error) {
 }
 
 // compileFloor adds instructions to replace the top value of float type on the stack with its floor value.
-// For example, stack [..., 1.123] results in [..., 1.0]. This is equivalent to "math.Floor".
+// For example, stack [..., 1.123] results in [..., 1.0]. This is equivalent to math.Floor.
 func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
 	// Internally, floor can be performed via ROUND instruction with 0x01 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/floorf.S for example.
@@ -1557,7 +1557,7 @@ func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
 }
 
 // compileTrunc adds instructions to replace the top value of float type on the stack with its truncated value.
-// For example, stack [..., 1.9] results in [..., 1.0]. This is equivalent to "math.Trunc".
+// For example, stack [..., 1.9] results in [..., 1.0]. This is equivalent to math.Trunc.
 func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	// Internally, trunc can be performed via ROUND instruction with 0x03 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/truncf.S for example.
@@ -1565,8 +1565,9 @@ func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 }
 
 // compileNearest adds instructions to replace the top value of float type on the stack with its nearest integer value.
-// For example, stack [..., 1.9] results in [..., 2.0]. This is NOT equivalent to "math.Round" and instead has the same
+// For example, stack [..., 1.9] results in [..., 2.0]. This is NOT equivalent to math.Round and instead has the same
 // the semantics of LLVM's rint instrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
+// For example, math.Round(-4.5) produces -5 while ROUND with 0x00 mode produces -4.
 func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	// Internally, nearest can be performed via ROUND instruction with 0x00 mode.
 	// If we compile the following Wat by "wasmtime wasm2obj",

@@ -3906,7 +3906,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 				1 << 31,
 				1<<31 | 123455,
 				6.8719476736e+10,
-				6.8719476736e+10,
+				math.Float64bits(-4.5), // This produces the different result between math.Round and ROUND with 0x00 mode.
 				1.37438953472e+11,
 				math.Float64bits(-1.3),
 				uint64(math.Float32bits(-1231.123)),
