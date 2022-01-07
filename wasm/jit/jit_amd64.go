@@ -1734,7 +1734,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 
 	// Start handling 1).
 
-	// Now handle the NaN-free case and different values case.
+	// Now handle the NaN-free and different values case.
 	nanFreeOrDiff := c.newProg()
 	nanFreeOrDiffJump.To.SetTarget(nanFreeOrDiff)
 	nanFreeOrDiff.As = minOrMaxInstruction
