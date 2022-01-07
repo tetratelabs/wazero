@@ -1647,22 +1647,6 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 }
 
 func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) error {
-	// 0000000000000000 <_wasm_function_0>:
-	//    0:       55                      push   %rbp
-	//    1:       48 89 e5                mov    %rsp,%rbp
-	//    4:       0f 2e c8                ucomiss %xmm0,%xmm1
-	//    7:       0f 85 18 00 00 00       jne    25 <_wasm_function_0+0x25>
-	//    d:       0f 8a 08 00 00 00       jp     1b <_wasm_function_0+0x1b>
-	//   13:       0f 56 c8                orps   %xmm0,%xmm1
-	//   16:       e9 0e 00 00 00          jmpq   29 <_wasm_function_0+0x29>
-	//   1b:       f3 0f 58 c8             addss  %xmm0,%xmm1
-	//   1f:       0f 8a 04 00 00 00       jp     29 <_wasm_function_0+0x29>
-	//   25:       f3 0f 5d c8             minss  %xmm0,%xmm1
-	//   29:       0f 28 c1                movaps %xmm1,%xmm0
-	//   2c:       48 89 ec                mov    %rbp,%rsp
-	//   2f:       5d                      pop    %rbp
-	//   30:       c3                      retq
-
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return err
@@ -1685,7 +1669,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	checkNaNOrEquals.To.Reg = x1.register
 	c.addInstruction(checkNaNOrEquals)
 
-	// Jump instruction to go to the (NaN-free or different value) case.
+	// Jump instruction to go to the (NaN-free or different values) case.
 	nanFreeOrDiffJump := c.newProg()
 	nanFreeOrDiffJump.As = x86.AJNE
 	nanFreeOrDiffJump.To.Type = obj.TYPE_BRANCH
@@ -1693,11 +1677,13 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 
 	// Jump if two values are equal and NaN-free.
 	jmpEquals := c.newProg()
+	// Here we use JPC which is the conditional jump on the parity flag, and
+	// the flag is only set by if one of values is NaN.
 	jmpEquals.As = x86.AJPC
 	jmpEquals.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpEquals)
 
-	// Emit the case of NaN presence.
+	// Handle the case of NaN presence.
 	// We emit the ADD instruction to produce the NaN in x1.
 	copyNan := c.newProg()
 	if is32Bit {
@@ -1717,7 +1703,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	nanExitJump.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(nanExitJump)
 
-	// Now handle the NaN-free case.
+	// Now handle the NaN-free case and different values case.
 	nanFreeOrDiff := c.newProg()
 	nanFreeOrDiffJump.To.SetTarget(nanFreeOrDiff)
 	nanFreeOrDiff.As = minOrMaxInstruction
