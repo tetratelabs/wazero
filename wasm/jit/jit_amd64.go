@@ -1628,6 +1628,9 @@ func (c *amd64Compiler) emitRoundInstruction(is32Bit bool, mode int64) error {
 	return nil
 }
 
+// compileMin adds instructions to pop two values from the stack, and push back the maximum of
+// these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 1.9].
+// For the cases where NaN involves, see the doc of emitMinOrMax below.
 func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
@@ -1637,6 +1640,9 @@ func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	}
 }
 
+// compileMin adds instructions to pop two values from the stack, and push back the minimum of
+// these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 100.1].
+// For the cases where NaN involves, see the doc of emitMinOrMax below.
 func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
@@ -1646,6 +1652,18 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 	}
 }
 
+// emitMinOrMax adds instructions to pop two values from the stack, and push back either minimum or
+// minimum of these two values onto the stack according to the minOrMaxInstruction argument.
+// minOrMaxInstruction must be one of MAXSS, MAXSD, MINSS or MINSD. These native min/max instructions are
+// almost compatible with min/max in the Wasm specification, but it is slightly different with
+// respect to the NaN handling.
+// Native min/max instructions return non-NaN value if exactly one of target values
+// is NaN. For example native_{min,max}(5.0, NaN) returns always 5.0, not NaN.
+// However, WebAssembly specifies that min/max must always return NaN if one of values is NaN.
+// Therefore in this function, we have to add conditional jumps to check if one of values is NaN before
+// the native min/max, which is why we cannot simply emit a native min/max instruction here.
+//
+// For the semantics, see wazeroir.{Min,Max} for detail.
 func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
