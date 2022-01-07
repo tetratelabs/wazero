@@ -1587,7 +1587,7 @@ func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	// 	e:       c3                      retq
 	//
 	// 000000000000000f <_wasm_function_1>:
-	// 	f:       55                      push   %rbp
+	// 	f:        55                      push   %rbp
 	//  10:       48 89 e5                mov    %rsp,%rbp
 	//  13:       66 0f 3a 0b c0 00       roundsd $0x0,%xmm0,%xmm0
 	//  19:       48 89 ec                mov    %rbp,%rsp
