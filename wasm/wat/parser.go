@@ -345,7 +345,7 @@ func (p *moduleParser) parseImportFuncParam(tok tokenType, tokenBytes []byte, _,
 		}
 		p.currentType.params = append(p.currentType.params, p.currentParams...)
 
-		// since multiple param fields are valid, prepare for any next.
+		// since multiple param fields are valid, ex `(func (param i32) (param i64))`, prepare for any next.
 		p.currentParams = nil
 		p.currentParamIndex++
 
