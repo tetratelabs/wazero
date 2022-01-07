@@ -1687,21 +1687,32 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	checkNaNOrEquals.To.Reg = x1.register
 	c.addInstruction(checkNaNOrEquals)
 
-	// Jump instruction to go to the (NaN-free or different values) case.
+	// At this point, we have the three cases of conditional flags below
+	// (See https://www.felixcloutier.com/x86/ucomiss#operation for detail.)
+	//
+	// 1) Two values are NaN-free and different: All flags are cleared.
+	// 2) Two values are NaN-free and equal: Only ZF flags is set.
+	// 3) One of Two values is NaN: ZF, PF and CF flags are set.
+
+	// Jump instruction to go to the (NaN-free or different values) case
+	// by checking the ZF flag as ZF is only set for 1) and 2) cases.
 	nanFreeOrDiffJump := c.newProg()
 	nanFreeOrDiffJump.As = x86.AJNE
 	nanFreeOrDiffJump.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(nanFreeOrDiffJump)
 
-	// Jump if two values are equal and NaN-free.
-	jmpEquals := c.newProg()
-	// Here we use JPC which is the conditional jump on the parity flag, and
-	// the flag is only set by if one of values is NaN.
-	jmpEquals.As = x86.AJPC
-	jmpEquals.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpEquals)
+	// Start handling 2) and 3).
 
-	// Handle the case of NaN presence.
+	// Jump if two values are equal and NaN-free by checking the PF flag.
+	// Here we use JPC to do the conditional jump when the parity flag is NOT set,
+	// and that is of 2).
+	equalExitJmp := c.newProg()
+	equalExitJmp.As = x86.AJPC
+	equalExitJmp.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(equalExitJmp)
+
+	// Start handling 3).
+
 	// We emit the ADD instruction to produce the NaN in x1.
 	copyNan := c.newProg()
 	if is32Bit {
@@ -1716,10 +1727,12 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	c.addInstruction(copyNan)
 
 	// Exit from the NaN case branch.
-	nanExitJump := c.newProg()
-	nanExitJump.As = obj.AJMP
-	nanExitJump.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(nanExitJump)
+	nanExitJmp := c.newProg()
+	nanExitJmp.As = obj.AJMP
+	nanExitJmp.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(nanExitJmp)
+
+	// Start handling 1).
 
 	// Now handle the NaN-free case and different values case.
 	nanFreeOrDiff := c.newProg()
@@ -1731,9 +1744,9 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	nanFreeOrDiff.To.Reg = x1.register
 	c.addInstruction(nanFreeOrDiff)
 
-	// Set the jump target of NaN case to the next instrucion after (NaN-free or different values) case.
-	c.addSetJmpOrigin(nanExitJump)
-	c.addSetJmpOrigin(jmpEquals)
+	// Set the jump target of 1) and 2) cases to the next instrucion after 3) case.
+	c.addSetJmpOrigin(nanExitJmp)
+	c.addSetJmpOrigin(equalExitJmp)
 
 	// Record that we consumed the x2 and placed the copysign result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
