@@ -62,7 +62,7 @@ func TestParseModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "proc_exit" (func $runtime.proc_exit (param i32)))
 )`,
 			expected: &module{
-				types: []*typeFunc{{params:  []wasm.ValueType{i32}}},
+				types: []*typeFunc{{params: []wasm.ValueType{i32}}},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "proc_exit", funcName: "$runtime.proc_exit"},
 				},
