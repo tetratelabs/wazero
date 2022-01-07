@@ -1865,6 +1865,22 @@ func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	return nil
 }
 
+func (c *amd64Compiler) compileI32WrapFromI64() error {
+	return nil
+}
+
+func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
+	return nil
+}
+
+func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) error {
+	return nil
+}
+
+func (c *amd64Compiler) compileF32DemoteFromF64() error {
+	return nil
+}
+
 func (c *amd64Compiler) compileEq(o *wazeroir.OperationEq) error {
 	return c.emitEqOrNe(o.Type, true)
 }

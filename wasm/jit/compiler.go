@@ -48,6 +48,10 @@ type compiler interface {
 	compileMin(o *wazeroir.OperationMin) error
 	compileMax(o *wazeroir.OperationMax) error
 	compileCopysign(o *wazeroir.OperationCopysign) error
+	compileI32WrapFromI64() error
+	compileITruncFromF(o *wazeroir.OperationITruncFromF) error
+	compileFConvertFromI(o *wazeroir.OperationFConvertFromI) error
+	compileF32DemoteFromF64() error
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
 	compileEqz(o *wazeroir.OperationEqz) error

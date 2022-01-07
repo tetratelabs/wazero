@@ -583,13 +583,13 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationCopysign:
 			err = compiler.compileCopysign(o)
 		case *wazeroir.OperationI32WrapFromI64:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileI32WrapFromI64()
 		case *wazeroir.OperationITruncFromF:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileITruncFromF(o)
 		case *wazeroir.OperationFConvertFromI:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileFConvertFromI(o)
 		case *wazeroir.OperationF32DemoteFromF64:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileF32DemoteFromF64()
 		case *wazeroir.OperationF64PromoteFromF32:
 		case *wazeroir.OperationI32ReinterpretFromF32,
 			*wazeroir.OperationI64ReinterpretFromF64,
