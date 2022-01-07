@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestParseModule(t *testing.T) {
+	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
 	tests := []struct {
 		name     string
 		input    string
@@ -38,6 +41,78 @@ func TestParseModule(t *testing.T) {
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "foo", name: "bar"},
 					{importIndex: 1, module: "baz", name: "qux"},
+				},
+			},
+		},
+		{
+			name: "import func inlined type",
+			input: `(module
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
+				},
+			},
+		},
+		{
+			name: "import func inlined type no result",
+			input: `(module
+	(import "wasi_snapshot_preview1" "proc_exit" (func $runtime.proc_exit (param i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{{params: []wasm.ValueType{i32}}},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "proc_exit", funcName: "$runtime.proc_exit"},
+				},
+			},
+		},
+		{
+			name: "import func inlined type different param types",
+			input: `(module
+	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{{
+					params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+					results: []wasm.ValueType{i32},
+				}},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open"},
+				},
+			},
+		},
+		{
+			name: "multiple import func different inlined type",
+			input: `(module
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{
+					{params: []wasm.ValueType{i32, i32}, results: []wasm.ValueType{i32}},
+					{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}},
+				},
+				importFuncs: []*importFunc{
+					{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get"},
+					{importIndex: 1, typeIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
+				},
+			},
+		},
+		{
+			name: "multiple import func same inlined type",
+			input: `(module
+	(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (param i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{
+					{params: []wasm.ValueType{i32, i32}, results: []wasm.ValueType{i32}},
+				},
+				importFuncs: []*importFunc{
+					{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get"},
+					{importIndex: 1, typeIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get"},
 				},
 			},
 		},
@@ -89,6 +164,11 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "no module",
 			input:       "()",
 			expectedErr: "1:2: expected field, but found )",
+		},
+		{
+			name:        "double module",
+			input:       "(module) (module)",
+			expectedErr: "1:10: unexpected (",
 		},
 		{
 			name:        "module invalid name",
@@ -144,6 +224,41 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "import func invalid name",
 			input:       "(module (import \"foo\" \"bar\" (func baz)))",
 			expectedErr: "1:35: unexpected keyword: baz in module.import[0].func",
+		},
+		{
+			name:        "import func missing param0 type",
+			input:       "(module (import \"\" \"\" (func (param))))",
+			expectedErr: "1:35: expected a type in module.import[0].func.param[0]",
+		},
+		{
+			name:        "import func missing param1 type",
+			input:       "(module (import \"\" \"\" (func (param i32) (param))))",
+			expectedErr: "1:47: expected a type in module.import[0].func.param[1]",
+		},
+		{
+			name:        "import func wrong param0 type",
+			input:       "(module (import \"\" \"\" (func (param f65))))",
+			expectedErr: "1:36: unknown type: f65 in module.import[0].func.param[0]",
+		},
+		{
+			name:        "import func wrong param1 type",
+			input:       "(module (import \"\" \"\" (func (param i32) (param f65))))",
+			expectedErr: "1:48: unknown type: f65 in module.import[0].func.param[1]",
+		},
+		{
+			name:        "import func double result",
+			input:       "(module (import \"\" \"\" (func (param i32) (result i32) (result i32))))",
+			expectedErr: "1:55: redundant result field in module.import[0].func",
+		},
+		{
+			name:        "import func double result type",
+			input:       "(module (import \"\" \"\" (func (param i32) (result i32 i32))))",
+			expectedErr: "1:53: redundant type in module.import[0].func.result",
+		},
+		{
+			name:        "import func wrong result type",
+			input:       "(module (import \"\" \"\" (func (param i32) (result f65))))",
+			expectedErr: "1:49: unknown type: f65 in module.import[0].func.result",
 		},
 		{
 			name:        "import func double desc",
