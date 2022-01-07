@@ -1212,7 +1212,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindNearest:
 			{
 				// Borrowed from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L77
-				// TODO: use the new algorithm from https://github.com/bytecodealliance/wasmtime/pull/2171.
+				// TODO: look at https://github.com/bytecodealliance/wasmtime/pull/2171 and reconsider this algorithm
 				if op.b1 == 0 {
 					// Float32
 					f := math.Float32frombits(uint32(it.pop()))

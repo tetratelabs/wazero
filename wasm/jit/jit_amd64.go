@@ -27,7 +27,7 @@ import (
 var (
 	float32SignBitMask        int64 = 1 << 31
 	float32SignBitMaskAddress uintptr
-	// This equals 1 << 63 but Go compiler errors as the number doesn't fit into
+	// float64SignBitMask equals 1 << 63 but Go compiler errors as the number doesn't fit into
 	// the range of "signed" 64bit int, so we have the literal signed 64-bit integer
 	// whose bit pattern equals 1 << 63 here.
 	float64SignBitMask        int64 = -9223372036854775808
@@ -1456,7 +1456,7 @@ func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 	return nil
 }
 
-// compileAbs emits the instructions to take absolute value of the top value of float type on the stack.
+// compileAbs adds instructions to replace the top value of float type on the stack with its absolute value.
 // For example, stack [..., -1.123] results in [..., 1.123].
 // See the following discussions for how we could take the abs of floats on x86 assembly.
 // https://stackoverflow.com/questions/32408665/fastest-way-to-compute-absolute-value-using-sse/32422471#32422471
@@ -1495,7 +1495,7 @@ func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 	return nil
 }
 
-// compileNeg emits the instructions to negate the top value of float type on the stack.
+// compileNeg adds instructions to replace the top value of float type on the stack with its negated value.
 // For example, stack [..., -1.123] results in [..., 1.123].
 func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
@@ -1540,7 +1540,7 @@ func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 	return nil
 }
 
-// compileCeil emits the instructions to take the ceil of the top value of float type on the stack.
+// compileCeil adds instructions to replace the top value of float type on the stack with its ceiling value.
 // For example, stack [..., 1.123] results in [..., 2.0]. This is equivalent to "math.Ceil".
 func (c *amd64Compiler) compileCeil(o *wazeroir.OperationCeil) (err error) {
 	// Internally, ceil can be performed via ROUND instruction with 0x02 mode.
@@ -1548,7 +1548,7 @@ func (c *amd64Compiler) compileCeil(o *wazeroir.OperationCeil) (err error) {
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x02)
 }
 
-// compileFloor emits the instructions to take the floor of the top value of float type on the stack.
+// compileFloor adds instructions to replace the top value of float type on the stack with its floor value.
 // For example, stack [..., 1.123] results in [..., 1.0]. This is equivalent to "math.Floor".
 func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
 	// Internally, floor can be performed via ROUND instruction with 0x01 mode.
@@ -1556,7 +1556,7 @@ func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x01)
 }
 
-// compileTrunc emits the instructions to take the integer value of the top value of float type on the stack.
+// compileTrunc adds instructions to replace the top value of float type on the stack with its truncated value.
 // For example, stack [..., 1.9] results in [..., 1.0]. This is equivalent to "math.Trunc".
 func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	// Internally, trunc can be performed via ROUND instruction with 0x03 mode.
@@ -1564,9 +1564,9 @@ func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x03)
 }
 
-// compileNearest emits the instructions to take the nearest integer value of the top value of float type on the stack.
+// compileNearest adds instructions to replace the top value of float type on the stack with its nearest integer value.
 // For example, stack [..., 1.9] results in [..., 2.0]. This is NOT equivalent to "math.Round" and instead has the same
-// the sematics of LLVM's rint instrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
+// the semantics of LLVM's rint instrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	// Internally, nearest can be performed via ROUND instruction with 0x00 mode.
 	// If we compile the following Wat by "wasmtime wasm2obj",
@@ -1594,7 +1594,7 @@ func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	//  1c:       5d                      pop    %rbp
 	//  1d:       c3                      retq
 	//
-	// Here, actually we could see "rounds{s,d} $0x0,%xmm0,%xmm0" where the mode is set to zero.
+	// Below, we use the same implementation: "rounds{s,d} $0x0,%xmm0,%xmm0" where the mode is set to zero.
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x00)
 }
 
@@ -1620,7 +1620,7 @@ func (c *amd64Compiler) emitRoundInstruction(is32Bit bool, mode int64) error {
 	return nil
 }
 
-// compileSqrt emits the instructions to take the square root of the top value of float type on the stack.
+// compileSqrt adds instructions to replace the top value of float type on the stack with its square root.
 // For example, stack [..., 9.0] results in [..., 3.0]. This is equivalent to "math.Sqrt".
 func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	target := c.locationStack.peek() // Note this is peek!
