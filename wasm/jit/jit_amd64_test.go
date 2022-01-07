@@ -4000,39 +4000,40 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 							require.NoError(t, err)
 						}
 						is32Bit = o.Type == wazeroir.Float32
+						// The same algorithm as in wazeroir/interpreter.go.
 						if is32Bit {
-							// Implementation from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L77.
-							f := math.Float32frombits(uint32(v))
-							f64 := float64(f)
-							if f != -0 && f != 0 {
-								u := float32(math.Ceil(f64))
-								d := float32(math.Floor(f64))
-								um := math.Abs(float64(f - u))
-								dm := math.Abs(float64(f - d))
-								h := u / 2.0
-								if um < dm || (um == dm && float32(math.Floor(float64(h))) == h) {
-									f = u
+							expFloat32 = math.Float32frombits(uint32(v))
+							f64 := float64(expFloat32)
+							if expFloat32 != -0 && expFloat32 != 0 {
+								ceil := float32(math.Ceil(f64))
+								floor := float32(math.Floor(f64))
+								distToCeil := math.Abs(float64(expFloat32 - ceil))
+								distToFloor := math.Abs(float64(expFloat32 - floor))
+								h := ceil / 2.0
+								if distToCeil < distToFloor {
+									expFloat32 = ceil
+								} else if distToCeil == distToFloor && float32(math.Floor(float64(h))) == h {
+									expFloat32 = ceil
 								} else {
-									f = d
+									expFloat32 = floor
 								}
 							}
-							expFloat32 = f
 						} else {
-							// Implementation from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L120-L144.
-							f := math.Float64frombits(v)
-							if f != -0 && f != 0 {
-								u := math.Ceil(f)
-								d := math.Floor(f)
-								um := math.Abs(f - u)
-								dm := math.Abs(f - d)
-								h := u / 2.0
-								if um < dm || (um == dm && math.Floor(h) == h) {
-									f = u
+							expFloat64 = math.Float64frombits(v)
+							if expFloat64 != -0 && expFloat64 != 0 {
+								ceil := math.Ceil(expFloat64)
+								floor := math.Floor(expFloat64)
+								distToCeil := math.Abs(expFloat64 - ceil)
+								distToFloor := math.Abs(expFloat64 - floor)
+								h := ceil / 2.0
+								if distToCeil < distToFloor {
+									expFloat64 = ceil
+								} else if distToCeil == distToFloor && math.Floor(h) == h {
+									expFloat64 = ceil
 								} else {
-									f = d
+									expFloat64 = floor
 								}
 							}
-							expFloat64 = f
 						}
 					}
 
