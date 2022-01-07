@@ -577,11 +577,11 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationSqrt:
 			err = compiler.compileSqrt(o)
 		case *wazeroir.OperationMin:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileMin(o)
 		case *wazeroir.OperationMax:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileMax(o)
 		case *wazeroir.OperationCopysign:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileCopysign(o)
 		case *wazeroir.OperationI32WrapFromI64:
 			err = fmt.Errorf("unsupported operation")
 		case *wazeroir.OperationITruncFromF:

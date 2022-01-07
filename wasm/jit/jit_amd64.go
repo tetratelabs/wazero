@@ -25,18 +25,21 @@ import (
 )
 
 var (
-	float32SignBitMask        int64 = 1 << 31
+	float32SignBitMask        uint32 = 1 << 31
+	float32RestBitMask        uint32 = ^float32SignBitMask
 	float32SignBitMaskAddress uintptr
-	// float64SignBitMask equals 1 << 63 but Go compiler errors as the number doesn't fit into
-	// the range of "signed" 64bit int, so we have the literal signed 64-bit integer
-	// whose bit pattern equals 1 << 63 here.
-	float64SignBitMask        int64 = -9223372036854775808
+	float32RestBitMaskAddress uintptr
+	float64SignBitMask        uint64 = 1 << 63
+	float64RestBitMask        uint64 = ^float64SignBitMask
 	float64SignBitMaskAddress uintptr
+	float64RestBitMaskAddress uintptr
 )
 
 func init() {
 	float32SignBitMaskAddress = uintptr(unsafe.Pointer(&float32SignBitMask))
+	float32RestBitMaskAddress = uintptr(unsafe.Pointer(&float32RestBitMask))
 	float64SignBitMaskAddress = uintptr(unsafe.Pointer(&float64SignBitMask))
+	float64RestBitMaskAddress = uintptr(unsafe.Pointer(&float64RestBitMask))
 }
 
 // jitcall is implemented in jit_amd64.s as a Go Assembler function.
@@ -67,8 +70,8 @@ type amd64Compiler struct {
 	ir  *wazeroir.CompilationResult
 	// Set a jmp kind instruction where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
-	setJmpOrigin *obj.Prog
-	builder      *asm.Builder
+	setJmpOrigins []*obj.Prog
+	builder       *asm.Builder
 	// location stack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
@@ -124,10 +127,14 @@ func (c *amd64Compiler) pushFunctionParams() {
 
 func (c *amd64Compiler) addInstruction(prog *obj.Prog) {
 	c.builder.AddInstruction(prog)
-	if c.setJmpOrigin != nil {
-		c.setJmpOrigin.To.SetTarget(prog)
-		c.setJmpOrigin = nil
+	for _, origin := range c.setJmpOrigins {
+		origin.To.SetTarget(prog)
 	}
+	c.setJmpOrigins = nil
+}
+
+func (c *amd64Compiler) addSetJmpOrigin(prog *obj.Prog) {
+	c.setJmpOrigins = append(c.setJmpOrigins, prog)
 }
 
 func (c *amd64Compiler) newProg() (prog *obj.Prog) {
@@ -473,7 +480,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	}
 
 	// Handle then branch.
-	c.setJmpOrigin = jmpWithCond
+	c.addSetJmpOrigin(jmpWithCond)
 	c.locationStack = saved
 	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
 		return err
@@ -672,7 +679,7 @@ func (c *amd64Compiler) compileSelect() error {
 	}
 
 	// Else, we don't need to adjust value, just need to jump to the next instruction.
-	c.setJmpOrigin = jmpIfNotZero
+	c.addSetJmpOrigin(jmpIfNotZero)
 
 	// In any case, we don't need x2 and c anymore!
 	c.locationStack.releaseRegister(x2)
@@ -1023,7 +1030,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 
 		// Finally the end jump instruction of zero case must target towards
 		// the next instruction.
-		c.setJmpOrigin = jmpAtEndOfZero
+		c.addSetJmpOrigin(jmpAtEndOfZero)
 	}
 
 	// We reused the same register of target for the result.
@@ -1102,7 +1109,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 
 		// Finally the end jump instruction of zero case must target towards
 		// the next instruction.
-		c.setJmpOrigin = jmpAtEndOfZero
+		c.addSetJmpOrigin(jmpAtEndOfZero)
 	}
 
 	// We reused the same register of target for the result.
@@ -1618,6 +1625,204 @@ func (c *amd64Compiler) emitRoundInstruction(is32Bit bool, mode int64) error {
 	round.RestArgs = append(round.RestArgs,
 		obj.Addr{Reg: target.register, Type: obj.TYPE_REG})
 	c.addInstruction(round)
+	return nil
+}
+
+func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
+	is32Bit := o.Type == wazeroir.Float32
+	if is32Bit {
+		return c.emitMinOrMax(is32Bit, x86.AMINSS)
+	} else {
+		return c.emitMinOrMax(is32Bit, x86.AMINSD)
+	}
+}
+
+func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
+	is32Bit := o.Type == wazeroir.Float32
+	if is32Bit {
+		return c.emitMinOrMax(is32Bit, x86.AMAXSS)
+	} else {
+		return c.emitMinOrMax(is32Bit, x86.AMAXSD)
+	}
+}
+
+func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) error {
+	// 0000000000000000 <_wasm_function_0>:
+	//    0:       55                      push   %rbp
+	//    1:       48 89 e5                mov    %rsp,%rbp
+	//    4:       0f 2e c8                ucomiss %xmm0,%xmm1
+	//    7:       0f 85 18 00 00 00       jne    25 <_wasm_function_0+0x25>
+	//    d:       0f 8a 08 00 00 00       jp     1b <_wasm_function_0+0x1b>
+	//   13:       0f 56 c8                orps   %xmm0,%xmm1
+	//   16:       e9 0e 00 00 00          jmpq   29 <_wasm_function_0+0x29>
+	//   1b:       f3 0f 58 c8             addss  %xmm0,%xmm1
+	//   1f:       0f 8a 04 00 00 00       jp     29 <_wasm_function_0+0x29>
+	//   25:       f3 0f 5d c8             minss  %xmm0,%xmm1
+	//   29:       0f 28 c1                movaps %xmm1,%xmm0
+	//   2c:       48 89 ec                mov    %rbp,%rsp
+	//   2f:       5d                      pop    %rbp
+	//   30:       c3                      retq
+
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// Check if this is (either x1 or x2 is NaN) or (x1 equals x2) case
+	checkNaNOrEquals := c.newProg()
+	if is32Bit {
+		checkNaNOrEquals.As = x86.AUCOMISS
+	} else {
+		checkNaNOrEquals.As = x86.AUCOMISD
+	}
+	checkNaNOrEquals.From.Type = obj.TYPE_REG
+	checkNaNOrEquals.From.Reg = x2.register
+	checkNaNOrEquals.To.Type = obj.TYPE_REG
+	checkNaNOrEquals.To.Reg = x1.register
+	c.addInstruction(checkNaNOrEquals)
+
+	// Jump instruction to go to the (NaN-free or different value) case.
+	nanFreeOrDiffJump := c.newProg()
+	nanFreeOrDiffJump.As = x86.AJNE
+	nanFreeOrDiffJump.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(nanFreeOrDiffJump)
+
+	// Jump if two values are equal and NaN-free.
+	jmpEquals := c.newProg()
+	jmpEquals.As = x86.AJPC
+	jmpEquals.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpEquals)
+
+	// Emit the case of NaN presence.
+	// We emit the ADD instruction to produce the NaN in x1.
+	copyNan := c.newProg()
+	if is32Bit {
+		copyNan.As = x86.AADDSS
+	} else {
+		copyNan.As = x86.AADDSD
+	}
+	copyNan.From.Type = obj.TYPE_REG
+	copyNan.From.Reg = x2.register
+	copyNan.To.Type = obj.TYPE_REG
+	copyNan.To.Reg = x1.register
+	c.addInstruction(copyNan)
+
+	// Exit from the NaN case branch.
+	nanExitJump := c.newProg()
+	nanExitJump.As = obj.AJMP
+	nanExitJump.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(nanExitJump)
+
+	// Now handle the NaN-free case.
+	nanFreeOrDiff := c.newProg()
+	nanFreeOrDiffJump.To.SetTarget(nanFreeOrDiff)
+	nanFreeOrDiff.As = minOrMaxInstruction
+	nanFreeOrDiff.From.Type = obj.TYPE_REG
+	nanFreeOrDiff.From.Reg = x2.register
+	nanFreeOrDiff.To.Type = obj.TYPE_REG
+	nanFreeOrDiff.To.Reg = x1.register
+	c.addInstruction(nanFreeOrDiff)
+
+	// Set the jump target of NaN case to the next instrucion after (NaN-free or different values) case.
+	c.addSetJmpOrigin(nanExitJump)
+	c.addSetJmpOrigin(jmpEquals)
+
+	// Record that we consumed the x2 and placed the copysign result in the x1's register.
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.pushValueOnRegister(x1.register)
+	return nil
+}
+
+func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
+	is32Bit := o.Type == wazeroir.Float32
+
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	// Move the rest bit mask to the temp register.
+	movRestBitMask := c.newProg()
+	movRestBitMask.From.Type = obj.TYPE_MEM
+	if is32Bit {
+		movRestBitMask.As = x86.AMOVL
+		movRestBitMask.From.Offset = int64(float32RestBitMaskAddress)
+	} else {
+		movRestBitMask.As = x86.AMOVQ
+		movRestBitMask.From.Offset = int64(float64RestBitMaskAddress)
+	}
+	movRestBitMask.To.Type = obj.TYPE_REG
+	movRestBitMask.To.Reg = tmpReg
+	c.addInstruction(movRestBitMask)
+
+	// Clear the sign bit of x1 via AND with the mask.
+	clearSignBit := c.newProg()
+	clearSignBit.From.Type = obj.TYPE_REG
+	clearSignBit.From.Reg = tmpReg
+	clearSignBit.To.Type = obj.TYPE_REG
+	clearSignBit.To.Reg = x1.register
+	if is32Bit {
+		clearSignBit.As = x86.AANDPS
+	} else {
+		clearSignBit.As = x86.AANDPD
+	}
+	c.addInstruction(clearSignBit)
+
+	// Move the sign bit mask to the temp register.
+	movSignBitMask := c.newProg()
+	movSignBitMask.From.Type = obj.TYPE_MEM
+	if is32Bit {
+		movSignBitMask.As = x86.AMOVL
+		movSignBitMask.From.Offset = int64(float32SignBitMaskAddress)
+	} else {
+		movSignBitMask.As = x86.AMOVQ
+		movSignBitMask.From.Offset = int64(float64SignBitMaskAddress)
+	}
+	movSignBitMask.To.Type = obj.TYPE_REG
+	movSignBitMask.To.Reg = tmpReg
+	c.addInstruction(movSignBitMask)
+
+	// Clear the non-sign bits of x2 via AND with the mask.
+	clearNonSignBit := c.newProg()
+	clearNonSignBit.From.Type = obj.TYPE_REG
+	clearNonSignBit.From.Reg = tmpReg
+	clearNonSignBit.To.Type = obj.TYPE_REG
+	clearNonSignBit.To.Reg = x2.register
+	if is32Bit {
+		clearNonSignBit.As = x86.AANDPS
+	} else {
+		clearNonSignBit.As = x86.AANDPD
+	}
+	c.addInstruction(clearNonSignBit)
+
+	// Finally, copy the sign bit of x2 to x1.
+	copySignBit := c.newProg()
+	copySignBit.From.Type = obj.TYPE_REG
+	copySignBit.From.Reg = x2.register
+	copySignBit.To.Type = obj.TYPE_REG
+	copySignBit.To.Reg = x1.register
+	if is32Bit {
+		copySignBit.As = x86.AORPS
+	} else {
+		copySignBit.As = x86.AORPD
+	}
+	c.addInstruction(copySignBit)
+
+	// Record that we consumed the x2 and placed the copysign result in the x1's register.
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.pushValueOnRegister(x1.register)
 	return nil
 }
 

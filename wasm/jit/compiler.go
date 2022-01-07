@@ -45,6 +45,9 @@ type compiler interface {
 	compileTrunc(o *wazeroir.OperationTrunc) error
 	compileNearest(o *wazeroir.OperationNearest) error
 	compileSqrt(o *wazeroir.OperationSqrt) error
+	compileMin(o *wazeroir.OperationMin) error
+	compileMax(o *wazeroir.OperationMax) error
+	compileCopysign(o *wazeroir.OperationCopysign) error
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
 	compileEqz(o *wazeroir.OperationEqz) error
