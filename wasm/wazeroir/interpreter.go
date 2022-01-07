@@ -1212,6 +1212,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindNearest:
 			{
 				// Borrowed from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L77
+				// TODO: use the new algorith from https://github.com/bytecodealliance/wasmtime/pull/2171.
 				if op.b1 == 0 {
 					// Float32
 					f := math.Float32frombits(uint32(it.pop()))
@@ -1222,7 +1223,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						um := math.Abs(float64(f - u))
 						dm := math.Abs(float64(f - d))
 						h := u / 2.0
-						if um < dm || float32(math.Floor(float64(h))) == h {
+						if um < dm || (um == dm && float32(math.Floor(float64(h))) == h) {
 							f = u
 						} else {
 							f = d
@@ -1239,13 +1240,13 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						um := math.Abs(f - u)
 						dm := math.Abs(f - d)
 						h := u / 2.0
-						if um < dm || math.Floor(float64(h)) == h {
+						if um < dm || (um == dm && math.Floor(float64(h)) == h) {
 							f = u
 						} else {
 							f = d
 						}
 					}
-					it.push(math.Float64bits(f))
+					it.push(math.Float64bits(math.Round(f)))
 				}
 				frame.pc++
 			}

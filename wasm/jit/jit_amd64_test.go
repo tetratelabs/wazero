@@ -3911,6 +3911,8 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 				math.Float64bits(-1.3),
 				uint64(math.Float32bits(-1231.123)),
 				math.Float64bits(1.3),
+				math.Float64bits(100.3),
+				math.Float64bits(-100.3),
 				uint64(math.Float32bits(1231.123)),
 				math.Float64bits(math.Inf(1)),
 				math.Float64bits(math.Inf(-1)),
@@ -3999,9 +4001,38 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 						}
 						is32Bit = o.Type == wazeroir.Float32
 						if is32Bit {
-							expFloat32 = float32(math.Round(float64(math.Float32frombits(uint32(v)))))
+							// Implementation from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L77.
+							f := math.Float32frombits(uint32(v))
+							f64 := float64(f)
+							if f != -0 && f != 0 {
+								u := float32(math.Ceil(f64))
+								d := float32(math.Floor(f64))
+								um := math.Abs(float64(f - u))
+								dm := math.Abs(float64(f - d))
+								h := u / 2.0
+								if um < dm || (um == dm && float32(math.Floor(float64(h))) == h) {
+									f = u
+								} else {
+									f = d
+								}
+							}
+							expFloat32 = f
 						} else {
-							expFloat64 = math.Round(math.Float64frombits(v))
+							// Implementation from https://github.com/wasmerio/wasmer/blob/703bb4ee2ffb17b2929a194fc045a7e351b696e2/lib/vm/src/libcalls.rs#L120-L144.
+							f := math.Float64frombits(v)
+							if f != -0 && f != 0 {
+								u := math.Ceil(f)
+								d := math.Floor(f)
+								um := math.Abs(f - u)
+								dm := math.Abs(f - d)
+								h := u / 2.0
+								if um < dm || (um == dm && math.Floor(h) == h) {
+									f = u
+								} else {
+									f = d
+								}
+							}
+							expFloat64 = f
 						}
 					}
 
@@ -4046,7 +4077,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 						if math.IsNaN(expFloat64) {
 							require.True(t, math.IsNaN(actual))
 						} else {
-							require.Equal(t, actual, expFloat64)
+							require.Equal(t, expFloat64, actual)
 						}
 					}
 				})

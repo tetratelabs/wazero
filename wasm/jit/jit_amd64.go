@@ -1565,11 +1565,37 @@ func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 }
 
 // compileNearest emits the instructions to take the nearest integer value of the top value of float type on the stack.
-// For example, stack [..., 1.9] results in [..., 2.0]. This is equivalent to "math.Round".
+// For example, stack [..., 1.9] results in [..., 2.0]. This is NOT equivalent to "math.Round" and instead has the same
+// the sematics of LLVM's rint instrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
-	// Internally, nearest can be performed via ROUND instruction with 0x04 mode.
-	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/rintf.S for example.
-	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x04)
+	// Internally, nearest can be performed via ROUND instruction with 0x00 mode.
+	// If we compile the following Wat by "wasmtime wasm2obj"
+	//
+	// (module
+	//   (func (export "nearest_f32") (param $x f32) (result f32) (f32.nearest (local.get $x)))
+	//   (func (export "nearest_f64") (param $x f64) (result f64) (f64.nearest (local.get $x)))
+	// )
+	//
+	// and we see a disassemble of the object via "objdump --disassemble-all" like:
+	//
+	// 0000000000000000 <_wasm_function_0>:
+	// 	0:       55                      push   %rbp
+	// 	1:       48 89 e5                mov    %rsp,%rbp
+	// 	4:       66 0f 3a 0a c0 00       roundss $0x0,%xmm0,%xmm0
+	// 	a:       48 89 ec                mov    %rbp,%rsp
+	// 	d:       5d                      pop    %rbp
+	// 	e:       c3                      retq
+	//
+	// 000000000000000f <_wasm_function_1>:
+	// 	f:       55                      push   %rbp
+	//  10:       48 89 e5                mov    %rsp,%rbp
+	//  13:       66 0f 3a 0b c0 00       roundsd $0x0,%xmm0,%xmm0
+	//  19:       48 89 ec                mov    %rbp,%rsp
+	//  1c:       5d                      pop    %rbp
+	//  1d:       c3                      retq
+	//
+	// Here, actually we could see "rounds{s,d} $0x0,%xmm0,%xmm0" where the mode is set to zero.
+	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x00)
 }
 
 func (c *amd64Compiler) emitRoundInstruction(is32Bit bool, mode int64) error {
