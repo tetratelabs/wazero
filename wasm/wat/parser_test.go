@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestParseModule(t *testing.T) {
+	i32 := wasm.ValueTypeI32
 	tests := []struct {
 		name     string
 		input    string
@@ -38,6 +41,51 @@ func TestParseModule(t *testing.T) {
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "foo", name: "bar"},
 					{importIndex: 1, module: "baz", name: "qux"},
+				},
+			},
+		},
+		{
+			name: "import func inlined type",
+			input: `(module
+	(import "wasi_snapshot_preview1" "fd_write" (func $fd_write (param i32 i32 i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$fd_write"},
+				},
+			},
+		},
+		{
+			name: "multiple import func different inlined type",
+			input: `(module
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{
+					{params: []wasm.ValueType{i32, i32}, results: []wasm.ValueType{i32}},
+					{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}},
+				},
+				importFuncs: []*importFunc{
+					{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get"},
+					{importIndex: 1, typeIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
+				},
+			},
+		},
+		{
+			name: "multiple import func same inlined type",
+			input: `(module
+	(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (param i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{
+					{params: []wasm.ValueType{i32, i32}, results: []wasm.ValueType{i32}},
+				},
+				importFuncs: []*importFunc{
+					{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get"},
+					{importIndex: 1, typeIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get"},
 				},
 			},
 		},
@@ -89,6 +137,11 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "no module",
 			input:       "()",
 			expectedErr: "1:2: expected field, but found )",
+		},
+		{
+			name:        "double module",
+			input:       "(module) (module)",
+			expectedErr: "1:10: unexpected (",
 		},
 		{
 			name:        "module invalid name",
