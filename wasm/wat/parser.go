@@ -440,9 +440,12 @@ func (p *moduleParser) errorContext() string {
 		return "module"
 	case fieldModuleStart:
 		return "module.start"
-	case fieldModuleImport, fieldModuleImportFunc, fieldModuleImportFuncParam:
+	case fieldModuleImport, fieldModuleImportFunc, fieldModuleImportFuncParam, fieldModuleImportFuncResult:
 		if p.currentField == fieldModuleImportFuncParam {
 			return fmt.Sprintf("module.import[%d].func.param[%d]", p.currentImportIndex, p.currentParamIndex)
+		}
+		if p.currentField == fieldModuleImportFuncResult {
+			return fmt.Sprintf("module.import[%d].func.result", p.currentImportIndex)
 		}
 		if p.currentField == fieldModuleImportFunc {
 			return fmt.Sprintf("module.import[%d].func", p.currentImportIndex)
