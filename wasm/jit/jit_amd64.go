@@ -1560,7 +1560,7 @@ func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
 // For example, stack [..., 1.9] results in [..., 1.0]. This is equivalent to "math.Trunc".
 func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	// Internally, trunc can be performed via ROUND instruction with 0x03 mode.
-	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/floorf.S for example.
+	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/truncf.S for example.
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x03)
 }
 
