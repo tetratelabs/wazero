@@ -1694,8 +1694,8 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	// 2) Two values are NaN-free and equal: Only ZF flags is set.
 	// 3) One of Two values is NaN: ZF, PF and CF flags are set.
 
-	// Jump instruction to go to the (NaN-free or different values) case
-	// by checking the ZF flag as ZF is only set for 1) and 2) cases.
+	// Jump instruction to go to 3) case by checking the ZF flag
+	// as ZF is only set for 1) and 2) cases.
 	nanFreeOrDiffJump := c.newProg()
 	nanFreeOrDiffJump.As = x86.AJNE
 	nanFreeOrDiffJump.To.Type = obj.TYPE_BRANCH
