@@ -1569,14 +1569,14 @@ func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 // the sematics of LLVM's rint instrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
 func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	// Internally, nearest can be performed via ROUND instruction with 0x00 mode.
-	// If we compile the following Wat by "wasmtime wasm2obj"
+	// If we compile the following Wat by "wasmtime wasm2obj",
 	//
 	// (module
 	//   (func (export "nearest_f32") (param $x f32) (result f32) (f32.nearest (local.get $x)))
 	//   (func (export "nearest_f64") (param $x f64) (result f64) (f64.nearest (local.get $x)))
 	// )
 	//
-	// and we see a disassemble of the object via "objdump --disassemble-all" like:
+	// we see a disassemble of the object via "objdump --disassemble-all" like:
 	//
 	// 0000000000000000 <_wasm_function_0>:
 	// 	0:       55                      push   %rbp
