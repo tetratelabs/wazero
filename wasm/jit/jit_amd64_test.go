@@ -4067,7 +4067,6 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 						exp := float64(v)
 						actual := math.Float64frombits(actualBits)
 						require.Equal(t, exp, actual)
-						fmt.Println(hex.EncodeToString(code))
 					}
 				})
 			}
