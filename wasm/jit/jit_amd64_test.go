@@ -3888,6 +3888,96 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
+	for _, v := range []float64{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		math.MaxFloat64,
+		math.SmallestNonzeroFloat64,
+		6.8719476736e+10,  /* = 1 << 36 */
+		1.37438953472e+11, /* = 1 << 37 */
+		math.Inf(1), math.Inf(-1), math.NaN(),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
+
+			// Setup the demote target.
+			err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF32DemoteFromF64()
+			require.NoError(t, err)
+
+			// To verify the behavior, we release the value
+			// to the stack.
+			compiler.releaseAllRegistersToStack()
+			compiler.returnFunction()
+
+			// Generate and run the code under test.
+			code, _, err := compiler.generate()
+			require.NoError(t, err)
+			eng := newEngine()
+			jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+			// Check the result.
+			require.Equal(t, uint64(1), eng.stackPointer)
+			if math.IsNaN(v) {
+				require.True(t, math.IsNaN(float64(math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))))
+			} else {
+				exp := float32(v)
+				actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
+	for _, v := range []float32{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN()),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
+
+			// Setup the demote target.
+			err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF64PromoteFromF32()
+			require.NoError(t, err)
+
+			// To verify the behavior, we release the value
+			// to the stack.
+			compiler.releaseAllRegistersToStack()
+			compiler.returnFunction()
+
+			// Generate and run the code under test.
+			code, _, err := compiler.generate()
+			require.NoError(t, err)
+			eng := newEngine()
+			jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+			// Check the result.
+			require.Equal(t, uint64(1), eng.stackPointer)
+			if math.IsNaN(float64(v)) {
+				require.True(t, math.IsNaN(math.Float64frombits(eng.stack[eng.stackPointer-1])))
+			} else {
+				exp := float64(v)
+				actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
 func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 	for _, tc := range []struct {
 		name string

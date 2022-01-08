@@ -591,6 +591,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationF32DemoteFromF64:
 			err = compiler.compileF32DemoteFromF64()
 		case *wazeroir.OperationF64PromoteFromF32:
+			err = compiler.compileF64PromoteFromF32()
 		case *wazeroir.OperationI32ReinterpretFromF32,
 			*wazeroir.OperationI64ReinterpretFromF64,
 			*wazeroir.OperationF32ReinterpretFromI32,

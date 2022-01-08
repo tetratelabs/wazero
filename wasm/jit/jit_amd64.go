@@ -1866,6 +1866,18 @@ func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 }
 
 func (c *amd64Compiler) compileI32WrapFromI64() error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	mov := c.newProg()
+	mov.As = x86.AMOVL
+	mov.From.Type = obj.TYPE_REG
+	mov.From.Reg = target.register
+	mov.To.Type = obj.TYPE_REG
+	mov.To.Reg = target.register
+	c.addInstruction(mov)
 	return nil
 }
 
@@ -1878,6 +1890,34 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 }
 
 func (c *amd64Compiler) compileF32DemoteFromF64() error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	convert := c.newProg()
+	convert.As = x86.ACVTSD2SS
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = target.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = target.register
+	c.addInstruction(convert)
+	return nil
+}
+
+func (c *amd64Compiler) compileF64PromoteFromF32() error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	convert := c.newProg()
+	convert.As = x86.ACVTSS2SD
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = target.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = target.register
+	c.addInstruction(convert)
 	return nil
 }
 
