@@ -97,9 +97,9 @@ func (p *moduleParser) parse(tok tokenType, tokenBytes []byte, line, col uint32)
 	return p.tokenParser(tok, tokenBytes, line, col)
 }
 
-func (p *moduleParser) ensureLParen(tok tokenType, _ []byte, _, _ uint32) error {
+func (p *moduleParser) ensureLParen(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok != tokenLParen {
-		return fmt.Errorf("expected '(', but found %s", tok)
+		return fmt.Errorf("expected '(', but found %s: %s", tok, tokenBytes)
 	}
 	p.tokenParser = p.beginField
 	return nil
@@ -142,13 +142,12 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 		}
 	case fieldModuleImport:
 		// Add the next import func object and ready for parsing it.
-		if string(fieldName) == "func" { // cannot repeat
-			if uint32(len(p.module.importFuncs)) > p.currentImportIndex {
-				return fmt.Errorf("redundant field: %s", string(fieldName))
-			}
-			if err := p.addNextImportFunc(); err != nil {
-				return err
-			}
+		if string(fieldName) == "func" {
+			p.module.importFuncs = append(p.module.importFuncs, &importFunc{
+				module:      string(p.currentValue0),
+				name:        string(p.currentValue1),
+				importIndex: p.currentImportIndex,
+			})
 			p.currentField = fieldModuleImportFunc
 			p.tokenParser = p.parseImportFunc
 		} // TODO: table, memory or global
@@ -178,7 +177,7 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 //
 // Design Note: This is an alternative to using a stack as the structure parsed by moduleParser is fixed depth. For
 // example, any function body may be parsed in a more dynamic way.
-func (p *moduleParser) endField() error {
+func (p *moduleParser) endField() {
 	switch p.currentField {
 	case fieldModuleImportFuncParam, fieldModuleImportFuncResult:
 		p.currentField = fieldModuleImportFunc
@@ -191,11 +190,10 @@ func (p *moduleParser) endField() error {
 		p.tokenParser = p.parseModule
 	case fieldModule:
 		p.currentField = fieldInitial
-		p.tokenParser = p.parseUnexpectedToken // only one module is allowed and nothing else
-	default:
-		return errors.New("parent field is unknown") // bug
+		p.tokenParser = p.parseUnexpectedTrailingCharacters // only one module is allowed and nothing else
+	default: // currentField is an enum, we expect to have handled all cases above. panic if we didn't
+		panic(fmt.Errorf("BUG: unhandled parsing state: %v", p.currentField))
 	}
-	return nil
 }
 
 func (p *moduleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ uint32) error {
@@ -210,7 +208,7 @@ func (p *moduleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ uint32
 		p.tokenParser = p.beginField // after this look for a field name
 		return nil
 	case tokenRParen: // end of module
-		return p.endField()
+		p.endField()
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
@@ -230,21 +228,31 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 			return fmt.Errorf("redundant name: %s", name)
 		}
 	case tokenLParen: // start fields, ex. (func
+		// Err if there's a second description. Ex. (import "" "" (func) (func))
+		if uint32(len(p.module.importFuncs)) > p.currentImportIndex {
+			return p.unexpectedToken(tok, tokenBytes)
+		}
+		// Err if there are not enough names when we reach a description. Ex. (import func())
+		if err := p.validateImportModuleAndName(); err != nil {
+			return err
+		}
 		p.tokenParser = p.beginField
 		return nil
 	case tokenRParen: // end of this import
-		// If we've not yet added the current import, determine the best error message.
+		// Err if we never reached a description...
 		if uint32(len(p.module.importFuncs)) == p.currentImportIndex {
 			if err := p.validateImportModuleAndName(); err != nil {
-				return err // Ex. (module) or (module "Math")
+				return err // Ex. missing (func) and names: (import) or (import "Math")
 			}
-			return errors.New("missing description field") // Ex. (module "Math" "Pi")
+			return errors.New("missing description field") // Ex. missing (func): (import "Math" "Pi")
 		}
 
-		// multiple imports are allowed, so advance in case there's a next.
+		// Multiple imports are allowed, so advance in case there's a next.
 		p.currentImportIndex++
 
-		return p.endField()
+		// Reset parsing state: this is late to help give correct error messages on multiple descriptions.
+		p.currentValue0, p.currentValue1 = nil, nil
+		p.endField()
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
@@ -258,19 +266,6 @@ func (p *moduleParser) validateImportModuleAndName() error {
 	} else if p.currentValue1 == nil {
 		return errors.New("missing name")
 	}
-	return nil
-}
-
-func (p *moduleParser) addNextImportFunc() error {
-	if err := p.validateImportModuleAndName(); err != nil {
-		return err
-	}
-
-	p.module.importFuncs = append(p.module.importFuncs, &importFunc{
-		module:      string(p.currentValue0),
-		name:        string(p.currentValue1),
-		importIndex: p.currentImportIndex,
-	})
 	return nil
 }
 
@@ -310,9 +305,8 @@ func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, _, _ ui
 		}
 
 		// reset parsing state
-		p.currentValue0, p.currentValue1 = nil, nil
 		p.currentParamIndex = 0
-		return p.endField()
+		p.endField()
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
@@ -327,11 +321,6 @@ func (p *moduleParser) parseImportFuncParam(tok tokenType, tokenBytes []byte, _,
 		vt, err := parseValueType(tokenBytes)
 		if err != nil {
 			return err
-		}
-
-		// Here, we have to check for the abbreviated form, ex. (param i32 i32), noting this does not allow names!
-		if p.currentParamIndex > 0 && p.currentParams != nil { // ex. (param i32) (param i32 i32)
-			return errors.New("multiple type abbreviation is unexpected with multiple params")
 		}
 		p.currentParams = append(p.currentParams, vt)
 	case tokenRParen: // end of this field
@@ -349,7 +338,7 @@ func (p *moduleParser) parseImportFuncParam(tok tokenType, tokenBytes []byte, _,
 		p.currentParams = nil
 		p.currentParamIndex++
 
-		return p.endField()
+		p.endField()
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
@@ -359,7 +348,11 @@ func (p *moduleParser) parseImportFuncParam(tok tokenType, tokenBytes []byte, _,
 func (p *moduleParser) parseImportFuncResult(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
 	case tokenKeyword: // Ex. i32
-		if p.currentType.results != nil { // Ex. (result i32 i32)
+		if p.currentType == nil { // Ex. no params: (func (result i32))
+			p.currentType = &typeFunc{}
+		}
+
+		if p.currentType.results != nil { // Ex. double result: (func (result i32 i32))
 			return errors.New("redundant type")
 		}
 
@@ -369,16 +362,12 @@ func (p *moduleParser) parseImportFuncResult(tok tokenType, tokenBytes []byte, _
 		}
 
 		// add the result to the current type
-		if p.currentType == nil {
-			p.currentType = &typeFunc{}
-		}
-
 		p.currentType.results = append(p.currentType.results, vt)
 	case tokenRParen: // end of this field
 		if p.currentType == nil || p.currentType.results == nil {
 			return errors.New("expected a type")
 		}
-		return p.endField()
+		p.endField()
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
@@ -414,20 +403,20 @@ func (p *moduleParser) parseStart(tok tokenType, tokenBytes []byte, line, col ui
 		if p.module.startFunction == nil {
 			return errors.New("missing funcidx")
 		}
-		return p.endField()
+		p.endField()
 	default:
 		return p.unexpectedToken(tok, tokenBytes)
 	}
 	return nil
 }
 
-func (p *moduleParser) parseUnexpectedToken(tok tokenType, tokenBytes []byte, _, _ uint32) error {
-	return p.unexpectedToken(tok, tokenBytes)
+func (p *moduleParser) parseUnexpectedTrailingCharacters(_ tokenType, tokenBytes []byte, _, _ uint32) error {
+	return fmt.Errorf("unexpected trailing characters: %s", tokenBytes)
 }
 
 func (p *moduleParser) unexpectedToken(tok tokenType, tokenBytes []byte) error {
-	if tok == tokenLParen || tok == tokenRParen {
-		return fmt.Errorf("unexpected %s", tok)
+	if tok == tokenLParen { // unbalanced tokenRParen is caught at the lexer layer
+		return errors.New("unexpected '('")
 	}
 	return fmt.Errorf("unexpected %s: %s", tok, tokenBytes)
 }
@@ -452,6 +441,7 @@ func (p *moduleParser) errorContext() string {
 		}
 		// TODO: table, memory or global
 		return fmt.Sprintf("module.import[%d]", p.currentImportIndex)
+	default: // currentField is an enum, we expect to have handled all cases above. panic if we didn't
+		panic(fmt.Errorf("BUG: unhandled parsing state: %v", p.currentField))
 	}
-	return ""
 }
