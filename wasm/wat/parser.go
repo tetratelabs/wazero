@@ -232,7 +232,7 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 		if uint32(len(p.module.importFuncs)) > p.currentImportIndex {
 			return p.unexpectedToken(tok, tokenBytes)
 		}
-		// Err if there's are not enough names when we reach a description. Ex. (import func())
+		// Err if there are not enough names when we reach a description. Ex. (import func())
 		if err := p.validateImportModuleAndName(); err != nil {
 			return err
 		}
