@@ -3996,6 +3996,7 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 		t.Run(fmt.Sprintf("%s from %s", tc.outputType, tc.inputType), func(t *testing.T) {
 			for _, v := range []uint64{
 				0, 1, 12345, 1 << 31, 1 << 32, 1 << 54, 1 << 63,
+				math.MaxUint32, math.MaxUint64, math.MaxInt32, math.MaxInt64,
 				math.Float64bits(1.23455555),
 				math.Float64bits(-1.23455555),
 				math.Float64bits(math.NaN()),
@@ -4033,32 +4034,40 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 
 					// Check the result.
 					require.Equal(t, uint64(1), eng.stackPointer)
+					actualBits := eng.stack[eng.stackPointer-1]
 					if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedInt32 {
 						exp := float32(int32(v))
-						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						actual := math.Float32frombits(uint32(actualBits))
 						require.Equal(t, exp, actual)
 					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedInt64 {
 						exp := float32(int64(v))
-						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						actual := math.Float32frombits(uint32(actualBits))
 						require.Equal(t, exp, actual)
 					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedInt32 {
 						exp := float64(int32(v))
-						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						actual := math.Float64frombits(actualBits)
 						require.Equal(t, exp, actual)
 					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedInt64 {
 						exp := float64(int64(v))
-						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						actual := math.Float64frombits(actualBits)
 						require.Equal(t, exp, actual)
 					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedUint32 {
 						exp := float32(uint32(v))
-						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						actual := math.Float32frombits(uint32(actualBits))
 						require.Equal(t, exp, actual)
 					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedUint32 {
 						exp := float64(uint32(v))
-						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						actual := math.Float64frombits(actualBits)
 						require.Equal(t, exp, actual)
-					} else {
-						t.Skip()
+					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedUint64 {
+						exp := float32(v)
+						actual := math.Float32frombits(uint32(actualBits))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedUint64 {
+						exp := float64(v)
+						actual := math.Float64frombits(actualBits)
+						require.Equal(t, exp, actual)
+						fmt.Println(hex.EncodeToString(code))
 					}
 				})
 			}

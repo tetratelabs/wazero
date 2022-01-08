@@ -1908,20 +1908,164 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		// For the same reason above, we use 64bit conversion for unsigned 32bit.
 		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int.
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
-		err = c.emitUnsignedInt64ToFloat32Conversion()
+		err = c.emitUnsignedInt64ToFloatConversion(true)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
-		err = c.emitUnsignedInt64ToFloat64Conversion()
+		err = c.emitUnsignedInt64ToFloatConversion(false)
 	}
 	return
 }
 
-func (c *amd64Compiler) emitUnsignedInt64ToFloat32Conversion() error {
-	// TODO
-	return nil
-}
+func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) error {
+	// The logic here is exactly the same as GCC emits for the following code:
+	//
+	// float convert(int num) {
+	//     float foo;
+	//     uint64_t ptr1 = 100;
+	//     foo = (float)(ptr1);
+	//     return foo;
+	// }
+	//
+	// which is compiled by GCC as
+	//
+	// convert:
+	// 	   push    rbp
+	// 	   mov     rbp, rsp
+	// 	   mov     DWORD PTR [rbp-20], edi
+	// 	   mov     DWORD PTR [rbp-4], 100
+	// 	   mov     eax, DWORD PTR [rbp-4]
+	// 	   test    rax, rax
+	// 	   js      .handle_sign_bit_case
+	// 	   cvtsi2ss        xmm0, rax
+	// 	   jmp     .exit
+	// .handle_sign_bit_case:
+	// 	   mov     rdx, rax
+	// 	   shr     rdx
+	// 	   and     eax, 1
+	// 	   or      rdx, rax
+	// 	   cvtsi2ss        xmm0, rdx
+	// 	   addsd   xmm0, xmm0
+	// .exit: ...
+	//
+	// tl;dr is that we have a branch depending on whether or not sign bit is set.
 
-func (c *amd64Compiler) emitUnsignedInt64ToFloat64Conversion() error {
-	// TODO
+	origin := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(origin); err != nil {
+		return err
+	}
+
+	dest, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	// Check if the most significant bit (sign bit) is set.
+	test := c.newProg()
+	test.As = x86.ATESTQ
+	test.From.Type = obj.TYPE_REG
+	test.From.Reg = origin.register
+	test.To.Type = obj.TYPE_REG
+	test.To.Reg = origin.register
+	c.addInstruction(test)
+
+	// Jump if the sign bit is set.
+	jmpIfSignbitSet := c.newProg()
+	jmpIfSignbitSet.To.Type = obj.TYPE_BRANCH
+	jmpIfSignbitSet.As = x86.AJMI
+	c.addInstruction(jmpIfSignbitSet)
+
+	// Otherwise, we could fit the unsigned int into float32.
+	// So we simply convert it to float32 and emit jump instruction to exit from this branch.
+	convert := c.newProg()
+	if isFloat32bit {
+		convert.As = x86.ACVTSQ2SS
+	} else {
+		convert.As = x86.ACVTSQ2SD
+	}
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = origin.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = dest
+	c.addInstruction(convert)
+
+	exitFromSignbitUnSet := c.newProg()
+	exitFromSignbitUnSet.As = obj.AJMP
+	exitFromSignbitUnSet.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(exitFromSignbitUnSet)
+
+	// Now handling the case where sign-bit is set.
+	// We emit the following sequences:
+	// 	   mov     tmpReg, origin
+	// 	   shr     tmpReg, 1
+	// 	   and     origin, 1
+	// 	   or      tmpReg, origin
+	// 	   cvtsi2ss        xmm0, tmpReg
+	// 	   addsd   xmm0, xmm0
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+	movToTmp := c.newProg()
+	jmpIfSignbitSet.To.SetTarget(movToTmp)
+	movToTmp.As = x86.AMOVQ
+	movToTmp.From.Type = obj.TYPE_REG
+	movToTmp.From.Reg = origin.register
+	movToTmp.To.Type = obj.TYPE_REG
+	movToTmp.To.Reg = tmpReg
+	c.addInstruction(movToTmp)
+	divideBy2 := c.newProg()
+	divideBy2.As = x86.ASHRQ
+	divideBy2.From.Type = obj.TYPE_CONST
+	divideBy2.From.Offset = 1
+	divideBy2.To.Type = obj.TYPE_REG
+	divideBy2.To.Reg = tmpReg
+	c.addInstruction(divideBy2)
+	rescureLeastSignificantBit := c.newProg()
+	rescureLeastSignificantBit.As = x86.AANDQ
+	rescureLeastSignificantBit.From.Type = obj.TYPE_CONST
+	rescureLeastSignificantBit.From.Offset = 0x1
+	rescureLeastSignificantBit.To.Type = obj.TYPE_REG
+	rescureLeastSignificantBit.To.Reg = origin.register
+	c.addInstruction(rescureLeastSignificantBit)
+	addRescuredBit := c.newProg()
+	addRescuredBit.As = x86.AORQ
+	addRescuredBit.From.Type = obj.TYPE_REG
+	addRescuredBit.From.Reg = origin.register
+	addRescuredBit.To.Type = obj.TYPE_REG
+	addRescuredBit.To.Reg = tmpReg
+	c.addInstruction(addRescuredBit)
+	convertDividedBy2Value := c.newProg()
+	if isFloat32bit {
+		convertDividedBy2Value.As = x86.ACVTSQ2SS
+	} else {
+		convertDividedBy2Value.As = x86.ACVTSQ2SD
+	}
+	convertDividedBy2Value.From.Type = obj.TYPE_REG
+	convertDividedBy2Value.From.Reg = tmpReg
+	convertDividedBy2Value.To.Type = obj.TYPE_REG
+	convertDividedBy2Value.To.Reg = dest
+	c.addInstruction(convertDividedBy2Value)
+	multiplyBy2 := c.newProg()
+	if isFloat32bit {
+		multiplyBy2.As = x86.AADDSS
+	} else {
+		multiplyBy2.As = x86.AADDSD
+	}
+	multiplyBy2.From.Type = obj.TYPE_REG
+	multiplyBy2.From.Reg = dest
+	multiplyBy2.To.Type = obj.TYPE_REG
+	multiplyBy2.To.Reg = dest
+	c.addInstruction(multiplyBy2)
+
+	// Now we finished the sign-bit set branch.
+	// We have to make the exit jump target of sign-bit unset branch
+	// towards the next instruction.
+	c.addSetJmpOrigin(exitFromSignbitUnSet)
+
+	// We consumed the origin's register and placed the conversion result
+	// in the dest register.
+	c.locationStack.markRegisterUnused(origin.register)
+	loc := c.locationStack.pushValueOnRegister(dest)
+	loc.setRegisterType(generalPurposeRegisterTypeFloat)
 	return nil
 }
 
