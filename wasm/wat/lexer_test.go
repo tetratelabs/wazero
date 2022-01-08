@@ -508,6 +508,13 @@ func TestLex_Errors(t *testing.T) {
 			expectedErr:  "expected an ASCII character, not 私",
 		},
 		{
+			name:         "truncated string",
+			input:        []byte("\"hello"),
+			expectedLine: 1,
+			expectedCol:  6,
+			expectedErr:  "expected end quote",
+		},
+		{
 			name:         "0x80 in block comment",
 			input:        []byte("(; \200)"),
 			expectedLine: 1,

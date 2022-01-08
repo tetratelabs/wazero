@@ -47,7 +47,33 @@ func TestParseModule(t *testing.T) {
 		{
 			name: "import func inlined type",
 			input: `(module
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32) (param i32) (param i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
+				},
+			},
+		},
+		{
+			name: "import func inlined type - abbreviated",
+			input: `(module
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
+				},
+			},
+		},
+		{
+			// Spec says expand abbreviations first. It doesn't explicitly say you can't mix forms.
+			// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A0
+			name: "import func inlined type - mixed abbreviated",
+			input: `(module
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32 i32) (param i32) (result i32)))
 )`,
 			expected: &module{
 				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
@@ -69,7 +95,30 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
+			name:  "import func inlined type no param",
+			input: `(module (import "" "" (func (result i32))))`,
+			expected: &module{
+				types:       []*typeFunc{{results: []wasm.ValueType{i32}}},
+				importFuncs: []*importFunc{{}},
+			},
+		},
+		{
 			name: "import func inlined type different param types",
+			input: `(module
+	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32) (param i32) (param i32) (param i32) (param i32) (param i64) (param i64) (param i32) (param i32) (result i32)))
+)`,
+			expected: &module{
+				types: []*typeFunc{{
+					params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+					results: []wasm.ValueType{i32},
+				}},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open"},
+				},
+			},
+		},
+		{
+			name: "import func inlined type different param types - abbreviated",
 			input: `(module
 	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
 )`,
@@ -158,8 +207,39 @@ func TestParseModule(t *testing.T) {
 	}
 }
 
+func TestParseValueType(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected wasm.ValueType
+	}{
+		{"i32", wasm.ValueTypeI32},
+		{"i64", wasm.ValueTypeI64},
+		{"f32", wasm.ValueTypeF32},
+		{"f64", wasm.ValueTypeF64},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.input, func(t *testing.T) {
+			m, err := parseValueType([]byte(tc.input))
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, m)
+		})
+	}
+	t.Run("unknown type", func(t *testing.T) {
+		_, err := parseValueType([]byte("f65"))
+		require.EqualError(t, err, "unknown type: f65")
+	})
+}
+
 func TestParseModule_Errors(t *testing.T) {
 	tests := []struct{ name, input, expectedErr string }{
+		{
+			name:        "forgot parens",
+			input:       "module",
+			expectedErr: "1:1: expected '(', but found keyword: module",
+		},
 		{
 			name:        "no module",
 			input:       "()",
@@ -168,12 +248,17 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "double module",
 			input:       "(module) (module)",
-			expectedErr: "1:10: unexpected (",
+			expectedErr: "1:10: unexpected trailing characters: (",
 		},
 		{
 			name:        "module invalid name",
 			input:       "(module test)", // must start with $
 			expectedErr: "1:9: unexpected keyword: test in module",
+		},
+		{
+			name:        "module invalid field",
+			input:       "(module (test))",
+			expectedErr: "1:10: unexpected field: test in module",
 		},
 		{
 			name:        "module double name",
@@ -196,9 +281,19 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:16: missing module and name in module.import[0]",
 		},
 		{
+			name:        "import with desc, but no module",
+			input:       "(module (import (func))",
+			expectedErr: "1:17: missing module and name in module.import[0]",
+		},
+		{
 			name:        "import missing name",
 			input:       "(module (import \"\"))",
 			expectedErr: "1:19: missing name in module.import[0]",
+		},
+		{
+			name:        "import with desc, no name",
+			input:       "(module (import \"\" (func)))",
+			expectedErr: "1:20: missing name in module.import[0]",
 		},
 		{
 			name:        "import unquoted module",
@@ -224,6 +319,11 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "import func invalid name",
 			input:       "(module (import \"foo\" \"bar\" (func baz)))",
 			expectedErr: "1:35: unexpected keyword: baz in module.import[0].func",
+		},
+		{
+			name:        "import func double name",
+			input:       "(module (import \"foo\" \"bar\" (func $baz $qux)))",
+			expectedErr: "1:40: redundant name: $qux in module.import[0].func",
 		},
 		{
 			name:        "import func missing param0 type",
@@ -261,9 +361,29 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:49: unknown type: f65 in module.import[0].func.result",
 		},
 		{
+			name:        "import func wrong no param type",
+			input:       "(module (import \"\" \"\" (func (param))))",
+			expectedErr: "1:35: expected a type in module.import[0].func.param[0]",
+		},
+		{
+			name:        "import func no result type",
+			input:       "(module (import \"\" \"\" (func (param i32) (result))))",
+			expectedErr: "1:48: expected a type in module.import[0].func.result",
+		},
+		{
+			name:        "import func wrong param token",
+			input:       "(module (import \"\" \"\" (func (param () ))))",
+			expectedErr: "1:36: unexpected '(' in module.import[0].func.param[0]",
+		},
+		{
+			name:        "import func wrong result token",
+			input:       "(module (import \"\" \"\" (func (result () ))))",
+			expectedErr: "1:37: unexpected '(' in module.import[0].func.result",
+		},
+		{
 			name:        "import func double desc",
 			input:       "(module (import \"foo\" \"bar\" (func $main) (func $mein)))",
-			expectedErr: "1:43: redundant field: func in module.import[0]",
+			expectedErr: "1:42: unexpected '(' in module.import[0]",
 		},
 		{
 			name:        "start missing funcidx",
@@ -279,6 +399,11 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "double start",
 			input:       "(module (start $main) (start $main))",
 			expectedErr: "1:24: redundant start in module",
+		},
+		{
+			name:        "wrong start",
+			input:       "(module (start main))",
+			expectedErr: "1:16: unexpected keyword: main in module.start",
 		},
 	}
 

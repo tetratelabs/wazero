@@ -13,6 +13,7 @@ import (
 
 func TestTextToBinary(t *testing.T) {
 	zero := uint32(0)
+	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
 	tests := []struct {
 		name     string
 		input    string
@@ -38,22 +39,28 @@ func TestTextToBinary(t *testing.T) {
 			},
 		},
 		{
-			name:  "import func two",
-			input: "(module (import \"foo\" \"bar\" (func)) (import \"baz\" \"qux\" (func)))",
+			name: "multiple import func with different inlined type",
+			input: `(module
+	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+				},
 				ImportSection: []*wasm.ImportSegment{
 					{
-						Module: "foo", Name: "bar",
+						Module: "wasi_snapshot_preview1", Name: "path_open",
 						Desc: &wasm.ImportDesc{
 							Kind:          wasm.ImportKindFunction,
 							FuncTypeIndex: 0,
 						},
 					}, {
-						Module: "baz", Name: "qux",
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
 						Desc: &wasm.ImportDesc{
 							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 0,
+							FuncTypeIndex: 1,
 						},
 					},
 				},
@@ -110,6 +117,11 @@ func TestTextToBinary(t *testing.T) {
 
 func TestTextToBinary_Errors(t *testing.T) {
 	tests := []struct{ name, input, expectedErr string }{
+		{
+			name:        "invalid",
+			input:       "module",
+			expectedErr: "1:1: expected '(', but found keyword: module",
+		},
 		{
 			name:        "start, but no funcs",
 			input:       "(module (start $main))",
