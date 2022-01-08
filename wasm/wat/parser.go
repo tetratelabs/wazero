@@ -250,7 +250,7 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 		// Multiple imports are allowed, so advance in case there's a next.
 		p.currentImportIndex++
 
-		// Reset parsing state: done late to help give correct error messages if there are multiple descriptions.
+		// Reset parsing state: this is late to help give correct error messages on multiple descriptions.
 		p.currentValue0, p.currentValue1 = nil, nil
 		p.endField()
 	default:
