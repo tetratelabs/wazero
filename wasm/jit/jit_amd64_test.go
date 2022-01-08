@@ -4027,7 +4027,6 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 
 					// Generate and run the code under test.
 					code, _, err := compiler.generate()
-					fmt.Println(hex.EncodeToString(code))
 					require.NoError(t, err)
 					eng := newEngine()
 					jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)

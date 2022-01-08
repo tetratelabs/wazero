@@ -1894,8 +1894,7 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		err = c.emitSimpleIntToFloatConversion(x86.ACVTSL2SD) // = CVTSI2SD for 32bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
 		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int
-	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 ||
-		o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
 		// See the following link for why we use 64bit conversion for unsigned 32bit interger sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
 		//
@@ -1905,6 +1904,9 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
 		// >> which allows CVTSI2SS to be used after all.
 		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SS) // = CVTSI2SS for 64bit int.
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+		// For the same reason above, we use 64bit conversion for unsigned 32bit.
+		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int.
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
 		err = c.emitUnsignedInt64ToFloat32Conversion()
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
