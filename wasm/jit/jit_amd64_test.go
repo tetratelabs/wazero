@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -4396,7 +4395,6 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 
 					// Generate and run the code under test.
 					code, _, err := compiler.generate()
-					fmt.Println(hex.EncodeToString(code))
 					require.NoError(t, err)
 					mem := newMemoryInst()
 					jitcall(
