@@ -31,13 +31,13 @@ const (
 func (s SignedInt) String() (ret string) {
 	switch s {
 	case SignedUint32:
-		ret = "i32"
-	case SignedUint64:
-		ret = "i64"
-	case SignedInt32:
 		ret = "u32"
-	case SignedInt64:
+	case SignedUint64:
 		ret = "u64"
+	case SignedInt32:
+		ret = "s32"
+	case SignedInt64:
+		ret = "s64"
 	}
 	return
 }
@@ -99,11 +99,11 @@ const (
 func (s SignedType) String() (ret string) {
 	switch s {
 	case SignedTypeInt32:
-		ret = "i32"
+		ret = "s32"
 	case SignedTypeUint32:
 		ret = "u32"
 	case SignedTypeInt64:
-		ret = "i64"
+		ret = "s64"
 	case SignedTypeUint64:
 		ret = "u64"
 	case SignedTypeFloat32:

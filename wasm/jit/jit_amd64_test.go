@@ -3947,7 +3947,7 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 			compiler := requireNewCompiler(t)
 			compiler.initializeReservedRegisters()
 
-			// Setup the demote target.
+			// Setup the promote target.
 			err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: v})
 			require.NoError(t, err)
 
@@ -3973,6 +3973,95 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 				exp := float64(v)
 				actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
 				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
+	for _, tc := range []struct {
+		inputType  wazeroir.SignedInt
+		outputType wazeroir.Float
+	}{
+		{inputType: wazeroir.SignedInt32, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedInt32, outputType: wazeroir.Float64},
+		{inputType: wazeroir.SignedInt64, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedInt64, outputType: wazeroir.Float64},
+		{inputType: wazeroir.SignedUint32, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedUint32, outputType: wazeroir.Float64},
+		{inputType: wazeroir.SignedUint64, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedUint64, outputType: wazeroir.Float64},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("%s from %s", tc.outputType, tc.inputType), func(t *testing.T) {
+			for _, v := range []uint64{
+				0, 1, 12345, 1 << 31, 1 << 32, 1 << 54, 1 << 63,
+				math.Float64bits(1.23455555),
+				math.Float64bits(-1.23455555),
+				math.Float64bits(math.NaN()),
+				math.Float64bits(math.Inf(1)),
+				math.Float64bits(math.Inf(-1)),
+			} {
+				t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
+
+					// Setup the conversion target.
+					var err error
+					if tc.inputType == wazeroir.SignedInt32 || tc.inputType == wazeroir.SignedUint32 {
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+					} else {
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(v)})
+					}
+					require.NoError(t, err)
+
+					err = compiler.compileFConvertFromI(&wazeroir.OperationFConvertFromI{
+						InputType: tc.inputType, OutputType: tc.outputType,
+					})
+					require.NoError(t, err)
+
+					// To verify the behavior, we release the value
+					// to the stack.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+
+					// Generate and run the code under test.
+					code, _, err := compiler.generate()
+					fmt.Println(hex.EncodeToString(code))
+					require.NoError(t, err)
+					eng := newEngine()
+					jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+					// Check the result.
+					require.Equal(t, uint64(1), eng.stackPointer)
+					if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedInt32 {
+						exp := float32(int32(v))
+						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedInt64 {
+						exp := float32(int64(v))
+						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedInt32 {
+						exp := float64(int32(v))
+						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedInt64 {
+						exp := float64(int64(v))
+						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedUint32 {
+						exp := float32(uint32(v))
+						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedUint32 {
+						exp := float64(uint32(v))
+						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						require.Equal(t, exp, actual)
+					} else {
+						t.Skip()
+					}
+				})
 			}
 		})
 	}
