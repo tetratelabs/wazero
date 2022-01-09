@@ -65,15 +65,12 @@ type typeFunc struct {
 	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
 	params []wasm.ValueType
 
-	// results are the possibly empty sequence of value types returned by a function with this signature.
+	// result is the value type of the signature or zero if there is none.
 	//
-	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
+	// Note: We use this shortcut instead of a slice because in WebAssembly 1.0 (MVP), there can be at most one result.
 	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
-	results []wasm.ValueType
+	result wasm.ValueType
 }
-
-// typeFuncEmpty represents a nullary function type. Ex. `(type (func))`
-var typeFuncEmpty = &typeFunc{}
 
 // importFunc corresponds to the text format of a WebAssembly function import.
 //

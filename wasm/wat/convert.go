@@ -25,7 +25,11 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 	// difference is that the text format has type names and the binary format does not.
 	result = &wasm.Module{}
 	for _, t := range m.types {
-		result.TypeSection = append(result.TypeSection, &wasm.FunctionType{Params: t.params, Results: t.results})
+		var results []wasm.ValueType
+		if t.result != 0 {
+			results = []wasm.ValueType{t.result}
+		}
+		result.TypeSection = append(result.TypeSection, &wasm.FunctionType{Params: t.params, Results: results})
 	}
 
 	// Now, handle any imported functions. Notably, we retain the same insertion order as defined in the text format in
@@ -35,7 +39,7 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 			Module: f.module, Name: f.name,
 			Desc: &wasm.ImportDesc{
 				Kind:          wasm.ImportKindFunction,
-				FuncTypeIndex: uint32(f.typeIndex),
+				FuncTypeIndex: f.typeIndex,
 			},
 		})
 	}
