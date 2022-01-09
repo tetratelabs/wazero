@@ -1882,6 +1882,7 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 }
 
 func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
+	// TODO
 	return nil
 }
 
