@@ -1754,6 +1754,9 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	return nil
 }
 
+// compileCopysign adds instructions to pop two float values from the stack, and copy the signbit of
+// the first-popped value to the last one.
+// For example, stack [..., 1.213, -5.0] results in [..., -1.213].
 func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	is32Bit := o.Type == wazeroir.Float32
 
@@ -1865,6 +1868,8 @@ func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	return nil
 }
 
+// compileI32WrapFromI64 adds instructions to replace the 64-bit int on top of the stack
+// with the corresponding 32-bit integer. This is equivalent to uint64(uint32(v)) in Go.
 func (c *amd64Compiler) compileI32WrapFromI64() error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -1886,6 +1891,8 @@ func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	return nil
 }
 
+// compileFConvertFromI adds instructions to replace the top value of int type on the stack with
+// the corresponding float value. This is equivalent to float32(uint32(x)), float32(int32(x)), etc in Go.
 func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
 	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
 		err = c.emitSimpleIntToFloatConversion(x86.ACVTSL2SS) // = CVTSI2SS for 32bit int
@@ -1916,6 +1923,8 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 	return
 }
 
+// emitUnsignedInt64ToFloatConversion is handling the case of unsigned 64-bit integer
+// in compileFConvertFromI.
 func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) error {
 	// The logic here is exactly the same as GCC emits for the following code:
 	//
@@ -2076,6 +2085,8 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	return nil
 }
 
+// emitSimpleIntToFloatConversion pops a flaot type from the stack, and applies the
+// given instruction on it, and push the integer result onto the stack.
 func (c *amd64Compiler) emitSimpleIntToFloatConversion(convInstruction obj.As) error {
 	origin := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(origin); err != nil {
@@ -2101,6 +2112,8 @@ func (c *amd64Compiler) emitSimpleIntToFloatConversion(convInstruction obj.As) e
 	return nil
 }
 
+// compileF32DemoteFromF64 adds instructions to replace the 64-bit float on top of the stack
+// with the corresponding 32-bit float. This is equivalent to float32(float64(v)) in Go.
 func (c *amd64Compiler) compileF32DemoteFromF64() error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -2117,6 +2130,8 @@ func (c *amd64Compiler) compileF32DemoteFromF64() error {
 	return nil
 }
 
+// compileF64PromoteFromF32 adds instructions to replace the 32-bit float on top of the stack
+// with the corresponding 64-bit float. This is equivalent to float64(float32(v)) in Go.
 func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
