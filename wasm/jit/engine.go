@@ -251,7 +251,8 @@ const (
 	jitCallStatusCodeCallHostFunction
 	// jitCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
 	jitCallStatusCodeUnreachable
-	// TODO: trap, etc?
+	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happended.
+	jitCallStatusCodeInvalidFloatToIntConversion
 )
 
 func (s jitCallStatusCode) String() (ret string) {
@@ -421,6 +422,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			targetHostFunction.f(&wasm.HostFunctionCallContext{Memory: currentFrame.wasmFunction.memory})
 			// Pop the call frame.
 			e.callFrameStack = currentFrame
+		case jitCallStatusCodeInvalidFloatToIntConversion:
+			panic("invalid float to int conversion")
 		case jitCallStatusCodeUnreachable:
 			panic("unreachable")
 		}

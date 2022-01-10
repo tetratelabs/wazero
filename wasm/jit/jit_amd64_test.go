@@ -5,6 +5,7 @@ package jit
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -28,6 +29,10 @@ import (
 
 func newMemoryInst() *wasm.MemoryInstance {
 	return &wasm.MemoryInstance{Buffer: make([]byte, 1024)}
+}
+
+func stackTopAsInt32(eng *engine) int32 {
+	return int32(eng.stack[eng.stackPointer-1])
 }
 
 func stackTopAsFloat32(eng *engine) float32 {
@@ -3980,6 +3985,104 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 				exp := float64(v)
 				actual := stackTopAsFloat64(eng)
 				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
+	for _, tc := range []struct {
+		outputType wazeroir.SignedInt
+		inputType  wazeroir.Float
+	}{
+		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float32},
+		// {outputType: wazeroir.SignedInt32, inputType: wazeroir.Float64},
+		// {outputType: wazeroir.SignedInt64, inputType: wazeroir.Float32},
+		// {outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64},
+		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32},
+		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64},
+		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32},
+		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("%s from %s", tc.outputType, tc.inputType), func(t *testing.T) {
+			for _, v := range []float64{
+				// 0, 100, -100, 1, -1,
+				// 100.01234124, -100.01234124, 200.12315,
+				// math.MinInt32,
+				math.MaxInt32,
+				// math.MaxUint32,
+				// math.MinInt64,
+				// math.MaxInt64,
+				// math.MaxUint64,
+				// math.MaxFloat32,
+				// math.SmallestNonzeroFloat32,
+				// math.MaxFloat64,
+				// math.SmallestNonzeroFloat64,
+				// 6.8719476736e+10,  /* = 1 << 36 */
+				// 1.37438953472e+11, /* = 1 << 37 */
+				// math.Inf(1), math.Inf(-1), math.NaN(),
+			} {
+				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
+
+					// Setup the conversion target.
+					var err error
+					if tc.inputType == wazeroir.Float32 {
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: float32(v)})
+					} else {
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
+					}
+					require.NoError(t, err)
+
+					err = compiler.compileITruncFromF(&wazeroir.OperationITruncFromF{
+						InputType: tc.inputType, OutputType: tc.outputType,
+					})
+					require.NoError(t, err)
+
+					// To verify the behavior, we release the value
+					// to the stack.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+
+					// Generate and run the code under test.
+					code, _, err := compiler.generate()
+					require.NoError(t, err)
+					eng := newEngine()
+					jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+					// Check the result.
+					var shouldInvalidStatus bool
+					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
+						fmt.Println(hex.EncodeToString(code))
+						f32 := float32(v)
+						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt32 || f32 > math.MaxInt32
+						if !shouldInvalidStatus {
+							actual := stackTopAsInt32(eng)
+							require.Equal(t, int32(math.Trunc(float64(f32))), actual)
+						}
+					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt64 {
+						t.Skip()
+					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
+						t.Skip()
+					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt64 {
+						t.Skip()
+					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
+						t.Skip()
+					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
+						t.Skip()
+					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
+						t.Skip()
+					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
+						t.Skip()
+					} else {
+						t.Fatal()
+					}
+
+					// Check the jit status code if necessary.
+					require.True(t, !shouldInvalidStatus || eng.jitCallStatusCode == jitCallStatusCodeInvalidFloatToIntConversion)
+				})
 			}
 		})
 	}
