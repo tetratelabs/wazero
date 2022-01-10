@@ -4024,18 +4024,10 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				1.37438953472e+11, /* = 1 << 37 */
 				-1.37438953472e+11,
 				math.MinInt32,
-				// Note that math.MaxInt32 is rounded up to math.MaxInt32+1 in 32-bit float representation.
-				// See the output of "fmt.Printf("%f\n", float32(2147483647))".
 				math.MaxInt32,
-				// Note that math.MaxUint32 is rounded up to math.MaxUint32+1 in 32-bit float representation.
-				// See the output of "fmt.Printf("%f, %f\n", float32(4294967295))".
 				math.MaxUint32,
 				math.MinInt64,
-				// Note that math.MaxInt64 is rounded up to math.MaxInt64+1 in 32/64-bit float representation.
-				// See the output of "fmt.Printf("%f, %f\n", float32(9223372036854775807), float64(9223372036854775807))".
 				math.MaxInt64,
-				// Note that math.MaxUint64 is rounded up to math.MaxUint64+1 in 32/64-bit float representation.
-				// See the output of "fmt.Printf("%f, %f\n", float32(18446744073709551615), float64(18446744073709551615))".
 				math.MaxUint64,
 				math.MaxFloat32,
 				math.SmallestNonzeroFloat32,
@@ -4043,6 +4035,22 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				math.SmallestNonzeroFloat64,
 				math.Inf(1), math.Inf(-1), math.NaN(),
 			} {
+				if v == math.MaxInt32 {
+					// Note that math.MaxInt32 is rounded up to math.MaxInt32+1 in 32-bit float representation.
+					require.Equal(t, float32(2147483648.0) /* = math.MaxInt32+1 */, float32(v))
+				} else if v == math.MaxUint32 {
+					// Note that math.MaxUint32 is rounded up to math.MaxUint32+1 in 32-bit float representation.
+					require.Equal(t, float32(4294967296 /* = math.MaxUint32+1 */), float32(v))
+				} else if v == math.MaxInt64 {
+					// Note that math.MaxInt64 is rounded up to math.MaxInt64+1 in 32/64-bit float representation.
+					require.Equal(t, float32(9223372036854775808.0) /* = math.MaxInt64+1 */, float32(v))
+					require.Equal(t, float64(9223372036854775808.0) /* = math.MaxInt64+1 */, float64(v))
+				} else if v == math.MaxUint64 {
+					// Note that math.MaxUint64 is rounded up to math.MaxUint64+1 in 32/64-bit float representation.
+					require.Equal(t, float32(18446744073709551616.0) /* = math.MaxInt64+1 */, float32(v))
+					require.Equal(t, float64(18446744073709551616.0) /* = math.MaxInt64+1 */, float64(v))
+				}
+
 				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
 					compiler.initializeReservedRegisters()
