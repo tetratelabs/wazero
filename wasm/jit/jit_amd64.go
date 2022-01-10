@@ -25,18 +25,21 @@ import (
 )
 
 var (
-	float32SignBitMask        int64 = 1 << 31
+	float32SignBitMask        uint32 = 1 << 31
+	float32RestBitMask        uint32 = ^float32SignBitMask
 	float32SignBitMaskAddress uintptr
-	// float64SignBitMask equals 1 << 63 but Go compiler errors as the number doesn't fit into
-	// the range of "signed" 64bit int, so we have the literal signed 64-bit integer
-	// whose bit pattern equals 1 << 63 here.
-	float64SignBitMask        int64 = -9223372036854775808
+	float32RestBitMaskAddress uintptr
+	float64SignBitMask        uint64 = 1 << 63
+	float64RestBitMask        uint64 = ^float64SignBitMask
 	float64SignBitMaskAddress uintptr
+	float64RestBitMaskAddress uintptr
 )
 
 func init() {
 	float32SignBitMaskAddress = uintptr(unsafe.Pointer(&float32SignBitMask))
+	float32RestBitMaskAddress = uintptr(unsafe.Pointer(&float32RestBitMask))
 	float64SignBitMaskAddress = uintptr(unsafe.Pointer(&float64SignBitMask))
+	float64RestBitMaskAddress = uintptr(unsafe.Pointer(&float64RestBitMask))
 }
 
 // jitcall is implemented in jit_amd64.s as a Go Assembler function.
@@ -67,8 +70,8 @@ type amd64Compiler struct {
 	ir  *wazeroir.CompilationResult
 	// Set a jmp kind instruction where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
-	setJmpOrigin *obj.Prog
-	builder      *asm.Builder
+	setJmpOrigins []*obj.Prog
+	builder       *asm.Builder
 	// location stack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
@@ -124,10 +127,14 @@ func (c *amd64Compiler) pushFunctionParams() {
 
 func (c *amd64Compiler) addInstruction(prog *obj.Prog) {
 	c.builder.AddInstruction(prog)
-	if c.setJmpOrigin != nil {
-		c.setJmpOrigin.To.SetTarget(prog)
-		c.setJmpOrigin = nil
+	for _, origin := range c.setJmpOrigins {
+		origin.To.SetTarget(prog)
 	}
+	c.setJmpOrigins = nil
+}
+
+func (c *amd64Compiler) addSetJmpOrigin(prog *obj.Prog) {
+	c.setJmpOrigins = append(c.setJmpOrigins, prog)
 }
 
 func (c *amd64Compiler) newProg() (prog *obj.Prog) {
@@ -473,7 +480,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	}
 
 	// Handle then branch.
-	c.setJmpOrigin = jmpWithCond
+	c.addSetJmpOrigin(jmpWithCond)
 	c.locationStack = saved
 	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
 		return err
@@ -672,7 +679,7 @@ func (c *amd64Compiler) compileSelect() error {
 	}
 
 	// Else, we don't need to adjust value, just need to jump to the next instruction.
-	c.setJmpOrigin = jmpIfNotZero
+	c.addSetJmpOrigin(jmpIfNotZero)
 
 	// In any case, we don't need x2 and c anymore!
 	c.locationStack.releaseRegister(x2)
@@ -1023,7 +1030,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 
 		// Finally the end jump instruction of zero case must target towards
 		// the next instruction.
-		c.setJmpOrigin = jmpAtEndOfZero
+		c.addSetJmpOrigin(jmpAtEndOfZero)
 	}
 
 	// We reused the same register of target for the result.
@@ -1102,7 +1109,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 
 		// Finally the end jump instruction of zero case must target towards
 		// the next instruction.
-		c.setJmpOrigin = jmpAtEndOfZero
+		c.addSetJmpOrigin(jmpAtEndOfZero)
 	}
 
 	// We reused the same register of target for the result.
@@ -1621,6 +1628,224 @@ func (c *amd64Compiler) emitRoundInstruction(is32Bit bool, mode int64) error {
 	return nil
 }
 
+// compileMin adds instructions to pop two values from the stack, and push back the maximum of
+// these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 1.9].
+// For the cases where NaN involves, see the doc of emitMinOrMax below.
+func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
+	is32Bit := o.Type == wazeroir.Float32
+	if is32Bit {
+		return c.emitMinOrMax(is32Bit, x86.AMINSS)
+	} else {
+		return c.emitMinOrMax(is32Bit, x86.AMINSD)
+	}
+}
+
+// compileMax adds instructions to pop two values from the stack, and push back the maximum of
+// these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 100.1].
+// For the cases where NaN involves, see the doc of emitMinOrMax below.
+func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
+	is32Bit := o.Type == wazeroir.Float32
+	if is32Bit {
+		return c.emitMinOrMax(is32Bit, x86.AMAXSS)
+	} else {
+		return c.emitMinOrMax(is32Bit, x86.AMAXSD)
+	}
+}
+
+// emitMinOrMax adds instructions to pop two values from the stack, and push back either minimum or
+// minimum of these two values onto the stack according to the minOrMaxInstruction argument.
+// minOrMaxInstruction must be one of MAXSS, MAXSD, MINSS or MINSD.
+// Note: These native min/max instructions are almost compatible with min/max in the Wasm specification,
+// but it is slightly different with respect to the NaN handling.
+// Native min/max instructions return non-NaN value if exactly one of target values
+// is NaN. For example native_{min,max}(5.0, NaN) returns always 5.0, not NaN.
+// However, WebAssembly specifies that min/max must always return NaN if one of values is NaN.
+// Therefore in this function, we have to add conditional jumps to check if one of values is NaN before
+// the native min/max, which is why we cannot simply emit a native min/max instruction here.
+//
+// For the semantics, see wazeroir.Min and wazeroir.Max for detail.
+func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) error {
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	// Check if this is (either x1 or x2 is NaN) or (x1 equals x2) case
+	checkNaNOrEquals := c.newProg()
+	if is32Bit {
+		checkNaNOrEquals.As = x86.AUCOMISS
+	} else {
+		checkNaNOrEquals.As = x86.AUCOMISD
+	}
+	checkNaNOrEquals.From.Type = obj.TYPE_REG
+	checkNaNOrEquals.From.Reg = x2.register
+	checkNaNOrEquals.To.Type = obj.TYPE_REG
+	checkNaNOrEquals.To.Reg = x1.register
+	c.addInstruction(checkNaNOrEquals)
+
+	// At this point, we have the three cases of conditional flags below
+	// (See https://www.felixcloutier.com/x86/ucomiss#operation for detail.)
+	//
+	// 1) Two values are NaN-free and different: All flags are cleared.
+	// 2) Two values are NaN-free and equal: Only ZF flags is set.
+	// 3) One of Two values is NaN: ZF, PF and CF flags are set.
+
+	// Jump instruction to handle 1) case by checking the ZF flag
+	// as ZF is only set for 2) and 3) cases.
+	nanFreeOrDiffJump := c.newProg()
+	nanFreeOrDiffJump.As = x86.AJNE
+	nanFreeOrDiffJump.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(nanFreeOrDiffJump)
+
+	// Start handling 2) and 3).
+
+	// Jump if two values are equal and NaN-free by checking the parity flag (PF).
+	// Here we use JPC to do the conditional jump when the parity flag is NOT set,
+	// and that is of 2).
+	equalExitJmp := c.newProg()
+	equalExitJmp.As = x86.AJPC
+	equalExitJmp.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(equalExitJmp)
+
+	// Start handling 3).
+
+	// We emit the ADD instruction to produce the NaN in x1.
+	copyNan := c.newProg()
+	if is32Bit {
+		copyNan.As = x86.AADDSS
+	} else {
+		copyNan.As = x86.AADDSD
+	}
+	copyNan.From.Type = obj.TYPE_REG
+	copyNan.From.Reg = x2.register
+	copyNan.To.Type = obj.TYPE_REG
+	copyNan.To.Reg = x1.register
+	c.addInstruction(copyNan)
+
+	// Exit from the NaN case branch.
+	nanExitJmp := c.newProg()
+	nanExitJmp.As = obj.AJMP
+	nanExitJmp.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(nanExitJmp)
+
+	// Start handling 1).
+
+	// Now handle the NaN-free and different values case.
+	nanFreeOrDiff := c.newProg()
+	nanFreeOrDiffJump.To.SetTarget(nanFreeOrDiff)
+	nanFreeOrDiff.As = minOrMaxInstruction
+	nanFreeOrDiff.From.Type = obj.TYPE_REG
+	nanFreeOrDiff.From.Reg = x2.register
+	nanFreeOrDiff.To.Type = obj.TYPE_REG
+	nanFreeOrDiff.To.Reg = x1.register
+	c.addInstruction(nanFreeOrDiff)
+
+	// Set the jump target of 1) and 2) cases to the next instruction after 3) case.
+	c.addSetJmpOrigin(nanExitJmp)
+	c.addSetJmpOrigin(equalExitJmp)
+
+	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.pushValueOnRegister(x1.register)
+	return nil
+}
+
+// compileCopysign adds instructions to pop two float values from the stack, and copy the signbit of
+// the first-popped value to the last one.
+// For example, stack [..., 1.213, -5.0] results in [..., -1.213].
+func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
+	is32Bit := o.Type == wazeroir.Float32
+
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	// Move the rest bit mask to the temp register.
+	movRestBitMask := c.newProg()
+	movRestBitMask.From.Type = obj.TYPE_MEM
+	if is32Bit {
+		movRestBitMask.As = x86.AMOVL
+		movRestBitMask.From.Offset = int64(float32RestBitMaskAddress)
+	} else {
+		movRestBitMask.As = x86.AMOVQ
+		movRestBitMask.From.Offset = int64(float64RestBitMaskAddress)
+	}
+	movRestBitMask.To.Type = obj.TYPE_REG
+	movRestBitMask.To.Reg = tmpReg
+	c.addInstruction(movRestBitMask)
+
+	// Clear the sign bit of x1 via AND with the mask.
+	clearSignBit := c.newProg()
+	clearSignBit.From.Type = obj.TYPE_REG
+	clearSignBit.From.Reg = tmpReg
+	clearSignBit.To.Type = obj.TYPE_REG
+	clearSignBit.To.Reg = x1.register
+	if is32Bit {
+		clearSignBit.As = x86.AANDPS
+	} else {
+		clearSignBit.As = x86.AANDPD
+	}
+	c.addInstruction(clearSignBit)
+
+	// Move the sign bit mask to the temp register.
+	movSignBitMask := c.newProg()
+	movSignBitMask.From.Type = obj.TYPE_MEM
+	if is32Bit {
+		movSignBitMask.As = x86.AMOVL
+		movSignBitMask.From.Offset = int64(float32SignBitMaskAddress)
+	} else {
+		movSignBitMask.As = x86.AMOVQ
+		movSignBitMask.From.Offset = int64(float64SignBitMaskAddress)
+	}
+	movSignBitMask.To.Type = obj.TYPE_REG
+	movSignBitMask.To.Reg = tmpReg
+	c.addInstruction(movSignBitMask)
+
+	// Clear the non-sign bits of x2 via AND with the mask.
+	clearNonSignBit := c.newProg()
+	clearNonSignBit.From.Type = obj.TYPE_REG
+	clearNonSignBit.From.Reg = tmpReg
+	clearNonSignBit.To.Type = obj.TYPE_REG
+	clearNonSignBit.To.Reg = x2.register
+	if is32Bit {
+		clearNonSignBit.As = x86.AANDPS
+	} else {
+		clearNonSignBit.As = x86.AANDPD
+	}
+	c.addInstruction(clearNonSignBit)
+
+	// Finally, copy the sign bit of x2 to x1.
+	copySignBit := c.newProg()
+	copySignBit.From.Type = obj.TYPE_REG
+	copySignBit.From.Reg = x2.register
+	copySignBit.To.Type = obj.TYPE_REG
+	copySignBit.To.Reg = x1.register
+	if is32Bit {
+		copySignBit.As = x86.AORPS
+	} else {
+		copySignBit.As = x86.AORPD
+	}
+	c.addInstruction(copySignBit)
+
+	// Record that we consumed the x2 and placed the copysign result in the x1's register.
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.pushValueOnRegister(x1.register)
+	return nil
+}
+
 // compileSqrt adds instructions to replace the top value of float type on the stack with its square root.
 // For example, stack [..., 9.0] results in [..., 3.0]. This is equivalent to "math.Sqrt".
 func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
@@ -1640,6 +1865,286 @@ func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	sqrt.To.Type = obj.TYPE_REG
 	sqrt.To.Reg = target.register
 	c.addInstruction(sqrt)
+	return nil
+}
+
+// compileI32WrapFromI64 adds instructions to replace the 64-bit int on top of the stack
+// with the corresponding 32-bit integer. This is equivalent to uint64(uint32(v)) in Go.
+func (c *amd64Compiler) compileI32WrapFromI64() error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	mov := c.newProg()
+	mov.As = x86.AMOVL
+	mov.From.Type = obj.TYPE_REG
+	mov.From.Reg = target.register
+	mov.To.Type = obj.TYPE_REG
+	mov.To.Reg = target.register
+	c.addInstruction(mov)
+	return nil
+}
+
+func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
+	// TODO
+	return nil
+}
+
+// compileFConvertFromI adds instructions to replace the top value of int type on the stack with
+// the corresponding float value. This is equivalent to float32(uint32(x)), float32(int32(x)), etc in Go.
+func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
+	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
+		err = c.emitSimpleIntToFloatConversion(x86.ACVTSL2SS) // = CVTSI2SS for 32bit int
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
+		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SS) // = CVTSI2SS for 64bit int
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
+		err = c.emitSimpleIntToFloatConversion(x86.ACVTSL2SD) // = CVTSI2SD for 32bit int
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
+		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
+		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
+		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
+		//
+		// Here's the summary:
+		// >> CVTSI2SS is indeed designed for converting a signed integer to a scalar single-precision float,
+		// >> not an unsigned integer like you have here. So what gives? Well, a 64-bit processor has 64-bit wide
+		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
+		// >> which allows CVTSI2SS to be used after all.
+		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SS) // = CVTSI2SS for 64bit int.
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+		// For the same reason above, we use 64bit conversion for unsigned 32bit.
+		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int.
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
+		err = c.emitUnsignedInt64ToFloatConversion(true)
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
+		err = c.emitUnsignedInt64ToFloatConversion(false)
+	}
+	return
+}
+
+// emitUnsignedInt64ToFloatConversion is handling the case of unsigned 64-bit integer
+// in compileFConvertFromI.
+func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) error {
+	// The logic here is exactly the same as GCC emits for the following code:
+	//
+	// float convert(int num) {
+	//     float foo;
+	//     uint64_t ptr1 = 100;
+	//     foo = (float)(ptr1);
+	//     return foo;
+	// }
+	//
+	// which is compiled by GCC as
+	//
+	// convert:
+	// 	   push    rbp
+	// 	   mov     rbp, rsp
+	// 	   mov     DWORD PTR [rbp-20], edi
+	// 	   mov     DWORD PTR [rbp-4], 100
+	// 	   mov     eax, DWORD PTR [rbp-4]
+	// 	   test    rax, rax
+	// 	   js      .handle_sign_bit_case
+	// 	   cvtsi2ss        xmm0, rax
+	// 	   jmp     .exit
+	// .handle_sign_bit_case:
+	// 	   mov     rdx, rax
+	// 	   shr     rdx
+	// 	   and     eax, 1
+	// 	   or      rdx, rax
+	// 	   cvtsi2ss        xmm0, rdx
+	// 	   addsd   xmm0, xmm0
+	// .exit: ...
+	//
+	// tl;dr is that we have a branch depending on whether or not sign bit is set.
+
+	origin := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(origin); err != nil {
+		return err
+	}
+
+	dest, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	// Check if the most significant bit (sign bit) is set.
+	test := c.newProg()
+	test.As = x86.ATESTQ
+	test.From.Type = obj.TYPE_REG
+	test.From.Reg = origin.register
+	test.To.Type = obj.TYPE_REG
+	test.To.Reg = origin.register
+	c.addInstruction(test)
+
+	// Jump if the sign bit is set.
+	jmpIfSignbitSet := c.newProg()
+	jmpIfSignbitSet.To.Type = obj.TYPE_BRANCH
+	jmpIfSignbitSet.As = x86.AJMI
+	c.addInstruction(jmpIfSignbitSet)
+
+	// Otherwise, we could fit the unsigned int into float32.
+	// So, we convert it to float32 and emit jump instruction to exit from this branch.
+	convert := c.newProg()
+	if isFloat32bit {
+		convert.As = x86.ACVTSQ2SS
+	} else {
+		convert.As = x86.ACVTSQ2SD
+	}
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = origin.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = dest
+	c.addInstruction(convert)
+
+	exitFromSignbitUnSet := c.newProg()
+	exitFromSignbitUnSet.As = obj.AJMP
+	exitFromSignbitUnSet.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(exitFromSignbitUnSet)
+
+	// Now handling the case where sign-bit is set.
+	// We emit the following sequences:
+	// 	   mov     tmpReg, origin
+	// 	   shr     tmpReg, 1
+	// 	   and     origin, 1
+	// 	   or      tmpReg, origin
+	// 	   cvtsi2ss        xmm0, tmpReg
+	// 	   addsd   xmm0, xmm0
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	movToTmp := c.newProg()
+	jmpIfSignbitSet.To.SetTarget(movToTmp)
+	movToTmp.As = x86.AMOVQ
+	movToTmp.From.Type = obj.TYPE_REG
+	movToTmp.From.Reg = origin.register
+	movToTmp.To.Type = obj.TYPE_REG
+	movToTmp.To.Reg = tmpReg
+	c.addInstruction(movToTmp)
+
+	divideBy2 := c.newProg()
+	divideBy2.As = x86.ASHRQ
+	divideBy2.From.Type = obj.TYPE_CONST
+	divideBy2.From.Offset = 1
+	divideBy2.To.Type = obj.TYPE_REG
+	divideBy2.To.Reg = tmpReg
+	c.addInstruction(divideBy2)
+
+	rescueLeastSignificantBit := c.newProg()
+	rescueLeastSignificantBit.As = x86.AANDQ
+	rescueLeastSignificantBit.From.Type = obj.TYPE_CONST
+	rescueLeastSignificantBit.From.Offset = 0x1
+	rescueLeastSignificantBit.To.Type = obj.TYPE_REG
+	rescueLeastSignificantBit.To.Reg = origin.register
+	c.addInstruction(rescueLeastSignificantBit)
+
+	addRescuedBit := c.newProg()
+	addRescuedBit.As = x86.AORQ
+	addRescuedBit.From.Type = obj.TYPE_REG
+	addRescuedBit.From.Reg = origin.register
+	addRescuedBit.To.Type = obj.TYPE_REG
+	addRescuedBit.To.Reg = tmpReg
+	c.addInstruction(addRescuedBit)
+
+	convertDividedBy2Value := c.newProg()
+	if isFloat32bit {
+		convertDividedBy2Value.As = x86.ACVTSQ2SS
+	} else {
+		convertDividedBy2Value.As = x86.ACVTSQ2SD
+	}
+	convertDividedBy2Value.From.Type = obj.TYPE_REG
+	convertDividedBy2Value.From.Reg = tmpReg
+	convertDividedBy2Value.To.Type = obj.TYPE_REG
+	convertDividedBy2Value.To.Reg = dest
+	c.addInstruction(convertDividedBy2Value)
+
+	multiplyBy2 := c.newProg()
+	if isFloat32bit {
+		multiplyBy2.As = x86.AADDSS
+	} else {
+		multiplyBy2.As = x86.AADDSD
+	}
+	multiplyBy2.From.Type = obj.TYPE_REG
+	multiplyBy2.From.Reg = dest
+	multiplyBy2.To.Type = obj.TYPE_REG
+	multiplyBy2.To.Reg = dest
+	c.addInstruction(multiplyBy2)
+
+	// Now, we finished the sign-bit set branch.
+	// We have to make the exit jump target of sign-bit unset branch
+	// towards the next instruction.
+	c.addSetJmpOrigin(exitFromSignbitUnSet)
+
+	// We consumed the origin's register and placed the conversion result
+	// in the dest register.
+	c.locationStack.markRegisterUnused(origin.register)
+	loc := c.locationStack.pushValueOnRegister(dest)
+	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	return nil
+}
+
+// emitSimpleIntToFloatConversion pops a flaot type from the stack, and applies the
+// given instruction on it, and push the integer result onto the stack.
+func (c *amd64Compiler) emitSimpleIntToFloatConversion(convInstruction obj.As) error {
+	origin := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(origin); err != nil {
+		return err
+	}
+
+	dest, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	convert := c.newProg()
+	convert.As = convInstruction
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = origin.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = dest
+	c.addInstruction(convert)
+
+	c.locationStack.markRegisterUnused(origin.register)
+	loc := c.locationStack.pushValueOnRegister(dest)
+	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	return nil
+}
+
+// compileF32DemoteFromF64 adds instructions to replace the 64-bit float on top of the stack
+// with the corresponding 32-bit float. This is equivalent to float32(float64(v)) in Go.
+func (c *amd64Compiler) compileF32DemoteFromF64() error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	convert := c.newProg()
+	convert.As = x86.ACVTSD2SS
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = target.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = target.register
+	c.addInstruction(convert)
+	return nil
+}
+
+// compileF64PromoteFromF32 adds instructions to replace the 32-bit float on top of the stack
+// with the corresponding 64-bit float. This is equivalent to float64(float32(v)) in Go.
+func (c *amd64Compiler) compileF64PromoteFromF32() error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	convert := c.newProg()
+	convert.As = x86.ACVTSS2SD
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = target.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = target.register
+	c.addInstruction(convert)
 	return nil
 }
 

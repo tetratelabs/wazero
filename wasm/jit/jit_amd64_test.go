@@ -30,6 +30,14 @@ func newMemoryInst() *wasm.MemoryInstance {
 	return &wasm.MemoryInstance{Buffer: make([]byte, 1024)}
 }
 
+func stackTopAsFloat32(eng *engine) float32 {
+	return math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+}
+
+func stackTopAsFloat64(eng *engine) float64 {
+	return math.Float64frombits(eng.stack[eng.stackPointer-1])
+}
+
 func requireNewCompiler(t *testing.T) *amd64Compiler {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
@@ -872,7 +880,7 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 			// As we push the constant to the stack, the stack pointer must be incremented.
 			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the squared const.
-			require.Equal(t, o.Value*2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+			require.Equal(t, o.Value*2, stackTopAsFloat32(eng))
 		})
 	}
 }
@@ -916,7 +924,7 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 			// As we push the constant to the stack, the stack pointer must be incremented.
 			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the squared const.
-			require.Equal(t, o.Value*2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+			require.Equal(t, o.Value*2, stackTopAsFloat64(eng))
 		})
 	}
 }
@@ -1041,7 +1049,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1+tc.v2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+				require.Equal(t, tc.v1+tc.v2, stackTopAsFloat32(eng))
 			})
 		}
 	})
@@ -1090,7 +1098,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1+tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.v1+tc.v2, stackTopAsFloat64(eng))
 			})
 		}
 	})
@@ -2248,7 +2256,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1-tc.v2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+				require.Equal(t, tc.v1-tc.v2, stackTopAsFloat32(eng))
 			})
 		}
 	})
@@ -2297,7 +2305,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1-tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.v1-tc.v2, stackTopAsFloat64(eng))
 			})
 		}
 	})
@@ -2581,7 +2589,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1*tc.x2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+				require.Equal(t, tc.x1*tc.x2, stackTopAsFloat32(eng))
 			})
 		}
 	})
@@ -2634,7 +2642,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1*tc.x2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.x1*tc.x2, stackTopAsFloat64(eng))
 			})
 		}
 	})
@@ -2666,7 +2674,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				require.True(t, compiler.locationStack.peek().onRegister())
 				// On darwin, we have two branches and one must jump to the next
 				// instruction after compileClz.
-				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
+				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
 				// To verify the behavior, we release the value
 				// to the stack.
@@ -2717,7 +2725,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				require.True(t, compiler.locationStack.peek().onRegister())
 				// On darwin, we have two branches and one must jump to the next
 				// instruction after compileClz.
-				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
+				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
 				// To verify the behavior, we release the value
 				// to the stack.
@@ -2769,7 +2777,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				require.True(t, compiler.locationStack.peek().onRegister())
 				// On darwin, we have two branches and one must jump to the next
 				// instruction after compileCtz.
-				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
+				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
 				// To verify the behavior, we release the value
 				// to the stack.
@@ -2820,7 +2828,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				require.True(t, compiler.locationStack.peek().onRegister())
 				// On darwin, we have two branches and one must jump to the next
 				// instruction after compileCtz.
-				require.True(t, runtime.GOOS != "darwin" || compiler.setJmpOrigin != nil)
+				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
 				// To verify the behavior, we release the value
 				// to the stack.
@@ -3455,6 +3463,11 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			{x1: float32(math.Inf(-1)), x2: 0},
 			{x1: 0, x2: float32(math.Inf(1))},
 			{x1: 0, x2: float32(math.Inf(-1))},
+			{x1: float32(math.NaN()), x2: 0},
+			{x1: 0, x2: float32(math.NaN())},
+			{x1: float32(math.NaN()), x2: 12321},
+			{x1: 12313, x2: float32(math.NaN())},
+			{x1: float32(math.NaN()), x2: float32(math.NaN())},
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -3492,7 +3505,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				// Check the result.
 				require.Equal(t, uint64(1), eng.stackPointer)
 				exp := tc.x1 / tc.x2
-				actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+				actual := stackTopAsFloat32(eng)
 				if math.IsNaN(float64(exp)) {
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
@@ -3527,6 +3540,11 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			{x1: math.Inf(-1), x2: 0},
 			{x1: 0, x2: math.Inf(1)},
 			{x1: 0, x2: math.Inf(-1)},
+			{x1: math.NaN(), x2: 0},
+			{x1: 0, x2: math.NaN()},
+			{x1: math.NaN(), x2: 12321},
+			{x1: 12313, x2: math.NaN()},
+			{x1: math.NaN(), x2: math.NaN()},
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -3564,7 +3582,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				// Check the result.
 				require.Equal(t, uint64(1), eng.stackPointer)
 				exp := tc.x1 / tc.x2
-				actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+				actual := stackTopAsFloat64(eng)
 				if math.IsNaN(exp) {
 					require.True(t, math.IsNaN(actual))
 				} else {
@@ -3877,6 +3895,194 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
+	for _, v := range []float64{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		math.MaxFloat64,
+		math.SmallestNonzeroFloat64,
+		6.8719476736e+10,  /* = 1 << 36 */
+		1.37438953472e+11, /* = 1 << 37 */
+		math.Inf(1), math.Inf(-1), math.NaN(),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
+
+			// Setup the demote target.
+			err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF32DemoteFromF64()
+			require.NoError(t, err)
+
+			// To verify the behavior, we release the value
+			// to the stack.
+			compiler.releaseAllRegistersToStack()
+			compiler.returnFunction()
+
+			// Generate and run the code under test.
+			code, _, err := compiler.generate()
+			require.NoError(t, err)
+			eng := newEngine()
+			jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+			// Check the result.
+			require.Equal(t, uint64(1), eng.stackPointer)
+			if math.IsNaN(v) {
+				require.True(t, math.IsNaN(float64(stackTopAsFloat32(eng))))
+			} else {
+				exp := float32(v)
+				actual := stackTopAsFloat32(eng)
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
+	for _, v := range []float32{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN()),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
+
+			// Setup the promote target.
+			err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF64PromoteFromF32()
+			require.NoError(t, err)
+
+			// To verify the behavior, we release the value
+			// to the stack.
+			compiler.releaseAllRegistersToStack()
+			compiler.returnFunction()
+
+			// Generate and run the code under test.
+			code, _, err := compiler.generate()
+			require.NoError(t, err)
+			eng := newEngine()
+			jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+			// Check the result.
+			require.Equal(t, uint64(1), eng.stackPointer)
+			if math.IsNaN(float64(v)) {
+				require.True(t, math.IsNaN(stackTopAsFloat64(eng)))
+			} else {
+				exp := float64(v)
+				actual := stackTopAsFloat64(eng)
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
+	for _, tc := range []struct {
+		inputType  wazeroir.SignedInt
+		outputType wazeroir.Float
+	}{
+		{inputType: wazeroir.SignedInt32, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedInt32, outputType: wazeroir.Float64},
+		{inputType: wazeroir.SignedInt64, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedInt64, outputType: wazeroir.Float64},
+		{inputType: wazeroir.SignedUint32, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedUint32, outputType: wazeroir.Float64},
+		{inputType: wazeroir.SignedUint64, outputType: wazeroir.Float32},
+		{inputType: wazeroir.SignedUint64, outputType: wazeroir.Float64},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("%s from %s", tc.outputType, tc.inputType), func(t *testing.T) {
+			for _, v := range []uint64{
+				0, 1, 12345, 1 << 31, 1 << 32, 1 << 54, 1 << 63,
+				math.MaxUint32, math.MaxUint64, math.MaxInt32, math.MaxInt64,
+				math.Float64bits(1.23455555),
+				math.Float64bits(-1.23455555),
+				math.Float64bits(math.NaN()),
+				math.Float64bits(math.Inf(1)),
+				math.Float64bits(math.Inf(-1)),
+			} {
+				t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
+
+					// Setup the conversion target.
+					var err error
+					if tc.inputType == wazeroir.SignedInt32 || tc.inputType == wazeroir.SignedUint32 {
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+					} else {
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(v)})
+					}
+					require.NoError(t, err)
+
+					err = compiler.compileFConvertFromI(&wazeroir.OperationFConvertFromI{
+						InputType: tc.inputType, OutputType: tc.outputType,
+					})
+					require.NoError(t, err)
+
+					// To verify the behavior, we release the value
+					// to the stack.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+
+					// Generate and run the code under test.
+					code, _, err := compiler.generate()
+					require.NoError(t, err)
+					eng := newEngine()
+					jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+					// Check the result.
+					require.Equal(t, uint64(1), eng.stackPointer)
+					actualBits := eng.stack[eng.stackPointer-1]
+					if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedInt32 {
+						exp := float32(int32(v))
+						actual := math.Float32frombits(uint32(actualBits))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedInt64 {
+						exp := float32(int64(v))
+						actual := math.Float32frombits(uint32(actualBits))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedInt32 {
+						exp := float64(int32(v))
+						actual := math.Float64frombits(actualBits)
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedInt64 {
+						exp := float64(int64(v))
+						actual := math.Float64frombits(actualBits)
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedUint32 {
+						exp := float32(uint32(v))
+						actual := math.Float32frombits(uint32(actualBits))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedUint32 {
+						exp := float64(uint32(v))
+						actual := math.Float64frombits(actualBits)
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float32 && tc.inputType == wazeroir.SignedUint64 {
+						exp := float32(v)
+						actual := math.Float32frombits(uint32(actualBits))
+						require.Equal(t, exp, actual)
+					} else if tc.outputType == wazeroir.Float64 && tc.inputType == wazeroir.SignedUint64 {
+						exp := float64(v)
+						actual := math.Float64frombits(actualBits)
+						require.Equal(t, exp, actual)
+					} else {
+						t.Fatal()
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -4067,16 +4273,159 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					// Check the result.
 					require.Equal(t, uint64(1), eng.stackPointer)
 					if is32Bit {
-						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						actual := stackTopAsFloat32(eng)
 						if math.IsNaN(float64(expFloat32)) {
 							require.True(t, math.IsNaN(float64(actual)))
 						} else {
 							require.Equal(t, actual, expFloat32)
 						}
 					} else {
-						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						actual := stackTopAsFloat64(eng)
 						if math.IsNaN(expFloat64) {
 							require.True(t, math.IsNaN(actual))
+						} else {
+							require.Equal(t, expFloat64, actual)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		op   wazeroir.Operation
+	}{
+		{name: "min-32-bit", op: &wazeroir.OperationMin{Type: wazeroir.Float32}},
+		{name: "min-64-bit", op: &wazeroir.OperationMin{Type: wazeroir.Float64}},
+		{name: "max-32-bit", op: &wazeroir.OperationMax{Type: wazeroir.Float32}},
+		{name: "max-64-bit", op: &wazeroir.OperationMax{Type: wazeroir.Float64}},
+		{name: "copysign-32-bit", op: &wazeroir.OperationCopysign{Type: wazeroir.Float32}},
+		{name: "copysign-64-bit", op: &wazeroir.OperationCopysign{Type: wazeroir.Float64}},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			for _, vs := range []struct{ x1, x2 float64 }{
+				{x1: 100, x2: -1.1},
+				{x1: 100, x2: 0},
+				{x1: 0, x2: 0},
+				{x1: 1, x2: 1},
+				{x1: -1, x2: 100},
+				{x1: 100, x2: 200},
+				{x1: 100.01234124, x2: 100.01234124},
+				{x1: 100.01234124, x2: -100.01234124},
+				{x1: 200.12315, x2: 100},
+				{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 100},
+				{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
+				{x1: math.Inf(1), x2: 100},
+				{x1: math.Inf(1), x2: -100},
+				{x1: 100, x2: math.Inf(1)},
+				{x1: -100, x2: math.Inf(1)},
+				{x1: math.Inf(-1), x2: 100},
+				{x1: math.Inf(-1), x2: -100},
+				{x1: 100, x2: math.Inf(-1)},
+				{x1: -100, x2: math.Inf(-1)},
+				{x1: math.Inf(1), x2: 0},
+				{x1: math.Inf(-1), x2: 0},
+				{x1: 0, x2: math.Inf(1)},
+				{x1: 0, x2: math.Inf(-1)},
+				{x1: math.NaN(), x2: 0},
+				{x1: 0, x2: math.NaN()},
+				{x1: math.NaN(), x2: 12321},
+				{x1: 12313, x2: math.NaN()},
+				{x1: math.NaN(), x2: math.NaN()},
+			} {
+				t.Run(fmt.Sprintf("x1=%f_x2=%f", vs.x1, vs.x2), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
+					eng := newEngine()
+
+					var is32Bit bool
+					var expFloat32 float32
+					var expFloat64 float64
+					var compileOperationFunc func()
+					switch o := tc.op.(type) {
+					case *wazeroir.OperationMin:
+						compileOperationFunc = func() {
+							err := compiler.compileMin(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(wazeroir.Min(float64(float32(vs.x1)), float64(float32(vs.x2))))
+						} else {
+							expFloat64 = wazeroir.Min(vs.x1, vs.x2)
+						}
+					case *wazeroir.OperationMax:
+						compileOperationFunc = func() {
+							err := compiler.compileMax(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(wazeroir.Max(float64(float32(vs.x1)), float64(float32(vs.x2))))
+						} else {
+							expFloat64 = wazeroir.Max(vs.x1, vs.x2)
+						}
+					case *wazeroir.OperationCopysign:
+						compileOperationFunc = func() {
+							err := compiler.compileCopysign(o)
+							require.NoError(t, err)
+						}
+						is32Bit = o.Type == wazeroir.Float32
+						if is32Bit {
+							expFloat32 = float32(math.Copysign(float64(float32(vs.x1)), float64(float32(vs.x2))))
+						} else {
+							expFloat64 = math.Copysign(vs.x1, vs.x2)
+						}
+					}
+
+					// Setup the target values.
+					if is32Bit {
+						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: float32(vs.x1)})
+						require.NoError(t, err)
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: float32(vs.x2)})
+						require.NoError(t, err)
+					} else {
+						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: vs.x1})
+						require.NoError(t, err)
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: vs.x2})
+						require.NoError(t, err)
+					}
+
+					// Compile the operation.
+					compileOperationFunc()
+
+					// To verify the behavior, we release the value
+					// to the stack.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+
+					// Generate and run the code under test.
+					code, _, err := compiler.generate()
+					require.NoError(t, err)
+					mem := newMemoryInst()
+					jitcall(
+						uintptr(unsafe.Pointer(&code[0])),
+						uintptr(unsafe.Pointer(eng)),
+						uintptr(unsafe.Pointer(&mem.Buffer[0])),
+					)
+
+					// Check the result.
+					require.Equal(t, uint64(1), eng.stackPointer)
+					if is32Bit {
+						actual := stackTopAsFloat32(eng)
+						if math.IsNaN(float64(expFloat32)) {
+							require.True(t, math.IsNaN(float64(actual)), actual)
+						} else {
+							require.Equal(t, expFloat32, actual)
+						}
+					} else {
+						actual := stackTopAsFloat64(eng)
+						if math.IsNaN(expFloat64) {
+							require.True(t, math.IsNaN(actual), actual)
 						} else {
 							require.Equal(t, expFloat64, actual)
 						}

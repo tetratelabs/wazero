@@ -1270,11 +1270,11 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 					// Float32
 					v2 := math.Float32frombits(uint32(it.pop()))
 					v1 := math.Float32frombits(uint32(it.pop()))
-					it.push(uint64(math.Float32bits(float32(min(float64(v1), float64(v2))))))
+					it.push(uint64(math.Float32bits(float32(Min(float64(v1), float64(v2))))))
 				} else {
 					v2 := math.Float64frombits(it.pop())
 					v1 := math.Float64frombits(it.pop())
-					it.push(math.Float64bits(min(v1, v2)))
+					it.push(math.Float64bits(Min(v1, v2)))
 				}
 				frame.pc++
 			}
@@ -1285,12 +1285,12 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 					// Float32
 					v2 := math.Float32frombits(uint32(it.pop()))
 					v1 := math.Float32frombits(uint32(it.pop()))
-					it.push(uint64(math.Float32bits(float32(max(float64(v1), float64(v2))))))
+					it.push(uint64(math.Float32bits(float32(Max(float64(v1), float64(v2))))))
 				} else {
 					// Float64
 					v2 := math.Float64frombits(it.pop())
 					v1 := math.Float64frombits(it.pop())
-					it.push(math.Float64bits(max(v1, v2)))
+					it.push(math.Float64bits(Max(v1, v2)))
 				}
 				frame.pc++
 			}
@@ -1483,7 +1483,7 @@ func funcTypeString(t *wasm.FunctionType) string {
 // math.Min doen't comply with the Wasm spec, so we borrow from the original
 // with a change that either one of NaN results in NaN even if another is -Inf.
 // https://github.com/golang/go/blob/1d20a362d0ca4898d77865e314ef6f73582daef0/src/math/dim.go#L74-L91
-func min(x, y float64) float64 {
+func Min(x, y float64) float64 {
 	switch {
 	case math.IsNaN(x) || math.IsNaN(y):
 		return math.NaN()
@@ -1504,7 +1504,7 @@ func min(x, y float64) float64 {
 // math.Max doen't comply with the Wasm spec, so we borrow from the original
 // with a change that either one of NaN results in NaN even if another is Inf.
 // https://github.com/golang/go/blob/1d20a362d0ca4898d77865e314ef6f73582daef0/src/math/dim.go#L42-L59
-func max(x, y float64) float64 {
+func Max(x, y float64) float64 {
 	switch {
 	case math.IsNaN(x) || math.IsNaN(y):
 		return math.NaN()
