@@ -34,6 +34,10 @@ func stackTopAsInt32(eng *engine) int32 {
 	return int32(eng.stack[eng.stackPointer-1])
 }
 
+func stackTopAsInt64(eng *engine) int64 {
+	return int64(eng.stack[eng.stackPointer-1])
+}
+
 func stackTopAsFloat32(eng *engine) float32 {
 	return math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
 }
@@ -3990,14 +3994,15 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
+	fmt.Printf("%f, %f\n", float32(9223372036854775807), float64(9223372036854775807))
 	for _, tc := range []struct {
 		outputType wazeroir.SignedInt
 		inputType  wazeroir.Float
 	}{
 		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float32},
 		{outputType: wazeroir.SignedInt32, inputType: wazeroir.Float64},
-		// {outputType: wazeroir.SignedInt64, inputType: wazeroir.Float32},
-		// {outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64},
+		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float32},
+		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64},
 		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32},
 		// {outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64},
 		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32},
@@ -4014,6 +4019,8 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				math.MaxInt32,
 				math.MaxUint32,
 				math.MinInt64,
+				// Note that math.MaxInt64 is rounded up to math.MaxInt64+1 in 32/64-bit float representation.
+				// See the output of "fmt.Printf("%f, %f\n", float32(9223372036854775807), float64(9223372036854775807))".
 				math.MaxInt64,
 				math.MaxUint64,
 				math.MaxFloat32,
@@ -4063,7 +4070,12 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 							require.Equal(t, int32(math.Trunc(float64(f32))), actual)
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt64 {
-						t.Skip()
+						f32 := float32(v)
+						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt64 || f32 >= math.MaxInt64
+						if !shouldInvalidStatus {
+							actual := stackTopAsInt64(eng)
+							require.Equal(t, int64(math.Trunc(float64(f32))), actual)
+						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
 						shouldInvalidStatus = math.IsNaN(v) || v < math.MinInt32 || v > math.MaxInt32
 						if !shouldInvalidStatus {
@@ -4071,7 +4083,11 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 							require.Equal(t, int32(math.Trunc(v)), actual)
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt64 {
-						t.Skip()
+						shouldInvalidStatus = math.IsNaN(v) || v < math.MinInt64 || v >= math.MaxInt64
+						if !shouldInvalidStatus {
+							actual := stackTopAsInt64(eng)
+							require.Equal(t, int64(math.Trunc(v)), actual)
+						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
 						t.Skip()
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
