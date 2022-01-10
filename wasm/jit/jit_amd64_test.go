@@ -4001,7 +4001,6 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileReinterpret(t *testing.T) {
-
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindF32ReinterpretFromI32,
 		wazeroir.OperationKindF64ReinterpretFromI64,
@@ -4010,59 +4009,79 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 	} {
 		kind := kind
 		t.Run(kind.String(), func(t *testing.T) {
-			for _, v := range []uint64{
-				0, 1, 1 << 16, 1 << 31, 1 << 32, 1 << 63,
-				math.MaxInt32, math.MaxUint32, math.MaxUint64,
-			} {
-				v := v
-				t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+			for _, originOnStack := range []bool{false, true} {
+				originOnStack := originOnStack
+				t.Run(fmt.Sprintf("%v", originOnStack), func(t *testing.T) {
+					for _, v := range []uint64{
+						0, 1, 1 << 16, 1 << 31, 1 << 32, 1 << 63,
+						math.MaxInt32, math.MaxUint32, math.MaxUint64,
+					} {
+						v := v
+						t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+							compiler := requireNewCompiler(t)
+							compiler.initializeReservedRegisters()
 
-					var is32Bit bool
-					switch kind {
-					case wazeroir.OperationKindF32ReinterpretFromI32:
-						is32Bit = true
-						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
-						require.NoError(t, err)
-						err = compiler.compileF32ReinterpretFromI32()
-						require.NoError(t, err)
-					case wazeroir.OperationKindF64ReinterpretFromI64:
-						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
-						require.NoError(t, err)
-						err = compiler.compileF64ReinterpretFromI64()
-						require.NoError(t, err)
-					case wazeroir.OperationKindI32ReinterpretFromF32:
-						is32Bit = true
-						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
-						require.NoError(t, err)
-						err = compiler.compileI32ReinterpretFromF32()
-						require.NoError(t, err)
-					case wazeroir.OperationKindI64ReinterpretFromF64:
-						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
-						require.NoError(t, err)
-						err = compiler.compileI64ReinterpretFromF64()
-						require.NoError(t, err)
-					default:
-						t.Fail()
-					}
+							eng := newEngine()
+							if originOnStack {
+								loc := compiler.locationStack.pushValueOnStack()
+								eng.stack[loc.stackPointer] = v
+								eng.stackPointer = 1
+							}
 
-					// To verify the behavior, we release the value
-					// to the stack.
-					compiler.releaseAllRegistersToStack()
-					compiler.returnFunction()
+							var is32Bit bool
+							var err error
+							switch kind {
+							case wazeroir.OperationKindF32ReinterpretFromI32:
+								is32Bit = true
+								if !originOnStack {
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+									require.NoError(t, err)
+								}
+								err = compiler.compileF32ReinterpretFromI32()
+								require.NoError(t, err)
+							case wazeroir.OperationKindF64ReinterpretFromI64:
+								if !originOnStack {
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+									require.NoError(t, err)
+								}
+								err = compiler.compileF64ReinterpretFromI64()
+								require.NoError(t, err)
+							case wazeroir.OperationKindI32ReinterpretFromF32:
+								is32Bit = true
+								if !originOnStack {
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+									require.NoError(t, err)
+								}
+								err = compiler.compileI32ReinterpretFromF32()
+								require.NoError(t, err)
+							case wazeroir.OperationKindI64ReinterpretFromF64:
+								if !originOnStack {
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+									require.NoError(t, err)
+								}
+								err = compiler.compileI64ReinterpretFromF64()
+								require.NoError(t, err)
+							default:
+								t.Fail()
+							}
 
-					// Generate and run the code under test.
-					code, _, err := compiler.generate()
-					require.NoError(t, err)
-					eng := newEngine()
-					jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+							// To verify the behavior, we release the value
+							// to the stack.
+							compiler.releaseAllRegistersToStack()
+							compiler.returnFunction()
 
-					// Reinterpret must preserve the bit-pattern.
-					if is32Bit {
-						require.Equal(t, uint32(v), stackTopAsUint32(eng))
-					} else {
-						require.Equal(t, v, stackTopAsUint64(eng))
+							// Generate and run the code under test.
+							code, _, err := compiler.generate()
+							require.NoError(t, err)
+							jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+							// Reinterpret must preserve the bit-pattern.
+							if is32Bit {
+								require.Equal(t, uint32(v), stackTopAsUint32(eng))
+							} else {
+								require.Equal(t, v, stackTopAsUint64(eng))
+							}
+						})
 					}
 				})
 			}

@@ -2690,6 +2690,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 // emitSimpleConversion pops a value type from the stack, and applies the
 // given instruction on it, and push the result onto a register of the given type.
 func (c *amd64Compiler) emitSimpleConversion(convInstruction obj.As, destinationRegisterType generalPurposeRegisterType) error {
+	// TODO: it is not necessary to place the origin on a register (i.e. ok to directly move the memory allocated value).
 	origin := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(origin); err != nil {
 		return err
@@ -2750,22 +2751,50 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	return nil
 }
 
+// compileI32ReinterpretFromF32 adds instructions to reinterpret the 32-bit float on top of the stack
+// as a 32-bit integer by preserving the bit representation. If the value is on the stack,
+// this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileI32ReinterpretFromF32() error {
+	if c.locationStack.peek().onStack() {
+		return nil
+	}
 	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeInt)
 }
 
+// compileI64ReinterpretFromF64 adds instructions to reinterpret the 64-bit float on top of the stack
+// as a 64-bit integer by preserving the bit representation. If the value is on the stack,
+// this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileI64ReinterpretFromF64() error {
+	if c.locationStack.peek().onStack() {
+		return nil
+	}
 	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeInt)
 }
 
+// compileF32ReinterpretFromI32 adds instructions to reinterpret the 32-bit int on top of the stack
+// as a 32-bit float by preserving the bit representation. If the value is on the stack,
+// this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileF32ReinterpretFromI32() error {
+	if c.locationStack.peek().onStack() {
+		return nil
+	}
 	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeFloat)
 }
 
+// compileF32ReinterpretFromI32 adds instructions to reinterpret the 64-bit int on top of the stack
+// as a 64-bit float by preserving the bit representation. If the value is on the stack,
+// this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
+	if c.locationStack.peek().onStack() {
+		return nil
+	}
 	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeFloat)
 }
 
+// compiledExtend adds instructions to extend the 32-bit signed or unsigned int on top of the stack
+// as a 64-bit integer of coressponding signedness. For unsigned case, this is just reinterpreting the
+// underlying bit pattern as 64-bit integer. For signed case, this is sign-extension which preserves the
+// original integer's sign.
 func (c *amd64Compiler) compiledExtend(o *wazeroir.OperationExtend) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
