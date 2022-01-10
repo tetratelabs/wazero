@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -3991,6 +3990,7 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
+	fmt.Printf("%f\n", float32(2147483647))
 	for _, tc := range []struct {
 		outputType wazeroir.SignedInt
 		inputType  wazeroir.Float
@@ -4007,21 +4007,23 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 		tc := tc
 		t.Run(fmt.Sprintf("%s from %s", tc.outputType, tc.inputType), func(t *testing.T) {
 			for _, v := range []float64{
-				// 0, 100, -100, 1, -1,
-				// 100.01234124, -100.01234124, 200.12315,
-				// math.MinInt32,
+				0, 100, -100, 1, -1,
+				100.01234124, -100.01234124, 200.12315,
+				math.MinInt32,
+				// Note that math.MaxInt32 is rounded up to math.MaxInt32+1 in float representation.
+				// See the output of "fmt.Printf("%f\n", float32(2147483647))".
 				math.MaxInt32,
-				// math.MaxUint32,
-				// math.MinInt64,
-				// math.MaxInt64,
-				// math.MaxUint64,
-				// math.MaxFloat32,
-				// math.SmallestNonzeroFloat32,
-				// math.MaxFloat64,
-				// math.SmallestNonzeroFloat64,
-				// 6.8719476736e+10,  /* = 1 << 36 */
-				// 1.37438953472e+11, /* = 1 << 37 */
-				// math.Inf(1), math.Inf(-1), math.NaN(),
+				math.MaxUint32,
+				math.MinInt64,
+				math.MaxInt64,
+				math.MaxUint64,
+				math.MaxFloat32,
+				math.SmallestNonzeroFloat32,
+				math.MaxFloat64,
+				math.SmallestNonzeroFloat64,
+				6.8719476736e+10,  /* = 1 << 36 */
+				1.37438953472e+11, /* = 1 << 37 */
+				math.Inf(1), math.Inf(-1), math.NaN(),
 			} {
 				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
@@ -4055,9 +4057,8 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					// Check the result.
 					var shouldInvalidStatus bool
 					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
-						fmt.Println(hex.EncodeToString(code))
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt32 || f32 > math.MaxInt32
+						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt32 || f32 >= math.MaxInt32
 						if !shouldInvalidStatus {
 							actual := stackTopAsInt32(eng)
 							require.Equal(t, int32(math.Trunc(float64(f32))), actual)

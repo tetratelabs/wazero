@@ -1948,10 +1948,6 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat32() error {
 	okJmp.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmp)
 
-	a := c.newProg()
-	a.As = x86.AUD2
-	c.addInstruction(a)
-
 	// Start handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	checkIfNaN := c.newProg()
