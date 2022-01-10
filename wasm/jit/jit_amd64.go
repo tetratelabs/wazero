@@ -1640,7 +1640,7 @@ func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	}
 }
 
-// compileMin adds instructions to pop two values from the stack, and push back the minimum of
+// compileMax adds instructions to pop two values from the stack, and push back the maximum of
 // these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 100.1].
 // For the cases where NaN involves, see the doc of emitMinOrMax below.
 func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
@@ -1663,7 +1663,7 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 // Therefore in this function, we have to add conditional jumps to check if one of values is NaN before
 // the native min/max, which is why we cannot simply emit a native min/max instruction here.
 //
-// For the semantics, see wazeroir.{Min,Max} for detail.
+// For the semantics, see wazeroir.Min and wazeroir.Max for detail.
 func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
@@ -1695,7 +1695,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	// 3) One of Two values is NaN: ZF, PF and CF flags are set.
 
 	// Jump instruction to go to 3) case by checking the ZF flag
-	// as ZF is only set for 1) and 2) cases.
+	// as ZF is only set for 2) and 3) cases.
 	nanFreeOrDiffJump := c.newProg()
 	nanFreeOrDiffJump.As = x86.AJNE
 	nanFreeOrDiffJump.To.Type = obj.TYPE_BRANCH
@@ -1703,7 +1703,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 
 	// Start handling 2) and 3).
 
-	// Jump if two values are equal and NaN-free by checking the PF flag.
+	// Jump if two values are equal and NaN-free by checking the parity flag (PF).
 	// Here we use JPC to do the conditional jump when the parity flag is NOT set,
 	// and that is of 2).
 	equalExitJmp := c.newProg()
@@ -1744,11 +1744,11 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	nanFreeOrDiff.To.Reg = x1.register
 	c.addInstruction(nanFreeOrDiff)
 
-	// Set the jump target of 1) and 2) cases to the next instrucion after 3) case.
+	// Set the jump target of 1) and 2) cases to the next instruction after 3) case.
 	c.addSetJmpOrigin(nanExitJmp)
 	c.addSetJmpOrigin(equalExitJmp)
 
-	// Record that we consumed the x2 and placed the copysign result in the x1's register.
+	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
 	c.locationStack.pushValueOnRegister(x1.register)
 	return nil
@@ -1896,7 +1896,7 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
 		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
-		// See the following link for why we use 64bit conversion for unsigned 32bit interger sources:
+		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
 		//
 		// Here's the summry:
@@ -1975,7 +1975,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	c.addInstruction(jmpIfSignbitSet)
 
 	// Otherwise, we could fit the unsigned int into float32.
-	// So we simply convert it to float32 and emit jump instruction to exit from this branch.
+	// So, we convert it to float32 and emit jump instruction to exit from this branch.
 	convert := c.newProg()
 	if isFloat32bit {
 		convert.As = x86.ACVTSQ2SS
@@ -2005,6 +2005,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	if err != nil {
 		return err
 	}
+
 	movToTmp := c.newProg()
 	jmpIfSignbitSet.To.SetTarget(movToTmp)
 	movToTmp.As = x86.AMOVQ
@@ -2020,20 +2021,23 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	divideBy2.To.Type = obj.TYPE_REG
 	divideBy2.To.Reg = tmpReg
 	c.addInstruction(divideBy2)
-	rescureLeastSignificantBit := c.newProg()
+
+	rescueLeastSignificantBit := c.newProg()
 	rescureLeastSignificantBit.As = x86.AANDQ
 	rescureLeastSignificantBit.From.Type = obj.TYPE_CONST
 	rescureLeastSignificantBit.From.Offset = 0x1
 	rescureLeastSignificantBit.To.Type = obj.TYPE_REG
 	rescureLeastSignificantBit.To.Reg = origin.register
 	c.addInstruction(rescureLeastSignificantBit)
-	addRescuredBit := c.newProg()
+
+	addRescuedBit := c.newProg()
 	addRescuredBit.As = x86.AORQ
 	addRescuredBit.From.Type = obj.TYPE_REG
 	addRescuredBit.From.Reg = origin.register
 	addRescuredBit.To.Type = obj.TYPE_REG
 	addRescuredBit.To.Reg = tmpReg
 	c.addInstruction(addRescuredBit)
+
 	convertDividedBy2Value := c.newProg()
 	if isFloat32bit {
 		convertDividedBy2Value.As = x86.ACVTSQ2SS
@@ -2045,6 +2049,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	convertDividedBy2Value.To.Type = obj.TYPE_REG
 	convertDividedBy2Value.To.Reg = dest
 	c.addInstruction(convertDividedBy2Value)
+
 	multiplyBy2 := c.newProg()
 	if isFloat32bit {
 		multiplyBy2.As = x86.AADDSS
@@ -2057,7 +2062,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	multiplyBy2.To.Reg = dest
 	c.addInstruction(multiplyBy2)
 
-	// Now we finished the sign-bit set branch.
+	// Now, we finished the sign-bit set branch.
 	// We have to make the exit jump target of sign-bit unset branch
 	// towards the next instruction.
 	c.addSetJmpOrigin(exitFromSignbitUnSet)
