@@ -278,6 +278,11 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:15: found ')' before '('",
 		},
 		{
+			name:        "module name after import",
+			input:       "(module (import \"\" \"\" (func) $Math)",
+			expectedErr: "1:30: unexpected id: $Math in module.import[0]",
+		},
+		{
 			name:        "import missing module",
 			input:       "(module (import))",
 			expectedErr: "1:16: missing module and name in module.import[0]",
