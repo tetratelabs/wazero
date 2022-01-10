@@ -1912,8 +1912,9 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 	return nil
 }
 
-// compileFConvertFromI adds instructions to replace the top value of float type on the stack with
+// compileITruncFromF adds instructions to replace the top value of float type on the stack with
 // the corresponding int value. This is equivalent to int32(math.Trunc(float32(x))), uint32(math.Trunc(float64(x))), etc in Go.
+//
 // Please refer to [1] and [2] for when we encounter undefined behavior in the WebAssembly specification.
 // To summarize, if the source float value is NaN or doesn't fit in the destination range of integers (incl. +=Inf),
 // then the runtime behavior is undefined. In wazero, we exit the function in these undefined cases with
@@ -1941,8 +1942,7 @@ func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (er
 	return
 }
 
-// emitUnsignedI32TruncFromFloat is the implementation of compileFConvertFromI for cases
-// where the destination type is 32-bit un-signed integer.
+// emitUnsignedI32TruncFromFloat implements compileITruncFromF when the destination type is a 32-bit unsigned integer.
 func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	source := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(source); err != nil {
@@ -2044,8 +2044,8 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(convertAfterSub)
 
 	// Next, we have to check if the value is from NaN, +Inf.
-	// NaN or +Inf cases result in 0x8000_0000 accorinding to the semantics of conversion,
-	// so, in anycase we just check if the result int value is minus or not.
+	// NaN or +Inf cases result in 0x8000_0000 according to the semantics of conversion,
+	// This means we check if the result int value is minus or not.
 	testIfMinus := c.newProg()
 	testIfMinus.As = x86.ATESTL
 	testIfMinus.From.Type = obj.TYPE_REG
@@ -2075,7 +2075,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	okJmpForAboveOrEqualMaxInt32PlusOne.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmpForAboveOrEqualMaxInt32PlusOne)
 
-	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
+	// Start emitting the error handling. These invalid float conversions are unrecoverable,
 	// so we must exit from the function with the dedicated status code.
 	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfNaN, jmpIfNaNOrPlusInf)
 	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
@@ -2092,8 +2092,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	return nil
 }
 
-// emitUnsignedI32TruncFromFloat is the implementation of compileFConvertFromI for cases
-// where the destination type is 64-bit un-signed integer.
+// emitUnsignedI32TruncFromFloat implements compileITruncFromF when the destination type is a 64-bit unsigned integer.
 func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	source := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(source); err != nil {
@@ -2131,7 +2130,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfNaN.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfNaN)
 
-	// Next we conver the value as a signed integer.
+	// Next we convert the value as a signed integer.
 	convert := c.newProg()
 	if isFloat32Bit {
 		convert.As = x86.ACVTTSS2SQ
@@ -2195,8 +2194,8 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(convertAfterSub)
 
 	// Next, we have to check if the value is from NaN, +Inf.
-	// NaN or +Inf cases result in 0x8000_0000 accorinding to the semantics of conversion,
-	// so, in anycase we just check if the result int value is minus or not.
+	// NaN or +Inf cases result in 0x8000_0000 according to the semantics of conversion,
+	// This means we check if the result int value is minus or not.
 	testIfMinus := c.newProg()
 	testIfMinus.As = x86.ATESTQ
 	testIfMinus.From.Type = obj.TYPE_REG
@@ -2243,8 +2242,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	return nil
 }
 
-// emitUnsignedI32TruncFromFloat is the implementation of compileFConvertFromI for cases
-// where the destination type is 32-bit signed integer.
+// emitSignedI32TruncFromFloat implements compileITruncFromF when the destination type is a 32-bit signed integer.
 func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	source := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(source); err != nil {
@@ -2287,7 +2285,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	cmpResult.To.Reg = result
 	c.addInstruction(cmpResult)
 
-	// Otherwise, we simply jump to exit as the result is valid.
+	// Otherwise, jump to exit as the result is valid.
 	okJmp := c.newProg()
 	okJmp.As = x86.AJNE
 	okJmp.To.Type = obj.TYPE_BRANCH
@@ -2372,8 +2370,7 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	return nil
 }
 
-// emitUnsignedI32TruncFromFloat is the implementation of compileFConvertFromI for cases
-// where the destination type is 64-bit signed integer.
+// emitSignedI64TruncFromFloat implements compileITruncFromF when the destination type is a 64-bit signed integer.
 func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	source := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(source); err != nil {

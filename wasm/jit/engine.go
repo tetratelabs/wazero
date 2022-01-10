@@ -251,7 +251,7 @@ const (
 	jitCallStatusCodeCallHostFunction
 	// jitCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
 	jitCallStatusCodeUnreachable
-	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happended.
+	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
 )
 

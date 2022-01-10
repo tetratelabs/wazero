@@ -4027,7 +4027,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				// Note that math.MaxInt32 is rounded up to math.MaxInt32+1 in 32-bit float representation.
 				// See the output of "fmt.Printf("%f\n", float32(2147483647))".
 				math.MaxInt32,
-				// Note that math.MaxUint32 is rounded up to math.MaxUint32+1 in 32 float representation.
+				// Note that math.MaxUint32 is rounded up to math.MaxUint32+1 in 32-bit float representation.
 				// See the output of "fmt.Printf("%f, %f\n", float32(4294967295))".
 				math.MaxUint32,
 				math.MinInt64,
