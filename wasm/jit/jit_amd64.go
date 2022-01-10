@@ -2497,13 +2497,13 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 // the corresponding float value. This is equivalent to float32(uint32(x)), float32(int32(x)), etc in Go.
 func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
 	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
-		err = c.emitSimpleConversion(x86.ACVTSL2SS, generalPurposeRegisterTypeInt) // = CVTSI2SS for 32bit int
+		err = c.emitSimpleConversion(x86.ACVTSL2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 32bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
-		err = c.emitSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeInt) // = CVTSI2SS for 64bit int
+		err = c.emitSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
-		err = c.emitSimpleConversion(x86.ACVTSL2SD, generalPurposeRegisterTypeInt) // = CVTSI2SD for 32bit int
+		err = c.emitSimpleConversion(x86.ACVTSL2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 32bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
-		err = c.emitSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeInt) // = CVTSI2SD for 64bit int
+		err = c.emitSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
 		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
@@ -2513,10 +2513,10 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		// >> not an unsigned integer like you have here. So what gives? Well, a 64-bit processor has 64-bit wide
 		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
 		// >> which allows CVTSI2SS to be used after all.
-		err = c.emitSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeInt) // = CVTSI2SS for 64bit int.
+		err = c.emitSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int.
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
 		// For the same reason above, we use 64bit conversion for unsigned 32bit.
-		err = c.emitSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeInt) // = CVTSI2SD for 64bit int.
+		err = c.emitSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int.
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
 		err = c.emitUnsignedInt64ToFloatConversion(true)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
