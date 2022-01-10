@@ -1913,7 +1913,7 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 }
 
 // compileFConvertFromI adds instructions to replace the top value of float type on the stack with
-// the corresponding int value. This is equivalent to int32(float32(x)), uint32(float64(x)), etc in Go.
+// the corresponding int value. This is equivalent to int32(math.Trunc(float32(x))), uint32(math.Trunc(float64(x))), etc in Go.
 // Please refer to [1] and [2] for when we encounter undefined behavior in the WebAssembly specification.
 // To summarize, if the source float value is NaN or doesn't fit in the destination range of integers (incl. +=Inf),
 // then the runtime behavior is undefined. In wazero, we exit the function in these undefined cases with
