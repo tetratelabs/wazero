@@ -30,6 +30,14 @@ func newMemoryInst() *wasm.MemoryInstance {
 	return &wasm.MemoryInstance{Buffer: make([]byte, 1024)}
 }
 
+func stackTopAsFloat32(eng *engine) float32 {
+	return math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+}
+
+func stackTopAsFloat64(eng *engine) float64 {
+	return math.Float64frombits(eng.stack[eng.stackPointer-1])
+}
+
 func requireNewCompiler(t *testing.T) *amd64Compiler {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
@@ -872,7 +880,7 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 			// As we push the constant to the stack, the stack pointer must be incremented.
 			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the squared const.
-			require.Equal(t, o.Value*2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+			require.Equal(t, o.Value*2, stackTopAsFloat32(eng))
 		})
 	}
 }
@@ -916,7 +924,7 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 			// As we push the constant to the stack, the stack pointer must be incremented.
 			require.Equal(t, uint64(1), eng.stackPointer)
 			// Check the value of the top on the stack equals the squared const.
-			require.Equal(t, o.Value*2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+			require.Equal(t, o.Value*2, stackTopAsFloat64(eng))
 		})
 	}
 }
@@ -1041,7 +1049,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1+tc.v2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+				require.Equal(t, tc.v1+tc.v2, stackTopAsFloat32(eng))
 			})
 		}
 	})
@@ -1090,7 +1098,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1+tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.v1+tc.v2, stackTopAsFloat64(eng))
 			})
 		}
 	})
@@ -2248,7 +2256,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1-tc.v2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+				require.Equal(t, tc.v1-tc.v2, stackTopAsFloat32(eng))
 			})
 		}
 	})
@@ -2297,7 +2305,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.v1-tc.v2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.v1-tc.v2, stackTopAsFloat64(eng))
 			})
 		}
 	})
@@ -2581,7 +2589,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1*tc.x2, math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))
+				require.Equal(t, tc.x1*tc.x2, stackTopAsFloat32(eng))
 			})
 		}
 	})
@@ -2634,7 +2642,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				)
 				// Check the stack.
 				require.Equal(t, uint64(1), eng.stackPointer)
-				require.Equal(t, tc.x1*tc.x2, math.Float64frombits(eng.stack[eng.stackPointer-1]))
+				require.Equal(t, tc.x1*tc.x2, stackTopAsFloat64(eng))
 			})
 		}
 	})
@@ -3497,7 +3505,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				// Check the result.
 				require.Equal(t, uint64(1), eng.stackPointer)
 				exp := tc.x1 / tc.x2
-				actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+				actual := stackTopAsFloat32(eng)
 				if math.IsNaN(float64(exp)) {
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
@@ -3574,7 +3582,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				// Check the result.
 				require.Equal(t, uint64(1), eng.stackPointer)
 				exp := tc.x1 / tc.x2
-				actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+				actual := stackTopAsFloat64(eng)
 				if math.IsNaN(exp) {
 					require.True(t, math.IsNaN(actual))
 				} else {
@@ -3924,10 +3932,10 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 			// Check the result.
 			require.Equal(t, uint64(1), eng.stackPointer)
 			if math.IsNaN(v) {
-				require.True(t, math.IsNaN(float64(math.Float32frombits(uint32(eng.stack[eng.stackPointer-1])))))
+				require.True(t, math.IsNaN(float64(stackTopAsFloat32(eng))))
 			} else {
 				exp := float32(v)
-				actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+				actual := stackTopAsFloat32(eng)
 				require.Equal(t, exp, actual)
 			}
 		})
@@ -3967,10 +3975,10 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 			// Check the result.
 			require.Equal(t, uint64(1), eng.stackPointer)
 			if math.IsNaN(float64(v)) {
-				require.True(t, math.IsNaN(math.Float64frombits(eng.stack[eng.stackPointer-1])))
+				require.True(t, math.IsNaN(stackTopAsFloat64(eng)))
 			} else {
 				exp := float64(v)
-				actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+				actual := stackTopAsFloat64(eng)
 				require.Equal(t, exp, actual)
 			}
 		})
@@ -4265,14 +4273,14 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					// Check the result.
 					require.Equal(t, uint64(1), eng.stackPointer)
 					if is32Bit {
-						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						actual := stackTopAsFloat32(eng)
 						if math.IsNaN(float64(expFloat32)) {
 							require.True(t, math.IsNaN(float64(actual)))
 						} else {
 							require.Equal(t, actual, expFloat32)
 						}
 					} else {
-						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						actual := stackTopAsFloat64(eng)
 						if math.IsNaN(expFloat64) {
 							require.True(t, math.IsNaN(actual))
 						} else {
@@ -4408,14 +4416,14 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 					// Check the result.
 					require.Equal(t, uint64(1), eng.stackPointer)
 					if is32Bit {
-						actual := math.Float32frombits(uint32(eng.stack[eng.stackPointer-1]))
+						actual := stackTopAsFloat32(eng)
 						if math.IsNaN(float64(expFloat32)) {
 							require.True(t, math.IsNaN(float64(actual)), actual)
 						} else {
 							require.Equal(t, expFloat32, actual)
 						}
 					} else {
-						actual := math.Float64frombits(eng.stack[eng.stackPointer-1])
+						actual := stackTopAsFloat64(eng)
 						if math.IsNaN(expFloat64) {
 							require.True(t, math.IsNaN(actual), actual)
 						} else {
