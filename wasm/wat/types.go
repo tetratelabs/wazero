@@ -26,7 +26,7 @@ type module struct {
 	// In the future, other types may be introduced to support features such as module linking.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#types%E2%91%A0%E2%91%A0
-	types []*typeFunc
+	typeFuncs []*typeFunc
 
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
@@ -59,6 +59,12 @@ type startFunction struct {
 //
 // See https://www.w3.org/TR/wasm-core-1/#text-functype
 type typeFunc struct {
+	// name starts with '$'. For example, "$v_v", and only set when explicitly defined in module.typeFuncs
+	//
+	// name is only used for debugging. At runtime, types are called based on raw numeric index. The type index space
+	// begins those explicitly defined in module.typeFuncs, followed by any inlined ones.
+	name string
+
 	// params are the possibly empty sequence of value types accepted by a function with this signature.
 	//
 	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
@@ -81,8 +87,15 @@ type importFunc struct {
 	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
 	importIndex uint32
 
-	// typeIndex is the zero-based index in module.types representing this function signature.
-	typeIndex uint32
+	// typeIndex is a importFunc.name, such as "$main", or its equivalent numeric index in module.importFuncs, such as
+	// "2". If typeInlined is also present, the signature in module.importFuncs must exist and match that type.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#text-typeuse
+	typeIndex []byte
+
+	// typeInlined is set if there are any "param" or "result" fields.
+	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
+	typeInlined *typeFunc
 
 	// module is the possibly empty module name to import. Ex. "" or "Math"
 	//
@@ -104,9 +117,6 @@ type importFunc struct {
 	// `wat2wasm --debug-names` will do this.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	funcName string
-
-	// TODO: typeuse https://www.w3.org/TR/wasm-core-1/#text-typeuse
-	// TODO: inlined type https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
 }
 
 // FormatError allows control over the format of errors parsing the WebAssembly Text Format.
