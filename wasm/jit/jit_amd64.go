@@ -1899,7 +1899,7 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
 		//
-		// Here's the summry:
+		// Here's the summary:
 		// >> CVTSI2SS is indeed designed for converting a signed integer to a scalar single-precision float,
 		// >> not an unsigned integer like you have here. So what gives? Well, a 64-bit processor has 64-bit wide
 		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
@@ -2014,6 +2014,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	movToTmp.To.Type = obj.TYPE_REG
 	movToTmp.To.Reg = tmpReg
 	c.addInstruction(movToTmp)
+
 	divideBy2 := c.newProg()
 	divideBy2.As = x86.ASHRQ
 	divideBy2.From.Type = obj.TYPE_CONST
@@ -2023,20 +2024,20 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	c.addInstruction(divideBy2)
 
 	rescueLeastSignificantBit := c.newProg()
-	rescureLeastSignificantBit.As = x86.AANDQ
-	rescureLeastSignificantBit.From.Type = obj.TYPE_CONST
-	rescureLeastSignificantBit.From.Offset = 0x1
-	rescureLeastSignificantBit.To.Type = obj.TYPE_REG
-	rescureLeastSignificantBit.To.Reg = origin.register
-	c.addInstruction(rescureLeastSignificantBit)
+	rescueLeastSignificantBit.As = x86.AANDQ
+	rescueLeastSignificantBit.From.Type = obj.TYPE_CONST
+	rescueLeastSignificantBit.From.Offset = 0x1
+	rescueLeastSignificantBit.To.Type = obj.TYPE_REG
+	rescueLeastSignificantBit.To.Reg = origin.register
+	c.addInstruction(rescueLeastSignificantBit)
 
 	addRescuedBit := c.newProg()
-	addRescuredBit.As = x86.AORQ
-	addRescuredBit.From.Type = obj.TYPE_REG
-	addRescuredBit.From.Reg = origin.register
-	addRescuredBit.To.Type = obj.TYPE_REG
-	addRescuredBit.To.Reg = tmpReg
-	c.addInstruction(addRescuredBit)
+	addRescuedBit.As = x86.AORQ
+	addRescuedBit.From.Type = obj.TYPE_REG
+	addRescuedBit.From.Reg = origin.register
+	addRescuedBit.To.Type = obj.TYPE_REG
+	addRescuedBit.To.Reg = tmpReg
+	c.addInstruction(addRescuedBit)
 
 	convertDividedBy2Value := c.newProg()
 	if isFloat32bit {
