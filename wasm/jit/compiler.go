@@ -53,6 +53,11 @@ type compiler interface {
 	compileFConvertFromI(o *wazeroir.OperationFConvertFromI) error
 	compileF32DemoteFromF64() error
 	compileF64PromoteFromF32() error
+	compileI32ReinterpretFromF32() error
+	compileI64ReinterpretFromF64() error
+	compileF32ReinterpretFromI32() error
+	compileF64ReinterpretFromI64() error
+	compiledExtend(o *wazeroir.OperationExtend) error
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
 	compileEqz(o *wazeroir.OperationEqz) error

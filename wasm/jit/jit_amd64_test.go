@@ -4000,6 +4000,50 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 	}
 }
 
+func TestAmd64Compiler_compiledExtend(t *testing.T) {
+	for _, signed := range []bool{false, true} {
+		signed := signed
+		t.Run(fmt.Sprintf("signed=%v", signed), func(t *testing.T) {
+			for _, v := range []uint32{
+				0, 1, 1 << 14, 1 << 31, math.MaxUint32, 0xFFFFFFFF, math.MaxInt32,
+			} {
+				v := v
+				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
+
+					// Setup the promote target.
+					err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
+					require.NoError(t, err)
+
+					err = compiler.compiledExtend(&wazeroir.OperationExtend{Signed: signed})
+					require.NoError(t, err)
+
+					// To verify the behavior, we release the value
+					// to the stack.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+
+					// Generate and run the code under test.
+					code, _, err := compiler.generate()
+					require.NoError(t, err)
+					eng := newEngine()
+					jitcall(uintptr(unsafe.Pointer(&code[0])), uintptr(unsafe.Pointer(eng)), 0)
+
+					require.Equal(t, uint64(1), eng.stackPointer)
+					if signed {
+						expected := int64(int32(v))
+						require.Equal(t, expected, stackTopAsInt64(eng))
+					} else {
+						expected := uint64(uint32(v))
+						require.Equal(t, expected, stackTopAsUint64(eng))
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 	for _, tc := range []struct {
 		outputType wazeroir.SignedInt

@@ -2497,13 +2497,13 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 // the corresponding float value. This is equivalent to float32(uint32(x)), float32(int32(x)), etc in Go.
 func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
 	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
-		err = c.emitSimpleIntToFloatConversion(x86.ACVTSL2SS) // = CVTSI2SS for 32bit int
+		err = c.emitSimpleConversion(x86.ACVTSL2SS, generalPurposeRegisterTypeInt) // = CVTSI2SS for 32bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
-		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SS) // = CVTSI2SS for 64bit int
+		err = c.emitSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeInt) // = CVTSI2SS for 64bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
-		err = c.emitSimpleIntToFloatConversion(x86.ACVTSL2SD) // = CVTSI2SD for 32bit int
+		err = c.emitSimpleConversion(x86.ACVTSL2SD, generalPurposeRegisterTypeInt) // = CVTSI2SD for 32bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
-		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int
+		err = c.emitSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeInt) // = CVTSI2SD for 64bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
 		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
@@ -2513,10 +2513,10 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		// >> not an unsigned integer like you have here. So what gives? Well, a 64-bit processor has 64-bit wide
 		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
 		// >> which allows CVTSI2SS to be used after all.
-		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SS) // = CVTSI2SS for 64bit int.
+		err = c.emitSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeInt) // = CVTSI2SS for 64bit int.
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
 		// For the same reason above, we use 64bit conversion for unsigned 32bit.
-		err = c.emitSimpleIntToFloatConversion(x86.ACVTSQ2SD) // = CVTSI2SD for 64bit int.
+		err = c.emitSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeInt) // = CVTSI2SD for 64bit int.
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
 		err = c.emitUnsignedInt64ToFloatConversion(true)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
@@ -2687,15 +2687,15 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	return nil
 }
 
-// emitSimpleIntToFloatConversion pops a flaot type from the stack, and applies the
-// given instruction on it, and push the integer result onto the stack.
-func (c *amd64Compiler) emitSimpleIntToFloatConversion(convInstruction obj.As) error {
+// emitSimpleConversion pops a value type from the stack, and applies the
+// given instruction on it, and push the result onto a register of the given type.
+func (c *amd64Compiler) emitSimpleConversion(convInstruction obj.As, destinationRegisterType generalPurposeRegisterType) error {
 	origin := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(origin); err != nil {
 		return err
 	}
 
-	dest, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	dest, err := c.allocateRegister(destinationRegisterType)
 	if err != nil {
 		return err
 	}
@@ -2710,7 +2710,7 @@ func (c *amd64Compiler) emitSimpleIntToFloatConversion(convInstruction obj.As) e
 
 	c.locationStack.markRegisterUnused(origin.register)
 	loc := c.locationStack.pushValueOnRegister(dest)
-	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	loc.setRegisterType(destinationRegisterType)
 	return nil
 }
 
@@ -2747,6 +2747,42 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	convert.To.Type = obj.TYPE_REG
 	convert.To.Reg = target.register
 	c.addInstruction(convert)
+	return nil
+}
+
+func (c *amd64Compiler) compileI32ReinterpretFromF32() error {
+	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeInt)
+}
+
+func (c *amd64Compiler) compileI64ReinterpretFromF64() error {
+	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeInt)
+}
+
+func (c *amd64Compiler) compileF32ReinterpretFromI32() error {
+	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeFloat)
+}
+
+func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
+	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeFloat)
+}
+
+func (c *amd64Compiler) compiledExtend(o *wazeroir.OperationExtend) error {
+	target := c.locationStack.peek() // Note this is peek!
+	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
+		return err
+	}
+
+	extend := c.newProg()
+	if o.Signed {
+		extend.As = x86.AMOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
+	} else {
+		extend.As = x86.AMOVQ
+	}
+	extend.From.Type = obj.TYPE_REG
+	extend.From.Reg = target.register
+	extend.To.Type = obj.TYPE_REG
+	extend.To.Reg = target.register
+	c.addInstruction(extend)
 	return nil
 }
 
