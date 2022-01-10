@@ -9,7 +9,9 @@ import (
 )
 
 func TestParseModule(t *testing.T) {
+	typeFuncEmpty := &typeFunc{}
 	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
+
 	tests := []struct {
 		name     string
 		input    string
@@ -50,7 +52,7 @@ func TestParseModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32) (param i32) (param i32) (result i32)))
 )`,
 			expected: &module{
-				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
+				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32}},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
 				},
@@ -62,7 +64,7 @@ func TestParseModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
 )`,
 			expected: &module{
-				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
+				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32}},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
 				},
@@ -76,7 +78,7 @@ func TestParseModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32 i32) (param i32) (result i32)))
 )`,
 			expected: &module{
-				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}}},
+				types: []*typeFunc{{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32}},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
 				},
@@ -98,7 +100,7 @@ func TestParseModule(t *testing.T) {
 			name:  "import func inlined type no param",
 			input: `(module (import "" "" (func (result i32))))`,
 			expected: &module{
-				types:       []*typeFunc{{results: []wasm.ValueType{i32}}},
+				types:       []*typeFunc{{result: i32}},
 				importFuncs: []*importFunc{{}},
 			},
 		},
@@ -109,8 +111,8 @@ func TestParseModule(t *testing.T) {
 )`,
 			expected: &module{
 				types: []*typeFunc{{
-					params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
-					results: []wasm.ValueType{i32},
+					params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+					result: i32,
 				}},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open"},
@@ -124,8 +126,8 @@ func TestParseModule(t *testing.T) {
 )`,
 			expected: &module{
 				types: []*typeFunc{{
-					params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
-					results: []wasm.ValueType{i32},
+					params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+					result: i32,
 				}},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open"},
@@ -140,8 +142,8 @@ func TestParseModule(t *testing.T) {
 )`,
 			expected: &module{
 				types: []*typeFunc{
-					{params: []wasm.ValueType{i32, i32}, results: []wasm.ValueType{i32}},
-					{params: []wasm.ValueType{i32, i32, i32, i32}, results: []wasm.ValueType{i32}},
+					{params: []wasm.ValueType{i32, i32}, result: i32},
+					{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
 				},
 				importFuncs: []*importFunc{
 					{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get"},
@@ -157,7 +159,7 @@ func TestParseModule(t *testing.T) {
 )`,
 			expected: &module{
 				types: []*typeFunc{
-					{params: []wasm.ValueType{i32, i32}, results: []wasm.ValueType{i32}},
+					{params: []wasm.ValueType{i32, i32}, result: i32},
 				},
 				importFuncs: []*importFunc{
 					{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get"},
@@ -207,32 +209,6 @@ func TestParseModule(t *testing.T) {
 	}
 }
 
-func TestParseValueType(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected wasm.ValueType
-	}{
-		{"i32", wasm.ValueTypeI32},
-		{"i64", wasm.ValueTypeI64},
-		{"f32", wasm.ValueTypeF32},
-		{"f64", wasm.ValueTypeF64},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.input, func(t *testing.T) {
-			m, err := parseValueType([]byte(tc.input))
-			require.NoError(t, err)
-			require.Equal(t, tc.expected, m)
-		})
-	}
-	t.Run("unknown type", func(t *testing.T) {
-		_, err := parseValueType([]byte("f65"))
-		require.EqualError(t, err, "unknown type: f65")
-	})
-}
-
 func TestParseModule_Errors(t *testing.T) {
 	tests := []struct{ name, input, expectedErr string }{
 		{
@@ -274,6 +250,11 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "module trailing )",
 			input:       "(module $foo ))",
 			expectedErr: "1:15: found ')' before '('",
+		},
+		{
+			name:        "module name after import",
+			input:       "(module (import \"\" \"\" (func) $Math)",
+			expectedErr: "1:30: unexpected id: $Math in module.import[0]",
 		},
 		{
 			name:        "import missing module",
@@ -321,6 +302,11 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:35: unexpected keyword: baz in module.import[0].func",
 		},
 		{
+			name:        "import func invalid token",
+			input:       "(module (import \"foo\" \"bar\" (func ($param))))",
+			expectedErr: "1:36: unexpected id: $param in module.import[0].func",
+		},
+		{
 			name:        "import func double name",
 			input:       "(module (import \"foo\" \"bar\" (func $baz $qux)))",
 			expectedErr: "1:40: redundant name: $qux in module.import[0].func",
@@ -348,7 +334,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "import func double result",
 			input:       "(module (import \"\" \"\" (func (param i32) (result i32) (result i32))))",
-			expectedErr: "1:55: redundant result field in module.import[0].func",
+			expectedErr: "1:54: unexpected '(' in module.import[0].func",
 		},
 		{
 			name:        "import func double result type",
@@ -379,6 +365,21 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "import func wrong result token",
 			input:       "(module (import \"\" \"\" (func (result () ))))",
 			expectedErr: "1:37: unexpected '(' in module.import[0].func.result",
+		},
+		{
+			name:        "import func name after param",
+			input:       "(module (import \"\" \"\" (func (param i32) $main)))",
+			expectedErr: "1:41: unexpected id: $main in module.import[0].func",
+		},
+		{
+			name:        "import func name after result",
+			input:       "(module (import \"\" \"\" (func (result i32) $main)))",
+			expectedErr: "1:42: unexpected id: $main in module.import[0].func",
+		},
+		{
+			name:        "import func param after result",
+			input:       "(module (import \"\" \"\" (func (result i32) (param i32))))",
+			expectedErr: "1:42: unexpected '(' in module.import[0].func",
 		},
 		{
 			name:        "import func double desc",
