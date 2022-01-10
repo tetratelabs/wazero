@@ -35,14 +35,14 @@ var (
 	float64RestBitMask                            uint64 = ^float64SignBitMask
 	float64SignBitMaskAddress                     uintptr
 	float64RestBitMaskAddress                     uintptr
-	float32ForMinimumSinged32bitInteger           float32 = math.Float32frombits(0xCF00_0000)
-	float32ForMinimumSinged32bitIntegerAdddress   uintptr
-	float64ForMinimumSinged32bitInteger           float64 = math.Float64frombits(0xC1E0_0000_0020_0000)
-	float64ForMinimumSinged32bitIntegerAdddress   uintptr
-	float32ForMinimumSinged64bitInteger           float32 = math.Float32frombits(0xDF00_0000)
-	float32ForMinimumSinged64bitIntegerAdddress   uintptr
-	float64ForMinimumSinged64bitInteger           float64 = math.Float64frombits(0xC3E0_0000_0000_0000)
-	float64ForMinimumSinged64bitIntegerAdddress   uintptr
+	float32ForMinimumSigned32bitInteger           float32 = math.Float32frombits(0xCF00_0000)
+	float32ForMinimumSigned32bitIntegerAdddress   uintptr
+	float64ForMinimumSigned32bitInteger           float64 = math.Float64frombits(0xC1E0_0000_0020_0000)
+	float64ForMinimumSigned32bitIntegerAdddress   uintptr
+	float32ForMinimumSigned64bitInteger           float32 = math.Float32frombits(0xDF00_0000)
+	float32ForMinimumSigned64bitIntegerAdddress   uintptr
+	float64ForMinimumSigned64bitInteger           float64 = math.Float64frombits(0xC3E0_0000_0000_0000)
+	float64ForMinimumSigned64bitIntegerAdddress   uintptr
 	float32ForMaximumSigned32bitIntPlusOne        float32 = math.Float32frombits(0x4F00_0000)
 	float32ForMaximumSigned32bitIntPlusOneAddress uintptr
 	float64ForMaximumSigned32bitIntPlusOne        float64 = math.Float64frombits(0x41E0_0000_0000_0000)
@@ -59,10 +59,10 @@ func init() {
 	float32RestBitMaskAddress = uintptr(unsafe.Pointer(&float32RestBitMask))
 	float64SignBitMaskAddress = uintptr(unsafe.Pointer(&float64SignBitMask))
 	float64RestBitMaskAddress = uintptr(unsafe.Pointer(&float64RestBitMask))
-	float32ForMinimumSinged32bitIntegerAdddress = uintptr(unsafe.Pointer(&float32ForMinimumSinged32bitInteger))
-	float64ForMinimumSinged32bitIntegerAdddress = uintptr(unsafe.Pointer(&float64ForMinimumSinged32bitInteger))
-	float32ForMinimumSinged64bitIntegerAdddress = uintptr(unsafe.Pointer(&float32ForMinimumSinged64bitInteger))
-	float64ForMinimumSinged64bitIntegerAdddress = uintptr(unsafe.Pointer(&float64ForMinimumSinged64bitInteger))
+	float32ForMinimumSigned32bitIntegerAdddress = uintptr(unsafe.Pointer(&float32ForMinimumSigned32bitInteger))
+	float64ForMinimumSigned32bitIntegerAdddress = uintptr(unsafe.Pointer(&float64ForMinimumSigned32bitInteger))
+	float32ForMinimumSigned64bitIntegerAdddress = uintptr(unsafe.Pointer(&float32ForMinimumSigned64bitInteger))
+	float64ForMinimumSigned64bitIntegerAdddress = uintptr(unsafe.Pointer(&float64ForMinimumSigned64bitInteger))
 	float32ForMaximumSigned32bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float32ForMaximumSigned32bitIntPlusOne))
 	float64ForMaximumSigned32bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float64ForMaximumSigned32bitIntPlusOne))
 	float32ForMaximumSigned64bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float32ForMaximumSigned64bitIntPlusOne))
@@ -2275,8 +2275,8 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	//
 	// So, we compare the conversion result with the sign bit mask to check if it is either
 	// 1) the source float value is either +-Inf or NaN, or it exceeds representative ranges of 32bit signed integer, or
-	// 2) the source equals the minimum signed 32-bit (=-2147483648.000000) whose bit pattern is float32ForMinimumSinged32bitIntegerAdddress for 32 bit flaot
-	// 	  or float64ForMinimumSinged32bitIntegerAdddress for 64bit float.
+	// 2) the source equals the minimum signed 32-bit (=-2147483648.000000) whose bit pattern is float32ForMinimumSigned32bitIntegerAdddress for 32 bit flaot
+	// 	  or float64ForMinimumSigned32bitIntegerAdddress for 64bit float.
 	cmpResult := c.newProg()
 	cmpResult.As = x86.ACMPL
 	cmpResult.From.Type = obj.TYPE_MEM
@@ -2316,10 +2316,10 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	checkIfExceedsLowerBound := c.newProg()
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
-		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSinged32bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned32bitIntegerAdddress)
 	} else {
 		checkIfExceedsLowerBound.As = x86.AUCOMISD
-		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSinged32bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSigned32bitIntegerAdddress)
 	}
 	checkIfExceedsLowerBound.From.Type = obj.TYPE_MEM
 	checkIfExceedsLowerBound.To.Type = obj.TYPE_REG
@@ -2403,8 +2403,8 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	//
 	// So, we compare the conversion result with the sign bit mask to check if it is either
 	// 1) the source float value is either +-Inf or NaN, or it exceeds representative ranges of 32bit signed integer, or
-	// 2) the source equals the minimum signed 32-bit (=-9223372036854775808.0) whose bit pattern is float32ForMinimumSinged64bitIntegerAdddress for 32 bit flaot
-	// 	  or float64ForMinimumSinged64bitIntegerAdddress for 64bit float.
+	// 2) the source equals the minimum signed 32-bit (=-9223372036854775808.0) whose bit pattern is float32ForMinimumSigned64bitIntegerAdddress for 32 bit flaot
+	// 	  or float64ForMinimumSigned64bitIntegerAdddress for 64bit float.
 
 	cmpResult := c.newProg()
 	cmpResult.As = x86.ACMPQ
@@ -2445,10 +2445,10 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	checkIfExceedsLowerBound := c.newProg()
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
-		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSinged64bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned64bitIntegerAdddress)
 	} else {
 		checkIfExceedsLowerBound.As = x86.AUCOMISD
-		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSinged64bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSigned64bitIntegerAdddress)
 	}
 	checkIfExceedsLowerBound.From.Type = obj.TYPE_MEM
 	checkIfExceedsLowerBound.To.Type = obj.TYPE_REG
