@@ -1654,9 +1654,9 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 
 // emitMinOrMax adds instructions to pop two values from the stack, and push back either minimum or
 // minimum of these two values onto the stack according to the minOrMaxInstruction argument.
-// minOrMaxInstruction must be one of MAXSS, MAXSD, MINSS or MINSD. These native min/max instructions are
-// almost compatible with min/max in the Wasm specification, but it is slightly different with
-// respect to the NaN handling.
+// minOrMaxInstruction must be one of MAXSS, MAXSD, MINSS or MINSD.
+// Note: These native min/max instructions are almost compatible with min/max in the Wasm specification,
+// but it is slightly different with respect to the NaN handling.
 // Native min/max instructions return non-NaN value if exactly one of target values
 // is NaN. For example native_{min,max}(5.0, NaN) returns always 5.0, not NaN.
 // However, WebAssembly specifies that min/max must always return NaN if one of values is NaN.
@@ -1694,7 +1694,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	// 2) Two values are NaN-free and equal: Only ZF flags is set.
 	// 3) One of Two values is NaN: ZF, PF and CF flags are set.
 
-	// Jump instruction to go to 3) case by checking the ZF flag
+	// Jump instruction to handle 1) case by checking the ZF flag
 	// as ZF is only set for 2) and 3) cases.
 	nanFreeOrDiffJump := c.newProg()
 	nanFreeOrDiffJump.As = x86.AJNE
