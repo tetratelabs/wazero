@@ -47,6 +47,10 @@ var (
 	float32ForMaximumSigned32bitIntPlusOneAddress uintptr
 	float64ForMaximumSigned32bitIntPlusOne        float64 = math.Float64frombits(0x41E0_0000_0000_0000)
 	float64ForMaximumSigned32bitIntPlusOneAddress uintptr
+	float32ForMaximumSigned64bitIntPlusOne        float32 = math.Float32frombits(0x5F00_0000)
+	float32ForMaximumSigned64bitIntPlusOneAddress uintptr
+	float64ForMaximumSigned64bitIntPlusOne        float64 = math.Float64frombits(0x43E0_0000_0000_0000)
+	float64ForMaximumSigned64bitIntPlusOneAddress uintptr
 )
 
 func init() {
@@ -61,6 +65,8 @@ func init() {
 	float64ForMinimumSinged64bitIntegerAdddress = uintptr(unsafe.Pointer(&float64ForMinimumSinged64bitInteger))
 	float32ForMaximumSigned32bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float32ForMaximumSigned32bitIntPlusOne))
 	float64ForMaximumSigned32bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float64ForMaximumSigned32bitIntPlusOne))
+	float32ForMaximumSigned64bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float32ForMaximumSigned64bitIntPlusOne))
+	float64ForMaximumSigned64bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float64ForMaximumSigned64bitIntPlusOne))
 }
 
 // jitcall is implemented in jit_amd64.s as a Go Assembler function.
@@ -1918,9 +1924,11 @@ func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (er
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
 		err = c.emitUnsignedI32TruncFromFloat(true)
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
+		err = c.emitUnsignedI64TruncFromFloat(true)
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint32 {
 		err = c.emitUnsignedI32TruncFromFloat(false)
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint64 {
+		err = c.emitUnsignedI64TruncFromFloat(false)
 	}
 	return
 }
@@ -1962,7 +1970,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfNaN.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfNaN)
 
-	// Next we conver the value as a signed intege.
+	// Next we conver the value as a signed integer.
 	convert := c.newProg()
 	if isFloat32Bit {
 		convert.As = x86.ACVTTSS2SL
@@ -1998,23 +2006,19 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	// Now, start handling the case where the original float value is above or equal math.MaxInt32+1.
 	//
 	// First, we subtract the math.MaxInt32+1 from the original value so it can fit in signed 32-bit integer.
-	subMaxUint32PlusOne := c.newProg()
-	jmpAboveOrEqualMaxIn32PlusOne.To.SetTarget(subMaxUint32PlusOne)
-	subMaxUint32PlusOne.From.Type = obj.TYPE_MEM
+	subMaxInt32PlusOne := c.newProg()
+	jmpAboveOrEqualMaxIn32PlusOne.To.SetTarget(subMaxInt32PlusOne)
+	subMaxInt32PlusOne.From.Type = obj.TYPE_MEM
 	if isFloat32Bit {
-		subMaxUint32PlusOne.As = x86.ASUBSS
-		subMaxUint32PlusOne.From.Offset = int64(float32ForMaximumSigned32bitIntPlusOneAddress)
+		subMaxInt32PlusOne.As = x86.ASUBSS
+		subMaxInt32PlusOne.From.Offset = int64(float32ForMaximumSigned32bitIntPlusOneAddress)
 	} else {
-		subMaxUint32PlusOne.As = x86.ASUBSD
-		subMaxUint32PlusOne.From.Offset = int64(float64ForMaximumSigned32bitIntPlusOneAddress)
+		subMaxInt32PlusOne.As = x86.ASUBSD
+		subMaxInt32PlusOne.From.Offset = int64(float64ForMaximumSigned32bitIntPlusOneAddress)
 	}
-	subMaxUint32PlusOne.To.Type = obj.TYPE_REG
-	subMaxUint32PlusOne.To.Reg = source.register
-	c.addInstruction(subMaxUint32PlusOne)
-
-	// a := c.newProg()
-	// a.As = x86.AUD2
-	// c.addInstruction(a)
+	subMaxInt32PlusOne.To.Type = obj.TYPE_REG
+	subMaxInt32PlusOne.To.Reg = source.register
+	c.addInstruction(subMaxInt32PlusOne)
 
 	// Then, convert the subtracted value as a signed 32-bit integer.
 	convertAfterSub := c.newProg()
@@ -2069,6 +2073,155 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 
 	// We jump to the next instructions for valid cases.
 	c.addSetJmpOrigins(okJmpForLessThanMaxInt32PlusOne, okJmpForAboveOrEqualMaxInt32PlusOne)
+
+	// We consumed the source's register and placed the conversion result
+	// in the result register.
+	c.locationStack.markRegisterUnused(source.register)
+	loc := c.locationStack.pushValueOnRegister(result)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
+	source := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(source); err != nil {
+		return err
+	}
+
+	result, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// First, we check the source float value is above or equal math.MaxInt64+1.
+	cmpWithMaxInt32PlusOne := c.newProg()
+	cmpWithMaxInt32PlusOne.From.Type = obj.TYPE_MEM
+	if isFloat32Bit {
+		cmpWithMaxInt32PlusOne.As = x86.AUCOMISS
+		cmpWithMaxInt32PlusOne.From.Offset = int64(float32ForMaximumSigned64bitIntPlusOneAddress)
+	} else {
+		cmpWithMaxInt32PlusOne.As = x86.AUCOMISD
+		cmpWithMaxInt32PlusOne.From.Offset = int64(float64ForMaximumSigned64bitIntPlusOneAddress)
+	}
+	cmpWithMaxInt32PlusOne.To.Type = obj.TYPE_REG
+	cmpWithMaxInt32PlusOne.To.Reg = source.register
+	c.addInstruction(cmpWithMaxInt32PlusOne)
+
+	// Jump if the source float values is above or equal math.MaxInt64+1.
+	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
+	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
+	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
+
+	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
+	jmpIfNaN := c.newProg()
+	jmpIfNaN.As = x86.AJPS // jump if parity is set.
+	jmpIfNaN.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNaN)
+
+	// Next we conver the value as a signed integer.
+	convert := c.newProg()
+	if isFloat32Bit {
+		convert.As = x86.ACVTTSS2SQ
+	} else {
+		convert.As = x86.ACVTTSD2SQ
+	}
+	convert.From.Type = obj.TYPE_REG
+	convert.From.Reg = source.register
+	convert.To.Type = obj.TYPE_REG
+	convert.To.Reg = result
+	c.addInstruction(convert)
+
+	// Then if the result is minus, it is invalid conversion from minus float (incl. -Inf).
+	testIfMinusOrMinusInf := c.newProg()
+	testIfMinusOrMinusInf.As = x86.ATESTQ
+	testIfMinusOrMinusInf.From.Type = obj.TYPE_REG
+	testIfMinusOrMinusInf.From.Reg = result
+	testIfMinusOrMinusInf.To.Type = obj.TYPE_REG
+	testIfMinusOrMinusInf.To.Reg = result
+	c.addInstruction(testIfMinusOrMinusInf)
+
+	jmpIfMinusOrMinusInf := c.newProg()
+	jmpIfMinusOrMinusInf.As = x86.AJMI
+	jmpIfMinusOrMinusInf.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfMinusOrMinusInf)
+
+	// Otherwise, the valus is valid.
+	okJmpForLessThanMaxInt64PlusOne := c.newProg()
+	okJmpForLessThanMaxInt64PlusOne.As = obj.AJMP
+	okJmpForLessThanMaxInt64PlusOne.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(okJmpForLessThanMaxInt64PlusOne)
+
+	// Now, start handling the case where the original float value is above or equal math.MaxInt64+1.
+	//
+	// First, we subtract the math.MaxInt64+1 from the original value so it can fit in signed 64-bit integer.
+	subMaxInt64PlusOne := c.newProg()
+	jmpAboveOrEqualMaxIn32PlusOne.To.SetTarget(subMaxInt64PlusOne)
+	subMaxInt64PlusOne.From.Type = obj.TYPE_MEM
+	if isFloat32Bit {
+		subMaxInt64PlusOne.As = x86.ASUBSS
+		subMaxInt64PlusOne.From.Offset = int64(float32ForMaximumSigned64bitIntPlusOneAddress)
+	} else {
+		subMaxInt64PlusOne.As = x86.ASUBSD
+		subMaxInt64PlusOne.From.Offset = int64(float64ForMaximumSigned64bitIntPlusOneAddress)
+	}
+	subMaxInt64PlusOne.To.Type = obj.TYPE_REG
+	subMaxInt64PlusOne.To.Reg = source.register
+	c.addInstruction(subMaxInt64PlusOne)
+
+	// Then, convert the subtracted value as a signed 64-bit integer.
+	convertAfterSub := c.newProg()
+	if isFloat32Bit {
+		convertAfterSub.As = x86.ACVTTSS2SQ
+	} else {
+		convertAfterSub.As = x86.ACVTTSD2SQ
+	}
+	convertAfterSub.From.Type = obj.TYPE_REG
+	convertAfterSub.From.Reg = source.register
+	convertAfterSub.To.Type = obj.TYPE_REG
+	convertAfterSub.To.Reg = result
+	c.addInstruction(convertAfterSub)
+
+	// Next, we have to check if the value is from NaN, +Inf.
+	// NaN or +Inf cases result in 0x8000_0000 accorinding to the semantics of conversion,
+	// so, in anycase we just check if the result int value is minus or not.
+	testIfMinus := c.newProg()
+	testIfMinus.As = x86.ATESTQ
+	testIfMinus.From.Type = obj.TYPE_REG
+	testIfMinus.From.Reg = result
+	testIfMinus.To.Type = obj.TYPE_REG
+	testIfMinus.To.Reg = result
+	c.addInstruction(testIfMinus)
+
+	// If the result is minus, the conversion is invalid (from NaN or +Inf)
+	jmpIfNaNOrPlusInf := c.newProg()
+	jmpIfNaNOrPlusInf.As = x86.AJMI
+	jmpIfNaNOrPlusInf.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNaNOrPlusInf)
+
+	// Otherwise, we successfully converted the the source float minus (math.MaxInt64+1) to int.
+	// So, we retrieve the original source float value by adding the sign mask.
+	add := c.newProg()
+	add.As = x86.AADDQ
+	add.From.Type = obj.TYPE_MEM
+	add.From.Offset = int64(float64SignBitMaskAddress)
+	add.To.Type = obj.TYPE_REG
+	add.To.Reg = result
+	c.addInstruction(add)
+
+	okJmpForAboveOrEqualMaxInt64PlusOne := c.newProg()
+	okJmpForAboveOrEqualMaxInt64PlusOne.As = obj.AJMP
+	okJmpForAboveOrEqualMaxInt64PlusOne.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(okJmpForAboveOrEqualMaxInt64PlusOne)
+
+	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
+	// so we must exit from the function with the dedicated status code.
+	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfNaN, jmpIfNaNOrPlusInf)
+	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
+
+	// We jump to the next instructions for valid cases.
+	c.addSetJmpOrigins(okJmpForLessThanMaxInt64PlusOne, okJmpForAboveOrEqualMaxInt64PlusOne)
 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.

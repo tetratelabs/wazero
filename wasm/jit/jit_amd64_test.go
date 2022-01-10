@@ -37,6 +37,9 @@ func stackTopAsUint32(eng *engine) uint32 {
 func stackTopAsInt32(eng *engine) int32 {
 	return int32(eng.stack[eng.stackPointer-1])
 }
+func stackTopAsUint64(eng *engine) uint64 {
+	return uint64(eng.stack[eng.stackPointer-1])
+}
 
 func stackTopAsInt64(eng *engine) int64 {
 	return int64(eng.stack[eng.stackPointer-1])
@@ -3998,7 +4001,6 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
-	fmt.Printf("%f\n", float32(4294967295))
 	for _, tc := range []struct {
 		outputType wazeroir.SignedInt
 		inputType  wazeroir.Float
@@ -4009,8 +4011,8 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 		{outputType: wazeroir.SignedInt64, inputType: wazeroir.Float64},
 		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float32},
 		{outputType: wazeroir.SignedUint32, inputType: wazeroir.Float64},
-		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32},
-		// {outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float32},
+		{outputType: wazeroir.SignedUint64, inputType: wazeroir.Float64},
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%s from %s", tc.outputType, tc.inputType), func(t *testing.T) {
@@ -4032,6 +4034,8 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				// Note that math.MaxInt64 is rounded up to math.MaxInt64+1 in 32/64-bit float representation.
 				// See the output of "fmt.Printf("%f, %f\n", float32(9223372036854775807), float64(9223372036854775807))".
 				math.MaxInt64,
+				// Note that math.MaxUint64 is rounded up to math.MaxUint64+1 in 32/64-bit float representation.
+				// See the output of "fmt.Printf("%f, %f\n", float32(18446744073709551615), float64(18446744073709551615))".
 				math.MaxUint64,
 				math.MaxFloat32,
 				math.SmallestNonzeroFloat32,
@@ -4104,9 +4108,16 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 							require.Equal(t, uint32(math.Trunc(v)), stackTopAsUint32(eng))
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
-						t.Skip()
+						f32 := float32(v)
+						shouldInvalidStatus = math.IsNaN(v) || f32 < 0 || f32 >= math.MaxUint64
+						if !shouldInvalidStatus {
+							require.Equal(t, uint64(math.Trunc(float64(f32))), stackTopAsUint64(eng))
+						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
-						t.Skip()
+						shouldInvalidStatus = math.IsNaN(v) || v < 0 || v >= math.MaxUint64
+						if !shouldInvalidStatus {
+							require.Equal(t, uint64(math.Trunc(v)), stackTopAsUint64(eng))
+						}
 					} else {
 						t.Fatal()
 					}
