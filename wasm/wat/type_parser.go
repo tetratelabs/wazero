@@ -187,9 +187,8 @@ func (p *typeParser) findOrAddType(m *module) (typeIndex uint32) {
 	return
 }
 
-func parseValueType(tokenBytes []byte) (wasm.ValueType, error) {
+func parseValueType(tokenBytes []byte) (vt wasm.ValueType, err error) {
 	t := string(tokenBytes)
-	var vt wasm.ValueType
 	switch t {
 	case "i32":
 		vt = wasm.ValueTypeI32
@@ -200,7 +199,7 @@ func parseValueType(tokenBytes []byte) (wasm.ValueType, error) {
 	case "f64":
 		vt = wasm.ValueTypeF64
 	default:
-		return 0, fmt.Errorf("unknown type: %s", t)
+		err = fmt.Errorf("unknown type: %s", t)
 	}
-	return vt, nil
+	return
 }
