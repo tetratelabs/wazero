@@ -4105,7 +4105,7 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 					err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
 					require.NoError(t, err)
 
-					err = compiler.compiledExtend(&wazeroir.OperationExtend{Signed: signed})
+					err = compiler.compileExtend(&wazeroir.OperationExtend{Signed: signed})
 					require.NoError(t, err)
 
 					// To verify the behavior, we release the value

@@ -2791,11 +2791,11 @@ func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeFloat)
 }
 
-// compiledExtend adds instructions to extend the 32-bit signed or unsigned int on top of the stack
+// compileExtend adds instructions to extend the 32-bit signed or unsigned int on top of the stack
 // as a 64-bit integer of coressponding signedness. For unsigned case, this is just reinterpreting the
 // underlying bit pattern as 64-bit integer. For signed case, this is sign-extension which preserves the
 // original integer's sign.
-func (c *amd64Compiler) compiledExtend(o *wazeroir.OperationExtend) error {
+func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
 		return err

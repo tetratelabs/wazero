@@ -57,7 +57,7 @@ type compiler interface {
 	compileI64ReinterpretFromF64() error
 	compileF32ReinterpretFromI32() error
 	compileF64ReinterpretFromI64() error
-	compiledExtend(o *wazeroir.OperationExtend) error
+	compileExtend(o *wazeroir.OperationExtend) error
 	compileEq(o *wazeroir.OperationEq) error
 	compileNe(o *wazeroir.OperationNe) error
 	compileEqz(o *wazeroir.OperationEqz) error

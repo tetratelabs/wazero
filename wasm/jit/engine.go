@@ -604,7 +604,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationF64ReinterpretFromI64:
 			err = compiler.compileF64ReinterpretFromI64()
 		case *wazeroir.OperationExtend:
-			err = compiler.compiledExtend(o)
+			err = compiler.compileExtend(o)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile operation %s: %w", op.Kind().String(), err)
