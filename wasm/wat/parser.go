@@ -173,7 +173,7 @@ func (p *moduleParser) endField() {
 }
 
 // parseModuleName is the first parser inside the module field. This records the module.name if present and sets the
-// next parser to parseModule. If the token isn't a tokenID, this dispatches to parseModule.
+// next parser to parseModule. If the token isn't a tokenID, this calls parseModule.
 //
 // Ex. A module name is present `(module $math)`
 //                       records $math --^
@@ -289,7 +289,7 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 }
 
 // parseImportFuncName is the first parser inside an imported function field. This records the typeFunc.name if present
-// and sets the next parser to parseImportFunc. If the token isn't a tokenID, this dispatches to parseImportFunc.
+// and sets the next parser to parseImportFunc. If the token isn't a tokenID, this calls parseImportFunc.
 //
 // Ex. A function name is present `(import "Math" "PI" (func $math.pi (result f32))`
 //                                   records $math.pi here --^

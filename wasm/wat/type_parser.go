@@ -48,10 +48,14 @@ type typeParser struct {
 	// state is initially parsingParamOrResult and updated alongside tokenParser
 	state typeParsingState
 
-	// inlinedTypes are a collection of types currently known to be inlined. Ex. (import (func (param i32)))
+	// inlinedTypes are a collection of types currently known to be inlined.
+	// Ex. `(param i32)` in `(import (func (param i32)))`
 	//
-	// Note: The Text Format requires imports first, not types first. This means type resolution has to be resolved
-	// later. The impact of this is types here can be removed if later discovered to be an explicitly defined type.
+	// Note: The Text Format requires imports first, not types first. This resolution has to be done later. The impact
+	// of this is types here can be removed if later discovered to be an explicitly defined type.
+	//
+	// For example, here the `(param i32)` type is initially considered inlined until the module type with the same
+	// signature is read later: (module (import (func (param i32))) (type (func (param i32))))`
 	inlinedTypes []*typeFunc
 
 	// currentTypeIndex is set when there's a "type" field in a type use
