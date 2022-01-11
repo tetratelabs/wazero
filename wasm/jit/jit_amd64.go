@@ -84,17 +84,20 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
 
+	labels := make(map[string]*labelInfo, len(ir.LabelCallers))
+	for key, callers := range ir.LabelCallers {
+		labels[key] = &labelInfo{callers: callers}
+	}
 	return &amd64Compiler{
-		eng: eng, f: f, builder: b, locationStack: newValueLocationStack(), ir: ir,
-		labelInitialInstructions: make(map[string]*obj.Prog),
-		onLabelStartCallbacks:    make(map[string][]func(*obj.Prog)),
+		eng: eng, f: f, builder: b, locationStack: newValueLocationStack(),
+		labels:                labels,
+		onLabelStartCallbacks: make(map[string][]func(*obj.Prog)),
 	}, nil
 }
 
 type amd64Compiler struct {
 	eng *engine
 	f   *wasm.FunctionInstance
-	ir  *wazeroir.CompilationResult
 	// Set a jmp kind instruction where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
 	setJmpOrigins []*obj.Prog
@@ -103,11 +106,16 @@ type amd64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
 	// Label resolvers.
-	onLabelStartCallbacks map[string][]func(*obj.Prog)
-	// Store the initial instructions for each label so
-	// other block can jump into it.
-	labelInitialInstructions                         map[string]*obj.Prog
+	onLabelStartCallbacks                            map[string][]func(*obj.Prog)
+	labels                                           map[string]*labelInfo
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
+}
+
+type labelInfo struct {
+	callers int
+	// The initial instructions for this label so
+	// other block can jump into it.
+	initialInstruction *obj.Prog
 }
 
 func (c *amd64Compiler) emitPreamble() {
@@ -393,7 +401,7 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		c.returnFunction()
 	} else {
 		labelKey := o.Target.String()
-		targetNumCallers := c.ir.LabelCallers[labelKey]
+		targetNumCallers := c.labels[labelKey].callers // Note that .labels map is initialized for all labels in newCompiler.
 		if targetNumCallers > 1 {
 			// If the number of callers to the target label is larget than one,
 			// we have multiple origins to the target branch. In that case,
@@ -496,7 +504,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		elseLabelKey := elseTarget.Target.Label.String()
-		if c.ir.LabelCallers[elseLabelKey] > 1 {
+		if c.labels[elseLabelKey].callers > 1 { // Note that .labels map is initialized for all labels in newCompiler.
 			c.preJumpRegisterAdjustment()
 		}
 		elseJmp := c.newProg()
@@ -520,7 +528,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		thenLabelKey := thenTarget.Target.Label.String()
-		if c.ir.LabelCallers[thenLabelKey] > 1 {
+		if c.labels[thenLabelKey].callers > 1 { // Note that .labels map is initialized for all labels in newCompiler.
 			c.preJumpRegisterAdjustment()
 		}
 		thenJmp := c.newProg()
@@ -543,9 +551,9 @@ func (c *amd64Compiler) preJumpRegisterAdjustment() {
 }
 
 func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
-	jmpTarget, ok := c.labelInitialInstructions[labelKey]
-	if ok {
-		jmpInstruction.To.SetTarget(jmpTarget)
+	jmpTarget := c.labels[labelKey] // Note that .labels map is initialized for all labels in newCompiler.
+	if jmpTarget.initialInstruction != nil {
+		jmpInstruction.To.SetTarget(jmpTarget.initialInstruction)
 	} else {
 		c.onLabelStartCallbacks[labelKey] = append(c.onLabelStartCallbacks[labelKey], func(jmpTarget *obj.Prog) {
 			jmpInstruction.To.SetTarget(jmpTarget)
@@ -563,7 +571,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	c.addInstruction(labelBegin)
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
-	c.labelInitialInstructions[labelKey] = labelBegin
+	c.labels[labelKey].initialInstruction = labelBegin // Note that .labels map is initialized for all labels in newCompiler.
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
 	for _, cb := range c.onLabelStartCallbacks[labelKey] {
