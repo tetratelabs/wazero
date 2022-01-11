@@ -3171,24 +3171,6 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 }
 
 func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
-	base := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
-		return err
-	}
-
-	// At this point, base's value is on the integer general purpose reg.
-	// We reuse the register below, so we alias it here for readability.
-	reg := base.register
-
-	// Then we have to calculate the offset on the memory region.
-	addOffsetToBase := c.newProg()
-	addOffsetToBase.As = x86.AADDL // 32-bit!
-	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = reg
-	addOffsetToBase.From.Type = obj.TYPE_CONST
-	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
-	c.addInstruction(addOffsetToBase)
-
 	var (
 		isIntType        bool
 		movInst          obj.As
@@ -3213,8 +3195,9 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		targetSizeInByte = 64 / 8
 	}
 
-	if err := c.emitMemoryBoundaryCheck(reg, targetSizeInByte); err != nil {
-		return nil
+	reg, err := c.setupMemoryOffset(o.Arg.Offest, targetSizeInByte)
+	if err != nil {
+		return err
 	}
 
 	if isIntType {
@@ -3255,26 +3238,9 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 }
 
 func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
-	base := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
+	reg, err := c.setupMemoryOffset(o.Arg.Offest, 1)
+	if err != nil {
 		return err
-	}
-
-	// At this point, base's value is on the integer general purpose reg.
-	// We reuse the register below, so we alias it here for readability.
-	reg := base.register
-
-	// We have to calculate the offset on the memory region.
-	addOffsetToBase := c.newProg()
-	addOffsetToBase.As = x86.AADDL // 32-bit!
-	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = reg
-	addOffsetToBase.From.Type = obj.TYPE_CONST
-	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
-	c.addInstruction(addOffsetToBase)
-
-	if err := c.emitMemoryBoundaryCheck(reg, 1); err != nil {
-		return nil
 	}
 
 	// Then move a byte at the offset to the register.
@@ -3305,26 +3271,9 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 }
 
 func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
-	base := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
+	reg, err := c.setupMemoryOffset(o.Arg.Offest, 16/8)
+	if err != nil {
 		return err
-	}
-
-	// At this point, base's value is on the integer general purpose reg.
-	// We reuse the register below, so we alias it here for readability.
-	reg := base.register
-
-	// We have to calculate the offset on the memory region.
-	addOffsetToBase := c.newProg()
-	addOffsetToBase.As = x86.AADDL // 32-bit!
-	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = reg
-	addOffsetToBase.From.Type = obj.TYPE_CONST
-	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
-	c.addInstruction(addOffsetToBase)
-
-	if err := c.emitMemoryBoundaryCheck(reg, 16/8); err != nil {
-		return nil
 	}
 
 	// Then move 2 bytes at the offset to the register.
@@ -3355,26 +3304,9 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 }
 
 func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
-	base := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
+	reg, err := c.setupMemoryOffset(o.Arg.Offest, 32/8)
+	if err != nil {
 		return err
-	}
-
-	// At this point, base's value is on the integer general purpose reg.
-	// We reuse the register below, so we alias it here for readability.
-	reg := base.register
-
-	// We have to calculate the offset on the memory region.
-	addOffsetToBase := c.newProg()
-	addOffsetToBase.As = x86.AADDL // 32-bit!
-	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = reg
-	addOffsetToBase.From.Type = obj.TYPE_CONST
-	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
-	c.addInstruction(addOffsetToBase)
-
-	if err := c.emitMemoryBoundaryCheck(reg, 32/8); err != nil {
-		return nil
 	}
 
 	// Then move 4 bytes at the offset to the register.
@@ -3398,18 +3330,39 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	return nil
 }
 
-func (c *amd64Compiler) emitMemoryBoundaryCheck(offsetRegister int16, targetSizeInByte int64) error {
+func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (offsetRegister int16, err error) {
+	base := c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(base); err != nil {
+		return 0, err
+	}
+
+	// We have to calculate the offset on the memory region.
+	addOffsetToBase := c.newProg()
+	addOffsetToBase.As = x86.AADDL // 32-bit!
+	addOffsetToBase.To.Type = obj.TYPE_REG
+	addOffsetToBase.To.Reg = base.register
+	addOffsetToBase.From.Type = obj.TYPE_CONST
+	addOffsetToBase.From.Offset = int64(offsetArg)
+	c.addInstruction(addOffsetToBase)
+
+	// Check if the base+offset overflows, and if so, we exit with the out of boundary status.
+	overflowJmp := c.newProg()
+	overflowJmp.As = x86.AJCS
+	overflowJmp.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(overflowJmp)
+
+	// Otherwise, we calculate base+offset+boundary and check if it is within memory boundary.
 	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	copyOffset := c.newProg()
-	copyOffset.As = x86.AMOVQ
+	copyOffset.As = x86.AMOVLQZX // Zero extend
 	copyOffset.To.Type = obj.TYPE_REG
 	copyOffset.To.Reg = tmpReg
 	copyOffset.From.Type = obj.TYPE_REG
-	copyOffset.From.Reg = offsetRegister
+	copyOffset.From.Reg = base.register
 	c.addInstruction(copyOffset)
 
 	addTargetSize := c.newProg()
@@ -3435,11 +3388,12 @@ func (c *amd64Compiler) emitMemoryBoundaryCheck(offsetRegister int16, targetSize
 	c.addInstruction(okJmp)
 
 	// Otherwise, we exit the function with out of bounds status code.
+	c.addSetJmpOrigins(overflowJmp)
 	c.setJITStatus(jitCallStatusCodeInvalidMemoryOutOfBounds)
 	c.returnFunction()
 
 	c.addSetJmpOrigins(okJmp)
-	return nil
+	return base.register, nil
 }
 
 func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
@@ -3474,21 +3428,8 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 		return err
 	}
 
-	base := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
-		return err
-	}
-
-	// Then we have to calculate the offset on the memory region.
-	addOffsetToBase := c.newProg()
-	addOffsetToBase.As = x86.AADDL // 32-bit!
-	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = base.register
-	addOffsetToBase.From.Type = obj.TYPE_CONST
-	addOffsetToBase.From.Offset = int64(offsetConst)
-	c.addInstruction(addOffsetToBase)
-
-	if err := c.emitMemoryBoundaryCheck(base.register, targetSizeInByte); err != nil {
+	reg, err := c.setupMemoryOffset(offsetConst, targetSizeInByte)
+	if err != nil {
 		return nil
 	}
 
@@ -3498,13 +3439,13 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 	moveToMemory.From.Reg = val.register
 	moveToMemory.To.Type = obj.TYPE_MEM
 	moveToMemory.To.Reg = reservedRegisterForMemory
-	moveToMemory.To.Index = base.register
+	moveToMemory.To.Index = reg
 	moveToMemory.To.Scale = 1
 	c.addInstruction(moveToMemory)
 
 	// We no longer need both the value and base registers.
 	c.locationStack.releaseRegister(val)
-	c.locationStack.releaseRegister(base)
+	c.locationStack.markRegisterUnused(reg)
 	return nil
 }
 

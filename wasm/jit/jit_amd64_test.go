@@ -4809,61 +4809,58 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	})
 }
 
-func TestAmd64Compiler_emitMemoryBoundaryCheck(t *testing.T) {
-	for _, tc := range []struct {
-		offset           uint32
-		targetSizeInByte int64
-	}{
-		{offset: 0, targetSizeInByte: 32},
-		{offset: 500, targetSizeInByte: 32},
-		{offset: 500, targetSizeInByte: 32},
-		// 8-bit read/load.
-		{offset: 1024 - 1, targetSizeInByte: 0},
-		{offset: 1024 - 1, targetSizeInByte: 1},
-		// 16-bit read/load.
-		{offset: 1024 - 2, targetSizeInByte: 2},
-		{offset: 1024 - 2, targetSizeInByte: 3},
-		// 32-bit read/load.
-		{offset: 1024 - 4, targetSizeInByte: 4},
-		{offset: 1024 - 4, targetSizeInByte: 5},
-		// 64-bit read/load.
-		{offset: 1024 - 8, targetSizeInByte: 8},
-		{offset: 1024 - 8, targetSizeInByte: 9},
-	} {
-		tc := tc
-		t.Run(fmt.Sprintf("offset=%d,targetSize=%d", tc.offset, tc.targetSizeInByte), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
+	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
+	offsets := []uint32{0,
+		1 << 10, 1 << 31,
+		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4, math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9,
+		math.MaxInt32, math.MaxUint32,
+	}
+	targetSizeInBytes := []int64{1, 2, 4, 8}
+	for _, base := range bases {
+		base := base
+		for _, offset := range offsets {
+			offset := offset
+			for _, targetSizeInByte := range targetSizeInBytes {
+				targetSizeInByte := targetSizeInByte
+				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
+					compiler := requireNewCompiler(t)
+					compiler.initializeReservedRegisters()
 
-			err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.offset})
-			require.NoError(t, err)
+					err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
+					require.NoError(t, err)
 
-			offsetLocation := compiler.locationStack.peek()
+					reg, err := compiler.setupMemoryOffset(offset, targetSizeInByte)
+					require.NoError(t, err)
 
-			err = compiler.emitMemoryBoundaryCheck(offsetLocation.register, tc.targetSizeInByte)
-			require.NoError(t, err)
+					compiler.locationStack.pushValueOnRegister(reg)
 
-			// Generate the code under test.
-			compiler.returnFunction()
-			code, _, err := compiler.generate()
-			require.NoError(t, err)
+					// Generate the code under test.
+					compiler.releaseAllRegistersToStack()
+					compiler.returnFunction()
+					code, _, err := compiler.generate()
+					// fmt.Println(hex.EncodeToString(code))
+					require.NoError(t, err)
 
-			// Set up and run.
-			mem := newMemoryInst()
-			eng := newEngine()
-			eng.memroySliceLen = len(mem.Buffer)
-			jitcall(
-				uintptr(unsafe.Pointer(&code[0])),
-				uintptr(unsafe.Pointer(eng)),
-				uintptr(unsafe.Pointer(&mem.Buffer[0])),
-			)
+					// Set up and run.
+					mem := newMemoryInst()
+					eng := newEngine()
+					eng.memroySliceLen = len(mem.Buffer)
+					jitcall(
+						uintptr(unsafe.Pointer(&code[0])),
+						uintptr(unsafe.Pointer(eng)),
+						uintptr(unsafe.Pointer(&mem.Buffer[0])),
+					)
 
-			if len(mem.Buffer) < int(tc.offset)+int(tc.targetSizeInByte) {
-				require.Equal(t, jitCallStatusCodeInvalidMemoryOutOfBounds, eng.jitCallStatusCode)
-			} else {
-				require.Equal(t, jitCallStatusCodeReturned, eng.jitCallStatusCode)
+					baseOffset := int(base) + int(offset)
+					if baseOffset >= math.MaxUint32 || len(mem.Buffer) < baseOffset+int(targetSizeInByte) {
+						require.Equal(t, jitCallStatusCodeInvalidMemoryOutOfBounds, eng.jitCallStatusCode)
+					} else {
+						require.Equal(t, jitCallStatusCodeReturned, eng.jitCallStatusCode)
+					}
+				})
 			}
-		})
+		}
 	}
 }
 
@@ -5012,6 +5009,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
+			eng.memroySliceLen = len(mem.Buffer)
 			// For testing, arbitrary byte is be fine.
 			original := byte(0x10)
 			mem.Buffer[baseOffset+o.Arg.Offest] = byte(original)
@@ -5076,6 +5074,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
+			eng.memroySliceLen = len(mem.Buffer)
 			// For testing, arbitrary uint16 is be fine.
 			original := uint16(0xff_fe)
 			binary.LittleEndian.PutUint16(mem.Buffer[baseOffset+o.Arg.Offest:], original)
@@ -5132,6 +5131,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 
 	// Place the load target value to the memory.
 	mem := newMemoryInst()
+	eng.memroySliceLen = len(mem.Buffer)
 	// For testing, arbitrary uint32 is be fine.
 	original := uint32(0xff_ff_fe)
 	binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], original)

@@ -69,17 +69,17 @@ const (
 )
 
 func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	prevFrame := e.callFrameStack
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
 		if v := recover(); v != nil {
+			// debug.PrintStack()
 			top := e.callFrameStack
 			var frames []string
 			var counter int
-			for top != prevFrame {
+			for top != nil {
 				frames = append(frames, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
 				top = top.caller
 				counter++
