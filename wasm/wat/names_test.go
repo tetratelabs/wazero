@@ -33,14 +33,13 @@ func TestEncodeNameSection(t *testing.T) {
 func TestEncodeNameSection_OnlyFuncName(t *testing.T) {
 	func0, func1 := "runtime.args_sizes_get", "runtime.fd_write" // note: no leading '$'
 	i32 := wasm.ValueTypeI32
+	type1 := &typeFunc{params: []wasm.ValueType{i32, i32}, result: i32}
+	type2 := &typeFunc{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32}
 	m := &module{
-		types: []*typeFunc{
-			{params: []wasm.ValueType{i32, i32}, result: i32},
-			{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
-		},
+		typeFuncs: []*typeFunc{type1, type2},
 		importFuncs: []*importFunc{
-			{importIndex: 0, typeIndex: 0, module: "wasi_snapshot_preview1", name: "args_sizes_get", funcName: "$" + func0},
-			{importIndex: 1, typeIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$" + func1},
+			{importIndex: 0, typeIndex: []byte{'0'}, module: "wasi_snapshot_preview1", name: "args_sizes_get", funcName: "$" + func0},
+			{importIndex: 1, typeIndex: []byte{'1'}, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$" + func1},
 		},
 	}
 

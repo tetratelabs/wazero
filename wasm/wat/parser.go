@@ -52,7 +52,7 @@ type moduleParser struct {
 	// Ex. for fieldModuleImport, this would be PI if (import "Math" "PI" ...)
 	currentValue1 []byte
 
-	// currentImportIndex allows us to track the relative position of imports regardless of position in the source.
+	// currentImportIndex allows us to track the relative position of module.importFuncs regardless of position in the source.
 	currentImportIndex uint32
 
 	typeParser *typeParser
@@ -83,6 +83,12 @@ func parseModule(source []byte) (*module, error) {
 	if err != nil {
 		return nil, &FormatError{line, col, p.errorContext(), err}
 	}
+
+	// TODO: inlined types can contain "verification types" basically where typeIndex != nil if there is a type we need
+	// to verify it matches the corresponding index exactly.
+
+	// Add any types implicitly defined from type use. Ex. (module (import (func (param i32)...
+	p.module.typeFuncs = append(p.module.typeFuncs, p.typeParser.inlinedTypes...)
 	return p.module, nil
 }
 
@@ -121,7 +127,7 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 		// TODO: "types"
 		case "import":
 			p.currentField = fieldModuleImport
-			p.tokenParser = p.parseImport
+			p.tokenParser = p.parseImportModule
 		case "start":
 			if p.module.startFunction != nil {
 				return errors.New("redundant start")
@@ -166,6 +172,14 @@ func (p *moduleParser) endField() {
 	}
 }
 
+// parseModuleName is the first parser inside the module field. This records the module.name if present and sets the
+// next parser to parseModule. If the token isn't a tokenID, this calls parseModule.
+//
+// Ex. A module name is present `(module $math)`
+//                       records $math --^
+//
+// Ex. No module name `(module)`
+//   calls parseModule here --^
 func (p *moduleParser) parseModuleName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $Math
 		name := string(tokenBytes)
@@ -191,35 +205,74 @@ func (p *moduleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ uint32
 	return nil
 }
 
+// parseImportModule is the first parser inside the import field. This records the importFunc.module, then sets the next
+// parser to parseImportName. Since the imported module name is required, this errs on anything besides tokenString.
+//
+// Ex. Imported module name is present `(import "Math" "PI" (func (result f32)))`
+//                                records Math --^     ^
+//                      parseImportName resumes here --+
+//
+// Ex. Imported module name is absent `(import (func (result f32)))`
+//                                 errs here --^
+func (p *moduleParser) parseImportModule(tok tokenType, tokenBytes []byte, _, _ uint32) error {
+	switch tok {
+	case tokenString: // Ex. "" or "Math"
+		p.currentValue0 = tokenBytes[1 : len(tokenBytes)-1] // unquote
+		p.tokenParser = p.parseImportName
+		return nil
+	case tokenLParen, tokenRParen:
+		return errors.New("missing module and name")
+	default:
+		return unexpectedToken(tok, tokenBytes)
+	}
+}
+
+// parseImportName is the second parser inside the import field. This records the importFunc.name, then sets the next
+// parser to parseImport. Since the imported function name is required, this errs on anything besides tokenString.
+//
+// Ex. Imported function name is present `(import "Math" "PI" (func (result f32)))`
+//                                         starts here --^    ^
+//                                           records PI --^   |
+//                                 parseImport resumes here --+
+//
+// Ex. Imported function name is absent `(import "Math" (func (result f32)))`
+//                                          errs here --+
+func (p *moduleParser) parseImportName(tok tokenType, tokenBytes []byte, _, _ uint32) error {
+	switch tok {
+	case tokenString: // Ex. "" or "PI"
+		p.currentValue1 = tokenBytes[1 : len(tokenBytes)-1] // unquote
+		p.tokenParser = p.parseImport
+		return nil
+	case tokenLParen, tokenRParen:
+		return errors.New("missing name")
+	default:
+		return unexpectedToken(tok, tokenBytes)
+	}
+}
+
+// parseImport is the last parser inside the import field. This records the description field, ex. (func) or errs if
+// missing. When complete, this sets the next parser to parseModule.
+//
+// Ex. Description is present `(module (import "Math" "PI" (func (result f32))))`
+//                                           starts here --^                   ^
+//                                                  parseModule resumes here --+
+//
+// Ex. Description is missing `(import "Math" "PI")`
+//                                    errs here --^
 func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
-	case tokenString:
-		// Note: tokenString is minimum length two on account of quotes. Ex. "" or "foo"
-		name := tokenBytes[1 : len(tokenBytes)-1] // unquote
-		if p.currentValue0 == nil {               // Ex. (module ""
-			p.currentValue0 = name
-		} else if p.currentValue1 == nil { // Ex. (module "" ""
-			p.currentValue1 = name
-		} else { // Ex. (module "" "" ""
-			return fmt.Errorf("redundant name: %s", name)
-		}
+	case tokenString: // Ex. (import "Math" "PI" "PI"
+		return fmt.Errorf("redundant name: %s", tokenBytes[1:len(tokenBytes)-1]) // unquote
 	case tokenLParen: // start fields, ex. (func
 		// Err if there's a second description. Ex. (import "" "" (func) (func))
 		if uint32(len(p.module.importFuncs)) > p.currentImportIndex {
 			return unexpectedToken(tok, tokenBytes)
-		}
-		// Err if there are not enough names when we reach a description. Ex. (import func())
-		if err := p.validateImportModuleAndName(); err != nil {
-			return err
 		}
 		p.tokenParser = p.beginField
 		return nil
 	case tokenRParen: // end of this import
 		// Err if we never reached a description...
 		if uint32(len(p.module.importFuncs)) == p.currentImportIndex {
-			if err := p.validateImportModuleAndName(); err != nil {
-				return err // Ex. missing (func) and names: (import) or (import "Math")
-			}
 			return errors.New("missing description field") // Ex. missing (func): (import "Math" "Pi")
 		}
 
@@ -235,16 +288,15 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 	return nil
 }
 
-// validateImportModuleAndName ensures we read both the module and name in the text format, even if they were empty.
-func (p *moduleParser) validateImportModuleAndName() error {
-	if p.currentValue0 == nil && p.currentValue1 == nil {
-		return errors.New("missing module and name")
-	} else if p.currentValue1 == nil {
-		return errors.New("missing name")
-	}
-	return nil
-}
-
+// parseImportFuncName is the first parser inside an imported function field. This records the typeFunc.name if present
+// and sets the next parser to parseImportFunc. If the token isn't a tokenID, this calls parseImportFunc.
+//
+// Ex. A function name is present `(import "Math" "PI" (func $math.pi (result f32))`
+//                                   records $math.pi here --^
+//                                     parseImportFunc resumes here --^
+//
+// Ex. No function name `(import "Math" "PI" (func (result f32))`
+//                    calls parseImportFunc here --^
 func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
 		name := string(tokenBytes)
@@ -256,33 +308,37 @@ func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, lin
 	return p.parseImportFunc(tok, tokenBytes, line, col)
 }
 
+// parseImportFunc is the second parser inside the imported function field. This passes control to the typeParser until
+// any signature is read, then sets the next parser to parseImportFuncAfterType.
+//
+// Ex. `(import "Math" "PI" (func $math.pi (result f32)))`
+//                           starts here --^           ^
+//             parseImportFuncAfterType resumes here --+
+//
+// Ex. If there is no signature `(import "" "main" (func))`
+//               calls parseImportFuncAfterType here ---^
 func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	switch tok {
 	case tokenID: // Ex. (func $main $main)
-		return fmt.Errorf("redundant name: %s", string(tokenBytes))
+		return fmt.Errorf("redundant name: %s", tokenBytes)
 	case tokenLParen: // start fields, ex. (param or (result
-		p.typeParser.beginParsingParamsOrResult(p.parseImportFuncAfterType)
+		p.typeParser.beginParsingTypeUse(p.parseImportFuncAfterType)
 		return nil
 	}
 	return p.parseImportFuncAfterType(tok, tokenBytes, line, col)
 }
 
-// parseImportFuncAfterType handles tokens after any type signature was read. The only valid token is tokenRParen
-// because no fields are defined except those in the function type.
-func (p *moduleParser) parseImportFuncAfterType(tok tokenType, tokenBytes []byte, line, col uint32) error {
+// parseImportFuncAfterType is the last parser inside the imported function field. This records the importFunc.typeIndex
+// and/or importFunc.typeInlined and sets the next parser to parseImport.
+func (p *moduleParser) parseImportFuncAfterType(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		p.endImportFunc()
+		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
+		fn.typeIndex, fn.typeInlined = p.typeParser.getTypeUse()
+		p.currentField = fieldModuleImport
+		p.tokenParser = p.parseImport
 		return nil
 	}
 	return unexpectedToken(tok, tokenBytes)
-}
-
-// endImportFunc adds the module.types index for this function regardless of whether one was defined inline or not
-func (p *moduleParser) endImportFunc() {
-	fn := p.module.importFuncs[len(p.module.importFuncs)-1]
-	fn.typeIndex = p.typeParser.findOrAddType(p.module)
-	p.currentField = fieldModuleImport
-	p.tokenParser = p.parseImport
 }
 
 func (p *moduleParser) parseStart(tok tokenType, tokenBytes []byte, line, col uint32) error {
@@ -320,12 +376,12 @@ func (p *moduleParser) errorContext() string {
 		return ""
 	case fieldModule:
 		return "module"
-	case fieldModuleStart:
-		return "module.start"
 	case fieldModuleImport:
 		return fmt.Sprintf("module.import[%d]", p.currentImportIndex)
 	case fieldModuleImportFunc: // TODO: table, memory or global
 		return fmt.Sprintf("module.import[%d].func%s", p.currentImportIndex, p.typeParser.errorContext())
+	case fieldModuleStart:
+		return "module.start"
 	default: // currentField is an enum, we expect to have handled all cases above. panic if we didn't
 		panic(fmt.Errorf("BUG: unhandled parsing state: %v", p.currentField))
 	}

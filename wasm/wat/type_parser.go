@@ -12,26 +12,29 @@ import (
 type typeParsingState byte
 
 const (
-	parsingParamOrResult typeParsingState = iota
+	parsingTypeUse typeParsingState = iota
+	parsingParamOrResult
 	parsingParam
 	parsingResult
 	parsingComplete
 )
 
-// typeParser parses an inlined type from a field such as "type" or "func". Unlike normal parsers, this is not used for
-// an entire field (enclosed by parens). Rather, this only handles "param" and "result" inner fields in the correct
-// order.
+// typeParser parses an inlined type from a field such as "type" or "func" and dispatches to onTypeEnd.
 //
-// Ex. `(module (import (func $main (param i32))))`
-//   This parses after the name     ^---------^
+// Ex. `(import "Math" "PI" (func $math.pi (result f32))`
+//                           starts here --^           ^
+//                            onTypeEnd resumes here --+
 //
-// Ex. `(module (type (param i32) (result i64)))`
-//   This parses here ^----------------------^
+// Ex. `(type (func (param i32) (result i64)))`
+//    starts here --^                       ^
+//                 onTypeEnd resumes here --+
 //
-// Ex. `(module (import (func)))`
-//   This parses nothing (because there is no type)
+// Ex. `(module (import "" "" (func $main)))`
+//                calls onTypeEnd here --^
 //
-// typeParser is reusable. The caller resets when reaching the appropriate tokenRParen via beginParsingParamsOrResult.
+// Note: Unlike normal parsers, this is not used for an entire field (enclosed by parens). Rather, this only handles
+// "param" and "result" inner fields in the correct order.
+// Note: typeParser is reusable. The caller resets when reaching the appropriate tokenRParen via beginParsingTypeUse.
 type typeParser struct {
 	// m is used as a function pointer to moduleParser.tokenParser. This updates based on state changes.
 	m *moduleParser
@@ -44,6 +47,20 @@ type typeParser struct {
 
 	// state is initially parsingParamOrResult and updated alongside tokenParser
 	state typeParsingState
+
+	// inlinedTypes are a collection of types currently known to be inlined.
+	// Ex. `(param i32)` in `(import (func (param i32)))`
+	//
+	// Note: The Text Format requires imports first, not types first. This resolution has to be done later. The impact
+	// of this is types here can be removed if later discovered to be an explicitly defined type.
+	//
+	// For example, here the `(param i32)` type is initially considered inlined until the module type with the same
+	// signature is read later: (module (import (func (param i32))) (type (func (param i32))))`
+	inlinedTypes []*typeFunc
+
+	// currentTypeIndex is set when there's a "type" field in a type use
+	// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
+	currentTypeIndex []byte
 
 	// currentParams allow us to accumulate typeFunc.params across multiple fields, as well support abbreviated
 	// anonymous parameters. ex. both (param i32) (param i32) and (param i32 i32) formats.
@@ -61,19 +78,19 @@ type typeParser struct {
 	currentResult wasm.ValueType
 }
 
-// beginParsingParamsOrResult sets moduleParser.tokenParser to beginParamOrResult after resetting internal fields.
+// beginParsingTypeUse sets moduleParser.tokenParser to parsingTypeUse after resetting internal fields.
 // This should only be called when reaching the first tokenLParen after the optional field name (tokenID).
 //
 // Ex. Given the source `(module (import (func $main (param i32))))`
-//         Set this result to the next parser here --^
-//             This result restores control to onTypeEnd here --^
+//                  beginParamOrResult starts here --^          ^
+//                                     onTypeEnd resumes here --+
 //
 // The onTypeEnd parameter is invoked once any "param" and "result" fields have been consumed.
 //
 // NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (import (func)))`
-func (p *typeParser) beginParsingParamsOrResult(onTypeEnd tokenParser) {
+func (p *typeParser) beginParsingTypeUse(onTypeEnd tokenParser) {
 	p.onTypeEnd = onTypeEnd
-	p.state = parsingParamOrResult
+	p.state = parsingTypeUse
 	p.m.tokenParser = p.beginParamOrResult
 	p.currentParams = nil
 	p.currentParamIndex = 0
@@ -172,19 +189,32 @@ func (p *typeParser) errorContext() string {
 	return ""
 }
 
-// findOrAddType returns the index in module.types of a possibly empty type matching any current params or result.
-func (p *typeParser) findOrAddType(m *module) (typeIndex uint32) {
-	// search for an existing signature that matches the current type
-	for i, t := range m.types {
-		if bytes.Equal(p.currentParams, t.params) && p.currentResult == t.result {
-			return uint32(i)
+var typeFuncEmpty = &typeFunc{}
+
+// getTypeUse finalizes any current params or result and returns the current typeIndex and/or type
+func (p *typeParser) getTypeUse() (typeIndex []byte, sig *typeFunc) {
+	typeIndex = p.currentTypeIndex
+
+	// Search for an existing signature that matches the current type in the pending inlined types
+	for _, t := range p.inlinedTypes {
+		if p.currentEqualsType(t) {
+			sig = t
+			return
 		}
 	}
 
-	// if we didn't find a match, we need to insert a new type and use it
-	typeIndex = uint32(len(m.types))
-	m.types = append(m.types, &typeFunc{p.currentParams, p.currentResult})
+	sig = &typeFunc{"", p.currentParams, p.currentResult}
+
+	// If we didn't find a match, we need to insert an inlined type to use it. We don't do this when there is a type
+	// index because in this case, the signature is only used for verification on an existing type.
+	if typeIndex == nil {
+		p.inlinedTypes = append(p.inlinedTypes, sig)
+	}
 	return
+}
+
+func (p *typeParser) currentEqualsType(t *typeFunc) bool {
+	return bytes.Equal(p.currentParams, t.params) && p.currentResult == t.result
 }
 
 func parseValueType(tokenBytes []byte) (wasm.ValueType, error) {
