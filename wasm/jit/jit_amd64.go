@@ -96,13 +96,13 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 }
 
 type amd64Compiler struct {
-	eng *engine
-	f   *wasm.FunctionInstance
-	// Set a jmp kind instruction where you want to set the next coming
+	builder *asm.Builder
+	eng     *engine
+	f       *wasm.FunctionInstance
+	// Set jmp kind instructions where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
 	setJmpOrigins []*obj.Prog
-	builder       *asm.Builder
-	// location stack holds the state of wazeroir virtual stack.
+	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
 	// Label resolvers.
@@ -3189,26 +3189,32 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
 	c.addInstruction(addOffsetToBase)
 
-	// TODO: Emit instructions here to check memory out of bounds as
-	// potentially it would be an security risk.
-
 	var (
-		isIntType bool
-		movInst   obj.As
+		isIntType        bool
+		movInst          obj.As
+		targetSizeInByte int64
 	)
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		isIntType = true
 		movInst = x86.AMOVL
+		targetSizeInByte = 32 / 8
 	case wazeroir.UnsignedTypeI64:
 		isIntType = true
 		movInst = x86.AMOVQ
+		targetSizeInByte = 64 / 8
 	case wazeroir.UnsignedTypeF32:
 		isIntType = false
 		movInst = x86.AMOVL
+		targetSizeInByte = 32 / 8
 	case wazeroir.UnsignedTypeF64:
 		isIntType = false
 		movInst = x86.AMOVQ
+		targetSizeInByte = 64 / 8
+	}
+
+	if err := c.emitMemoryBoundaryCheck(reg, targetSizeInByte); err != nil {
+		return nil
 	}
 
 	if isIntType {
@@ -3267,10 +3273,23 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
 	c.addInstruction(addOffsetToBase)
 
+	if err := c.emitMemoryBoundaryCheck(reg, 8/8); err != nil {
+		return nil
+	}
+
 	// Then move a byte at the offset to the register.
 	// Note that Load8 is only for integer types.
 	moveFromMemory := c.newProg()
-	moveFromMemory.As = x86.AMOVB
+	switch o.Type {
+	case wazeroir.SignedInt32:
+		moveFromMemory.As = x86.AMOVBLSX
+	case wazeroir.SignedUint32:
+		moveFromMemory.As = x86.AMOVBLZX
+	case wazeroir.SignedInt64:
+		moveFromMemory.As = x86.AMOVBQSX
+	case wazeroir.SignedUint64:
+		moveFromMemory.As = x86.AMOVBQZX
+	}
 	moveFromMemory.To.Type = obj.TYPE_REG
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
@@ -3303,6 +3322,10 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	addOffsetToBase.From.Type = obj.TYPE_CONST
 	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
 	c.addInstruction(addOffsetToBase)
+
+	if err := c.emitMemoryBoundaryCheck(reg, 16/8); err != nil {
+		return nil
+	}
 
 	// Then move 2 bytes at the offset to the register.
 	// Note that Load16 is only for integer types.
@@ -3341,6 +3364,10 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
 	c.addInstruction(addOffsetToBase)
 
+	if err := c.emitMemoryBoundaryCheck(reg, 32/8); err != nil {
+		return nil
+	}
+
 	// Then move 4 bytes at the offset to the register.
 	moveFromMemory := c.newProg()
 	moveFromMemory.As = x86.AMOVL
@@ -3358,30 +3385,81 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	return nil
 }
 
+func (c *amd64Compiler) emitMemoryBoundaryCheck(offsetRegister int16, targetSizeInByte int64) error {
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	copyOffset := c.newProg()
+	copyOffset.As = x86.AMOVL
+	copyOffset.To.Type = obj.TYPE_REG
+	copyOffset.To.Reg = tmpReg
+	copyOffset.From.Type = obj.TYPE_REG
+	copyOffset.From.Reg = offsetRegister
+	c.addInstruction(copyOffset)
+
+	addTargetSize := c.newProg()
+	addTargetSize.As = x86.AADDL
+	addTargetSize.To.Type = obj.TYPE_REG
+	addTargetSize.To.Reg = tmpReg
+	addTargetSize.From.Type = obj.TYPE_CONST
+	addTargetSize.From.Offset = targetSizeInByte
+	c.addInstruction(addTargetSize)
+
+	cmp := c.newProg()
+	cmp.As = x86.ACMPQ
+	cmp.To.Type = obj.TYPE_REG
+	cmp.To.Reg = tmpReg
+	cmp.From.Type = obj.TYPE_MEM
+	cmp.From.Reg = reservedRegisterForEngine
+	cmp.From.Offset = engineMemroySliceLenOffset
+	c.addInstruction(cmp)
+
+	okJmp := c.newProg()
+	okJmp.As = x86.AJHI
+	okJmp.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(okJmp)
+
+	// a := c.newProg()
+	// a.As = x86.AUD2
+	// c.addInstruction(a)
+
+	// Otherwise, we exit the function with out of bounds status code.
+	c.setJITStatus(jitCallStatusCodeInvalidMemoryOutOfBounds)
+	c.returnFunction()
+
+	c.addSetJmpOrigins(okJmp)
+	return nil
+}
+
 func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
 	var movInst obj.As
+	var targetSizeInByte int64
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 		movInst = x86.AMOVL
+		targetSizeInByte = 32 / 8
 	case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
 		movInst = x86.AMOVQ
+		targetSizeInByte = 64 / 8
 	}
-	return c.moveToMemory(o.Arg.Offest, movInst)
+	return c.moveToMemory(o.Arg.Offest, movInst, targetSizeInByte)
 }
 
 func (c *amd64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
-	return c.moveToMemory(o.Arg.Offest, x86.AMOVB)
+	return c.moveToMemory(o.Arg.Offest, x86.AMOVB, 8/8)
 }
 
 func (c *amd64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
-	return c.moveToMemory(o.Arg.Offest, x86.AMOVW)
+	return c.moveToMemory(o.Arg.Offest, x86.AMOVW, 16/8)
 }
 
 func (c *amd64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
-	return c.moveToMemory(o.Arg.Offest, x86.AMOVL)
+	return c.moveToMemory(o.Arg.Offest, x86.AMOVL, 32/8)
 }
 
-func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As) error {
+func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As, targetSizeInByte int64) error {
 	val := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(val); err != nil {
 		return err
@@ -3401,8 +3479,9 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As)
 	addOffsetToBase.From.Offset = int64(offsetConst)
 	c.addInstruction(addOffsetToBase)
 
-	// TODO: Emit instructions here to check memory out of bounds as
-	// potentially it would be an security risk.
+	if err := c.emitMemoryBoundaryCheck(base.register, targetSizeInByte); err != nil {
+		return nil
+	}
 
 	moveToMemory := c.newProg()
 	moveToMemory.As = moveInstruction

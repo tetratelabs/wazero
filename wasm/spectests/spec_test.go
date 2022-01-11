@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/jit"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -198,15 +200,27 @@ func TestSpecification(t *testing.T) {
 
 		wastName := filepath.Base(base.SourceFile)
 		t.Run(wastName, func(t *testing.T) {
-			for _, tc := range []struct {
+			engines := []struct {
 				name   string
 				engine wasm.Engine
-			}{
-				{engine: wazeroir.NewEngine(), name: "wazeroir_interpreter"},
-			} {
+			}{{engine: wazeroir.NewEngine(), name: "interpreter"}}
+
+			// JIT is only implemented for amd64 now.
+			if runtime.GOARCH == "amd64" {
+				engines = append(engines, struct {
+					name   string
+					engine wasm.Engine
+				}{
+					name: "jit", engine: jit.NewEngine(),
+				})
+				if !strings.Contains(wastName, "address.wast") {
+					t.Skip()
+				}
+			}
+			for _, tc := range engines {
 				tc := tc
 				t.Run(tc.name, func(t *testing.T) {
-					t.Parallel()
+					// t.Parallel()
 					store := wasm.NewStore(tc.engine)
 					addSpectestModule(t, store)
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"unsafe"
 
@@ -41,6 +42,8 @@ type engine struct {
 	continuationAddressOffset uintptr
 	// The current compiledWasmFunction.globalSliceAddress
 	globalSliceAddress uintptr
+	// Stores the length of memory slice which is used by the currently excuted function.
+	memroySliceLen int
 	// Function call frames in linked list
 	callFrameStack *callFrame
 
@@ -63,6 +66,7 @@ const (
 	engineFunctionCallIndexOffset   = 48
 	engineContinuationAddressOffset = 56
 	engineglobalSliceAddressOffset  = 64
+	engineMemroySliceLenOffset      = 72
 )
 
 func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
@@ -73,6 +77,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	// host functions, will be captured as errors, not panics.
 	defer func() {
 		if v := recover(); v != nil {
+			debug.PrintStack()
 			top := e.callFrameStack
 			var frames []string
 			var counter int
@@ -253,6 +258,7 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
+	jitCallStatusCodeInvalidMemoryOutOfBounds
 )
 
 func (s jitCallStatusCode) String() (ret string) {
@@ -352,6 +358,9 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		continuationStackPointer: f.paramCount,
 	}
 	e.globalSliceAddress = f.globalSliceAddress
+	if f.memory != nil {
+		e.memroySliceLen = len(f.memory.Buffer)
+	}
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
 	for e.callFrameStack != nil {
@@ -380,6 +389,10 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			if callerFrame != nil {
 				e.stackBasePointer = callerFrame.stackBasePointer
 				e.stackPointer = callerFrame.continuationStackPointer
+				e.globalSliceAddress = callerFrame.wasmFunction.globalSliceAddress
+				if callerFrame.wasmFunction.memory != nil {
+					e.memroySliceLen = len(callerFrame.wasmFunction.memory.Buffer)
+				}
 			}
 		case jitCallStatusCodeCallWasmFunction:
 			// This never panics as we made sure that the index exists for all the referenced functions
@@ -405,6 +418,9 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Set the stack pointer so that base+sp would point to the top of function params.
 			e.stackPointer = nextFunc.paramCount
 			e.globalSliceAddress = nextFunc.globalSliceAddress
+			if nextFunc.memory != nil {
+				e.memroySliceLen = len(nextFunc.memory.Buffer)
+			}
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
@@ -426,6 +442,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			panic("invalid float to int conversion")
 		case jitCallStatusCodeUnreachable:
 			panic("unreachable")
+		case jitCallStatusCodeInvalidMemoryOutOfBounds:
+			panic("out of bounds memory access")
 		}
 	}
 }

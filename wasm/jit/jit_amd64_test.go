@@ -4809,6 +4809,64 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_emitMemoryBoundaryCheck(t *testing.T) {
+	for _, tc := range []struct {
+		offset           uint32
+		targetSizeInByte int64
+	}{
+		{offset: 0, targetSizeInByte: 32},
+		{offset: 500, targetSizeInByte: 32},
+		{offset: 500, targetSizeInByte: 32},
+		// 8-bit read/load.
+		{offset: 1024 - 1, targetSizeInByte: 0},
+		{offset: 1024 - 1, targetSizeInByte: 1},
+		// 16-bit read/load.
+		{offset: 1024 - 2, targetSizeInByte: 2},
+		{offset: 1024 - 2, targetSizeInByte: 3},
+		// 32-bit read/load.
+		{offset: 1024 - 4, targetSizeInByte: 4},
+		{offset: 1024 - 4, targetSizeInByte: 5},
+		// 64-bit read/load.
+		{offset: 1024 - 8, targetSizeInByte: 8},
+		{offset: 1024 - 8, targetSizeInByte: 9},
+	} {
+		tc := tc
+		t.Run(fmt.Sprintf("offset=%d,targetSize=%d", tc.offset, tc.targetSizeInByte), func(t *testing.T) {
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedRegisters()
+
+			err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.offset})
+			require.NoError(t, err)
+
+			offsetLocation := compiler.locationStack.peek()
+
+			err = compiler.emitMemoryBoundaryCheck(offsetLocation.register, tc.targetSizeInByte)
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			compiler.returnFunction()
+			code, _, err := compiler.generate()
+			require.NoError(t, err)
+
+			// Set up and run.
+			mem := newMemoryInst()
+			eng := newEngine()
+			eng.memroySliceLen = len(mem.Buffer)
+			jitcall(
+				uintptr(unsafe.Pointer(&code[0])),
+				uintptr(unsafe.Pointer(eng)),
+				uintptr(unsafe.Pointer(&mem.Buffer[0])),
+			)
+
+			if len(mem.Buffer) <= int(tc.offset)+int(tc.targetSizeInByte) {
+				require.Equal(t, jitCallStatusCodeInvalidMemoryOutOfBounds, eng.jitCallStatusCode)
+			} else {
+				require.Equal(t, jitCallStatusCodeReturned, eng.jitCallStatusCode)
+			}
+		})
+	}
+}
+
 func TestAmd64Compiler_compileLoad(t *testing.T) {
 	for i, tp := range []wazeroir.UnsignedType{
 		wazeroir.UnsignedTypeI32,
@@ -4873,6 +4931,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
+			eng.memroySliceLen = len(mem.Buffer)
 			targetRegion := mem.Buffer[baseOffset+o.Arg.Offest:]
 			var expValue uint64
 			switch tp {
