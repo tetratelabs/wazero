@@ -5194,6 +5194,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 
 			// Run code.
 			mem := newMemoryInst()
+			eng.memroySliceLen = len(mem.Buffer)
 			jitcall(
 				uintptr(unsafe.Pointer(&code[0])),
 				uintptr(unsafe.Pointer(eng)),
@@ -5250,6 +5251,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 
 	// Run code.
 	mem := newMemoryInst()
+	eng.memroySliceLen = len(mem.Buffer)
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
@@ -5296,6 +5298,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 
 	// Run code.
 	mem := newMemoryInst()
+	eng.memroySliceLen = len(mem.Buffer)
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
@@ -5342,6 +5345,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 
 	// Run code.
 	mem := newMemoryInst()
+	eng.memroySliceLen = len(mem.Buffer)
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),

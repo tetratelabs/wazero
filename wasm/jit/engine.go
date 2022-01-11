@@ -95,6 +95,10 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 			if len(frames) > 0 {
 				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
 			}
+			// Reset the state.
+			e.callFrameStack = nil
+			e.stackBasePointer = 0
+			e.stackPointer = 0
 		}
 	}()
 
@@ -350,10 +354,9 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 
 func (e *engine) exec(f *compiledWasmFunction) {
 	e.callFrameStack = &callFrame{
-		continuationAddress:      f.codeInitialAddress,
-		wasmFunction:             f,
-		caller:                   nil,
-		continuationStackPointer: f.paramCount,
+		continuationAddress: f.codeInitialAddress,
+		wasmFunction:        f,
+		caller:              nil,
 	}
 	e.globalSliceAddress = f.globalSliceAddress
 	if f.memory != nil {

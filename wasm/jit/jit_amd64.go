@@ -3411,7 +3411,7 @@ func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
 }
 
 func (c *amd64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
-	return c.moveToMemory(o.Arg.Offest, x86.AMOVB, 8/8)
+	return c.moveToMemory(o.Arg.Offest, x86.AMOVB, 1)
 }
 
 func (c *amd64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
