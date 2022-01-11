@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"runtime/debug"
 	"strings"
 	"unsafe"
 
@@ -77,7 +76,6 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	// host functions, will be captured as errors, not panics.
 	defer func() {
 		if v := recover(); v != nil {
-			debug.PrintStack()
 			top := e.callFrameStack
 			var frames []string
 			var counter int

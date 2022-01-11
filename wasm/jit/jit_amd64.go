@@ -3273,7 +3273,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	addOffsetToBase.From.Offset = int64(o.Arg.Offest)
 	c.addInstruction(addOffsetToBase)
 
-	if err := c.emitMemoryBoundaryCheck(reg, 8/8); err != nil {
+	if err := c.emitMemoryBoundaryCheck(reg, 1); err != nil {
 		return nil
 	}
 
@@ -3330,7 +3330,16 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	// Then move 2 bytes at the offset to the register.
 	// Note that Load16 is only for integer types.
 	moveFromMemory := c.newProg()
-	moveFromMemory.As = x86.AMOVW
+	switch o.Type {
+	case wazeroir.SignedInt32:
+		moveFromMemory.As = x86.AMOVWLSX
+	case wazeroir.SignedInt64:
+		moveFromMemory.As = x86.AMOVWQSX
+	case wazeroir.SignedUint32:
+		moveFromMemory.As = x86.AMOVWLZX
+	case wazeroir.SignedUint64:
+		moveFromMemory.As = x86.AMOVWQZX
+	}
 	moveFromMemory.To.Type = obj.TYPE_REG
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
@@ -3370,7 +3379,11 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 
 	// Then move 4 bytes at the offset to the register.
 	moveFromMemory := c.newProg()
-	moveFromMemory.As = x86.AMOVL
+	if o.Signed {
+		moveFromMemory.As = x86.AMOVLQSX
+	} else {
+		moveFromMemory.As = x86.AMOVLQZX
+	}
 	moveFromMemory.To.Type = obj.TYPE_REG
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
@@ -3392,7 +3405,7 @@ func (c *amd64Compiler) emitMemoryBoundaryCheck(offsetRegister int16, targetSize
 	}
 
 	copyOffset := c.newProg()
-	copyOffset.As = x86.AMOVL
+	copyOffset.As = x86.AMOVQ
 	copyOffset.To.Type = obj.TYPE_REG
 	copyOffset.To.Reg = tmpReg
 	copyOffset.From.Type = obj.TYPE_REG
@@ -3400,7 +3413,7 @@ func (c *amd64Compiler) emitMemoryBoundaryCheck(offsetRegister int16, targetSize
 	c.addInstruction(copyOffset)
 
 	addTargetSize := c.newProg()
-	addTargetSize.As = x86.AADDL
+	addTargetSize.As = x86.AADDQ
 	addTargetSize.To.Type = obj.TYPE_REG
 	addTargetSize.To.Reg = tmpReg
 	addTargetSize.From.Type = obj.TYPE_CONST
@@ -3417,13 +3430,9 @@ func (c *amd64Compiler) emitMemoryBoundaryCheck(offsetRegister int16, targetSize
 	c.addInstruction(cmp)
 
 	okJmp := c.newProg()
-	okJmp.As = x86.AJHI
+	okJmp.As = x86.AJCC
 	okJmp.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmp)
-
-	// a := c.newProg()
-	// a.As = x86.AUD2
-	// c.addInstruction(a)
 
 	// Otherwise, we exit the function with out of bounds status code.
 	c.setJITStatus(jitCallStatusCodeInvalidMemoryOutOfBounds)

@@ -4858,7 +4858,7 @@ func TestAmd64Compiler_emitMemoryBoundaryCheck(t *testing.T) {
 				uintptr(unsafe.Pointer(&mem.Buffer[0])),
 			)
 
-			if len(mem.Buffer) <= int(tc.offset)+int(tc.targetSizeInByte) {
+			if len(mem.Buffer) < int(tc.offset)+int(tc.targetSizeInByte) {
 				require.Equal(t, jitCallStatusCodeInvalidMemoryOutOfBounds, eng.jitCallStatusCode)
 			} else {
 				require.Equal(t, jitCallStatusCodeReturned, eng.jitCallStatusCode)
