@@ -196,12 +196,13 @@ func (c *amd64Compiler) compileUnreachable() {
 }
 
 func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
-	index := len(c.locationStack.stack) - 1 - o.Depth
+	index := int(c.locationStack.sp) - 1 - o.Depth
 	// Note that, in theory, the register types and value types
 	// are the same between these swap targets as swap operations
 	// are generated from local.set,tee instructions in Wasm.
-	x1 := c.locationStack.stack[len(c.locationStack.stack)-1]
+	x1 := c.locationStack.peek()
 	x2 := c.locationStack.stack[index]
+	fmt.Println(x1.String(), x2.String())
 
 	// If x1 is on the conditional register, we must move it to a gp
 	// register before swap.
@@ -210,9 +211,13 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 			return err
 		}
 	}
+	fmt.Println("index", index)
+	fmt.Println(x1.String(), x2.String())
 
 	if x1.onRegister() && x2.onRegister() {
+		fmt.Println(x1.register, x2.register)
 		x1.register, x2.register = x2.register, x1.register
+		fmt.Println(x1.register, x2.register)
 	} else if x1.onRegister() && x2.onStack() {
 		reg := x1.register
 		// Save x1's value to the temporary top of the stack.

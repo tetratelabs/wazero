@@ -50,7 +50,7 @@ func isFloatRegister(r int16) bool {
 type conditionalRegisterState byte
 
 const (
-	conditionalRegisterStateUnset conditionalRegisterState = 0 + iota
+	conditionalRegisterStateUnset conditionalRegisterState = iota
 	conditionalRegisterStateE                              // ZF equal to zero
 	conditionalRegisterStateNE                             //˜ZF not equal to zero
 	conditionalRegisterStateS                              // SF negative

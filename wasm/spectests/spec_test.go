@@ -232,7 +232,7 @@ func TestJIT(t *testing.T) {
 		"local_tee.wast":              false, // Needs br_table support
 		"loop.wast":                   false, // Needs call_indirect support
 		"memory_grow.wast":            false, // Needs call_indirect support
-		"memory_redundancy.wast":      false, // TODO: needs fix.
+		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
 		"memory_trap.wast":            false, // TODO: needs fix.
 		"memory.wast":                 true,
