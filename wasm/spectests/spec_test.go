@@ -183,77 +183,77 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 
 func TestJIT(t *testing.T) {
 	runTest(t, jit.NewEngine, map[string]bool{
-		// "address.wast":       true,
-		// "align.wast":         false, // Needs br_table support
-		// "binary.wast":        false, // Needs br_table support
-		// "binary-leb128.wast": true,
-		// "block.wast":         false,
-		// "break-drop.wast":    false, // Needs br_table support
-		// "br_if.wast":         false, // Needs br_table support
-		// "br.wast":            false, // Needs br_table support
-		// "call_indirect.wast": false, // Needs call_indirect support
-		// "call.wast":          false, // Needs call_indirect support
-		// "comments.wast":      true,
-		// "const.wast":       true,
-		//		"conversions.wast":            true,
-		// "custom.wast":                 true,
-		// "data.wast":                   true,
-		// "elem.wast":                   false, // Needs call_indirect support
-		// "endianness.wast":             false, // TODO: needs fix.
-		// "exports.wast":                true,
-		// "f32_bitwise.wast":            true,
-		// "f32_cmp.wast":                true,
-		// "f32.wast":                    true,
-		// "f64_bitwise.wast":            true,
-		// "f64_cmp.wast":                true,
-		// "f64.wast":                    true,
-		// "fac.wast":                    false, // TODO: needs fix.
-		// "float_exprs.wast":            false, // TODO: needs fix.
-		// "float_literals.wast":         true,
-		// "float_memory.wast":           true,
-		// "float_misc.wast":             true,
-		// "forward.wast":                true,
-		// "func_ptrs.wast":              true, // Needs call_indirect support
-		// "func.wast":                   false,  // Needs br_table support
-		// "globals.wast":                false, // Needs br_table support
-		// "i32.wast":                    true,
-		// "i64.wast":                    true,
-		"if.wast":                     false,
-		"imports.wast":                false,
-		"inline-module.wast":          false,
-		"int_exprs.wast":              false,
-		"int_literals.wast":           false,
-		"labels.wast":                 false,
-		"left-to-right.wast":          false,
-		"linking.wast":                false,
-		"load.wast":                   false,
-		"local_get.wast":              false,
-		"local_set.wast":              false,
-		"local_tee.wast":              false,
-		"loop.wast":                   false,
-		"memory_grow.wast":            false,
-		"memory_redundancy.wast":      false,
-		"memory_size.wast":            false,
-		"memory_trap.wast":            false,
-		"memory.wast":                 false,
-		"names.wast":                  false,
-		"nop.wast":                    false,
-		"return.wast":                 false,
-		"select.wast":                 false,
-		"skip-stack-guard-page.wast":  false,
-		"stack.wast":                  false,
-		"start.wast":                  false,
-		"store.wast":                  false,
-		"switch.wast":                 false,
-		"token.wast":                  false,
-		"traps.wast":                  false,
-		"type.wast":                   false,
-		"unreachable.wast":            false,
-		"unreached-invalid.wast":      false,
-		"unwind.wast":                 false,
-		"utf8-custom-section-id.wast": false,
-		"utf8-import-field.wast":      false,
-		"utf8-import-module.wast":     false,
+		"address.wast":                true,
+		"align.wast":                  false, // Needs br_table support
+		"binary.wast":                 false, // Needs br_table support
+		"binary-leb128.wast":          true,
+		"block.wast":                  false, // Needs br_table support
+		"break-drop.wast":             false, // Needs br_table support
+		"br_if.wast":                  false, // Needs br_table support
+		"br.wast":                     false, // Needs br_table support
+		"call_indirect.wast":          false, // Needs call_indirect support
+		"call.wast":                   false, // Needs call_indirect support
+		"comments.wast":               true,
+		"const.wast":                  true,
+		"conversions.wast":            true,
+		"custom.wast":                 true,
+		"data.wast":                   true,
+		"elem.wast":                   false, // Needs call_indirect support
+		"endianness.wast":             false, // TODO: needs fix.
+		"exports.wast":                true,
+		"f32_bitwise.wast":            true,
+		"f32_cmp.wast":                true,
+		"f32.wast":                    true,
+		"f64_bitwise.wast":            true,
+		"f64_cmp.wast":                true,
+		"f64.wast":                    true,
+		"fac.wast":                    false, // TODO: needs fix.
+		"float_exprs.wast":            false, // TODO: needs fix.
+		"float_literals.wast":         true,
+		"float_memory.wast":           true,
+		"float_misc.wast":             true,
+		"forward.wast":                true,
+		"func_ptrs.wast":              false, // Needs call_indirect support
+		"func.wast":                   false, // Needs br_table support
+		"globals.wast":                false, // Needs br_table support
+		"i32.wast":                    true,
+		"i64.wast":                    true,
+		"if.wast":                     false, // Needs br_table support
+		"imports.wast":                false, // Needs call_indirect support
+		"inline-module.wast":          true,
+		"int_exprs.wast":              true,
+		"int_literals.wast":           true,
+		"labels.wast":                 false, // Needs br_table support
+		"left-to-right.wast":          false, // Needs br_table support
+		"linking.wast":                false, // Needs call_indirect support
+		"load.wast":                   false, // Needs call_indirect support
+		"local_get.wast":              false, // Needs br_table support
+		"local_set.wast":              false, // Needs br_table support
+		"local_tee.wast":              false, // Needs br_table support
+		"loop.wast":                   false, // Needs call_indirect support
+		"memory_grow.wast":            false, // Needs call_indirect support
+		"memory_redundancy.wast":      false, // TODO: needs fix.
+		"memory_size.wast":            true,
+		"memory_trap.wast":            false, // TODO: needs fix.
+		"memory.wast":                 false, // TODO: needs fix.
+		"names.wast":                  true,
+		"nop.wast":                    false, // Needs br_table support
+		"return.wast":                 true,
+		"select.wast":                 false, // Needs br_table support
+		"skip-stack-guard-page.wast":  false, // TODO: needs fix.
+		"stack.wast":                  false, // Needs call_indirect support
+		"start.wast":                  true,
+		"store.wast":                  false, // Needs br_table support
+		"switch.wast":                 false, // Needs br_table support
+		"token.wast":                  true,
+		"traps.wast":                  true,
+		"type.wast":                   true,
+		"unreachable.wast":            true,
+		"unreached-invalid.wast":      true,
+		"unwind.wast":                 false, // Needs br_table support
+		"utf8-custom-section-id.wast": true,
+		"utf8-import-field.wast":      true,
+		"utf8-import-module.wast":     true,
 	})
 }
 
