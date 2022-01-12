@@ -8,6 +8,21 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+// example has a work-in-progress of supported functionality, used primarily for benchmarking. This includes:
+// * module and function names
+// * explicit, and inlined type definitions (including anonymous)
+// * start function
+//
+// NOTE: this is different from exampleWat because the parser doesn't yet support all features
+var example = []byte(`(module $example
+	(type $i32i32_i32 (func (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type $i32i32_i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+	(type (func))
+	(import "" "hello" (func $hello (type 1)))
+	(start $hello)
+)`)
+
 func TestParseModule(t *testing.T) {
 	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
 	paramI32 := &typeFunc{params: []wasm.ValueType{i32}}
@@ -18,6 +33,7 @@ func TestParseModule(t *testing.T) {
 		result: i32,
 	}
 	resultI32 := &typeFunc{result: i32}
+	indexZero, indexOne := &index{numeric: 0}, &index{numeric: 1}
 
 	tests := []struct {
 		name     string
@@ -35,11 +51,49 @@ func TestParseModule(t *testing.T) {
 			expected: &module{name: "$tools"},
 		},
 		{
+			name:  "type one empty",
+			input: "(module (type $i32i32_i32 (func (param i32 i32) (result i32))) (type (func)))",
+			expected: &module{
+				typeFuncs: []*typeFunc{
+					{name: "$i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
+					typeFuncEmpty,
+				},
+			},
+		},
+		{
+			name: "type empty after inlined", // ensures the parser was reset properly
+			input: `(module
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+	(type (func))
+)`,
+			expected: &module{
+				typeFuncs: []*typeFunc{
+					typeFuncEmpty, // module types are always before inlined types
+					paramI32I32I32I32ResultI32,
+				},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: indexOne},
+				},
+			},
+		},
+		{
 			name:  "import func empty",
 			input: "(module (import \"foo\" \"bar\" (func)))", // ok empty sig
 			expected: &module{
 				typeFuncs:   []*typeFunc{typeFuncEmpty},
-				importFuncs: []*importFunc{{module: "foo", name: "bar", typeInlined: typeFuncEmpty}},
+				importFuncs: []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+			},
+		},
+		{
+			name: "import func empty after non-empty", // ensures the parser was reset properly
+			input: `(module
+	(type (func (param i32) (param i32) (param i32) (param i32) (result i32)))
+	(import "foo" "bar" (func))
+)`,
+			expected: &module{
+				typeFuncs:   []*typeFunc{paramI32I32I32I32ResultI32, typeFuncEmpty},
+				importFuncs: []*importFunc{{module: "foo", name: "bar", typeIndex: indexOne}},
 			},
 		},
 		{
@@ -48,8 +102,8 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{typeFuncEmpty},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "foo", name: "bar", typeInlined: typeFuncEmpty},
-					{importIndex: 1, module: "baz", name: "qux", typeInlined: typeFuncEmpty},
+					{importIndex: 0, module: "foo", name: "bar", typeIndex: indexZero},
+					{importIndex: 1, module: "baz", name: "qux", typeIndex: indexZero},
 				},
 			},
 		},
@@ -61,7 +115,8 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write", typeInlined: paramI32I32I32I32ResultI32},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: indexZero},
 				},
 			},
 		},
@@ -73,7 +128,8 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write", typeInlined: paramI32I32I32I32ResultI32},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: indexZero},
 				},
 			},
 		},
@@ -87,7 +143,8 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write", typeInlined: paramI32I32I32I32ResultI32},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: indexZero},
 				},
 			},
 		},
@@ -99,7 +156,8 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{paramI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "proc_exit", funcName: "$runtime.proc_exit", typeInlined: paramI32},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "proc_exit", funcName: "$runtime.proc_exit",
+						typeIndex: indexZero},
 				},
 			},
 		},
@@ -108,7 +166,7 @@ func TestParseModule(t *testing.T) {
 			input: `(module (import "" "" (func (result i32))))`,
 			expected: &module{
 				typeFuncs:   []*typeFunc{resultI32},
-				importFuncs: []*importFunc{{typeInlined: resultI32}},
+				importFuncs: []*importFunc{{typeIndex: indexZero}},
 			},
 		},
 		{
@@ -119,7 +177,8 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{paramI32I32I32I32I32I64I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open", typeInlined: paramI32I32I32I32I32I64I32I32ResultI32},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open",
+						typeIndex: indexZero},
 				},
 			},
 		},
@@ -131,7 +190,8 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{paramI32I32I32I32I32I64I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open", typeInlined: paramI32I32I32I32I32I64I32I32ResultI32},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "path_open", funcName: "$runtime.path_open",
+						typeIndex: indexZero},
 				},
 			},
 		},
@@ -144,22 +204,105 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs: []*typeFunc{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, typeInlined: paramI32I32ResultI32, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get"},
-					{importIndex: 1, typeInlined: paramI32I32I32I32ResultI32, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write"},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
+						typeIndex: indexZero},
+					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: indexOne},
+				},
+			},
+		},
+		{
+			name: "multiple import func different type - name index",
+			input: `(module
+	(type (func) (; ensures no false match on index 0 ;))
+	(type $i32i32_i32 (func (param i32 i32) (result i32)))
+	(type $i32i32i32i32_i32 (func (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type $i32i32_i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (type $i32i32i32i32_i32)))
+)`,
+			expected: &module{
+				typeFuncs: []*typeFunc{
+					typeFuncEmpty,
+					{name: "$i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
+					{name: "$i32i32i32i32_i32", params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
+				},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
+						typeIndex: &index{numeric: 1, line: 5, col: 86}},
+					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: &index{numeric: 2, line: 6, col: 76}},
+				},
+			},
+		},
+		{
+			name: "multiple import func different type - integer index",
+			input: `(module
+	(type (func) (; ensures no false match on index 0 ;))
+	(type (func (param i32 i32) (result i32)))
+	(type (func (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type 1)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (type 2)))
+)`,
+			expected: &module{
+				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
+						typeIndex: &index{numeric: 1, line: 5, col: 86}},
+					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: &index{numeric: 2, line: 6, col: 76}},
 				},
 			},
 		},
 		{
 			name: "multiple import func same inlined type",
 			input: `(module
+	(type (func) (; ensures no false match on index 0 ;))
 	(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (param i32 i32) (result i32)))
 	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (param i32 i32) (result i32)))
 )`,
 			expected: &module{
-				typeFuncs: []*typeFunc{paramI32I32ResultI32},
+				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, typeInlined: paramI32I32ResultI32, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get"},
-					{importIndex: 1, typeInlined: paramI32I32ResultI32, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get"},
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get",
+						typeIndex: indexOne},
+					{importIndex: 1, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
+						typeIndex: indexOne},
+				},
+			},
+		},
+		{
+			name: "multiple import func same type index",
+			input: `(module
+	(type (func) (; ensures no false match on index 0 ;))
+	(type (func (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (type 1)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type 1)))
+)`,
+			expected: &module{
+				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get",
+						typeIndex: &index{numeric: 1, line: 4, col: 76}},
+					{importIndex: 1, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
+						typeIndex: &index{numeric: 1, line: 5, col: 86}},
+				},
+			},
+		},
+		{
+			name: "multiple import func same type index - type after import",
+			input: `(module
+	(type (func) (; ensures no false match on index 0 ;))
+	(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (type 1)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type 1)))
+	(type (func (param i32 i32) (result i32)))
+)`,
+			expected: &module{
+				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get",
+						typeIndex: &index{numeric: 1, line: 3, col: 76}},
+					{importIndex: 1, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
+						typeIndex: &index{numeric: 1, line: 4, col: 86}},
 				},
 			},
 		},
@@ -171,7 +314,7 @@ func TestParseModule(t *testing.T) {
 )`,
 			expected: &module{
 				typeFuncs:     []*typeFunc{typeFuncEmpty},
-				importFuncs:   []*importFunc{{name: "hello", funcName: "$hello", typeInlined: typeFuncEmpty}},
+				importFuncs:   []*importFunc{{name: "hello", funcName: "$hello", typeIndex: indexZero}},
 				startFunction: &index{numeric: 0, line: 3, col: 9},
 			},
 		},
@@ -183,8 +326,29 @@ func TestParseModule(t *testing.T) {
 )`,
 			expected: &module{
 				typeFuncs:     []*typeFunc{typeFuncEmpty},
-				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeInlined: typeFuncEmpty}},
+				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
 				startFunction: &index{numeric: 0, line: 3, col: 9},
+			},
+		},
+		{
+			name:  "example",
+			input: string(example),
+			expected: &module{
+				name: "$example",
+				typeFuncs: []*typeFunc{
+					{name: "$i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
+					typeFuncEmpty, // Note: inlined types come after explicit ones even if the latter are defined later
+					{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
+				},
+				importFuncs: []*importFunc{
+					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
+						typeIndex: &index{numeric: 0, line: 3, col: 86}},
+					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
+						typeIndex: &index{numeric: 2, line: 0, col: 0}},
+					{importIndex: 2, module: "", name: "hello", funcName: "$hello",
+						typeIndex: &index{numeric: 1, line: 6, col: 40}},
+				},
+				startFunction: &index{numeric: 2, line: 7, col: 9},
 			},
 		},
 	}
@@ -248,6 +412,26 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:30: unexpected id: $Math in module.import[0]",
 		},
 		{
+			name:        "type missing func",
+			input:       "(module (type))",
+			expectedErr: "1:14: missing func field in module.type[0]",
+		},
+		{
+			name:        "type too much func",
+			input:       "(module (type (func) (func)))",
+			expectedErr: "1:22: unexpected '(' in module.type[0]",
+		},
+		{
+			name:        "type second name",
+			input:       "(module (type $v_v $v_v func()))",
+			expectedErr: "1:20: unexpected id: $v_v in module.type[0]",
+		},
+		{
+			name:        "type name wrong place",
+			input:       "(module (type (func $v_v )))",
+			expectedErr: "1:21: unexpected id: $v_v in module.type[0].func",
+		},
+		{
 			name:        "import missing module",
 			input:       "(module (import))",
 			expectedErr: "1:16: missing module and name in module.import[0]",
@@ -261,6 +445,11 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "import missing name",
 			input:       "(module (import \"\"))",
 			expectedErr: "1:19: missing name in module.import[0]",
+		},
+		{
+			name:        "import name not a string",
+			input:       "(module (import \"\" 0))",
+			expectedErr: "1:20: unexpected uN: 0 in module.import[0]",
 		},
 		{
 			name:        "import with desc, no name",
@@ -378,14 +567,14 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:42: unexpected '(' in module.import[0]",
 		},
 		{
-			name:        "start missing funcidx",
+			name:        "start missing index",
 			input:       "(module (start))",
-			expectedErr: "1:15: missing funcidx in module.start",
+			expectedErr: "1:15: missing index in module.start",
 		},
 		{
-			name:        "start double funcidx",
+			name:        "start double index",
 			input:       "(module (start $main $main))",
-			expectedErr: "1:22: redundant funcidx in module.start",
+			expectedErr: "1:22: redundant index in module.start",
 		},
 		{
 			name:        "double start",
@@ -403,12 +592,12 @@ func TestParseModule_Errors(t *testing.T) {
 	(import "" "hello" (func))
 	(start 1)
 )`,
-			expectedErr: "3:9: function index 1 is out of range [0..0] in module.start",
+			expectedErr: "3:9: index 1 is out of range [0..0] in module.start",
 		},
 		{
 			name:        "start points nowhere",
 			input:       "(module (start $main))",
-			expectedErr: "1:16: unknown function name $main in module.start",
+			expectedErr: "1:16: unknown ID $main in module.start",
 		},
 	}
 

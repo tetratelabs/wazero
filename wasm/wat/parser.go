@@ -14,6 +14,13 @@ const (
 	fieldInitial currentField = iota
 	// fieldModule is at the top-level field named "module" and cannot repeat in the same source.
 	fieldModule
+	// fieldModuleType is at the position module.type and can repeat in the same module.
+	//
+	// At the start of the field, moduleParser.currentValue0 tracks typeFunc.name. If a field named "func" is
+	// encountered, these names are recorded while fieldModuleTypeFunc takes over parsing.
+	fieldModuleType
+	// fieldModuleTypeFunc is at the position module.type.func and cannot repeat in the same type.
+	fieldModuleTypeFunc
 	// fieldModuleImport is at the position module.import and can repeat in the same module.
 	//
 	// At the start of the field, moduleParser.currentValue0 tracks importFunc.module while moduleParser.currentValue1
@@ -55,7 +62,11 @@ type moduleParser struct {
 	// currentImportIndex allows us to track the relative position of module.importFuncs regardless of position in the source.
 	currentImportIndex uint32
 
-	typeParser *typeParser
+	// currentTypeIndex allows us to track the relative position of module.typeFuncs regardless of position in the source.
+	currentTypeIndex uint32
+
+	typeParser  *typeParser
+	indexParser *indexParser
 }
 
 // parse has the same signature as tokenParser and called by lex on each token.
@@ -73,7 +84,7 @@ func (p *moduleParser) parse(tok tokenType, tokenBytes []byte, line, col uint32)
 // * module is the result of parsing or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 func parseModule(source []byte) (*module, error) {
-	p := moduleParser{source: source, module: &module{}}
+	p := moduleParser{source: source, module: &module{}, indexParser: &indexParser{}}
 	p.typeParser = &typeParser{m: &p}
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
@@ -83,9 +94,6 @@ func parseModule(source []byte) (*module, error) {
 	if err != nil {
 		return nil, &FormatError{line, col, p.errorContext(), err}
 	}
-
-	// TODO: inlined types can contain "verification types" basically where typeIndex != nil if there is a type we need
-	// to verify it matches the corresponding index exactly.
 
 	// Add any types implicitly defined from type use. Ex. (module (import (func (param i32)...
 	p.module.typeFuncs = append(p.module.typeFuncs, p.typeParser.inlinedTypes...)
@@ -130,7 +138,9 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 		}
 	case fieldModule:
 		switch string(fieldName) {
-		// TODO: "types"
+		case "type":
+			p.currentField = fieldModuleType
+			p.tokenParser = p.parseTypeName
 		case "import":
 			p.currentField = fieldModuleImport
 			p.tokenParser = p.parseImportModule
@@ -139,7 +149,12 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 				return errors.New("redundant start")
 			}
 			p.currentField = fieldModuleStart
-			p.tokenParser = p.parseStart
+			p.tokenParser = p.indexParser.beginParsingIndex(p.parseStartEnd)
+		}
+	case fieldModuleType:
+		if string(fieldName) == "func" {
+			p.currentField = fieldModuleTypeFunc
+			p.tokenParser = p.parseTypeFunc
 		}
 	case fieldModuleImport:
 		// Add the next import func object and ready for parsing it.
@@ -167,7 +182,7 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 // example, any function body may be parsed in a more dynamic way.
 func (p *moduleParser) endField() {
 	switch p.currentField {
-	case fieldModuleStart, fieldModuleImport:
+	case fieldModuleStart, fieldModuleImport, fieldModuleType:
 		p.currentField = fieldModule
 		p.tokenParser = p.parseModule
 	case fieldModule:
@@ -209,6 +224,88 @@ func (p *moduleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ uint32
 		return unexpectedToken(tok, tokenBytes)
 	}
 	return nil
+}
+
+// parseTypeName is the first parser inside a type field. This records the typeFunc.name if present or calls parseType
+// if not found.
+//
+// Ex. A type name is present `(type $t0 (func (result i32)))`
+//                     records $t0 --^   ^
+//              parseType resumes here --+
+//
+// Ex. No type name `(type (func (result i32)))`
+//       calls parseType --^
+func (p *moduleParser) parseTypeName(tok tokenType, tokenBytes []byte, line, col uint32) error {
+	if tok == tokenID { // Ex. $v_v
+		p.currentValue0 = tokenBytes
+		p.tokenParser = p.parseType
+		return nil
+	}
+	return p.parseType(tok, tokenBytes, line, col)
+}
+
+// parseType is the last parser inside the type field. This records the func field or errs if missing. When complete,
+// this sets the next parser to parseModule.
+//
+// Ex. func is present `(module (type $rf32 (func (result f32))))`
+//                            starts here --^                   ^
+//                                   parseModule resumes here --+
+//
+// Ex. func is missing `(type $rf32 )`
+//                      errs here --^
+func (p *moduleParser) parseType(tok tokenType, tokenBytes []byte, _, _ uint32) error {
+	switch tok {
+	case tokenLParen: // start fields, ex. (func
+		// Err if there's a second func. Ex. (type (func) (func))
+		if uint32(len(p.module.typeFuncs)) > p.currentTypeIndex {
+			return unexpectedToken(tok, tokenBytes)
+		}
+		p.tokenParser = p.beginField
+		return nil
+	case tokenRParen: // end of this type
+		// Err if we never reached a description...
+		if uint32(len(p.module.typeFuncs)) == p.currentTypeIndex {
+			return errors.New("missing func field")
+		}
+
+		// Multiple types are allowed, so advance in case there's a next.
+		p.currentTypeIndex++
+		p.endField()
+	default:
+		return unexpectedToken(tok, tokenBytes)
+	}
+	return nil
+}
+
+// parseTypeFunc is the second parser inside the type field. This passes control to the typeParser until
+// any signature is read, then sets the next parser to parseTypeFuncEnd.
+//
+// Ex. `(module (type $rf32 (func (result f32))))`
+//            starts here --^                 ^
+//            parseTypeFuncEnd resumes here --+
+//
+// Ex. If there is no signature `(module (type $rf32 ))`
+//                    calls parseTypeFuncEnd here ---^
+func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col uint32) error {
+	p.typeParser.reset()
+	if tok == tokenLParen {
+		p.typeParser.beginType(p.parseTypeFuncEnd)
+		return nil // start fields, ex. (param or (result
+	}
+	return p.parseTypeFuncEnd(tok, tokenBytes, line, col) // ended with no parameters
+}
+
+// parseTypeFuncEnd is the last parser of the "func" field. As there is no alternative to ending the field, this ensures
+// the token is tokenRParen and sets the next parser to parseType on tokenRParen.
+func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
+	if tok == tokenRParen {
+		p.module.typeFuncs = append(p.module.typeFuncs, p.typeParser.getType(string(p.currentValue0)))
+		p.currentValue0 = nil
+		p.currentField = fieldModuleType
+		p.tokenParser = p.parseType
+		return nil
+	}
+	return unexpectedToken(tok, tokenBytes)
 }
 
 // parseImportModule is the first parser inside the import field. This records the importFunc.module, then sets the next
@@ -314,28 +411,29 @@ func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, lin
 }
 
 // parseImportFunc is the second parser inside the imported function field. This passes control to the typeParser until
-// any signature is read, then sets the next parser to parseImportFuncAfterType.
+// any signature is read, then sets the next parser to parseImportFuncEnd.
 //
 // Ex. `(import "Math" "PI" (func $math.pi (result f32)))`
 //                           starts here --^           ^
-//             parseImportFuncAfterType resumes here --+
+//             parseImportFuncEnd resumes here --+
 //
 // Ex. If there is no signature `(import "" "main" (func))`
-//               calls parseImportFuncAfterType here ---^
+//               calls parseImportFuncEnd here ---^
 func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, col uint32) error {
+	p.typeParser.reset() // reset now in case there is never a tokenLParen
 	switch tok {
 	case tokenID: // Ex. (func $main $main)
 		return fmt.Errorf("redundant name: %s", tokenBytes)
-	case tokenLParen: // start fields, ex. (param or (result
-		p.typeParser.beginParsingTypeUse(p.parseImportFuncAfterType)
+	case tokenLParen:
+		p.typeParser.beginTypeUse(p.parseImportFuncEnd) // start fields, ex. (param or (result
 		return nil
 	}
-	return p.parseImportFuncAfterType(tok, tokenBytes, line, col)
+	return p.parseImportFuncEnd(tok, tokenBytes, line, col)
 }
 
-// parseImportFuncAfterType is the last parser inside the imported function field. This records the importFunc.typeIndex
+// parseImportFuncEnd is the last parser inside the imported function field. This records the importFunc.typeIndex
 // and/or importFunc.typeInlined and sets the next parser to parseImport.
-func (p *moduleParser) parseImportFuncAfterType(tok tokenType, tokenBytes []byte, _, _ uint32) error {
+func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
 		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
 		fn.typeIndex, fn.typeInlined = p.typeParser.getTypeUse()
@@ -346,31 +444,9 @@ func (p *moduleParser) parseImportFuncAfterType(tok tokenType, tokenBytes []byte
 	return unexpectedToken(tok, tokenBytes)
 }
 
-func (p *moduleParser) parseStart(tok tokenType, tokenBytes []byte, line, col uint32) error {
-	switch tok {
-	case tokenUN: // Ex. 2
-		if p.module.startFunction != nil {
-			return errors.New("redundant funcidx")
-		}
-		numeric, err := decodeUint32(tokenBytes)
-		if err != nil {
-			return fmt.Errorf("funcidx outside range of uint32: %s", tokenBytes)
-		}
-		p.module.startFunction = &index{numeric: numeric, line: line, col: col}
-	case tokenID: // Ex. $main
-		if p.module.startFunction != nil {
-			return errors.New("redundant funcidx")
-		}
-		p.module.startFunction = &index{ID: string(tokenBytes), line: line, col: col}
-	case tokenRParen: // end of this start
-		if p.module.startFunction == nil {
-			return errors.New("missing funcidx")
-		}
-		p.endField()
-	default:
-		return unexpectedToken(tok, tokenBytes)
-	}
-	return nil
+func (p *moduleParser) parseStartEnd(funcidx *index) {
+	p.module.startFunction = funcidx
+	p.endField()
 }
 
 func (p *moduleParser) parseUnexpectedTrailingCharacters(_ tokenType, tokenBytes []byte, _, _ uint32) error {
@@ -390,6 +466,10 @@ func (p *moduleParser) errorContext() string {
 		return ""
 	case fieldModule:
 		return "module"
+	case fieldModuleType:
+		return fmt.Sprintf("module.type[%d]", p.currentTypeIndex)
+	case fieldModuleTypeFunc:
+		return fmt.Sprintf("module.type[%d].func%s", p.currentTypeIndex, p.typeParser.errorContext())
 	case fieldModuleImport:
 		return fmt.Sprintf("module.import[%d]", p.currentImportIndex)
 	case fieldModuleImportFunc: // TODO: table, memory or global

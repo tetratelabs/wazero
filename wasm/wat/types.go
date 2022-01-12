@@ -99,13 +99,15 @@ type importFunc struct {
 	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
 	importIndex uint32
 
-	// typeIndex is a importFunc.name, such as "$main", or its equivalent numeric index in module.importFuncs, such as
-	// "2". If typeInlined is also present, the signature in module.importFuncs must exist and match that type.
+	// typeIndex is the optional index in module.typeFuncs for the function signature. If index.ID is set, it must match
+	// typeFunc.name.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#text-typeuse
-	typeIndex []byte
+	typeIndex *index
 
-	// typeInlined is set if there are any "param" or "result" fields.
+	// typeInlined is set if there are any "param" or "result" fields. When set and typeIndex is also set, the signature
+	// in module.typeFuncs must exist and match this.
+	//
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
 	typeInlined *typeFunc
 

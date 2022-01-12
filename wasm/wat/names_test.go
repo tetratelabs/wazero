@@ -9,11 +9,14 @@ import (
 )
 
 func TestEncodeNameSection(t *testing.T) {
-	m, err := parseModule(simpleExample)
+	m, err := parseModule([]byte(`(module $simple
+	(import "" "hello" (func $hello))
+	(start $hello)
+)`))
 	require.NoError(t, err)
 
 	// TIP: the below is the binary suffix of `wat2wasm --debug-names --debug-parser -v simple.wat` where simple.wat
-	// contains the same text as simpleExample
+	// contains the same text as the above inlined text format.
 	require.Equal(t, []byte{
 		0x00, // module subsection ID zero
 		0x07, // 7 bytes to follow
@@ -38,8 +41,10 @@ func TestEncodeNameSection_OnlyFuncName(t *testing.T) {
 	m := &module{
 		typeFuncs: []*typeFunc{type1, type2},
 		importFuncs: []*importFunc{
-			{importIndex: 0, typeIndex: []byte{'0'}, module: "wasi_snapshot_preview1", name: "args_sizes_get", funcName: "$" + func0},
-			{importIndex: 1, typeIndex: []byte{'1'}, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$" + func1},
+			{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_sizes_get", funcName: "$" + func0,
+				typeIndex: &index{ /* TODO 0*/ }},
+			{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$" + func1,
+				typeIndex: &index{ /* TODO 1*/ }},
 		},
 	}
 
