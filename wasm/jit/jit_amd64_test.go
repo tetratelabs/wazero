@@ -1265,7 +1265,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					})
 				}
 			})
-			t.Run("float32", func(t *testing.T) {
+			t.Run("float32", func(t *testing.T) { // AAA
 				for _, tc := range []struct {
 					x1, x2 float32
 				}{
@@ -1694,7 +1694,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 				}
 			})
 			t.Run("float32", func(t *testing.T) {
-				for i, tc := range []struct {
+				for _, tc := range []struct {
 					x1, x2 float32
 				}{
 					{x1: 100, x2: -1.1},
@@ -1703,10 +1703,18 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					{x1: 100.01234124, x2: 100.01234124},
 					{x1: 100.01234124, x2: -100.01234124},
 					{x1: 200.12315, x2: 100},
+					{x1: float32(math.NaN()), x2: 1.231},
+					{x1: float32(math.NaN()), x2: -1.231},
+					{x1: 1.231, x2: float32(math.NaN())},
+					{x1: -1.231, x2: float32(math.NaN())},
 					{x1: float32(math.Inf(1)), x2: 100},
+					{x1: 100, x2: float32(math.Inf(1))},
+					{x1: float32(math.Inf(1)), x2: float32(math.Inf(1))},
 					{x1: float32(math.Inf(-1)), x2: 100},
+					{x1: 100, x2: float32(math.Inf(-1))},
+					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
 				} {
-					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+					t.Run(fmt.Sprintf("x1=%f,x2=%f", tc.x1, tc.x2), func(t *testing.T) {
 						// Prepare operands.
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
@@ -1776,6 +1784,16 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
 					{x1: math.Inf(1), x2: 100},
 					{x1: math.Inf(-1), x2: 100},
+					{x1: math.NaN(), x2: 1.231},
+					{x1: math.NaN(), x2: -1.231},
+					{x1: 1.231, x2: math.NaN()},
+					{x1: -1.231, x2: math.NaN()},
+					{x1: math.Inf(1), x2: 100},
+					{x1: 100, x2: math.Inf(1)},
+					{x1: math.Inf(1), x2: math.Inf(1)},
+					{x1: math.Inf(-1), x2: 100},
+					{x1: 100, x2: math.Inf(-1)},
+					{x1: math.Inf(-1), x2: math.Inf(-1)},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						// Prepare operands.
@@ -2021,8 +2039,16 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 					{x1: 100.01234124, x2: 100.01234124},
 					{x1: 100.01234124, x2: -100.01234124},
 					{x1: 200.12315, x2: 100},
+					{x1: float32(math.NaN()), x2: 1.231},
+					{x1: float32(math.NaN()), x2: -1.231},
+					{x1: 1.231, x2: float32(math.NaN())},
+					{x1: -1.231, x2: float32(math.NaN())},
 					{x1: float32(math.Inf(1)), x2: 100},
+					{x1: 100, x2: float32(math.Inf(1))},
+					{x1: float32(math.Inf(1)), x2: float32(math.Inf(1))},
 					{x1: float32(math.Inf(-1)), x2: 100},
+					{x1: 100, x2: float32(math.Inf(-1))},
+					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						// Prepare operands.
@@ -2096,6 +2122,16 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
 					{x1: math.Inf(1), x2: 100},
 					{x1: math.Inf(-1), x2: 100},
+					{x1: math.NaN(), x2: 1.231},
+					{x1: math.NaN(), x2: -1.231},
+					{x1: 1.231, x2: math.NaN()},
+					{x1: -1.231, x2: math.NaN()},
+					{x1: math.Inf(1), x2: 100},
+					{x1: 100, x2: math.Inf(1)},
+					{x1: math.Inf(1), x2: math.Inf(1)},
+					{x1: math.Inf(-1), x2: 100},
+					{x1: 100, x2: math.Inf(-1)},
+					{x1: math.Inf(-1), x2: math.Inf(-1)},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						// Prepare operands.

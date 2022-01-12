@@ -3010,15 +3010,15 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 		prog.From.Reg = x1.register
 		prog.To.Reg = x2.register
 	case wazeroir.SignedTypeFloat32:
-		resultConditionState = conditionalRegisterStateB
+		resultConditionState = conditionalRegisterStateA
 		prog.As = x86.ACOMISS
-		prog.From.Reg = x2.register
-		prog.To.Reg = x1.register
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
 	case wazeroir.SignedTypeFloat64:
-		resultConditionState = conditionalRegisterStateB
+		resultConditionState = conditionalRegisterStateA
 		prog.As = x86.ACOMISD
-		prog.From.Reg = x2.register
-		prog.To.Reg = x1.register
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
 	}
 	c.addInstruction(prog)
 
@@ -3073,18 +3073,16 @@ func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 		prog.To.Reg = x2.register
 	case wazeroir.SignedTypeFloat32:
 		resultConditionState = conditionalRegisterStateA
-		prog.As = x86.ACOMISS
+		prog.As = x86.AUCOMISS
 		prog.From.Reg = x2.register
 		prog.To.Reg = x1.register
 	case wazeroir.SignedTypeFloat64:
 		resultConditionState = conditionalRegisterStateA
-		prog.As = x86.ACOMISD
+		prog.As = x86.AUCOMISD
 		prog.From.Reg = x2.register
 		prog.To.Reg = x1.register
 	}
 	c.addInstruction(prog)
-
-	// TODO: emit NaN value handings for floats.
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
@@ -3134,15 +3132,15 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 		prog.From.Reg = x1.register
 		prog.To.Reg = x2.register
 	case wazeroir.SignedTypeFloat32:
-		resultConditionState = conditionalRegisterStateBE
-		prog.As = x86.ACOMISS
-		prog.From.Reg = x2.register
-		prog.To.Reg = x1.register
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.AUCOMISS
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
 	case wazeroir.SignedTypeFloat64:
-		resultConditionState = conditionalRegisterStateBE
-		prog.As = x86.ACOMISD
-		prog.From.Reg = x2.register
-		prog.To.Reg = x1.register
+		resultConditionState = conditionalRegisterStateAE
+		prog.As = x86.AUCOMISD
+		prog.From.Reg = x1.register
+		prog.To.Reg = x2.register
 	}
 	c.addInstruction(prog)
 
