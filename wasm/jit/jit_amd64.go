@@ -631,7 +631,6 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	for i := 0; i < len(target.Signature.Params); i++ {
 		c.locationStack.pop()
 	}
-
 	for _, t := range target.Signature.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {

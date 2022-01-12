@@ -234,7 +234,7 @@ func TestJIT(t *testing.T) {
 		"memory_grow.wast":            false, // Needs call_indirect support
 		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
-		"memory_trap.wast":            false, // TODO: needs fix.
+		"memory_trap.wast":            true,
 		"memory.wast":                 true,
 		"names.wast":                  true,
 		"nop.wast":                    false, // Needs br_table support
