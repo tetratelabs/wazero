@@ -89,16 +89,18 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 		labels[key] = &labelInfo{callers: callers}
 	}
 	return &amd64Compiler{
-		eng: eng, f: f, builder: b, locationStack: newValueLocationStack(),
+		currentLabel: ".entrypoint",
+		eng:          eng, f: f, builder: b, locationStack: newValueLocationStack(),
 		labels:                labels,
 		onLabelStartCallbacks: make(map[string][]func(*obj.Prog)),
 	}, nil
 }
 
 type amd64Compiler struct {
-	builder *asm.Builder
-	eng     *engine
-	f       *wasm.FunctionInstance
+	currentLabel string
+	builder      *asm.Builder
+	eng          *engine
+	f            *wasm.FunctionInstance
 	// Set jmp kind instructions where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
 	setJmpOrigins []*obj.Prog
@@ -116,6 +118,7 @@ type labelInfo struct {
 	// The initial instructions for this label so
 	// other block can jump into it.
 	initialInstruction *obj.Prog
+	initialStack       *valueLocationStack
 }
 
 func (c *amd64Compiler) labelInfo(labelKey string) *labelInfo {
@@ -410,12 +413,15 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		c.returnFunction()
 	} else {
 		labelKey := o.Target.String()
-		targetNumCallers := c.labelInfo(labelKey).callers
-		if targetNumCallers > 1 {
+		targetLabel := c.labelInfo(labelKey)
+		if targetLabel.callers > 1 {
 			// If the number of callers to the target label is larget than one,
 			// we have multiple origins to the target branch. In that case,
 			// we must have unique register state.
 			c.preJumpRegisterAdjustment()
+		}
+		if targetLabel.initialStack == nil {
+			targetLabel.initialStack = c.locationStack.clone()
 		}
 		jmp := c.newProg()
 		jmp.As = obj.AJMP
@@ -513,8 +519,12 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		elseLabelKey := elseTarget.Target.Label.String()
-		if c.labelInfo(elseLabelKey).callers > 1 {
+		labelInfo := c.labelInfo(elseLabelKey)
+		if labelInfo.callers > 1 {
 			c.preJumpRegisterAdjustment()
+		}
+		if labelInfo.initialStack == nil {
+			labelInfo.initialStack = c.locationStack.clone()
 		}
 		elseJmp := c.newProg()
 		elseJmp.As = obj.AJMP
@@ -537,8 +547,12 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		thenLabelKey := thenTarget.Target.Label.String()
+		labelInfo := c.labelInfo(thenLabelKey)
 		if c.labelInfo(thenLabelKey).callers > 1 {
 			c.preJumpRegisterAdjustment()
+		}
+		if labelInfo.initialStack == nil {
+			labelInfo.initialStack = c.locationStack.clone()
 		}
 		thenJmp := c.newProg()
 		thenJmp.As = obj.AJMP
@@ -571,16 +585,22 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 }
 
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
-	c.locationStack.sp = uint64(o.Label.OriginalStackLen)
+	fmt.Printf("[label %s ends]\n%s\n", c.currentLabel, c.locationStack)
+
+	labelKey := o.Label.String()
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
-	labelKey := o.Label.String()
 	labelBegin := c.newProg()
 	labelBegin.As = obj.ANOP
 	c.addInstruction(labelBegin)
+
+	labelInfo := c.labelInfo(labelKey)
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
-	c.labelInfo(labelKey).initialInstruction = labelBegin
+	labelInfo.initialInstruction = labelBegin
+	if labelInfo.initialStack != nil {
+		c.locationStack = labelInfo.initialStack
+	}
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
 	for _, cb := range c.onLabelStartCallbacks[labelKey] {
@@ -588,6 +608,9 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	}
 	// Now we don't need to call the callbacks.
 	delete(c.onLabelStartCallbacks, labelKey)
+
+	fmt.Printf("[label %s]\n%s\n", labelKey, c.locationStack)
+	c.currentLabel = labelKey
 	return nil
 }
 
@@ -610,7 +633,7 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	if r == nil {
 		return nil
 	} else if r.Start == 0 {
-		for i := 0; i < r.End; i++ {
+		for i := 0; i <= r.End; i++ {
 			if loc := c.locationStack.pop(); loc.onRegister() {
 				c.locationStack.releaseRegister(loc)
 			}
@@ -748,6 +771,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		prog.To.Reg = reg
 		c.addInstruction(prog)
 	} else if pickTarget.onConditionalRegister() {
+		fmt.Println(c.locationStack, pickTarget)
 		panic("TODO")
 	}
 	// Now we already placed the picked value on the register,

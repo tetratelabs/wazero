@@ -208,13 +208,13 @@ func TestJIT(t *testing.T) {
 		// "f64_cmp.wast":                true,
 		// "f64.wast":                    true,
 		// "fac.wast":                    true, // TODO: needs fix.
-		"float_exprs.wast":            false,
-		"float_literals.wast":         false,
-		"float_memory.wast":           false,
-		"float_misc.wast":             false,
-		"forward.wast":                false,
-		"func_ptrs.wast":              false,
-		"func.wast":                   false,
+		// "float_exprs.wast":            true, // TODO: needs fix.
+		// "float_literals.wast":         true,
+		// "float_memory.wast":           true,
+		// "float_misc.wast":             true,
+		// "forward.wast":                true,
+		// "func_ptrs.wast":              true, // Needs call_indirect support
+		// "func.wast":                   true,
 		"globals.wast":                false,
 		"i32.wast":                    false,
 		"i64.wast":                    false,

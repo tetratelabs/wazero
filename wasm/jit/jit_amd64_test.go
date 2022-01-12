@@ -5468,7 +5468,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			compiler.locationStack.pushValueOnRegister(i)
 		}
 		err := compiler.compileDrop(&wazeroir.OperationDrop{
-			Range: &wazeroir.InclusiveRange{Start: 0, End: numReg},
+			Range: &wazeroir.InclusiveRange{Start: 0, End: numReg - 1},
 		})
 		require.NoError(t, err)
 		for i := int16(0); i < numReg; i++ {

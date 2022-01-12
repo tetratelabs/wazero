@@ -488,6 +488,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	compiler.emitPreamble()
 
 	for _, op := range ir.Operations {
+		fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler.(*amd64Compiler).locationStack.String())
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:

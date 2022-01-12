@@ -41,6 +41,37 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.Equal(t, uint64(10946), out[0])
 }
 
+/*
+.entrypoint:
+	f32.const 0.000000 ;; 0
+	i32.const 0 ;; 1
+	i64.const 0 ;; 2
+	i32.const 0 ;; 3
+	f64.const 0.000000 ;; 4
+	i32.const 0 ;; 5
+	pick 5
+	f32.neg
+	drop 0..0
+	pick 4
+	i32.eqz
+	drop 0..0
+	pick 3
+	i64.eqz
+	drop 0..0
+	pick 2
+	i32.eqz
+	drop 0..0
+	pick 1 ;; ouch!
+	f64.neg
+	drop 0..0
+	pick 0
+	i32.eqz
+	drop 0..0
+	pick 1
+	drop 1..6
+	br .return
+
+*/
 func TestEngine_fac(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
 		t.Skip()
