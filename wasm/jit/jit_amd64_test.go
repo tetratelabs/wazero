@@ -3659,7 +3659,10 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 		for _, signed := range []struct {
 			name   string
 			signed bool
-		}{{name: "signed", signed: true}, {name: "unsigned", signed: false}} {
+		}{
+			{name: "signed", signed: true},
+			// {name: "unsigned", signed: false},
+		} {
 			signed := signed
 			t.Run(signed.name, func(t *testing.T) {
 				for _, tc := range []struct {
@@ -3711,7 +3714,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 						const dxValue uint64 = 111111
-						for i, vs := range []struct {
+						for _, vs := range []struct {
 							x1Value, x2Value uint32
 						}{
 							{x1Value: 2, x2Value: 1},
@@ -3722,9 +3725,11 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 							// Following cases produce different resulting bit patterns for signed and unsigned.
 							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 1},
 							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 0xfffffffe /* -2 in signed 32bit */},
+							{x1Value: math.MaxInt32, x2Value: math.MaxUint32},
+							{x1Value: math.MaxInt32 + 1, x2Value: math.MaxUint32},
 						} {
 							vs := vs
-							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+							t.Run(fmt.Sprintf("x1=%d,x2=%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								eng := newEngine()
 								compiler := requireNewCompiler(t)
@@ -3782,7 +3787,10 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								code, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
-								defer getDivisionByZeroErrorRecoverFunc(t)()
+								if vs.x2Value == 0 {
+									defer getDivisionByZeroErrorRecoverFunc(t)()
+								}
+								fmt.Println(hex.EncodeToString(code))
 								jitcall(
 									uintptr(unsafe.Pointer(&code[0])),
 									uintptr(unsafe.Pointer(eng)),
@@ -3792,7 +3800,9 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// Verify the stack is in the form of ["any value previously used by DX" + x1 / x2]
 								require.Equal(t, uint64(1), eng.stackPointer)
 								if signed.signed {
-									require.Equal(t, int32(vs.x1Value)%int32(vs.x2Value)+int32(dxValue), int32(eng.stack[eng.stackPointer-1]))
+									x1Signed := int32(vs.x1Value)
+									x2Signed := int32(vs.x2Value)
+									require.Equal(t, x1Signed%x2Signed+int32(dxValue), int32(eng.stack[eng.stackPointer-1]))
 								} else {
 									require.Equal(t, vs.x1Value%vs.x2Value+uint32(dxValue), uint32(eng.stack[eng.stackPointer-1]))
 								}
@@ -3873,6 +3883,10 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 							// Following cases produce different resulting bit patterns for signed and unsigned.
 							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 1},
 							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 0xfffffffffffffffe /* -2 in signed 64bit */},
+							{x1Value: math.MaxInt32, x2Value: math.MaxUint32},
+							{x1Value: math.MaxInt32 + 1, x2Value: math.MaxUint32},
+							{x1Value: math.MaxInt64, x2Value: math.MaxUint64},
+							{x1Value: math.MaxInt64 + 1, x2Value: math.MaxUint64},
 						} {
 							vs := vs
 							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -3933,7 +3947,9 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								code, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
-								defer getDivisionByZeroErrorRecoverFunc(t)()
+								if vs.x2Value == 0 {
+									defer getDivisionByZeroErrorRecoverFunc(t)()
+								}
 								jitcall(
 									uintptr(unsafe.Pointer(&code[0])),
 									uintptr(unsafe.Pointer(eng)),

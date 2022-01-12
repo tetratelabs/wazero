@@ -1225,7 +1225,7 @@ func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
 // onto the stack. For example, stack [..., 10, 3] results in [..., 3] where
 // the remainder is discarded. See compileRem for how to acquire remainder, not quotient.
 func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
-	if err := c.performDivisionOnInts(is32Bit, signed); err != nil {
+	if err := c.performDivisionOnInts(false, is32Bit, signed); err != nil {
 		return err
 	}
 	// Now we have the quotient of the division result in the AX register,
@@ -1245,13 +1245,13 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		err = c.performDivisionOnInts(true, true)
+		err = c.performDivisionOnInts(true, true, true)
 	case wazeroir.SignedInt64:
-		err = c.performDivisionOnInts(false, true)
+		err = c.performDivisionOnInts(true, false, true)
 	case wazeroir.SignedUint32:
-		err = c.performDivisionOnInts(true, false)
+		err = c.performDivisionOnInts(true, true, false)
 	case wazeroir.SignedUint64:
-		err = c.performDivisionOnInts(false, false)
+		err = c.performDivisionOnInts(true, false, false)
 	}
 	if err != nil {
 		return err
@@ -1281,7 +1281,7 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 //
 // tl;dr is that the division result is placed in AX and DX registers after instructions emitted by this function
 // where AX holds the quotient while DX the remainder of the division result.
-func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
+func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error {
 
 	const (
 		quotientRegister  = x86.REG_AX
@@ -1289,11 +1289,56 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 	)
 
 	x2 := c.locationStack.pop()
-	if x2.onConditionalRegister() {
-		if err := c.moveConditionalToFreeGeneralPurposeRegister(x2); err != nil {
-			return err
-		}
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
 	}
+
+	// We have to save the existing value on DX as the division instruction
+	// place the remainder of the result there.
+	if x2.register != remainderRegister {
+		c.onValueReleaseRegisterToStack(remainderRegister)
+	}
+
+	isSignedRem := isRem && signed
+	var signedRemMinusOneDivisorJmp *obj.Prog
+	if isSignedRem {
+		cmpWithMinusOne := c.newProg()
+		if is32Bit {
+			cmpWithMinusOne.As = x86.ACMPL
+		} else {
+			cmpWithMinusOne.As = x86.ACMPQ
+		}
+		cmpWithMinusOne.From.Type = obj.TYPE_REG
+		cmpWithMinusOne.From.Reg = x2.register
+		cmpWithMinusOne.To.Type = obj.TYPE_CONST
+		cmpWithMinusOne.To.Offset = -1
+		c.addInstruction(cmpWithMinusOne)
+
+		okJmp := c.newProg()
+		okJmp.As = x86.AJNE
+		okJmp.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(okJmp)
+
+		storeZeroToDX := c.newProg()
+		if is32Bit {
+			storeZeroToDX.As = x86.AXORL
+		} else {
+			storeZeroToDX.As = x86.AXORQ
+		}
+		storeZeroToDX.To.Type = obj.TYPE_REG
+		storeZeroToDX.To.Reg = remainderRegister
+		storeZeroToDX.From.Type = obj.TYPE_REG
+		storeZeroToDX.From.Reg = remainderRegister
+		c.addInstruction(storeZeroToDX)
+
+		signedRemMinusOneDivisorJmp = c.newProg()
+		signedRemMinusOneDivisorJmp.As = obj.AJMP
+		signedRemMinusOneDivisorJmp.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(signedRemMinusOneDivisorJmp)
+
+		c.addSetJmpOrigins(okJmp)
+	}
+
 	// If x2 is placed in the quotient (AX) register, we just release it to the memory stack
 	// as AX must be set to the x1's value below.
 	if x2.register == quotientRegister {
@@ -1384,6 +1429,10 @@ func (c *amd64Compiler) performDivisionOnInts(is32Bit bool, signed bool) error {
 		div.From.Offset = int64(x2.stackPointer) * 8
 	}
 	c.addInstruction(div)
+
+	if signedRemMinusOneDivisorJmp != nil {
+		c.addSetJmpOrigins(signedRemMinusOneDivisorJmp)
+	}
 	return nil
 }
 
