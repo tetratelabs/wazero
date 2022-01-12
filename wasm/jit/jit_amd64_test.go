@@ -3157,12 +3157,6 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 						}
 					}
 
-					for _, r := range unreservedGeneralPurposeIntRegisters {
-						if r != x86.REG_AX && r != x86.REG_CX {
-							compiler.locationStack.usedRegisters[r] = struct{}{}
-						}
-					}
-
 					// Setup the target values.
 					if is32Bit {
 						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(vs.x1)})

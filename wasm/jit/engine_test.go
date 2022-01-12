@@ -41,6 +41,33 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.Equal(t, uint64(10946), out[0])
 }
 
+func TestEngine_fac(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip()
+	}
+	buf, err := os.ReadFile("testdata/fac.wasm")
+	require.NoError(t, err)
+	mod, err := wasm.DecodeModule(buf)
+	require.NoError(t, err)
+	store := wasm.NewStore(NewEngine())
+	require.NoError(t, err)
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	for _, name := range []string{
+		"fac-rec",
+		// "fac-iter",
+	} {
+		name := name
+		t.Run(name, func(t *testing.T) {
+			out, _, err := store.CallFunction("test", name, 25)
+			require.NoError(t, err)
+			require.Equal(t, uint64(7034535277573963776), out[0])
+
+		})
+	}
+}
+
 func TestEngine_unreachable(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
 		t.Skip()
