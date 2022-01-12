@@ -31,20 +31,32 @@ type module struct {
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
 
-	startFunction *startFunction
+	// startFunction is the index of the function to call during wasm.Store Instantiate. When a tokenID, this must match
+	// importFunc.funcName.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
+	startFunction *index
 }
 
-// startFunction is the function to call during wasm.Store Instantiate.
+// index is symbolic ID, such as "$main", or its equivalent numeric value, such as "2".
 //
 // Note: line and col used for lazy validation of index. These are attached to an error if later found to be invalid
 // (ex an unknown function or out-of-bound index).
 //
-// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
-type startFunction struct {
-	// index is a importFunc.name, such as "$main", or its equivalent numeric index in module.importFuncs, such as "2".
+// https://www.w3.org/TR/wasm-core-1/#indices%E2%91%A4
+type index struct {
+	// ID is set when its corresponding token is tokenID to a symbolic identifier index. Ex. $main
 	//
-	// See wasm.Module StartSection for more.
-	index string
+	// Note: This must be checked for a corresponding index element name, as it is possible it doesn't exist.
+	// Ex. This is $t0 from (import "Math" "PI" (func (type $t0))), but (type $t0 (func ...)) does not exist.
+	ID string
+
+	// numeric is set when its corresponding token is tokenUN to a numeric index. Ex. 3
+	//
+	// Note: To avoid conflating unset with the valid index zero, only read this value when ID is unset.
+	// Note: This must be checked for range as there's a possible out-of-bonds condition.
+	// Ex. This is 32 from (import "Math" "PI" (func (type 32))), but there are only 10 types defined in the module.
+	numeric uint32
 
 	// line is the line in the source where the index was defined.
 	line uint32
@@ -63,7 +75,7 @@ type typeFunc struct {
 	//
 	// name is only used for debugging. At runtime, types are called based on raw numeric index. The type index space
 	// begins those explicitly defined in module.typeFuncs, followed by any inlined ones.
-	name string
+	name string // TODO: presumably, this must be unique as it is a symbolic identifier?
 
 	// params are the possibly empty sequence of value types accepted by a function with this signature.
 	//
@@ -116,7 +128,7 @@ type importFunc struct {
 	// Note: funcName may be stored in the wasm.Module CustomSection under the key "name" subsection 1. For example,
 	// `wat2wasm --debug-names` will do this.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-	funcName string
+	funcName string // TODO: presumably, this must be unique as it is a symbolic identifier?
 }
 
 // FormatError allows control over the format of errors parsing the WebAssembly Text Format.
