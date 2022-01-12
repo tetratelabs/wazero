@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/jit"
+	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 type (
@@ -181,7 +181,87 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	require.NoError(t, store.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax))
 }
 
-func TestSpecification(t *testing.T) {
+func TestJIT(t *testing.T) {
+	runTest(t, jit.NewEngine, map[string]bool{
+		// "address.wast":       true,
+		// "align.wast":         false, // Needs br_table support
+		// "binary.wast":        false, // Needs br_table support
+		// "binary-leb128.wast": true,
+		// "block.wast":         false,
+		// "break-drop.wast":    false, // Needs br_table support
+		// "br_if.wast":         false, // Needs br_table support
+		// "br.wast":            false, // Needs br_table support
+		// "call_indirect.wast": false, // Needs call_indirect support
+		// "call.wast":          false, // Needs call_indirect support
+		// "comments.wast":      true,
+		// "const.wast":       true,
+		//		"conversions.wast":            true,
+		// "custom.wast":                 true,
+		// "data.wast":                   true,
+		// "elem.wast":                   false, // Needs call_indirect support
+		// "endianness.wast":             true, TODO: needs fix.
+		// "exports.wast":                true,
+		// "f32_bitwise.wast":            true,
+		"f32_cmp.wast":                true,
+		"f32.wast":                    false,
+		"f64_bitwise.wast":            false,
+		"f64_cmp.wast":                false,
+		"f64.wast":                    false,
+		"fac.wast":                    false,
+		"float_exprs.wast":            false,
+		"float_literals.wast":         false,
+		"float_memory.wast":           false,
+		"float_misc.wast":             false,
+		"forward.wast":                false,
+		"func_ptrs.wast":              false,
+		"func.wast":                   false,
+		"globals.wast":                false,
+		"i32.wast":                    false,
+		"i64.wast":                    false,
+		"if.wast":                     false,
+		"imports.wast":                false,
+		"inline-module.wast":          false,
+		"int_exprs.wast":              false,
+		"int_literals.wast":           false,
+		"labels.wast":                 false,
+		"left-to-right.wast":          false,
+		"linking.wast":                false,
+		"load.wast":                   false,
+		"local_get.wast":              false,
+		"local_set.wast":              false,
+		"local_tee.wast":              false,
+		"loop.wast":                   false,
+		"memory_grow.wast":            false,
+		"memory_redundancy.wast":      false,
+		"memory_size.wast":            false,
+		"memory_trap.wast":            false,
+		"memory.wast":                 false,
+		"names.wast":                  false,
+		"nop.wast":                    false,
+		"return.wast":                 false,
+		"select.wast":                 false,
+		"skip-stack-guard-page.wast":  false,
+		"stack.wast":                  false,
+		"start.wast":                  false,
+		"store.wast":                  false,
+		"switch.wast":                 false,
+		"token.wast":                  false,
+		"traps.wast":                  false,
+		"type.wast":                   false,
+		"unreachable.wast":            false,
+		"unreached-invalid.wast":      false,
+		"unwind.wast":                 false,
+		"utf8-custom-section-id.wast": false,
+		"utf8-import-field.wast":      false,
+		"utf8-import-module.wast":     false,
+	})
+}
+
+func TestInterpreter(t *testing.T) {
+	runTest(t, wazeroir.NewEngine, nil)
+}
+
+func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]bool) {
 	const caseDir = "./cases"
 	files, err := os.ReadDir(caseDir)
 	require.NoError(t, err)
@@ -198,196 +278,173 @@ func TestSpecification(t *testing.T) {
 		require.NoError(t, json.Unmarshal(raw, &base))
 
 		wastName := filepath.Base(base.SourceFile)
-		if !strings.Contains(wastName, "address.wast") {
-			t.Skip()
+		if wastTargets != nil && !wastTargets[wastName] {
+			continue
 		}
 		t.Run(wastName, func(t *testing.T) {
-			engines := []struct {
-				name   string
-				engine wasm.Engine
-			}{
-				// {engine: wazeroir.NewEngine(), name: "interpreter"},
-			}
+			store := wasm.NewStore(newEngine())
+			addSpectestModule(t, store)
 
-			// JIT is only implemented for amd64 now.
-			if runtime.GOARCH == "amd64" {
-				engines = append(engines, struct {
-					name   string
-					engine wasm.Engine
-				}{
-					name: "jit", engine: jit.NewEngine(),
-				})
-			}
-			for _, tc := range engines {
-				tc := tc
-				t.Run(tc.name, func(t *testing.T) {
-					// t.Parallel()
-					store := wasm.NewStore(tc.engine)
-					addSpectestModule(t, store)
+			var lastInstanceName string
+			for _, c := range base.Commands {
+				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
+					msg := fmt.Sprintf("%s:%d", wastName, c.Line)
+					switch c.CommandType {
+					case "module":
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
 
-					var lastInstanceName string
-					for _, c := range base.Commands {
-						t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
-							msg := fmt.Sprintf("%s:%d", wastName, c.Line)
-							switch c.CommandType {
-							case "module":
-								buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
-								require.NoError(t, err, msg)
+						mod, err := wasm.DecodeModule(buf)
+						require.NoError(t, err, msg)
 
-								mod, err := wasm.DecodeModule(buf)
-								require.NoError(t, err, msg)
-
-								lastInstanceName = c.Name
-								if lastInstanceName == "" {
-									lastInstanceName = c.Filename
-								}
-								err = store.Instantiate(mod, lastInstanceName)
-								require.NoError(t, err)
-							case "register":
-								name := lastInstanceName
-								if c.Name != "" {
-									name = c.Name
-								}
-								store.ModuleInstances[c.As] = store.ModuleInstances[name]
-							case "assert_return", "action":
-								moduleName := lastInstanceName
-								if c.Action.Module != "" {
-									moduleName = c.Action.Module
-								}
-								switch c.Action.ActionType {
-								case "invoke":
-									args, exps := c.getAssertReturnArgsExps()
-									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
-									if c.Action.Module != "" {
-										msg += " in module " + c.Action.Module
-									}
-									vals, types, err := store.CallFunction(moduleName, c.Action.Field, args...)
-									if assert.NoError(t, err, msg) &&
-										assert.Equal(t, len(exps), len(vals), msg) &&
-										assert.Equal(t, len(exps), len(types), msg) {
-										for i, exp := range exps {
-											assertValueEq(t, vals[i], exp, types[i], msg)
-										}
-									}
-								case "get":
-									_, exps := c.getAssertReturnArgsExps()
-									require.Len(t, exps, 1)
-									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
-									if c.Action.Module != "" {
-										msg += " in module " + c.Action.Module
-									}
-									inst, ok := store.ModuleInstances[moduleName]
-									require.True(t, ok, msg)
-									addr := inst.Exports[c.Action.Field]
-									if addr.Kind != wasm.ExportKindGlobal {
-										t.Fatal()
-									}
-									actual := addr.Global
-									var expType wasm.ValueType
-									switch c.Exps[0].ValType {
-									case "i32":
-										expType = wasm.ValueTypeI32
-									case "i64":
-										expType = wasm.ValueTypeI64
-									case "f32":
-										expType = wasm.ValueTypeF32
-									case "f64":
-										expType = wasm.ValueTypeF64
-									}
-									require.NotNil(t, actual, msg)
-									assert.Equal(t, expType, actual.Type.ValType, msg)
-									assert.Equal(t, exps[0], actual.Val, expType, msg)
-								default:
-									t.Fatalf("unsupported action type type: %v", c)
-								}
-							case "assert_malformed":
-								if c.ModuleType == "text" {
-									// We don't support direct loading of wast yet.
-									t.Skip()
-								}
-								buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
-								require.NoError(t, err, msg)
-								mod, err := wasm.DecodeModule(buf)
-								if err == nil {
-									err = store.Instantiate(mod, "")
-								}
-								require.Error(t, err, msg)
-							case "assert_trap":
-								moduleName := lastInstanceName
-								if c.Action.Module != "" {
-									moduleName = c.Action.Module
-								}
-								switch c.Action.ActionType {
-								case "invoke":
-									args := c.getAssertReturnArgs()
-									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
-									if c.Action.Module != "" {
-										msg += " in module " + c.Action.Module
-									}
-									_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
-									assert.Error(t, err, msg)
-								default:
-									t.Fatalf("unsupported action type type: %v", c)
-								}
-							case "assert_invalid":
-								if c.ModuleType == "text" {
-									// We don't support direct loading of wast yet.
-									t.Skip()
-								}
-								buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
-								require.NoError(t, err, msg)
-								mod, err := wasm.DecodeModule(buf)
-								if err == nil {
-									err = store.Instantiate(mod, "")
-								}
-								require.Error(t, err, msg)
-							case "assert_exhaustion":
-								moduleName := lastInstanceName
-								if c.Action.Module != "" {
-									moduleName = c.Action.Module
-								}
-								switch c.Action.ActionType {
-								case "invoke":
-									args := c.getAssertReturnArgs()
-									msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
-									if c.Action.Module != "" {
-										msg += " in module " + c.Action.Module
-									}
-									_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
-									assert.Error(t, err, msg)
-									assert.True(t, errors.Is(err, wasm.ErrCallStackOverflow), msg)
-								default:
-									t.Fatalf("unsupported action type type: %v", c)
-								}
-							case "assert_unlinkable":
-								if c.ModuleType == "text" {
-									// We don't support direct loading of wast yet.
-									t.Skip()
-								}
-								buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
-								require.NoError(t, err, msg)
-								mod, err := wasm.DecodeModule(buf)
-								if err == nil {
-									err = store.Instantiate(mod, "")
-								}
-								require.Error(t, err, msg)
-							case "assert_uninstantiable":
-								buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
-								require.NoError(t, err, msg)
-
-								mod, err := wasm.DecodeModule(buf)
-								require.NoError(t, err, msg)
-
-								err = store.Instantiate(mod, "")
-								require.Error(t, err, msg)
-							default:
-								t.Fatalf("unsupported command type: %s", c)
+						lastInstanceName = c.Name
+						if lastInstanceName == "" {
+							lastInstanceName = c.Filename
+						}
+						err = store.Instantiate(mod, lastInstanceName)
+						require.NoError(t, err)
+					case "register":
+						name := lastInstanceName
+						if c.Name != "" {
+							name = c.Name
+						}
+						store.ModuleInstances[c.As] = store.ModuleInstances[name]
+					case "assert_return", "action":
+						moduleName := lastInstanceName
+						if c.Action.Module != "" {
+							moduleName = c.Action.Module
+						}
+						switch c.Action.ActionType {
+						case "invoke":
+							args, exps := c.getAssertReturnArgsExps()
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
 							}
-						})
+							vals, types, err := store.CallFunction(moduleName, c.Action.Field, args...)
+							if assert.NoError(t, err, msg) &&
+								assert.Equal(t, len(exps), len(vals), msg) &&
+								assert.Equal(t, len(exps), len(types), msg) {
+								for i, exp := range exps {
+									assertValueEq(t, vals[i], exp, types[i], msg)
+								}
+							}
+						case "get":
+							_, exps := c.getAssertReturnArgsExps()
+							require.Len(t, exps, 1)
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							inst, ok := store.ModuleInstances[moduleName]
+							require.True(t, ok, msg)
+							addr := inst.Exports[c.Action.Field]
+							if addr.Kind != wasm.ExportKindGlobal {
+								t.Fatal()
+							}
+							actual := addr.Global
+							var expType wasm.ValueType
+							switch c.Exps[0].ValType {
+							case "i32":
+								expType = wasm.ValueTypeI32
+							case "i64":
+								expType = wasm.ValueTypeI64
+							case "f32":
+								expType = wasm.ValueTypeF32
+							case "f64":
+								expType = wasm.ValueTypeF64
+							}
+							require.NotNil(t, actual, msg)
+							assert.Equal(t, expType, actual.Type.ValType, msg)
+							assert.Equal(t, exps[0], actual.Val, expType, msg)
+						default:
+							t.Fatalf("unsupported action type type: %v", c)
+						}
+					case "assert_malformed":
+						if c.ModuleType == "text" {
+							// We don't support direct loading of wast yet.
+							t.Skip()
+						}
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
+						mod, err := wasm.DecodeModule(buf)
+						if err == nil {
+							err = store.Instantiate(mod, "")
+						}
+						require.Error(t, err, msg)
+					case "assert_trap":
+						moduleName := lastInstanceName
+						if c.Action.Module != "" {
+							moduleName = c.Action.Module
+						}
+						switch c.Action.ActionType {
+						case "invoke":
+							args := c.getAssertReturnArgs()
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
+							assert.Error(t, err, msg)
+						default:
+							t.Fatalf("unsupported action type type: %v", c)
+						}
+					case "assert_invalid":
+						if c.ModuleType == "text" {
+							// We don't support direct loading of wast yet.
+							t.Skip()
+						}
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
+						mod, err := wasm.DecodeModule(buf)
+						if err == nil {
+							err = store.Instantiate(mod, "")
+						}
+						require.Error(t, err, msg)
+					case "assert_exhaustion":
+						moduleName := lastInstanceName
+						if c.Action.Module != "" {
+							moduleName = c.Action.Module
+						}
+						switch c.Action.ActionType {
+						case "invoke":
+							args := c.getAssertReturnArgs()
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
+							assert.Error(t, err, msg)
+							assert.True(t, errors.Is(err, wasm.ErrCallStackOverflow), msg)
+						default:
+							t.Fatalf("unsupported action type type: %v", c)
+						}
+					case "assert_unlinkable":
+						if c.ModuleType == "text" {
+							// We don't support direct loading of wast yet.
+							t.Skip()
+						}
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
+						mod, err := wasm.DecodeModule(buf)
+						if err == nil {
+							err = store.Instantiate(mod, "")
+						}
+						require.Error(t, err, msg)
+					case "assert_uninstantiable":
+						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
+						require.NoError(t, err, msg)
+
+						mod, err := wasm.DecodeModule(buf)
+						require.NoError(t, err, msg)
+
+						err = store.Instantiate(mod, "")
+						require.Error(t, err, msg)
+					default:
+						t.Fatalf("unsupported command type: %s", c)
 					}
 				})
 			}
-
 		})
 	}
 }

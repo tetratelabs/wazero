@@ -5,6 +5,7 @@ package jit
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -3115,6 +3116,12 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 						}
 					}
 
+					for _, r := range unreservedGeneralPurposeIntRegisters {
+						if r != x86.REG_AX && r != x86.REG_CX {
+							compiler.locationStack.usedRegisters[r] = struct{}{}
+						}
+					}
+
 					// Setup the target values.
 					if is32Bit {
 						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(vs.x1)})
@@ -3146,6 +3153,8 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 						uintptr(unsafe.Pointer(eng)),
 						uintptr(unsafe.Pointer(&mem.Buffer[0])),
 					)
+
+					fmt.Println(hex.EncodeToString(code))
 
 					// Check the result.
 					require.Equal(t, uint64(1), eng.stackPointer)
@@ -4158,6 +4167,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				-6.8719476736e+10,
 				1.37438953472e+11, /* = 1 << 37 */
 				-1.37438953472e+11,
+				-2147483649.0,
 				math.MinInt32,
 				math.MaxInt32,
 				math.MaxUint32,
@@ -5473,6 +5483,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			)
 			compiler := requireNewCompiler(t)
 			bottom := compiler.locationStack.pushValueOnStack()
+			require.Equal(t, uint64(0), compiler.locationStack.stack[0].stackPointer)
 			for i := int16(0); i < dropNum; i++ {
 				compiler.locationStack.pushValueOnRegister(i)
 			}
@@ -5486,6 +5497,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			err := compiler.compileDrop(&wazeroir.OperationDrop{
 				Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
 			})
+			require.Equal(t, uint64(0), compiler.locationStack.stack[0].stackPointer)
 			require.NoError(t, err)
 			require.Equal(t, uint64(4), compiler.locationStack.sp)
 			for i := int16(0); i < dropNum; i++ {
@@ -5504,6 +5516,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			require.True(t, actualBottomLive.onRegister() && !actualBottomLive.onStack())
 			// The bottom after drop should stay on stack.
 			actualBottom := compiler.locationStack.pop()
+			require.Equal(t, uint64(0), compiler.locationStack.stack[0].stackPointer)
 			require.Equal(t, bottom, actualBottom)
 			require.True(t, bottom.onStack())
 		})

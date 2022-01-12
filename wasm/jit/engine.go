@@ -1,9 +1,11 @@
 package jit
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"unsafe"
 
@@ -75,7 +77,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	// host functions, will be captured as errors, not panics.
 	defer func() {
 		if v := recover(); v != nil {
-			// debug.PrintStack()
+			debug.PrintStack()
 			top := e.callFrameStack
 			var frames []string
 			var counter int
@@ -634,6 +636,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
+
+	println(wazeroir.Format(ir.Operations))
+	println(hex.EncodeToString(code))
 
 	cf := &compiledWasmFunction{
 		source:          f,

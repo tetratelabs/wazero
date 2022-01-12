@@ -609,17 +609,9 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 		return nil
 	}
 
-	var (
-		top              *valueLocation
-		topIsConditional bool
-		liveValues       []*valueLocation
-	)
+	var liveValues []*valueLocation
 	for i := 0; i < r.Start; i++ {
 		live := c.locationStack.pop()
-		if top == nil {
-			top = live
-			topIsConditional = top.onConditionalRegister()
-		}
 		liveValues = append(liveValues, live)
 	}
 	for i := 0; i < r.End-r.Start+1; i++ {
@@ -630,23 +622,19 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	for i := range liveValues {
 		live := liveValues[len(liveValues)-1-i]
 		if live.onStack() {
-			if topIsConditional {
-				// If the top is conditional, and it's not target of drop,
-				// we must assign it to the register before we emit any instructions here.
-				if err := c.moveConditionalToFreeGeneralPurposeRegister(top); err != nil {
-					return err
-				}
-				topIsConditional = false
-			}
 			// Write the value in the old stack location to a register
 			if err := c.moveStackToRegisterWithAllocation(live.registerType(), live); err != nil {
 				return err
 			}
-			// Modify the location in the stack with new stack pointer.
-			c.locationStack.push(live)
-		} else if live.onRegister() {
-			c.locationStack.push(live)
+		} else if live.onConditionalRegister() {
+			// If the live is conditional, and it's not target of drop,
+			// we must assign it to the register before we emit any instructions here.
+			if err := c.moveConditionalToFreeGeneralPurposeRegister(live); err != nil {
+				return err
+			}
 		}
+		// Modify the location in the stack with new stack pointer.
+		c.locationStack.push(live)
 	}
 	return nil
 }
@@ -2356,6 +2344,11 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(checkIfMinimumSignedInt)
 
 	jmpIfMinimumSignedInt := c.newProg()
+	if isFloat32Bit {
+		jmpIfExceedsLowerBound.As = x86.AJCS
+	} else {
+		jmpIfExceedsLowerBound.As = x86.AJLS
+	}
 	jmpIfMinimumSignedInt.As = x86.AJCS // jump if the value is minus (= the minimum signed 32-bit int).
 	jmpIfMinimumSignedInt.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfMinimumSignedInt)
@@ -3769,6 +3762,11 @@ func (c *amd64Compiler) releaseAllRegistersToStack() {
 	used := len(c.locationStack.usedRegisters)
 	for i := uint64(0); i < c.locationStack.sp && used > 0; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
+			c.releaseRegisterToStack(loc)
+			used--
+		} else if loc.onConditionalRegister() {
+			tmpReg, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
+			c.moveConditionalToGeneralPurposeRegister(loc, tmpReg)
 			c.releaseRegisterToStack(loc)
 			used--
 		}
