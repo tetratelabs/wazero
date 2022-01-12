@@ -118,6 +118,15 @@ type labelInfo struct {
 	initialInstruction *obj.Prog
 }
 
+func (c *amd64Compiler) labelInfo(labelKey string) *labelInfo {
+	ret, ok := c.labels[labelKey]
+	if ok {
+		return ret
+	}
+	c.labels[labelKey] = &labelInfo{}
+	return c.labels[labelKey]
+}
+
 func (c *amd64Compiler) emitPreamble() {
 	// We assume all function parameters are already pushed onto the stack by
 	// the caller.
@@ -401,7 +410,7 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		c.returnFunction()
 	} else {
 		labelKey := o.Target.String()
-		targetNumCallers := c.labels[labelKey].callers // Note that .labels map is initialized for all labels in newCompiler.
+		targetNumCallers := c.labelInfo(labelKey).callers
 		if targetNumCallers > 1 {
 			// If the number of callers to the target label is larget than one,
 			// we have multiple origins to the target branch. In that case,
@@ -504,7 +513,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		elseLabelKey := elseTarget.Target.Label.String()
-		if c.labels[elseLabelKey].callers > 1 { // Note that .labels map is initialized for all labels in newCompiler.
+		if c.labelInfo(elseLabelKey).callers > 1 {
 			c.preJumpRegisterAdjustment()
 		}
 		elseJmp := c.newProg()
@@ -528,7 +537,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		thenLabelKey := thenTarget.Target.Label.String()
-		if c.labels[thenLabelKey].callers > 1 { // Note that .labels map is initialized for all labels in newCompiler.
+		if c.labelInfo(thenLabelKey).callers > 1 {
 			c.preJumpRegisterAdjustment()
 		}
 		thenJmp := c.newProg()
@@ -551,7 +560,7 @@ func (c *amd64Compiler) preJumpRegisterAdjustment() {
 }
 
 func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
-	jmpTarget := c.labels[labelKey] // Note that .labels map is initialized for all labels in newCompiler.
+	jmpTarget := c.labelInfo(labelKey)
 	if jmpTarget.initialInstruction != nil {
 		jmpInstruction.To.SetTarget(jmpTarget.initialInstruction)
 	} else {
@@ -571,7 +580,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	c.addInstruction(labelBegin)
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
-	c.labels[labelKey].initialInstruction = labelBegin // Note that .labels map is initialized for all labels in newCompiler.
+	c.labelInfo(labelKey).initialInstruction = labelBegin
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
 	for _, cb := range c.onLabelStartCallbacks[labelKey] {

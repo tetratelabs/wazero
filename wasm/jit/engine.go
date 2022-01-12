@@ -477,6 +477,8 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	if err != nil {
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
+	println(wazeroir.Format(ir.Operations))
+	fmt.Println(ir.LabelCallers)
 
 	compiler, err := newCompiler(e, f, ir)
 	if err != nil {
@@ -637,7 +639,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	println(wazeroir.Format(ir.Operations))
 	println(hex.EncodeToString(code))
 
 	cf := &compiledWasmFunction{
