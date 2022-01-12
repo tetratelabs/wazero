@@ -21,28 +21,21 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 	// Next, we need to convert the types from the text format into the binary one. This is easy because the only
 	// difference is that the text format has type names and the binary format does not.
 	result = &wasm.Module{}
-	typeToIndex := map[*typeFunc]uint32{}
-	for i, t := range m.typeFuncs {
+	for _, t := range m.typeFuncs {
 		var results []wasm.ValueType
 		if t.result != 0 {
 			results = []wasm.ValueType{t.result}
 		}
-		typeToIndex[t] = uint32(i)
 		result.TypeSection = append(result.TypeSection, &wasm.FunctionType{Params: t.params, Results: results})
 	}
 
 	// Now, handle any imported functions. Notably, we retain the same insertion order as defined in the text format in
 	// case a numeric index is used for the start function (or another reason such as the call instruction).
 	for _, f := range m.importFuncs {
-		i := &wasm.ImportSegment{
+		result.ImportSection = append(result.ImportSection, &wasm.ImportSegment{
 			Module: f.module, Name: f.name,
-			Desc: &wasm.ImportDesc{Kind: wasm.ImportKindFunction},
-		}
-		if f.typeInlined != nil {
-			i.Desc.FuncTypeIndex = typeToIndex[f.typeInlined]
-		}
-
-		result.ImportSection = append(result.ImportSection, i)
+			Desc: &wasm.ImportDesc{Kind: wasm.ImportKindFunction, FuncTypeIndex: f.typeIndex.numeric},
+		})
 	}
 
 	// The start function is called on Module.Instantiate.

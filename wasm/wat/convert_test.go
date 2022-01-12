@@ -12,7 +12,7 @@ import (
 )
 
 func TestTextToBinary(t *testing.T) {
-	zero := uint32(0)
+	zero, two := uint32(0), uint32(2)
 	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
 	tests := []struct {
 		name     string
@@ -41,11 +41,13 @@ func TestTextToBinary(t *testing.T) {
 		{
 			name: "multiple import func with different inlined type",
 			input: `(module
+	(type (func) (; ensures no false match on index 0 ;))
 	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
+					{},
 					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
@@ -54,13 +56,45 @@ func TestTextToBinary(t *testing.T) {
 						Module: "wasi_snapshot_preview1", Name: "path_open",
 						Desc: &wasm.ImportDesc{
 							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 0,
+							FuncTypeIndex: 1,
 						},
 					}, {
 						Module: "wasi_snapshot_preview1", Name: "fd_write",
 						Desc: &wasm.ImportDesc{
 							Kind:          wasm.ImportKindFunction,
+							FuncTypeIndex: 2,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple import func different type - name index",
+			input: `(module
+	(type (func) (; ensures no false match on index 0 ;))
+	(type $i32i32_i32 (func (param i32 i32) (result i32)))
+	(type $i32i32i32i32_i32 (func (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type $i32i32_i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (type $i32i32i32i32_i32)))
+)`,
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+				},
+				ImportSection: []*wasm.ImportSegment{
+					{
+						Module: "wasi_snapshot_preview1", Name: "arg_sizes_get",
+						Desc: &wasm.ImportDesc{
+							Kind:          wasm.ImportKindFunction,
 							FuncTypeIndex: 1,
+						},
+					}, {
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Desc: &wasm.ImportDesc{
+							Kind:          wasm.ImportKindFunction,
+							FuncTypeIndex: 2,
 						},
 					},
 				},
@@ -102,6 +136,39 @@ func TestTextToBinary(t *testing.T) {
 				StartSection: &zero,
 			},
 		},
+		{
+			name:  "example",
+			input: string(example),
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+				},
+				ImportSection: []*wasm.ImportSegment{
+					{
+						Module: "wasi_snapshot_preview1", Name: "arg_sizes_get",
+						Desc: &wasm.ImportDesc{
+							Kind:          wasm.ImportKindFunction,
+							FuncTypeIndex: 0,
+						},
+					}, {
+						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Desc: &wasm.ImportDesc{
+							Kind:          wasm.ImportKindFunction,
+							FuncTypeIndex: 2,
+						},
+					}, {
+						Module: "", Name: "hello",
+						Desc: &wasm.ImportDesc{
+							Kind:          wasm.ImportKindFunction,
+							FuncTypeIndex: 1,
+						},
+					},
+				},
+				StartSection: &two,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -122,28 +189,6 @@ func TestTextToBinary_Errors(t *testing.T) {
 			input:       "module",
 			expectedErr: "1:1: expected '(', but found keyword: module",
 		},
-		{
-			name:        "start, but no funcs",
-			input:       "(module (start $main))",
-			expectedErr: "1:16: unknown function name $main in module.start",
-		},
-		{
-			name: "start index out of range",
-			input: `(module
-	(import "" "hello" (func))
-	(import "" "goodbye" (func))
-	(start 3)
-)`,
-			expectedErr: "4:9: function index 3 is out of range [0..1] in module.start",
-		},
-		{
-			name: "start points to unknown func",
-			input: `(module
-	(import "" "hello" (func $main))
-	(start $mein)
-)`,
-			expectedErr: "3:9: unknown function name $mein in module.start",
-		},
 	}
 
 	for _, tt := range tests {
@@ -156,23 +201,18 @@ func TestTextToBinary_Errors(t *testing.T) {
 	}
 }
 
-var simpleExample = []byte(`(module $simple
-	(import "" "hello" (func $hello))
-	(start $hello)
-)`)
-
 func BenchmarkTextToBinaryExample(b *testing.B) {
-	var simpleExampleBinary []byte
-	if bin, err := os.ReadFile("testdata/simple.wasm"); err != nil {
+	var exampleBinary []byte // wat2wasm --debug-names example.wat
+	if bin, err := os.ReadFile("testdata/example.wasm"); err != nil {
 		b.Fatal(err)
 	} else {
-		simpleExampleBinary = bin
+		exampleBinary = bin
 	}
 
 	b.Run("vs utf8.Valid", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if !utf8.Valid(simpleExample) {
+			if !utf8.Valid(example) {
 				panic("unexpected")
 			}
 		}
@@ -182,7 +222,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wasmtime.Wat2Wasm", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, err := wasmtime.Wat2Wasm(string(simpleExample))
+			_, err := wasmtime.Wat2Wasm(string(example))
 			if err != nil {
 				panic(err)
 			}
@@ -193,7 +233,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wasm.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := wasm.DecodeModule(simpleExampleBinary); err != nil {
+			if _, err := wasm.DecodeModule(exampleBinary); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -201,7 +241,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wat.lex", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if line, col, err := lex(noopTokenParser, simpleExample); err != nil {
+			if line, col, err := lex(noopTokenParser, example); err != nil {
 				b.Fatalf("%d:%d: %s", line, col, err)
 			}
 		}
@@ -209,7 +249,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("vs wat.parseModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := parseModule(simpleExample); err != nil {
+			if _, err := parseModule(example); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -217,7 +257,7 @@ func BenchmarkTextToBinaryExample(b *testing.B) {
 	b.Run("TextToBinary", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := TextToBinary(simpleExample); err != nil {
+			if _, err := TextToBinary(example); err != nil {
 				b.Fatal(err)
 			}
 		}
