@@ -125,23 +125,24 @@ func TestTextToBinary_Errors(t *testing.T) {
 		{
 			name:        "start, but no funcs",
 			input:       "(module (start $main))",
-			expectedErr: "1:16: unknown function name: $main in module.start",
+			expectedErr: "1:16: unknown function name $main in module.start",
 		},
 		{
-			name: "start index missing - number",
+			name: "start index out of range",
 			input: `(module
 	(import "" "hello" (func))
-	(start 1)
+	(import "" "goodbye" (func))
+	(start 3)
 )`,
-			expectedErr: "3:9: invalid function index: 1 in module.start",
+			expectedErr: "4:9: function index 3 is out of range [0..1] in module.start",
 		},
 		{
-			name: "start index missing - name",
+			name: "start points to unknown func",
 			input: `(module
 	(import "" "hello" (func $main))
 	(start $mein)
 )`,
-			expectedErr: "3:9: unknown function name: $mein in module.start",
+			expectedErr: "3:9: unknown function name $mein in module.start",
 		},
 	}
 

@@ -164,11 +164,6 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name:     "start function", // TODO: this is pointing to a funcidx not in the source!
-			input:    "(module (start $main))",
-			expected: &module{startFunction: &startFunction{"$main", 1, 16}},
-		},
-		{
 			name: "start imported function by name",
 			input: `(module
 	(import "" "hello" (func $hello))
@@ -177,7 +172,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs:     []*typeFunc{typeFuncEmpty},
 				importFuncs:   []*importFunc{{name: "hello", funcName: "$hello", typeInlined: typeFuncEmpty}},
-				startFunction: &startFunction{"$hello", 3, 9},
+				startFunction: &index{numeric: 0, line: 3, col: 9},
 			},
 		},
 		{
@@ -189,7 +184,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				typeFuncs:     []*typeFunc{typeFuncEmpty},
 				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeInlined: typeFuncEmpty}},
-				startFunction: &startFunction{"0", 3, 9},
+				startFunction: &index{numeric: 0, line: 3, col: 9},
 			},
 		},
 	}
@@ -401,6 +396,19 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "wrong start",
 			input:       "(module (start main))",
 			expectedErr: "1:16: unexpected keyword: main in module.start",
+		},
+		{
+			name: "start points out of range",
+			input: `(module
+	(import "" "hello" (func))
+	(start 1)
+)`,
+			expectedErr: "3:9: function index 1 is out of range [0..0] in module.start",
+		},
+		{
+			name:        "start points nowhere",
+			input:       "(module (start $main))",
+			expectedErr: "1:16: unknown function name $main in module.start",
 		},
 	}
 

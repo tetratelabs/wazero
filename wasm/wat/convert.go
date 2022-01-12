@@ -1,9 +1,6 @@
 package wat
 
 import (
-	"fmt"
-	"strconv"
-
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -48,44 +45,11 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 		result.ImportSection = append(result.ImportSection, i)
 	}
 
-	// The start function is called on Module.Instantiate. To prevent runtime errors, resolve it into a valid function
-	// index now. parseStartSection already returns a FormatError, so don't re-wrap it!
+	// The start function is called on Module.Instantiate.
 	if m.startFunction != nil {
-		if result.StartSection, err = parseStartSection(m); err != nil {
-			return nil, err
-		}
+		result.StartSection = &m.startFunction.numeric
 	}
 
 	// TODO: encode CustomSection["name"] with module function and local names
 	return
-}
-
-// parseStartSection looks up the numerical index in module.importFuncs corresponding to startFunction.index or returns
-// a FormatError.
-func parseStartSection(m *module) (*uint32, error) {
-	start := m.startFunction
-
-	// Try to see if this is a numeric index like "2" first.
-	if parsed, parseErr := strconv.ParseUint(start.index, 0, 32); parseErr == nil {
-		if int(parsed) >= len(m.importFuncs) { // TODO len(m.importFuncs + m.funcs) when we add them!
-			return nil, &FormatError{start.line, start.col, "module.start",
-				fmt.Errorf("invalid function index: %d", parsed),
-			}
-		}
-		startIdx := uint32(parsed)
-		return &startIdx, nil
-	}
-
-	// Now, attempt to look up the symbolic name of any function imported or defined in this module.
-	for i, f := range m.importFuncs {
-		if f.funcName == start.index {
-			startIdx := uint32(i)
-			return &startIdx, nil
-		}
-	}
-
-	// TODO: also search functions defined in this module, once we add them!
-	return nil, &FormatError{start.line, start.col, "module.start",
-		fmt.Errorf("unknown function name: %s", start.index),
-	}
 }

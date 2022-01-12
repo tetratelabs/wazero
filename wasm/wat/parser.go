@@ -89,6 +89,12 @@ func parseModule(source []byte) (*module, error) {
 
 	// Add any types implicitly defined from type use. Ex. (module (import (func (param i32)...
 	p.module.typeFuncs = append(p.module.typeFuncs, p.typeParser.inlinedTypes...)
+
+	// Ensure indices only point to numeric values
+	if err = bindIndices(p.module); err != nil {
+		return nil, err
+	}
+
 	return p.module, nil
 }
 
@@ -168,7 +174,7 @@ func (p *moduleParser) endField() {
 		p.currentField = fieldInitial
 		p.tokenParser = p.parseUnexpectedTrailingCharacters // only one module is allowed and nothing else
 	default: // currentField is an enum, we expect to have handled all cases above. panic if we didn't
-		panic(fmt.Errorf("BUG: unhandled parsing state: %v", p.currentField))
+		panic(fmt.Errorf("BUG: unhandled parsing state on endField: %v", p.currentField))
 	}
 }
 
@@ -299,9 +305,8 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 //                    calls parseImportFunc here --^
 func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
-		name := string(tokenBytes)
 		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
-		fn.funcName = name
+		fn.funcName = string(tokenBytes)
 		p.tokenParser = p.parseImportFunc
 		return nil
 	}
@@ -343,11 +348,20 @@ func (p *moduleParser) parseImportFuncAfterType(tok tokenType, tokenBytes []byte
 
 func (p *moduleParser) parseStart(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	switch tok {
-	case tokenUN, tokenID: // Ex. $main or 2
+	case tokenUN: // Ex. 2
 		if p.module.startFunction != nil {
 			return errors.New("redundant funcidx")
 		}
-		p.module.startFunction = &startFunction{string(tokenBytes), line, col}
+		numeric, err := decodeUint32(tokenBytes)
+		if err != nil {
+			return fmt.Errorf("funcidx outside range of uint32: %s", tokenBytes)
+		}
+		p.module.startFunction = &index{numeric: numeric, line: line, col: col}
+	case tokenID: // Ex. $main
+		if p.module.startFunction != nil {
+			return errors.New("redundant funcidx")
+		}
+		p.module.startFunction = &index{ID: string(tokenBytes), line: line, col: col}
 	case tokenRParen: // end of this start
 		if p.module.startFunction == nil {
 			return errors.New("missing funcidx")
@@ -383,6 +397,6 @@ func (p *moduleParser) errorContext() string {
 	case fieldModuleStart:
 		return "module.start"
 	default: // currentField is an enum, we expect to have handled all cases above. panic if we didn't
-		panic(fmt.Errorf("BUG: unhandled parsing state: %v", p.currentField))
+		panic(fmt.Errorf("BUG: unhandled parsing state on errorContext: %v", p.currentField))
 	}
 }
