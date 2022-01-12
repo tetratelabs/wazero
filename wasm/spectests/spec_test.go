@@ -199,7 +199,7 @@ func TestJIT(t *testing.T) {
 		// "custom.wast":                 true,
 		// "data.wast":                   true,
 		// "elem.wast":                   false, // Needs call_indirect support
-		// "endianness.wast":             true, TODO: needs fix.
+		// "endianness.wast":             false, // TODO: needs fix.
 		// "exports.wast":                true,
 		// "f32_bitwise.wast":            true,
 		"f32_cmp.wast":                true,

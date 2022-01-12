@@ -2836,38 +2836,95 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 	}
 
 	// Emit the compare instruction.
-	prog := c.newProg()
-	prog.From.Type = obj.TYPE_REG
-	prog.From.Reg = x1.register
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = x2.register
+	cmp := c.newProg()
+	cmp.From.Type = obj.TYPE_REG
+	cmp.From.Reg = x1.register
+	cmp.To.Type = obj.TYPE_REG
+	cmp.To.Reg = x2.register
 	switch t {
 	case wazeroir.UnsignedTypeI32:
-		prog.As = x86.ACMPL
+		cmp.As = x86.ACMPL
 	case wazeroir.UnsignedTypeI64:
-		prog.As = x86.ACMPQ
+		cmp.As = x86.ACMPQ
 	case wazeroir.UnsignedTypeF32:
-		prog.As = x86.ACOMISS
+		cmp.As = x86.AUCOMISS
 	case wazeroir.UnsignedTypeF64:
-		prog.As = x86.ACOMISD
+		cmp.As = x86.AUCOMISD
 	}
-	c.addInstruction(prog)
-
-	// TODO: emit NaN value handings for floats.
+	c.addInstruction(cmp)
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
 
-	// Finally, record that the result is on the conditional register.
-	var condReg conditionalRegisterState
-	if shouldEqual {
-		condReg = conditionalRegisterStateE
-	} else {
-		condReg = conditionalRegisterStateNE
+	switch t {
+	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
+		// Record that the result is on the conditional register.
+		var condReg conditionalRegisterState
+		if shouldEqual {
+			condReg = conditionalRegisterStateE
+		} else {
+			condReg = conditionalRegisterStateNE
+		}
+		loc := c.locationStack.pushValueOnConditionalRegister(condReg)
+		loc.setRegisterType(generalPurposeRegisterTypeInt)
+	case wazeroir.UnsignedTypeF32, wazeroir.UnsignedTypeF64:
+		cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		// cmpResultReg
+		c.locationStack.markRegisterUsed(cmpResultReg)
+		nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+
+		getNaNFlag := c.newProg()
+		// Parity flag is set = at least one of values was NaN.
+		if shouldEqual {
+			getNaNFlag.As = x86.ASETPC
+		} else {
+			getNaNFlag.As = x86.ASETPS
+		}
+		getNaNFlag.To.Type = obj.TYPE_REG
+		getNaNFlag.To.Reg = nanFragReg
+		c.addInstruction(getNaNFlag)
+
+		getCmpResult := c.newProg()
+		if shouldEqual {
+			getCmpResult.As = x86.ASETEQ
+		} else {
+			getCmpResult.As = x86.ASETNE
+		}
+		getCmpResult.To.Type = obj.TYPE_REG
+		getCmpResult.To.Reg = cmpResultReg
+		c.addInstruction(getCmpResult)
+
+		andCmpResultWithNaNFlag := c.newProg()
+		if shouldEqual {
+			andCmpResultWithNaNFlag.As = x86.AANDL
+		} else {
+			andCmpResultWithNaNFlag.As = x86.AORL
+		}
+		andCmpResultWithNaNFlag.To.Type = obj.TYPE_REG
+		andCmpResultWithNaNFlag.To.Reg = cmpResultReg
+		andCmpResultWithNaNFlag.From.Type = obj.TYPE_REG
+		andCmpResultWithNaNFlag.From.Reg = nanFragReg
+		c.addInstruction(andCmpResultWithNaNFlag)
+
+		// Clear the unnecessary bits.
+		clearHigherBits := c.newProg()
+		clearHigherBits.As = x86.AMOVBLZX
+		clearHigherBits.To.Type = obj.TYPE_REG
+		clearHigherBits.To.Reg = cmpResultReg
+		clearHigherBits.From.Type = obj.TYPE_REG
+		clearHigherBits.From.Reg = cmpResultReg
+		c.addInstruction(clearHigherBits)
+
+		loc := c.locationStack.pushValueOnRegister(cmpResultReg)
+		loc.setRegisterType(generalPurposeRegisterTypeInt)
 	}
-	loc := c.locationStack.pushValueOnConditionalRegister(condReg)
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 

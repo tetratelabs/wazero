@@ -1266,7 +1266,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 				}
 			})
 			t.Run("float32", func(t *testing.T) {
-				for i, tc := range []struct {
+				for _, tc := range []struct {
 					x1, x2 float32
 				}{
 					{x1: 100, x2: -1.1},
@@ -1275,6 +1275,10 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: 100.01234124, x2: 100.01234124},
 					{x1: 100.01234124, x2: -100.01234124},
 					{x1: 200.12315, x2: 100},
+					{x1: float32(math.NaN()), x2: 1.231},
+					{x1: float32(math.NaN()), x2: -1.231},
+					{x1: 1.231, x2: float32(math.NaN())},
+					{x1: -1.231, x2: float32(math.NaN())},
 					{x1: float32(math.Inf(1)), x2: 100},
 					{x1: 100, x2: float32(math.Inf(1))},
 					{x1: float32(math.Inf(1)), x2: float32(math.Inf(1))},
@@ -1282,7 +1286,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: 100, x2: float32(math.Inf(-1))},
 					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
 				} {
-					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+					t.Run(fmt.Sprintf("x1=%f,x2=%f", tc.x1, tc.x2), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
 
@@ -1307,19 +1311,15 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// Plus the result must be pushed.
 						require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-						// To verify the behavior, we push the flag value
+						// To verify the behavior, we release the flag value
 						// to the stack.
-						flag := compiler.locationStack.peek()
-						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
-						require.NoError(t, err)
-						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-						compiler.releaseRegisterToStack(flag)
+						compiler.releaseAllRegistersToStack()
 						compiler.returnFunction()
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
 						code, _, err := compiler.generate()
+						fmt.Println(hex.EncodeToString(code))
 						require.NoError(t, err)
 						// Run code.
 						eng := newEngine()
@@ -1353,6 +1353,16 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: 6.8719476736e+10 /* = 1 << 36 */, x2: 1.37438953472e+11 /* = 1 << 37*/},
 					{x1: math.Inf(1), x2: 100},
 					{x1: math.Inf(-1), x2: 100},
+					{x1: math.NaN(), x2: 1.231},
+					{x1: math.NaN(), x2: -1.231},
+					{x1: 1.231, x2: math.NaN()},
+					{x1: -1.231, x2: math.NaN()},
+					{x1: math.Inf(1), x2: 100},
+					{x1: 100, x2: math.Inf(1)},
+					{x1: math.Inf(1), x2: math.Inf(1)},
+					{x1: math.Inf(-1), x2: 100},
+					{x1: 100, x2: math.Inf(-1)},
+					{x1: math.Inf(-1), x2: math.Inf(-1)},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
@@ -1382,12 +1392,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// To verify the behavior, we push the flag value
 						// to the stack.
-						flag := compiler.locationStack.peek()
-						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
-						require.NoError(t, err)
-						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-						compiler.releaseRegisterToStack(flag)
+						compiler.releaseAllRegistersToStack()
 						compiler.returnFunction()
 
 						// Generate the code under test.
