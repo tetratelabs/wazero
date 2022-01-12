@@ -9,10 +9,11 @@ func bindIndices(m *module) error {
 	typeToIndex := map[*typeFunc]uint32{}
 	typeNameToIndex := map[string]uint32{}
 	for i, t := range m.typeFuncs {
+		index := uint32(i)
 		if t.name != "" {
-			typeNameToIndex[t.name] = uint32(i)
+			typeNameToIndex[t.name] = index
 		}
-		typeToIndex[t] = uint32(i)
+		typeToIndex[t] = index
 	}
 
 	funcNameToIndex, err := bindFunctionTypes(m, typeToIndex, typeNameToIndex)
