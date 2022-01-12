@@ -182,7 +182,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 }
 
 func TestJIT(t *testing.T) {
-	runTest(t, jit.NewEngine, map[string]bool{
+	targets := map[string]bool{
 		"address.wast":                true,
 		"align.wast":                  false, // Needs br_table support
 		"binary.wast":                 false, // Needs br_table support
@@ -235,7 +235,7 @@ func TestJIT(t *testing.T) {
 		"memory_redundancy.wast":      false, // TODO: needs fix.
 		"memory_size.wast":            true,
 		"memory_trap.wast":            false, // TODO: needs fix.
-		"memory.wast":                 false, // TODO: needs fix.
+		"memory.wast":                 true,
 		"names.wast":                  true,
 		"nop.wast":                    false, // Needs br_table support
 		"return.wast":                 true,
@@ -254,7 +254,9 @@ func TestJIT(t *testing.T) {
 		"utf8-custom-section-id.wast": true,
 		"utf8-import-field.wast":      true,
 		"utf8-import-module.wast":     true,
-	})
+	}
+	targets = map[string]bool{"memory_redundancy.wast": true}
+	runTest(t, jit.NewEngine, targets)
 }
 
 func TestInterpreter(t *testing.T) {

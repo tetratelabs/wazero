@@ -3601,6 +3601,10 @@ func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) {
 }
 
 func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
@@ -3623,6 +3627,10 @@ func (c *amd64Compiler) emitConstI32(val uint32, register int16) {
 }
 
 func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
@@ -3645,6 +3653,10 @@ func (c *amd64Compiler) emitConstI64(val uint64, register int16) {
 }
 
 func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
 		return err
@@ -3679,6 +3691,10 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 }
 
 func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
 		return err
@@ -3739,6 +3755,15 @@ func (c *amd64Compiler) moveStackToRegister(loc *valueLocation) {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = loc.register
 	c.addInstruction(prog)
+}
+
+func (c *amd64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() (err error) {
+	if c.locationStack.sp > 0 {
+		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
+			err = c.moveConditionalToFreeGeneralPurposeRegister(loc)
+		}
+	}
+	return
 }
 
 func (c *amd64Compiler) moveConditionalToFreeGeneralPurposeRegister(loc *valueLocation) error {
@@ -3804,6 +3829,7 @@ func (c *amd64Compiler) moveConditionalToGeneralPurposeRegister(loc *valueLocati
 
 	// Mark it uses the register.
 	loc.setRegister(reg)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	c.locationStack.markRegisterUsed(reg)
 }
 

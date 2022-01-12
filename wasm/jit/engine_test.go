@@ -28,7 +28,7 @@ func TestEngine_fibonacci(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
 		t.Skip()
 	}
-	buf, err := os.ReadFile("testdata/fib.wasm")
+	buf, err := os.ReadFile("testdata/tmp.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)
@@ -36,9 +36,9 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
-	out, _, err := store.CallFunction("test", "fib", 20)
+	out, _, err := store.CallFunction("test", "data")
 	require.NoError(t, err)
-	require.Equal(t, uint64(10946), out[0])
+	require.Equal(t, uint64(1), out[0])
 }
 
 func TestEngine_fac(t *testing.T) {
