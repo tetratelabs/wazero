@@ -255,7 +255,6 @@ func TestJIT(t *testing.T) {
 		"utf8-import-field.wast":      true,
 		"utf8-import-module.wast":     true,
 	}
-	targets = map[string]bool{"memory_redundancy.wast": true}
 	runTest(t, jit.NewEngine, targets)
 }
 

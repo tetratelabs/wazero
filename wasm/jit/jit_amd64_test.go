@@ -4795,7 +4795,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		eng := newEngine()
 		compiler.eng = eng
 		hostFuncRefValue := reflect.ValueOf(func() {})
-		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue}
+		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue, Signature: &wasm.FunctionType{}}
 		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
 		compiler.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
 		eng.compiledHostFunctionIndex[hostFuncInstance] = functionIndex
@@ -4835,7 +4835,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		// Setup.
 		eng := newEngine()
 		compiler.eng = eng
-		wasmFuncInstance := &wasm.FunctionInstance{}
+		wasmFuncInstance := &wasm.FunctionInstance{Signature: &wasm.FunctionType{}}
 		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
 		compiler.f.ModuleInstance.Functions[functionIndex] = wasmFuncInstance
 		eng.compiledWasmFunctionIndex[wasmFuncInstance] = functionIndex

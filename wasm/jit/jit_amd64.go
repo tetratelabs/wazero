@@ -628,8 +628,22 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		index := c.eng.compiledWasmFunctionIndex[target]
 		c.callFunctionFromConstIndex(index)
 	}
+	for i := 0; i < len(target.Signature.Params); i++ {
+		c.locationStack.pop()
+	}
+
+	for _, t := range target.Signature.Results {
+		loc := c.locationStack.pushValueOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
 	return nil
 }
+
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 	return c.emitDropRange(o.Range)
 }
