@@ -240,7 +240,7 @@ func TestJIT(t *testing.T) {
 		"nop.wast":                    false, // Needs br_table support
 		"return.wast":                 true,
 		"select.wast":                 false, // Needs br_table support
-		"skip-stack-guard-page.wast":  false, // TODO: needs fix.
+		"skip-stack-guard-page.wast":  true,
 		"stack.wast":                  false, // Needs call_indirect support
 		"start.wast":                  true,
 		"store.wast":                  false, // Needs br_table support
