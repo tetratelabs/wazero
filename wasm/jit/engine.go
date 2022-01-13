@@ -533,9 +533,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationStore32:
 			err = compiler.compileStore32(o)
 		case *wazeroir.OperationMemorySize:
-			compiler.compileMemorySize()
+			err = compiler.compileMemorySize()
 		case *wazeroir.OperationMemoryGrow:
-			compiler.compileMemoryGrow()
+			err = compiler.compileMemoryGrow()
 		case *wazeroir.OperationConstI32:
 			err = compiler.compileConstI32(o)
 		case *wazeroir.OperationConstI64:
@@ -623,7 +623,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationI64ReinterpretFromF64:
 			err = compiler.compileI64ReinterpretFromF64()
 		case *wazeroir.OperationF32ReinterpretFromI32:
-			err = compiler.compileI64ReinterpretFromF64()
+			err = compiler.compileF32ReinterpretFromI32()
 		case *wazeroir.OperationF64ReinterpretFromI64:
 			err = compiler.compileF64ReinterpretFromI64()
 		case *wazeroir.OperationExtend:

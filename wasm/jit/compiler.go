@@ -73,8 +73,8 @@ type compiler interface {
 	compileStore8(o *wazeroir.OperationStore8) error
 	compileStore16(o *wazeroir.OperationStore16) error
 	compileStore32(o *wazeroir.OperationStore32) error
-	compileMemoryGrow()
-	compileMemorySize()
+	compileMemoryGrow() error
+	compileMemorySize() error
 	compileConstI32(o *wazeroir.OperationConstI32) error
 	compileConstI64(o *wazeroir.OperationConstI64) error
 	compileConstF32(o *wazeroir.OperationConstF32) error

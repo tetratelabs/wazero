@@ -202,7 +202,6 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	// are generated from local.set,tee instructions in Wasm.
 	x1 := c.locationStack.peek()
 	x2 := c.locationStack.stack[index]
-	fmt.Println(x1.String(), x2.String())
 
 	// If x1 is on the conditional register, we must move it to a gp
 	// register before swap.
@@ -288,6 +287,10 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 const globalInstanceValueOffset = 8
 
 func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	intReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
@@ -354,6 +357,10 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 }
 
 func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	// First, move the value to set into a temporary register.
 	val := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(val); err != nil {
@@ -410,6 +417,10 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 }
 
 func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	if o.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		c.releaseAllRegistersToStack()
@@ -620,6 +631,10 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 }
 
 func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
 	if target.HostFunction != nil {
 		index := c.eng.compiledHostFunctionIndex[target]
@@ -761,6 +776,10 @@ func (c *amd64Compiler) compileSelect() error {
 }
 
 func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
 	// TODO: if we track the type of values on the stack,
 	// we could optimize the instruction according to the bit size of the value.
 	// For now, we just move the entire register i.e. as a quad word (8 bytes).
@@ -2856,7 +2875,8 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 // as a 32-bit integer by preserving the bit representation. If the value is on the stack,
 // this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileI32ReinterpretFromF32() error {
-	if c.locationStack.peek().onStack() {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		peek.setRegisterType(generalPurposeRegisterTypeInt)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeInt)
@@ -2866,7 +2886,8 @@ func (c *amd64Compiler) compileI32ReinterpretFromF32() error {
 // as a 64-bit integer by preserving the bit representation. If the value is on the stack,
 // this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileI64ReinterpretFromF64() error {
-	if c.locationStack.peek().onStack() {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		peek.setRegisterType(generalPurposeRegisterTypeInt)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeInt)
@@ -2876,17 +2897,19 @@ func (c *amd64Compiler) compileI64ReinterpretFromF64() error {
 // as a 32-bit float by preserving the bit representation. If the value is on the stack,
 // this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileF32ReinterpretFromI32() error {
-	if c.locationStack.peek().onStack() {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		peek.setRegisterType(generalPurposeRegisterTypeFloat)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeFloat)
 }
 
-// compileF32ReinterpretFromI32 adds instructions to reinterpret the 64-bit int on top of the stack
+// compileF64ReinterpretFromI64 adds instructions to reinterpret the 64-bit int on top of the stack
 // as a 64-bit float by preserving the bit representation. If the value is on the stack,
 // this is no-op as there is nothing to do for converting type.
 func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
-	if c.locationStack.peek().onStack() {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		peek.setRegisterType(generalPurposeRegisterTypeFloat)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeFloat)
@@ -3597,14 +3620,22 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 	return nil
 }
 
-func (c *amd64Compiler) compileMemoryGrow() {
+func (c *amd64Compiler) compileMemoryGrow() error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 	c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemoryGrow)
+	return nil
 }
 
-func (c *amd64Compiler) compileMemorySize() {
+func (c *amd64Compiler) compileMemorySize() error {
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
 	c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize)
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
 }
 
 func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) {
