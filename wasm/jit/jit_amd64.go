@@ -4142,8 +4142,7 @@ func (c *amd64Compiler) releaseAllRegistersToStack() {
 			c.releaseRegisterToStack(loc)
 			used--
 		} else if loc.onConditionalRegister() {
-			tmpReg, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
-			c.moveConditionalToGeneralPurposeRegister(loc, tmpReg)
+			c.moveConditionalToFreeGeneralPurposeRegister(loc)
 			c.releaseRegisterToStack(loc)
 			used--
 		}
