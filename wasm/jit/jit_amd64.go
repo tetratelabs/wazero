@@ -1382,12 +1382,13 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	var signedRemMinusOneDivisorJmp *obj.Prog
 	if isSignedRem {
 		// If this is for getting remainder of signed division,
-		// we have treat the special case where the divisor equals -1.
+		// we have to treat the special case where the divisor equals -1.
 		// For example, if this is 32-bit case, the result of (-2^31) / -1 equals (quotient=2^31, remainder=0)
 		// where quotient doesn't fit in the 32-bit range whose maximum is 2^31-1.
 		// x86 in this case cause floating point exception, but according to the Wasm spec
 		// if the divisor equals -1, the result must be zero (not undefined!) as opposed to be "undefined"
 		// for divisions on (-2^31) / -1 where we do not need to emit the special branches.
+		// For detail, please refer to https://stackoverflow.com/questions/56303282/why-idiv-with-1-causes-floating-point-exception
 
 		// First we compare the division with -1.
 		cmpWithMinusOne := c.newProg()
