@@ -289,7 +289,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 			var lastInstanceName string
 			for _, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
-					msg := fmt.Sprintf("%s:%d", wastName, c.Line)
+					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 					switch c.CommandType {
 					case "module":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))

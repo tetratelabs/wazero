@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"runtime/debug"
 	"strings"
 	"unsafe"
 
@@ -78,7 +77,6 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	// host functions, will be captured as errors, not panics.
 	defer func() {
 		if v := recover(); v != nil {
-			debug.PrintStack()
 			top := e.callFrameStack
 			var frames []string
 			var counter int
@@ -399,9 +397,9 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
-			fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d, stack: %v\n",
-				currentFrame.String(), e.stackBasePointer, e.stackPointer,
-				e.stack[:e.stackBasePointer+e.stackPointer],
+			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
+				currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer,
+				// e.stack[:e.stackBasePointer+e.stackPointer],
 			)
 		}
 
@@ -488,6 +486,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	if err != nil {
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
+
 	println(wazeroir.Format(ir.Operations))
 
 	compiler, err := newCompiler(e, f, ir)
@@ -498,7 +497,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	compiler.emitPreamble()
 
 	for _, op := range ir.Operations {
-		fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler.(*amd64Compiler).locationStack.String())
+		if buildoptions.IsDebugMode {
+			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler.(*amd64Compiler).locationStack.String())
+		}
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:

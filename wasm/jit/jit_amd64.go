@@ -21,6 +21,7 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -111,6 +112,14 @@ type amd64Compiler struct {
 	onLabelStartCallbacks                            map[string][]func(*obj.Prog)
 	labels                                           map[string]*labelInfo
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
+	maxStackPointer                                  uint64
+}
+
+func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
+	if c.maxStackPointer < c.locationStack.maxStackPointer {
+		c.maxStackPointer = c.locationStack.maxStackPointer
+	}
+	c.locationStack = newStack
 }
 
 type labelInfo struct {
@@ -157,7 +166,12 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 		afterReturnInst := obj.Link.Link.Link.Link
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
-	return code, c.locationStack.maxStackPointer, nil
+
+	maxStackPointer := c.maxStackPointer
+	if maxStackPointer < c.locationStack.maxStackPointer {
+		maxStackPointer = c.locationStack.maxStackPointer
+	}
+	return code, maxStackPointer, nil
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
@@ -210,13 +224,9 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 			return err
 		}
 	}
-	fmt.Println("index", index)
-	fmt.Println(x1.String(), x2.String())
 
 	if x1.onRegister() && x2.onRegister() {
-		fmt.Println(x1.register, x2.register)
 		x1.register, x2.register = x2.register, x1.register
-		fmt.Println(x1.register, x2.register)
 	} else if x1.onRegister() && x2.onStack() {
 		reg := x1.register
 		// Save x1's value to the temporary top of the stack.
@@ -526,7 +536,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 	// Emit for else branches
 	saved := c.locationStack
-	c.locationStack = saved.clone()
+	c.replaceLocationStack(saved.clone())
 	if elseTarget.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		c.releaseAllRegistersToStack()
@@ -551,7 +561,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 	// Handle then branch.
 	c.addSetJmpOrigins(jmpWithCond)
-	c.locationStack = saved
+	c.replaceLocationStack(saved)
 	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
 		return err
 	}
@@ -601,7 +611,9 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 }
 
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
-	fmt.Printf("[label %s ends]\n%s\n", c.currentLabel, c.locationStack)
+	if buildoptions.IsDebugMode {
+		fmt.Printf("[label %s ends]\n%s\n", c.currentLabel, c.locationStack)
+	}
 
 	labelKey := o.Label.String()
 	// We use NOP as a beginning of instructions in a label.
@@ -615,7 +627,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	// instructions can jump to this label.
 	labelInfo.initialInstruction = labelBegin
 	if labelInfo.initialStack != nil {
-		c.locationStack = labelInfo.initialStack
+		c.replaceLocationStack(labelInfo.initialStack)
 	}
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
@@ -625,7 +637,9 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	// Now we don't need to call the callbacks.
 	delete(c.onLabelStartCallbacks, labelKey)
 
-	fmt.Printf("[label %s]\n%s\n", labelKey, c.locationStack)
+	if buildoptions.IsDebugMode {
+		fmt.Printf("[label %s]\n%s\n", labelKey, c.locationStack)
+	}
 	c.currentLabel = labelKey
 	return nil
 }
@@ -808,8 +822,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		prog.To.Reg = reg
 		c.addInstruction(prog)
 	} else if pickTarget.onConditionalRegister() {
-		fmt.Println(c.locationStack, pickTarget)
-		panic("TODO")
+		panic("TODO: compilePick for targets on a conditonal register")
 	}
 	// Now we already placed the picked value on the register,
 	// so push the location onto the stack.

@@ -166,6 +166,7 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 			register:            v.register,
 		}
 	}
+	ret.maxStackPointer = s.maxStackPointer
 	return ret
 }
 

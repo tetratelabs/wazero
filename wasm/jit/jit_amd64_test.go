@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -1319,7 +1318,6 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
 						code, _, err := compiler.generate()
-						fmt.Println(hex.EncodeToString(code))
 						require.NoError(t, err)
 						// Run code.
 						eng := newEngine()
@@ -3259,8 +3257,6 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 								uintptr(unsafe.Pointer(&mem.Buffer[0])),
 							)
 
-							fmt.Println(hex.EncodeToString(code))
-
 							// Check the result.
 							require.Equal(t, uint64(1), eng.stackPointer)
 							if is32Bit {
@@ -3862,7 +3858,6 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								if vs.x2Value == 0 {
 									defer getDivisionByZeroErrorRecoverFunc(t)()
 								}
-								fmt.Println(hex.EncodeToString(code))
 								jitcall(
 									uintptr(unsafe.Pointer(&code[0])),
 									uintptr(unsafe.Pointer(eng)),
@@ -4972,7 +4967,6 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					compiler.releaseAllRegistersToStack()
 					compiler.returnFunction()
 					code, _, err := compiler.generate()
-					// fmt.Println(hex.EncodeToString(code))
 					require.NoError(t, err)
 
 					// Set up and run.
@@ -5499,7 +5493,8 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 
 	compiler.initializeReservedRegisters()
 	// Emit memory.grow instructions.
-	compiler.compileMemoryGrow()
+	err := compiler.compileMemoryGrow()
+	require.NoError(t, err)
 
 	// Generate the code under test.
 	code, _, err := compiler.generate()
@@ -5521,7 +5516,8 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	compiler := requireNewCompiler(t)
 	compiler.initializeReservedRegisters()
 	// Emit memory.size instructions.
-	compiler.compileMemorySize()
+	err := compiler.compileMemorySize()
+	require.NoError(t, err)
 	// At this point, the size of memory should be pushed onto the stack.
 	require.Equal(t, uint64(1), compiler.locationStack.sp)
 	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())

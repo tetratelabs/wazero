@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"runtime"
@@ -53,7 +54,6 @@ func TestEngine_fac(t *testing.T) {
 	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
-
 	for _, name := range []string{
 		"fac-rec",
 		"fac-iter",
@@ -66,9 +66,11 @@ func TestEngine_fac(t *testing.T) {
 			out, _, err := store.CallFunction("test", name, 25)
 			require.NoError(t, err)
 			require.Equal(t, uint64(7034535277573963776), out[0])
-
 		})
 	}
+
+	_, _, err = store.CallFunction("test", "fac-rec", 1073741824)
+	require.True(t, errors.Is(err, wasm.ErrCallStackOverflow))
 }
 
 func TestEngine_unreachable(t *testing.T) {
