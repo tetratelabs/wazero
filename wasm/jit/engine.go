@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"reflect"
@@ -41,8 +42,13 @@ type engine struct {
 	continuationAddressOffset uintptr
 	// The current compiledWasmFunction.globalSliceAddress
 	globalSliceAddress uintptr
+	// memorySliceLen stores the length of memory slice used by the currently executed function.
+	memorySliceLen int
 	// Function call frames in linked list
 	callFrameStack *callFrame
+	// callFrameNum tracks the current number of call frames.
+	// Note: this is not len(callFrameStack) because the stack is implemented as a linked list.
+	callFrameNum uint64
 
 	// The following fields are only used during compilation.
 
@@ -63,34 +69,50 @@ const (
 	engineFunctionCallIndexOffset   = 48
 	engineContinuationAddressOffset = 56
 	engineglobalSliceAddressOffset  = 64
+	engineMemorySliceLenOffset      = 72
 )
 
 func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	prevFrame := e.callFrameStack
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
-	defer func() {
-		if v := recover(); v != nil {
-			top := e.callFrameStack
-			var frames []string
-			var counter int
-			for top != prevFrame {
-				frames = append(frames, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
-				top = top.caller
-				counter++
-				// TODO: include DWARF symbols. See #58
-			}
-			err2, ok := v.(error)
-			if ok {
-				err = fmt.Errorf("wasm runtime error: %w", err2)
-			} else {
-				err = fmt.Errorf("wasm runtime error: %v", v)
-			}
 
-			if len(frames) > 0 {
-				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
+	// shouldRecover is true when a panic at the origin of callstack should be recovered
+	//
+	// If this is the recursive call into Wasm (e.callFrameStack != nil), we do not recover, and delegate the
+	// recovery to the first engine.Call.
+	//
+	// For example, given the call stack:
+	//	 "original host function" --(engine.Call)--> Wasm func A --> Host func --(engine.Call)--> Wasm function B,
+	// if the top Wasm function panics, we go back to the "original host function".
+	shouldRecover := e.callFrameStack == nil
+	defer func() {
+		if shouldRecover {
+			if v := recover(); v != nil {
+				top := e.callFrameStack
+				var frames []string
+				var counter int
+				for top != nil {
+					frames = append(frames, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
+					top = top.caller
+					counter++
+					// TODO: include DWARF symbols. See #58
+				}
+				runtimeErr, ok := v.(error)
+				if ok {
+					err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
+				} else {
+					err = fmt.Errorf("wasm runtime error: %v", v)
+				}
+
+				if len(frames) > 0 {
+					err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
+				}
+				// Reset the state so this engine can be reused
+				e.callFrameStack = nil
+				e.stackBasePointer = 0
+				e.stackPointer = 0
 			}
 		}
 	}()
@@ -236,6 +258,46 @@ func (e *engine) push(v uint64) {
 	e.stackPointer++
 }
 
+var callStackCeiling = uint64(buildoptions.CallStackCeiling)
+
+func (e *engine) callFramePush(next *callFrame) {
+	e.callFrameNum++
+	if callStackCeiling < e.callFrameNum {
+		panic(wasm.ErrCallStackOverflow)
+	}
+	// Push the new frame to the top of stack.
+	next.caller = e.callFrameStack
+	e.callFrameStack = next
+
+	// Initialize the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
+	e.stackBasePointer = next.stackBasePointer
+	// Set the stack pointer so that base+sp would point to the top of function params.
+	e.stackPointer = next.wasmFunction.paramCount
+	e.globalSliceAddress = next.wasmFunction.globalSliceAddress
+	if next.wasmFunction.memory != nil {
+		e.memorySliceLen = len(next.wasmFunction.memory.Buffer)
+	}
+}
+
+func (e *engine) callFramePop() {
+	// Pop the old callframe from the top of stack.
+	e.callFrameNum--
+	caller := e.callFrameStack.caller
+	e.callFrameStack = caller
+
+	// If the caller is not nil, we have to go back into the caller's frame.
+	if caller != nil {
+		// Revert the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
+		// so we can go back to the exact state when the caller made the function call.
+		e.stackBasePointer = caller.stackBasePointer
+		e.stackPointer = caller.continuationStackPointer
+		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
+		if caller.wasmFunction.memory != nil {
+			e.memorySliceLen = len(caller.wasmFunction.memory.Buffer)
+		}
+	}
+}
+
 // jitCallStatusCode represents the result of `jitcall`.
 // This is set by the jitted native code.
 type jitCallStatusCode uint32
@@ -253,6 +315,8 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
+	// jitCallStatusCodeMemoryOutOfBounds means a out of bounds memory access happened.
+	jitCallStatusCodeMemoryOutOfBounds
 )
 
 func (s jitCallStatusCode) String() (ret string) {
@@ -345,22 +409,16 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 }
 
 func (e *engine) exec(f *compiledWasmFunction) {
-	e.callFrameStack = &callFrame{
-		continuationAddress:      f.codeInitialAddress,
-		wasmFunction:             f,
-		caller:                   nil,
-		continuationStackPointer: f.paramCount,
-	}
-	e.globalSliceAddress = f.globalSliceAddress
+	// Push a new call frame for the target function.
+	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, wasmFunction: f})
+
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
-			fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d, stack: %v\n",
-				currentFrame.String(), e.stackBasePointer, e.stackPointer,
-				e.stack[:e.stackBasePointer+e.stackPointer],
-			)
+			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
+				currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer)
 		}
 
 		// Call into the jitted code.
@@ -374,13 +432,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		switch e.jitCallStatusCode {
 		case jitCallStatusCodeReturned:
 			// Meaning that the current frame exits
-			// so we just get back to the caller's frame.
-			callerFrame := currentFrame.caller
-			e.callFrameStack = callerFrame
-			if callerFrame != nil {
-				e.stackBasePointer = callerFrame.stackBasePointer
-				e.stackPointer = callerFrame.continuationStackPointer
-			}
+			// so restore the caller's frame.
+			e.callFramePop()
 		case jitCallStatusCodeCallWasmFunction:
 			// This never panics as we made sure that the index exists for all the referenced functions
 			// in a module.
@@ -392,19 +445,12 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
 				wasmFunction:        nextFunc,
-				// Set the caller frame so we can return back to the current frame!
-				caller: currentFrame,
 				// Set the base pointer to the beginning of the function params
 				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
 			}
+			e.callFramePush(frame)
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 			e.maybeGrowStack(nextFunc.maxStackPointer)
-			// Now move onto the callee function.
-			e.callFrameStack = frame
-			e.stackBasePointer = frame.stackBasePointer
-			// Set the stack pointer so that base+sp would point to the top of function params.
-			e.stackPointer = nextFunc.paramCount
-			e.globalSliceAddress = nextFunc.globalSliceAddress
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
@@ -423,9 +469,14 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Pop the call frame.
 			e.callFrameStack = currentFrame
 		case jitCallStatusCodeInvalidFloatToIntConversion:
+			// TODO: have wasm.ErrInvalidFloatToIntConversion and use it here.
 			panic("invalid float to int conversion")
 		case jitCallStatusCodeUnreachable:
+			// TODO: have wasm.ErrUnreachable and use it here.
 			panic("unreachable")
+		case jitCallStatusCodeMemoryOutOfBounds:
+			// TODO: have wasm.ErrMemoryOutOfBounds and use it here.
+			panic("out of bounds memory access")
 		}
 	}
 }
@@ -457,6 +508,10 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
+	if buildoptions.IsDebugMode {
+		fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
+	}
+
 	compiler, err := newCompiler(e, f, ir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
@@ -465,10 +520,13 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	compiler.emitPreamble()
 
 	for _, op := range ir.Operations {
+		if buildoptions.IsDebugMode {
+			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
+		}
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
-			compiler.compileUnreachable()
+			err = compiler.compileUnreachable()
 		case *wazeroir.OperationLabel:
 			err = compiler.compileLabel(o)
 		case *wazeroir.OperationBr:
@@ -510,9 +568,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationStore32:
 			err = compiler.compileStore32(o)
 		case *wazeroir.OperationMemorySize:
-			compiler.compileMemorySize()
+			err = compiler.compileMemorySize()
 		case *wazeroir.OperationMemoryGrow:
-			compiler.compileMemoryGrow()
+			err = compiler.compileMemoryGrow()
 		case *wazeroir.OperationConstI32:
 			err = compiler.compileConstI32(o)
 		case *wazeroir.OperationConstI64:
@@ -600,7 +658,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationI64ReinterpretFromF64:
 			err = compiler.compileI64ReinterpretFromF64()
 		case *wazeroir.OperationF32ReinterpretFromI32:
-			err = compiler.compileI64ReinterpretFromF64()
+			err = compiler.compileF32ReinterpretFromI32()
 		case *wazeroir.OperationF64ReinterpretFromI64:
 			err = compiler.compileF64ReinterpretFromI64()
 		case *wazeroir.OperationExtend:
@@ -614,6 +672,10 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	code, maxStackPointer, err := compiler.generate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
+	}
+
+	if buildoptions.IsDebugMode {
+		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
 	}
 
 	cf := &compiledWasmFunction{

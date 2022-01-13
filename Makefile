@@ -40,7 +40,7 @@ build.spectest:
 
 .PHONY: test
 test:
-	@go test $$(eval go list ./... | grep -v -E "examples/wasm|bench")
+	@go test ./...
 
 .PHONY: lint
 lint:

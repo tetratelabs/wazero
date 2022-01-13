@@ -1,9 +1,9 @@
 package jit
 
 import (
+	"errors"
 	"os"
 	"reflect"
-	"runtime"
 	"testing"
 	"unsafe"
 
@@ -21,12 +21,10 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallIndex)), engineFunctionCallIndexOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).globalSliceAddress)), engineglobalSliceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).memorySliceLen)), engineMemorySliceLenOffset)
 }
 
 func TestEngine_fibonacci(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		t.Skip()
-	}
 	buf, err := os.ReadFile("testdata/fib.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
@@ -40,10 +38,35 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.Equal(t, uint64(10946), out[0])
 }
 
-func TestEngine_unreachable(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		t.Skip()
+func TestEngine_fac(t *testing.T) {
+	buf, err := os.ReadFile("testdata/fac.wasm")
+	require.NoError(t, err)
+	mod, err := wasm.DecodeModule(buf)
+	require.NoError(t, err)
+	store := wasm.NewStore(NewEngine())
+	require.NoError(t, err)
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+	for _, name := range []string{
+		"fac-rec",
+		"fac-iter",
+		"fac-rec-named",
+		"fac-iter-named",
+		"fac-opt",
+	} {
+		name := name
+		t.Run(name, func(t *testing.T) {
+			out, _, err := store.CallFunction("test", name, 25)
+			require.NoError(t, err)
+			require.Equal(t, uint64(7034535277573963776), out[0])
+		})
 	}
+
+	_, _, err = store.CallFunction("test", "fac-rec", 1073741824)
+	require.True(t, errors.Is(err, wasm.ErrCallStackOverflow))
+}
+
+func TestEngine_unreachable(t *testing.T) {
 	buf, err := os.ReadFile("testdata/unreachable.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
@@ -64,9 +87,6 @@ wasm backtrace:
 }
 
 func TestEngine_memory(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		t.Skip()
-	}
 	buf, err := os.ReadFile("testdata/memory.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)

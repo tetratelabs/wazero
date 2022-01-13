@@ -23,9 +23,9 @@ func TestInterpreter_PushFrame(t *testing.T) {
 }
 
 func TestInterpreter_PushFrame_StackOverflow(t *testing.T) {
-	defer func() { callStackHeightLimit = buildoptions.CallStackHeightLimit }()
+	defer func() { callStackCeiling = buildoptions.CallStackCeiling }()
 
-	callStackHeightLimit = 3
+	callStackCeiling = 3
 
 	f1 := &interpreterFrame{}
 	f2 := &interpreterFrame{}

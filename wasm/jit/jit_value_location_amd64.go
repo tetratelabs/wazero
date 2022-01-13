@@ -4,6 +4,9 @@
 package jit
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 )
 
@@ -47,7 +50,7 @@ func isFloatRegister(r int16) bool {
 type conditionalRegisterState byte
 
 const (
-	conditionalRegisterStateUnset conditionalRegisterState = 0 + iota
+	conditionalRegisterStateUnset conditionalRegisterState = iota
 	conditionalRegisterStateE                              // ZF equal to zero
 	conditionalRegisterStateNE                             //˜ZF not equal to zero
 	conditionalRegisterStateS                              // SF negative
@@ -101,6 +104,18 @@ func (v *valueLocation) onConditionalRegister() bool {
 	return v.conditionalRegister != conditionalRegisterStateUnset
 }
 
+func (v *valueLocation) String() string {
+	var location string
+	if v.onStack() {
+		location = fmt.Sprintf("stack(%d)", v.stackPointer)
+	} else if v.onConditionalRegister() {
+		location = fmt.Sprintf("conditional(%d)", v.conditionalRegister)
+	} else if v.onRegister() {
+		location = fmt.Sprintf("register(%d)", v.register)
+	}
+	return fmt.Sprintf("{type=%s,location=%s}", v.regType, location)
+}
+
 func newValueLocationStack() *valueLocationStack {
 	return &valueLocationStack{
 		usedRegisters: map[int16]struct{}{},
@@ -127,6 +142,14 @@ type valueLocationStack struct {
 	maxStackPointer uint64
 }
 
+func (v *valueLocationStack) String() string {
+	var stackStr []string
+	for i := uint64(0); i < v.sp; i++ {
+		stackStr = append(stackStr, v.stack[i].String())
+	}
+	return fmt.Sprintf("sp=%d, stack=[%s]", v.sp, strings.Join(stackStr, ","))
+}
+
 func (s *valueLocationStack) clone() *valueLocationStack {
 	ret := &valueLocationStack{}
 	ret.sp = s.sp
@@ -143,6 +166,7 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 			register:            v.register,
 		}
 	}
+	ret.maxStackPointer = s.maxStackPointer
 	return ret
 }
 
@@ -211,6 +235,16 @@ const (
 	generalPurposeRegisterTypeInt generalPurposeRegisterType = iota
 	generalPurposeRegisterTypeFloat
 )
+
+func (tp generalPurposeRegisterType) String() (ret string) {
+	switch tp {
+	case generalPurposeRegisterTypeInt:
+		ret = "int"
+	case generalPurposeRegisterTypeFloat:
+		ret = "float"
+	}
+	return
+}
 
 // takeFreeRegister searches for unused registers. Any found are marked used and returned.
 func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {

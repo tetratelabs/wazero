@@ -5,6 +5,8 @@ import "github.com/tetratelabs/wazero/wasm/wazeroir"
 // compiler is the interface of architecture-specific native code compiler,
 // and this is responsible for compiling native code for all wazeroir operations.
 type compiler interface {
+	// For debugging purpose.
+	String() string
 	// emitPreamble is called before compiling any wazeroir operation.
 	// This is used, for example, to initilize the reserved registers, etc.
 	emitPreamble()
@@ -12,7 +14,7 @@ type compiler interface {
 	// maxStackPointer is the max stack pointer that the target function would reach.
 	generate() (code []byte, maxStackPointer uint64, err error)
 	// Followings are resinposible for compiling each wazeroir operation.
-	compileUnreachable()
+	compileUnreachable() error
 	compileSwap(o *wazeroir.OperationSwap) error
 	compileGlobalGet(o *wazeroir.OperationGlobalGet) error
 	compileGlobalSet(o *wazeroir.OperationGlobalSet) error
@@ -73,8 +75,8 @@ type compiler interface {
 	compileStore8(o *wazeroir.OperationStore8) error
 	compileStore16(o *wazeroir.OperationStore16) error
 	compileStore32(o *wazeroir.OperationStore32) error
-	compileMemoryGrow()
-	compileMemorySize()
+	compileMemoryGrow() error
+	compileMemorySize() error
 	compileConstI32(o *wazeroir.OperationConstI32) error
 	compileConstI64(o *wazeroir.OperationConstI64) error
 	compileConstF32(o *wazeroir.OperationConstF32) error
