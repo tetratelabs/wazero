@@ -78,7 +78,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	// host functions, will be captured as errors, not panics.
 
 	// Recovery from runtime panic should happen at the very origin of callstack.
-	// If this is the recursive call into Wasm, we do not recover, and delegate the
+	// If this is the recursive call into Wasm (e.callFrameStack != nil), we do not recover, and delegate the
 	// recovery to the first engine.Call().
 	// For example, if the callstack is like this:
 	//	 "original host function" --(engine.Call)--> Wasm func A --> Host func --(engine.Call)--> Wasm function B,
