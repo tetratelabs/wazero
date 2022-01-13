@@ -1269,6 +1269,20 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					})
 				}
 			})
+			// For float operations, we have to reserve two int registers to deal with NaN cases.
+			// So we intentionally use up the int registers with this function.
+			useUpIntRegistersFunc := func(compiler *amd64Compiler) {
+				for i, reg := range unreservedGeneralPurposeIntRegisters {
+					compiler.locationStack.pushValueOnRegister(reg)
+					compiler.movIntConstToRegister(int64(i), reg)
+				}
+			}
+			// Check the existing int values pushed by useUpIntRegistersFunc above.
+			checkInitialIntValuesOnStack := func(t *testing.T, eng *engine) {
+				for i := range unreservedGeneralPurposeIntRegisters {
+					require.Equal(t, uint64(i), eng.stack[i])
+				}
+			}
 			t.Run("float32", func(t *testing.T) {
 				for _, tc := range []struct {
 					x1, x2 float32
@@ -1293,13 +1307,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					t.Run(fmt.Sprintf("x1=%f,x2=%f", tc.x1, tc.x2), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
-
-						// For float operations, we have to reserve two int registers to deal with NaN cases.
-						// So we intentionally use up the int registers here.
-						for i, reg := range unreservedGeneralPurposeIntRegisters {
-							compiler.locationStack.pushValueOnRegister(reg)
-							compiler.movIntConstToRegister(int64(i), reg)
-						}
+						useUpIntRegistersFunc(compiler)
 
 						// Push the cmp target values.
 						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
@@ -1348,11 +1356,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						} else {
 							require.Equal(t, tc.x1 != tc.x2, stackTopAsInt32(eng) == 1)
 						}
-
-						// Check the existing int values.
-						for i := range unreservedGeneralPurposeIntRegisters {
-							require.Equal(t, uint64(i), eng.stack[i])
-						}
+						checkInitialIntValuesOnStack(t, eng)
 					})
 				}
 			})
@@ -1384,13 +1388,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
-
-						// For float operations, we have to reserve two int registers to deal with NaN cases.
-						// So we intentionally use up the int registers here.
-						for i, reg := range unreservedGeneralPurposeIntRegisters {
-							compiler.locationStack.pushValueOnRegister(reg)
-							compiler.movIntConstToRegister(int64(i), reg)
-						}
+						useUpIntRegistersFunc(compiler)
 
 						// Push the cmp target values.
 						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
@@ -1440,11 +1438,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						} else {
 							require.Equal(t, tc.x1 != tc.x2, stackTopAsUint32(eng) == 1)
 						}
-
-						// Check the existing int values.
-						for i := range unreservedGeneralPurposeIntRegisters {
-							require.Equal(t, uint64(i), eng.stack[i])
-						}
+						checkInitialIntValuesOnStack(t, eng)
 					})
 				}
 			})
