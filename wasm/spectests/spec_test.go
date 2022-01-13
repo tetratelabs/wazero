@@ -207,7 +207,7 @@ func TestJIT(t *testing.T) {
 		"f64_bitwise.wast":            true,
 		"f64_cmp.wast":                true,
 		"f64.wast":                    true,
-		"fac.wast":                    false, // TODO: needs fix.
+		"fac.wast":                    true,
 		"float_exprs.wast":            true,
 		"float_literals.wast":         true,
 		"float_memory.wast":           true,

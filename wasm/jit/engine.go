@@ -47,6 +47,7 @@ type engine struct {
 	memroySliceLen int
 	// Function call frames in linked list
 	callFrameStack *callFrame
+	callFrameNum   uint64
 
 	// The following fields are only used during compilation.
 
@@ -245,6 +246,38 @@ func (e *engine) push(v uint64) {
 	e.stackPointer++
 }
 
+var callStackHeightLimit = uint64(buildoptions.CallStackHeightLimit)
+
+func (e *engine) callFramePush(next *callFrame) {
+	e.callFrameNum++
+	if callStackHeightLimit < e.callFrameNum {
+		panic(wasm.ErrCallStackOverflow)
+	}
+	next.caller = e.callFrameStack
+	e.callFrameStack = next
+	e.stackBasePointer = next.stackBasePointer
+	// Set the stack pointer so that base+sp would point to the top of function params.
+	e.stackPointer = next.wasmFunction.paramCount
+	e.globalSliceAddress = next.wasmFunction.globalSliceAddress
+	if next.wasmFunction.memory != nil {
+		e.memroySliceLen = len(next.wasmFunction.memory.Buffer)
+	}
+}
+
+func (e *engine) callFramePop() {
+	e.callFrameNum--
+	caller := e.callFrameStack.caller
+	e.callFrameStack = caller
+	if caller != nil {
+		e.stackBasePointer = caller.stackBasePointer
+		e.stackPointer = caller.continuationStackPointer
+		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
+		if caller.wasmFunction.memory != nil {
+			e.memroySliceLen = len(caller.wasmFunction.memory.Buffer)
+		}
+	}
+}
+
 // jitCallStatusCode represents the result of `jitcall`.
 // This is set by the jitted native code.
 type jitCallStatusCode uint32
@@ -355,11 +388,8 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 }
 
 func (e *engine) exec(f *compiledWasmFunction) {
-	e.callFrameStack = &callFrame{
-		continuationAddress: f.codeInitialAddress,
-		wasmFunction:        f,
-		caller:              nil,
-	}
+	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, wasmFunction: f})
+
 	e.globalSliceAddress = f.globalSliceAddress
 	if f.memory != nil {
 		e.memroySliceLen = len(f.memory.Buffer)
@@ -387,16 +417,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		case jitCallStatusCodeReturned:
 			// Meaning that the current frame exits
 			// so we just get back to the caller's frame.
-			callerFrame := currentFrame.caller
-			e.callFrameStack = callerFrame
-			if callerFrame != nil {
-				e.stackBasePointer = callerFrame.stackBasePointer
-				e.stackPointer = callerFrame.continuationStackPointer
-				e.globalSliceAddress = callerFrame.wasmFunction.globalSliceAddress
-				if callerFrame.wasmFunction.memory != nil {
-					e.memroySliceLen = len(callerFrame.wasmFunction.memory.Buffer)
-				}
-			}
+			e.callFramePop()
 		case jitCallStatusCodeCallWasmFunction:
 			// This never panics as we made sure that the index exists for all the referenced functions
 			// in a module.
@@ -408,22 +429,12 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			frame := &callFrame{
 				continuationAddress: nextFunc.codeInitialAddress,
 				wasmFunction:        nextFunc,
-				// Set the caller frame so we can return back to the current frame!
-				caller: currentFrame,
 				// Set the base pointer to the beginning of the function params
 				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
 			}
+			e.callFramePush(frame)
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 			e.maybeGrowStack(nextFunc.maxStackPointer)
-			// Now move onto the callee function.
-			e.callFrameStack = frame
-			e.stackBasePointer = frame.stackBasePointer
-			// Set the stack pointer so that base+sp would point to the top of function params.
-			e.stackPointer = nextFunc.paramCount
-			e.globalSliceAddress = nextFunc.globalSliceAddress
-			if nextFunc.memory != nil {
-				e.memroySliceLen = len(nextFunc.memory.Buffer)
-			}
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallIndex {
 			case builtinFunctionIndexMemoryGrow:

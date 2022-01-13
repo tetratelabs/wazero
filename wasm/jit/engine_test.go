@@ -56,7 +56,10 @@ func TestEngine_fac(t *testing.T) {
 
 	for _, name := range []string{
 		"fac-rec",
-		// TODO: "fac-iter",
+		"fac-iter",
+		"fac-rec-named",
+		"fac-iter-named",
+		"fac-opt",
 	} {
 		name := name
 		t.Run(name, func(t *testing.T) {
