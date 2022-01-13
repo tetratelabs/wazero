@@ -498,7 +498,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 
 	for _, op := range ir.Operations {
 		if buildoptions.IsDebugMode {
-			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler.(*amd64Compiler).locationStack.String())
+			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
 		}
 		var err error
 		switch o := op.(type) {

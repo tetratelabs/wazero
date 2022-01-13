@@ -97,6 +97,10 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 	}, nil
 }
 
+func (c *amd64Compiler) String() string {
+	return c.locationStack.String()
+}
+
 type amd64Compiler struct {
 	currentLabel string
 	builder      *asm.Builder
