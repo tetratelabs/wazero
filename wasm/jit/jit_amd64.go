@@ -454,7 +454,7 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		c.returnFunction()
 	} else {
 		labelKey := o.Target.String()
-		targetLabel := c.labelInfo(labelKey)
+		targetLabel := c.label(labelKey)
 		if targetLabel.callers > 1 {
 			// If the number of callers to the target label is larget than one,
 			// we have multiple origins to the target branch. In that case,
@@ -567,7 +567,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		elseLabelKey := elseTarget.Target.Label.String()
-		labelInfo := c.labelInfo(elseLabelKey)
+		labelInfo := c.label(elseLabelKey)
 		if labelInfo.callers > 1 {
 			if err := c.preJumpRegisterAdjustment(); err != nil {
 				return err
@@ -602,8 +602,8 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		c.returnFunction()
 	} else {
 		thenLabelKey := thenTarget.Target.Label.String()
-		labelInfo := c.labelInfo(thenLabelKey)
-		if c.labelInfo(thenLabelKey).callers > 1 {
+		labelInfo := c.label(thenLabelKey)
+		if c.label(thenLabelKey).callers > 1 {
 			if err := c.preJumpRegisterAdjustment(); err != nil {
 				return err
 			}
@@ -637,7 +637,7 @@ func (c *amd64Compiler) preJumpRegisterAdjustment() error {
 }
 
 func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
-	jmpTargetLabel := c.labelInfo(labelKey)
+	jmpTargetLabel := c.label(labelKey)
 	if jmpTargetLabel.initialInstruction != nil {
 		jmpInstruction.To.SetTarget(jmpTargetLabel.initialInstruction)
 	} else {
@@ -659,7 +659,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	labelBegin.As = obj.ANOP
 	c.addInstruction(labelBegin)
 
-	labelInfo := c.labelInfo(labelKey)
+	labelInfo := c.label(labelKey)
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
@@ -3665,7 +3665,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 //
 // Note that this also emits the instructions to check the out of bounds memory access. That means
 // if the base+offsetArg+targetSizeInByte exceeds the memory size, we exit this function with
-// jitCallStatusCodeInvalidMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInByte].
+// jitCallStatusCodeMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInByte].
 func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (offsetRegister int16, err error) {
 	base := c.locationStack.pop()
 	if err = c.ensureOnGeneralPurposeRegister(base); err != nil {
@@ -3718,7 +3718,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	cmp.To.Reg = tmpReg
 	cmp.From.Type = obj.TYPE_MEM
 	cmp.From.Reg = reservedRegisterForEngine
-	cmp.From.Offset = engineMemroySliceLenOffset
+	cmp.From.Offset = engineMemorySliceLenOffset
 	c.addInstruction(cmp)
 
 	// Jump if the value is within the memory length.
@@ -3729,7 +3729,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 
 	// Otherwise, we exit the function with out of bounds status code.
 	c.addSetJmpOrigins(overflowJmp)
-	c.setJITStatus(jitCallStatusCodeInvalidMemoryOutOfBounds)
+	c.setJITStatus(jitCallStatusCodeMemoryOutOfBounds)
 	c.returnFunction()
 
 	c.addSetJmpOrigins(okJmp)

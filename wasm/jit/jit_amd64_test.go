@@ -5026,7 +5026,7 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					// Set up and run.
 					mem := newMemoryInst()
 					eng := newEngine()
-					eng.memroySliceLen = len(mem.Buffer)
+					eng.memorySliceLen = len(mem.Buffer)
 					jitcall(
 						uintptr(unsafe.Pointer(&code[0])),
 						uintptr(unsafe.Pointer(eng)),
@@ -5034,10 +5034,10 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					)
 
 					// If the memory offset exceeds the length of memory, we must exit the function
-					// with jitCallStatusCodeInvalidMemoryOutOfBounds status code.
+					// with jitCallStatusCodeMemoryOutOfBounds status code.
 					baseOffset := int(base) + int(offset)
 					if baseOffset >= math.MaxUint32 || len(mem.Buffer) < baseOffset+int(targetSizeInByte) {
-						require.Equal(t, jitCallStatusCodeInvalidMemoryOutOfBounds, eng.jitCallStatusCode)
+						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, eng.jitCallStatusCode)
 					} else {
 						require.Equal(t, jitCallStatusCodeReturned, eng.jitCallStatusCode)
 					}
@@ -5111,7 +5111,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
-			eng.memroySliceLen = len(mem.Buffer)
+			eng.memorySliceLen = len(mem.Buffer)
 			targetRegion := mem.Buffer[baseOffset+o.Arg.Offest:]
 			var expValue uint64
 			switch tp {
@@ -5192,7 +5192,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
-			eng.memroySliceLen = len(mem.Buffer)
+			eng.memorySliceLen = len(mem.Buffer)
 			// For testing, arbitrary byte is be fine.
 			original := byte(0x10)
 			mem.Buffer[baseOffset+o.Arg.Offest] = byte(original)
@@ -5257,7 +5257,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 			// Place the load target value to the memory.
 			mem := newMemoryInst()
-			eng.memroySliceLen = len(mem.Buffer)
+			eng.memorySliceLen = len(mem.Buffer)
 			// For testing, arbitrary uint16 is be fine.
 			original := uint16(0xff_fe)
 			binary.LittleEndian.PutUint16(mem.Buffer[baseOffset+o.Arg.Offest:], original)
@@ -5314,7 +5314,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 
 	// Place the load target value to the memory.
 	mem := newMemoryInst()
-	eng.memroySliceLen = len(mem.Buffer)
+	eng.memorySliceLen = len(mem.Buffer)
 	// For testing, arbitrary uint32 is be fine.
 	original := uint32(0xff_ff_fe)
 	binary.LittleEndian.PutUint32(mem.Buffer[baseOffset+o.Arg.Offest:], original)
@@ -5377,7 +5377,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 
 			// Run code.
 			mem := newMemoryInst()
-			eng.memroySliceLen = len(mem.Buffer)
+			eng.memorySliceLen = len(mem.Buffer)
 			jitcall(
 				uintptr(unsafe.Pointer(&code[0])),
 				uintptr(unsafe.Pointer(eng)),
@@ -5434,7 +5434,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 
 	// Run code.
 	mem := newMemoryInst()
-	eng.memroySliceLen = len(mem.Buffer)
+	eng.memorySliceLen = len(mem.Buffer)
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
@@ -5481,7 +5481,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 
 	// Run code.
 	mem := newMemoryInst()
-	eng.memroySliceLen = len(mem.Buffer)
+	eng.memorySliceLen = len(mem.Buffer)
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),
@@ -5528,7 +5528,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 
 	// Run code.
 	mem := newMemoryInst()
-	eng.memroySliceLen = len(mem.Buffer)
+	eng.memorySliceLen = len(mem.Buffer)
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(eng)),

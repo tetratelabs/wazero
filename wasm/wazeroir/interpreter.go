@@ -14,7 +14,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
-var callStackHeightLimit = buildoptions.CallStackHeightLimit
+var callStackCeiling = buildoptions.CallStackCeiling
 
 // interpreter implements wasm.Engine interface.
 // This is the direct interpreter of wazeroir operations.
@@ -72,7 +72,7 @@ func (it *interpreter) drop(r *InclusiveRange) {
 }
 
 func (it *interpreter) pushFrame(frame *interpreterFrame) {
-	if callStackHeightLimit <= len(it.frames) {
+	if callStackCeiling <= len(it.frames) {
 		panic(wasm.ErrCallStackOverflow)
 	}
 	it.frames = append(it.frames, frame)

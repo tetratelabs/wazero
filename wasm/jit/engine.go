@@ -265,7 +265,7 @@ var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 // we can enter the next callframe after this call.
 func (e *engine) callFramePush(next *callFrame) {
 	e.callFrameNum++
-	if callStackHeightLimit < e.callFrameNum {
+	if callStackCeiling < e.callFrameNum {
 		panic(wasm.ErrCallStackOverflow)
 	}
 	// Push the new frame to the top of stack.
@@ -278,7 +278,7 @@ func (e *engine) callFramePush(next *callFrame) {
 	e.stackPointer = next.wasmFunction.paramCount
 	e.globalSliceAddress = next.wasmFunction.globalSliceAddress
 	if next.wasmFunction.memory != nil {
-		e.memroySliceLen = len(next.wasmFunction.memory.Buffer)
+		e.memorySliceLen = len(next.wasmFunction.memory.Buffer)
 	}
 }
 
@@ -298,7 +298,7 @@ func (e *engine) callFramePop() {
 		e.stackPointer = caller.continuationStackPointer
 		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
 		if caller.wasmFunction.memory != nil {
-			e.memroySliceLen = len(caller.wasmFunction.memory.Buffer)
+			e.memorySliceLen = len(caller.wasmFunction.memory.Buffer)
 		}
 	}
 }
@@ -320,8 +320,8 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
-	// jitCallStatusCodeInvalidMemoryOutOfBounds means a out of bounds memory access happened.
-	jitCallStatusCodeInvalidMemoryOutOfBounds
+	// jitCallStatusCodeMemoryOutOfBounds means a out of bounds memory access happened.
+	jitCallStatusCodeMemoryOutOfBounds
 )
 
 func (s jitCallStatusCode) String() (ret string) {
@@ -479,7 +479,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		case jitCallStatusCodeUnreachable:
 			// TODO: have wasm.ErrUnreachable and use it here.
 			panic("unreachable")
-		case jitCallStatusCodeInvalidMemoryOutOfBounds:
+		case jitCallStatusCodeMemoryOutOfBounds:
 			// TODO: have wasm.ErrMemoryOutOfBounds and use it here.
 			panic("out of bounds memory access")
 		}
