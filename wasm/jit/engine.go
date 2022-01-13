@@ -514,7 +514,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	}
 
 	if buildoptions.IsDebugMode {
-		println(wazeroir.Format(ir.Operations))
+		fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
 	}
 
 	compiler, err := newCompiler(e, f, ir)
@@ -680,7 +680,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	}
 
 	if buildoptions.IsDebugMode {
-		println(hex.EncodeToString(code))
+		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
 	}
 
 	cf := &compiledWasmFunction{

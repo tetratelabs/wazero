@@ -128,7 +128,6 @@ func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
 	c.locationStack = newStack
 }
 
-// labelInfo holds the information about a specific label in wazeroir.
 type labelInfo struct {
 	// callers is the number of call sites which may jump into this label.
 	callers int
@@ -177,6 +176,9 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
 
+	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack
+	// used for all labels (via replaceLocationStack), excluding the current one.
+	// Hense, we check here if the final block's max one exceeds the current c.maxStackPointer.
 	maxStackPointer := c.maxStackPointer
 	if maxStackPointer < c.locationStack.maxStackPointer {
 		maxStackPointer = c.locationStack.maxStackPointer
