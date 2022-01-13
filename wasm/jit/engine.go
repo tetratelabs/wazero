@@ -528,7 +528,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
-			compiler.compileUnreachable()
+			err = compiler.compileUnreachable()
 		case *wazeroir.OperationLabel:
 			err = compiler.compileLabel(o)
 		case *wazeroir.OperationBr:

@@ -123,7 +123,9 @@ func TestRecursiveFunctionCalls(t *testing.T) {
 	// and call itself recursively.
 	compiler.releaseRegisterToStack(loc)
 	require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
-	compiler.callFunctionFromConstIndex(0)
+	err := compiler.callFunctionFromConstIndex(0)
+	require.NoError(t, err)
+
 	// ::End
 	// If zero, we return from this function after pushing 5.
 	compiler.assignRegisterToValue(loc, tmpReg)
@@ -356,7 +358,9 @@ func Test_callFunction(t *testing.T) {
 		// Build codes.
 		compiler := requireNewCompiler(t)
 		compiler.initializeReservedRegisters()
-		compiler.callFunctionFromConstIndex(functionIndex)
+		err := compiler.callFunctionFromConstIndex(functionIndex)
+		require.NoError(t, err)
+
 		// On the continuation after function call,
 		// We push the value onto stack
 		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
@@ -396,7 +400,9 @@ func Test_callFunction(t *testing.T) {
 		compiler := requireNewCompiler(t)
 		compiler.initializeReservedRegisters()
 		compiler.movIntConstToRegister(functionIndex, tmpReg)
-		compiler.callFunctionFromRegisterIndex(tmpReg)
+		err := compiler.callFunctionFromRegisterIndex(tmpReg)
+		require.NoError(t, err)
+
 		// On the continuation after function call,
 		// We push the value onto stack
 		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
@@ -447,7 +453,8 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		compiler.movIntConstToRegister(int64(50), tmpReg)
 		compiler.releaseRegisterToStack(loc)
 		require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
-		compiler.callHostFunctionFromConstIndex(functionIndex)
+		err := compiler.callHostFunctionFromConstIndex(functionIndex)
+		require.NoError(t, err)
 		// On the continuation after function call,
 		// We push the value onto stack
 		compiler.setJITStatus(jitCallStatusCodeReturned)
@@ -489,7 +496,8 @@ func TestEngine_exec_callHostFunction(t *testing.T) {
 		require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
 		// Set the function index
 		compiler.movIntConstToRegister(int64(1), tmpReg)
-		compiler.callHostFunctionFromRegisterIndex(tmpReg)
+		err := compiler.callHostFunctionFromRegisterIndex(tmpReg)
+		require.NoError(t, err)
 		// On the continuation after function call,
 		// We push the value onto stack
 		compiler.setJITStatus(jitCallStatusCodeReturned)
@@ -1316,7 +1324,8 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// To verify the behavior, we release the flag value
 						// to the stack.
-						compiler.releaseAllRegistersToStack()
+						err = compiler.releaseAllRegistersToStack()
+						require.NoError(t, err)
 						compiler.returnFunction()
 
 						// Generate the code under test.
@@ -1407,7 +1416,8 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// To verify the behavior, we push the flag value
 						// to the stack.
-						compiler.releaseAllRegistersToStack()
+						err = compiler.releaseAllRegistersToStack()
+						require.NoError(t, err)
 						compiler.returnFunction()
 
 						// Generate the code under test.
@@ -2492,7 +2502,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate the code under test.
@@ -2607,7 +2618,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate the code under test.
@@ -2762,7 +2774,8 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 
 				// To verify the behavior, we release the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
@@ -2813,7 +2826,8 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 
 				// To verify the behavior, we release the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
@@ -2865,7 +2879,8 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 
 				// To verify the behavior, we release the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
@@ -2916,7 +2931,8 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 
 				// To verify the behavior, we release the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
@@ -2967,7 +2983,8 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 
 				// To verify the behavior, we release the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
@@ -3019,7 +3036,8 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 
 				// To verify the behavior, we release the value
 				// to the stack.
-				compiler.releaseAllRegistersToStack()
+				err = compiler.releaseAllRegistersToStack()
+				require.NoError(t, err)
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
@@ -3267,7 +3285,8 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 
 							// To verify the behavior, we release the value
 							// to the stack.
-							compiler.releaseAllRegistersToStack()
+							err := compiler.releaseAllRegistersToStack()
+							require.NoError(t, err)
 							compiler.returnFunction()
 
 							// Generate and run the code under test.
@@ -3416,7 +3435,8 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 
 								// To verify the behavior, we push the value
 								// to the stack.
-								compiler.releaseAllRegistersToStack()
+								err = compiler.releaseAllRegistersToStack()
+								require.NoError(t, err)
 								compiler.returnFunction()
 
 								// Generate the code under test.
@@ -3567,7 +3587,8 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 
 								// To verify the behavior, we push the value
 								// to the stack.
-								compiler.releaseAllRegistersToStack()
+								err = compiler.releaseAllRegistersToStack()
+								require.NoError(t, err)
 								compiler.returnFunction()
 
 								// Generate the code under test.
@@ -3871,7 +3892,8 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 
 								// To verify the behavior, we push the value
 								// to the stack.
-								compiler.releaseAllRegistersToStack()
+								err = compiler.releaseAllRegistersToStack()
+								require.NoError(t, err)
 								compiler.returnFunction()
 
 								// Generate the code under test.
@@ -4030,7 +4052,8 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 
 								// To verify the behavior, we push the value
 								// to the stack.
-								compiler.releaseAllRegistersToStack()
+								err = compiler.releaseAllRegistersToStack()
+								require.NoError(t, err)
 								compiler.returnFunction()
 
 								// Generate the code under test.
@@ -4087,7 +4110,8 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 
 			// To verify the behavior, we release the value
 			// to the stack.
-			compiler.releaseAllRegistersToStack()
+			err = compiler.releaseAllRegistersToStack()
+			require.NoError(t, err)
 			compiler.returnFunction()
 
 			// Generate and run the code under test.
@@ -4130,7 +4154,8 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 
 			// To verify the behavior, we release the value
 			// to the stack.
-			compiler.releaseAllRegistersToStack()
+			err = compiler.releaseAllRegistersToStack()
+			require.NoError(t, err)
 			compiler.returnFunction()
 
 			// Generate and run the code under test.
@@ -4219,7 +4244,8 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 
 							// To verify the behavior, we release the value
 							// to the stack.
-							compiler.releaseAllRegistersToStack()
+							err = compiler.releaseAllRegistersToStack()
+							require.NoError(t, err)
 							compiler.returnFunction()
 
 							// Generate and run the code under test.
@@ -4262,7 +4288,8 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 
 					// To verify the behavior, we release the value
 					// to the stack.
-					compiler.releaseAllRegistersToStack()
+					err = compiler.releaseAllRegistersToStack()
+					require.NoError(t, err)
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
@@ -4357,7 +4384,8 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 
 					// To verify the behavior, we release the value
 					// to the stack.
-					compiler.releaseAllRegistersToStack()
+					err = compiler.releaseAllRegistersToStack()
+					require.NoError(t, err)
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
@@ -4469,7 +4497,8 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 
 					// To verify the behavior, we release the value
 					// to the stack.
-					compiler.releaseAllRegistersToStack()
+					err = compiler.releaseAllRegistersToStack()
+					require.NoError(t, err)
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
@@ -4696,7 +4725,8 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 
 					// To verify the behavior, we release the value
 					// to the stack.
-					compiler.releaseAllRegistersToStack()
+					err = compiler.releaseAllRegistersToStack()
+					require.NoError(t, err)
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
@@ -4839,7 +4869,8 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 
 					// To verify the behavior, we release the value
 					// to the stack.
-					compiler.releaseAllRegistersToStack()
+					err := compiler.releaseAllRegistersToStack()
+					require.NoError(t, err)
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
@@ -4986,7 +5017,8 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					compiler.locationStack.pushValueOnRegister(reg)
 
 					// Generate the code under test.
-					compiler.releaseAllRegistersToStack()
+					err = compiler.releaseAllRegistersToStack()
+					require.NoError(t, err)
 					compiler.returnFunction()
 					code, _, err := compiler.generate()
 					require.NoError(t, err)
@@ -5717,7 +5749,8 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	// Set the values supposed to be released to stack memory space.
 	compiler.movIntConstToRegister(300, x1Reg)
 	compiler.movIntConstToRegister(51, x2Reg)
-	compiler.releaseAllRegistersToStack()
+	err := compiler.releaseAllRegistersToStack()
+	require.NoError(t, err)
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
 	compiler.returnFunction()
 
@@ -5762,7 +5795,8 @@ func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 	compiler.locationStack.pushValueOnRegister(x2Reg)
 	compiler.movIntConstToRegister(300, x1Reg)
 	compiler.movIntConstToRegister(51, x2Reg)
-	compiler.compileUnreachable()
+	err := compiler.compileUnreachable()
+	require.NoError(t, err)
 
 	// Generate the code under test.
 	code, _, err := compiler.generate()
@@ -5963,7 +5997,8 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 			err := compiler.compileSwap(&wazeroir.OperationSwap{Depth: 2})
 			require.NoError(t, err)
 			// To verify the behavior, we release all the registers to stack locations.
-			compiler.releaseAllRegistersToStack()
+			err = compiler.releaseAllRegistersToStack()
+			require.NoError(t, err)
 			compiler.returnFunction()
 
 			// Generate the code under test.
@@ -6016,7 +6051,8 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			case wasm.ValueTypeI32, wasm.ValueTypeI64:
 				require.True(t, isIntRegister(global.register))
 			}
-			compiler.releaseAllRegistersToStack()
+			err = compiler.releaseAllRegistersToStack()
+			require.NoError(t, err)
 			compiler.returnFunction()
 
 			// Generate the code under test.

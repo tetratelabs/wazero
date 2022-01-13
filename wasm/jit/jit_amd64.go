@@ -214,10 +214,13 @@ func (c *amd64Compiler) newProg() (prog *obj.Prog) {
 	return
 }
 
-func (c *amd64Compiler) compileUnreachable() {
-	c.releaseAllRegistersToStack()
+func (c *amd64Compiler) compileUnreachable() error {
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
 	c.setJITStatus(jitCallStatusCodeUnreachable)
 	c.returnFunction()
+	return nil
 }
 
 func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
@@ -444,7 +447,9 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 
 	if o.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
-		c.releaseAllRegistersToStack()
+		if err := c.releaseAllRegistersToStack(); err != nil {
+			return err
+		}
 		c.setJITStatus(jitCallStatusCodeReturned)
 		// Then return from this function.
 		c.returnFunction()
@@ -455,7 +460,9 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 			// If the number of callers to the target label is larget than one,
 			// we have multiple origins to the target branch. In that case,
 			// we must have unique register state.
-			c.preJumpRegisterAdjustment()
+			if err := c.preJumpRegisterAdjustment(); err != nil {
+				return err
+			}
 		}
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
@@ -553,7 +560,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	c.replaceLocationStack(saved.clone())
 	if elseTarget.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
-		c.releaseAllRegistersToStack()
+		if err := c.releaseAllRegistersToStack(); err != nil {
+			return err
+		}
 		c.setJITStatus(jitCallStatusCodeReturned)
 		// Then return from this function.
 		c.returnFunction()
@@ -561,7 +570,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		elseLabelKey := elseTarget.Target.Label.String()
 		labelInfo := c.labelInfo(elseLabelKey)
 		if labelInfo.callers > 1 {
-			c.preJumpRegisterAdjustment()
+			if err := c.preJumpRegisterAdjustment(); err != nil {
+				return err
+			}
 		}
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
@@ -584,7 +595,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	}
 	if thenTarget.Target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
-		c.releaseAllRegistersToStack()
+		if err := c.releaseAllRegistersToStack(); err != nil {
+			return err
+		}
 		c.setJITStatus(jitCallStatusCodeReturned)
 		// Then return from this function.
 		c.returnFunction()
@@ -592,7 +605,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		thenLabelKey := thenTarget.Target.Label.String()
 		labelInfo := c.labelInfo(thenLabelKey)
 		if c.labelInfo(thenLabelKey).callers > 1 {
-			c.preJumpRegisterAdjustment()
+			if err := c.preJumpRegisterAdjustment(); err != nil {
+				return err
+			}
 		}
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
@@ -612,11 +627,14 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 // If a jump target has multiple callesr (origins),
 // we must have unique register states, so this function
 // must be called before such jump instruction.
-func (c *amd64Compiler) preJumpRegisterAdjustment() {
+func (c *amd64Compiler) preJumpRegisterAdjustment() error {
 	// For now, we just release all registers to memory.
 	// But this is obviously inefficient, so we come back here
 	// later once we finish the baseline implementation.
-	c.releaseAllRegistersToStack()
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
@@ -676,10 +694,14 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
 	if target.HostFunction != nil {
 		index := c.eng.compiledHostFunctionIndex[target]
-		c.callHostFunctionFromConstIndex(index)
+		if err := c.callHostFunctionFromConstIndex(index); err != nil {
+			return err
+		}
 	} else {
 		index := c.eng.compiledWasmFunctionIndex[target]
-		c.callFunctionFromConstIndex(index)
+		if err := c.callFunctionFromConstIndex(index); err != nil {
+			return err
+		}
 	}
 
 	// We consumed the function parameters from the stack after call.
@@ -3774,8 +3796,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemoryGrow)
-	return nil
+	return c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemoryGrow)
 }
 
 func (c *amd64Compiler) compileMemorySize() error {
@@ -3784,21 +3805,26 @@ func (c *amd64Compiler) compileMemorySize() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize)
+	if err := c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize); err != nil {
+		return err
+	}
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
-func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) {
+func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) error {
 	c.setJITStatus(jitCallStatusCodeCallBuiltInFunction)
 	c.setFunctionCallIndexFromConst(index)
 	// Release all the registers as our calling convention requires the callee-save.
-	c.releaseAllRegistersToStack()
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
 	c.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once we return from the function call,
 	// we must setup the reserved registers again.
 	c.initializeReservedRegisters()
+	return nil
 }
 
 func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
@@ -4083,70 +4109,85 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) callHostFunctionFromConstIndex(index int64) {
+func (c *amd64Compiler) callHostFunctionFromConstIndex(index int64) error {
 	// Set the jit status as jitCallStatusCodeCallHostFunction
 	c.setJITStatus(jitCallStatusCodeCallHostFunction)
 	// Set the function index.
 	c.setFunctionCallIndexFromConst(index)
 	// Release all the registers as our calling convention requires the callee-save.
-	c.releaseAllRegistersToStack()
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
 	// Set the continuation offset on the next instruction.
 	c.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the function call returns, we must re-initialize the reserved registers.
 	c.initializeReservedRegisters()
+	return nil
 }
 
-func (c *amd64Compiler) callHostFunctionFromRegisterIndex(reg int16) {
+func (c *amd64Compiler) callHostFunctionFromRegisterIndex(reg int16) error {
 	// Set the jit status as jitCallStatusCodeCallHostFunction
 	c.setJITStatus(jitCallStatusCodeCallHostFunction)
 	// Set the function index.
 	c.setFunctionCallIndexFromRegister(reg)
 	// Release all the registers as our calling convention requires the callee-save.
-	c.releaseAllRegistersToStack()
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
 	// Set the continuation offset on the next instruction.
 	c.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the function call returns, we must re-initialize the reserved registers..
 	c.initializeReservedRegisters()
+	return nil
 }
 
-func (c *amd64Compiler) callFunctionFromConstIndex(index int64) {
+func (c *amd64Compiler) callFunctionFromConstIndex(index int64) error {
 	// Set the jit status as jitCallStatusCodeCallWasmFunction
 	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	// Set the function index.
 	c.setFunctionCallIndexFromConst(index)
 	// Release all the registers as our calling convention requires the callee-save.
-	c.releaseAllRegistersToStack()
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
 	// Set the continuation offset on the next instruction.
 	c.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the function call returns, we must re-initialize the reserved registers.
 	c.initializeReservedRegisters()
+	return nil
 }
 
-func (c *amd64Compiler) callFunctionFromRegisterIndex(reg int16) {
+func (c *amd64Compiler) callFunctionFromRegisterIndex(reg int16) error {
 	// Set the jit status as jitCallStatusCodeCallWasmFunction
 	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	// Set the function index.
 	c.setFunctionCallIndexFromRegister(reg)
 	// Release all the registers as our calling convention requires the callee-save.
-	c.releaseAllRegistersToStack()
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
 	// Set the continuation offset on the next instruction.
 	c.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the function call returns, we must re-initialize the reserved registers.
 	c.initializeReservedRegisters()
+	return nil
 }
 
-func (c *amd64Compiler) releaseAllRegistersToStack() {
+func (c *amd64Compiler) releaseAllRegistersToStack() error {
 	used := len(c.locationStack.usedRegisters)
 	for i := uint64(0); i < c.locationStack.sp && used > 0; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
 			c.releaseRegisterToStack(loc)
 			used--
 		} else if loc.onConditionalRegister() {
-			c.moveConditionalToFreeGeneralPurposeRegister(loc)
+			if err := c.moveConditionalToFreeGeneralPurposeRegister(loc); err != nil {
+				return err
+			}
 			c.releaseRegisterToStack(loc)
 			used--
 		}
 	}
+	return nil
 }
 
 // TODO: If this function call is the tail call,
