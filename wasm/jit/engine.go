@@ -260,9 +260,6 @@ func (e *engine) push(v uint64) {
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 
-// callFramePush pushes the given callframe to the top of stack,
-// and initializes the callframe-specific fields of engine so
-// we can enter the next callframe after this call.
 func (e *engine) callFramePush(next *callFrame) {
 	e.callFrameNum++
 	if callStackCeiling < e.callFrameNum {
@@ -272,7 +269,7 @@ func (e *engine) callFramePush(next *callFrame) {
 	next.caller = e.callFrameStack
 	e.callFrameStack = next
 
-	// Initialize the callframe-specific fields.
+	// Initialize the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
 	e.stackBasePointer = next.stackBasePointer
 	// Set the stack pointer so that base+sp would point to the top of function params.
 	e.stackPointer = next.wasmFunction.paramCount
@@ -282,9 +279,6 @@ func (e *engine) callFramePush(next *callFrame) {
 	}
 }
 
-// callFramePop pops the top of callframe stack,
-// and initializes the callframe-specific fields of engine so
-// we can go back into the caller's frame after this call.
 func (e *engine) callFramePop() {
 	// Pop the old callframe from the top of stack.
 	e.callFrameNum--
@@ -293,7 +287,8 @@ func (e *engine) callFramePop() {
 
 	// If the caller is not nil, we have to go back into the caller's frame.
 	if caller != nil {
-		// Reset state match the calling frame
+		// Revert the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
+		// so we can go back to the exact state when the caller made the function call.
 		e.stackBasePointer = caller.stackBasePointer
 		e.stackPointer = caller.continuationStackPointer
 		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
