@@ -1579,6 +1579,39 @@ func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 	return
 }
 
+// emitSimpleBinaryOp emits instructions to pop two values from the stack
+// and perform the given instruction on these two values and push the result
+// onto the stack.
+func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
+
+	inst := c.newProg()
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = x2.register
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = x1.register
+	inst.As = instruction
+	c.addInstruction(inst)
+
+	// We consumed x2 register after the operation here,
+	// so we release it.
+	c.locationStack.releaseRegister(x2)
+
+	// We already stored the result in the register used by x1
+	// so we record it.
+	result := c.locationStack.pushValueOnRegister(x1.register)
+	result.setRegisterType(x1.registerType())
+	return nil
+}
+
 // compileShl emits instructions to perform a shift-left operation on
 // top two values on the stack, and pushes the result.
 func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
@@ -1631,6 +1664,8 @@ func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
 	return
 }
 
+// emitShiftOp adds instructions for shift operations (SHR, SHL, ROTR, ROTL)
+// where we have to place the second value (shift counts) on the CX register.
 func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
 	const shiftCountRegister = x86.REG_CX
 
@@ -1641,9 +1676,13 @@ func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
 		}
 	}
 
+	// Ensures that x2 (holding shift counts) is placed on the CX register.
 	if (x2.onRegister() && x2.register != shiftCountRegister) || x2.onStack() {
+		// If another value lives on the CX register, we release it to the stack.
 		c.onValueReleaseRegisterToStack(shiftCountRegister)
+
 		if x2.onRegister() {
+			// If x2 lives on a register, we just move the value to CX.
 			movToCX := c.newProg()
 			movToCX.From.Type = obj.TYPE_REG
 			movToCX.From.Reg = x2.register
@@ -1655,16 +1694,19 @@ func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
 				movToCX.As = x86.AMOVQ
 			}
 			c.addInstruction(movToCX)
+			// We no longer place any value on the original register, so we record it.
 			c.locationStack.markRegisterUnused(x2.register)
+			// Instead, we've already placed the value on the CX register.
 			x2.setRegister(shiftCountRegister)
 		} else {
+			// If it is on stack, we just move the memory allocated value to the CX register.
 			x2.setRegister(shiftCountRegister)
 			c.moveStackToRegister(x2)
 		}
 		c.locationStack.markRegisterUsed(shiftCountRegister)
 	}
 
-	x1 := c.locationStack.peek()
+	x1 := c.locationStack.peek() // Note this is peek!
 
 	inst := c.newProg()
 	inst.As = instruction
@@ -1674,6 +1716,7 @@ func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
 		inst.To.Type = obj.TYPE_REG
 		inst.To.Reg = x1.register
 	} else {
+		// Shift target can be placed on a memory location.
 		inst.To.Type = obj.TYPE_MEM
 		inst.To.Reg = reservedRegisterForStackBasePointer
 		inst.To.Offset = int64(x1.stackPointer) * 8
@@ -1683,39 +1726,6 @@ func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
 	// We consumed x2 register after the operation here,
 	// so we release it.
 	c.locationStack.releaseRegister(x2)
-	return nil
-}
-
-// emitSimpleBinaryOp emits instructions to pop two values from the stack
-// and perform the given instruction on these two values and push the result
-// onto the stack.
-func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
-	x2 := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
-		return err
-	}
-
-	x1 := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
-		return err
-	}
-
-	inst := c.newProg()
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = x2.register
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = x1.register
-	inst.As = instruction
-	c.addInstruction(inst)
-
-	// We consumed x2 register after the operation here,
-	// so we release it.
-	c.locationStack.releaseRegister(x2)
-
-	// We already stored the result in the register used by x1
-	// so we record it.
-	result := c.locationStack.pushValueOnRegister(x1.register)
-	result.setRegisterType(x1.registerType())
 	return nil
 }
 
@@ -3088,7 +3098,6 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 	case wazeroir.UnsignedTypeF64:
 		cmp.As = x86.AUCOMISD
 	}
-	c.addInstruction(cmp)
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
@@ -3096,6 +3105,8 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 
 	switch t {
 	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
+		c.addInstruction(cmp)
+
 		// Record that the result is on the conditional register.
 		var condReg conditionalRegisterState
 		if shouldEqual {
@@ -3106,38 +3117,47 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 		loc := c.locationStack.pushValueOnConditionalRegister(condReg)
 		loc.setRegisterType(generalPurposeRegisterTypeInt)
 	case wazeroir.UnsignedTypeF32, wazeroir.UnsignedTypeF64:
+		// For float EQ and NE, we have to take NaN values into account.
+		// Notably, Wasm specification states that if one of targets is NaN,
+		// the result must be zero for EQ or one for NE.
+
+		// Before we allocate the result, we have to reserve two int registers.
 		cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
 		}
-		// cmpResultReg
 		c.locationStack.markRegisterUsed(cmpResultReg)
 		nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
 		}
 
+		// Then, execute the comparison.
+		c.addInstruction(cmp)
+
+		// First, we get the parity flag which indicates whether one of values was NaN.
 		getNaNFlag := c.newProg()
-		// Parity flag is set = at least one of values was NaN.
 		if shouldEqual {
-			getNaNFlag.As = x86.ASETPC
+			getNaNFlag.As = x86.ASETPC // Set 1 if two values are NOT NaN.
 		} else {
-			getNaNFlag.As = x86.ASETPS
+			getNaNFlag.As = x86.ASETPS // Set 1 if one of values is NaN.
 		}
 		getNaNFlag.To.Type = obj.TYPE_REG
 		getNaNFlag.To.Reg = nanFragReg
 		c.addInstruction(getNaNFlag)
 
+		// Next, we get the usual comparison flag.
 		getCmpResult := c.newProg()
 		if shouldEqual {
-			getCmpResult.As = x86.ASETEQ
+			getCmpResult.As = x86.ASETEQ // Set 1 if equal.
 		} else {
-			getCmpResult.As = x86.ASETNE
+			getCmpResult.As = x86.ASETNE // Set 1 if NOT equal.
 		}
 		getCmpResult.To.Type = obj.TYPE_REG
 		getCmpResult.To.Reg = cmpResultReg
 		c.addInstruction(getCmpResult)
 
+		// Do "and" operations on these two flags to get the actual result.
 		andCmpResultWithNaNFlag := c.newProg()
 		if shouldEqual {
 			andCmpResultWithNaNFlag.As = x86.AANDL
@@ -3150,7 +3170,8 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 		andCmpResultWithNaNFlag.From.Reg = nanFragReg
 		c.addInstruction(andCmpResultWithNaNFlag)
 
-		// Clear the unnecessary bits.
+		// Clear the unnecessary bits by zero extending the first byte.
+		// This is necessary the upper bits (5 to 32 bits) of SET* instruction result is undefined.
 		clearHigherBits := c.newProg()
 		clearHigherBits.As = x86.AMOVBLZX
 		clearHigherBits.To.Type = obj.TYPE_REG
@@ -3159,6 +3180,7 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 		clearHigherBits.From.Reg = cmpResultReg
 		c.addInstruction(clearHigherBits)
 
+		// Now we have the result in cmpResultReg register, so we record it.
 		loc := c.locationStack.pushValueOnRegister(cmpResultReg)
 		loc.setRegisterType(generalPurposeRegisterTypeInt)
 	}

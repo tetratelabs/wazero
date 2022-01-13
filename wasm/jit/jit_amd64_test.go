@@ -1286,6 +1286,13 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
 
+						// For float operations, we have to reserve two int registers to deal with NaN cases.
+						// So we intentionally use up the int registers here.
+						for i, reg := range unreservedGeneralPurposeIntRegisters {
+							compiler.locationStack.pushValueOnRegister(reg)
+							compiler.movIntConstToRegister(int64(i), reg)
+						}
+
 						// Push the cmp target values.
 						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 						require.NoError(t, err)
@@ -1305,7 +1312,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 						// Plus the result must be pushed.
-						require.Equal(t, uint64(1), compiler.locationStack.sp)
+						require.Equal(t, len(unreservedGeneralPurposeIntRegisters)+1, int(compiler.locationStack.sp))
 
 						// To verify the behavior, we release the flag value
 						// to the stack.
@@ -1324,12 +1331,18 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 							uintptr(unsafe.Pointer(eng)),
 							uintptr(unsafe.Pointer(&mem.Buffer[0])),
 						)
+
 						// Check the stack.
-						require.Equal(t, uint64(1), eng.stackPointer)
+						require.Equal(t, len(unreservedGeneralPurposeIntRegisters)+1, int(eng.stackPointer))
 						if instruction.isEq {
-							require.Equal(t, tc.x1 == tc.x2, eng.stack[eng.stackPointer-1] == 1)
+							require.Equal(t, tc.x1 == tc.x2, stackTopAsInt32(eng) == 1)
 						} else {
-							require.Equal(t, tc.x1 != tc.x2, eng.stack[eng.stackPointer-1] == 1)
+							require.Equal(t, tc.x1 != tc.x2, stackTopAsInt32(eng) == 1)
+						}
+
+						// Check the existing int values.
+						for i := range unreservedGeneralPurposeIntRegisters {
+							require.Equal(t, uint64(i), eng.stack[i])
 						}
 					})
 				}
@@ -1363,6 +1376,13 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						compiler := requireNewCompiler(t)
 						compiler.initializeReservedRegisters()
 
+						// For float operations, we have to reserve two int registers to deal with NaN cases.
+						// So we intentionally use up the int registers here.
+						for i, reg := range unreservedGeneralPurposeIntRegisters {
+							compiler.locationStack.pushValueOnRegister(reg)
+							compiler.movIntConstToRegister(int64(i), reg)
+						}
+
 						// Push the cmp target values.
 						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 						require.NoError(t, err)
@@ -1383,7 +1403,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 						// Plus the result must be pushed.
-						require.Equal(t, uint64(1), compiler.locationStack.sp)
+						require.Equal(t, len(unreservedGeneralPurposeIntRegisters)+1, int(compiler.locationStack.sp))
 
 						// To verify the behavior, we push the flag value
 						// to the stack.
@@ -1402,12 +1422,18 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 							uintptr(unsafe.Pointer(eng)),
 							uintptr(unsafe.Pointer(&mem.Buffer[0])),
 						)
+
 						// Check the stack.
-						require.Equal(t, uint64(1), eng.stackPointer)
+						require.Equal(t, len(unreservedGeneralPurposeIntRegisters)+1, int(eng.stackPointer))
 						if instruction.isEq {
-							require.Equal(t, tc.x1 == tc.x2, eng.stack[eng.stackPointer-1] == 1)
+							require.Equal(t, tc.x1 == tc.x2, stackTopAsUint32(eng) == 1)
 						} else {
-							require.Equal(t, tc.x1 != tc.x2, eng.stack[eng.stackPointer-1] == 1)
+							require.Equal(t, tc.x1 != tc.x2, stackTopAsUint32(eng) == 1)
+						}
+
+						// Check the existing int values.
+						for i := range unreservedGeneralPurposeIntRegisters {
+							require.Equal(t, uint64(i), eng.stack[i])
 						}
 					})
 				}
