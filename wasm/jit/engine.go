@@ -257,13 +257,19 @@ func (e *engine) push(v uint64) {
 
 var callStackHeightLimit = uint64(buildoptions.CallStackHeightLimit)
 
+// callFramePush pushes the given callframe to the top of stack,
+// and initializes the callframe-specific fields of engine so
+// we can enter the next callframe after this call.
 func (e *engine) callFramePush(next *callFrame) {
 	e.callFrameNum++
 	if callStackHeightLimit < e.callFrameNum {
 		panic(wasm.ErrCallStackOverflow)
 	}
+	// Push the new frame to the top of stack.
 	next.caller = e.callFrameStack
 	e.callFrameStack = next
+
+	// Initialize the callframe-specific fields.
 	e.stackBasePointer = next.stackBasePointer
 	// Set the stack pointer so that base+sp would point to the top of function params.
 	e.stackPointer = next.wasmFunction.paramCount
@@ -273,11 +279,18 @@ func (e *engine) callFramePush(next *callFrame) {
 	}
 }
 
+// callFramePop pops the top of callframe stack,
+// and initializes the callframe-specific fields of engine so
+// we can go back into the caller's frame after this call.
 func (e *engine) callFramePop() {
+	// Pop the old callframe from the top of stack.
 	e.callFrameNum--
 	caller := e.callFrameStack.caller
 	e.callFrameStack = caller
+
+	// If the caller is not nil, we have to go back into the caller's frame.
 	if caller != nil {
+		// Initialize the callframe-specific fields.
 		e.stackBasePointer = caller.stackBasePointer
 		e.stackPointer = caller.continuationStackPointer
 		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
