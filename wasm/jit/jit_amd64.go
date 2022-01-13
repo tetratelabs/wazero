@@ -3094,7 +3094,7 @@ func (c *amd64Compiler) compileNe(o *wazeroir.OperationNe) error {
 	return c.emitEqOrNe(o.Type, false)
 }
 
-func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) error {
+func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) (err error) {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return err
@@ -3105,108 +3105,119 @@ func (c *amd64Compiler) emitEqOrNe(t wazeroir.UnsignedType, shouldEqual bool) er
 		return err
 	}
 
-	// Emit the compare instruction.
-	cmp := c.newProg()
-	cmp.From.Type = obj.TYPE_REG
-	cmp.From.Reg = x1.register
-	cmp.To.Type = obj.TYPE_REG
-	cmp.To.Reg = x2.register
 	switch t {
 	case wazeroir.UnsignedTypeI32:
-		cmp.As = x86.ACMPL
+		err = c.emitEqOrNeForInts(x1.register, x2.register, x86.ACMPL, shouldEqual)
 	case wazeroir.UnsignedTypeI64:
-		cmp.As = x86.ACMPQ
+		err = c.emitEqOrNeForInts(x1.register, x2.register, x86.ACMPQ, shouldEqual)
 	case wazeroir.UnsignedTypeF32:
-		cmp.As = x86.AUCOMISS
+		err = c.emitEqOrNeForFloats(x1.register, x2.register, x86.AUCOMISS, shouldEqual)
 	case wazeroir.UnsignedTypeF64:
-		cmp.As = x86.AUCOMISD
+		err = c.emitEqOrNeForFloats(x1.register, x2.register, x86.AUCOMISD, shouldEqual)
+	}
+	if err != nil {
+		return
 	}
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
+	return
+}
 
-	switch t {
-	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
-		c.addInstruction(cmp)
+func (c *amd64Compiler) emitEqOrNeForInts(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
+	cmp := c.newProg()
+	cmp.As = cmpInstruction
+	cmp.From.Type = obj.TYPE_REG
+	cmp.From.Reg = x2Reg
+	cmp.To.Type = obj.TYPE_REG
+	cmp.To.Reg = x1Reg
+	c.addInstruction(cmp)
 
-		// Record that the result is on the conditional register.
-		var condReg conditionalRegisterState
-		if shouldEqual {
-			condReg = conditionalRegisterStateE
-		} else {
-			condReg = conditionalRegisterStateNE
-		}
-		loc := c.locationStack.pushValueOnConditionalRegister(condReg)
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
-	case wazeroir.UnsignedTypeF32, wazeroir.UnsignedTypeF64:
-		// For float EQ and NE, we have to take NaN values into account.
-		// Notably, Wasm specification states that if one of targets is NaN,
-		// the result must be zero for EQ or one for NE.
-
-		// Before we allocate the result, we have to reserve two int registers.
-		cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-		if err != nil {
-			return err
-		}
-		c.locationStack.markRegisterUsed(cmpResultReg)
-		nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-		if err != nil {
-			return err
-		}
-
-		// Then, execute the comparison.
-		c.addInstruction(cmp)
-
-		// First, we get the parity flag which indicates whether one of values was NaN.
-		getNaNFlag := c.newProg()
-		if shouldEqual {
-			getNaNFlag.As = x86.ASETPC // Set 1 if two values are NOT NaN.
-		} else {
-			getNaNFlag.As = x86.ASETPS // Set 1 if one of values is NaN.
-		}
-		getNaNFlag.To.Type = obj.TYPE_REG
-		getNaNFlag.To.Reg = nanFragReg
-		c.addInstruction(getNaNFlag)
-
-		// Next, we get the usual comparison flag.
-		getCmpResult := c.newProg()
-		if shouldEqual {
-			getCmpResult.As = x86.ASETEQ // Set 1 if equal.
-		} else {
-			getCmpResult.As = x86.ASETNE // Set 1 if NOT equal.
-		}
-		getCmpResult.To.Type = obj.TYPE_REG
-		getCmpResult.To.Reg = cmpResultReg
-		c.addInstruction(getCmpResult)
-
-		// Do "and" operations on these two flags to get the actual result.
-		andCmpResultWithNaNFlag := c.newProg()
-		if shouldEqual {
-			andCmpResultWithNaNFlag.As = x86.AANDL
-		} else {
-			andCmpResultWithNaNFlag.As = x86.AORL
-		}
-		andCmpResultWithNaNFlag.To.Type = obj.TYPE_REG
-		andCmpResultWithNaNFlag.To.Reg = cmpResultReg
-		andCmpResultWithNaNFlag.From.Type = obj.TYPE_REG
-		andCmpResultWithNaNFlag.From.Reg = nanFragReg
-		c.addInstruction(andCmpResultWithNaNFlag)
-
-		// Clear the unnecessary bits by zero extending the first byte.
-		// This is necessary the upper bits (5 to 32 bits) of SET* instruction result is undefined.
-		clearHigherBits := c.newProg()
-		clearHigherBits.As = x86.AMOVBLZX
-		clearHigherBits.To.Type = obj.TYPE_REG
-		clearHigherBits.To.Reg = cmpResultReg
-		clearHigherBits.From.Type = obj.TYPE_REG
-		clearHigherBits.From.Reg = cmpResultReg
-		c.addInstruction(clearHigherBits)
-
-		// Now we have the result in cmpResultReg register, so we record it.
-		loc := c.locationStack.pushValueOnRegister(cmpResultReg)
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
+	// Record that the result is on the conditional register.
+	var condReg conditionalRegisterState
+	if shouldEqual {
+		condReg = conditionalRegisterStateE
+	} else {
+		condReg = conditionalRegisterStateNE
 	}
+	loc := c.locationStack.pushValueOnConditionalRegister(condReg)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	return nil
+}
+
+// For float EQ and NE, we have to take NaN values into account.
+// Notably, Wasm specification states that if one of targets is NaN,
+// the result must be zero for EQ or one for NE.
+func (c *amd64Compiler) emitEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
+	// Before we allocate the result, we have to reserve two int registers.
+	cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+	c.locationStack.markRegisterUsed(cmpResultReg)
+	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// Then, execute the comparison.
+	cmp := c.newProg()
+	cmp.As = cmpInstruction
+	cmp.From.Type = obj.TYPE_REG
+	cmp.From.Reg = x2Reg
+	cmp.To.Type = obj.TYPE_REG
+	cmp.To.Reg = x1Reg
+	c.addInstruction(cmp)
+
+	// First, we get the parity flag which indicates whether one of values was NaN.
+	getNaNFlag := c.newProg()
+	if shouldEqual {
+		getNaNFlag.As = x86.ASETPC // Set 1 if two values are NOT NaN.
+	} else {
+		getNaNFlag.As = x86.ASETPS // Set 1 if one of values is NaN.
+	}
+	getNaNFlag.To.Type = obj.TYPE_REG
+	getNaNFlag.To.Reg = nanFragReg
+	c.addInstruction(getNaNFlag)
+
+	// Next, we get the usual comparison flag.
+	getCmpResult := c.newProg()
+	if shouldEqual {
+		getCmpResult.As = x86.ASETEQ // Set 1 if equal.
+	} else {
+		getCmpResult.As = x86.ASETNE // Set 1 if NOT equal.
+	}
+	getCmpResult.To.Type = obj.TYPE_REG
+	getCmpResult.To.Reg = cmpResultReg
+	c.addInstruction(getCmpResult)
+
+	// Do "and" operations on these two flags to get the actual result.
+	andCmpResultWithNaNFlag := c.newProg()
+	if shouldEqual {
+		andCmpResultWithNaNFlag.As = x86.AANDL
+	} else {
+		andCmpResultWithNaNFlag.As = x86.AORL
+	}
+	andCmpResultWithNaNFlag.To.Type = obj.TYPE_REG
+	andCmpResultWithNaNFlag.To.Reg = cmpResultReg
+	andCmpResultWithNaNFlag.From.Type = obj.TYPE_REG
+	andCmpResultWithNaNFlag.From.Reg = nanFragReg
+	c.addInstruction(andCmpResultWithNaNFlag)
+
+	// Clear the unnecessary bits by zero extending the first byte.
+	// This is necessary the upper bits (5 to 32 bits) of SET* instruction result is undefined.
+	clearHigherBits := c.newProg()
+	clearHigherBits.As = x86.AMOVBLZX
+	clearHigherBits.To.Type = obj.TYPE_REG
+	clearHigherBits.To.Reg = cmpResultReg
+	clearHigherBits.From.Type = obj.TYPE_REG
+	clearHigherBits.From.Reg = cmpResultReg
+	c.addInstruction(clearHigherBits)
+
+	// Now we have the result in cmpResultReg register, so we record it.
+	loc := c.locationStack.pushValueOnRegister(cmpResultReg)
+	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
 
