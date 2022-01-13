@@ -3055,152 +3055,220 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			for i, vs := range []struct {
-				x1, x2 uint64
+			for _, locations := range []struct {
+				name string
+				// Interpret -1 as stack.
+				x1Reg, x2Reg int16
 			}{
-				{x1: 0, x2: 0},
-				{x1: 0, x2: 1},
-				{x1: 1, x2: 0},
-				{x1: 1, x2: 1},
-				{x1: 1 << 31, x2: 1},
-				{x1: 1, x2: 1 << 31},
-				{x1: 1 << 31, x2: 1 << 31},
-				{x1: 1 << 63, x2: 1},
-				{x1: 1, x2: 1 << 63},
-				{x1: 1 << 63, x2: 1 << 63},
+				{
+					name:  "x1:cx,x2:random_reg",
+					x1Reg: x86.REG_CX,
+					x2Reg: x86.REG_R10,
+				},
+				{
+					name:  "x1:cx,x2:stack",
+					x1Reg: x86.REG_CX,
+					x2Reg: -1,
+				},
+				{
+					name:  "x1:random_reg,x2:cx",
+					x1Reg: x86.REG_R10,
+					x2Reg: x86.REG_CX,
+				},
+				{
+					name:  "x1:staack,x2:cx",
+					x1Reg: -1,
+					x2Reg: x86.REG_CX,
+				},
+				{
+					name:  "x1:random_reg,x2:random_reg",
+					x1Reg: x86.REG_R10,
+					x2Reg: x86.REG_R9,
+				},
+				{
+					name:  "x1:stack,x2:random_reg",
+					x1Reg: -1,
+					x2Reg: x86.REG_R9,
+				},
+				{
+					name:  "x1:random_reg,x2:stack",
+					x1Reg: x86.REG_R9,
+					x2Reg: -1,
+				},
+				{
+					name:  "x1:stack,x2:stack",
+					x1Reg: -1,
+					x2Reg: -1,
+				},
 			} {
-				t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+				locations := locations
+				t.Run(locations.name, func(t *testing.T) {
+					for i, vs := range []struct {
+						x1, x2 uint64
+					}{
+						{x1: 0, x2: 0},
+						{x1: 0, x2: 1},
+						{x1: 1, x2: 0},
+						{x1: 1, x2: 1},
+						{x1: 1 << 31, x2: 1},
+						{x1: 1, x2: 1 << 31},
+						{x1: 1 << 31, x2: 1 << 31},
+						{x1: 1 << 63, x2: 1},
+						{x1: 1, x2: 1 << 63},
+						{x1: 1 << 63, x2: 1 << 63},
+					} {
+						vs := vs
+						t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+							compiler := requireNewCompiler(t)
+							compiler.initializeReservedRegisters()
 
-					var is32Bit bool
-					var expectedValue uint64
-					var compileOperationFunc func()
-					switch o := tc.op.(type) {
-					case *wazeroir.OperationAnd:
-						compileOperationFunc = func() {
-							err := compiler.compileAnd(o)
-							require.NoError(t, err)
-						}
-						is32Bit = o.Type == wazeroir.UnsignedInt32
-						if is32Bit {
-							expectedValue = uint64(uint32(vs.x1) & uint32(vs.x2))
-						} else {
-							expectedValue = vs.x1 & vs.x2
-						}
-					case *wazeroir.OperationOr:
-						compileOperationFunc = func() {
-							err := compiler.compileOr(o)
-							require.NoError(t, err)
-						}
-						is32Bit = o.Type == wazeroir.UnsignedInt32
-						if is32Bit {
-							expectedValue = uint64(uint32(vs.x1) | uint32(vs.x2))
-						} else {
-							expectedValue = vs.x1 | vs.x2
-						}
-					case *wazeroir.OperationXor:
-						compileOperationFunc = func() {
-							err := compiler.compileXor(o)
-							require.NoError(t, err)
-						}
-						is32Bit = o.Type == wazeroir.UnsignedInt32
-						if is32Bit {
-							expectedValue = uint64(uint32(vs.x1) ^ uint32(vs.x2))
-						} else {
-							expectedValue = vs.x1 ^ vs.x2
-						}
-					case *wazeroir.OperationShl:
-						compileOperationFunc = func() {
-							err := compiler.compileShl(o)
-							require.NoError(t, err)
-						}
-						is32Bit = o.Type == wazeroir.UnsignedInt32
-						if is32Bit {
-							expectedValue = uint64(uint32(vs.x1) << uint32(vs.x2%32))
-						} else {
-							expectedValue = vs.x1 << (vs.x2 % 64)
-						}
-					case *wazeroir.OperationShr:
-						compileOperationFunc = func() {
-							err := compiler.compileShr(o)
-							require.NoError(t, err)
-						}
-						is32Bit = o.Type == wazeroir.SignedInt32 || o.Type == wazeroir.SignedUint32
-						switch o.Type {
-						case wazeroir.SignedInt32:
-							expectedValue = uint64(int32(vs.x1) >> (uint32(vs.x2) % 32))
-						case wazeroir.SignedInt64:
-							expectedValue = uint64(int64(vs.x1) >> (vs.x2 % 64))
-						case wazeroir.SignedUint32:
-							expectedValue = uint64(uint32(vs.x1) >> (uint32(vs.x2) % 32))
-						case wazeroir.SignedUint64:
-							expectedValue = vs.x1 >> (vs.x2 % 64)
-						}
-					case *wazeroir.OperationRotl:
-						compileOperationFunc = func() {
-							err := compiler.compileRotl(o)
-							require.NoError(t, err)
-						}
-						is32Bit = o.Type == wazeroir.UnsignedInt32
-						if is32Bit {
-							expectedValue = uint64(bits.RotateLeft32(uint32(vs.x1), int(vs.x2)))
-						} else {
-							expectedValue = uint64(bits.RotateLeft64(vs.x1, int(vs.x2)))
-						}
-					case *wazeroir.OperationRotr:
-						compileOperationFunc = func() {
-							err := compiler.compileRotr(o)
-							require.NoError(t, err)
-						}
-						is32Bit = o.Type == wazeroir.UnsignedInt32
-						if is32Bit {
-							expectedValue = uint64(bits.RotateLeft32(uint32(vs.x1), -int(vs.x2)))
-						} else {
-							expectedValue = uint64(bits.RotateLeft64(vs.x1, -int(vs.x2)))
-						}
-					}
+							var is32Bit bool
+							var expectedValue uint64
+							var compileOperationFunc func()
+							switch o := tc.op.(type) {
+							case *wazeroir.OperationAnd:
+								compileOperationFunc = func() {
+									err := compiler.compileAnd(o)
+									require.NoError(t, err)
+								}
+								is32Bit = o.Type == wazeroir.UnsignedInt32
+								if is32Bit {
+									expectedValue = uint64(uint32(vs.x1) & uint32(vs.x2))
+								} else {
+									expectedValue = vs.x1 & vs.x2
+								}
+							case *wazeroir.OperationOr:
+								compileOperationFunc = func() {
+									err := compiler.compileOr(o)
+									require.NoError(t, err)
+								}
+								is32Bit = o.Type == wazeroir.UnsignedInt32
+								if is32Bit {
+									expectedValue = uint64(uint32(vs.x1) | uint32(vs.x2))
+								} else {
+									expectedValue = vs.x1 | vs.x2
+								}
+							case *wazeroir.OperationXor:
+								compileOperationFunc = func() {
+									err := compiler.compileXor(o)
+									require.NoError(t, err)
+								}
+								is32Bit = o.Type == wazeroir.UnsignedInt32
+								if is32Bit {
+									expectedValue = uint64(uint32(vs.x1) ^ uint32(vs.x2))
+								} else {
+									expectedValue = vs.x1 ^ vs.x2
+								}
+							case *wazeroir.OperationShl:
+								compileOperationFunc = func() {
+									err := compiler.compileShl(o)
+									require.NoError(t, err)
+								}
+								is32Bit = o.Type == wazeroir.UnsignedInt32
+								if is32Bit {
+									expectedValue = uint64(uint32(vs.x1) << uint32(vs.x2%32))
+								} else {
+									expectedValue = vs.x1 << (vs.x2 % 64)
+								}
+							case *wazeroir.OperationShr:
+								compileOperationFunc = func() {
+									err := compiler.compileShr(o)
+									require.NoError(t, err)
+								}
+								is32Bit = o.Type == wazeroir.SignedInt32 || o.Type == wazeroir.SignedUint32
+								switch o.Type {
+								case wazeroir.SignedInt32:
+									expectedValue = uint64(int32(vs.x1) >> (uint32(vs.x2) % 32))
+								case wazeroir.SignedInt64:
+									expectedValue = uint64(int64(vs.x1) >> (vs.x2 % 64))
+								case wazeroir.SignedUint32:
+									expectedValue = uint64(uint32(vs.x1) >> (uint32(vs.x2) % 32))
+								case wazeroir.SignedUint64:
+									expectedValue = vs.x1 >> (vs.x2 % 64)
+								}
+							case *wazeroir.OperationRotl:
+								compileOperationFunc = func() {
+									err := compiler.compileRotl(o)
+									require.NoError(t, err)
+								}
+								is32Bit = o.Type == wazeroir.UnsignedInt32
+								if is32Bit {
+									expectedValue = uint64(bits.RotateLeft32(uint32(vs.x1), int(vs.x2)))
+								} else {
+									expectedValue = uint64(bits.RotateLeft64(vs.x1, int(vs.x2)))
+								}
+							case *wazeroir.OperationRotr:
+								compileOperationFunc = func() {
+									err := compiler.compileRotr(o)
+									require.NoError(t, err)
+								}
+								is32Bit = o.Type == wazeroir.UnsignedInt32
+								if is32Bit {
+									expectedValue = uint64(bits.RotateLeft32(uint32(vs.x1), -int(vs.x2)))
+								} else {
+									expectedValue = uint64(bits.RotateLeft64(vs.x1, -int(vs.x2)))
+								}
+							}
 
-					// Setup the target values.
-					if is32Bit {
-						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(vs.x1)})
-						require.NoError(t, err)
-						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(vs.x2)})
-						require.NoError(t, err)
-					} else {
-						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: vs.x1})
-						require.NoError(t, err)
-						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: vs.x2})
-						require.NoError(t, err)
-					}
+							// Setup the target values.
+							eng := newEngine()
+							if locations.x1Reg != -1 {
+								compiler.movIntConstToRegister(int64(vs.x1), locations.x1Reg)
+								compiler.locationStack.pushValueOnRegister(locations.x1Reg)
+							} else {
+								loc := compiler.locationStack.pushValueOnStack()
+								eng.stack[loc.stackPointer] = uint64(vs.x1)
+							}
+							if locations.x2Reg != -1 {
+								compiler.movIntConstToRegister(int64(vs.x2), locations.x2Reg)
+								compiler.locationStack.pushValueOnRegister(locations.x2Reg)
+							} else {
+								loc := compiler.locationStack.pushValueOnStack()
+								eng.stack[loc.stackPointer] = uint64(vs.x2)
+							}
 
-					// Compile the operation.
-					compileOperationFunc()
+							// Compile the operation.
+							compileOperationFunc()
+							require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-					// To verify the behavior, we release the value
-					// to the stack.
-					compiler.releaseAllRegistersToStack()
-					compiler.returnFunction()
+							switch tc.op.Kind() {
+							case wazeroir.OperationKindShl, wazeroir.OperationKindShr,
+								wazeroir.OperationKindRotl, wazeroir.OperationKindRotr:
+								require.NotContains(t, compiler.locationStack.usedRegisters, x86.REG_CX)
+								if locations.x1Reg == x86.REG_CX || locations.x1Reg == -1 {
+									require.True(t, compiler.locationStack.peek().onStack())
+									require.Len(t, compiler.locationStack.usedRegisters, 0)
+								} else {
+									require.True(t, compiler.locationStack.peek().onRegister())
+									require.Len(t, compiler.locationStack.usedRegisters, 1)
+								}
+							}
 
-					// Generate and run the code under test.
-					code, _, err := compiler.generate()
-					require.NoError(t, err)
-					eng := newEngine()
-					mem := newMemoryInst()
-					jitcall(
-						uintptr(unsafe.Pointer(&code[0])),
-						uintptr(unsafe.Pointer(eng)),
-						uintptr(unsafe.Pointer(&mem.Buffer[0])),
-					)
+							// To verify the behavior, we release the value
+							// to the stack.
+							compiler.releaseAllRegistersToStack()
+							compiler.returnFunction()
 
-					fmt.Println(hex.EncodeToString(code))
+							// Generate and run the code under test.
+							code, _, err := compiler.generate()
+							require.NoError(t, err)
+							mem := newMemoryInst()
+							jitcall(
+								uintptr(unsafe.Pointer(&code[0])),
+								uintptr(unsafe.Pointer(eng)),
+								uintptr(unsafe.Pointer(&mem.Buffer[0])),
+							)
 
-					// Check the result.
-					require.Equal(t, uint64(1), eng.stackPointer)
-					if is32Bit {
-						require.Equal(t, uint32(expectedValue), uint32(eng.stack[eng.stackPointer-1]))
-					} else {
-						require.Equal(t, expectedValue, eng.stack[eng.stackPointer-1])
+							fmt.Println(hex.EncodeToString(code))
+
+							// Check the result.
+							require.Equal(t, uint64(1), eng.stackPointer)
+							if is32Bit {
+								require.Equal(t, uint32(expectedValue), uint32(eng.stack[eng.stackPointer-1]))
+							} else {
+								require.Equal(t, expectedValue, eng.stack[eng.stackPointer-1])
+							}
+						})
 					}
 				})
 			}

@@ -1525,9 +1525,9 @@ func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.emitSimpleBinaryOp(x86.ASHLL)
+		err = c.emitShiftOp(x86.ASHLL, false)
 	case wazeroir.UnsignedInt64:
-		err = c.emitSimpleBinaryOp(x86.ASHLQ)
+		err = c.emitShiftOp(x86.ASHLQ, true)
 	}
 	return
 }
@@ -1537,13 +1537,13 @@ func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		err = c.emitSimpleBinaryOp(x86.ASARL)
+		err = c.emitShiftOp(x86.ASARL, true)
 	case wazeroir.SignedInt64:
-		err = c.emitSimpleBinaryOp(x86.ASARQ)
+		err = c.emitShiftOp(x86.ASARQ, false)
 	case wazeroir.SignedUint32:
-		err = c.emitSimpleBinaryOp(x86.ASHRL)
+		err = c.emitShiftOp(x86.ASHRL, true)
 	case wazeroir.SignedUint64:
-		err = c.emitSimpleBinaryOp(x86.ASHRQ)
+		err = c.emitShiftOp(x86.ASHRQ, false)
 	}
 	return
 }
@@ -1553,9 +1553,9 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.emitSimpleBinaryOp(x86.AROLL)
+		err = c.emitShiftOp(x86.AROLL, true)
 	case wazeroir.UnsignedInt64:
-		err = c.emitSimpleBinaryOp(x86.AROLQ)
+		err = c.emitShiftOp(x86.AROLQ, false)
 	}
 	return
 }
@@ -1565,11 +1565,66 @@ func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.emitSimpleBinaryOp(x86.ARORL)
+		err = c.emitShiftOp(x86.ARORL, true)
 	case wazeroir.UnsignedInt64:
-		err = c.emitSimpleBinaryOp(x86.ARORQ)
+		err = c.emitShiftOp(x86.ARORQ, false)
 	}
 	return
+}
+
+func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
+	const shiftCountRegister = x86.REG_CX
+
+	x2 := c.locationStack.pop()
+	if x2.onConditionalRegister() {
+		if err := c.moveConditionalToFreeGeneralPurposeRegister(x2); err != nil {
+			return err
+		}
+	}
+
+	if (x2.onRegister() && x2.register != shiftCountRegister) || x2.onStack() {
+		c.onValueReleaseRegisterToStack(shiftCountRegister)
+		if x2.onRegister() {
+			movToCX := c.newProg()
+			movToCX.From.Type = obj.TYPE_REG
+			movToCX.From.Reg = x2.register
+			movToCX.To.Type = obj.TYPE_REG
+			movToCX.To.Reg = shiftCountRegister
+			if is32Bit {
+				movToCX.As = x86.AMOVL
+			} else {
+				movToCX.As = x86.AMOVQ
+			}
+			c.addInstruction(movToCX)
+			c.locationStack.markRegisterUnused(x2.register)
+			x2.setRegister(shiftCountRegister)
+		} else {
+			x2.setRegister(shiftCountRegister)
+			c.moveStackToRegister(x2)
+		}
+		c.locationStack.markRegisterUsed(shiftCountRegister)
+	}
+
+	x1 := c.locationStack.peek()
+
+	inst := c.newProg()
+	inst.As = instruction
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = x2.register
+	if x1.onRegister() {
+		inst.To.Type = obj.TYPE_REG
+		inst.To.Reg = x1.register
+	} else {
+		inst.To.Type = obj.TYPE_MEM
+		inst.To.Reg = reservedRegisterForStackBasePointer
+		inst.To.Offset = int64(x1.stackPointer) * 8
+	}
+	c.addInstruction(inst)
+
+	// We consumed x2 register after the operation here,
+	// so we release it.
+	c.locationStack.releaseRegister(x2)
+	return nil
 }
 
 // emitSimpleBinaryOp emits instructions to pop two values from the stack
