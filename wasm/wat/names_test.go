@@ -39,7 +39,7 @@ func TestEncodeNameSection_OnlyFuncName(t *testing.T) {
 	type1 := &typeFunc{params: []wasm.ValueType{i32, i32}, result: i32}
 	type2 := &typeFunc{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32}
 	m := &module{
-		typeFuncs: []*typeFunc{type1, type2},
+		types: []*typeFunc{type1, type2},
 		importFuncs: []*importFunc{
 			{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_sizes_get", funcName: "$" + func0,
 				typeIndex: &index{ /* TODO 0*/ }},

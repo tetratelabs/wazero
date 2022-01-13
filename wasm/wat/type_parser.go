@@ -1,7 +1,6 @@
 package wat
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -68,15 +67,32 @@ type typeParser struct {
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A2
 	currentParams []wasm.ValueType
 
-	// currentParamIndex is used to give an appropriate errorContext
-	currentParamIndex uint32
+	// currentParamNames accumulates any typeFunc.params for the current type. Ex. $x names (param $x i32)
+	//
+	// Note: names can be missing because they were never assigned, ex. (param i32), or due to abbreviated format which
+	// does not support names. Ex. (param i32 i32)
+	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A2
+	currentParamNames paramNames
 
-	// foundParam allows us to check if we found a type in a "param" field. We can't use currentParamIndex because when
-	// parameters are abbreviated, ex. (param i32 i32), the currentParamIndex will be less than the type count.
+	// currentParamField is a field index and used to give an appropriate errorContext. Due to abbreviation it may be
+	// unrelated to the length of currentParams
+	currentParamField uint32
+
+	// currentParamName is the name of the currentParamField, added on tokenRParen to currentParamNames
+	currentParamName []byte
+
+	// foundParam allows us to check if we found a type in a "param" field. We can't use currentParamField because when
+	// parameters are abbreviated, ex. (param i32 i32), the currentParamField will be less than the type count.
 	foundParam bool
 
 	// currentResult is zero until set, and only set once as WebAssembly 1.0 only supports up to one result.
 	currentResult wasm.ValueType
+
+	// currentTypeUseStartLine tracks the start column of a type use in case there's an error later
+	currentTypeUseStartLine uint32
+
+	// currentTypeUseStartCol tracks the start column of a type use in case there's an error later
+	currentTypeUseStartCol uint32
 }
 
 // beginTypeUse sets the next parser to beginTypeParamOrResult. reset must be called prior to this.
@@ -99,10 +115,16 @@ func (p *typeParser) beginTypeUse(onTypeEnd tokenParser) {
 // (tokenKeyword).
 func (p *typeParser) beginTypeParamOrResult(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenKeyword && string(tokenBytes) == "type" {
+		// If we see a "type" field, there's a chance there's an inlined type following it. We record the position, as
+		// we can't verify the signature until all types are read. If there's a signature mismatch later, we need to
+		// know where in the source it was wrong!
+		p.currentTypeUseStartLine = line
+		p.currentTypeUseStartCol = col
 		p.state = parsingType
 		p.m.tokenParser = p.m.indexParser.beginParsingIndex(p.parseTypeIndexEnd)
 		return nil
 	}
+	p.state = parsingParamOrResult
 	return p.beginParamOrResult(tok, tokenBytes, line, col)
 }
 
@@ -124,7 +146,8 @@ func (p *typeParser) beginType(onTypeEnd tokenParser) {
 func (p *typeParser) reset() {
 	p.currentTypeIndex = nil
 	p.currentParams = nil
-	p.currentParamIndex = 0
+	p.currentParamNames = nil
+	p.currentParamField = 0
 	p.currentResult = 0
 }
 
@@ -142,7 +165,8 @@ func (p *typeParser) beginParamOrResult(tok tokenType, tokenBytes []byte, line, 
 		case "param":
 			p.state = parsingParam
 			p.foundParam = false
-			p.m.tokenParser = p.parseParam
+			p.currentParamName = nil
+			p.m.tokenParser = p.parseParamName
 		case "result":
 			p.state = parsingResult
 			p.m.tokenParser = p.parseResult
@@ -165,14 +189,48 @@ func (p *typeParser) parseMoreParamsOrResult(tok tokenType, tokenBytes []byte, l
 	return p.onTypeEnd(tok, tokenBytes, line, col)
 }
 
+// parseParamName is the first parser inside a param field. This records the name if present or calls parseParam if not
+// found.
+//
+// Ex. A param name is present `(param $x i32)`
+//                        records $x --^  ^
+//              parseParam resumes here --+
+//
+// Ex. No param name `(param i32)`
+//        calls parseParam --^
+func (p *typeParser) parseParamName(tok tokenType, tokenBytes []byte, line, col uint32) error {
+	if tok == tokenID { // Ex. $len
+		p.currentParamName = tokenBytes
+		p.m.tokenParser = p.parseParam
+		return nil
+	}
+	return p.parseParam(tok, tokenBytes, line, col)
+}
+
+// parseParam is the last parser inside the param field. This records value type and continues if it is an abbreviated
+// form with multiple value types. When complete, this sets the next parser to parseMoreParamsOrResult.
+//
+// Ex. One param type is present `(param i32)`
+//                         records i32 --^  ^
+//   parseMoreParamsOrResult resumes here --+
+//
+// Ex. One param type is present `(param i32)`
+//                         records i32 --^  ^
+//   parseMoreParamsOrResult resumes here --+
+//
+// Ex. type is missing `(param)`
+//                errs here --^
 func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
 	case tokenID: // Ex. $len
-		return errors.New("TODO param name ex (param $len i32), but not in abbreviation ex (param $x i32 $y i32)")
+		return errors.New("redundant name")
 	case tokenKeyword: // Ex. i32
 		vt, err := parseValueType(tokenBytes)
 		if err != nil {
 			return err
+		}
+		if p.foundParam && p.currentParamName != nil {
+			return errors.New("cannot name parameters in abbreviated form")
 		}
 		p.currentParams = append(p.currentParams, vt)
 		p.foundParam = true
@@ -181,8 +239,15 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) e
 			return errors.New("expected a type")
 		}
 
+		// Note: currentParamField is the index of the param field, but due to mixing and matching of abbreviated params
+		// it can be less than the param index. Ex. (param i32 i32) (param $v i32) is param field 2, but the 3rd param.
+		if p.currentParamName != nil {
+			nameIndex := &paramNameIndex{uint32(len(p.currentParams) - 1), p.currentParamName}
+			p.currentParamNames = append(p.currentParamNames, nameIndex)
+		}
+
 		// since multiple param fields are valid, ex `(func (param i32) (param i64))`, prepare for any next.
-		p.currentParamIndex++
+		p.currentParamField++
 		p.state = parsingParamOrResult
 		p.m.tokenParser = p.parseMoreParamsOrResult
 	default:
@@ -219,7 +284,7 @@ func (p *typeParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) 
 func (p *typeParser) errorContext() string {
 	switch p.state {
 	case parsingParam:
-		return fmt.Sprintf(".param[%d]", p.currentParamIndex)
+		return fmt.Sprintf(".param[%d]", p.currentParamField)
 	case parsingResult:
 		return ".result"
 	case parsingType:
@@ -230,48 +295,56 @@ func (p *typeParser) errorContext() string {
 
 var typeFuncEmpty = &typeFunc{}
 
-// getTypeUse finalizes any current params or result and returns the current typeIndex and/or type
-func (p *typeParser) getTypeUse() (typeIndex *index, sig *typeFunc) {
+// getTypeUse finalizes any current params or result and returns the current typeIndex and/or type. paramNames are only
+// returned if defined inline.
+func (p *typeParser) getTypeUse() (typeIndex *index, inlined *inlinedTypeFunc, paramNames paramNames) {
 	typeIndex = p.currentTypeIndex
+	paramNames = p.currentParamNames
 
 	// Don't conflate lack of verification type with nullary
-	if typeIndex != nil && p.currentEqualsType(typeFuncEmpty) {
+	if typeIndex != nil && funcTypeEquals(typeFuncEmpty, p.currentParams, p.currentResult) {
 		return
 	}
 
 	// Search for an existing signature that matches the current type in the module types.
-	for _, t := range p.m.module.typeFuncs {
-		if p.currentEqualsType(t) {
-			sig = t
+	for _, t := range p.m.module.types {
+		if funcTypeEquals(t, p.currentParams, p.currentResult) {
+			inlined = &inlinedTypeFunc{t, p.currentTypeUseStartLine, p.currentTypeUseStartCol}
 			return
 		}
 	}
 
 	// Search for an existing signature that matches the current type in the pending inlined types
 	for _, t := range p.inlinedTypes {
-		if p.currentEqualsType(t) {
-			sig = t
+		if funcTypeEquals(t, p.currentParams, p.currentResult) {
+			inlined = &inlinedTypeFunc{t, p.currentTypeUseStartLine, p.currentTypeUseStartCol}
 			return
 		}
 	}
 
-	sig = &typeFunc{"", p.currentParams, p.currentResult}
+	inlined = &inlinedTypeFunc{
+		typeFunc: &typeFunc{"", p.currentParams, p.currentResult},
+		line:     p.currentTypeUseStartLine,
+		col:      p.currentTypeUseStartCol,
+	}
 
 	// If we didn't find a match, we need to insert an inlined type to use it. We don't do this when there is a type
 	// index because in this case, the signature is only used for verification on an existing type.
 	if typeIndex == nil {
-		p.inlinedTypes = append(p.inlinedTypes, sig)
+		p.inlinedTypes = append(p.inlinedTypes, inlined.typeFunc)
 	}
 	return
 }
 
-// getType finalizes any current params or result and returns the current type.
+// getType finalizes any current params or result and returns the current type and any paramNames for it.
 //
 // If the current type is in typeParser.inlinedTypes, it is removed prior to returning.
-func (p *typeParser) getType(typeName string) (sig *typeFunc) {
+func (p *typeParser) getType(typeName string) (sig *typeFunc, paramNames paramNames) {
+	paramNames = p.currentParamNames
+
 	// Search inlined types in case a matching type was found after its type use.
 	for i, t := range p.inlinedTypes {
-		if p.currentEqualsType(t) {
+		if funcTypeEquals(t, p.currentParams, p.currentResult) {
 			// If we got here, we found a type field after a type use. This means it wasn't an inlined type, rather an
 			// out-of-order type. Hence, remove it from the inlined types and add it to the module types.
 			p.inlinedTypes = append(p.inlinedTypes[:i], p.inlinedTypes[i+1:]...)
@@ -281,15 +354,11 @@ func (p *typeParser) getType(typeName string) (sig *typeFunc) {
 	}
 
 	// While inlined types are supposed to re-use an existing type index, there's no no unique constraint on explicitly
-	// defined module types. This means a duplicate type is not a bug: we don't check module.typeFuncs first.
+	// defined module types. This means a duplicate type is not a bug: we don't check module.types first.
 	if sig == nil {
 		sig = &typeFunc{typeName, p.currentParams, p.currentResult}
 	}
 	return
-}
-
-func (p *typeParser) currentEqualsType(t *typeFunc) bool {
-	return bytes.Equal(p.currentParams, t.params) && p.currentResult == t.result
 }
 
 func parseValueType(tokenBytes []byte) (wasm.ValueType, error) {

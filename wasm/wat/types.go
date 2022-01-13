@@ -1,6 +1,7 @@
 package wat
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -26,7 +27,10 @@ type module struct {
 	// In the future, other types may be introduced to support features such as module linking.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#types%E2%91%A0%E2%91%A0
-	typeFuncs []*typeFunc
+	types []*typeFunc
+
+	// typeParamNames include any parameter names for the corresponding index of types.
+	typeParamNames []*typeParamNames
 
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
@@ -36,6 +40,22 @@ type module struct {
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
 	startFunction *index
+}
+
+// typeParamNames include any parameter names for the corresponding index of module.types.
+type typeParamNames struct {
+	index      uint32
+	paramNames paramNames
+}
+
+type inlinedTypeFunc struct {
+	typeFunc *typeFunc
+
+	// line is the line in the source where the typeFunc was defined.
+	line uint32
+
+	// col is the column on the line where the typeFunc was defined.
+	col uint32
 }
 
 // index is symbolic ID, such as "$main", or its equivalent numeric value, such as "2".
@@ -71,10 +91,10 @@ type index struct {
 //
 // See https://www.w3.org/TR/wasm-core-1/#text-functype
 type typeFunc struct {
-	// name starts with '$'. For example, "$v_v", and only set when explicitly defined in module.typeFuncs
+	// name starts with '$'. For example, "$v_v", and only set when explicitly defined in module.types
 	//
 	// name is only used for debugging. At runtime, types are called based on raw numeric index. The type index space
-	// begins those explicitly defined in module.typeFuncs, followed by any inlined ones.
+	// begins those explicitly defined in module.types, followed by any inlined ones.
 	name string // TODO: presumably, this must be unique as it is a symbolic identifier?
 
 	// params are the possibly empty sequence of value types accepted by a function with this signature.
@@ -90,6 +110,28 @@ type typeFunc struct {
 	result wasm.ValueType
 }
 
+// funcTypeEquals allows you to compare signatures ignoring names
+func funcTypeEquals(t *typeFunc, params []wasm.ValueType, result wasm.ValueType) bool {
+	return bytes.Equal(t.params, params) && t.result == result
+}
+
+// paramNames are the possibly empty association of names that correspond with params. The index is to params and
+// the name will never be empty and always begin with '$' (ex. "$len") (tokenID). Ex. $x names (param $x i32)
+//
+// paramNames are only used for debugging. At runtime, parameters are called based on raw numeric index.
+//
+// Note: paramNames may be stored in the wasm.Module CustomSection under the key "name" subsection 2 (locals). For
+// example, `wat2wasm --debug-names` will do this.
+// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
+type paramNames []*paramNameIndex // type is only to re-use documentation
+
+type paramNameIndex struct {
+	// index is in currentParams, not necessarily related to currentParamField due to abbreviated format.
+	index uint32
+	// name is the tokenID of the param field.
+	name []byte
+}
+
 // importFunc corresponds to the text format of a WebAssembly function import.
 //
 // Note: nothing is required per specification. Ex `(import "" "" (func))` is valid!
@@ -99,17 +141,20 @@ type importFunc struct {
 	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
 	importIndex uint32
 
-	// typeIndex is the optional index in module.typeFuncs for the function signature. If index.ID is set, it must match
+	// typeIndex is the optional index in module.types for the function signature. If index.ID is set, it must match
 	// typeFunc.name.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#text-typeuse
 	typeIndex *index
 
 	// typeInlined is set if there are any "param" or "result" fields. When set and typeIndex is also set, the signature
-	// in module.typeFuncs must exist and match this.
+	// in module.types must exist and match this.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
-	typeInlined *typeFunc
+	typeInlined *inlinedTypeFunc
+
+	// paramNames include any parameter names for typeInlined.
+	paramNames paramNames
 
 	// module is the possibly empty module name to import. Ex. "" or "Math"
 	//

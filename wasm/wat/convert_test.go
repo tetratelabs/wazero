@@ -12,8 +12,8 @@ import (
 )
 
 func TestTextToBinary(t *testing.T) {
-	zero, two := uint32(0), uint32(2)
-	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
+	zero, four := uint32(0), uint32(4)
+	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
 	tests := []struct {
 		name     string
 		input    string
@@ -144,6 +144,7 @@ func TestTextToBinary(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
 				ImportSection: []*wasm.ImportSegment{
 					{
@@ -159,6 +160,18 @@ func TestTextToBinary(t *testing.T) {
 							FuncTypeIndex: 2,
 						},
 					}, {
+						Module: "Math", Name: "Mul",
+						Desc: &wasm.ImportDesc{
+							Kind:          wasm.ImportKindFunction,
+							FuncTypeIndex: 3,
+						},
+					}, {
+						Module: "Math", Name: "Add",
+						Desc: &wasm.ImportDesc{
+							Kind:          wasm.ImportKindFunction,
+							FuncTypeIndex: 0,
+						},
+					}, {
 						Module: "", Name: "hello",
 						Desc: &wasm.ImportDesc{
 							Kind:          wasm.ImportKindFunction,
@@ -166,7 +179,7 @@ func TestTextToBinary(t *testing.T) {
 						},
 					},
 				},
-				StartSection: &two,
+				StartSection: &four,
 			},
 		},
 	}
