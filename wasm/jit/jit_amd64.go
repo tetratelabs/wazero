@@ -3644,7 +3644,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 //
 // Note that this also emits the instructions to check the out of bounds memory access. That means
 // if the base+offsetArg+targetSizeInByte exceeds the memory size, we exit this function with
-// jitCallStatusCodeInvalidMemoryOutOfBounds status code since we read memory "memory[base+offsetArg: base+offsetArg+targetSizeInByte]".
+// jitCallStatusCodeInvalidMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInByte].
 func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (offsetRegister int16, err error) {
 	base := c.locationStack.pop()
 	if err = c.ensureOnGeneralPurposeRegister(base); err != nil {
