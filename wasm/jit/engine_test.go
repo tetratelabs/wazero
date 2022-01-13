@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"reflect"
-	"runtime"
 	"testing"
 	"unsafe"
 
@@ -26,9 +25,6 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 }
 
 func TestEngine_fibonacci(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		t.Skip()
-	}
 	buf, err := os.ReadFile("testdata/fib.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
@@ -43,9 +39,6 @@ func TestEngine_fibonacci(t *testing.T) {
 }
 
 func TestEngine_fac(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		t.Skip()
-	}
 	buf, err := os.ReadFile("testdata/fac.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
@@ -74,9 +67,6 @@ func TestEngine_fac(t *testing.T) {
 }
 
 func TestEngine_unreachable(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		t.Skip()
-	}
 	buf, err := os.ReadFile("testdata/unreachable.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
@@ -97,9 +87,6 @@ wasm backtrace:
 }
 
 func TestEngine_memory(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
-		t.Skip()
-	}
 	buf, err := os.ReadFile("testdata/memory.wasm")
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
