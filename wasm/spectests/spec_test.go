@@ -262,6 +262,7 @@ func TestInterpreter(t *testing.T) {
 	runTest(t, wazeroir.NewEngine, nil)
 }
 
+// TODO: delete wastTargets after JIT passes all tests.
 func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]bool) {
 	const caseDir = "./cases"
 	files, err := os.ReadDir(caseDir)
@@ -279,6 +280,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 		require.NoError(t, json.Unmarshal(raw, &base))
 
 		wastName := filepath.Base(base.SourceFile)
+
+		// TODO: delet after JIT passes all tests.
 		if wastTargets != nil && !wastTargets[wastName] {
 			continue
 		}
