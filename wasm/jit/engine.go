@@ -398,9 +398,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
 			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
-				currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer,
-				// e.stack[:e.stackBasePointer+e.stackPointer],
-			)
+				currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer)
 		}
 
 		// Call into the jitted code.
@@ -487,7 +485,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
-	println(wazeroir.Format(ir.Operations))
+	if buildoptions.IsDebugMode {
+		println(wazeroir.Format(ir.Operations))
+	}
 
 	compiler, err := newCompiler(e, f, ir)
 	if err != nil {
@@ -651,7 +651,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	println(hex.EncodeToString(code))
+	if buildoptions.IsDebugMode {
+		println(hex.EncodeToString(code))
+	}
 
 	cf := &compiledWasmFunction{
 		source:          f,
