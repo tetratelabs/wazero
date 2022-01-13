@@ -3637,13 +3637,21 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	return nil
 }
 
+// setupMemoryOffset pops the top value from the stack (called "base"), and returns the result of addition with
+// base and offsetArg, which we call "offset". The returned offsetRegister is the register number with the offset calculation value.
+// targetSizeInByte is the original memory operation's target size in byte. For example, 4 = 32 / 8 for Load32 operation.
+// This is used for all Store* and Load* instructions.
+//
+// Note that this also emits the instructions to check the out of bounds memory access. That means
+// if the base+offsetArg+targetSizeInByte exceeds the memory size, we exit this function with
+// jitCallStatusCodeInvalidMemoryOutOfBounds status code since we read memory "memory[base+offsetArg: base+offsetArg+targetSizeInByte]".
 func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (offsetRegister int16, err error) {
 	base := c.locationStack.pop()
 	if err = c.ensureOnGeneralPurposeRegister(base); err != nil {
 		return 0, err
 	}
 
-	// We have to calculate the offset on the memory region.
+	// First, we calculate the offset on the memory region.
 	addOffsetToBase := c.newProg()
 	addOffsetToBase.As = x86.AADDL // 32-bit!
 	addOffsetToBase.To.Type = obj.TYPE_REG
@@ -3652,18 +3660,19 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	addOffsetToBase.From.Offset = int64(offsetArg)
 	c.addInstruction(addOffsetToBase)
 
-	// Check if the base+offset overflows, and if so, we exit with the out of boundary status.
+	// If the base+offset already overflows from uint32 range, we exit with the out of boundary status.
 	overflowJmp := c.newProg()
 	overflowJmp.As = x86.AJCS
 	overflowJmp.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(overflowJmp)
 
-	// Otherwise, we calculate base+offset+boundary and check if it is within memory boundary.
+	// Otherwise, we calculate base+offset+targetSizeInByte and check if it is within memory boundary.
 	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return 0, err
 	}
 
+	// Copy the 32-bit base+offset as to the temporary register as 64-bit integer.
 	copyOffset := c.newProg()
 	copyOffset.As = x86.AMOVLQZX // Zero extend
 	copyOffset.To.Type = obj.TYPE_REG
@@ -3672,6 +3681,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	copyOffset.From.Reg = base.register
 	c.addInstruction(copyOffset)
 
+	// Adds targetSizeInByte to base+offset stored in the temporary register.
 	addTargetSize := c.newProg()
 	addTargetSize.As = x86.AADDQ
 	addTargetSize.To.Type = obj.TYPE_REG
@@ -3680,6 +3690,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	addTargetSize.From.Offset = targetSizeInByte
 	c.addInstruction(addTargetSize)
 
+	// Now we compare the value with the memory length which is held by engine.
 	cmp := c.newProg()
 	cmp.As = x86.ACMPQ
 	cmp.To.Type = obj.TYPE_REG
@@ -3689,6 +3700,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	cmp.From.Offset = engineMemroySliceLenOffset
 	c.addInstruction(cmp)
 
+	// Jump if the value is within the memory length.
 	okJmp := c.newProg()
 	okJmp.As = x86.AJCC
 	okJmp.To.Type = obj.TYPE_BRANCH
