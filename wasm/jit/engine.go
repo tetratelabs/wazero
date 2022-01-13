@@ -458,10 +458,13 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Pop the call frame.
 			e.callFrameStack = currentFrame
 		case jitCallStatusCodeInvalidFloatToIntConversion:
+			// TODO: have wasm.ErrInvalidFloatToIntConversion and use it here.
 			panic("invalid float to int conversion")
 		case jitCallStatusCodeUnreachable:
+			// TODO: have wasm.ErrUnreachable and use it here.
 			panic("unreachable")
 		case jitCallStatusCodeInvalidMemoryOutOfBounds:
+			// TODO: have wasm.ErrMemoryOutOfBounds and use it here.
 			panic("out of bounds memory access")
 		}
 	}
