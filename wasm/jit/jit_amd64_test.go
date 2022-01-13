@@ -57,9 +57,8 @@ func requireNewCompiler(t *testing.T) *amd64Compiler {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
 	return &amd64Compiler{eng: nil, builder: b,
-		locationStack:         newValueLocationStack(),
-		onLabelStartCallbacks: map[string][]func(*obj.Prog){},
-		labels:                map[string]*labelInfo{},
+		locationStack: newValueLocationStack(),
+		labels:        map[string]*labelInfo{},
 	}
 }
 
@@ -655,15 +654,13 @@ func TestAmd64Compiler_compileLabel(t *testing.T) {
 	compiler.initializeReservedRegisters()
 	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
 	labelKey := label.String()
-	compiler.labels[labelKey] = &labelInfo{}
-
 	var called bool
-	compiler.onLabelStartCallbacks[labelKey] = append(compiler.onLabelStartCallbacks[labelKey],
-		func(p *obj.Prog) { called = true },
-	)
+	compiler.labels[labelKey] = &labelInfo{
+		labelBeginningCallbacks: []func(*obj.Prog){func(p *obj.Prog) { called = true }},
+	}
+
 	err := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
 	require.NoError(t, err)
-	require.Len(t, compiler.onLabelStartCallbacks, 0)
 	require.NotNil(t, compiler.labels[labelKey].initialInstruction)
 	require.True(t, called)
 

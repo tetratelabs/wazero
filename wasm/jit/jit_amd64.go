@@ -92,8 +92,7 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 	return &amd64Compiler{
 		currentLabel: ".entrypoint",
 		eng:          eng, f: f, builder: b, locationStack: newValueLocationStack(),
-		labels:                labels,
-		onLabelStartCallbacks: make(map[string][]func(*obj.Prog)),
+		labels: labels,
 	}, nil
 }
 
@@ -112,13 +111,16 @@ type amd64Compiler struct {
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
-	// Label resolvers.
-	onLabelStartCallbacks                            map[string][]func(*obj.Prog)
+	// labels holds per wazeroir label specific informationsin this function.
 	labels                                           map[string]*labelInfo
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
-	maxStackPointer                                  uint64
+	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
+	maxStackPointer uint64
 }
 
+// replaceLocationStack sets the given valueLocationStack to .locationStack field,
+// while allowing us to track valueLocationStack.maxStackPointer across multiple stacks.
+// This is called when we branch into different block.
 func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
 	if c.maxStackPointer < c.locationStack.maxStackPointer {
 		c.maxStackPointer = c.locationStack.maxStackPointer
@@ -126,12 +128,17 @@ func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
 	c.locationStack = newStack
 }
 
+// labelInfo holds the information about a specific label in wazeroir.
 type labelInfo struct {
+	// callers is the numbe of callsites which (maybe) jump into this label.
 	callers int
-	// The initial instructions for this label so
-	// other block can jump into it.
+	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction *obj.Prog
-	initialStack       *valueLocationStack
+	// initialStack is the initial value location stack from which we start compiling this label.
+	initialStack *valueLocationStack
+	// labelBeginningCallbacks holds callbacks which are supposed to be called with this label's initial
+	// instruction.
+	labelBeginningCallbacks []func(*obj.Prog)
 }
 
 func (c *amd64Compiler) labelInfo(labelKey string) *labelInfo {
@@ -371,10 +378,6 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 }
 
 func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
-	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
-		return err
-	}
-
 	// First, move the value to set into a temporary register.
 	val := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(val); err != nil {
@@ -604,12 +607,12 @@ func (c *amd64Compiler) preJumpRegisterAdjustment() {
 }
 
 func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
-	jmpTarget := c.labelInfo(labelKey)
-	if jmpTarget.initialInstruction != nil {
-		jmpInstruction.To.SetTarget(jmpTarget.initialInstruction)
+	jmpTargetLabel := c.labelInfo(labelKey)
+	if jmpTargetLabel.initialInstruction != nil {
+		jmpInstruction.To.SetTarget(jmpTargetLabel.initialInstruction)
 	} else {
-		c.onLabelStartCallbacks[labelKey] = append(c.onLabelStartCallbacks[labelKey], func(jmpTarget *obj.Prog) {
-			jmpInstruction.To.SetTarget(jmpTarget)
+		jmpTargetLabel.labelBeginningCallbacks = append(jmpTargetLabel.labelBeginningCallbacks, func(labelInitialInstruction *obj.Prog) {
+			jmpInstruction.To.SetTarget(labelInitialInstruction)
 		})
 	}
 }
@@ -635,11 +638,9 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	}
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
-	for _, cb := range c.onLabelStartCallbacks[labelKey] {
+	for _, cb := range labelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
-	// Now we don't need to call the callbacks.
-	delete(c.onLabelStartCallbacks, labelKey)
 
 	if buildoptions.IsDebugMode {
 		fmt.Printf("[label %s]\n%s\n", labelKey, c.locationStack)
@@ -3878,6 +3879,11 @@ func (c *amd64Compiler) moveStackToRegister(loc *valueLocation) {
 	c.addInstruction(prog)
 }
 
+// maybeMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
+// if the value is located on a conditional register. This is usually called at the beginning of
+// amd64Compiler.compile* functions where we possibly emit istructions without saving the conditional
+// register value. The compile* functions without calling this function is saving the conditional
+// value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
 func (c *amd64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() (err error) {
 	if c.locationStack.sp > 0 {
 		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
