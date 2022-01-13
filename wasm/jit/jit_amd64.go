@@ -308,6 +308,8 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 const globalInstanceValueOffset = 8
 
 func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -434,6 +436,8 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 }
 
 func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -650,6 +654,8 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 }
 
 func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -795,6 +801,8 @@ func (c *amd64Compiler) compileSelect() error {
 }
 
 func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3694,6 +3702,8 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 }
 
 func (c *amd64Compiler) compileMemoryGrow() error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3702,6 +3712,8 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 }
 
 func (c *amd64Compiler) compileMemorySize() error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3723,6 +3735,8 @@ func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) {
 }
 
 func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3749,6 +3763,8 @@ func (c *amd64Compiler) emitConstI32(val uint32, register int16) {
 }
 
 func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3775,6 +3791,8 @@ func (c *amd64Compiler) emitConstI64(val uint64, register int16) {
 }
 
 func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
@@ -3813,6 +3831,8 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 }
 
 func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
+	// If the top value is conditional one, we must save it before executing the following instructions
+	// as they clear the conditional flag, meaning that the conditional value might change.
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
