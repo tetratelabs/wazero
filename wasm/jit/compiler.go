@@ -5,6 +5,7 @@ import "github.com/tetratelabs/wazero/wasm/wazeroir"
 // compiler is the interface of architecture-specific native code compiler,
 // and this is responsible for compiling native code for all wazeroir operations.
 type compiler interface {
+	// For debugging purpose.
 	String() string
 	// emitPreamble is called before compiling any wazeroir operation.
 	// This is used, for example, to initilize the reserved registers, etc.

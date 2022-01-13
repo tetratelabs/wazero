@@ -46,7 +46,8 @@ type engine struct {
 	memroySliceLen int
 	// Function call frames in linked list
 	callFrameStack *callFrame
-	callFrameNum   uint64
+	// Tracks the current number of call frames. We cannot take len(callFrameStack) as the stack is implemented as a linked list.
+	callFrameNum uint64
 
 	// The following fields are only used during compilation.
 
@@ -75,31 +76,41 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
-	defer func() {
-		if v := recover(); v != nil {
-			top := e.callFrameStack
-			var frames []string
-			var counter int
-			for top != nil {
-				frames = append(frames, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
-				top = top.caller
-				counter++
-				// TODO: include DWARF symbols. See #58
-			}
-			err2, ok := v.(error)
-			if ok {
-				err = fmt.Errorf("wasm runtime error: %w", err2)
-			} else {
-				err = fmt.Errorf("wasm runtime error: %v", v)
-			}
 
-			if len(frames) > 0 {
-				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
+	// Recovery from runtime panic should happen at the very origin of callstack.
+	// If this is the recursive call into Wasm, we do not recover, and delegate the
+	// recovery to the first engine.Call().
+	// For example, if the callstack is like this:
+	//	 "original host function" --(engine.Call)--> Wasm func A --> Host func --(engine.Call)--> Wasm function B,
+	// and if the top Wasm function panics, then we go back to the "original host function" all at once.
+	shouldRecover := e.callFrameStack == nil
+	defer func() {
+		if shouldRecover {
+			if v := recover(); v != nil {
+				top := e.callFrameStack
+				var frames []string
+				var counter int
+				for top != nil {
+					frames = append(frames, fmt.Sprintf("\t%d: %s", counter, top.getFunctionName()))
+					top = top.caller
+					counter++
+					// TODO: include DWARF symbols. See #58
+				}
+				err2, ok := v.(error)
+				if ok {
+					err = fmt.Errorf("wasm runtime error: %w", err2)
+				} else {
+					err = fmt.Errorf("wasm runtime error: %v", v)
+				}
+
+				if len(frames) > 0 {
+					err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
+				}
+				// Reset the state so this engine can be reused, without creating a new one.
+				e.callFrameStack = nil
+				e.stackBasePointer = 0
+				e.stackPointer = 0
 			}
-			// Reset the state.
-			e.callFrameStack = nil
-			e.stackBasePointer = 0
-			e.stackPointer = 0
 		}
 	}()
 
