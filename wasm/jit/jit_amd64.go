@@ -90,8 +90,7 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 		labels[key] = &labelInfo{callers: callers}
 	}
 	return &amd64Compiler{
-		currentLabel: ".entrypoint",
-		eng:          eng, f: f, builder: b, locationStack: newValueLocationStack(),
+		eng: eng, f: f, builder: b, locationStack: newValueLocationStack(),
 		labels: labels,
 	}, nil
 }
@@ -101,10 +100,9 @@ func (c *amd64Compiler) String() string {
 }
 
 type amd64Compiler struct {
-	currentLabel string
-	builder      *asm.Builder
-	eng          *engine
-	f            *wasm.FunctionInstance
+	builder *asm.Builder
+	eng     *engine
+	f       *wasm.FunctionInstance
 	// Set jmp kind instructions where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
 	setJmpOrigins []*obj.Prog
@@ -116,6 +114,8 @@ type amd64Compiler struct {
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
 	maxStackPointer uint64
+	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
+	currentLabel string
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
@@ -457,6 +457,9 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 			// we must have unique register state.
 			c.preJumpRegisterAdjustment()
 		}
+		// Set the initial stack of the target label, so we can start compiling the label
+		// with the appropriate value locations. Note we clone the stack here as we maybe
+		// manipulate the stack before compiler reaches the label.
 		if targetLabel.initialStack == nil {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
@@ -560,6 +563,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		if labelInfo.callers > 1 {
 			c.preJumpRegisterAdjustment()
 		}
+		// Set the initial stack of the target label, so we can start compiling the label
+		// with the appropriate value locations. Note we clone the stack here as we maybe
+		// manipulate the stack before compiler reaches the label.
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack.clone()
 		}
@@ -588,6 +594,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		if c.labelInfo(thenLabelKey).callers > 1 {
 			c.preJumpRegisterAdjustment()
 		}
+		// Set the initial stack of the target label, so we can start compiling the label
+		// with the appropriate value locations. Note we clone the stack here as we maybe
+		// manipulate the stack before compiler reaches the label.
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack.clone()
 		}
@@ -634,12 +643,16 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	c.addInstruction(labelBegin)
 
 	labelInfo := c.labelInfo(labelKey)
+
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
 	labelInfo.initialInstruction = labelBegin
+
+	// Set the initial stack.
 	if labelInfo.initialStack != nil {
 		c.replaceLocationStack(labelInfo.initialStack)
 	}
+
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
 	for _, cb := range labelInfo.labelBeginningCallbacks {
@@ -668,9 +681,13 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		index := c.eng.compiledWasmFunctionIndex[target]
 		c.callFunctionFromConstIndex(index)
 	}
+
+	// We consumed the function parameters from the stack after call.
 	for i := 0; i < len(target.Signature.Params); i++ {
 		c.locationStack.pop()
 	}
+
+	// Also, the function results were pushed by the call.
 	for _, t := range target.Signature.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
