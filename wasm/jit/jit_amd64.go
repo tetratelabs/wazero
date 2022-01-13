@@ -1362,7 +1362,6 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 // tl;dr is that the division result is placed in AX and DX registers after instructions emitted by this function
 // where AX holds the quotient while DX the remainder of the division result.
 func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error {
-
 	const (
 		quotientRegister  = x86.REG_AX
 		remainderRegister = x86.REG_DX
@@ -1382,6 +1381,15 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	isSignedRem := isRem && signed
 	var signedRemMinusOneDivisorJmp *obj.Prog
 	if isSignedRem {
+		// If this is for getting remainder of signed division,
+		// we have treat the special case where the divisor equals -1.
+		// For example, if this is 32-bit case, the result of (-2^31) / -1 equals (quotient=2^31, remainder=0)
+		// where quotient doesn't fit in the 32-bit range whose maximum is 2^31-1.
+		// x86 in this case cause floating point exception, but according to the Wasm spec
+		// if the divisor equals -1, the result must be zero (not undefined!) as opposed to be "undefined"
+		// for divisions on (-2^31) / -1 where we do not need to emit the special branches.
+
+		// First we compare the division with -1.
 		cmpWithMinusOne := c.newProg()
 		if is32Bit {
 			cmpWithMinusOne.As = x86.ACMPL
@@ -1394,11 +1402,13 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		cmpWithMinusOne.To.Offset = -1
 		c.addInstruction(cmpWithMinusOne)
 
+		// If it doesn't equal minus one, we jump to the normal case.
 		okJmp := c.newProg()
 		okJmp.As = x86.AJNE
 		okJmp.To.Type = obj.TYPE_BRANCH
 		c.addInstruction(okJmp)
 
+		// Otherwise, we store zero into the remainder result register (DX).
 		storeZeroToDX := c.newProg()
 		if is32Bit {
 			storeZeroToDX.As = x86.AXORL
@@ -1411,11 +1421,14 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		storeZeroToDX.From.Reg = remainderRegister
 		c.addInstruction(storeZeroToDX)
 
+		// Emit the exit jump instruction for the divisor -1 case so
+		// we skips the normal case.
 		signedRemMinusOneDivisorJmp = c.newProg()
 		signedRemMinusOneDivisorJmp.As = obj.AJMP
 		signedRemMinusOneDivisorJmp.To.Type = obj.TYPE_BRANCH
 		c.addInstruction(signedRemMinusOneDivisorJmp)
 
+		// Set the normal case's jump target.
 		c.addSetJmpOrigins(okJmp)
 	}
 
@@ -1510,6 +1523,8 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	}
 	c.addInstruction(div)
 
+	// If this is signed rem instruction, we must set the jump target of
+	// the exit jump from division -1 case towards the next instruction.
 	if signedRemMinusOneDivisorJmp != nil {
 		c.addSetJmpOrigins(signedRemMinusOneDivisorJmp)
 	}
