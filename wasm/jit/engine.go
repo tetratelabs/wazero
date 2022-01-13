@@ -304,6 +304,7 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
+	// jitCallStatusCodeInvalidMemoryOutOfBounds means a out of bounds memory access happened.
 	jitCallStatusCodeInvalidMemoryOutOfBounds
 )
 
@@ -397,12 +398,9 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 }
 
 func (e *engine) exec(f *compiledWasmFunction) {
+	// Push a new call frame for the target function.
 	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, wasmFunction: f})
 
-	e.globalSliceAddress = f.globalSliceAddress
-	if f.memory != nil {
-		e.memroySliceLen = len(f.memory.Buffer)
-	}
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
 	for e.callFrameStack != nil {
