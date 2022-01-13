@@ -1261,7 +1261,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					})
 				}
 			})
-			t.Run("float32", func(t *testing.T) { // AAA
+			t.Run("float32", func(t *testing.T) {
 				for _, tc := range []struct {
 					x1, x2 float32
 				}{
@@ -3752,7 +3752,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 			signed bool
 		}{
 			{name: "signed", signed: true},
-			// {name: "unsigned", signed: false},
+			{name: "unsigned", signed: false},
 		} {
 			signed := signed
 			t.Run(signed.name, func(t *testing.T) {
@@ -4963,9 +4963,8 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
 	offsets := []uint32{0,
-		1 << 10, 1 << 31,
-		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4, math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9,
-		math.MaxInt32, math.MaxUint32,
+		1 << 10, 1 << 31, math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
+		math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9, math.MaxInt32, math.MaxUint32,
 	}
 	targetSizeInBytes := []int64{1, 2, 4, 8}
 	for _, base := range bases {
@@ -5002,6 +5001,8 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 						uintptr(unsafe.Pointer(&mem.Buffer[0])),
 					)
 
+					// If the memory offset exceeds the length of memory, we must exit the function
+					// with jitCallStatusCodeInvalidMemoryOutOfBounds status code.
 					baseOffset := int(base) + int(offset)
 					if baseOffset >= math.MaxUint32 || len(mem.Buffer) < baseOffset+int(targetSizeInByte) {
 						require.Equal(t, jitCallStatusCodeInvalidMemoryOutOfBounds, eng.jitCallStatusCode)
