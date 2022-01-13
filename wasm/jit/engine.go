@@ -42,11 +42,12 @@ type engine struct {
 	continuationAddressOffset uintptr
 	// The current compiledWasmFunction.globalSliceAddress
 	globalSliceAddress uintptr
-	// Stores the length of memory slice which is used by the currently excuted function.
-	memroySliceLen int
+	// memorySliceLen stores the length of memory slice used by the currently executed function.
+	memorySliceLen int
 	// Function call frames in linked list
 	callFrameStack *callFrame
-	// Tracks the current number of call frames. We cannot take len(callFrameStack) as the stack is implemented as a linked list.
+	// callFrameNum tracks the current number of call frames.
+	// Note: this is not len(callFrameStack) because the stack is implemented as a linked list.
 	callFrameNum uint64
 
 	// The following fields are only used during compilation.
@@ -68,7 +69,7 @@ const (
 	engineFunctionCallIndexOffset   = 48
 	engineContinuationAddressOffset = 56
 	engineglobalSliceAddressOffset  = 64
-	engineMemroySliceLenOffset      = 72
+	engineMemorySliceLenOffset      = 72
 )
 
 func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
@@ -77,12 +78,14 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 
-	// Recovery from runtime panic should happen at the very origin of callstack.
+	// shouldRecover is true when a panic at the origin of callstack should be recovered
+	//
 	// If this is the recursive call into Wasm (e.callFrameStack != nil), we do not recover, and delegate the
-	// recovery to the first engine.Call().
-	// For example, if the callstack is like this:
+	// recovery to the first engine.Call.
+	//
+	// For example, given the call stack:
 	//	 "original host function" --(engine.Call)--> Wasm func A --> Host func --(engine.Call)--> Wasm function B,
-	// and if the top Wasm function panics, then we go back to the "original host function" all at once.
+	// if the top Wasm function panics, we go back to the "original host function".
 	shouldRecover := e.callFrameStack == nil
 	defer func() {
 		if shouldRecover {
@@ -96,9 +99,9 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 					counter++
 					// TODO: include DWARF symbols. See #58
 				}
-				err2, ok := v.(error)
+				runtimeErr, ok := v.(error)
 				if ok {
-					err = fmt.Errorf("wasm runtime error: %w", err2)
+					err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
 				} else {
 					err = fmt.Errorf("wasm runtime error: %v", v)
 				}
@@ -106,7 +109,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 				if len(frames) > 0 {
 					err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(frames, "\n"))
 				}
-				// Reset the state so this engine can be reused, without creating a new one.
+				// Reset the state so this engine can be reused
 				e.callFrameStack = nil
 				e.stackBasePointer = 0
 				e.stackPointer = 0
@@ -255,7 +258,7 @@ func (e *engine) push(v uint64) {
 	e.stackPointer++
 }
 
-var callStackHeightLimit = uint64(buildoptions.CallStackHeightLimit)
+var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 
 // callFramePush pushes the given callframe to the top of stack,
 // and initializes the callframe-specific fields of engine so
@@ -290,7 +293,7 @@ func (e *engine) callFramePop() {
 
 	// If the caller is not nil, we have to go back into the caller's frame.
 	if caller != nil {
-		// Initialize the callframe-specific fields.
+		// Reset state match the calling frame
 		e.stackBasePointer = caller.stackBasePointer
 		e.stackPointer = caller.continuationStackPointer
 		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
@@ -434,7 +437,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		switch e.jitCallStatusCode {
 		case jitCallStatusCodeReturned:
 			// Meaning that the current frame exits
-			// so we just get back to the caller's frame.
+			// so restore the caller's frame.
 			e.callFramePop()
 		case jitCallStatusCodeCallWasmFunction:
 			// This never panics as we made sure that the index exists for all the referenced functions

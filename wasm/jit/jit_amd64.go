@@ -103,7 +103,7 @@ type amd64Compiler struct {
 	builder *asm.Builder
 	eng     *engine
 	f       *wasm.FunctionInstance
-	// Set jmp kind instructions where you want to set the next coming
+	// setJmpOrigins sets jmp kind instructions where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
 	setJmpOrigins []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
@@ -130,18 +130,17 @@ func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
 
 // labelInfo holds the information about a specific label in wazeroir.
 type labelInfo struct {
-	// callers is the numbe of callsites which (maybe) jump into this label.
+	// callers is the number of call sites which may jump into this label.
 	callers int
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction *obj.Prog
 	// initialStack is the initial value location stack from which we start compiling this label.
 	initialStack *valueLocationStack
-	// labelBeginningCallbacks holds callbacks which are supposed to be called with this label's initial
-	// instruction.
+	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
 	labelBeginningCallbacks []func(*obj.Prog)
 }
 
-func (c *amd64Compiler) labelInfo(labelKey string) *labelInfo {
+func (c *amd64Compiler) label(labelKey string) *labelInfo {
 	ret, ok := c.labels[labelKey]
 	if ok {
 		return ret
