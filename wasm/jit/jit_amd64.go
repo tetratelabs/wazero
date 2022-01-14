@@ -704,7 +704,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 			return err
 		}
 	} else {
-		if err := c.callFunctionFromConstAddress(address); err != nil {
+		if err := c.callWasmFunction(-1, address); err != nil {
 			return err
 		}
 	}
@@ -728,7 +728,55 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 }
 
 func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
-	return nil
+	offset := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(offset); err != nil {
+		return nil
+	}
+
+	// First, we need to check if the offset doesn't exceed the length of table.
+	cmpLength := c.newProg()
+	cmpLength.As = x86.ACMPQ
+	cmpLength.To.Type = obj.TYPE_REG
+	cmpLength.To.Reg = offset.register
+	cmpLength.From.Type = obj.TYPE_MEM
+	cmpLength.From.Reg = reservedRegisterForEngine
+	cmpLength.From.Offset = engineTableSliceLenOffset
+	c.addInstruction(cmpLength)
+
+	okJmp := c.newProg()
+	okJmp.To.Type = obj.TYPE_BRANCH
+	okJmp.As = x86.AJCC
+	c.addInstruction(okJmp)
+
+	// If it eceeds, we return the function with jitCallStatusCodeTableOutOfBounds.
+	c.setJITStatus(jitCallStatusCodeTableOutOfBounds)
+	c.returnFunction()
+
+	// Otherwise, we read the table value and set it to functionCallAddress field of engine.
+	c.addSetJmpOrigins(okJmp)
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	movTableSliceAddress := c.newProg()
+	movTableSliceAddress.As = x86.AMOVQ
+	movTableSliceAddress.To.Type = obj.TYPE_REG
+	movTableSliceAddress.To.Reg = tmpReg
+	movTableSliceAddress.From.Type = obj.TYPE_MEM
+	movTableSliceAddress.From.Reg = reservedRegisterForEngine
+	movTableSliceAddress.From.Offset = engineTableSliceAddressOffset
+	c.addInstruction(movTableSliceAddress)
+
+	addOffsetToAddress := c.newProg()
+	addOffsetToAddress.As = x86.AADDQ
+	addOffsetToAddress.To.Type = obj.TYPE_REG
+	addOffsetToAddress.To.Reg = tmpReg
+	addOffsetToAddress.From.Type = obj.TYPE_REG
+	addOffsetToAddress.From.Reg = offset.register
+	c.addInstruction(addOffsetToAddress)
+
+	return c.callWasmFunction(tmpReg, 0)
 }
 
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
@@ -4124,26 +4172,35 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 }
 
 func (c *amd64Compiler) callHostFunctionFromConstAddress(functionAddress int64) error {
-	// Set the jit status as jitCallStatusCodeCallHostFunction
 	c.setJITStatus(jitCallStatusCodeCallHostFunction)
-	// Set the function index.
 	c.setFunctionCallAddressFromConst(functionAddress)
+
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
 	}
-	// Set the continuation offset on the next instruction.
 	c.setContinuationOffsetAtNextInstructionAndReturn()
 	// Once the function call returns, we must re-initialize the reserved registers.
 	c.initializeReservedRegisters()
 	return nil
 }
 
-func (c *amd64Compiler) callFunctionFromConstAddress(functionAddress int64) error {
-	// Set the jit status as jitCallStatusCodeCallWasmFunction
+func (c *amd64Compiler) callWasmFunction(reg int16, functionAddress int64) error {
 	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
-	// Set the function index.
-	c.setFunctionCallAddressFromConst(functionAddress)
+
+	if isIntRegister(reg) {
+		prog := c.newProg()
+		prog.As = x86.AMOVQ
+		prog.From.Type = obj.TYPE_REG
+		prog.From.Reg = reg
+		prog.To.Type = obj.TYPE_MEM
+		prog.To.Reg = reservedRegisterForEngine
+		prog.To.Offset = engineFunctionCallAddressOffset
+		c.addInstruction(prog)
+	} else {
+		c.setFunctionCallAddressFromConst(functionAddress)
+	}
+
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4172,11 +4229,6 @@ func (c *amd64Compiler) releaseAllRegistersToStack() error {
 	return nil
 }
 
-// TODO: If this function call is the tail call,
-// we don't need to return back to this function.
-// Maybe better have another status for that case
-// so that we don't call back again to this function
-// and instead just release the call frame.
 func (c *amd64Compiler) setContinuationOffsetAtNextInstructionAndReturn() {
 	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
 	// all the registers, so at this point we always have free registers.
@@ -4224,7 +4276,7 @@ func (c *amd64Compiler) setFunctionCallIndexFromRegister(reg int16) {
 
 func (c *amd64Compiler) setFunctionCallAddressFromConst(functionAddress int64) {
 	prog := c.newProg()
-	prog.As = x86.AMOVL
+	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = functionAddress
 	prog.To.Type = obj.TYPE_MEM

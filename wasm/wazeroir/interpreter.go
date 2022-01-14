@@ -594,8 +594,8 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case OperationKindCallIndirect:
 			{
-				index := it.pop()
-				target := it.functions[table.Table[index]]
+				offset := it.pop()
+				target := it.functions[table.Table[offset]]
 				// Type check.
 				if target.typeID != op.us[1] {
 					panic("function signature mismatch on call_indirect")
