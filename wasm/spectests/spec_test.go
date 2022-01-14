@@ -259,7 +259,7 @@ func TestJIT(t *testing.T) {
 }
 
 func TestInterpreter(t *testing.T) {
-	runTest(t, wazeroir.NewEngine, map[string]bool{"start.wast": true})
+	runTest(t, wazeroir.NewEngine, nil)
 }
 
 // TODO: delete wastTargets after JIT passes all tests.

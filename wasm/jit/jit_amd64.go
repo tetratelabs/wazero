@@ -698,7 +698,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	address := int64(target.Address)
+	address := target.Address
 	if target.IsHostFunction() {
 		if err := c.callHostFunctionFromConstAddress(address); err != nil {
 			return err
@@ -3863,7 +3863,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.callBuiltinFunctionFromConstIndex(builtinFunctionIDMemoryGrow)
+	return c.callBuiltinFunctionFromConstIndex(builtinFunctionAddressMemoryGrow)
 }
 
 func (c *amd64Compiler) compileMemorySize() error {
@@ -3872,7 +3872,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	if err := c.callBuiltinFunctionFromConstIndex(builtinFunctionIDMemorySize); err != nil {
+	if err := c.callBuiltinFunctionFromConstIndex(builtinFunctionAddressMemorySize); err != nil {
 		return err
 	}
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
@@ -3880,9 +3880,9 @@ func (c *amd64Compiler) compileMemorySize() error {
 	return nil
 }
 
-func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) error {
+func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(addr wasm.FunctionAddress) error {
 	c.setJITStatus(jitCallStatusCodeCallBuiltInFunction)
-	c.setFunctionCallAddressFromConst(index)
+	c.setFunctionCallAddressFromConst(addr)
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4176,9 +4176,9 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) callHostFunctionFromConstAddress(functionAddress int64) error {
+func (c *amd64Compiler) callHostFunctionFromConstAddress(addr wasm.FunctionAddress) error {
 	c.setJITStatus(jitCallStatusCodeCallHostFunction)
-	c.setFunctionCallAddressFromConst(functionAddress)
+	c.setFunctionCallAddressFromConst(addr)
 
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
@@ -4190,7 +4190,7 @@ func (c *amd64Compiler) callHostFunctionFromConstAddress(functionAddress int64) 
 	return nil
 }
 
-func (c *amd64Compiler) callWasmFunction(reg int16, functionAddress int64) error {
+func (c *amd64Compiler) callWasmFunction(reg int16, addr wasm.FunctionAddress) error {
 	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
 
 	if isIntRegister(reg) {
@@ -4203,7 +4203,7 @@ func (c *amd64Compiler) callWasmFunction(reg int16, functionAddress int64) error
 		setFunctionAddressFromReg.To.Offset = engineFunctionCallAddressOffset
 		c.addInstruction(setFunctionAddressFromReg)
 	} else {
-		c.setFunctionCallAddressFromConst(functionAddress)
+		c.setFunctionCallAddressFromConst(addr)
 	}
 
 	// Release all the registers as our calling convention requires the callee-save.
@@ -4279,11 +4279,11 @@ func (c *amd64Compiler) setFunctionCallIndexFromRegister(reg int16) {
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) setFunctionCallAddressFromConst(functionAddress int64) {
+func (c *amd64Compiler) setFunctionCallAddressFromConst(addr wasm.FunctionAddress) {
 	prog := c.newProg()
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = functionAddress
+	prog.From.Offset = int64(addr)
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineFunctionCallAddressOffset

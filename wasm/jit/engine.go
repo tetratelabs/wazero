@@ -354,8 +354,8 @@ type compiledWasmFunction struct {
 }
 
 const (
-	builtinFunctionIDMemoryGrow = iota
-	builtinFunctionIDMemorySize
+	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
+	builtinFunctionAddressMemorySize
 )
 
 // Grow the stack size according to maxStackPointer argument
@@ -421,9 +421,9 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			e.maybeGrowStack(nextFunc.maxStackPointer)
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallAddress {
-			case builtinFunctionIDMemoryGrow:
+			case builtinFunctionAddressMemoryGrow:
 				e.builtinFunctionMemoryGrow(currentFrame.wasmFunction)
-			case builtinFunctionIDMemorySize:
+			case builtinFunctionAddressMemorySize:
 				e.builtinFunctionMemorySize(currentFrame.wasmFunction)
 			}
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset

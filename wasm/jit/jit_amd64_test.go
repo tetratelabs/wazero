@@ -196,7 +196,7 @@ func Test_setFunctionCallAddressFromConst(t *testing.T) {
 		// Build codes.
 		compiler := requireNewCompiler(t)
 		compiler.initializeReservedRegisters()
-		compiler.setFunctionCallAddressFromConst(int64(index))
+		compiler.setFunctionCallAddressFromConst(index)
 		compiler.returnFunction()
 
 		// Generate the code under test.
@@ -4413,7 +4413,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileCall(t *testing.T) {
-	const functionAddress = 5
+	const functionAddress wasm.FunctionAddress = 5
 	t.Run("host function", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := requireNewCompiler(t)
@@ -4443,7 +4443,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 		// Check the status.
 		require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
-		require.Equal(t, int64(functionAddress), env.functionCallAddress())
+		require.Equal(t, functionAddress, env.functionCallAddress())
 
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(2), env.stackPointer())
@@ -4478,7 +4478,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 		// Check the status.
 		require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
-		require.Equal(t, int64(functionAddress), env.functionCallAddress())
+		require.Equal(t, functionAddress, env.functionCallAddress())
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(3), env.stackPointer())
 		require.Equal(t, uint64(50), env.stackTopAsUint64())
@@ -5006,7 +5006,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, int64(builtinFunctionIDMemoryGrow), env.functionCallAddress())
+	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
 }
 
 func TestAmd64Compiler_compileMemorySize(t *testing.T) {
@@ -5028,7 +5028,7 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, int64(builtinFunctionIDMemorySize), env.functionCallAddress())
+	require.Equal(t, wasm.FunctionAddress(builtinFunctionAddressMemorySize), env.functionCallAddress())
 }
 
 func TestAmd64Compiler_compileDrop(t *testing.T) {
