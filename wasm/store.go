@@ -136,13 +136,6 @@ func (s *Store) Instantiate(module *Module, name string) error {
 		return fmt.Errorf("exports: %w", err)
 	}
 
-	// We compile functions after successfully finished building all instances.
-	// This is not only because we want to do early feedback on malicious binaries,
-	// but also during the compilation phase, the compilers have to see all the possible
-	// instances (function, memory, table) in the module instance.
-	if err = s.engine.PreCompile(instance.Functions); err != nil {
-		return fmt.Errorf("failed to precompile: %w", err)
-	}
 	for i, f := range instance.Functions {
 		if err := s.engine.Compile(f); err != nil {
 			return fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
@@ -1655,10 +1648,6 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		Signature:      sig,
 		ModuleInstance: m,
 	}
-	if err := s.engine.PreCompile([]*FunctionInstance{f}); err != nil {
-		return fmt.Errorf("failed to precompile %s: %v", f.Name, err)
-	}
-
 	if err := s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}

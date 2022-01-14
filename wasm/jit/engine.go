@@ -33,7 +33,7 @@ type engine struct {
 	jitCallStatusCode jitCallStatusCode
 	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
 	// Indicating the function call index.
-	functionCallIndex int64
+	functionCallAddress wasm.FunctionAddress
 	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
 	// We use this value to continue the current function
 	// after calling the target function exits.
@@ -43,7 +43,11 @@ type engine struct {
 	// The current compiledWasmFunction.globalSliceAddress
 	globalSliceAddress uintptr
 	// memorySliceLen stores the length of memory slice used by the currently executed function.
-	memorySliceLen int
+	memorySliceLen int64
+	// The current compiledWasmFunction.tableSliceAddress
+	tableSliceAddress uintptr
+	// tableSliceLen stores the length of the unique table by the currently executed function.
+	tableSliceLen int64
 	// Function call frames in linked list
 	callFrameStack *callFrame
 	// callFrameNum tracks the current number of call frames.
@@ -52,12 +56,10 @@ type engine struct {
 
 	// The following fields are only used during compilation.
 
-	// Store the compiled functions and indexes.
-	compiledWasmFunctions     []*compiledWasmFunction
-	compiledWasmFunctionIndex map[*wasm.FunctionInstance]int64
-	// Store the host functions and indexes.
-	compiledHostFunctions     []*compiledHostFunction
-	compiledHostFunctionIndex map[*wasm.FunctionInstance]int64
+	// Store the compiled functions.
+	compiledWasmFunctions map[wasm.FunctionAddress]*compiledWasmFunction
+	// Store the host functions.
+	compiledHostFunctions map[wasm.FunctionAddress]*compiledHostFunction
 }
 
 // Native code manipulates the engine's fields with these constants.
@@ -66,10 +68,12 @@ const (
 	enginestackPointerOffset        = 24
 	enginestackBasePointerOffset    = 32
 	engineJITCallStatusCodeOffset   = 40
-	engineFunctionCallIndexOffset   = 48
+	engineFunctionCallAddressOffset = 48
 	engineContinuationAddressOffset = 56
 	engineglobalSliceAddressOffset  = 64
 	engineMemorySliceLenOffset      = 72
+	engineTableSliceAddressOffset   = 80
+	engineTableSliceLenOffset       = 88
 )
 
 func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
@@ -122,15 +126,15 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	}
 	// Note that there's no conflict between e.hostFunctionIndex and e.compiledWasmFunctionIndex,
 	// meaning that each *wasm.FunctionInstance is assigned to either host function index or wasm function one.
-	if index, ok := e.compiledHostFunctionIndex[f]; ok {
-		e.compiledHostFunctions[index].f(&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
-	} else if index, ok := e.compiledWasmFunctionIndex[f]; ok {
-		f := e.compiledWasmFunctions[index]
-		e.exec(f)
+	if hostFunc, ok := e.compiledHostFunctions[f.Address]; ok {
+		hostFunc.f(&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
+	} else if wasmFunc, ok := e.compiledWasmFunctions[f.Address]; ok {
+		e.exec(wasmFunc)
 	} else {
 		err = fmt.Errorf("function not compiled")
 		return
 	}
+
 	// Note the top value is the tail of the results,
 	// so we assign them in reverse order.
 	results = make([]uint64, len(f.Signature.Results))
@@ -140,49 +144,8 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	return
 }
 
-// Here we assign unique ids to all the function instances,
-// so we can reference it when we compile each function instance.
-func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
-	var newUniqueHostFunctions, newUniqueWasmFunctions int
-	for _, f := range fs {
-		if f.IsHostFunction() {
-			if _, ok := e.compiledHostFunctionIndex[f]; ok {
-				continue
-			}
-			id := getNewID(e.compiledHostFunctionIndex)
-			e.compiledHostFunctionIndex[f] = id
-			newUniqueHostFunctions++
-		} else {
-			if _, ok := e.compiledWasmFunctionIndex[f]; ok {
-				continue
-			}
-			id := getNewID(e.compiledWasmFunctionIndex)
-			e.compiledWasmFunctionIndex[f] = id
-			newUniqueWasmFunctions++
-		}
-	}
-	e.compiledHostFunctions = append(
-		e.compiledHostFunctions,
-		make([]*compiledHostFunction, newUniqueHostFunctions)...,
-	)
-	e.compiledWasmFunctions = append(
-		e.compiledWasmFunctions,
-		make([]*compiledWasmFunction, newUniqueWasmFunctions)...,
-	)
-	return nil
-}
-
-func getNewID(idMap map[*wasm.FunctionInstance]int64) int64 {
-	return int64(len(idMap))
-}
-
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	if f.IsHostFunction() {
-		id := e.compiledHostFunctionIndex[f]
-		if e.compiledHostFunctions[id] != nil {
-			// Already compiled.
-			return nil
-		}
 		hf := func(ctx *wasm.HostFunctionCallContext) {
 			tp := f.HostFunction.Type()
 			in := make([]reflect.Value, tp.NumIn())
@@ -216,18 +179,13 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 				}
 			}
 		}
-		e.compiledHostFunctions[id] = &compiledHostFunction{f: hf, name: f.Name}
+		e.compiledHostFunctions[f.Address] = &compiledHostFunction{f: hf, name: f.Name}
 	} else {
-		id := e.compiledWasmFunctionIndex[f]
-		if e.compiledWasmFunctions[id] != nil {
-			// Already compiled.
-			return nil
-		}
 		cf, err := e.compileWasmFunction(f)
 		if err != nil {
 			return fmt.Errorf("failed to compile Wasm function: %w", err)
 		}
-		e.compiledWasmFunctions[id] = cf
+		e.compiledWasmFunctions[f.Address] = cf
 	}
 	return nil
 }
@@ -240,9 +198,9 @@ const initialStackSize = 1024
 
 func newEngine() *engine {
 	e := &engine{
-		stack:                     make([]uint64, initialStackSize),
-		compiledWasmFunctionIndex: make(map[*wasm.FunctionInstance]int64),
-		compiledHostFunctionIndex: make(map[*wasm.FunctionInstance]int64),
+		stack:                 make([]uint64, initialStackSize),
+		compiledWasmFunctions: make(map[wasm.FunctionAddress]*compiledWasmFunction),
+		compiledHostFunctions: make(map[wasm.FunctionAddress]*compiledHostFunction),
 	}
 	return e
 }
@@ -260,22 +218,24 @@ func (e *engine) push(v uint64) {
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 
-func (e *engine) callFramePush(next *callFrame) {
+func (e *engine) callFramePush(callee *callFrame) {
 	e.callFrameNum++
 	if callStackCeiling < e.callFrameNum {
 		panic(wasm.ErrCallStackOverflow)
 	}
 	// Push the new frame to the top of stack.
-	next.caller = e.callFrameStack
-	e.callFrameStack = next
+	callee.caller = e.callFrameStack
+	e.callFrameStack = callee
 
 	// Initialize the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
-	e.stackBasePointer = next.stackBasePointer
+	e.stackBasePointer = callee.stackBasePointer
 	// Set the stack pointer so that base+sp would point to the top of function params.
-	e.stackPointer = next.wasmFunction.paramCount
-	e.globalSliceAddress = next.wasmFunction.globalSliceAddress
-	if next.wasmFunction.memory != nil {
-		e.memorySliceLen = len(next.wasmFunction.memory.Buffer)
+	e.stackPointer = callee.wasmFunction.paramCount
+	e.globalSliceAddress = callee.wasmFunction.globalSliceAddress
+	e.tableSliceLen = callee.wasmFunction.tableSliceLen
+	e.tableSliceAddress = callee.wasmFunction.tableSliceAddress
+	if callee.wasmFunction.memory != nil {
+		e.memorySliceLen = int64(len(callee.wasmFunction.memory.Buffer))
 	}
 }
 
@@ -292,8 +252,10 @@ func (e *engine) callFramePop() {
 		e.stackBasePointer = caller.stackBasePointer
 		e.stackPointer = caller.continuationStackPointer
 		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
+		e.tableSliceLen = caller.wasmFunction.tableSliceLen
+		e.tableSliceAddress = caller.wasmFunction.tableSliceAddress
 		if caller.wasmFunction.memory != nil {
-			e.memorySliceLen = len(caller.wasmFunction.memory.Buffer)
+			e.memorySliceLen = int64(len(caller.wasmFunction.memory.Buffer))
 		}
 	}
 }
@@ -381,13 +343,17 @@ type compiledWasmFunction struct {
 	memoryAddress uintptr
 	// globalSliceAddress is like codeInitialAddress, but for .globals.
 	globalSliceAddress uintptr
+	// tableSliceAddress and tableSliceLen are like codeInitialAddress, but for tables.
+	// Note we don't support multiple tables yet.
+	tableSliceAddress uintptr
+	tableSliceLen     int64
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
 }
 
 const (
-	builtinFunctionIndexMemoryGrow = iota
-	builtinFunctionIndexMemorySize
+	builtinFunctionIDMemoryGrow = iota
+	builtinFunctionIDMemorySize
 )
 
 // Grow the stack size according to maxStackPointer argument
@@ -437,7 +403,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		case jitCallStatusCodeCallWasmFunction:
 			// This never panics as we made sure that the index exists for all the referenced functions
 			// in a module.
-			nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
+			nextFunc := e.compiledWasmFunctions[e.functionCallAddress]
 			// Calculate the continuation address so we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
@@ -452,15 +418,15 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 			e.maybeGrowStack(nextFunc.maxStackPointer)
 		case jitCallStatusCodeCallBuiltInFunction:
-			switch e.functionCallIndex {
-			case builtinFunctionIndexMemoryGrow:
+			switch e.functionCallAddress {
+			case builtinFunctionIDMemoryGrow:
 				e.builtinFunctionMemoryGrow(currentFrame.wasmFunction)
-			case builtinFunctionIndexMemorySize:
+			case builtinFunctionIDMemorySize:
 				e.builtinFunctionMemorySize(currentFrame.wasmFunction)
 			}
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeCallHostFunction:
-			targetHostFunction := e.compiledHostFunctions[e.functionCallIndex]
+			targetHostFunction := e.compiledHostFunctions[e.functionCallAddress]
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 			// Push the call frame for this host function.
 			e.callFrameStack = &callFrame{hostFunction: targetHostFunction, caller: currentFrame}
@@ -691,6 +657,14 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	}
 	if len(f.ModuleInstance.Globals) > 0 {
 		cf.globalSliceAddress = uintptr(unsafe.Pointer(&f.ModuleInstance.Globals[0]))
+	}
+	if tables := f.ModuleInstance.Tables; len(tables) > 0 {
+		// We don't support multiple tables yet.
+		table := tables[0]
+		if len(table.Table) > 0 {
+			cf.tableSliceAddress = uintptr(unsafe.Pointer(&table.Table[0]))
+		}
+		cf.tableSliceLen = int64(len(table.Table))
 	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 	return cf, nil

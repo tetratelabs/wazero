@@ -626,6 +626,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 }
 
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
+	// TODO: implement!
 	return nil
 }
 
@@ -697,14 +698,13 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	if target.HostFunction != nil {
-		index := c.eng.compiledHostFunctionIndex[target]
-		if err := c.callHostFunctionFromConstIndex(index); err != nil {
+	address := int64(target.Address)
+	if target.IsHostFunction() {
+		if err := c.callHostFunctionFromConstAddress(address); err != nil {
 			return err
 		}
 	} else {
-		index := c.eng.compiledWasmFunctionIndex[target]
-		if err := c.callFunctionFromConstIndex(index); err != nil {
+		if err := c.callFunctionFromConstAddress(address); err != nil {
 			return err
 		}
 	}
@@ -3810,7 +3810,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemoryGrow)
+	return c.callBuiltinFunctionFromConstIndex(builtinFunctionIDMemoryGrow)
 }
 
 func (c *amd64Compiler) compileMemorySize() error {
@@ -3819,7 +3819,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	if err := c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize); err != nil {
+	if err := c.callBuiltinFunctionFromConstIndex(builtinFunctionIDMemorySize); err != nil {
 		return err
 	}
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
@@ -3829,7 +3829,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 
 func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) error {
 	c.setJITStatus(jitCallStatusCodeCallBuiltInFunction)
-	c.setFunctionCallIndexFromConst(index)
+	c.setFunctionCallAddressFromConst(index)
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4123,11 +4123,11 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) callHostFunctionFromConstIndex(index int64) error {
+func (c *amd64Compiler) callHostFunctionFromConstAddress(functionAddress int64) error {
 	// Set the jit status as jitCallStatusCodeCallHostFunction
 	c.setJITStatus(jitCallStatusCodeCallHostFunction)
 	// Set the function index.
-	c.setFunctionCallIndexFromConst(index)
+	c.setFunctionCallAddressFromConst(functionAddress)
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4139,11 +4139,11 @@ func (c *amd64Compiler) callHostFunctionFromConstIndex(index int64) error {
 	return nil
 }
 
-func (c *amd64Compiler) callFunctionFromConstIndex(index int64) error {
+func (c *amd64Compiler) callFunctionFromConstAddress(functionAddress int64) error {
 	// Set the jit status as jitCallStatusCodeCallWasmFunction
 	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	// Set the function index.
-	c.setFunctionCallIndexFromConst(index)
+	c.setFunctionCallAddressFromConst(functionAddress)
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4218,18 +4218,18 @@ func (c *amd64Compiler) setFunctionCallIndexFromRegister(reg int16) {
 	prog.From.Reg = reg
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineFunctionCallIndexOffset
+	prog.To.Offset = engineFunctionCallAddressOffset
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) setFunctionCallIndexFromConst(index int64) {
+func (c *amd64Compiler) setFunctionCallAddressFromConst(functionAddress int64) {
 	prog := c.newProg()
 	prog.As = x86.AMOVL
 	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = index
+	prog.From.Offset = functionAddress
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineFunctionCallIndexOffset
+	prog.To.Offset = engineFunctionCallAddressOffset
 	c.addInstruction(prog)
 }
 

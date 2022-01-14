@@ -3,7 +3,6 @@ package jit
 import (
 	"errors"
 	"os"
-	"reflect"
 	"sync"
 	"testing"
 	"unsafe"
@@ -19,10 +18,12 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).stackPointer)), enginestackPointerOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).stackBasePointer)), enginestackBasePointerOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).jitCallStatusCode)), engineJITCallStatusCodeOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallIndex)), engineFunctionCallIndexOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallAddress)), engineFunctionCallAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).globalSliceAddress)), engineglobalSliceAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).memorySliceLen)), engineMemorySliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceAddress)), engineTableSliceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceLen)), engineTableSliceLenOffset)
 }
 
 func TestEngine_fibonacci(t *testing.T) {
@@ -126,38 +127,6 @@ func TestEngine_memory(t *testing.T) {
 	out, _, err = store.CallFunction("test", "grow", 0)
 	require.NoError(t, err)
 	require.Equal(t, newPages, out[0])
-}
-
-func TestEngine_PreCompile(t *testing.T) {
-	eng := newEngine()
-	hf := reflect.ValueOf(func(*wasm.HostFunctionCallContext) {})
-	// Usually the function instances in a module consist of the maxture
-	// of host functions and wasm functions. And we treat a fcuntion instance
-	// as a native one when .HostFunction is nil.
-	fs := []*wasm.FunctionInstance{
-		{HostFunction: &hf},
-		{HostFunction: nil},
-		{HostFunction: nil},
-		{HostFunction: nil},
-	}
-	err := eng.PreCompile(fs)
-	require.NoError(t, err)
-	// Check the indexes.
-	require.Len(t, eng.compiledWasmFunctions, 3)
-	require.Len(t, eng.compiledWasmFunctionIndex, 3)
-	require.Len(t, eng.compiledHostFunctions, 1)
-	require.Len(t, eng.compiledHostFunctionIndex, 1)
-	prevCompiledFunctions := make([]*compiledWasmFunction, len(eng.compiledWasmFunctions))
-	prevHostFunctions := make([]*compiledHostFunction, len(eng.compiledHostFunctions))
-	copy(prevCompiledFunctions, eng.compiledWasmFunctions)
-	copy(prevHostFunctions, eng.compiledHostFunctions)
-	err = eng.PreCompile(fs)
-	// Precompiling same functions should be noop.
-	require.NoError(t, err)
-	require.Len(t, eng.compiledWasmFunctionIndex, 3)
-	require.Len(t, eng.compiledHostFunctionIndex, 1)
-	require.Equal(t, prevHostFunctions, eng.compiledHostFunctions)
-	require.Equal(t, prevCompiledFunctions, eng.compiledWasmFunctions)
 }
 
 func TestEngine_maybeGrowStack(t *testing.T) {

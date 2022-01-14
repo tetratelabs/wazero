@@ -73,8 +73,8 @@ func (j *jitEnv) jitStatus() jitCallStatusCode {
 	return j.eng.jitCallStatusCode
 }
 
-func (j *jitEnv) functionCallIndex() int64 {
-	return j.eng.functionCallIndex
+func (j *jitEnv) functionCallAddress() int64 {
+	return int64(j.eng.functionCallAddress)
 }
 
 func (j *jitEnv) continuationAddressOffset() uintptr {
@@ -98,7 +98,7 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 }
 
 func (j *jitEnv) exec(code []byte) {
-	j.eng.memorySliceLen = len(j.mem.Buffer)
+	j.eng.memorySliceLen = int64(len(j.mem.Buffer))
 	if len(j.globals) > 0 {
 		j.eng.globalSliceAddress = uintptr(unsafe.Pointer(&j.globals[0]))
 	}
@@ -179,13 +179,13 @@ func Test_setJITStatus(t *testing.T) {
 	}
 }
 
-func Test_setFunctionCallIndexFromConst(t *testing.T) {
+func Test_setFunctionCallAddressFromConst(t *testing.T) {
 	// Build codes.
 	for _, index := range []int64{1, 5, 20} {
 		// Build codes.
 		compiler := requireNewCompiler(t)
 		compiler.initializeReservedRegisters()
-		compiler.setFunctionCallIndexFromConst(index)
+		compiler.setFunctionCallAddressFromConst(index)
 		compiler.returnFunction()
 
 		// Generate the code under test.
@@ -197,7 +197,7 @@ func Test_setFunctionCallIndexFromConst(t *testing.T) {
 		env.exec(code)
 
 		// Check index.
-		require.Equal(t, index, env.functionCallIndex())
+		require.Equal(t, index, env.functionCallAddress())
 	}
 }
 
@@ -220,7 +220,7 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 		env.exec(code)
 
 		// Check index.
-		require.Equal(t, index, env.functionCallIndex())
+		require.Equal(t, index, env.functionCallAddress())
 	}
 }
 
@@ -4402,9 +4402,8 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileCall(t *testing.T) {
+	const functionAddress = 5
 	t.Run("host function", func(t *testing.T) {
-		const functionIndex = 5
-
 		env := newJITEnvironment()
 		compiler := requireNewCompiler(t)
 		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
@@ -4412,10 +4411,8 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		// Setup.
 		compiler.eng = env.eng
 		hostFuncRefValue := reflect.ValueOf(func() {})
-		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue, Signature: &wasm.FunctionType{}}
-		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
-		compiler.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
-		compiler.eng.compiledHostFunctionIndex[hostFuncInstance] = functionIndex
+		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue, Signature: &wasm.FunctionType{}, Address: functionAddress}
+		compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{hostFuncInstance}
 
 		// Build codes.
 		compiler.initializeReservedRegisters()
@@ -4423,7 +4420,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
 		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
 		compiler.movIntConstToRegister(int64(50), loc.register)
-		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
 		require.NoError(t, err)
 
 		// Generate the code under test.
@@ -4435,24 +4432,21 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 		// Check the status.
 		require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
-		require.Equal(t, int64(functionIndex), env.functionCallIndex())
+		require.Equal(t, int64(functionAddress), env.functionCallAddress())
+
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(2), env.stackPointer())
 		require.Equal(t, uint64(50), env.stackTopAsUint64())
 	})
 	t.Run("wasm function", func(t *testing.T) {
-		const functionIndex = 20
-
 		env := newJITEnvironment()
 		compiler := requireNewCompiler(t)
 		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
 
 		// Setup.
 		compiler.eng = env.eng
-		wasmFuncInstance := &wasm.FunctionInstance{Signature: &wasm.FunctionType{}}
-		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
-		compiler.f.ModuleInstance.Functions[functionIndex] = wasmFuncInstance
-		env.eng.compiledWasmFunctionIndex[wasmFuncInstance] = functionIndex
+		wasmFuncInstance := &wasm.FunctionInstance{Signature: &wasm.FunctionType{}, Address: functionAddress}
+		compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{wasmFuncInstance}
 
 		// Build codes.
 		compiler.initializeReservedRegisters()
@@ -4461,7 +4455,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
 		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
 		compiler.movIntConstToRegister(int64(50), loc.register)
-		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
+		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
 		require.NoError(t, err)
 
 		// Generate the code under test.
@@ -4473,7 +4467,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 		// Check the status.
 		require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
-		require.Equal(t, int64(functionIndex), env.functionCallIndex())
+		require.Equal(t, int64(functionAddress), env.functionCallAddress())
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(3), env.stackPointer())
 		require.Equal(t, uint64(50), env.stackTopAsUint64())
@@ -5001,7 +4995,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, int64(builtinFunctionIndexMemoryGrow), env.functionCallIndex())
+	require.Equal(t, int64(builtinFunctionIDMemoryGrow), env.functionCallAddress())
 }
 
 func TestAmd64Compiler_compileMemorySize(t *testing.T) {
@@ -5023,7 +5017,7 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, int64(builtinFunctionIndexMemorySize), env.functionCallIndex())
+	require.Equal(t, int64(builtinFunctionIDMemorySize), env.functionCallAddress())
 }
 
 func TestAmd64Compiler_compileDrop(t *testing.T) {

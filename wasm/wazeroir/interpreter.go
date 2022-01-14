@@ -112,11 +112,6 @@ type interpreterOp struct {
 	f      *interpreterFunction
 }
 
-func (it *interpreter) PreCompile(fs []*wasm.FunctionInstance) error {
-	// We have nothing to do on the precompile phase, in contrast to JIT engine.
-	return nil
-}
-
 // Compile Implements wasm.Engine for interpreter.
 func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	funcaddr := f.Address
