@@ -549,7 +549,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.Memory
 	globals := moduleInst.Globals
-	tables := moduleInst.Tables
+	var table *wasm.TableInstance
+	if len(moduleInst.Tables) > 0 {
+		table = moduleInst.Tables[0] // We don't support yet.
+	}
 	it.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -597,7 +600,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCallIndirect:
 			{
 				index := it.pop()
-				target := it.functions[tables[op.us[0]].Table[index]]
+				target := it.functions[table.Table[index]]
 				// Type check.
 				if target.typeID != op.us[1] {
 					panic("function signature mismatch on call_indirect")

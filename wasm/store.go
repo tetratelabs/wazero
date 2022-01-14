@@ -562,18 +562,9 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	// Allocate table instances.
 	for _, tableSeg := range module.TableSection {
-		tableInst := &TableInstance{
-			Table:    make([]FunctionAddress, tableSeg.Limit.Min),
-			Min:      tableSeg.Limit.Min,
-			Max:      tableSeg.Limit.Max,
-			ElemType: tableSeg.ElemType,
-		}
-		for i := range tableInst.Table {
-			// We use math.MaxUint64 to represent the uninitialized elements.
-			tableInst.Table[i] = math.MaxUint64
-		}
-		target.Tables = append(target.Tables, tableInst)
-		s.Tables = append(s.Tables, tableInst)
+		instance := newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
+		target.Tables = append(target.Tables, instance)
+		s.Tables = append(s.Tables, instance)
 	}
 
 	for _, elem := range module.ElementSection {
@@ -1711,18 +1702,9 @@ func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint3
 		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
 	}
 
-	tableInst := &TableInstance{
-		Table:    make([]FunctionAddress, min),
-		Min:      min,
-		Max:      max,
-		ElemType: 0x70, // funcref
-	}
-	for i := range tableInst.Table {
-		// We use math.MaxUint64 to represent the uninitialized elements.
-		tableInst.Table[i] = math.MaxUint64
-	}
-	m.Exports[name] = &ExportInstance{Kind: ExportKindTable, Table: tableInst}
-	s.Tables = append(s.Tables, tableInst)
+	instance := newTableInstance(min, max)
+	m.Exports[name] = &ExportInstance{Kind: ExportKindTable, Table: instance}
+	s.Tables = append(s.Tables, instance)
 	return nil
 }
 
@@ -1746,4 +1728,18 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 	m.Exports[name] = &ExportInstance{Kind: ExportKindMemory, Memory: memory}
 	s.Memories = append(s.Memories, memory)
 	return nil
+}
+
+func newTableInstance(min uint32, max *uint32) *TableInstance {
+	tableInst := &TableInstance{
+		Table:    make([]FunctionAddress, min),
+		Min:      min,
+		Max:      max,
+		ElemType: 0x70, // funcref
+	}
+	for i := range tableInst.Table {
+		// We use math.MaxUint64 to represent the uninitialized elements.
+		tableInst.Table[i] = math.MaxUint64
+	}
+	return tableInst
 }
