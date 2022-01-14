@@ -2,7 +2,6 @@ package jit
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"reflect"
 	"sync"
@@ -33,7 +32,7 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.NoError(t, err)
 
 	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
-	// and we have never conflicts with Go's runtime.
+	// and we have no conflict with Go's runtime.
 	const goroutines = 1000
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
@@ -48,7 +47,6 @@ func TestEngine_fibonacci(t *testing.T) {
 			out, _, err := store.CallFunction("test", "fib", 20)
 			require.NoError(t, err)
 			require.Equal(t, uint64(10946), out[0])
-			fmt.Println(i)
 		}()
 	}
 	wg.Wait()
