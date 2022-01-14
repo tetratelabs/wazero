@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
@@ -21,11 +20,6 @@ var callStackCeiling = buildoptions.CallStackCeiling
 type interpreter struct {
 	// Stores compiled functions.
 	functions map[wasm.FunctionAddress]*interpreterFunction
-	// Cached function type IDs assigned to
-	// function signatures.
-	// Type IDs are used to check the signature of
-	// functions on call_indirect operation at runtime
-	functionTypeIDs map[string]uint64
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
@@ -35,6 +29,13 @@ type interpreter struct {
 	// See the comment where this is used below for detail.
 	// Not used at runtime, and only in the compilation phase.
 	onCompilationDoneCallbacks map[wasm.FunctionAddress][]func(*interpreterFunction)
+}
+
+func NewEngine() wasm.Engine {
+	return &interpreter{
+		functions:                  map[wasm.FunctionAddress]*interpreterFunction{},
+		onCompilationDoneCallbacks: map[wasm.FunctionAddress][]func(*interpreterFunction){},
+	}
 }
 
 func (it *interpreter) push(v uint64) {
@@ -99,8 +100,6 @@ type interpreterFunction struct {
 	funcInstance *wasm.FunctionInstance
 	body         []*interpreterOp
 	hostFn       *reflect.Value
-	signature    *wasm.FunctionType
-	typeID       uint64
 }
 
 // Non-interface union of all the wazeroir operations.
@@ -119,14 +118,6 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	if f.IsHostFunction() {
 		ret := &interpreterFunction{
 			hostFn: f.HostFunction, funcInstance: f,
-			signature: f.Signature,
-		}
-		if id, ok := it.functionTypeIDs[funcTypeString(f.Signature)]; !ok {
-			id = uint64(len(it.functionTypeIDs))
-			it.functionTypeIDs[funcTypeString(f.Signature)] = id
-			ret.typeID = id
-		} else {
-			ret.typeID = id
 		}
 		it.functions[funcaddr] = ret
 		return nil
@@ -152,14 +143,7 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 // Lowers the wazeroir operations to interpreter friendly struct.
 func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 	ops []Operation) (*interpreterFunction, error) {
-	ret := &interpreterFunction{funcInstance: f, signature: f.Signature}
-	if id, ok := it.functionTypeIDs[funcTypeString(f.Signature)]; !ok {
-		id = uint64(len(it.functionTypeIDs))
-		it.functionTypeIDs[funcTypeString(f.Signature)] = id
-		ret.typeID = id
-	} else {
-		ret.typeID = id
-	}
+	ret := &interpreterFunction{funcInstance: f}
 	labelAddress := map[string]uint64{}
 	onLabelAddressResolved := map[string][]func(addr uint64){}
 	for _, original := range ops {
@@ -264,12 +248,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 		case *OperationCallIndirect:
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.TableIndex)
-			key := funcTypeString(f.ModuleInstance.Types[o.TypeIndex])
-			typeid, ok := it.functionTypeIDs[key]
-			if !ok {
-				it.functionTypeIDs[key] = uint64(len(it.functionTypeIDs))
-			}
-			op.us[1] = typeid
+			op.us[1] = f.ModuleInstance.Types[o.TypeIndex].FunctionTypeID
 		case *OperationDrop:
 			op.rs = make([]*InclusiveRange, 1)
 			op.rs[0] = o.Range
@@ -489,7 +468,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		}
 		it.callNativeFunc(g)
 	}
-	results = make([]uint64, len(f.Signature.Results))
+	results = make([]uint64, len(f.FunctionType.Results))
 	for i := range results {
 		results[len(results)-1-i] = it.pop()
 	}
@@ -586,7 +565,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCall:
 			{
 				if op.f.hostFn != nil {
-					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.signature.Params):]...)
+					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.funcInstance.FunctionType.Params):]...)
 				} else {
 					it.callNativeFunc(op.f)
 				}
@@ -595,14 +574,15 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCallIndirect:
 			{
 				offset := it.pop()
-				target := it.functions[table.Table[offset]]
+				target := it.functions[table.Table[offset].FunctionAddress]
 				// Type check.
-				if target.typeID != op.us[1] {
-					panic("function signature mismatch on call_indirect")
+				if target.funcInstance.FunctionTypeID != op.us[1] {
+					fmt.Printf("%d != %d\n", target.funcInstance.FunctionTypeID, op.us[1])
+					panic("function type mismatch on call_indirect")
 				}
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(target.signature.Params):]...)
+					it.callHostFunc(target, it.stack[len(it.stack)-len(target.funcInstance.FunctionType.Params):]...)
 				} else {
 					it.callNativeFunc(target)
 				}
@@ -1466,16 +1446,6 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		}
 	}
 	it.popFrame()
-}
-
-func funcTypeString(t *wasm.FunctionType) string {
-	return fmt.Sprintf("%s-%s",
-		// Fast stringification of byte slice.
-		// This is safe anyway as the results are copied
-		// into the return value string.
-		*(*string)(unsafe.Pointer(&t.Params)),
-		*(*string)(unsafe.Pointer(&t.Results)),
-	)
 }
 
 // math.Min doen't comply with the Wasm spec, so we borrow from the original

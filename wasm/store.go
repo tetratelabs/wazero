@@ -15,6 +15,7 @@ type (
 	Store struct {
 		engine          Engine
 		ModuleInstances map[string]*ModuleInstance
+		FunctionTypeIDs map[string]uint64
 
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
@@ -28,8 +29,12 @@ type (
 		Globals   []*GlobalInstance
 		Memory    *MemoryInstance
 		Tables    []*TableInstance
+		Types     []*TypeInstance
+	}
 
-		Types []*FunctionType
+	TypeInstance struct {
+		FunctionType   *FunctionType
+		FunctionTypeID uint64
 	}
 
 	ExportInstance struct {
@@ -45,7 +50,8 @@ type (
 		Address        FunctionAddress
 		ModuleInstance *ModuleInstance
 		Body           []byte
-		Signature      *FunctionType
+		FunctionType   *FunctionType
+		FunctionTypeID uint64
 		NumLocals      uint32
 		LocalTypes     []ValueType
 		HostFunction   *reflect.Value
@@ -73,10 +79,15 @@ type (
 
 	// Note this is fixed to function type until post MVP reference type is implemented.
 	TableInstance struct {
-		Table    []FunctionAddress
+		Table    []TableElement
 		Min      uint32
 		Max      *uint32
 		ElemType byte
+	}
+
+	TableElement struct {
+		FunctionAddress FunctionAddress
+		FunctionTypeID  uint64
 	}
 
 	MemoryInstance struct {
@@ -91,11 +102,18 @@ func (f *FunctionInstance) IsHostFunction() bool {
 }
 
 func NewStore(engine Engine) *Store {
-	return &Store{ModuleInstances: map[string]*ModuleInstance{}, engine: engine}
+	return &Store{ModuleInstances: map[string]*ModuleInstance{}, FunctionTypeIDs: map[string]uint64{}, engine: engine}
 }
 
 func (s *Store) Instantiate(module *Module, name string) error {
-	instance := &ModuleInstance{Types: module.TypeSection}
+	instance := &ModuleInstance{}
+	for _, t := range module.TypeSection {
+		instance.Types = append(instance.Types, &TypeInstance{
+			FunctionType:   t,
+			FunctionTypeID: s.funcTypeID(t),
+		})
+	}
+
 	s.ModuleInstances[name] = instance
 	// Resolve the imports before doing the actual instantiation (mutating store).
 	if err := s.resolveImports(module, instance); err != nil {
@@ -148,9 +166,9 @@ func (s *Store) Instantiate(module *Module, name string) error {
 		if int(index) >= len(instance.Functions) {
 			return fmt.Errorf("invalid start function index: %d", index)
 		}
-		signature := instance.Functions[index].Signature
-		if len(signature.Params) != 0 || len(signature.Results) != 0 {
-			return fmt.Errorf("start function must have the empty signature")
+		funcType := instance.Functions[index].FunctionType
+		if len(funcType.Params) != 0 || len(funcType.Results) != 0 {
+			return fmt.Errorf("start function must have the empty function type")
 		}
 	}
 
@@ -183,16 +201,17 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 	}
 
 	f := exp.Function
-	if len(f.Signature.Params) != len(params) {
+	if len(f.FunctionType.Params) != len(params) {
 		return nil, nil, fmt.Errorf("invalid number of parameters")
 	}
 
 	ret, err := s.engine.Call(f, params...)
-	return ret, f.Signature.Results, err
+	return ret, f.FunctionType.Results, err
 }
 
 func (s *Store) addFunctionInstance(f *FunctionInstance) {
 	f.Address = FunctionAddress(len(s.Functions))
+	f.FunctionTypeID = s.funcTypeID(f.FunctionType)
 	s.Functions = append(s.Functions, f)
 }
 
@@ -248,11 +267,11 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex uint32, ex
 	if int(typeIndex) >= len(target.Types) {
 		return fmt.Errorf("unknown type for function import")
 	}
-	iSig := target.Types[typeIndex]
-	if !HasSameSignature(iSig.Results, f.Signature.Results) {
-		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.Results, f.Signature.Results)
-	} else if !HasSameSignature(iSig.Params, f.Signature.Params) {
-		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.Params, f.Signature.Params)
+	expectedType := target.Types[typeIndex].FunctionType
+	if !SameFunctionTypes(expectedType.Results, f.FunctionType.Results) {
+		return fmt.Errorf("return signature mimatch: %#x != %#x", expectedType.Results, f.FunctionType.Results)
+	} else if !SameFunctionTypes(expectedType.Params, f.FunctionType.Params) {
+		return fmt.Errorf("input signature mimatch: %#x != %#x", expectedType.Params, f.FunctionType.Params)
 	}
 	target.Functions = append(target.Functions, f)
 	return nil
@@ -455,7 +474,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 		f := &FunctionInstance{
 			Name:           name,
-			Signature:      module.TypeSection[typeIndex],
+			FunctionType:   module.TypeSection[typeIndex],
 			Body:           module.CodeSection[codeIndex].Body,
 			NumLocals:      module.CodeSection[codeIndex].NumLocals,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
@@ -607,7 +626,10 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 			rollbackFuncs = append(rollbackFuncs, func() {
 				tableInst.Table[pos] = original
 			})
-			tableInst.Table[pos] = target.Functions[elm].Address
+			tableInst.Table[pos] = TableElement{
+				FunctionAddress: target.Functions[elm].Address,
+				FunctionTypeID:  target.Functions[elm].FunctionTypeID,
+			}
 		}
 	}
 	if len(target.Tables) > 1 {
@@ -769,14 +791,15 @@ func (s *valueTypeStack) String() string {
 type BlockType = FunctionType
 
 func analyzeFunction(
-	module *Module, f *FunctionInstance,
+	module *Module,
+	f *FunctionInstance,
 	functionDeclarations []uint32,
 	globalDeclarations []*GlobalType,
 	memoryDeclarations []*MemoryType,
 	tableDeclarations []*TableType,
 ) error {
 	labelStack := []*FunctionInstanceBlock{
-		{BlockType: f.Signature, StartAt: math.MaxUint64},
+		{BlockType: f.FunctionType, StartAt: math.MaxUint64},
 	}
 	valueTypeStack := &valueTypeStack{}
 	for pc := uint64(0); pc < uint64(len(f.Body)); pc++ {
@@ -1024,23 +1047,23 @@ func analyzeFunction(
 			pc += num - 1
 			switch Opcode(op) {
 			case OpcodeLocalGet:
-				inputLen := uint32(len(f.Signature.Params))
+				inputLen := uint32(len(f.FunctionType.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				if index < inputLen {
-					valueTypeStack.push(f.Signature.Params[index])
+					valueTypeStack.push(f.FunctionType.Params[index])
 				} else {
 					valueTypeStack.push(f.LocalTypes[index-inputLen])
 				}
 			case OpcodeLocalSet:
-				inputLen := uint32(len(f.Signature.Params))
+				inputLen := uint32(len(f.FunctionType.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.Params[index]
+					expType = f.FunctionType.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1048,13 +1071,13 @@ func analyzeFunction(
 					return err
 				}
 			case OpcodeLocalTee:
-				inputLen := uint32(len(f.Signature.Params))
+				inputLen := uint32(len(f.FunctionType.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.Params[index]
+					expType = f.FunctionType.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1436,7 +1459,7 @@ func analyzeFunction(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1448,7 +1471,7 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1461,7 +1484,7 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1512,7 +1535,7 @@ func analyzeFunction(
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			expTypes := f.Signature.Results
+			expTypes := f.FunctionType.Results
 			for i := 0; i < len(expTypes); i++ {
 				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
 					return fmt.Errorf("return type mismatch on return: %v; want %v", err, expTypes)
@@ -1561,7 +1584,7 @@ func analyzeFunction(
 	return nil
 }
 
-func ReadBlockType(types []*FunctionType, r io.Reader) (*BlockType, uint64, error) {
+func ReadBlockType(types []*TypeInstance, r io.Reader) (*BlockType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
@@ -1583,7 +1606,7 @@ func ReadBlockType(types []*FunctionType, r io.Reader) (*BlockType, uint64, erro
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
 		}
-		ret = types[raw]
+		ret = types[raw].FunctionType
 	}
 	return ret, num, nil
 }
@@ -1645,7 +1668,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	f := &FunctionInstance{
 		Name:           fmt.Sprintf("%s.%s", moduleName, funcName),
 		HostFunction:   &fn,
-		Signature:      sig,
+		FunctionType:   sig,
 		ModuleInstance: m,
 	}
 	if err := s.engine.Compile(f); err != nil {
@@ -1716,16 +1739,29 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 	return nil
 }
 
+func (s *Store) funcTypeID(t *FunctionType) uint64 {
+	key := t.String()
+	id, ok := s.FunctionTypeIDs[key]
+	if ok {
+		return id
+	}
+	id = uint64(len(s.FunctionTypeIDs))
+	s.FunctionTypeIDs[key] = id
+	return id
+}
+
 func newTableInstance(min uint32, max *uint32) *TableInstance {
 	tableInst := &TableInstance{
-		Table:    make([]FunctionAddress, min),
+		Table:    make([]TableElement, min),
 		Min:      min,
 		Max:      max,
 		ElemType: 0x70, // funcref
 	}
 	for i := range tableInst.Table {
-		// We use math.MaxUint64 to represent the uninitialized elements.
-		tableInst.Table[i] = math.MaxUint64
+		tableInst.Table[i] = TableElement{
+			// We use math.MaxUint64 to represent the uninitialized elements.
+			FunctionAddress: math.MaxUint32,
+		}
 	}
 	return tableInst
 }

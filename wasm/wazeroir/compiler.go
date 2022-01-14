@@ -148,7 +148,7 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 	c := compiler{controlFrames: &controlFrames{}, f: f, result: CompilationResult{LabelCallers: map[string]int{}}}
 
 	// Push function arguments.
-	for _, t := range f.Signature.Params {
+	for _, t := range f.FunctionType.Params {
 		c.stackPush(wasmValueTypeToUnsignedType(t))
 	}
 	// Emit const expressions for locals.
@@ -160,13 +160,13 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 	}
 
 	// Insert the function control frame.
-	returns := make([]UnsignedType, 0, len(f.Signature.Results))
-	for _, t := range f.Signature.Results {
+	returns := make([]UnsignedType, 0, len(f.FunctionType.Results))
+	for _, t := range f.FunctionType.Results {
 		returns = append(returns, wasmValueTypeToUnsignedType(t))
 	}
 	c.controlFrames.push(&controlFrame{
 		frameID:          c.nextID(),
-		originalStackLen: len(f.Signature.Params),
+		originalStackLen: len(f.FunctionType.Params),
 		returns:          returns,
 		kind:             controlFrameKindFunction,
 	})

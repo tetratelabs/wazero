@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -99,7 +98,7 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 	return j.globals[index].Val
 }
 
-func (j *jitEnv) setTable(table []wasm.FunctionAddress) {
+func (j *jitEnv) setTable(table []wasm.TableElement) {
 	j.table.Table = table
 }
 
@@ -148,12 +147,12 @@ func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *
 }
 
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
-	f := &wasm.FunctionInstance{Signature: &wasm.FunctionType{
+	f := &wasm.FunctionInstance{FunctionType: &wasm.FunctionType{
 		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
 	}}
 	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
 	compiler.pushFunctionParams()
-	require.Equal(t, uint64(len(f.Signature.Params)), compiler.locationStack.sp)
+	require.Equal(t, uint64(len(f.FunctionType.Params)), compiler.locationStack.sp)
 	loc := compiler.locationStack.pop()
 	require.Equal(t, uint64(1), loc.stackPointer)
 	loc = compiler.locationStack.pop()
@@ -4422,7 +4421,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		// Setup.
 		compiler.eng = env.eng
 		hostFuncRefValue := reflect.ValueOf(func() {})
-		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue, Signature: &wasm.FunctionType{}, Address: functionAddress}
+		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue, FunctionType: &wasm.FunctionType{}, Address: functionAddress}
 		compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{hostFuncInstance}
 
 		// Build codes.
@@ -4456,7 +4455,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 		// Setup.
 		compiler.eng = env.eng
-		wasmFuncInstance := &wasm.FunctionInstance{Signature: &wasm.FunctionType{}, Address: functionAddress}
+		wasmFuncInstance := &wasm.FunctionInstance{FunctionType: &wasm.FunctionType{}, Address: functionAddress}
 		compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{wasmFuncInstance}
 
 		// Build codes.
@@ -5544,12 +5543,12 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
-		env.setTable(make([]wasm.FunctionAddress, 10))
+		env.setTable(make([]wasm.TableElement, 10))
 		compiler := requireNewCompiler(t)
 
 		// Place the offfset value.
 		loc := compiler.locationStack.pushValueOnStack()
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.FunctionType{{}}}}
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{}}}}
 		env.stack()[loc.stackPointer] = 1000000000
 
 		// Now emit the code.
@@ -5570,9 +5569,9 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		// Setup table.
-		table := make([]wasm.FunctionAddress, 10)
+		table := make([]wasm.TableElement, 10)
 		for i := range table {
-			table[i] = wasm.FunctionAddress(i)
+			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i)}
 		}
 
 		for i := 0; i < len(table); i++ {
@@ -5586,7 +5585,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				targetType := &wasm.FunctionType{
 					Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 					Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32}}
-				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.FunctionType{targetType}}}
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{FunctionType: targetType}}}}
 
 				// Put the function call params.
 				for i := 0; i < len(targetType.Params); i++ {
@@ -5597,7 +5596,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
 				require.NoError(t, err)
 
-				// At this point, we should have three elements (params+offset value) on the stack
+				// At this point, we should have three elements (function params + offset value) on the stack
 				require.Equal(t, uint64(3), compiler.locationStack.sp)
 
 				// Now emit the code.
@@ -5615,8 +5614,6 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 				// Run code.
 				env.exec(code)
-
-				fmt.Println(hex.EncodeToString(code))
 
 				// The global value should be set to valueToSet.
 				require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())

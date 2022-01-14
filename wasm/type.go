@@ -3,12 +3,23 @@ package wasm
 import (
 	"fmt"
 	"io"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
 type FunctionType struct {
 	Params, Results []ValueType
+}
+
+func (t *FunctionType) String() string {
+	return fmt.Sprintf("%s-%s",
+		// Fast stringification of byte slice.
+		// This is safe anyway as the results are copied
+		// into the return value string.
+		*(*string)(unsafe.Pointer(&t.Params)),
+		*(*string)(unsafe.Pointer(&t.Results)),
+	)
 }
 
 func readFunctionType(r io.Reader) (*FunctionType, error) {

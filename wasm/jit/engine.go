@@ -137,7 +137,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 
 	// Note the top value is the tail of the results,
 	// so we assign them in reverse order.
-	results = make([]uint64, len(f.Signature.Results))
+	results = make([]uint64, len(f.FunctionType.Results))
 	for i := range results {
 		results[len(results)-1-i] = e.pop()
 	}
@@ -649,8 +649,8 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	cf := &compiledWasmFunction{
 		source:          f,
 		codeSegment:     code,
-		paramCount:      uint64(len(f.Signature.Params)),
-		resultCount:     uint64(len(f.Signature.Results)),
+		paramCount:      uint64(len(f.FunctionType.Params)),
+		resultCount:     uint64(len(f.FunctionType.Results)),
 		memory:          f.ModuleInstance.Memory,
 		maxStackPointer: maxStackPointer,
 	}

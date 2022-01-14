@@ -187,7 +187,7 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
-	for _, t := range c.f.Signature.Params {
+	for _, t := range c.f.FunctionType.Params {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -710,12 +710,12 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(target.Signature.Params); i++ {
+	for i := 0; i < len(target.FunctionType.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range target.Signature.Results {
+	for _, t := range target.FunctionType.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -788,13 +788,13 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	}
 
 	// We consumed the function parameters from the stack after call.
-	sig := c.f.ModuleInstance.Types[o.TypeIndex]
-	for i := 0; i < len(sig.Params); i++ {
+	ft := c.f.ModuleInstance.Types[o.TypeIndex].FunctionType
+	for i := 0; i < len(ft.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range sig.Results {
+	for _, t := range ft.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:

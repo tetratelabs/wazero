@@ -54,7 +54,7 @@ func readNameValue(r io.Reader) (string, error) {
 	return string(buf), nil
 }
 
-func HasSameSignature(a []ValueType, b []ValueType) bool {
+func SameFunctionTypes(a []ValueType, b []ValueType) bool {
 	if len(a) != len(b) {
 		return false
 	}
