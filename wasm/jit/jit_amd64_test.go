@@ -5548,7 +5548,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		// Place the offfset value.
 		loc := compiler.locationStack.pushValueOnStack()
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{}}}}
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{FunctionType: &wasm.FunctionType{}}}}}
 		env.stack()[loc.stackPointer] = 1000000000
 
 		// Now emit the code.

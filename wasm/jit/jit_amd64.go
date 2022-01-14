@@ -757,14 +757,14 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// TODO: type check branch.
 
 	// Otherwise, we read the table value and set it to functionCallAddress field of engine.
-	multiplyBy3 := c.newProg()
-	okJmp.To.SetTarget(multiplyBy3)
-	multiplyBy3.As = x86.ASHLQ
-	multiplyBy3.To.Type = obj.TYPE_REG
-	multiplyBy3.To.Reg = offset.register
-	multiplyBy3.From.Type = obj.TYPE_CONST
-	multiplyBy3.From.Offset = 3
-	c.addInstruction(multiplyBy3)
+	multiplyBy4 := c.newProg()
+	okJmp.To.SetTarget(multiplyBy4)
+	multiplyBy4.As = x86.ASHLQ
+	multiplyBy4.To.Type = obj.TYPE_REG
+	multiplyBy4.To.Reg = offset.register
+	multiplyBy4.From.Type = obj.TYPE_CONST
+	multiplyBy4.From.Offset = 4
+	c.addInstruction(multiplyBy4)
 
 	movTableSliceAddress := c.newProg()
 	movTableSliceAddress.As = x86.AADDQ
