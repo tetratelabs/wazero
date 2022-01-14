@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"sync"
 	"testing"
 	"unsafe"
 
@@ -29,13 +30,25 @@ func TestEngine_fibonacci(t *testing.T) {
 	require.NoError(t, err)
 	mod, err := wasm.DecodeModule(buf)
 	require.NoError(t, err)
-	store := wasm.NewStore(NewEngine())
-	require.NoError(t, err)
-	err = store.Instantiate(mod, "test")
-	require.NoError(t, err)
-	out, _, err := store.CallFunction("test", "fib", 20)
-	require.NoError(t, err)
-	require.Equal(t, uint64(10946), out[0])
+
+	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
+	// and we have no conflict with Go's runtime.
+	const goroutines = 1000
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			store := wasm.NewStore(NewEngine())
+			require.NoError(t, err)
+			err = store.Instantiate(mod, "test")
+			require.NoError(t, err)
+			out, _, err := store.CallFunction("test", "fib", 20)
+			require.NoError(t, err)
+			require.Equal(t, uint64(10946), out[0])
+		}()
+	}
+	wg.Wait()
 }
 
 func TestEngine_fac(t *testing.T) {
