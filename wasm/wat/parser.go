@@ -62,7 +62,7 @@ type moduleParser struct {
 	// currentImportIndex allows us to track the relative position of module.importFuncs regardless of position in the source.
 	currentImportIndex uint32
 
-	// currentTypeIndex allows us to track the relative position of module.typeFuncs regardless of position in the source.
+	// currentTypeIndex allows us to track the relative position of module.types regardless of position in the source.
 	currentTypeIndex uint32
 
 	typeParser  *typeParser
@@ -96,7 +96,7 @@ func parseModule(source []byte) (*module, error) {
 	}
 
 	// Add any types implicitly defined from type use. Ex. (module (import (func (param i32)...
-	p.module.typeFuncs = append(p.module.typeFuncs, p.typeParser.inlinedTypes...)
+	p.module.types = append(p.module.types, p.typeParser.inlinedTypes...)
 
 	// Ensure indices only point to numeric values
 	if err = bindIndices(p.module); err != nil {
@@ -255,16 +255,18 @@ func (p *moduleParser) parseTypeName(tok tokenType, tokenBytes []byte, line, col
 //                      errs here --^
 func (p *moduleParser) parseType(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
+	case tokenID:
+		return errors.New("redundant name")
 	case tokenLParen: // start fields, ex. (func
 		// Err if there's a second func. Ex. (type (func) (func))
-		if uint32(len(p.module.typeFuncs)) > p.currentTypeIndex {
+		if uint32(len(p.module.types)) > p.currentTypeIndex {
 			return unexpectedToken(tok, tokenBytes)
 		}
 		p.tokenParser = p.beginField
 		return nil
 	case tokenRParen: // end of this type
 		// Err if we never reached a description...
-		if uint32(len(p.module.typeFuncs)) == p.currentTypeIndex {
+		if uint32(len(p.module.types)) == p.currentTypeIndex {
 			return errors.New("missing func field")
 		}
 
@@ -299,7 +301,11 @@ func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col
 // the token is tokenRParen and sets the next parser to parseType on tokenRParen.
 func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		p.module.typeFuncs = append(p.module.typeFuncs, p.typeParser.getType(string(p.currentValue0)))
+		sig, names := p.typeParser.getType(string(p.currentValue0))
+		if names != nil {
+			p.module.typeParamNames = append(p.module.typeParamNames, &typeParamNames{uint32(len(p.module.types)), names})
+		}
+		p.module.types = append(p.module.types, sig)
 		p.currentValue0 = nil
 		p.currentField = fieldModuleType
 		p.tokenParser = p.parseType
@@ -436,7 +442,7 @@ func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, c
 func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
 		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
-		fn.typeIndex, fn.typeInlined = p.typeParser.getTypeUse()
+		fn.typeIndex, fn.typeInlined, fn.paramNames = p.typeParser.getTypeUse()
 		p.currentField = fieldModuleImport
 		p.tokenParser = p.parseImport
 		return nil

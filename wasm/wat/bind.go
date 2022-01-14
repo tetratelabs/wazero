@@ -8,12 +8,12 @@ import (
 func bindIndices(m *module) error {
 	typeToIndex := map[*typeFunc]uint32{}
 	typeNameToIndex := map[string]uint32{}
-	for i, t := range m.typeFuncs {
-		index := uint32(i)
+	for i, t := range m.types {
+		ui := uint32(i)
 		if t.name != "" {
-			typeNameToIndex[t.name] = index
+			typeNameToIndex[t.name] = ui
 		}
-		typeToIndex[t] = index
+		typeToIndex[t] = ui
 	}
 
 	funcNameToIndex, err := bindFunctionTypes(m, typeToIndex, typeNameToIndex)
@@ -37,7 +37,7 @@ func bindIndices(m *module) error {
 //  or (import "Math" "PI" (func (type 32))) exists, but there are only 10 types.
 func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIndex map[string]uint32) (map[string]uint32, error) {
 	funcNameToIndex := map[string]uint32{}
-	typeCount := uint32(len(m.typeFuncs))
+	typeCount := uint32(len(m.types))
 	for i, f := range m.importFuncs {
 		if f.funcName != "" {
 			funcNameToIndex[f.funcName] = uint32(i)
@@ -45,13 +45,12 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 
 		idx := f.typeIndex
 		if idx == nil { // inlined type
-			f.typeIndex = &index{numeric: typeToIndex[f.typeInlined] /* TODO: 0, 0 aren't valid line/col */}
+			ti := f.typeInlined
+			f.typeIndex = &index{numeric: typeToIndex[ti.typeFunc], line: ti.line, col: ti.col}
 			f.typeInlined = nil
 			continue
 		}
 
-		// TODO: inlined types can contain "verification types" basically where typeIndex != nil if there is a type we need
-		// to verify it matches the corresponding index exactly.
 		if idx.ID == "" { // already bound to a numeric index: verify it is in range
 			if err := checkIndexInRange(idx, typeCount, "module.import[%d].func.type", i); err != nil {
 				return nil, err
@@ -60,6 +59,16 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 			return nil, err
 		}
 
+		// If there's an inlined type now, it must contain the same signature as the index, and may contain names.
+		if f.typeInlined != nil { // TODO: test me please!
+			realType := m.types[idx.numeric]
+			ti := f.typeInlined
+			if !funcTypeEquals(realType, ti.typeFunc.params, ti.typeFunc.result) {
+				return nil, &FormatError{ti.line, ti.col, fmt.Sprintf("module.import[%d].func.type", i),
+					fmt.Errorf("inlined type doesn't match type index %d", idx.numeric),
+				}
+			}
+		}
 	}
 	return funcNameToIndex, nil
 }

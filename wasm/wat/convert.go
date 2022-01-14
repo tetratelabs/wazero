@@ -21,7 +21,7 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 	// Next, we need to convert the types from the text format into the binary one. This is easy because the only
 	// difference is that the text format has type names and the binary format does not.
 	result = &wasm.Module{}
-	for _, t := range m.typeFuncs {
+	for _, t := range m.types {
 		var results []wasm.ValueType
 		if t.result != 0 {
 			results = []wasm.ValueType{t.result}

@@ -21,14 +21,14 @@ func TestBindIndices(t *testing.T) {
 		{
 			name: "import function: inlined type to numeric index",
 			input: &module{
-				typeFuncs: []*typeFunc{paramI32I32I32I32ResultI32},
+				types: []*typeFunc{paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
-						typeInlined: paramI32I32I32I32ResultI32},
+						typeInlined: &inlinedTypeFunc{paramI32I32I32I32ResultI32, 0, 0}},
 				},
 			},
 			expected: &module{
-				typeFuncs: []*typeFunc{paramI32I32I32I32ResultI32},
+				types: []*typeFunc{paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
 						typeIndex: indexZero},
@@ -38,16 +38,16 @@ func TestBindIndices(t *testing.T) {
 		{
 			name: "import function: multiple inlined types to numeric indices",
 			input: &module{
-				typeFuncs: []*typeFunc{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				types: []*typeFunc{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
-						typeInlined: paramI32I32ResultI32},
+						typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
 					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "$runtime.fd_write",
-						typeInlined: paramI32I32I32I32ResultI32},
+						typeInlined: &inlinedTypeFunc{paramI32I32I32I32ResultI32, 0, 0}},
 				},
 			},
 			expected: &module{
-				typeFuncs: []*typeFunc{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				types: []*typeFunc{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
 						typeIndex: indexZero},
@@ -59,16 +59,16 @@ func TestBindIndices(t *testing.T) {
 		{
 			name: "import function: multiple inlined types to same numeric index",
 			input: &module{
-				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get",
-						typeInlined: paramI32I32ResultI32},
+						typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
 					{importIndex: 1, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
-						typeInlined: paramI32I32ResultI32},
+						typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
 				},
 			},
 			expected: &module{
-				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "$runtime.args_get",
 						typeIndex: indexOne},
@@ -80,7 +80,7 @@ func TestBindIndices(t *testing.T) {
 		{
 			name: "import function: multiple type names to numeric indices",
 			input: &module{
-				typeFuncs: []*typeFunc{
+				types: []*typeFunc{
 					typeFuncEmpty,
 					{name: "$i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
 					{name: "$i32i32i32i32_i32", params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
@@ -93,7 +93,7 @@ func TestBindIndices(t *testing.T) {
 				},
 			},
 			expected: &module{
-				typeFuncs: []*typeFunc{
+				types: []*typeFunc{
 					typeFuncEmpty,
 					{name: "$i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
 					{name: "$i32i32i32i32_i32", params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
@@ -109,7 +109,7 @@ func TestBindIndices(t *testing.T) {
 		{
 			name: "import function: multiple type numeric indices left alone",
 			input: &module{
-				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
 						typeIndex: &index{numeric: 1, line: 5, col: 86}},
@@ -118,7 +118,7 @@ func TestBindIndices(t *testing.T) {
 				},
 			},
 			expected: &module{
-				typeFuncs: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "$runtime.arg_sizes_get",
 						typeIndex: &index{numeric: 1, line: 5, col: 86}},
@@ -130,7 +130,7 @@ func TestBindIndices(t *testing.T) {
 		{
 			name: "start: imported function name to numeric index",
 			input: &module{
-				typeFuncs: []*typeFunc{typeFuncEmpty},
+				types: []*typeFunc{typeFuncEmpty},
 				importFuncs: []*importFunc{
 					{funcName: "$one", typeIndex: indexZero},
 					{funcName: "$two", typeIndex: indexZero},
@@ -138,7 +138,7 @@ func TestBindIndices(t *testing.T) {
 				startFunction: &index{ID: "$two", line: 3, col: 9},
 			},
 			expected: &module{
-				typeFuncs: []*typeFunc{typeFuncEmpty},
+				types: []*typeFunc{typeFuncEmpty},
 				importFuncs: []*importFunc{
 					{funcName: "$one", typeIndex: indexZero},
 					{funcName: "$two", typeIndex: indexZero},
@@ -149,12 +149,12 @@ func TestBindIndices(t *testing.T) {
 		{
 			name: "start: imported function numeric index left alone",
 			input: &module{
-				typeFuncs:     []*typeFunc{typeFuncEmpty},
+				types:         []*typeFunc{typeFuncEmpty},
 				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
 				startFunction: &index{numeric: 0, line: 3, col: 9},
 			},
 			expected: &module{
-				typeFuncs:     []*typeFunc{typeFuncEmpty},
+				types:         []*typeFunc{typeFuncEmpty},
 				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
 				startFunction: &index{numeric: 0, line: 3, col: 9},
 			},
@@ -183,7 +183,7 @@ func TestBindIndices_Errors(t *testing.T) {
 		{
 			name: "function type points out of range",
 			input: &module{
-				typeFuncs:   []*typeFunc{typeFuncEmpty},
+				types:       []*typeFunc{typeFuncEmpty},
 				importFuncs: []*importFunc{{name: "hello", typeIndex: &index{numeric: 1, line: 3, col: 9}}},
 			},
 			expectedErr: "3:9: index 1 is out of range [0..0] in module.import[0].func.type",
@@ -191,7 +191,7 @@ func TestBindIndices_Errors(t *testing.T) {
 		{
 			name: "function type points nowhere",
 			input: &module{
-				typeFuncs:   []*typeFunc{typeFuncEmpty},
+				types:       []*typeFunc{typeFuncEmpty},
 				importFuncs: []*importFunc{{name: "hello", typeIndex: &index{ID: "$main", line: 3, col: 9}}},
 			},
 			expectedErr: "3:9: unknown ID $main in module.import[0].func.type",
@@ -199,7 +199,7 @@ func TestBindIndices_Errors(t *testing.T) {
 		{
 			name: "start points out of range",
 			input: &module{
-				typeFuncs:     []*typeFunc{typeFuncEmpty},
+				types:         []*typeFunc{typeFuncEmpty},
 				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
 				startFunction: &index{numeric: 1, line: 3, col: 9},
 			},
