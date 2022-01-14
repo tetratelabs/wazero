@@ -5549,6 +5549,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		// Place the offfset value.
 		loc := compiler.locationStack.pushValueOnStack()
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.FunctionType{{}}}}
 		env.stack()[loc.stackPointer] = 1000000000
 
 		// Now emit the code.
@@ -5582,14 +5583,31 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				env := newJITEnvironment()
 				env.setTable(table)
 				compiler := requireNewCompiler(t)
+				targetType := &wasm.FunctionType{
+					Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+					Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32}}
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.FunctionType{targetType}}}
+
+				// Put the function call params.
+				for i := 0; i < len(targetType.Params); i++ {
+					compiler.locationStack.pushValueOnStack()
+				}
 
 				// Place the offfset value.
 				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
 				require.NoError(t, err)
 
+				// At this point, we should have three elements (params+offset value) on the stack
+				require.Equal(t, uint64(3), compiler.locationStack.sp)
+
 				// Now emit the code.
 				compiler.initializeReservedRegisters()
 				require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
+
+				// At this point we consumed the function inputs and offset value, but the functino result (four float values)
+				// are pushed onto the register.
+				require.Equal(t, uint64(4), compiler.locationStack.sp)
+
 				compiler.returnFunction()
 
 				// Generate the code under test.

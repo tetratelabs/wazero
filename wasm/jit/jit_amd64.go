@@ -727,7 +727,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	return nil
 }
 
-func (c *amd64Compiler) compileCallIndirect(_ *wazeroir.OperationCallIndirect) error {
+func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
 	// We don't yet support multiple tables.
 
 	offset := c.locationStack.pop()
@@ -753,6 +753,8 @@ func (c *amd64Compiler) compileCallIndirect(_ *wazeroir.OperationCallIndirect) e
 	// If it eceeds, we return the function with jitCallStatusCodeTableOutOfBounds.
 	c.setJITStatus(jitCallStatusCodeTableOutOfBounds)
 	c.returnFunction()
+
+	// TODO: type check branch.
 
 	// Otherwise, we read the table value and set it to functionCallAddress field of engine.
 	multiplyBy3 := c.newProg()
@@ -781,7 +783,27 @@ func (c *amd64Compiler) compileCallIndirect(_ *wazeroir.OperationCallIndirect) e
 	readValue.From.Reg = offset.register
 	c.addInstruction(readValue)
 
-	return c.callWasmFunction(offset.register, 0)
+	if err := c.callWasmFunction(offset.register, 0); err != nil {
+		return nil
+	}
+
+	// We consumed the function parameters from the stack after call.
+	sig := c.f.ModuleInstance.Types[o.TypeIndex]
+	for i := 0; i < len(sig.Params); i++ {
+		c.locationStack.pop()
+	}
+
+	// Also, the function results were pushed by the call.
+	for _, t := range sig.Results {
+		loc := c.locationStack.pushValueOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
+	return nil
 }
 
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {

@@ -100,6 +100,23 @@ wasm backtrace:
 	require.Equal(t, exp, err.Error())
 }
 
+func TestEngine_call_indirect(t *testing.T) {
+	buf, err := os.ReadFile("testdata/call_indirect.wasm")
+	require.NoError(t, err)
+	mod, err := wasm.DecodeModule(buf)
+	require.NoError(t, err)
+	store := wasm.NewStore(NewEngine())
+	require.NoError(t, err)
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	for i := uint64(0); i < 5; i++ {
+		out, _, err := store.CallFunction("test", "callt", i)
+		require.NoError(t, err)
+		require.Equal(t, i+1, out[0])
+	}
+}
+
 func TestEngine_memory(t *testing.T) {
 	buf, err := os.ReadFile("testdata/memory.wasm")
 	require.NoError(t, err)
