@@ -5604,13 +5604,12 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				compiler.initializeReservedRegisters()
 				require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
 
-				// At this point we consumed the function inputs and offset value, but the functino result (four float values)
+				// At this point, we consumed the function inputs and offset value, but the functino result (four float values)
 				// are pushed onto the register.
 				require.Equal(t, uint64(4), compiler.locationStack.sp)
 
-				compiler.returnFunction()
-
 				// Generate the code under test.
+				compiler.returnFunction()
 				code, _, err := compiler.generate()
 				require.NoError(t, err)
 
