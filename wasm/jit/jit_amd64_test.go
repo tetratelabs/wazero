@@ -5576,9 +5576,6 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		for i := 0; i < len(table); i++ {
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				if i != 5 {
-					t.Skip()
-				}
 				env := newJITEnvironment()
 				env.setTable(table)
 				compiler := requireNewCompiler(t)
