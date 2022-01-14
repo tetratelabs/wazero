@@ -620,9 +620,6 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 	if len(target.Tables) > 1 {
 		return rollbackFuncs, fmt.Errorf("multiple tables not supported")
 	}
-	if len(target.Tables) > 0 {
-		fmt.Println(target.Tables[0].Table)
-	}
 	return rollbackFuncs, nil
 }
 
