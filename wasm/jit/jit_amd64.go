@@ -3315,8 +3315,6 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	}
 	c.addInstruction(prog)
 
-	// TODO: emit NaN value handings for floats.
-
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
@@ -3437,8 +3435,6 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	}
 	c.addInstruction(prog)
 
-	// TODO: emit NaN value handings for floats.
-
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
 	c.locationStack.releaseRegister(x2)
@@ -3498,8 +3494,6 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 		prog.To.Reg = x1.register
 	}
 	c.addInstruction(prog)
-
-	// TODO: emit NaN value handings for floats.
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
@@ -4137,43 +4131,11 @@ func (c *amd64Compiler) callHostFunctionFromConstIndex(index int64) error {
 	return nil
 }
 
-func (c *amd64Compiler) callHostFunctionFromRegisterIndex(reg int16) error {
-	// Set the jit status as jitCallStatusCodeCallHostFunction
-	c.setJITStatus(jitCallStatusCodeCallHostFunction)
-	// Set the function index.
-	c.setFunctionCallIndexFromRegister(reg)
-	// Release all the registers as our calling convention requires the callee-save.
-	if err := c.releaseAllRegistersToStack(); err != nil {
-		return err
-	}
-	// Set the continuation offset on the next instruction.
-	c.setContinuationOffsetAtNextInstructionAndReturn()
-	// Once the function call returns, we must re-initialize the reserved registers..
-	c.initializeReservedRegisters()
-	return nil
-}
-
 func (c *amd64Compiler) callFunctionFromConstIndex(index int64) error {
 	// Set the jit status as jitCallStatusCodeCallWasmFunction
 	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
 	// Set the function index.
 	c.setFunctionCallIndexFromConst(index)
-	// Release all the registers as our calling convention requires the callee-save.
-	if err := c.releaseAllRegistersToStack(); err != nil {
-		return err
-	}
-	// Set the continuation offset on the next instruction.
-	c.setContinuationOffsetAtNextInstructionAndReturn()
-	// Once the function call returns, we must re-initialize the reserved registers.
-	c.initializeReservedRegisters()
-	return nil
-}
-
-func (c *amd64Compiler) callFunctionFromRegisterIndex(reg int16) error {
-	// Set the jit status as jitCallStatusCodeCallWasmFunction
-	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
-	// Set the function index.
-	c.setFunctionCallIndexFromRegister(reg)
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4285,22 +4247,6 @@ func (c *amd64Compiler) releaseRegisterToStack(loc *valueLocation) {
 
 	// Mark the register is free.
 	c.locationStack.releaseRegister(loc)
-}
-
-func (c *amd64Compiler) assignRegisterToValue(loc *valueLocation, reg int16) {
-	// Pop value to the resgister.
-	prog := c.newProg()
-	prog.As = x86.AMOVQ
-	prog.From.Type = obj.TYPE_MEM
-	prog.From.Reg = reservedRegisterForStackBasePointer
-	prog.From.Offset = int64(loc.stackPointer) * 8
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = reg
-	c.addInstruction(prog)
-
-	// Now the value is on register, so mark as such.
-	loc.setRegister(reg)
-	c.locationStack.markRegisterUsed(reg)
 }
 
 func (c *amd64Compiler) returnFunction() {
