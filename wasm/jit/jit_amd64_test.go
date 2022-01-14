@@ -5,6 +5,7 @@ package jit
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -28,6 +29,7 @@ type jitEnv struct {
 	eng     *engine
 	mem     *wasm.MemoryInstance
 	globals []*wasm.GlobalInstance
+	table   *wasm.TableInstance
 }
 
 func (j *jitEnv) stackTopAsByte() byte {
@@ -73,8 +75,8 @@ func (j *jitEnv) jitStatus() jitCallStatusCode {
 	return j.eng.jitCallStatusCode
 }
 
-func (j *jitEnv) functionCallAddress() int64 {
-	return int64(j.eng.functionCallAddress)
+func (j *jitEnv) functionCallAddress() wasm.FunctionAddress {
+	return j.eng.functionCallAddress
 }
 
 func (j *jitEnv) continuationAddressOffset() uintptr {
@@ -97,10 +99,18 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 	return j.globals[index].Val
 }
 
+func (j *jitEnv) setTable(table []wasm.FunctionAddress) {
+	j.table.Table = table
+}
+
 func (j *jitEnv) exec(code []byte) {
 	j.eng.memorySliceLen = int64(len(j.mem.Buffer))
 	if len(j.globals) > 0 {
 		j.eng.globalSliceAddress = uintptr(unsafe.Pointer(&j.globals[0]))
+	}
+	if l := len(j.table.Table); l > 0 {
+		j.eng.tableSliceAddress = uintptr(unsafe.Pointer(&j.table.Table[0]))
+		j.eng.tableSliceLen = int64(l)
 	}
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
@@ -111,8 +121,9 @@ func (j *jitEnv) exec(code []byte) {
 
 func newJITEnvironment() *jitEnv {
 	return &jitEnv{
-		eng: newEngine(),
-		mem: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+		eng:   newEngine(),
+		mem:   &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+		table: &wasm.TableInstance{},
 	}
 }
 
@@ -181,11 +192,11 @@ func Test_setJITStatus(t *testing.T) {
 
 func Test_setFunctionCallAddressFromConst(t *testing.T) {
 	// Build codes.
-	for _, index := range []int64{1, 5, 20} {
+	for _, index := range []wasm.FunctionAddress{1, 5, 20} {
 		// Build codes.
 		compiler := requireNewCompiler(t)
 		compiler.initializeReservedRegisters()
-		compiler.setFunctionCallAddressFromConst(index)
+		compiler.setFunctionCallAddressFromConst(int64(index))
 		compiler.returnFunction()
 
 		// Generate the code under test.
@@ -203,11 +214,11 @@ func Test_setFunctionCallAddressFromConst(t *testing.T) {
 
 func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 	reg := int16(x86.REG_R10)
-	for _, index := range []int64{1, 5, 20} {
+	for _, index := range []wasm.FunctionAddress{1, 5, 20} {
 		// Build codes.
 		compiler := requireNewCompiler(t)
 		compiler.initializeReservedRegisters()
-		compiler.movIntConstToRegister(index, reg)
+		compiler.movIntConstToRegister(int64(index), reg)
 		compiler.setFunctionCallIndexFromRegister(reg)
 		compiler.returnFunction()
 
@@ -5528,4 +5539,72 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			require.Equal(t, uint64(0), env.stackPointer())
 		})
 	}
+}
+
+func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
+	t.Run("out of bounds", func(t *testing.T) {
+		env := newJITEnvironment()
+		env.setTable(make([]wasm.FunctionAddress, 10))
+		compiler := requireNewCompiler(t)
+
+		// Place the offfset value.
+		loc := compiler.locationStack.pushValueOnStack()
+		env.stack()[loc.stackPointer] = 1000000000
+
+		// Now emit the code.
+		compiler.initializeReservedRegisters()
+		require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
+		compiler.returnFunction()
+
+		// Generate the code under test.
+		code, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		// The global value should be set to valueToSet.
+		require.Equal(t, jitCallStatusCodeTableOutOfBounds, env.jitStatus())
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		// Setup table.
+		table := make([]wasm.FunctionAddress, 10)
+		for i := range table {
+			table[i] = wasm.FunctionAddress(i)
+		}
+
+		for i := 0; i < len(table); i++ {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				if i != 5 {
+					t.Skip()
+				}
+				env := newJITEnvironment()
+				env.setTable(table)
+				compiler := requireNewCompiler(t)
+
+				// Place the offfset value.
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
+				require.NoError(t, err)
+
+				// Now emit the code.
+				compiler.initializeReservedRegisters()
+				require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
+				compiler.returnFunction()
+
+				// Generate the code under test.
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+
+				// Run code.
+				env.exec(code)
+
+				fmt.Println(hex.EncodeToString(code))
+
+				// The global value should be set to valueToSet.
+				require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
+				require.Equal(t, wasm.FunctionAddress(i), env.functionCallAddress())
+			})
+		}
+	})
 }

@@ -727,7 +727,9 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	return nil
 }
 
-func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
+func (c *amd64Compiler) compileCallIndirect(_ *wazeroir.OperationCallIndirect) error {
+	// We don't yet support multiple tables.
+
 	offset := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(offset); err != nil {
 		return nil
@@ -753,30 +755,33 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.returnFunction()
 
 	// Otherwise, we read the table value and set it to functionCallAddress field of engine.
-	c.addSetJmpOrigins(okJmp)
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-	if err != nil {
-		return err
-	}
+	multiplyBy3 := c.newProg()
+	okJmp.To.SetTarget(multiplyBy3)
+	multiplyBy3.As = x86.ASHLQ
+	multiplyBy3.To.Type = obj.TYPE_REG
+	multiplyBy3.To.Reg = offset.register
+	multiplyBy3.From.Type = obj.TYPE_CONST
+	multiplyBy3.From.Offset = 3
+	c.addInstruction(multiplyBy3)
 
 	movTableSliceAddress := c.newProg()
-	movTableSliceAddress.As = x86.AMOVQ
+	movTableSliceAddress.As = x86.AADDQ
 	movTableSliceAddress.To.Type = obj.TYPE_REG
-	movTableSliceAddress.To.Reg = tmpReg
+	movTableSliceAddress.To.Reg = offset.register
 	movTableSliceAddress.From.Type = obj.TYPE_MEM
 	movTableSliceAddress.From.Reg = reservedRegisterForEngine
 	movTableSliceAddress.From.Offset = engineTableSliceAddressOffset
 	c.addInstruction(movTableSliceAddress)
 
-	addOffsetToAddress := c.newProg()
-	addOffsetToAddress.As = x86.AADDQ
-	addOffsetToAddress.To.Type = obj.TYPE_REG
-	addOffsetToAddress.To.Reg = tmpReg
-	addOffsetToAddress.From.Type = obj.TYPE_REG
-	addOffsetToAddress.From.Reg = offset.register
-	c.addInstruction(addOffsetToAddress)
+	readValue := c.newProg()
+	readValue.As = x86.AMOVQ
+	readValue.To.Type = obj.TYPE_REG
+	readValue.To.Reg = offset.register
+	readValue.From.Type = obj.TYPE_MEM
+	readValue.From.Reg = offset.register
+	c.addInstruction(readValue)
 
-	return c.callWasmFunction(tmpReg, 0)
+	return c.callWasmFunction(offset.register, 0)
 }
 
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
@@ -4189,14 +4194,14 @@ func (c *amd64Compiler) callWasmFunction(reg int16, functionAddress int64) error
 	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
 
 	if isIntRegister(reg) {
-		prog := c.newProg()
-		prog.As = x86.AMOVQ
-		prog.From.Type = obj.TYPE_REG
-		prog.From.Reg = reg
-		prog.To.Type = obj.TYPE_MEM
-		prog.To.Reg = reservedRegisterForEngine
-		prog.To.Offset = engineFunctionCallAddressOffset
-		c.addInstruction(prog)
+		setFunctionAddressFromReg := c.newProg()
+		setFunctionAddressFromReg.As = x86.AMOVQ
+		setFunctionAddressFromReg.From.Type = obj.TYPE_REG
+		setFunctionAddressFromReg.From.Reg = reg
+		setFunctionAddressFromReg.To.Type = obj.TYPE_MEM
+		setFunctionAddressFromReg.To.Reg = reservedRegisterForEngine
+		setFunctionAddressFromReg.To.Offset = engineFunctionCallAddressOffset
+		c.addInstruction(setFunctionAddressFromReg)
 	} else {
 		c.setFunctionCallAddressFromConst(functionAddress)
 	}
