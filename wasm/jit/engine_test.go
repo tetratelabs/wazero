@@ -37,7 +37,6 @@ func TestEngine_fibonacci(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
-		i := i
 		go func() {
 			defer wg.Done()
 			store := wasm.NewStore(NewEngine())
