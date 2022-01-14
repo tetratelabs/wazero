@@ -281,6 +281,8 @@ const (
 	jitCallStatusCodeMemoryOutOfBounds
 	// jitCallStatusCodeTableOutOfBounds means the offset to table exceeds the length of table during call_indirect.
 	jitCallStatusCodeTableOutOfBounds
+	// TODO
+	jitCallStatusCodeTypeMismatchOnIndirectCall
 )
 
 func (s jitCallStatusCode) String() (ret string) {

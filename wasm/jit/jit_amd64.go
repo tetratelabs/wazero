@@ -750,7 +750,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	notLengthExceedJump.As = x86.AJCC
 	c.addInstruction(notLengthExceedJump)
 
-	// If it eceeds, we return the function with jitCallStatusCodeTableOutOfBounds.
+	// If it exceeds, we return the function with jitCallStatusCodeTableOutOfBounds.
 	c.setJITStatus(jitCallStatusCodeTableOutOfBounds)
 	c.returnFunction()
 
@@ -776,16 +776,24 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
 	cmpTypeID := c.newProg()
 	cmpTypeID.As = x86.ACMPQ
-	cmpTypeID.To.Type = obj.TYPE_MEM
-	cmpTypeID.To.Reg = offset.register
-	cmpTypeID.To.Offset = 4
-	cmpTypeID.From.Type = obj.TYPE_CONST
-	cmpTypeID.From.Offset = int64(targetFunctionType.FunctionTypeID)
+	cmpTypeID.From.Type = obj.TYPE_MEM
+	cmpTypeID.From.Reg = offset.register
+	cmpTypeID.From.Offset = 4
+	cmpTypeID.To.Type = obj.TYPE_CONST
+	cmpTypeID.To.Offset = int64(targetFunctionType.FunctionTypeID)
 	c.addInstruction(cmpTypeID)
 
-	// TODO: jump for type mismatch.
+	typeMatchJump := c.newProg()
+	typeMatchJump.To.Type = obj.TYPE_BRANCH
+	typeMatchJump.As = x86.AJEQ
+	c.addInstruction(typeMatchJump)
+
+	// If type doesn't match, we return the function with jitCallStatusCodeTypeMismatchOnIndirectCall.
+	c.setJITStatus(jitCallStatusCodeTypeMismatchOnIndirectCall)
+	c.returnFunction()
 
 	readValue := c.newProg()
+	typeMatchJump.To.SetTarget(readValue)
 	readValue.As = x86.AMOVQ
 	readValue.To.Type = obj.TYPE_REG
 	readValue.To.Reg = offset.register

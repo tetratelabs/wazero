@@ -5567,6 +5567,33 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		require.Equal(t, jitCallStatusCodeTableOutOfBounds, env.jitStatus())
 	})
 
+	t.Run("type not match", func(t *testing.T) {
+		table := make([]wasm.TableElement, 10)
+		env := newJITEnvironment()
+		env.setTable(table)
+
+		compiler := requireNewCompiler(t)
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{FunctionType: &wasm.FunctionType{}, FunctionTypeID: 1000}}}}
+
+		// Place the offfset value.
+		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(0)})
+		require.NoError(t, err)
+
+		// Now emit the code.
+		compiler.initializeReservedRegisters()
+		require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
+
+		// Generate the code under test.
+		compiler.returnFunction()
+		code, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall, env.jitStatus())
+	})
+
 	t.Run("ok", func(t *testing.T) {
 		// Setup table.
 		table := make([]wasm.TableElement, 10)
