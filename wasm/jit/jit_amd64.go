@@ -745,26 +745,24 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	cmpLength.From.Offset = engineTableSliceLenOffset
 	c.addInstruction(cmpLength)
 
-	okJmp := c.newProg()
-	okJmp.To.Type = obj.TYPE_BRANCH
-	okJmp.As = x86.AJCC
-	c.addInstruction(okJmp)
+	notLengthExceedJump := c.newProg()
+	notLengthExceedJump.To.Type = obj.TYPE_BRANCH
+	notLengthExceedJump.As = x86.AJCC
+	c.addInstruction(notLengthExceedJump)
 
 	// If it eceeds, we return the function with jitCallStatusCodeTableOutOfBounds.
 	c.setJITStatus(jitCallStatusCodeTableOutOfBounds)
 	c.returnFunction()
 
-	// TODO: type check branch.
-
-	// Otherwise, we read the table value and set it to functionCallAddress field of engine.
-	multiplyBy4 := c.newProg()
-	okJmp.To.SetTarget(multiplyBy4)
-	multiplyBy4.As = x86.ASHLQ
-	multiplyBy4.To.Type = obj.TYPE_REG
-	multiplyBy4.To.Reg = offset.register
-	multiplyBy4.From.Type = obj.TYPE_CONST
-	multiplyBy4.From.Offset = 4
-	c.addInstruction(multiplyBy4)
+	// Next we check if the target's type matches the operation's one.
+	getTypeInstanceAddress := c.newProg()
+	notLengthExceedJump.To.SetTarget(getTypeInstanceAddress)
+	getTypeInstanceAddress.As = x86.ASHLQ
+	getTypeInstanceAddress.To.Type = obj.TYPE_REG
+	getTypeInstanceAddress.To.Reg = offset.register
+	getTypeInstanceAddress.From.Type = obj.TYPE_CONST
+	getTypeInstanceAddress.From.Offset = 4
+	c.addInstruction(getTypeInstanceAddress)
 
 	movTableSliceAddress := c.newProg()
 	movTableSliceAddress.As = x86.AADDQ
@@ -774,6 +772,18 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.From.Reg = reservedRegisterForEngine
 	movTableSliceAddress.From.Offset = engineTableSliceAddressOffset
 	c.addInstruction(movTableSliceAddress)
+
+	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
+	cmpTypeID := c.newProg()
+	cmpTypeID.As = x86.ACMPQ
+	cmpTypeID.To.Type = obj.TYPE_MEM
+	cmpTypeID.To.Reg = offset.register
+	cmpTypeID.To.Offset = 4
+	cmpTypeID.From.Type = obj.TYPE_CONST
+	cmpTypeID.From.Offset = int64(targetFunctionType.FunctionTypeID)
+	c.addInstruction(cmpTypeID)
+
+	// TODO: jump for type mismatch.
 
 	readValue := c.newProg()
 	readValue.As = x86.AMOVQ
@@ -788,13 +798,12 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	}
 
 	// We consumed the function parameters from the stack after call.
-	ft := c.f.ModuleInstance.Types[o.TypeIndex].FunctionType
-	for i := 0; i < len(ft.Params); i++ {
+	for i := 0; i < len(targetFunctionType.FunctionType.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range ft.Results {
+	for _, t := range targetFunctionType.FunctionType.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
