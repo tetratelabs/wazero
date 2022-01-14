@@ -20,8 +20,10 @@ type compiler interface {
 	compileGlobalSet(o *wazeroir.OperationGlobalSet) error
 	compileBr(o *wazeroir.OperationBr) error
 	compileBrIf(o *wazeroir.OperationBrIf) error
+	compileBrTable(o *wazeroir.OperationBrTable) error
 	compileLabel(o *wazeroir.OperationLabel) error
 	compileCall(o *wazeroir.OperationCall) error
+	compileCallIndirect(o *wazeroir.OperationCallIndirect) error
 	compileDrop(o *wazeroir.OperationDrop) error
 	compileSelect() error
 	compilePick(o *wazeroir.OperationPick) error

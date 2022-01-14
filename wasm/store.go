@@ -42,6 +42,7 @@ type (
 
 	FunctionInstance struct {
 		Name           string
+		Address        FunctionAddress
 		ModuleInstance *ModuleInstance
 		Body           []byte
 		Signature      *FunctionType
@@ -49,6 +50,8 @@ type (
 		LocalTypes     []ValueType
 		HostFunction   *reflect.Value
 	}
+
+	FunctionAddress uint64
 
 	HostFunctionCallContext struct {
 		Memory *MemoryInstance
@@ -68,16 +71,12 @@ type (
 		Val  uint64
 	}
 
+	// Note this is fixed to function type until post MVP reference type is implemented.
 	TableInstance struct {
-		Table    []*TableInstanceElm
+		Table    []FunctionAddress
 		Min      uint32
 		Max      *uint32
 		ElemType byte
-	}
-
-	TableInstanceElm struct {
-		Function *FunctionInstance
-		// Other ref types will be added.
 	}
 
 	MemoryInstance struct {
@@ -86,6 +85,10 @@ type (
 		Max    *uint32
 	}
 )
+
+func (f *FunctionInstance) IsHostFunction() bool {
+	return f.HostFunction != nil
+}
 
 func NewStore(engine Engine) *Store {
 	return &Store{ModuleInstances: map[string]*ModuleInstance{}, engine: engine}
@@ -147,8 +150,8 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	}
 
 	// Check the start function is valid.
-	if module.StartSection != nil {
-		index := *module.StartSection
+	if startIndex := module.StartSection; startIndex != nil {
+		index := *startIndex
 		if int(index) >= len(instance.Functions) {
 			return fmt.Errorf("invalid start function index: %d", index)
 		}
@@ -162,8 +165,8 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	rollbackFuncs = nil
 
 	// Execute the start function.
-	if module.StartSection != nil {
-		f := instance.Functions[*module.StartSection]
+	if startIndex := module.StartSection; startIndex != nil {
+		f := instance.Functions[*startIndex]
 		if _, err := s.engine.Call(f); err != nil {
 			return fmt.Errorf("calling start function failed: %v", err)
 		}
@@ -193,6 +196,11 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 
 	ret, err := s.engine.Call(f, params...)
 	return ret, f.Signature.Results, err
+}
+
+func (s *Store) addFunctionInstance(f *FunctionInstance) {
+	f.Address = FunctionAddress(len(s.Functions))
+	s.Functions = append(s.Functions, f)
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
@@ -472,7 +480,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		target.Functions = append(target.Functions, f)
-		s.Functions = append(s.Functions, f)
+		s.addFunctionInstance(f)
 	}
 	return rollbackFuncs, nil
 }
@@ -555,10 +563,14 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 	// Allocate table instances.
 	for _, tableSeg := range module.TableSection {
 		tableInst := &TableInstance{
-			Table:    make([]*TableInstanceElm, tableSeg.Limit.Min),
+			Table:    make([]FunctionAddress, tableSeg.Limit.Min),
 			Min:      tableSeg.Limit.Min,
 			Max:      tableSeg.Limit.Max,
 			ElemType: tableSeg.ElemType,
+		}
+		for i := range tableInst.Table {
+			// We use math.MaxUint64 to represent the uninitialized elements.
+			tableInst.Table[i] = math.MaxUint64
 		}
 		target.Tables = append(target.Tables, tableInst)
 		s.Tables = append(s.Tables, tableInst)
@@ -611,13 +623,14 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 			rollbackFuncs = append(rollbackFuncs, func() {
 				tableInst.Table[pos] = original
 			})
-			tableInst.Table[pos] = &TableInstanceElm{
-				Function: target.Functions[elm],
-			}
+			tableInst.Table[pos] = target.Functions[elm].Address
 		}
 	}
 	if len(target.Tables) > 1 {
 		return rollbackFuncs, fmt.Errorf("multiple tables not supported")
+	}
+	if len(target.Tables) > 0 {
+		fmt.Println(target.Tables[0].Table)
 	}
 	return rollbackFuncs, nil
 }
@@ -1662,7 +1675,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
 	m.Exports[funcName] = &ExportInstance{Kind: ExportKindFunction, Function: f}
-	s.Functions = append(s.Functions, f)
+	s.addFunctionInstance(f)
 	return nil
 }
 
@@ -1698,14 +1711,18 @@ func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint3
 		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
 	}
 
-	table := &TableInstance{
-		Table:    make([]*TableInstanceElm, min),
+	tableInst := &TableInstance{
+		Table:    make([]FunctionAddress, min),
 		Min:      min,
 		Max:      max,
 		ElemType: 0x70, // funcref
 	}
-	m.Exports[name] = &ExportInstance{Kind: ExportKindTable, Table: table}
-	s.Tables = append(s.Tables, table)
+	for i := range tableInst.Table {
+		// We use math.MaxUint64 to represent the uninitialized elements.
+		tableInst.Table[i] = math.MaxUint64
+	}
+	m.Exports[name] = &ExportInstance{Kind: ExportKindTable, Table: tableInst}
+	s.Tables = append(s.Tables, tableInst)
 	return nil
 }
 

@@ -145,7 +145,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 func (e *engine) PreCompile(fs []*wasm.FunctionInstance) error {
 	var newUniqueHostFunctions, newUniqueWasmFunctions int
 	for _, f := range fs {
-		if f.HostFunction != nil {
+		if f.IsHostFunction() {
 			if _, ok := e.compiledHostFunctionIndex[f]; ok {
 				continue
 			}
@@ -177,7 +177,7 @@ func getNewID(idMap map[*wasm.FunctionInstance]int64) int64 {
 }
 
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
-	if f.HostFunction != nil {
+	if f.IsHostFunction() {
 		id := e.compiledHostFunctionIndex[f]
 		if e.compiledHostFunctions[id] != nil {
 			// Already compiled.
@@ -534,11 +534,11 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		case *wazeroir.OperationBrIf:
 			err = compiler.compileBrIf(o)
 		case *wazeroir.OperationBrTable:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileBrTable(o)
 		case *wazeroir.OperationCall:
 			err = compiler.compileCall(o)
 		case *wazeroir.OperationCallIndirect:
-			err = fmt.Errorf("unsupported operation")
+			err = compiler.compileCallIndirect(o)
 		case *wazeroir.OperationDrop:
 			err = compiler.compileDrop(o)
 		case *wazeroir.OperationSelect:

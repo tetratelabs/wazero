@@ -5,10 +5,9 @@ import (
 )
 
 func NewEngine() wasm.Engine {
-	// TODO: add option to use JIT instead of interpreter
 	return &interpreter{
-		functions:                  map[*wasm.FunctionInstance]*interpreterFunction{},
+		functions:                  map[wasm.FunctionAddress]*interpreterFunction{},
 		functionTypeIDs:            map[string]uint64{},
-		onCompilationDoneCallbacks: map[*wasm.FunctionInstance][]func(*interpreterFunction){},
+		onCompilationDoneCallbacks: map[wasm.FunctionAddress][]func(*interpreterFunction){},
 	}
 }

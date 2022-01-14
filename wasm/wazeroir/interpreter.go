@@ -20,7 +20,7 @@ var callStackCeiling = buildoptions.CallStackCeiling
 // This is the direct interpreter of wazeroir operations.
 type interpreter struct {
 	// Stores compiled functions.
-	functions map[*wasm.FunctionInstance]*interpreterFunction
+	functions map[wasm.FunctionAddress]*interpreterFunction
 	// Cached function type IDs assigned to
 	// function signatures.
 	// Type IDs are used to check the signature of
@@ -34,7 +34,7 @@ type interpreter struct {
 	// The callbacks when an function instance is compiled.
 	// See the comment where this is used below for detail.
 	// Not used at runtime, and only in the compilation phase.
-	onCompilationDoneCallbacks map[*wasm.FunctionInstance][]func(*interpreterFunction)
+	onCompilationDoneCallbacks map[wasm.FunctionAddress][]func(*interpreterFunction)
 }
 
 func (it *interpreter) push(v uint64) {
@@ -119,9 +119,9 @@ func (it *interpreter) PreCompile(fs []*wasm.FunctionInstance) error {
 
 // Compile Implements wasm.Engine for interpreter.
 func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
-	if _, ok := it.functions[f]; ok {
-		return nil
-	} else if f.HostFunction != nil {
+	funcaddr := f.Address
+
+	if f.IsHostFunction() {
 		ret := &interpreterFunction{
 			hostFn: f.HostFunction, funcInstance: f,
 			signature: f.Signature,
@@ -133,25 +133,24 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 		} else {
 			ret.typeID = id
 		}
-		it.functions[f] = ret
+		it.functions[funcaddr] = ret
 		return nil
-	}
+	} else {
+		ir, err := Compile(f)
+		if err != nil {
+			return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
+		}
 
-	ir, err := Compile(f)
-	if err != nil {
-		return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
+		fn, err := it.lowerIROps(f, ir.Operations)
+		if err != nil {
+			return fmt.Errorf("failed to lower wazeroir operations to interpreter operations: %w", err)
+		}
+		it.functions[funcaddr] = fn
+		for _, cb := range it.onCompilationDoneCallbacks[funcaddr] {
+			cb(fn)
+		}
+		delete(it.onCompilationDoneCallbacks, funcaddr)
 	}
-
-	fn, err := it.lowerIROps(f, ir.Operations)
-	if err != nil {
-		return fmt.Errorf("failed to lower wazeroir operations to interpreter operations: %w", err)
-	}
-
-	it.functions[f] = fn
-	for _, cb := range it.onCompilationDoneCallbacks[f] {
-		cb(fn)
-	}
-	delete(it.onCompilationDoneCallbacks, f)
 	return nil
 }
 
@@ -255,17 +254,17 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 				}
 			}
 		case *OperationCall:
-			targetInst := f.ModuleInstance.Functions[o.FunctionIndex]
-			target, ok := it.functions[targetInst]
+			target := f.ModuleInstance.Functions[o.FunctionIndex]
+			compiledTarget, ok := it.functions[target.Address]
 			if !ok {
 				// If the target function instance is not compiled,
 				// we set the callback so we can set the pointer to the target when the compilation done.
-				it.onCompilationDoneCallbacks[targetInst] = append(it.onCompilationDoneCallbacks[targetInst],
+				it.onCompilationDoneCallbacks[target.Address] = append(it.onCompilationDoneCallbacks[target.Address],
 					func(compiled *interpreterFunction) {
 						op.f = compiled
 					})
 			} else {
-				op.f = target
+				op.f = compiledTarget
 			}
 		case *OperationCallIndirect:
 			op.us = make([]uint64, 2)
@@ -481,7 +480,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		}
 	}()
 
-	g, ok := it.functions[f]
+	g, ok := it.functions[f.Address]
 	if !ok {
 		err = fmt.Errorf("function not compiled")
 		return
@@ -547,9 +546,10 @@ func (it *interpreter) callHostFunc(f *interpreterFunction, _ ...uint64) {
 
 func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
-	memoryInst := frame.f.funcInstance.ModuleInstance.Memory
-	globals := frame.f.funcInstance.ModuleInstance.Globals
-	tables := f.funcInstance.ModuleInstance.Tables
+	moduleInst := f.funcInstance.ModuleInstance
+	memoryInst := moduleInst.Memory
+	globals := moduleInst.Globals
+	tables := moduleInst.Tables
 	it.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -597,7 +597,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCallIndirect:
 			{
 				index := it.pop()
-				target := it.functions[tables[op.us[0]].Table[index].Function]
+				target := it.functions[tables[op.us[0]].Table[index]]
 				// Type check.
 				if target.typeID != op.us[1] {
 					panic("function signature mismatch on call_indirect")

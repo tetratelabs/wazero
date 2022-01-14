@@ -625,6 +625,10 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	return nil
 }
 
+func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
+	return nil
+}
+
 // If a jump target has multiple callesr (origins),
 // we must have unique register states, so this function
 // must be called before such jump instruction.
@@ -720,6 +724,10 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 			loc.setRegisterType(generalPurposeRegisterTypeFloat)
 		}
 	}
+	return nil
+}
+
+func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
 	return nil
 }
 
