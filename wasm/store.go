@@ -334,7 +334,7 @@ func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExp
 	case OpcodeF32Const:
 		v, err = readFloat32(r)
 		if err != nil {
-			return nil, 0, fmt.Errorf("read f34: %w", err)
+			return nil, 0, fmt.Errorf("read f32: %w", err)
 		}
 		return v, ValueTypeF32, nil
 	case OpcodeF64Const:
