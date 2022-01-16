@@ -3,7 +3,7 @@ package wasm
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetModuleInstance(t *testing.T) {
@@ -14,9 +14,9 @@ func TestGetModuleInstance(t *testing.T) {
 	s := NewStore(nil)
 
 	m1 := s.getModuleInstance(name)
-	assert.Equal(t, m1, s.ModuleInstances[name])
-	assert.NotNil(t, m1.Exports)
+	require.Equal(t, m1, s.ModuleInstances[name])
+	require.NotNil(t, m1.Exports)
 
 	m2 := s.getModuleInstance(name)
-	assert.Equal(t, m1, m2)
+	require.Equal(t, m1, m2)
 }
