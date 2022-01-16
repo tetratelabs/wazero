@@ -162,9 +162,9 @@ func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 func Test_setJITStatus(t *testing.T) {
 	for _, s := range []jitCallStatusCode{
 		jitCallStatusCodeReturned,
-		jitCallStatusCodeCallWasmFunction,
+		jitCallStatusCodeCallFunction,
 		jitCallStatusCodeCallBuiltInFunction,
-		jitCallStatusCodeCallHostFunction,
+		jitCallStatusCodeCallFunction,
 		jitCallStatusCodeUnreachable,
 	} {
 		t.Run(s.String(), func(t *testing.T) {
@@ -227,7 +227,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	compiler.movIntConstToRegister(int64(50), tmpReg)
 	compiler.releaseRegisterToStack(loc)
 	require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
-	compiler.setJITStatus(jitCallStatusCodeCallWasmFunction)
+	compiler.setJITStatus(jitCallStatusCodeCallFunction)
 	compiler.returnFunction()
 	// Generate the code under test.
 	code, _, err := compiler.generate()
@@ -243,7 +243,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	// Run code again on the continuation.
 	env.exec(code[env.continuationAddressOffset():])
 
-	require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
+	require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
 	require.Equal(t, uint64(50), env.stack()[1])
 }
 
@@ -4419,7 +4419,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		env.exec(code)
 
 		// Check the status.
-		require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
+		require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
 		require.Equal(t, functionAddress, env.functionCallAddress())
 
 		// All the registers must be written back to stack.
@@ -4454,7 +4454,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		env.exec(code)
 
 		// Check the status.
-		require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
+		require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
 		require.Equal(t, functionAddress, env.functionCallAddress())
 		// All the registers must be written back to stack.
 		require.Equal(t, uint64(3), env.stackPointer())
@@ -5620,7 +5620,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				env.exec(code)
 
 				// The global value should be set to valueToSet.
-				require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
+				require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
 				require.Equal(t, wasm.FunctionAddress(i), env.functionCallAddress())
 			})
 		}

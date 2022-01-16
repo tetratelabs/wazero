@@ -174,6 +174,7 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 		// Therefore obj.Link.Link.Link.Link means the next instruction after the return.
 		afterReturnInst := obj.Link.Link.Link.Link
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
+		fmt.Printf("%d for %d\n", uint64(afterReturnInst.Pc), obj.Pc)
 	}
 
 	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack
@@ -698,14 +699,8 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	if target.IsHostFunction() {
-		if err := c.makeFunctionCallFromConsts(jitCallStatusCodeCallHostFunction, target.Address); err != nil {
-			return err
-		}
-	} else {
-		if err := c.makeFunctionCallFromConsts(jitCallStatusCodeCallWasmFunction, target.Address); err != nil {
-			return err
-		}
+	if err := c.makeFunctionCallFromConsts(jitCallStatusCodeCallFunction, target.Address); err != nil {
+		return err
 	}
 
 	// We consumed the function parameters from the stack after call.
@@ -800,10 +795,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	readValue.From.Reg = offset.register
 	c.addInstruction(readValue)
 
-	// TODO: get status branch!
-	var statusRegister int16
-
-	if err := c.makeFunctionCallFromRegisters(statusRegister, offset.register); err != nil {
+	if err := c.makeFunctionCallFromRegister(offset.register); err != nil {
 		return nil
 	}
 
@@ -4203,17 +4195,6 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) setJITStatusFromRegister(status int16) {
-	prog := c.newProg()
-	prog.As = x86.AMOVL
-	prog.From.Type = obj.TYPE_REG
-	prog.From.Reg = status
-	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineJITCallStatusCodeOffset
-	c.addInstruction(prog)
-}
-
 func (c *amd64Compiler) makeFunctionCallFromConsts(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
 	c.setJITStatus(jitStatus)
 
@@ -4237,8 +4218,8 @@ func (c *amd64Compiler) makeFunctionCallFromConsts(jitStatus jitCallStatusCode, 
 	return nil
 }
 
-func (c *amd64Compiler) makeFunctionCallFromRegisters(jitStatusRegister, functionCallAddressRegister int16) error {
-	c.setJITStatusFromRegister(jitStatusRegister)
+func (c *amd64Compiler) makeFunctionCallFromRegister(functionCallAddressRegister int16) error {
+	c.setJITStatus(jitCallStatusCodeCallFunction)
 
 	setFunctionAddressFromReg := c.newProg()
 	setFunctionAddressFromReg.As = x86.AMOVQ

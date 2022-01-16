@@ -58,9 +58,7 @@ type engine struct {
 	// The following fields are only used during compilation.
 
 	// Store the compiled functions.
-	compiledWasmFunctions map[wasm.FunctionAddress]*compiledWasmFunction
-	// Store the host functions.
-	compiledHostFunctions map[wasm.FunctionAddress]*compiledHostFunction
+	compiledFunctions map[wasm.FunctionAddress]*compiledFunction
 }
 
 // Native code manipulates the engine's fields with these constants.
@@ -127,12 +125,9 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	for _, param := range params {
 		e.push(param)
 	}
-	// Note that there's no conflict between e.hostFunctionIndex and e.compiledWasmFunctionIndex,
-	// meaning that each *wasm.FunctionInstance is assigned to either host function index or wasm function one.
-	if hostFunc, ok := e.compiledHostFunctions[f.Address]; ok {
-		hostFunc.f(&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
-	} else if wasmFunc, ok := e.compiledWasmFunctions[f.Address]; ok {
-		e.exec(wasmFunc)
+
+	if f, ok := e.compiledFunctions[f.Address]; ok {
+		e.exec(f)
 	} else {
 		err = fmt.Errorf("function not compiled")
 		return
@@ -182,13 +177,13 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 				}
 			}
 		}
-		e.compiledHostFunctions[f.Address] = &compiledHostFunction{f: hf, name: f.Name}
+		e.compiledFunctions[f.Address] = &compiledFunction{source: f, hostFunc: hf, memory: f.ModuleInstance.Memory}
 	} else {
 		cf, err := e.compileWasmFunction(f)
 		if err != nil {
 			return fmt.Errorf("failed to compile Wasm function: %w", err)
 		}
-		e.compiledWasmFunctions[f.Address] = cf
+		e.compiledFunctions[f.Address] = cf
 	}
 	return nil
 }
@@ -201,9 +196,8 @@ const initialStackSize = 1024
 
 func newEngine() *engine {
 	e := &engine{
-		stack:                 make([]uint64, initialStackSize),
-		compiledWasmFunctions: make(map[wasm.FunctionAddress]*compiledWasmFunction),
-		compiledHostFunctions: make(map[wasm.FunctionAddress]*compiledHostFunction),
+		stack:             make([]uint64, initialStackSize),
+		compiledFunctions: make(map[wasm.FunctionAddress]*compiledFunction),
 	}
 	return e
 }
@@ -233,12 +227,12 @@ func (e *engine) callFramePush(callee *callFrame) {
 	// Initialize the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
 	e.stackBasePointer = callee.stackBasePointer
 	// Set the stack pointer so that base+sp would point to the top of function params.
-	e.stackPointer = callee.wasmFunction.paramCount
-	e.globalSliceAddress = callee.wasmFunction.globalSliceAddress
-	e.tableSliceLen = callee.wasmFunction.tableSliceLen
-	e.tableSliceAddress = callee.wasmFunction.tableSliceAddress
-	if callee.wasmFunction.memory != nil {
-		e.memorySliceLen = int64(len(callee.wasmFunction.memory.Buffer))
+	e.stackPointer = callee.compiledFunction.paramCount
+	e.globalSliceAddress = callee.compiledFunction.globalSliceAddress
+	e.tableSliceLen = callee.compiledFunction.tableSliceLen
+	e.tableSliceAddress = callee.compiledFunction.tableSliceAddress
+	if callee.compiledFunction.memory != nil {
+		e.memorySliceLen = int64(len(callee.compiledFunction.memory.Buffer))
 	}
 }
 
@@ -254,11 +248,11 @@ func (e *engine) callFramePop() {
 		// so we can go back to the exact state when the caller made the function call.
 		e.stackBasePointer = caller.stackBasePointer
 		e.stackPointer = caller.continuationStackPointer
-		e.globalSliceAddress = caller.wasmFunction.globalSliceAddress
-		e.tableSliceLen = caller.wasmFunction.tableSliceLen
-		e.tableSliceAddress = caller.wasmFunction.tableSliceAddress
-		if caller.wasmFunction.memory != nil {
-			e.memorySliceLen = int64(len(caller.wasmFunction.memory.Buffer))
+		e.globalSliceAddress = caller.compiledFunction.globalSliceAddress
+		e.tableSliceLen = caller.compiledFunction.tableSliceLen
+		e.tableSliceAddress = caller.compiledFunction.tableSliceAddress
+		if caller.compiledFunction.memory != nil {
+			e.memorySliceLen = int64(len(caller.compiledFunction.memory.Buffer))
 		}
 	}
 }
@@ -270,12 +264,10 @@ type jitCallStatusCode uint32
 const (
 	// jitStatusReturned means the jitcall reaches the end of function, and returns successfully.
 	jitCallStatusCodeReturned jitCallStatusCode = iota
-	// jitCallStatusCodeCallWasmFunction means the jitcall returns to make a regular Wasm function call.
-	jitCallStatusCodeCallWasmFunction
-	// jitCallStatusCodeCallWasmFunction means the jitcall returns to make a builtin function call.
+	// jitCallStatusCodeCallFunction means the jitcall returns to make a regular Wasm function call.
+	jitCallStatusCodeCallFunction
+	// jitCallStatusCodeCallFunction means the jitcall returns to make a builtin function call.
 	jitCallStatusCodeCallBuiltInFunction
-	// jitCallStatusCodeCallWasmFunction means the jitcall returns to make a host function call.
-	jitCallStatusCodeCallHostFunction
 	// jitCallStatusCodeUnreachable means the function invocation reaches "unreachable" instruction.
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
@@ -292,12 +284,10 @@ func (s jitCallStatusCode) String() (ret string) {
 	switch s {
 	case jitCallStatusCodeReturned:
 		ret = "returned"
-	case jitCallStatusCodeCallWasmFunction:
-		ret = "call_wasm_function"
+	case jitCallStatusCodeCallFunction:
+		ret = "call_function"
 	case jitCallStatusCodeCallBuiltInFunction:
 		ret = "call_builtin_function"
-	case jitCallStatusCodeCallHostFunction:
-		ret = "call_host_function"
 	case jitCallStatusCodeUnreachable:
 		ret = "unreachable"
 	}
@@ -308,8 +298,7 @@ type callFrame struct {
 	continuationAddress      uintptr
 	continuationStackPointer uint64
 	stackBasePointer         uint64
-	wasmFunction             *compiledWasmFunction
-	hostFunction             *compiledHostFunction
+	compiledFunction         *compiledFunction
 	caller                   *callFrame
 }
 
@@ -321,21 +310,13 @@ func (c *callFrame) String() string {
 }
 
 func (c *callFrame) getFunctionName() string {
-	if c.wasmFunction != nil {
-		return c.wasmFunction.source.Name
-	} else {
-		return c.hostFunction.name
-	}
+	return c.compiledFunction.source.Name
 }
 
-type compiledHostFunction = struct {
-	f    func(ctx *wasm.HostFunctionCallContext)
-	name string
-}
-
-type compiledWasmFunction struct {
+type compiledFunction struct {
 	// The source function instance from which this is compiled.
 	source                  *wasm.FunctionInstance
+	hostFunc                func(ctx *wasm.HostFunctionCallContext)
 	paramCount, resultCount uint64
 	// codeSegment is holding the compiled native code as a byte slice.
 	codeSegment []byte
@@ -356,6 +337,10 @@ type compiledWasmFunction struct {
 	tableSliceLen     int64
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
+}
+
+func (f *compiledFunction) isHostFunction() bool {
+	return f.hostFunc != nil
 }
 
 const (
@@ -381,27 +366,25 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 	// TODO: maybe better think about how to shrink the stack as well.
 }
 
-func (e *engine) exec(f *compiledWasmFunction) {
+func (e *engine) exec(f *compiledFunction) {
 	// Push a new call frame for the target function.
-	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, wasmFunction: f})
+	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, compiledFunction: f})
 
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
-		// if buildoptions.IsDebugMode {
-		fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
-			currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer)
-		// }
+		if buildoptions.IsDebugMode {
+			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
+				currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer)
+		}
 
 		// Call into the jitted code.
 		jitcall(
 			currentFrame.continuationAddress,
 			uintptr(unsafe.Pointer(e)),
-			currentFrame.wasmFunction.memoryAddress,
+			currentFrame.compiledFunction.memoryAddress,
 		)
-
-		fmt.Printf("jit status... %s\n", e.jitCallStatusCode)
 
 		// Check the status code from JIT code.
 		switch e.jitCallStatusCode {
@@ -409,41 +392,42 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			// Meaning that the current frame exits
 			// so restore the caller's frame.
 			e.callFramePop()
-		case jitCallStatusCodeCallWasmFunction:
-			// This never panics as we made sure that the index exists for all the referenced functions
-			// in a module.
-			nextFunc := e.compiledWasmFunctions[e.functionCallAddress]
-			// Calculate the continuation address so we can resume this caller function frame.
-			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
-			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
-			// Create the callee frame.
-			frame := &callFrame{
-				continuationAddress: nextFunc.codeInitialAddress,
-				wasmFunction:        nextFunc,
-				// Set the base pointer to the beginning of the function params
-				stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
+		case jitCallStatusCodeCallFunction:
+			nextFunc := e.compiledFunctions[e.functionCallAddress]
+			if nextFunc.isHostFunction() {
+				fmt.Printf("calling %s for address %d, continuation: %d\n", nextFunc.source.Name, e.functionCallAddress, e.continuationAddressOffset)
+				currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
+				// Push the call frame for this host function.
+				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
+				// Call into the host function.
+				nextFunc.hostFunc(
+					&wasm.HostFunctionCallContext{Memory: nextFunc.memory},
+				)
+				// Pop the call frame.
+				e.callFrameStack = currentFrame
+			} else {
+				// Calculate the continuation address so we can resume this caller function frame.
+				currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
+				currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
+				// Create the callee frame.
+				frame := &callFrame{
+					continuationAddress: nextFunc.codeInitialAddress,
+					compiledFunction:    nextFunc,
+					// Set the base pointer to the beginning of the function params
+					stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
+				}
+				e.callFramePush(frame)
+				// If the Go-allocated stack is running out, we grow it before calling into JITed code.
+				e.maybeGrowStack(nextFunc.maxStackPointer)
 			}
-			e.callFramePush(frame)
-			// If the Go-allocated stack is running out, we grow it before calling into JITed code.
-			e.maybeGrowStack(nextFunc.maxStackPointer)
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallAddress {
 			case builtinFunctionAddressMemoryGrow:
-				e.builtinFunctionMemoryGrow(currentFrame.wasmFunction)
+				e.builtinFunctionMemoryGrow(currentFrame.compiledFunction)
 			case builtinFunctionAddressMemorySize:
-				e.builtinFunctionMemorySize(currentFrame.wasmFunction)
+				e.builtinFunctionMemorySize(currentFrame.compiledFunction)
 			}
-			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
-		case jitCallStatusCodeCallHostFunction:
-			targetHostFunction := e.compiledHostFunctions[e.functionCallAddress]
-			fmt.Printf("calling %s with %v\n", targetHostFunction.name, e.stack[:e.stackBasePointer+e.stackPointer])
-			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
-			// Push the call frame for this host function.
-			e.callFrameStack = &callFrame{hostFunction: targetHostFunction, caller: currentFrame}
-			// Call into the host function.
-			targetHostFunction.f(&wasm.HostFunctionCallContext{Memory: currentFrame.wasmFunction.memory})
-			// Pop the call frame.
-			e.callFrameStack = currentFrame
+			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeInvalidFloatToIntConversion:
 			// TODO: have wasm.ErrInvalidFloatToIntConversion and use it here.
 			panic("invalid float to int conversion")
@@ -463,7 +447,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	}
 }
 
-func (e *engine) builtinFunctionMemoryGrow(f *compiledWasmFunction) {
+func (e *engine) builtinFunctionMemoryGrow(f *compiledFunction) {
 	newPages := e.pop()
 	max := uint64(math.MaxUint32)
 	if f.memory.Max != nil {
@@ -480,11 +464,11 @@ func (e *engine) builtinFunctionMemoryGrow(f *compiledWasmFunction) {
 	}
 }
 
-func (e *engine) builtinFunctionMemorySize(f *compiledWasmFunction) {
+func (e *engine) builtinFunctionMemorySize(f *compiledFunction) {
 	e.push(uint64(len(f.memory.Buffer)) / wasm.PageSize)
 }
 
-func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFunction, error) {
+func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	ir, err := wazeroir.Compile(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
@@ -660,7 +644,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
 	// }
 
-	cf := &compiledWasmFunction{
+	cf := &compiledFunction{
 		source:          f,
 		codeSegment:     code,
 		paramCount:      uint64(len(f.FunctionType.Params)),

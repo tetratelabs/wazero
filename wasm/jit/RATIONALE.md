@@ -61,7 +61,7 @@ mov ... $100 ;; This is the beginning of program *after* function return.
 This way, the engine, which enters the native code via `jitcall`, can know the continuation address of the caller's function frame: 
 
 ```go
-case jitCallStatusCodeCallWasmFunction:
+case jitCallStatusCodeCallFunction:
     nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
     // Calculate the continuation address so
     // we can resume this caller function frame.
