@@ -354,7 +354,7 @@ func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExp
 	case OpcodeF32Const:
 		v, err = readFloat32(r)
 		if err != nil {
-			return nil, 0, fmt.Errorf("read f34: %w", err)
+			return nil, 0, fmt.Errorf("read f32: %w", err)
 		}
 		return v, ValueTypeF32, nil
 	case OpcodeF64Const:
@@ -1649,13 +1649,9 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		return &FunctionType{Params: paramTypes, Results: resultTypes}, nil
 	}
 
-	m, ok := s.ModuleInstances[moduleName]
-	if !ok {
-		m = &ModuleInstance{Exports: map[string]*ExportInstance{}}
-		s.ModuleInstances[moduleName] = m
-	}
+	m := s.getModuleInstance(moduleName)
 
-	_, ok = m.Exports[funcName]
+	_, ok := m.Exports[funcName]
 	if ok {
 		return fmt.Errorf("name %s already exists in module %s", funcName, moduleName)
 	}
@@ -1680,13 +1676,9 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 }
 
 func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType ValueType, mutable bool) error {
-	m, ok := s.ModuleInstances[moduleName]
-	if !ok {
-		m = &ModuleInstance{}
-		s.ModuleInstances[moduleName] = m
-	}
+	m := s.getModuleInstance(moduleName)
 
-	_, ok = m.Exports[name]
+	_, ok := m.Exports[name]
 	if ok {
 		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
 	}
@@ -1700,13 +1692,9 @@ func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType Value
 }
 
 func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint32) error {
-	m, ok := s.ModuleInstances[moduleName]
-	if !ok {
-		m = &ModuleInstance{}
-		s.ModuleInstances[moduleName] = m
-	}
+	m := s.getModuleInstance(moduleName)
 
-	_, ok = m.Exports[name]
+	_, ok := m.Exports[name]
 	if ok {
 		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
 	}
@@ -1718,13 +1706,9 @@ func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint3
 }
 
 func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint32) error {
-	m, ok := s.ModuleInstances[moduleName]
-	if !ok {
-		m = &ModuleInstance{}
-		s.ModuleInstances[moduleName] = m
-	}
+	m := s.getModuleInstance(moduleName)
 
-	_, ok = m.Exports[name]
+	_, ok := m.Exports[name]
 	if ok {
 		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
 	}
@@ -1748,6 +1732,16 @@ func (s *Store) funcTypeID(t *FunctionType) uint64 {
 	id = uint64(len(s.FunctionTypeIDs))
 	s.FunctionTypeIDs[key] = id
 	return id
+}
+
+// getModuleInstance returns an existing ModuleInstance if exists, or assigns a new one.
+func (s *Store) getModuleInstance(name string) *ModuleInstance {
+	m, ok := s.ModuleInstances[name]
+	if !ok {
+		m = &ModuleInstance{Exports: map[string]*ExportInstance{}}
+		s.ModuleInstances[name] = m
+	}
+	return m
 }
 
 func newTableInstance(min uint32, max *uint32) *TableInstance {
