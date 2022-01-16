@@ -191,8 +191,8 @@ func TestJIT(t *testing.T) {
 		"break-drop.wast":             false, // Needs br_table support
 		"br_if.wast":                  false, // Needs br_table support
 		"br.wast":                     false, // Needs br_table support
-		"call_indirect.wast":          false, // Needs call_indirect support
-		"call.wast":                   false, // Needs call_indirect support
+		"call_indirect.wast":          false, // TODO: needs fix!
+		"call.wast":                   false, // TODO: needs fix!
 		"comments.wast":               true,
 		"const.wast":                  true,
 		"conversions.wast":            true,
@@ -219,19 +219,19 @@ func TestJIT(t *testing.T) {
 		"i32.wast":                    true,
 		"i64.wast":                    true,
 		"if.wast":                     false, // Needs br_table support
-		"imports.wast":                true,  // Needs call_indirect support
+		"imports.wast":                true,
 		"inline-module.wast":          true,
 		"int_exprs.wast":              true,
 		"int_literals.wast":           true,
 		"labels.wast":                 false, // Needs br_table support
 		"left-to-right.wast":          false, // Needs br_table support
-		"linking.wast":                false, // Needs call_indirect support
-		"load.wast":                   false, // Needs call_indirect support
+		"linking.wast":                true,
+		"load.wast":                   false, // TODO: needs fix!
 		"local_get.wast":              false, // Needs br_table support
 		"local_set.wast":              false, // Needs br_table support
 		"local_tee.wast":              false, // Needs br_table support
-		"loop.wast":                   false, // Needs call_indirect support
-		"memory_grow.wast":            false, // Needs call_indirect support
+		"loop.wast":                   false, // TODO: needs fix!
+		"memory_grow.wast":            false, // TODO: needs fix!
 		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
 		"memory_trap.wast":            true,
@@ -241,7 +241,7 @@ func TestJIT(t *testing.T) {
 		"return.wast":                 true,
 		"select.wast":                 false, // Needs br_table support
 		"skip-stack-guard-page.wast":  true,
-		"stack.wast":                  false, // Needs call_indirect support
+		"stack.wast":                  false, // TODO: needs fix!
 		"start.wast":                  true,
 		"store.wast":                  false, // Needs br_table support
 		"switch.wast":                 false, // Needs br_table support
@@ -255,7 +255,6 @@ func TestJIT(t *testing.T) {
 		"utf8-import-field.wast":      true,
 		"utf8-import-module.wast":     true,
 	}
-	targets = map[string]bool{"imports.wast": true}
 	runTest(t, jit.NewEngine, targets)
 }
 
@@ -294,7 +293,6 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 			for _, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
-					fmt.Println(msg)
 					switch c.CommandType {
 					case "module":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))

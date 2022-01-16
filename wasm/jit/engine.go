@@ -126,11 +126,16 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 		e.push(param)
 	}
 
-	if f, ok := e.compiledFunctions[f.Address]; ok {
-		e.exec(f)
-	} else {
+	compiled, ok := e.compiledFunctions[f.Address]
+	if !ok {
 		err = fmt.Errorf("function not compiled")
 		return
+	}
+
+	if compiled.isHostFunction() {
+		compiled.hostFunc(&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
+	} else {
+		e.exec(compiled)
 	}
 
 	// Note the top value is the tail of the results,
@@ -395,7 +400,6 @@ func (e *engine) exec(f *compiledFunction) {
 		case jitCallStatusCodeCallFunction:
 			nextFunc := e.compiledFunctions[e.functionCallAddress]
 			if nextFunc.isHostFunction() {
-				fmt.Printf("calling %s for address %d, continuation: %d\n", nextFunc.source.Name, e.functionCallAddress, e.continuationAddressOffset)
 				currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 				// Push the call frame for this host function.
 				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
@@ -474,9 +478,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
-	// if buildoptions.IsDebugMode {
-	fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
-	// }
+	if buildoptions.IsDebugMode {
+		fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
+	}
 
 	compiler, err := newCompiler(e, f, ir)
 	if err != nil {
@@ -486,9 +490,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 	compiler.emitPreamble()
 
 	for _, op := range ir.Operations {
-		// if buildoptions.IsDebugMode {
-		fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
-		// }
+		if buildoptions.IsDebugMode {
+			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
+		}
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
@@ -640,9 +644,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	// if buildoptions.IsDebugMode {
-	fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
-	// }
+	if buildoptions.IsDebugMode {
+		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
+	}
 
 	cf := &compiledFunction{
 		source:          f,

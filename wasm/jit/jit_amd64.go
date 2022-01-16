@@ -165,16 +165,17 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	// we calculate now the offset to the next instruction
 	// relative to the beginning of this function body.
 	const operandSizeBytes = 8
-	for _, obj := range c.requireFunctionCallReturnAddressOffsetResolution {
+	for _, inst := range c.requireFunctionCallReturnAddressOffsetResolution {
+		afterReturnInst := inst
+		for ; ; afterReturnInst = afterReturnInst.Link {
+			if afterReturnInst.As == obj.ARET {
+				afterReturnInst = afterReturnInst.Link
+				break
+			}
+		}
 		// Skip MOV, and the register(rax): "0x49, 0xbd"
-		start := obj.Pc + 2
-		// obj.Link = setting offset to memory
-		// obj.Link.Link = writing back the stack pointer to eng.stackPointer.
-		// obj.Link.Link.Link = Return instruction.
-		// Therefore obj.Link.Link.Link.Link means the next instruction after the return.
-		afterReturnInst := obj.Link.Link.Link.Link
+		start := inst.Pc + 2
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
-		fmt.Printf("%d for %d\n", uint64(afterReturnInst.Pc), obj.Pc)
 	}
 
 	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack
