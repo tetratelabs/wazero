@@ -189,28 +189,6 @@ func Test_setJITStatus(t *testing.T) {
 	}
 }
 
-func Test_setFunctionCallAddressFromConst(t *testing.T) {
-	// Build codes.
-	for _, index := range []wasm.FunctionAddress{1, 5, 20} {
-		// Build codes.
-		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		compiler.setFunctionCallAddressFromConst(index)
-		compiler.returnFunction()
-
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
-
-		// Run codes
-		env := newJITEnvironment()
-		env.exec(code)
-
-		// Check index.
-		require.Equal(t, index, env.functionCallAddress())
-	}
-}
-
 func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 	reg := int16(x86.REG_R10)
 	for _, index := range []wasm.FunctionAddress{1, 5, 20} {

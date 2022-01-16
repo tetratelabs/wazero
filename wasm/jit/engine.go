@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"unsafe"
 
@@ -94,6 +95,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	defer func() {
 		if shouldRecover {
 			if v := recover(); v != nil {
+				debug.PrintStack()
 				top := e.callFrameStack
 				var frames []string
 				var counter int
@@ -387,10 +389,10 @@ func (e *engine) exec(f *compiledWasmFunction) {
 	e.maybeGrowStack(f.maxStackPointer)
 	for e.callFrameStack != nil {
 		currentFrame := e.callFrameStack
-		if buildoptions.IsDebugMode {
-			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
-				currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer)
-		}
+		// if buildoptions.IsDebugMode {
+		fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
+			currentFrame.String(), e.callFrameNum, e.stackBasePointer, e.stackPointer)
+		// }
 
 		// Call into the jitted code.
 		jitcall(
@@ -398,6 +400,8 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			uintptr(unsafe.Pointer(e)),
 			currentFrame.wasmFunction.memoryAddress,
 		)
+
+		fmt.Printf("jit status... %s\n", e.jitCallStatusCode)
 
 		// Check the status code from JIT code.
 		switch e.jitCallStatusCode {
@@ -432,6 +436,7 @@ func (e *engine) exec(f *compiledWasmFunction) {
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeCallHostFunction:
 			targetHostFunction := e.compiledHostFunctions[e.functionCallAddress]
+			fmt.Printf("calling %s with %v\n", targetHostFunction.name, e.stack[:e.stackBasePointer+e.stackPointer])
 			currentFrame.continuationAddress = currentFrame.wasmFunction.codeInitialAddress + e.continuationAddressOffset
 			// Push the call frame for this host function.
 			e.callFrameStack = &callFrame{hostFunction: targetHostFunction, caller: currentFrame}
@@ -485,9 +490,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
-	if buildoptions.IsDebugMode {
-		fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
-	}
+	// if buildoptions.IsDebugMode {
+	fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
+	// }
 
 	compiler, err := newCompiler(e, f, ir)
 	if err != nil {
@@ -497,9 +502,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	compiler.emitPreamble()
 
 	for _, op := range ir.Operations {
-		if buildoptions.IsDebugMode {
-			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
-		}
+		// if buildoptions.IsDebugMode {
+		fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
+		// }
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
@@ -651,9 +656,9 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	if buildoptions.IsDebugMode {
-		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
-	}
+	// if buildoptions.IsDebugMode {
+	fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
+	// }
 
 	cf := &compiledWasmFunction{
 		source:          f,
@@ -680,3 +685,30 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledWasmFun
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 	return cf, nil
 }
+
+/*
+.entrypoint:
+	f32.const 0.000000
+	pick 1
+	f32.convert_from.s32
+	swap 1
+	drop 0..0
+	pick 1
+	call 0
+	pick 1
+	i32.const 1
+	i32.add
+	f32.const 42.000000
+	call 4
+	pick 1
+	call 1
+	pick 1
+	call 6
+	pick 0
+	call 2
+	pick 1
+	i32.const 0
+	call_indirect: type=0, table=0
+	drop 0..1
+	br .return
+*/

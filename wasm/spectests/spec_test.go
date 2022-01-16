@@ -191,14 +191,14 @@ func TestJIT(t *testing.T) {
 		"break-drop.wast":             false, // Needs br_table support
 		"br_if.wast":                  false, // Needs br_table support
 		"br.wast":                     false, // Needs br_table support
-		"call_indirect.wast":          true,  // Needs call_indirect support
+		"call_indirect.wast":          false, // Needs call_indirect support
 		"call.wast":                   false, // Needs call_indirect support
 		"comments.wast":               true,
 		"const.wast":                  true,
 		"conversions.wast":            true,
 		"custom.wast":                 true,
 		"data.wast":                   true,
-		"elem.wast":                   false, // Needs call_indirect support
+		"elem.wast":                   true,
 		"endianness.wast":             true,
 		"exports.wast":                true,
 		"f32_bitwise.wast":            true,
@@ -213,13 +213,13 @@ func TestJIT(t *testing.T) {
 		"float_memory.wast":           true,
 		"float_misc.wast":             true,
 		"forward.wast":                true,
-		"func_ptrs.wast":              false, // Needs call_indirect support
+		"func_ptrs.wast":              true,
 		"func.wast":                   false, // Needs br_table support
 		"globals.wast":                false, // Needs br_table support
 		"i32.wast":                    true,
 		"i64.wast":                    true,
 		"if.wast":                     false, // Needs br_table support
-		"imports.wast":                false, // Needs call_indirect support
+		"imports.wast":                true,  // Needs call_indirect support
 		"inline-module.wast":          true,
 		"int_exprs.wast":              true,
 		"int_literals.wast":           true,
@@ -255,6 +255,7 @@ func TestJIT(t *testing.T) {
 		"utf8-import-field.wast":      true,
 		"utf8-import-module.wast":     true,
 	}
+	targets = map[string]bool{"imports.wast": true}
 	runTest(t, jit.NewEngine, targets)
 }
 
@@ -293,6 +294,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 			for _, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
+					fmt.Println(msg)
 					switch c.CommandType {
 					case "module":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
