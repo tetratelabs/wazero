@@ -21,6 +21,9 @@ type CustomNameSection struct {
 	//
 	// Ex. Assuming the below text format is the second import, you would expect FunctionNames[1] = "mul"
 	//	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
+	//
+	// Note: FunctionNames are a map because the specification requires function indices to be unique. These are sorted
+	// during EncodeData
 	FunctionNames map[uint32]string
 
 	// LocalNames is an association of a function index to any locals which have a symbolic identifier. Ex. add x
@@ -28,9 +31,11 @@ type CustomNameSection struct {
 	// * the key (funcIndex) is in the function namespace, where module defined functions are preceded by imported ones.
 	// * the second key (idx) is in the local namespace, where parameters precede any function locals.
 	//
-	// Ex. Assuming the below text format is the second import, you would expect a call SetFunctionName(2, 1, "y")
+	// Ex. Assuming the below text format is the second import, you would expect LocalNames[1][1] = "y"
 	//	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
-	// LocalNames are a map because the specification requires both function and local indexes to be unique
+	//
+	// Note: LocalNames are a map because the specification requires both function and local indices to be unique. These
+	// are sorted during EncodeData
 	LocalNames map[uint32]map[uint32]string
 }
 
@@ -106,7 +111,7 @@ func (n *CustomNameSection) encodeLocalNameData() []byte {
 	return subsection
 }
 
-// This returns a buffer encoding the given subsection
+// encodeNameSubsection returns a buffer encoding the given subsection
 // See https://www.w3.org/TR/wasm-core-1/#subsections%E2%91%A0
 func encodeNameSubsection(subsectionID uint8, content []byte) []byte {
 	contentSizeInBytes := leb128.EncodeUint32(uint32(len(content)))
