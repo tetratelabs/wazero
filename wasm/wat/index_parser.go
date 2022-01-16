@@ -46,7 +46,7 @@ func (p *indexParser) parseIndex(tok tokenType, tokenBytes []byte, line, col uin
 		if p.currentIndex != nil {
 			return errors.New("redundant index")
 		}
-		p.currentIndex = &index{ID: string(tokenBytes), line: line, col: col}
+		p.currentIndex = &index{ID: string(stripDollar(tokenBytes)), line: line, col: col}
 	case tokenRParen: // end of this field
 		if p.currentIndex == nil {
 			return errors.New("missing index")

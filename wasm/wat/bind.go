@@ -101,7 +101,7 @@ func bindSymbolicIDToNumericIndex(idToIndex map[string]uint32, idx *index, conte
 		context = fmt.Sprintf(context, contextArg0)
 	}
 	return &FormatError{idx.line, idx.col, context,
-		fmt.Errorf("unknown ID %s", idx.ID),
+		fmt.Errorf("unknown ID $%s", idx.ID), // re-attach '$' as that was in the text format!
 	}
 }
 

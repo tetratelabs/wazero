@@ -41,7 +41,7 @@ func EncodeUint32(value uint32) (buf []byte) {
 	}
 }
 
-func DecodeUint32(r io.Reader) (ret uint32, num uint64, err error) {
+func DecodeUint32(r io.Reader) (ret uint32, bytesRead uint64, err error) {
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	// with the modification on the overflow handling tailored for 32-bits.
 	var s uint32
@@ -63,7 +63,7 @@ func DecodeUint32(r io.Reader) (ret uint32, num uint64, err error) {
 	return 0, 0, errOverflow32
 }
 
-func DecodeUint64(r io.Reader) (ret uint64, num uint64, err error) {
+func DecodeUint64(r io.Reader) (ret uint64, bytesRead uint64, err error) {
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	var s uint64
 	for i := 0; i < maxVarintLen64; i++ {
@@ -84,7 +84,7 @@ func DecodeUint64(r io.Reader) (ret uint64, num uint64, err error) {
 	return 0, 0, errOverflow64
 }
 
-func DecodeInt32(r io.Reader) (ret int32, num uint64, err error) {
+func DecodeInt32(r io.Reader) (ret int32, bytesRead uint64, err error) {
 	var shift int
 	var b byte
 	for {
@@ -94,18 +94,18 @@ func DecodeInt32(r io.Reader) (ret int32, num uint64, err error) {
 		}
 		ret |= (int32(b) & 0x7f) << shift
 		shift += 7
-		num++
+		bytesRead++
 		if b&0x80 == 0 {
 			if shift < 32 && (b&0x40) != 0 {
 				ret |= ^0 << shift
 			}
 			// Over flow checks.
 			// fixme: can be optimized.
-			if num > 5 {
+			if bytesRead > 5 {
 				return 0, 0, errOverflow32
-			} else if unused := b & 0b00110000; num == 5 && ret < 0 && unused != 0b00110000 {
+			} else if unused := b & 0b00110000; bytesRead == 5 && ret < 0 && unused != 0b00110000 {
 				return 0, 0, errOverflow32
-			} else if num == 5 && ret >= 0 && unused != 0x00 {
+			} else if bytesRead == 5 && ret >= 0 && unused != 0x00 {
 				return 0, 0, errOverflow32
 			}
 			return
@@ -113,7 +113,7 @@ func DecodeInt32(r io.Reader) (ret int32, num uint64, err error) {
 	}
 }
 
-func DecodeInt33AsInt64(r io.Reader) (ret int64, num uint64, err error) {
+func DecodeInt33AsInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
 	const (
 		int33Mask  int64 = 1 << 7
 		int33Mask2       = ^int33Mask
@@ -133,7 +133,7 @@ func DecodeInt33AsInt64(r io.Reader) (ret int64, num uint64, err error) {
 		b = int64(rb)
 		ret |= (b & int33Mask2) << shift
 		shift += 7
-		num++
+		bytesRead++
 		if b&int33Mask == 0 {
 			break
 		}
@@ -151,17 +151,17 @@ func DecodeInt33AsInt64(r io.Reader) (ret int64, num uint64, err error) {
 	}
 	// Over flow checks.
 	// fixme: can be optimized.
-	if num > 5 {
+	if bytesRead > 5 {
 		return 0, 0, errOverflow33
-	} else if unused := b & 0b00100000; num == 5 && ret < 0 && unused != 0b00100000 {
+	} else if unused := b & 0b00100000; bytesRead == 5 && ret < 0 && unused != 0b00100000 {
 		return 0, 0, errOverflow33
-	} else if num == 5 && ret >= 0 && unused != 0x00 {
+	} else if bytesRead == 5 && ret >= 0 && unused != 0x00 {
 		return 0, 0, errOverflow33
 	}
-	return ret, num, nil
+	return ret, bytesRead, nil
 }
 
-func DecodeInt64(r io.Reader) (ret int64, num uint64, err error) {
+func DecodeInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
 	const (
 		int64Mask3 = 1 << 6
 		int64Mask4 = ^0
@@ -175,18 +175,18 @@ func DecodeInt64(r io.Reader) (ret int64, num uint64, err error) {
 		}
 		ret |= (int64(b) & 0x7f) << shift
 		shift += 7
-		num++
+		bytesRead++
 		if b&0x80 == 0 {
 			if shift < 64 && (b&int64Mask3) == int64Mask3 {
 				ret |= int64Mask4 << shift
 			}
 			// Over flow checks.
 			// fixme: can be optimized.
-			if num > 10 {
+			if bytesRead > 10 {
 				return 0, 0, errOverflow64
-			} else if unused := b & 0b00111110; num == 10 && ret < 0 && unused != 0b00111110 {
+			} else if unused := b & 0b00111110; bytesRead == 10 && ret < 0 && unused != 0b00111110 {
 				return 0, 0, errOverflow64
-			} else if num == 10 && ret >= 0 && unused != 0x00 {
+			} else if bytesRead == 10 && ret >= 0 && unused != 0x00 {
 				return 0, 0, errOverflow64
 			}
 			return

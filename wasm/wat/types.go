@@ -14,7 +14,7 @@ import (
 //
 // See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
 type module struct {
-	// name is optional and starts with '$'. For example, "$test".
+	// name is optional. For example, "test".
 	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
 	//
 	// Note: The name may also be stored in the wasm.Module CustomSection under the key "name" subsection 0.
@@ -91,7 +91,7 @@ type index struct {
 //
 // See https://www.w3.org/TR/wasm-core-1/#text-functype
 type typeFunc struct {
-	// name starts with '$'. For example, "$v_v", and only set when explicitly defined in module.types
+	// name is only set when explicitly defined in module.types. Ex. v_v
 	//
 	// name is only used for debugging. At runtime, types are called based on raw numeric index. The type index space
 	// begins those explicitly defined in module.types, followed by any inlined ones.
@@ -116,7 +116,7 @@ func funcTypeEquals(t *typeFunc, params []wasm.ValueType, result wasm.ValueType)
 }
 
 // paramNames are the possibly empty association of names that correspond with params. The index is to params and
-// the name will never be empty and always begin with '$' (ex. "$len") (tokenID). Ex. $x names (param $x i32)
+// the name will never be empty. Ex. x is the name of (param $x i32)
 //
 // paramNames are only used for debugging. At runtime, parameters are called based on raw numeric index.
 //
@@ -158,15 +158,15 @@ type importFunc struct {
 
 	// module is the possibly empty module name to import. Ex. "" or "Math"
 	//
-	// Note: This is not necessarily the module.name, so it does not need to begin with '$'!
+	// Note: This is not necessarily the module.name
 	module string
 
 	// name is the possibly empty entity name to import. Ex. "" or "PI"
 	//
-	// Note: This is not necessarily the funcName, so it does not need to begin with '$'!
+	// Note: This is not necessarily the funcName
 	name string
 
-	// funcName starts with '$'. For example, "$main".
+	// funcName is optional. Ex. main
 	//
 	// funcName is only used for debugging. At runtime, functions are called based on raw numeric index. The function
 	// index space begins with imported functions, followed by any defined in this module.

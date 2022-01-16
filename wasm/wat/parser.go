@@ -197,14 +197,13 @@ func (p *moduleParser) endField() {
 // next parser to parseModule. If the token isn't a tokenID, this calls parseModule.
 //
 // Ex. A module name is present `(module $math)`
-//                       records $math --^
+//                        records math --^
 //
 // Ex. No module name `(module)`
 //   calls parseModule here --^
 func (p *moduleParser) parseModuleName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $Math
-		name := string(tokenBytes)
-		p.module.name = name
+		p.module.name = string(stripDollar(tokenBytes))
 		p.tokenParser = p.parseModule
 		return nil
 	}
@@ -230,14 +229,14 @@ func (p *moduleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ uint32
 // if not found.
 //
 // Ex. A type name is present `(type $t0 (func (result i32)))`
-//                     records $t0 --^   ^
+//                      records t0 --^   ^
 //              parseType resumes here --+
 //
 // Ex. No type name `(type (func (result i32)))`
 //       calls parseType --^
 func (p *moduleParser) parseTypeName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $v_v
-		p.currentValue0 = tokenBytes
+		p.currentValue0 = stripDollar(tokenBytes)
 		p.tokenParser = p.parseType
 		return nil
 	}
@@ -401,7 +400,7 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 // and sets the next parser to parseImportFunc. If the token isn't a tokenID, this calls parseImportFunc.
 //
 // Ex. A function name is present `(import "Math" "PI" (func $math.pi (result f32))`
-//                                   records $math.pi here --^
+//                                    records math.pi here --^
 //                                     parseImportFunc resumes here --^
 //
 // Ex. No function name `(import "Math" "PI" (func (result f32))`
@@ -409,7 +408,7 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
 		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
-		fn.funcName = string(tokenBytes)
+		fn.funcName = string(stripDollar(tokenBytes))
 		p.tokenParser = p.parseImportFunc
 		return nil
 	}

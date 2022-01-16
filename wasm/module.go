@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-
-	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
-const (
-	magic   = "\x00asm"
-	version = "\x01\x00\x00\x00"
-)
+// magic is the 4 byte preamble (literally "\0asm") of the binary format
+// See https://www.w3.org/TR/wasm-core-1/#binary-magic
+var magic = []byte{0x00, 0x61, 0x73, 0x6D}
+
+// version is format version and doesn't change between known specification versions
+// See https://www.w3.org/TR/wasm-core-1/#binary-version
+var version = []byte{0x01, 0x00, 0x00, 0x00}
 
 type reader struct {
 	binary []byte
@@ -95,6 +96,11 @@ type Module struct {
 	CustomSections map[string][]byte
 }
 
+// Encode encodes the given module into a byte slice. The result can be used directly or saved as a %.wasm file.
+func (m *Module) Encode() (bytes []byte) {
+	return m.encodeSections(append(magic, version...))
+}
+
 // DecodeModule decodes a `raw` module from io.Reader whose index spaces are yet to be initialized
 func DecodeModule(binary []byte) (*Module, error) {
 	r := &reader{binary: binary, buffer: bytes.NewBuffer(binary)}
@@ -128,63 +134,5 @@ func DecodeModule(binary []byte) (*Module, error) {
 	if len(ret.FunctionSection) != len(ret.CodeSection) {
 		return nil, fmt.Errorf("function and code section have inconsistent lengths")
 	}
-	return ret, nil
-}
-
-func (m *Module) DecodeCustomNameSection() (map[uint32]string, error) {
-	namesec, ok := m.CustomSections["name"]
-	if !ok {
-		return nil, fmt.Errorf("'name' %w", ErrCustomSectionNotFound)
-	}
-
-	r := bytes.NewReader(namesec)
-	for {
-		id, err := r.ReadByte()
-		if err != nil {
-			return nil, fmt.Errorf("failed to read subsection ID: %w", err)
-		}
-
-		size, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read the size of subsection %d: %w", id, err)
-		}
-
-		if id == 1 {
-			// ID = 1 is the function name subsection.
-			break
-		} else {
-			// Skip other subsections.
-			_, err := r.Seek(int64(size), io.SeekCurrent)
-			if err != nil {
-				return nil, fmt.Errorf("failed to skip subsection %d: %w", id, err)
-			}
-		}
-	}
-
-	nameVectorSize, _, err := leb128.DecodeUint32(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read the size of name vector: %w", err)
-	}
-
-	ret := make(map[uint32]string, nameVectorSize)
-	for i := uint32(0); i < nameVectorSize; i++ {
-		functionIndex, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read function index: %w", err)
-		}
-
-		functionNameSize, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read function name size: %w", err)
-		}
-
-		namebuf := make([]byte, functionNameSize)
-		_, err = io.ReadFull(r, namebuf)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read function name: %w", err)
-		}
-		ret[functionIndex] = string(namebuf)
-	}
-
 	return ret, nil
 }

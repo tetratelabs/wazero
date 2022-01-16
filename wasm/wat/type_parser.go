@@ -193,14 +193,14 @@ func (p *typeParser) parseMoreParamsOrResult(tok tokenType, tokenBytes []byte, l
 // found.
 //
 // Ex. A param name is present `(param $x i32)`
-//                        records $x --^  ^
+//                         records x --^  ^
 //              parseParam resumes here --+
 //
 // Ex. No param name `(param i32)`
 //        calls parseParam --^
 func (p *typeParser) parseParamName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $len
-		p.currentParamName = tokenBytes
+		p.currentParamName = stripDollar(tokenBytes)
 		p.m.tokenParser = p.parseParam
 		return nil
 	}

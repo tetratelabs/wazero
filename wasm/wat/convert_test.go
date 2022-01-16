@@ -66,6 +66,14 @@ func TestTextToBinary(t *testing.T) {
 						},
 					},
 				},
+				CustomSections: map[string][]byte{
+					"name": (&wasm.CustomNameSection{
+						FunctionNames: map[uint32]string{
+							0: "runtime.path_open",
+							1: "runtime.fd_write",
+						},
+					}).EncodeData(),
+				},
 			},
 		},
 		{
@@ -98,6 +106,14 @@ func TestTextToBinary(t *testing.T) {
 						},
 					},
 				},
+				CustomSections: map[string][]byte{
+					"name": (&wasm.CustomNameSection{
+						FunctionNames: map[uint32]string{
+							0: "runtime.arg_sizes_get",
+							1: "runtime.fd_write",
+						},
+					}).EncodeData(),
+				},
 			},
 		},
 		{
@@ -116,6 +132,13 @@ func TestTextToBinary(t *testing.T) {
 					},
 				}},
 				StartSection: &zero,
+				CustomSections: map[string][]byte{
+					"name": (&wasm.CustomNameSection{
+						FunctionNames: map[uint32]string{
+							0: "hello",
+						},
+					}).EncodeData(),
+				},
 			},
 		},
 		{
@@ -180,6 +203,22 @@ func TestTextToBinary(t *testing.T) {
 					},
 				},
 				StartSection: &four,
+				CustomSections: map[string][]byte{
+					"name": (&wasm.CustomNameSection{
+						ModuleName: "example",
+						FunctionNames: map[uint32]string{
+							0: "runtime.arg_sizes_get",
+							1: "runtime.fd_write",
+							2: "mul",
+							3: "add",
+							4: "hello",
+						},
+						LocalNames: map[uint32]map[uint32]string{
+							2: {0: "x", 1: "y"},
+							3: {0: "l", 1: "r"},
+						},
+					}).EncodeData(),
+				},
 			},
 		},
 	}

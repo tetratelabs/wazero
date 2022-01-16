@@ -433,7 +433,13 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	memoryDeclarations = append(memoryDeclarations, module.MemorySection...)
 	tableDeclarations = append(tableDeclarations, module.TableSection...)
 
-	functionNames, _ := module.DecodeCustomNameSection()
+	// TODO: decode during Module.Decode per #134
+	var functionNames map[uint32]string
+	if data, ok := module.CustomSections["name"]; ok {
+		if c, decodeErr := DecodeCustomNameSection(data); decodeErr == nil {
+			functionNames = c.FunctionNames
+		}
+	}
 	if functionNames == nil {
 		// We cannot guarantee the existence of "name" custom section
 		// in the binary. That is because the custom section is optional
