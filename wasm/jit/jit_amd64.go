@@ -628,8 +628,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 }
 
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
-	// TODO: implement!
-	return nil
+	panic("TODO implement!")
 }
 
 // If a jump target has multiple callesr (origins),

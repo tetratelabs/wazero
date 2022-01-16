@@ -191,8 +191,8 @@ func TestJIT(t *testing.T) {
 		"break-drop.wast":             false, // Needs br_table support
 		"br_if.wast":                  false, // Needs br_table support
 		"br.wast":                     false, // Needs br_table support
-		"call_indirect.wast":          false, // TODO: needs fix!
-		"call.wast":                   false, // TODO: needs fix!
+		"call_indirect.wast":          false, // Needs br_table support
+		"call.wast":                   false, // Needs br_table support
 		"comments.wast":               true,
 		"const.wast":                  true,
 		"conversions.wast":            true,
@@ -226,12 +226,12 @@ func TestJIT(t *testing.T) {
 		"labels.wast":                 false, // Needs br_table support
 		"left-to-right.wast":          false, // Needs br_table support
 		"linking.wast":                true,
-		"load.wast":                   false, // TODO: needs fix!
+		"load.wast":                   false, // Needs br_table support
 		"local_get.wast":              false, // Needs br_table support
 		"local_set.wast":              false, // Needs br_table support
 		"local_tee.wast":              false, // Needs br_table support
-		"loop.wast":                   false, // TODO: needs fix!
-		"memory_grow.wast":            false, // TODO: needs fix!
+		"loop.wast":                   false, // Needs br_table support
+		"memory_grow.wast":            false, // Needs br_table support
 		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
 		"memory_trap.wast":            true,
