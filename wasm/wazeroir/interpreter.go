@@ -577,7 +577,6 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				target := it.functions[table.Table[offset].FunctionAddress]
 				// Type check.
 				if target.funcInstance.FunctionTypeID != op.us[1] {
-					fmt.Printf("%d != %d\n", target.funcInstance.FunctionTypeID, op.us[1])
 					panic("function type mismatch on call_indirect")
 				}
 				// Call in.

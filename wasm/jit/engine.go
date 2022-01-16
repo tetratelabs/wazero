@@ -117,6 +117,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 				e.callFrameStack = nil
 				e.stackBasePointer = 0
 				e.stackPointer = 0
+				e.callFrameNum = 0
 			}
 		}
 	}()
@@ -447,6 +448,12 @@ func (e *engine) exec(f *compiledWasmFunction) {
 		case jitCallStatusCodeMemoryOutOfBounds:
 			// TODO: have wasm.ErrMemoryOutOfBounds and use it here.
 			panic("out of bounds memory access")
+		case jitCallStatusCodeTableOutOfBounds:
+			// TODO: have wasm.ErrTableOutOfBounds and use it here.
+			panic("out of bounds table access")
+		case jitCallStatusCodeTypeMismatchOnIndirectCall:
+			// TODO: have wasm.ErrTypeMismatchOnIndirectCall and use it here.
+			panic("type mismatch on indirect function call")
 		}
 	}
 }

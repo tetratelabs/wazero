@@ -778,7 +778,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	cmpTypeID.As = x86.ACMPQ
 	cmpTypeID.From.Type = obj.TYPE_MEM
 	cmpTypeID.From.Reg = offset.register
-	cmpTypeID.From.Offset = 4
+	cmpTypeID.From.Offset = 8
 	cmpTypeID.To.Type = obj.TYPE_CONST
 	cmpTypeID.To.Offset = int64(targetFunctionType.FunctionTypeID)
 	c.addInstruction(cmpTypeID)

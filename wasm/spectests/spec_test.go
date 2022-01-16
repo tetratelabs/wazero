@@ -191,7 +191,7 @@ func TestJIT(t *testing.T) {
 		"break-drop.wast":             false, // Needs br_table support
 		"br_if.wast":                  false, // Needs br_table support
 		"br.wast":                     false, // Needs br_table support
-		"call_indirect.wast":          false, // Needs call_indirect support
+		"call_indirect.wast":          true,  // Needs call_indirect support
 		"call.wast":                   false, // Needs call_indirect support
 		"comments.wast":               true,
 		"const.wast":                  true,

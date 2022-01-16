@@ -5598,7 +5598,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		// Setup table.
 		table := make([]wasm.TableElement, 10)
 		for i := range table {
-			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i)}
+			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: uint64(i)}
 		}
 
 		for i := 0; i < len(table); i++ {
@@ -5609,7 +5609,9 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				targetType := &wasm.FunctionType{
 					Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 					Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32}}
-				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{FunctionType: targetType}}}}
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
+					Types: []*wasm.TypeInstance{{FunctionType: targetType, FunctionTypeID: uint64(i)}}},
+				}
 
 				// Put the function call params.
 				for i := 0; i < len(targetType.Params); i++ {
@@ -5625,7 +5627,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 				// Now emit the code.
 				compiler.initializeReservedRegisters()
-				require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
+				require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{TypeIndex: 0}))
 
 				// At this point, we consumed the function inputs and offset value, but the functino result (four float values)
 				// are pushed onto the register.

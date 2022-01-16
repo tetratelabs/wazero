@@ -12,8 +12,4 @@
   (func (export "callt") (param $i i32) (result i32)
     (call_indirect (type $T) (local.get $i))
   )
-
-  (func (export "callu") (param $i i32) (result i32)
-    (call_indirect (type $U) (local.get $i))
-  )
 )
