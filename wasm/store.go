@@ -16,10 +16,10 @@ type (
 	// Multiple modules can be instantiated within a single store, and each instance,
 	// (e.g. function instance) can be referenced by other modules in a Store via imports.
 	//
-	// Every type whose name ends with *"Instance" suffix belongs to exactly one store.
+	// Every type whose name ends with "Instance" suffix belongs to exactly one store.
 	//
 	// Note that store is not thread (concurrency) safe, meaning that using single Store
-	// multiple goroutines by might result in race conditions. In that case, the invocation
+	// via multiple goroutines might result in race conditions. In that case, the invocation
 	// and access to any methods and field of Store must be guarded by mutex.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0
