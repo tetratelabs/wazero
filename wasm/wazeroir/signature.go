@@ -171,7 +171,7 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		return signature_UnknownUnkownI32_Unknown, nil
 	case wasm.OpcodeLocalGet:
 		inputLen := uint32(len(f.FunctionType.Type.Params))
-		if l := f.NumLocals + inputLen; index >= l {
+		if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
@@ -183,7 +183,7 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		return &signature{out: []UnsignedType{t}}, nil
 	case wasm.OpcodeLocalSet:
 		inputLen := uint32(len(f.FunctionType.Type.Params))
-		if l := f.NumLocals + inputLen; index >= l {
+		if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType
@@ -195,7 +195,7 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		return &signature{in: []UnsignedType{t}}, nil
 	case wasm.OpcodeLocalTee:
 		inputLen := uint32(len(f.FunctionType.Type.Params))
-		if l := f.NumLocals + inputLen; index >= l {
+		if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 			return nil, fmt.Errorf("invalid local index for local.get %d >= %d", index, l)
 		}
 		var t UnsignedType

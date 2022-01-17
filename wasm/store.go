@@ -90,8 +90,6 @@ type (
 		Body []byte
 		// FunctionType holds the pointer to TypeInstance whose functionType field equals that of this function.
 		FunctionType *TypeInstance
-		// NumLocals holds the number of locals in this function.
-		NumLocals uint32
 		// LocalTypes holds types of locals.
 		LocalTypes []ValueType
 		// HostFunction holds the runtime representation of host functions.
@@ -555,7 +553,6 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			Name:           name,
 			FunctionType:   s.getTypeInstance(module.TypeSection[typeIndex]),
 			Body:           module.CodeSection[codeIndex].Body,
-			NumLocals:      module.CodeSection[codeIndex].NumLocals,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
 			ModuleInstance: target,
 		}
@@ -1138,7 +1135,7 @@ func validateFunction(
 			switch Opcode(op) {
 			case OpcodeLocalGet:
 				inputLen := uint32(len(f.FunctionType.Type.Params))
-				if l := f.NumLocals + inputLen; index >= l {
+				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				if index < inputLen {
@@ -1148,7 +1145,7 @@ func validateFunction(
 				}
 			case OpcodeLocalSet:
 				inputLen := uint32(len(f.FunctionType.Type.Params))
-				if l := f.NumLocals + inputLen; index >= l {
+				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
@@ -1162,7 +1159,7 @@ func validateFunction(
 				}
 			case OpcodeLocalTee:
 				inputLen := uint32(len(f.FunctionType.Type.Params))
-				if l := f.NumLocals + inputLen; index >= l {
+				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
