@@ -14,7 +14,7 @@ import (
 type (
 	// Store is the runtime representation of "instantiated" Wasm module and objects.
 	// Multiple modules can be instantiated within a single store, and each instance,
-	// (e.g. function instance) can be referenced by other modules in a Store via imports.
+	// (e.g. function instance) can be referenced by other module instances in a Store via Module.ImportSection.
 	//
 	// Every type whose name ends with "Instance" suffix belongs to exactly one store.
 	//
