@@ -90,14 +90,6 @@ type (
 		// TODO: Add others if necessary.
 	}
 
-	FunctionInstanceBlock struct {
-		StartAt, ElseAt, EndAt uint64
-		BlockType              *FunctionType
-		BlockTypeBytes         uint64
-		IsLoop                 bool // TODO: might not be necessary
-		IsIf                   bool // TODO: might not be necessary
-	}
-
 	GlobalInstance struct {
 		Type *GlobalType
 		Val  uint64
@@ -506,7 +498,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		if _, ok := analysisCache[codeIndex]; !ok {
-			err := analyzeFunction(
+			err := validateFunction(
 				module, f, functionDeclarations, globalDeclarations,
 				memoryDeclarations, tableDeclarations,
 			)
@@ -813,9 +805,19 @@ func (s *valueTypeStack) String() string {
 		strings.Join(typeStrs, ", "), strings.Join(limits, ","))
 }
 
-type BlockType = FunctionType
+type functionBlock struct {
+	StartAt, ElseAt, EndAt uint64
+	BlockType              *FunctionType
+	BlockTypeBytes         uint64
+	IsLoop                 bool
+	IsIf                   bool
+}
 
-func analyzeFunction(
+// validateFunction validates the instruction sequence in a given function isntance's body
+// following the specification https://www.w3.org/TR/wasm-core-1/#instructions%E2%91%A2.
+//
+// TODO: put this in a separate file like validate.go.
+func validateFunction(
 	module *Module,
 	f *FunctionInstance,
 	functionDeclarations []uint32,
@@ -823,7 +825,7 @@ func analyzeFunction(
 	memoryDeclarations []*MemoryType,
 	tableDeclarations []*TableType,
 ) error {
-	labelStack := []*FunctionInstanceBlock{
+	labelStack := []*functionBlock{
 		{BlockType: f.FunctionType.Type, StartAt: math.MaxUint64},
 	}
 	valueTypeStack := &valueTypeStack{}
@@ -1488,7 +1490,7 @@ func analyzeFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &FunctionInstanceBlock{
+			labelStack = append(labelStack, &functionBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1500,7 +1502,7 @@ func analyzeFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &FunctionInstanceBlock{
+			labelStack = append(labelStack, &functionBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1513,7 +1515,7 @@ func analyzeFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &FunctionInstanceBlock{
+			labelStack = append(labelStack, &functionBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1609,24 +1611,24 @@ func analyzeFunction(
 	return nil
 }
 
-func ReadBlockType(types []*TypeInstance, r io.Reader) (*BlockType, uint64, error) {
+func ReadBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
 	}
 
-	var ret *BlockType
+	var ret *FunctionType
 	switch raw {
 	case -64: // 0x40 in original byte = nil
-		ret = &BlockType{}
+		ret = &FunctionType{}
 	case -1: // 0x7f in original byte = i32
-		ret = &BlockType{Results: []ValueType{ValueTypeI32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI32}}
 	case -2: // 0x7e in original byte = i64
-		ret = &BlockType{Results: []ValueType{ValueTypeI64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI64}}
 	case -3: // 0x7d in original byte = f32
-		ret = &BlockType{Results: []ValueType{ValueTypeF32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
-		ret = &BlockType{Results: []ValueType{ValueTypeF64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
 	default:
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)

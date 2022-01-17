@@ -63,7 +63,7 @@ func (c *controlFrame) asBranchTarget() *BranchTarget {
 func (c *controlFrames) functionFrame() *controlFrame {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase.
 	return c.frames[0]
 }
@@ -71,7 +71,7 @@ func (c *controlFrames) functionFrame() *controlFrame {
 func (c *controlFrames) get(n int) *controlFrame {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase.
 	return c.frames[len(c.frames)-n-1]
 }
@@ -79,7 +79,7 @@ func (c *controlFrames) get(n int) *controlFrame {
 func (c *controlFrames) top() *controlFrame {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase.
 	return c.frames[len(c.frames)-1]
 }
@@ -91,7 +91,7 @@ func (c *controlFrames) empty() bool {
 func (c *controlFrames) pop() (frame *controlFrame) {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase.
 	frame = c.top()
 	c.frames = c.frames[:len(c.frames)-1]
@@ -1444,7 +1444,7 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 func (c *compiler) stackPop() (ret UnsignedType) {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase.
 	ret = c.stack[len(c.stack)-1]
 	c.stack = c.stack[:len(c.stack)-1]

@@ -45,7 +45,7 @@ func (it *interpreter) push(v uint64) {
 func (it *interpreter) pop() (v uint64) {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase
 	// and wazeroir translation
 	// before compilation.
@@ -57,7 +57,7 @@ func (it *interpreter) pop() (v uint64) {
 func (it *interpreter) drop(r *InclusiveRange) {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase
 	// and wazeroir translation
 	// before compilation.
@@ -80,7 +80,7 @@ func (it *interpreter) pushFrame(frame *interpreterFrame) {
 }
 
 func (it *interpreter) popFrame() (frame *interpreterFrame) {
-	// No need to check stack bound as we can assume that all the operations are valid thanks to analyzeFunction at
+	// No need to check stack bound as we can assume that all the operations are valid thanks to validateFunction at
 	// module validation phase and wazeroir translation before compilation.
 	oneLess := len(it.frames) - 1
 	frame = it.frames[oneLess]
