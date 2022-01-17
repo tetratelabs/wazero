@@ -207,6 +207,7 @@ func TestTextToBinary(t *testing.T) {
 						4: "hello",
 					},
 					LocalNames: map[uint32]map[uint32]string{
+						1: {0: "fd", 1: "iovs_ptr", 2: "iovs_len", 3: "nwritten_ptr"},
 						2: {0: "x", 1: "y"},
 						3: {0: "l", 1: "r"},
 					},

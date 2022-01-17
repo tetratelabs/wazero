@@ -7,6 +7,8 @@ import (
 )
 
 func TestModule_Encode(t *testing.T) {
+	i32 := ValueTypeI32
+
 	tests := []struct {
 		name     string
 		input    *Module
@@ -54,6 +56,23 @@ func TestModule_Encode(t *testing.T) {
 				subsectionIDModuleName, 0x07, // 7 bytes in this subsection
 				0x06, // the Module name simple is 6 bytes long
 				's', 'i', 'm', 'p', 'l', 'e'),
+		},
+		{
+			name: "type section",
+			input: &Module{
+				TypeSection: []*FunctionType{
+					{},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
+				},
+			},
+			expected: append(append(magic, version...),
+				SectionIDType, 0x12, // 18 bytes in this section
+				0x03,             // 3 types
+				0x60, 0x00, 0x00, // func=0x60 no param no result
+				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
+				0x60, 0x04, i32, i32, i32, i32, 0x01, i32, // func=0x60 4 params and 1 result
+			),
 		},
 	}
 

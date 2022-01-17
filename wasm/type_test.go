@@ -6,6 +6,70 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFunctionType_Encode(t *testing.T) {
+	i32, i64 := ValueTypeI32, ValueTypeI64
+	tests := []struct {
+		name     string
+		input    *FunctionType
+		expected []byte
+	}{
+		{
+			name:     "empty",
+			input:    &FunctionType{},
+			expected: []byte{0x60, 0, 0},
+		},
+		{
+			name:     "one param no result",
+			input:    &FunctionType{Params: []ValueType{i32}},
+			expected: []byte{0x60, 1, i32, 0},
+		},
+		{
+			name:     "no param one result",
+			input:    &FunctionType{Results: []ValueType{i32}},
+			expected: []byte{0x60, 0, 1, i32},
+		},
+		{
+			name:     "one param one result",
+			input:    &FunctionType{Params: []ValueType{i64}, Results: []ValueType{i32}},
+			expected: []byte{0x60, 1, i64, 1, i32},
+		},
+		{
+			name:     "two params no result",
+			input:    &FunctionType{Params: []ValueType{i32, i64}},
+			expected: []byte{0x60, 2, i32, i64, 0},
+		},
+		{
+			name:     "no param two results", // this is just for coverage as WebAssembly 1.0 (MVP) does not allow it!
+			input:    &FunctionType{Results: []ValueType{i32, i64}},
+			expected: []byte{0x60, 0, 2, i32, i64},
+		},
+		{
+			name:     "one param two results", // this is just for coverage as WebAssembly 1.0 (MVP) does not allow it!
+			input:    &FunctionType{Params: []ValueType{i64}, Results: []ValueType{i32, i64}},
+			expected: []byte{0x60, 1, i64, 2, i32, i64},
+		},
+		{
+			name:     "two param one result",
+			input:    &FunctionType{Params: []ValueType{i32, i64}, Results: []ValueType{i32}},
+			expected: []byte{0x60, 2, i32, i64, 1, i32},
+		},
+		{
+			name:     "two param two results", // this is just for coverage as WebAssembly 1.0 (MVP) does not allow it!
+			input:    &FunctionType{Params: []ValueType{i32, i64}, Results: []ValueType{i32, i64}},
+			expected: []byte{0x60, 2, i32, i64, 2, i32, i64},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			bytes := tc.input.encode()
+			require.Equal(t, tc.expected, bytes)
+		})
+	}
+}
+
 func TestFunctionType_String(t *testing.T) {
 	tp := FunctionType{}
 	require.Equal(t, "null_null", tp.String())
