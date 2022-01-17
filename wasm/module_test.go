@@ -126,6 +126,28 @@ func TestDecodeModule_Errors(t *testing.T) {
 			input:       []byte("\x00asm\x01\x00\x00\x01"),
 			expectedErr: "invalid version header",
 		},
+		{
+			name: "redundant custom section",
+			input: append(append(magic, version...),
+				SectionIDCustom, 0x09, // 9 bytes in this section
+				0x04, 'm', 'e', 'm', 'e',
+				subsectionIDModuleName, 0x03, 0x01, 'x',
+				SectionIDCustom, 0x09, // 9 bytes in this section
+				0x04, 'm', 'e', 'm', 'e',
+				subsectionIDModuleName, 0x03, 0x01, 'y'),
+			expectedErr: "readSections failed: section ID 0: malformed custom section meme",
+		},
+		{
+			name: "redundant name section",
+			input: append(append(magic, version...),
+				SectionIDCustom, 0x09, // 9 bytes in this section
+				0x04, 'n', 'a', 'm', 'e',
+				subsectionIDModuleName, 0x03, 0x01, 'x',
+				SectionIDCustom, 0x09, // 9 bytes in this section
+				0x04, 'n', 'a', 'm', 'e',
+				subsectionIDModuleName, 0x03, 0x01, 'x'),
+			expectedErr: "readSections failed: section ID 0: malformed custom section name",
+		},
 	}
 
 	for _, tt := range tests {
