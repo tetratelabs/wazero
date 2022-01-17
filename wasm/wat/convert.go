@@ -21,11 +21,6 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 	// Next, we need to convert the types from the text format into the binary one. This is easy because the only
 	// difference is that the text format has type names and the binary format does not.
 	result = &wasm.Module{}
-	names := wasm.CustomNameSection{
-		ModuleName:    m.name,
-		FunctionNames: map[uint32]string{},
-		LocalNames:    map[uint32]map[uint32]string{},
-	}
 	for _, t := range m.types {
 		var results []wasm.ValueType
 		if t.result != 0 {
@@ -36,16 +31,26 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 
 	// Now, handle any imported functions. Notably, we retain the same insertion order as defined in the text format in
 	// case a numeric index is used for the start function (or another reason such as the call instruction).
+	var functionNames map[uint32]string
+	var localNames map[uint32]map[uint32]string
 	for i, f := range m.importFuncs {
 		funcidx := uint32(i)
 		if f.funcName != "" {
-			names.FunctionNames[funcidx] = f.funcName
+			if functionNames == nil {
+				functionNames = map[uint32]string{funcidx: f.funcName}
+			} else {
+				functionNames[funcidx] = f.funcName
+			}
 		}
 		if f.paramNames != nil {
 			locals := map[uint32]string{}
-			names.LocalNames[funcidx] = locals
 			for _, pn := range f.paramNames {
 				locals[pn.index] = string(pn.name)
+			}
+			if localNames == nil {
+				localNames = map[uint32]map[uint32]string{funcidx: locals}
+			} else {
+				localNames[funcidx] = locals
 			}
 		}
 		result.ImportSection = append(result.ImportSection, &wasm.ImportSegment{
@@ -64,10 +69,12 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 		result.StartSection = &m.startFunction.numeric
 	}
 
-	// Encode the custom name section, if there is any data in it
-	if nameData := names.EncodeData(); nameData != nil {
-		result.CustomSections = map[string][]byte{
-			"name": nameData,
+	// Don't set the name section unless we found a name!
+	if m.name != "" || functionNames != nil || localNames != nil {
+		result.NameSection = &wasm.NameSection{
+			ModuleName:    m.name,
+			FunctionNames: functionNames,
+			LocalNames:    localNames,
 		}
 	}
 	return

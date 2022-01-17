@@ -91,8 +91,21 @@ type Module struct {
 	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
-	CodeSection    []*CodeSegment
-	DataSection    []*DataSegment
+	CodeSection []*CodeSegment
+	DataSection []*DataSegment
+	// NameSection is set when the custom section "name" was successfully decoded from the binary format.
+	//
+	// Note: This is the only custom section defined in the WebAssembly 1.0 (MVP) Binary Format. Others are in
+	// CustomSections
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#name-section%E2%91%A0
+	NameSection *NameSection
+	// CustomSections is set when at least one non-standard, or otherwise unsupported custom section was found in the
+	// binary format.
+	//
+	// Note: This never contains a "name" because that is standard and parsed into the NameSection.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#custom-section%E2%91%A0
 	CustomSections map[string][]byte
 }
 
@@ -126,7 +139,7 @@ func DecodeModule(binary []byte) (*Module, error) {
 		}
 	}
 
-	ret := &Module{CustomSections: map[string][]byte{}}
+	ret := &Module{}
 	if err := ret.readSections(r); err != nil {
 		return nil, fmt.Errorf("readSections failed: %w", err)
 	}
