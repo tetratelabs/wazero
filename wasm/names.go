@@ -75,11 +75,11 @@ func encodeSortedAndSizePrefixed(m map[uint32]string) []byte {
 	data := leb128.EncodeUint32(count)
 
 	// Sort the keys so that they encode in ascending order
-	keys := make(uint32Slice, 0, count)
+	keys := make([]uint32, 0, count)
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.Sort(keys)
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 	for _, i := range keys {
 		data = append(data, encodeNameMapEntry(i, []byte(m[i]))...)
@@ -98,11 +98,11 @@ func (n *CustomNameSection) encodeLocalNameData() []byte {
 	subsection := leb128.EncodeUint32(funcNameCount)
 
 	// Sort the function indices so that they encode in ascending order
-	funcIndex := make(uint32Slice, 0, funcNameCount)
+	funcIndex := make([]uint32, 0, funcNameCount)
 	for k := range n.LocalNames {
 		funcIndex = append(funcIndex, k)
 	}
-	sort.Sort(funcIndex)
+	sort.Slice(funcIndex, func(i, j int) bool { return funcIndex[i] < funcIndex[j] })
 
 	for _, i := range funcIndex {
 		locals := encodeSortedAndSizePrefixed(n.LocalNames[i])
@@ -132,13 +132,6 @@ func encodeSizePrefixed(data []byte) []byte {
 	size := leb128.EncodeUint32(uint32(len(data)))
 	return append(size, data...)
 }
-
-// uint32Slice implements sort.Interface
-type uint32Slice []uint32
-
-func (x uint32Slice) Len() int           { return len(x) }
-func (x uint32Slice) Less(i, j int) bool { return x[i] < x[j] }
-func (x uint32Slice) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 
 // DecodeCustomNameSection deserializes the data associated with the "name" key in SectionIDCustom according to the
 // standard:

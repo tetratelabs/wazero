@@ -113,6 +113,10 @@ func DecodeInt32(r io.Reader) (ret int32, bytesRead uint64, err error) {
 	}
 }
 
+// DecodeInt33AsInt64 is a special cased decoder for wasm.BlockType which is encoded as a positive signed integer, yet
+// still needs to fit the 32-bit range of allowed indices. Hence, this is 33, not 32-bit!
+//
+// See https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions
 func DecodeInt33AsInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
 	const (
 		int33Mask  int64 = 1 << 7
