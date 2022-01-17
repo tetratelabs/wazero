@@ -1823,18 +1823,13 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 }
 
 func (s *Store) getTypeInstance(t *FunctionType) *TypeInstance {
-	return &TypeInstance{Type: t, TypeID: s.TypeID(t)}
-}
-
-func (s *Store) TypeID(t *FunctionType) FunctionTypeID {
 	key := t.String()
 	id, ok := s.TypeIDs[key]
-	if ok {
-		return FunctionTypeID(id)
+	if !ok {
+		id = FunctionTypeID(len(s.TypeIDs))
+		s.TypeIDs[key] = id
 	}
-	id = FunctionTypeID(len(s.TypeIDs))
-	s.TypeIDs[key] = id
-	return id
+	return &TypeInstance{Type: t, TypeID: id}
 }
 
 // getModuleInstance returns an existing ModuleInstance if exists, or assigns a new one.
