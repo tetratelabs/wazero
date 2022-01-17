@@ -103,12 +103,10 @@ type (
 		Address FunctionAddress
 		// Name is for debugging purpose, and is used to argument the stack traces.
 		//
-		// For non-host functions, this holds the value of
-		// name for this function which might be stored in the "name" custom section.
-		// Otherwise, the value is set to "unknown".
+		// When HostFunction is not nil, this returns dot-delimited parameters given to
+		// Store.AddHostFunction. Ex. something.realistic
 		//
-		// For host functions, this is in the form of "{moduleName}.{funcName}" where these params
-		// are given via storeAddHostFunction.
+		// Otherwise, this is the corresponding value in NameSection.FunctionNames or "unknown" if unavailable.
 		Name string
 	}
 
