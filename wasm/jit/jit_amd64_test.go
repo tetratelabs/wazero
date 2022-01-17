@@ -5504,7 +5504,6 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		// Run code.
 		env.exec(code)
 
-		// The global value should be set to valueToSet.
 		require.Equal(t, jitCallStatusCodeTableOutOfBounds, env.jitStatus())
 	})
 
@@ -5589,7 +5588,6 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				// Run code.
 				env.exec(code)
 
-				// The global value should be set to valueToSet.
 				require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
 				require.Equal(t, wasm.FunctionAddress(i), env.functionCallAddress())
 			})
