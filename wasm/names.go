@@ -14,8 +14,10 @@ import (
 // See https://github.com/tetratelabs/wazero/issues/134 about adding this to Module
 type CustomNameSection struct {
 	// ModuleName is the symbolic identifier for a module. Ex. math
+	// The corresponding subsection is subsectionIDModuleName.
 	ModuleName string
 	// FunctionNames is an association of a function index to its symbolic identifier. Ex. add
+	// The corresponding subsection is subsectionIDFunctionNames.
 	//
 	// * the key (idx) is in the function namespace, where module defined functions are preceded by imported ones.
 	//
@@ -27,6 +29,7 @@ type CustomNameSection struct {
 	FunctionNames map[uint32]string
 
 	// LocalNames is an association of a function index to any locals which have a symbolic identifier. Ex. add x
+	// The corresponding subsection is subsectionIDLocalNames.
 	//
 	// * the key (funcIndex) is in the function namespace, where module defined functions are preceded by imported ones.
 	// * the second key (idx) is in the local namespace, where parameters precede any function locals.
@@ -39,24 +42,30 @@ type CustomNameSection struct {
 	LocalNames map[uint32]map[uint32]string
 }
 
+const (
+	// subsectionIDModuleName contains only the module name.
+	subsectionIDModuleName = uint8(0)
+	// subsectionIDFunctionNames is a map of indices to function names, in ascending order by function index
+	subsectionIDFunctionNames = uint8(1)
+	// subsectionIDLocalNames contain a map of function indices to a map of local indices to their names, in ascending
+	// order by function and local index
+	subsectionIDLocalNames = uint8(2)
+)
+
 // EncodeData serializes the data associated with the "name" key in SectionIDCustom according to the standard:
-//
-// * ModuleName encode as subsection 0
-// * FunctionNames encode as subsection 1 in ascending order by function index
-// * LocalNames encode as subsection 2 in ascending order by function and local index
 //
 // Note: The result can be nil because this does not encode empty subsections
 //
 // See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 func (n *CustomNameSection) EncodeData() (data []byte) {
 	if n.ModuleName != "" {
-		data = append(data, encodeNameSubsection(uint8(0), encodeSizePrefixed([]byte(n.ModuleName)))...)
+		data = append(data, encodeNameSubsection(subsectionIDModuleName, encodeSizePrefixed([]byte(n.ModuleName)))...)
 	}
 	if fd := n.encodeFunctionNameData(); len(fd) > 0 {
-		data = append(data, encodeNameSubsection(uint8(1), fd)...)
+		data = append(data, encodeNameSubsection(subsectionIDFunctionNames, fd)...)
 	}
 	if ld := n.encodeLocalNameData(); len(ld) > 0 {
-		data = append(data, encodeNameSubsection(uint8(2), ld)...)
+		data = append(data, encodeNameSubsection(subsectionIDLocalNames, ld)...)
 	}
 	return
 }
@@ -141,54 +150,133 @@ func encodeSizePrefixed(data []byte) []byte {
 // * LocalNames decode from subsection 2
 //
 // See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-func DecodeCustomNameSection(data []byte) (*CustomNameSection, error) {
+func DecodeCustomNameSection(data []byte) (result *CustomNameSection, err error) {
+	// TODO: add leb128 functions that work on []byte and offset. While using a reader allows us to reuse reader-based
+	// leb128 functions, it is less efficient, causes untestable code and in some cases more complex vs plain []byte.
 	r := bytes.NewReader(data)
+	result = &CustomNameSection{}
+
+	// subsectionID is decoded if known, and skipped if not
+	var subsectionID uint8
+	// subsectionSize is the length to skip when the subsectionID is unknown
+	var subsectionSize uint32
 	for {
-		id, err := r.ReadByte()
-		if err != nil {
-			return nil, fmt.Errorf("failed to read subsection ID: %w", err)
+		if subsectionID, err = r.ReadByte(); err != nil {
+			if err == io.EOF {
+				return result, nil
+			}
+			// TODO: untestable as this can't fail for a reason beside EOF reading a byte from a buffer
+			return nil, fmt.Errorf("failed to read a subsection ID: %w", err)
 		}
 
-		size, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read the size of subsection %d: %w", id, err)
+		// TODO: unused except when skipping. This means we can pass on a corrupt length of a known subsection
+		if subsectionSize, _, err = leb128.DecodeUint32(r); err != nil {
+			return nil, fmt.Errorf("failed to read the size of subsection[%d]: %w", subsectionID, err)
 		}
 
-		if id == 1 { // the function name subsection.
-			break
-		} else { // TODO: ModuleName and LocalNames!
-			// Skip other subsections.
-			_, err := r.Seek(int64(size), io.SeekCurrent)
-			if err != nil {
-				return nil, fmt.Errorf("failed to skip subsection %d: %w", id, err)
+		switch subsectionID {
+		case subsectionIDModuleName:
+			if result.ModuleName, err = decodeName(r, "module"); err != nil {
+				return nil, err
+			}
+		case subsectionIDFunctionNames:
+			if result.FunctionNames, err = decodeFunctionNames(r); err != nil {
+				return nil, err
+			}
+		case subsectionIDLocalNames:
+			if result.LocalNames, err = decodeLocalNames(r); err != nil {
+				return nil, err
+			}
+		default: // Skip other subsections.
+			// Note: Not Seek because it doesn't err when given an offset past EOF. Rather, it leads to undefined state.
+			if _, err := io.CopyN(io.Discard, r, int64(subsectionSize)); err != nil {
+				return nil, fmt.Errorf("failed to skip subsection[%d]: %w", subsectionID, err)
 			}
 		}
 	}
+}
 
-	nameVectorSize, _, err := leb128.DecodeUint32(r)
+func decodeFunctionNames(r *bytes.Reader) (map[uint32]string, error) {
+	functionCount, err := decodeFunctionCount(r, subsectionIDFunctionNames)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read the size of name vector: %w", err)
+		return nil, err
 	}
 
-	funcNames := make(map[uint32]string, nameVectorSize)
-	for i := uint32(0); i < nameVectorSize; i++ {
-		functionIndex, _, err := leb128.DecodeUint32(r)
+	result := make(map[uint32]string, functionCount)
+	for i := uint32(0); i < functionCount; i++ {
+		functionIndex, err := decodeFunctionIndex(r, subsectionIDFunctionNames)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read function index: %w", err)
+			return nil, err
 		}
 
-		functionNameSize, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read function name size: %w", err)
+		if result[functionIndex], err = decodeName(r, "function[%d]", functionIndex); err != nil {
+			return nil, err
 		}
+	}
+	return result, nil
+}
 
-		namebuf := make([]byte, functionNameSize)
-		_, err = io.ReadFull(r, namebuf)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read function name: %w", err)
-		}
-		funcNames[functionIndex] = string(namebuf)
+func decodeLocalNames(r *bytes.Reader) (map[uint32]map[uint32]string, error) {
+	functionCount, err := decodeFunctionCount(r, subsectionIDLocalNames)
+	if err != nil {
+		return nil, err
 	}
 
-	return &CustomNameSection{FunctionNames: funcNames}, nil
+	result := make(map[uint32]map[uint32]string, functionCount)
+	for i := uint32(0); i < functionCount; i++ {
+		functionIndex, err := decodeFunctionIndex(r, subsectionIDLocalNames)
+		if err != nil {
+			return nil, err
+		}
+
+		localCount, _, err := leb128.DecodeUint32(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read the local count for function[%d]: %w", functionIndex, err)
+		}
+
+		locals := make(map[uint32]string, localCount)
+		for i := uint32(0); i < localCount; i++ {
+			localIndex, _, err := leb128.DecodeUint32(r)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read a local index of function[%d]: %w", functionIndex, err)
+			}
+			locals[localIndex], err = decodeName(r, "function[%d] local[%d]", functionIndex, localIndex)
+			if err != nil {
+				return nil, err
+			}
+		}
+		result[functionIndex] = locals
+	}
+	return result, nil
+}
+
+func decodeFunctionIndex(r *bytes.Reader, subsectionID uint8) (uint32, error) {
+	functionIndex, _, err := leb128.DecodeUint32(r)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read a function index in subsection[%d]: %w", subsectionID, err)
+	}
+	return functionIndex, nil
+}
+
+func decodeFunctionCount(r *bytes.Reader, subsectionID uint8) (uint32, error) {
+	functionCount, _, err := leb128.DecodeUint32(r)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read the function count of subsection[%d]: %w", subsectionID, err)
+	}
+	return functionCount, nil
+}
+
+// decodeName decodes a size prefixed string from the reader.
+// contextFormat and contextArgs apply an error format when present
+func decodeName(r *bytes.Reader, contextFormat string, contextArgs ...interface{}) (string, error) {
+	size, _, err := leb128.DecodeUint32(r)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s name size: %w", fmt.Sprintf(contextFormat, contextArgs...), err)
+	}
+
+	namebuf := make([]byte, size)
+	if _, err = io.ReadFull(r, namebuf); err != nil {
+		return "", fmt.Errorf("failed to read %s name: %w", fmt.Sprintf(contextFormat, contextArgs...), err)
+	}
+	return string(namebuf), nil
 }
