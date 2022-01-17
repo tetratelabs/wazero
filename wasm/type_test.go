@@ -24,14 +24,29 @@ func TestFunctionType_Encode(t *testing.T) {
 			expected: []byte{0x60, 1, i32, 0},
 		},
 		{
+			name:     "undefined param no result", // ensure future spec changes don't panic
+			input:    &FunctionType{Params: []ValueType{0x7b}},
+			expected: []byte{0x60, 1, 0x7b, 0},
+		},
+		{
 			name:     "no param one result",
 			input:    &FunctionType{Results: []ValueType{i32}},
 			expected: []byte{0x60, 0, 1, i32},
 		},
 		{
+			name:     "no param undefined result", // ensure future spec changes don't panic
+			input:    &FunctionType{Results: []ValueType{0x7b}},
+			expected: []byte{0x60, 0, 1, 0x7b},
+		},
+		{
 			name:     "one param one result",
 			input:    &FunctionType{Params: []ValueType{i64}, Results: []ValueType{i32}},
 			expected: []byte{0x60, 1, i64, 1, i32},
+		},
+		{
+			name:     "undefined param undefined result", // ensure future spec changes don't panic
+			input:    &FunctionType{Params: []ValueType{0x7b}, Results: []ValueType{0x7b}},
+			expected: []byte{0x60, 1, 0x7b, 1, 0x7b},
 		},
 		{
 			name:     "two params no result",

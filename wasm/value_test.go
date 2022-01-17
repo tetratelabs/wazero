@@ -19,6 +19,11 @@ func TestEncodeValTypes(t *testing.T) {
 			expected: []byte{0},
 		},
 		{
+			name:     "undefined", // ensure future spec changes don't panic
+			input:    []ValueType{0x7b},
+			expected: []byte{1, 0x7b},
+		},
+		{
 			name:     "i32",
 			input:    []ValueType{i32},
 			expected: []byte{1, i32},

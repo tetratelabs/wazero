@@ -19,13 +19,6 @@ const (
 	ValueTypeI64 ValueType = 0x7e
 	ValueTypeF32 ValueType = 0x7d
 	ValueTypeF64 ValueType = 0x7c
-	// valTypeRange allows us to cache common valueType calculations. To determine the array offset, subtract
-	// valTypeFloor from the value of interest.
-	valTypeRange = ValueTypeI32 - valTypeFloor + 1
-	// valTypeFloor is the lowest numeric value of a value type.
-	//
-	// Note: the floor value changes after WebAssembly 1.0 (MVP)
-	valTypeFloor = ValueTypeF64
 )
 
 func formatValueType(t ValueType) (ret string) {
@@ -45,17 +38,11 @@ func formatValueType(t ValueType) (ret string) {
 var noValType = []byte{0}
 
 // encodedValTypes is a cache of size prefixed binary encoding of known val types.
-var encodedValTypes = buildEncodedValTypes()
-
-// buildEncodedValTypes builds results for encodeValTypes for known value types.
-//
-// Note: this is length ValueTypeI32+1 because the largest known val type is that.
-func buildEncodedValTypes() (encodedTypes [valTypeRange][]byte) {
-	encodedTypes[ValueTypeI32-valTypeFloor] = []byte{1, ValueTypeI32}
-	encodedTypes[ValueTypeI64-valTypeFloor] = []byte{1, ValueTypeI64}
-	encodedTypes[ValueTypeF32-valTypeFloor] = []byte{1, ValueTypeF32}
-	encodedTypes[ValueTypeF64-valTypeFloor] = []byte{1, ValueTypeF64}
-	return
+var encodedValTypes = map[ValueType][]byte{
+	ValueTypeI32: {1, ValueTypeI32},
+	ValueTypeI64: {1, ValueTypeI64},
+	ValueTypeF32: {1, ValueTypeF32},
+	ValueTypeF64: {1, ValueTypeF64},
 }
 
 // encodeValTypes fast paths binary encoding of common value type lengths
@@ -65,17 +52,19 @@ func encodeValTypes(vt []ValueType) []byte {
 	case 0: // nullary
 		return noValType
 	case 1: // ex $wasi_snapshot_preview1.fd_close or any result
-		return encodedValTypes[vt[0]-valTypeFloor]
+		if encoded, ok := encodedValTypes[vt[0]]; ok {
+			return encoded
+		}
 	case 2: // ex $wasi_snapshot_preview1.environ_sizes_get
 		return []byte{2, vt[0], vt[1]}
 	case 4: // ex $wasi_snapshot_preview1.fd_write
 		return []byte{4, vt[0], vt[1], vt[2], vt[3]}
 	case 9: // ex $wasi_snapshot_preview1.fd_write
 		return []byte{9, vt[0], vt[1], vt[2], vt[3], vt[4], vt[5], vt[6], vt[7], vt[8]}
-	default: // Slow path others until someone complains with a valid signature
-		count := leb128.EncodeUint32(uint32(len(vt)))
-		return append(count, vt...)
 	}
+	// Slow path others until someone complains with a valid signature
+	count := leb128.EncodeUint32(uint32(len(vt)))
+	return append(count, vt...)
 }
 
 func readValueTypes(r io.Reader, num uint32) ([]ValueType, error) {
