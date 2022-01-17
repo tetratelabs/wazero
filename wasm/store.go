@@ -30,9 +30,9 @@ type (
 		engine Engine
 		// ModuleInstances holds the instantiated Wasm modules keyed on names given at Instantiate.
 		ModuleInstances map[string]*ModuleInstance
-		// TypeIDs maps each FunctionType.String() to an unique integer. This is used at runtime to
+		// TypeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
 		// do type-checks on indirect function calls.
-		TypeIDs map[string]uint64
+		TypeIDs map[string]FunctionTypeID
 
 		// The followings fields match the definition of Store in the specification.
 
@@ -92,7 +92,7 @@ type (
 		//
 		// This is used by both host and non-host functions.
 		Address FunctionAddress
-		// Name is the debugging purpose name, and is used to argument the stack traces.
+		// Name is for debugging purpose, and is used to argument the stack traces.
 		//
 		// For non-host functions, this holds the value of
 		// name for this function which might be stored in the "name" custom section.
@@ -103,41 +103,68 @@ type (
 		Name string
 	}
 
+	// TypeInstance is a store-specific representation of FunctionType where the function type
+	// is coupled with TypeID which is specific in a store.
 	TypeInstance struct {
-		Type   *FunctionType
-		TypeID uint64
+		Type *FunctionType
+		// TypeID is assigned by a store for FunctionType.
+		TypeID FunctionTypeID
 	}
 
-	HostFunctionCallContext struct {
-		Memory *MemoryInstance
-		// TODO: Add others if necessary.
-	}
-
+	// GlobalInstance represents a global instance in a store.
+	// See https://www.w3.org/TR/wasm-core-1/#global-instances%E2%91%A0
 	GlobalInstance struct {
 		Type *GlobalType
-		Val  uint64
+		// Val holds a 64-bit representation of the actual value.
+		Val uint64
 	}
 
+	// TableInstance represents a table instance in a store.
+	// See https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0
+	//
 	// Note this is fixed to function type until post MVP reference type is implemented.
 	TableInstance struct {
-		Table    []TableElement
-		Min      uint32
-		Max      *uint32
+		// Table holds the table elements managed by this table instance.
+		//
+		// Note: we intentionally use "[]TableElement", not "[]*TableElement",
+		// as JIT engine access this slice directly from assembly.
+		// If pointer type is used, the access becomes two level indirection (two hops of pointer jumps)
+		// which is a bit costly. TableElement is 128 bit (two 64bit fields) so the cost of using types
+		// would be ignorable.
+		Table []TableElement
+		Min   uint32
+		Max   *uint32
+		// Currently fixed to 0x70 (funcref type).
 		ElemType byte
 	}
 
+	// TableElement represents an item in a table instance.
+	//
+	// Note this is fixed to function type until post MVP reference type is implemented.
 	TableElement struct {
+		// FunctionAddress is funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr)
+		// of the target function instance. More precisely, this equals the index of
+		// the target function instance in store.FunctionInstances.
 		FunctionAddress FunctionAddress
-		FunctionTypeID  uint64
+		// FunctionTypeID is the type ID of the target function's type, which
+		// equals store.Functions[FunctionAddress].FunctionType.TypeID.
+		FunctionTypeID FunctionTypeID
 	}
-
-	FunctionAddress uint64
 
 	MemoryInstance struct {
 		Buffer []byte
 		Min    uint32
 		Max    *uint32
 	}
+
+	// FunctionAddress is funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr),
+	// and the index to store.Functions.
+	FunctionAddress uint64
+
+	// FunctionTypeID is an uniquely assigned integer for a function type.
+	// This is wazero specific runtime object and specific to a store.
+	// This is used at runtime to do type-checks on indirect function calls.
+	FunctionTypeID uint64
 )
 
 func (f *FunctionInstance) IsHostFunction() bool {
@@ -145,7 +172,7 @@ func (f *FunctionInstance) IsHostFunction() bool {
 }
 
 func NewStore(engine Engine) *Store {
-	return &Store{ModuleInstances: map[string]*ModuleInstance{}, TypeIDs: map[string]uint64{}, engine: engine}
+	return &Store{ModuleInstances: map[string]*ModuleInstance{}, TypeIDs: map[string]FunctionTypeID{}, engine: engine}
 }
 
 func (s *Store) Instantiate(module *Module, name string) error {
@@ -1661,6 +1688,11 @@ func ReadBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, e
 	return ret, num, nil
 }
 
+type HostFunctionCallContext struct {
+	Memory *MemoryInstance
+	// TODO: Add others if necessary.
+}
+
 func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
 	getTypeOf := func(kind reflect.Kind) (ValueType, error) {
 		switch kind {
@@ -1778,13 +1810,13 @@ func (s *Store) getTypeInstance(t *FunctionType) *TypeInstance {
 	return &TypeInstance{Type: t, TypeID: s.TypeID(t)}
 }
 
-func (s *Store) TypeID(t *FunctionType) uint64 {
+func (s *Store) TypeID(t *FunctionType) FunctionTypeID {
 	key := t.String()
 	id, ok := s.TypeIDs[key]
 	if ok {
-		return id
+		return FunctionTypeID(id)
 	}
-	id = uint64(len(s.TypeIDs))
+	id = FunctionTypeID(len(s.TypeIDs))
 	s.TypeIDs[key] = id
 	return id
 }

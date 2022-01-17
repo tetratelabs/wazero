@@ -5556,10 +5556,10 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
-					Types: []*wasm.TypeInstance{{Type: targetType, TypeID: uint64(i)}}},
+					Types: []*wasm.TypeInstance{{Type: targetType, TypeID: wasm.FunctionTypeID(i)}}},
 				}
 				// and the typeID  matches the table[targetOffset]'s type ID.
-				table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: uint64(i)}
+				table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: wasm.FunctionTypeID(i)}
 
 				// Put the function call params.
 				for i := 0; i < len(targetType.Params); i++ {

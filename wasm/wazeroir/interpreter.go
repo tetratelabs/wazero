@@ -248,7 +248,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 		case *OperationCallIndirect:
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.TableIndex)
-			op.us[1] = f.ModuleInstance.Types[o.TypeIndex].TypeID
+			op.us[1] = uint64(f.ModuleInstance.Types[o.TypeIndex].TypeID)
 		case *OperationDrop:
 			op.rs = make([]*InclusiveRange, 1)
 			op.rs[0] = o.Range
@@ -577,7 +577,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				target := it.functions[table.Table[offset].FunctionAddress]
 				// Type check.
 				expType := target.funcInstance.FunctionType
-				if expType.TypeID != op.us[1] {
+				if uint64(expType.TypeID) != op.us[1] {
 					panic("function type mismatch on call_indirect")
 				}
 				// Call in.
