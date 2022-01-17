@@ -8,6 +8,10 @@ import (
 	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
+// ValueType is the binary encoding of a type such as i32
+// See https://www.w3.org/TR/wasm-core-1/#binary-valtype
+//
+// Note: This is a type alias as it is easier to encode and decode in the binary format.
 type ValueType = byte
 
 const (

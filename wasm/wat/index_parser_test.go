@@ -12,7 +12,7 @@ func TestParseIndex(t *testing.T) {
 		expected    *index
 	}{
 		{"numeric", "(1)", &index{numeric: 0x1, line: 1, col: 2}},
-		{"symbolic", "($v_v)", &index{ID: "$v_v", line: 1, col: 2}},
+		{"symbolic", "($v_v)", &index{ID: "v_v", line: 1, col: 2}},
 	}
 
 	for _, tt := range tests {
