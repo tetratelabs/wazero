@@ -250,7 +250,7 @@ const (
 	jitCallStatusCodeMemoryOutOfBounds
 	// jitCallStatusCodeTableOutOfBounds means the offset to table exceeds the length of table during call_indirect.
 	jitCallStatusCodeTableOutOfBounds
-	// TODO
+	// jitCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
 	jitCallStatusCodeTypeMismatchOnIndirectCall
 )
 
