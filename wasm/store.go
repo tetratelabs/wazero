@@ -141,7 +141,7 @@ type (
 		// Note: we intentionally use "[]TableElement", not "[]*TableElement",
 		// as JIT engine access this slice directly from assembly.
 		// If pointer type is used, the access becomes two level indirection (two hops of pointer jumps)
-		// which is a bit costly. TableElement is 128 bit (two 64bit fields) so the cost of using types
+		// which is a bit costly. TableElement is 128 bit (two 64bit fields) so the cost of using value type
 		// would be ignorable.
 		Table []TableElement
 		Min   uint32
