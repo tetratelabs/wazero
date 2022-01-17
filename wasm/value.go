@@ -19,6 +19,13 @@ const (
 	ValueTypeI64 ValueType = 0x7e
 	ValueTypeF32 ValueType = 0x7d
 	ValueTypeF64 ValueType = 0x7c
+	// valTypeRange allows us to cache common valueType calculations. To determine the array offset, subtract
+	// valTypeFloor from the value of interest.
+	valTypeRange = ValueTypeI32 - valTypeFloor + 1
+	// valTypeFloor is the lowest numeric value of a value type.
+	//
+	// Note: the floor value changes after WebAssembly 1.0 (MVP)
+	valTypeFloor = ValueTypeF64
 )
 
 func formatValueType(t ValueType) (ret string) {
@@ -43,11 +50,11 @@ var encodedValTypes = buildEncodedValTypes()
 // buildEncodedValTypes builds results for encodeValTypes for known value types.
 //
 // Note: this is length ValueTypeI32+1 because the largest known val type is that.
-func buildEncodedValTypes() (encodedTypes [ValueTypeI32 + 1][]byte) {
-	encodedTypes[ValueTypeI32] = []byte{1, ValueTypeI32}
-	encodedTypes[ValueTypeI64] = []byte{1, ValueTypeI64}
-	encodedTypes[ValueTypeF32] = []byte{1, ValueTypeF32}
-	encodedTypes[ValueTypeF64] = []byte{1, ValueTypeF64}
+func buildEncodedValTypes() (encodedTypes [valTypeRange][]byte) {
+	encodedTypes[ValueTypeI32-valTypeFloor] = []byte{1, ValueTypeI32}
+	encodedTypes[ValueTypeI64-valTypeFloor] = []byte{1, ValueTypeI64}
+	encodedTypes[ValueTypeF32-valTypeFloor] = []byte{1, ValueTypeF32}
+	encodedTypes[ValueTypeF64-valTypeFloor] = []byte{1, ValueTypeF64}
 	return
 }
 
@@ -58,7 +65,7 @@ func encodeValTypes(vt []ValueType) []byte {
 	case 0: // nullary
 		return noValType
 	case 1: // ex $wasi_snapshot_preview1.fd_close or any result
-		return encodedValTypes[vt[0]]
+		return encodedValTypes[vt[0]-valTypeFloor]
 	case 2: // ex $wasi_snapshot_preview1.environ_sizes_get
 		return []byte{2, vt[0], vt[1]}
 	case 4: // ex $wasi_snapshot_preview1.fd_write

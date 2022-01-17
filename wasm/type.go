@@ -20,18 +20,18 @@ var encodedOneResult = buildEncodedFuncTypes(false)
 // type prefix 0x60.
 //
 // See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
-func buildEncodedFuncTypes(param bool) (encodedTypes [ValueTypeI32 + 1][]byte) {
+func buildEncodedFuncTypes(param bool) (encodedTypes [valTypeRange][]byte) {
 	if param {
-		encodedTypes[ValueTypeI32] = []byte{0x60, 1, ValueTypeI32, 0}
-		encodedTypes[ValueTypeI64] = []byte{0x60, 1, ValueTypeI64, 0}
-		encodedTypes[ValueTypeF32] = []byte{0x60, 1, ValueTypeF32, 0}
-		encodedTypes[ValueTypeF64] = []byte{0x60, 1, ValueTypeF64, 0}
+		encodedTypes[ValueTypeI32-valTypeFloor] = []byte{0x60, 1, ValueTypeI32, 0}
+		encodedTypes[ValueTypeI64-valTypeFloor] = []byte{0x60, 1, ValueTypeI64, 0}
+		encodedTypes[ValueTypeF32-valTypeFloor] = []byte{0x60, 1, ValueTypeF32, 0}
+		encodedTypes[ValueTypeF64-valTypeFloor] = []byte{0x60, 1, ValueTypeF64, 0}
 		return
 	}
-	encodedTypes[ValueTypeI32] = []byte{0x60, 0, 1, ValueTypeI32}
-	encodedTypes[ValueTypeI64] = []byte{0x60, 0, 1, ValueTypeI64}
-	encodedTypes[ValueTypeF32] = []byte{0x60, 0, 1, ValueTypeF32}
-	encodedTypes[ValueTypeF64] = []byte{0x60, 0, 1, ValueTypeF64}
+	encodedTypes[ValueTypeI32-valTypeFloor] = []byte{0x60, 0, 1, ValueTypeI32}
+	encodedTypes[ValueTypeI64-valTypeFloor] = []byte{0x60, 0, 1, ValueTypeI64}
+	encodedTypes[ValueTypeF32-valTypeFloor] = []byte{0x60, 0, 1, ValueTypeF32}
+	encodedTypes[ValueTypeF64-valTypeFloor] = []byte{0x60, 0, 1, ValueTypeF64}
 	return
 }
 
@@ -63,12 +63,12 @@ func (t *FunctionType) encode() []byte {
 	}
 	if resultCount == 0 {
 		if paramCount == 1 {
-			return encodedOneParam[t.Params[0]]
+			return encodedOneParam[t.Params[0]-valTypeFloor]
 		}
 		return append(append([]byte{0x60}, encodeValTypes(t.Params)...), 0)
 	} else if resultCount == 1 {
 		if paramCount == 0 {
-			return encodedOneResult[t.Results[0]]
+			return encodedOneResult[t.Results[0]-valTypeFloor]
 		}
 		return append(append([]byte{0x60}, encodeValTypes(t.Params)...), 1, t.Results[0])
 	}
