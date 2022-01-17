@@ -6,20 +6,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCustomNameSection_EncodeData(t *testing.T) {
+func TestNameSection_EncodeData(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    *CustomNameSection
+		input    *NameSection
 		expected []byte
 	}{
 		{
 			name:  "empty",
-			input: &CustomNameSection{},
+			input: &NameSection{},
 		},
 		{
 			name: "only module",
 			// Ex. (module $simple )
-			input: &CustomNameSection{ModuleName: "simple"},
+			input: &NameSection{ModuleName: "simple"},
 			expected: []byte{
 				subsectionIDModuleName, 0x07, // 7 bytes
 				0x06, // the Module name simple is 6 bytes long
@@ -32,7 +32,7 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 			//		(import "" "Hello" (func $hello))
 			//		(start $hello)
 			//	)
-			input: &CustomNameSection{
+			input: &NameSection{
 				ModuleName:    "simple",
 				FunctionNames: map[uint32]string{0x00: "hello"},
 			},
@@ -53,7 +53,7 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 			//		(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (param i32, i32) (result i32)))
 			//		(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32, i32, i32, i32) (result i32)))
 			//	)
-			input: &CustomNameSection{
+			input: &NameSection{
 				FunctionNames: map[uint32]string{
 					0x00: "runtime.args_sizes_get",
 					0x01: "runtime.fd_write",
@@ -76,7 +76,7 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 			//		(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
 			//		(import "Math" "Add" (func $add (param $l f32) (param $r f32) (result f32)))
 			//	)
-			input: &CustomNameSection{
+			input: &NameSection{
 				FunctionNames: map[uint32]string{
 					0x00: "mul",
 					0x01: "add",
@@ -104,11 +104,11 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 		{
 			name: "function with local names - out of order",
 			// Names are associated with functions and parameters which are ordered in the module, but decoupled via
-			// CustomNameSection. The impact is they can become out-of-order, so we have to sort during encode.
+			// NameSection. The impact is they can become out-of-order, so we have to sort during encode.
 			//
 			// Note: We can't force map iteration out of order. However, reversing the order of the same values across
 			// two tests improves the likelihood of needing to sort!
-			input: &CustomNameSection{
+			input: &NameSection{
 				FunctionNames: map[uint32]string{
 					0x01: "add",
 					0x00: "mul",
@@ -118,7 +118,7 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 					0x00: {0x01: "y", 0x00: "x"},
 				},
 			},
-			expected: (&CustomNameSection{
+			expected: (&NameSection{
 				FunctionNames: map[uint32]string{
 					0x00: "mul",
 					0x01: "add",
@@ -161,30 +161,30 @@ func TestEncodeSizePrefixed(t *testing.T) {
 	require.Equal(t, []byte{5, 'h', 'e', 'l', 'l', 'o'}, encodeSizePrefixed([]byte("hello")))
 }
 
-// TestDecodeCustomNameSection relies on unit tests for CustomNameSection.EncodeData, specifically that the encoding is
+// TestDecodeNameSection relies on unit tests for NameSection.EncodeData, specifically that the encoding is
 // both known and correct. This avoids having to copy/paste or share variables to assert against byte arrays.
-func TestDecodeCustomNameSection(t *testing.T) {
+func TestDecodeNameSection(t *testing.T) {
 	tests := []struct {
 		name  string
-		input *CustomNameSection // round trip test!
+		input *NameSection // round trip test!
 	}{{
 		name:  "empty",
-		input: &CustomNameSection{},
+		input: &NameSection{},
 	},
 		{
 			name:  "only module",
-			input: &CustomNameSection{ModuleName: "simple"},
+			input: &NameSection{ModuleName: "simple"},
 		},
 		{
 			name: "module and function name",
-			input: &CustomNameSection{
+			input: &NameSection{
 				ModuleName:    "simple",
 				FunctionNames: map[uint32]string{0x00: "hello"},
 			},
 		},
 		{
 			name: "two function names",
-			input: &CustomNameSection{
+			input: &NameSection{
 				FunctionNames: map[uint32]string{
 					0x00: "runtime.args_sizes_get",
 					0x01: "runtime.fd_write",
@@ -193,7 +193,7 @@ func TestDecodeCustomNameSection(t *testing.T) {
 		},
 		{
 			name: "function with local names",
-			input: &CustomNameSection{
+			input: &NameSection{
 				FunctionNames: map[uint32]string{
 					0x00: "mul",
 					0x01: "add",
@@ -210,14 +210,14 @@ func TestDecodeCustomNameSection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ns, err := DecodeCustomNameSection(tc.input.EncodeData())
+			ns, err := DecodeNameSection(tc.input.EncodeData())
 			require.NoError(t, err)
 			require.Equal(t, tc.input, ns)
 		})
 	}
 }
 
-func TestDecodeCustomNameSection_Errors(t *testing.T) {
+func TestDecodeNameSection_Errors(t *testing.T) {
 	// currently, we ignore the size of known subsections
 	ignoredSubsectionSize := byte(50)
 	tests := []struct {
@@ -311,7 +311,7 @@ func TestDecodeCustomNameSection_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := DecodeCustomNameSection(tc.input)
+			_, err := DecodeNameSection(tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

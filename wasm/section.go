@@ -11,7 +11,7 @@ import (
 type SectionID = byte
 
 const (
-	// SectionIDCustom includes the standard defined CustomNameSection and possibly others not defined in the standard.
+	// SectionIDCustom includes the standard defined NameSection and possibly others not defined in the standard.
 	SectionIDCustom   SectionID = 0
 	SectionIDType     SectionID = 1
 	SectionIDImport   SectionID = 2
@@ -31,6 +31,9 @@ const (
 // See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%93%AA
 func (m *Module) encodeSections(buffer []byte) (bytes []byte) {
 	bytes = buffer
+	for name, data := range m.CustomSections {
+		bytes = append(bytes, encodeCustomSection(name, data)...)
+	}
 	if len(m.TypeSection) > 0 {
 		panic("TODO: TypeSection")
 	}
@@ -64,12 +67,10 @@ func (m *Module) encodeSections(buffer []byte) (bytes []byte) {
 	if len(m.DataSection) > 0 {
 		panic("TODO: DataSection")
 	}
-
-	// We encode custom sections after data as that ensures the correct order in the only section where order matters:
 	// >> The name section should appear only once in a module, and only after the data section.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-	for name, data := range m.CustomSections {
-		bytes = append(bytes, encodeCustomSection(name, data)...)
+	if m.NameSection != nil {
+		bytes = append(bytes, encodeCustomSection("name", m.NameSection.EncodeData())...)
 	}
 	return
 }
@@ -142,6 +143,8 @@ func (m *Module) readSections(r *reader) error {
 	}
 }
 
+// readSectionCustom reads a custom section into Module.CustomSections unless it is the "name" section, which decodes
+// into Module.NameSection.
 func (m *Module) readSectionCustom(r *reader, sectionSize int) error {
 	nameLen, nameLenSize, err := leb128.DecodeUint32(r)
 	if err != nil {
@@ -156,16 +159,33 @@ func (m *Module) readSectionCustom(r *reader, sectionSize int) error {
 	if !utf8.Valid(nameBuf) {
 		return fmt.Errorf("custom section name must be valid utf8")
 	}
+	name := string(nameBuf)
+
 	dataSize := sectionSize - int(nameLenSize) - int(nameLen)
 	if dataSize < 0 {
-		return fmt.Errorf("malformed custom section %s", string(nameBuf))
+		return fmt.Errorf("malformed custom section %s", name)
 	}
 	data := make([]byte, dataSize)
 	_, err = io.ReadFull(r, data)
 	if err != nil {
 		return fmt.Errorf("cannot read custom section data: %v", err)
 	}
-	m.CustomSections[string(nameBuf)] = data
+
+	// Decode any known custom sections after checking for redundant keys
+	if name == "name" {
+		if m.NameSection != nil {
+			return fmt.Errorf("malformed custom section %s", name)
+		}
+		if m.NameSection, err = DecodeNameSection(data); err != nil {
+			return err
+		}
+	} else if _, ok := m.CustomSections[name]; ok {
+		return fmt.Errorf("malformed custom section %s", name)
+	} else if m.CustomSections == nil {
+		m.CustomSections = map[string][]byte{name: data}
+	} else {
+		m.CustomSections[name] = data
+	}
 	return nil
 }
 

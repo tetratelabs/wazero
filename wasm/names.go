@@ -9,10 +9,10 @@ import (
 	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
-// CustomNameSection represent the known custom name subsections defined in the WebAssembly Binary Format
+// NameSection represent the known custom name subsections defined in the WebAssembly Binary Format
 // See https://www.w3.org/TR/wasm-core-1/#name-section%E2%91%A0
 // See https://github.com/tetratelabs/wazero/issues/134 about adding this to Module
-type CustomNameSection struct {
+type NameSection struct {
 	// ModuleName is the symbolic identifier for a module. Ex. math
 	// The corresponding subsection is subsectionIDModuleName.
 	ModuleName string
@@ -57,7 +57,7 @@ const (
 // Note: The result can be nil because this does not encode empty subsections
 //
 // See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-func (n *CustomNameSection) EncodeData() (data []byte) {
+func (n *NameSection) EncodeData() (data []byte) {
 	if n.ModuleName != "" {
 		data = append(data, encodeNameSubsection(subsectionIDModuleName, encodeSizePrefixed([]byte(n.ModuleName)))...)
 	}
@@ -72,7 +72,7 @@ func (n *CustomNameSection) EncodeData() (data []byte) {
 
 // encodeFunctionNameData encodes the data for the function name subsection.
 // See https://www.w3.org/TR/wasm-core-1/#binary-funcnamesec
-func (n *CustomNameSection) encodeFunctionNameData() []byte {
+func (n *NameSection) encodeFunctionNameData() []byte {
 	if len(n.FunctionNames) == 0 {
 		return nil
 	}
@@ -98,7 +98,7 @@ func encodeSortedAndSizePrefixed(m map[uint32]string) []byte {
 
 // encodeLocalNameData encodes the data for the local name subsection.
 // See https://www.w3.org/TR/wasm-core-1/#binary-localnamesec
-func (n *CustomNameSection) encodeLocalNameData() []byte {
+func (n *NameSection) encodeLocalNameData() []byte {
 	if len(n.LocalNames) == 0 {
 		return nil
 	}
@@ -142,7 +142,7 @@ func encodeSizePrefixed(data []byte) []byte {
 	return append(size, data...)
 }
 
-// DecodeCustomNameSection deserializes the data associated with the "name" key in SectionIDCustom according to the
+// DecodeNameSection deserializes the data associated with the "name" key in SectionIDCustom according to the
 // standard:
 //
 // * ModuleName decode from subsection 0
@@ -150,11 +150,11 @@ func encodeSizePrefixed(data []byte) []byte {
 // * LocalNames decode from subsection 2
 //
 // See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-func DecodeCustomNameSection(data []byte) (result *CustomNameSection, err error) {
+func DecodeNameSection(data []byte) (result *NameSection, err error) {
 	// TODO: add leb128 functions that work on []byte and offset. While using a reader allows us to reuse reader-based
 	// leb128 functions, it is less efficient, causes untestable code and in some cases more complex vs plain []byte.
 	r := bytes.NewReader(data)
-	result = &CustomNameSection{}
+	result = &NameSection{}
 
 	// subsectionID is decoded if known, and skipped if not
 	var subsectionID uint8
