@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
-	"reflect"
 	"runtime"
 	"testing"
 	"unsafe"
@@ -28,6 +27,7 @@ type jitEnv struct {
 	eng     *engine
 	mem     *wasm.MemoryInstance
 	globals []*wasm.GlobalInstance
+	table   *wasm.TableInstance
 }
 
 func (j *jitEnv) stackTopAsByte() byte {
@@ -73,8 +73,8 @@ func (j *jitEnv) jitStatus() jitCallStatusCode {
 	return j.eng.jitCallStatusCode
 }
 
-func (j *jitEnv) functionCallIndex() int64 {
-	return j.eng.functionCallIndex
+func (j *jitEnv) functionCallAddress() wasm.FunctionAddress {
+	return j.eng.functionCallAddress
 }
 
 func (j *jitEnv) continuationAddressOffset() uintptr {
@@ -97,10 +97,18 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 	return j.globals[index].Val
 }
 
+func (j *jitEnv) setTable(table []wasm.TableElement) {
+	j.table.Table = table
+}
+
 func (j *jitEnv) exec(code []byte) {
-	j.eng.memorySliceLen = len(j.mem.Buffer)
+	j.eng.memorySliceLen = uint64(len(j.mem.Buffer))
 	if len(j.globals) > 0 {
 		j.eng.globalSliceAddress = uintptr(unsafe.Pointer(&j.globals[0]))
+	}
+	if l := len(j.table.Table); l > 0 {
+		j.eng.tableSliceAddress = uintptr(unsafe.Pointer(&j.table.Table[0]))
+		j.eng.tableSliceLen = uint64(l)
 	}
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
@@ -111,8 +119,9 @@ func (j *jitEnv) exec(code []byte) {
 
 func newJITEnvironment() *jitEnv {
 	return &jitEnv{
-		eng: newEngine(),
-		mem: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+		eng:   newEngine(),
+		mem:   &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+		table: &wasm.TableInstance{},
 	}
 }
 
@@ -136,13 +145,62 @@ func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *
 	return prog
 }
 
+func TestAmd64Compiler_generate(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+
+		// Emit a good move instruction which is followed by return and continuation.
+		inst := compiler.newProg()
+		inst.As = x86.AMOVQ
+		inst.From.Type = obj.TYPE_CONST
+		inst.To.Type = obj.TYPE_REG
+		inst.To.Reg = x86.REG_R10
+		inst.From.Offset = int64(1 << 33)
+		compiler.addInstruction(inst)
+		compiler.requireFunctionCallReturnAddressOffsetResolution = append(
+			compiler.requireFunctionCallReturnAddressOffsetResolution, inst)
+
+		ret := compiler.newProg()
+		ret.As = obj.ARET
+		compiler.addInstruction(ret)
+
+		afterFunctionCallInst := compiler.newProg()
+		afterFunctionCallInst.As = obj.ANOP
+		compiler.addInstruction(afterFunctionCallInst)
+
+		// Check the error is NOT returned.
+		_, _, err := compiler.generate()
+		require.NoError(t, err)
+	})
+	t.Run("invalid function call", func(t *testing.T) {
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+
+		// Set the invalid function call origin which the return instruction doesn't follow.
+		invalidInst := compiler.newProg()
+		invalidInst.As = x86.AMOVQ
+		invalidInst.To.Type = obj.TYPE_REG
+		invalidInst.To.Reg = x86.REG_R10
+		invalidInst.To.Type = obj.TYPE_REG
+		invalidInst.To.Reg = x86.REG_R10
+		compiler.addInstruction(invalidInst)
+		compiler.requireFunctionCallReturnAddressOffsetResolution = append(
+			compiler.requireFunctionCallReturnAddressOffsetResolution, invalidInst)
+
+		// Check the error is returned.
+		_, _, err := compiler.generate()
+		require.Error(t, err)
+	})
+}
+
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
-	f := &wasm.FunctionInstance{Signature: &wasm.FunctionType{
+	f := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{
 		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
-	}}
+	}}}
 	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
 	compiler.pushFunctionParams()
-	require.Equal(t, uint64(len(f.Signature.Params)), compiler.locationStack.sp)
+	require.Equal(t, uint64(len(f.FunctionType.Type.Params)), compiler.locationStack.sp)
 	loc := compiler.locationStack.pop()
 	require.Equal(t, uint64(1), loc.stackPointer)
 	loc = compiler.locationStack.pop()
@@ -152,9 +210,9 @@ func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 func Test_setJITStatus(t *testing.T) {
 	for _, s := range []jitCallStatusCode{
 		jitCallStatusCodeReturned,
-		jitCallStatusCodeCallWasmFunction,
+		jitCallStatusCodeCallFunction,
 		jitCallStatusCodeCallBuiltInFunction,
-		jitCallStatusCodeCallHostFunction,
+		jitCallStatusCodeCallFunction,
 		jitCallStatusCodeUnreachable,
 	} {
 		t.Run(s.String(), func(t *testing.T) {
@@ -179,35 +237,13 @@ func Test_setJITStatus(t *testing.T) {
 	}
 }
 
-func Test_setFunctionCallIndexFromConst(t *testing.T) {
-	// Build codes.
-	for _, index := range []int64{1, 5, 20} {
-		// Build codes.
-		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		compiler.setFunctionCallIndexFromConst(index)
-		compiler.returnFunction()
-
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
-
-		// Run codes
-		env := newJITEnvironment()
-		env.exec(code)
-
-		// Check index.
-		require.Equal(t, index, env.functionCallIndex())
-	}
-}
-
 func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 	reg := int16(x86.REG_R10)
-	for _, index := range []int64{1, 5, 20} {
+	for _, index := range []wasm.FunctionAddress{1, 5, 20} {
 		// Build codes.
 		compiler := requireNewCompiler(t)
 		compiler.initializeReservedRegisters()
-		compiler.movIntConstToRegister(index, reg)
+		compiler.movIntConstToRegister(int64(index), reg)
 		compiler.setFunctionCallIndexFromRegister(reg)
 		compiler.returnFunction()
 
@@ -220,7 +256,7 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 		env.exec(code)
 
 		// Check index.
-		require.Equal(t, index, env.functionCallIndex())
+		require.Equal(t, index, env.functionCallAddress())
 	}
 }
 
@@ -239,7 +275,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	compiler.movIntConstToRegister(int64(50), tmpReg)
 	compiler.releaseRegisterToStack(loc)
 	require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
-	compiler.setJITStatus(jitCallStatusCodeCallWasmFunction)
+	compiler.setJITStatus(jitCallStatusCodeCallFunction)
 	compiler.returnFunction()
 	// Generate the code under test.
 	code, _, err := compiler.generate()
@@ -255,7 +291,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	// Run code again on the continuation.
 	env.exec(code[env.continuationAddressOffset():])
 
-	require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
+	require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
 	require.Equal(t, uint64(50), env.stack()[1])
 }
 
@@ -4402,82 +4438,33 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileCall(t *testing.T) {
-	t.Run("host function", func(t *testing.T) {
-		const functionIndex = 5
+	const functionAddress wasm.FunctionAddress = 5 // arbitrary value for testing
+	env := newJITEnvironment()
+	compiler := requireNewCompiler(t)
+	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
 
-		env := newJITEnvironment()
-		compiler := requireNewCompiler(t)
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
+	// Setup.
+	compiler.eng = env.eng
+	wasmFuncInstance := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}}, Address: functionAddress}
+	compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{wasmFuncInstance}
 
-		// Setup.
-		compiler.eng = env.eng
-		hostFuncRefValue := reflect.ValueOf(func() {})
-		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue, Signature: &wasm.FunctionType{}}
-		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
-		compiler.f.ModuleInstance.Functions[functionIndex] = hostFuncInstance
-		compiler.eng.compiledHostFunctionIndex[hostFuncInstance] = functionIndex
+	compiler.initializeReservedRegisters()
 
-		// Build codes.
-		compiler.initializeReservedRegisters()
-		// Push the value onto stack.
-		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
-		compiler.movIntConstToRegister(int64(50), loc.register)
-		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
-		require.NoError(t, err)
+	err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
+	require.NoError(t, err)
 
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
+	// Generate the code under test.
+	code, _, err := compiler.generate()
+	require.NoError(t, err)
 
-		// Run code.
-		env.exec(code)
+	// Run code.
+	env.exec(code)
 
-		// Check the status.
-		require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
-		require.Equal(t, int64(functionIndex), env.functionCallIndex())
-		// All the registers must be written back to stack.
-		require.Equal(t, uint64(2), env.stackPointer())
-		require.Equal(t, uint64(50), env.stackTopAsUint64())
-	})
-	t.Run("wasm function", func(t *testing.T) {
-		const functionIndex = 20
-
-		env := newJITEnvironment()
-		compiler := requireNewCompiler(t)
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
-
-		// Setup.
-		compiler.eng = env.eng
-		wasmFuncInstance := &wasm.FunctionInstance{Signature: &wasm.FunctionType{}}
-		compiler.f.ModuleInstance.Functions = make([]*wasm.FunctionInstance, functionIndex+1)
-		compiler.f.ModuleInstance.Functions[functionIndex] = wasmFuncInstance
-		env.eng.compiledWasmFunctionIndex[wasmFuncInstance] = functionIndex
-
-		// Build codes.
-		compiler.initializeReservedRegisters()
-		// Push the value onto stack.
-		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
-		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
-		compiler.movIntConstToRegister(int64(50), loc.register)
-		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: functionIndex})
-		require.NoError(t, err)
-
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
-
-		// Run code.
-		env.exec(code)
-
-		// Check the status.
-		require.Equal(t, jitCallStatusCodeCallWasmFunction, env.jitStatus())
-		require.Equal(t, int64(functionIndex), env.functionCallIndex())
-		// All the registers must be written back to stack.
-		require.Equal(t, uint64(3), env.stackPointer())
-		require.Equal(t, uint64(50), env.stackTopAsUint64())
-	})
+	// Check the status.
+	require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
+	require.Equal(t, functionAddress, env.functionCallAddress())
+	// All the registers must be written back to stack.
+	require.Equal(t, uint64(0), env.stackPointer())
 }
 
 func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
@@ -5001,7 +4988,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, int64(builtinFunctionIndexMemoryGrow), env.functionCallIndex())
+	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
 }
 
 func TestAmd64Compiler_compileMemorySize(t *testing.T) {
@@ -5023,7 +5010,7 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, int64(builtinFunctionIndexMemorySize), env.functionCallIndex())
+	require.Equal(t, wasm.FunctionAddress(builtinFunctionAddressMemorySize), env.functionCallAddress())
 }
 
 func TestAmd64Compiler_compileDrop(t *testing.T) {
@@ -5534,4 +5521,125 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			require.Equal(t, uint64(0), env.stackPointer())
 		})
 	}
+}
+
+func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
+	// Ensure that the offset of wasm.TableInstance doesn't drift.
+	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionAddress)), tableElementFunctionAddressOffest)
+	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionTypeID)), tableElementTypeIDOffest)
+
+	t.Run("out of bounds", func(t *testing.T) {
+		env := newJITEnvironment()
+		env.setTable(make([]wasm.TableElement, 10))
+		compiler := requireNewCompiler(t)
+
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}}}
+
+		// Place the offfset value.
+		loc := compiler.locationStack.pushValueOnStack()
+		env.stack()[loc.stackPointer] = 1000000000
+
+		// Now emit the code.
+		compiler.initializeReservedRegisters()
+		require.NoError(t, compiler.compileCallIndirect(targetOperation))
+		compiler.returnFunction()
+
+		// Generate the code under test.
+		code, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeTableOutOfBounds, env.jitStatus())
+	})
+
+	t.Run("type not match", func(t *testing.T) {
+		env := newJITEnvironment()
+		table := make([]wasm.TableElement, 10)
+		env.setTable(table)
+
+		compiler := requireNewCompiler(t)
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}}}
+		// and the typeID doesn't match the table[targetOffset]'s type ID.
+		table[0] = wasm.TableElement{FunctionTypeID: 50}
+
+		// Place the offfset value.
+		err := compiler.compileConstI32(targetOffset)
+		require.NoError(t, err)
+
+		// Now emit the code.
+		compiler.initializeReservedRegisters()
+		require.NoError(t, compiler.compileCallIndirect(targetOperation))
+
+		// Generate the code under test.
+		compiler.returnFunction()
+		code, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall, env.jitStatus())
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		table := make([]wasm.TableElement, 10)
+		for i := 0; i < len(table); i++ {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				env := newJITEnvironment()
+				env.setTable(table)
+				compiler := requireNewCompiler(t)
+
+				targetType := &wasm.FunctionType{
+					Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
+					Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32}}
+				targetOffset := &wazeroir.OperationConstI32{Value: uint32(i)}
+				targetOperation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
+
+				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
+					Types: []*wasm.TypeInstance{{Type: targetType, TypeID: wasm.FunctionTypeID(i)}}},
+				}
+				// and the typeID  matches the table[targetOffset]'s type ID.
+				table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: wasm.FunctionTypeID(i)}
+
+				// Put the function call params.
+				for i := 0; i < len(targetType.Params); i++ {
+					compiler.locationStack.pushValueOnStack()
+				}
+
+				// Place the offfset value.
+				err := compiler.compileConstI32(targetOffset)
+				require.NoError(t, err)
+
+				// At this point, we should have three elements (function params + offset value) on the stack
+				require.Equal(t, uint64(3), compiler.locationStack.sp)
+
+				// Now emit the code.
+				compiler.initializeReservedRegisters()
+				require.NoError(t, compiler.compileCallIndirect(targetOperation))
+
+				// At this point, we consumed the function inputs and offset value, but the function result (four float values)
+				// are pushed onto the register.
+				require.Equal(t, uint64(4), compiler.locationStack.sp)
+
+				// Generate the code under test.
+				compiler.returnFunction()
+				code, _, err := compiler.generate()
+				require.NoError(t, err)
+
+				// Run code.
+				env.exec(code)
+
+				require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
+				require.Equal(t, wasm.FunctionAddress(i), env.functionCallAddress())
+			})
+		}
+	})
 }

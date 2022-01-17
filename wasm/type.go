@@ -11,6 +11,23 @@ type FunctionType struct {
 	Params, Results []ValueType
 }
 
+func (t *FunctionType) String() (ret string) {
+	for _, b := range t.Params {
+		ret += formatValueType(b)
+	}
+	if len(t.Params) == 0 {
+		ret += "null"
+	}
+	ret += "_"
+	for _, b := range t.Results {
+		ret += formatValueType(b)
+	}
+	if len(t.Results) == 0 {
+		ret += "null"
+	}
+	return
+}
+
 func readFunctionType(r io.Reader) (*FunctionType, error) {
 	b := make([]byte, 1)
 	if _, err := io.ReadFull(r, b); err != nil {

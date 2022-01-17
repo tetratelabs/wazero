@@ -161,18 +161,25 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	// As we cannot read RIP register directly,
-	// we calculate now the offset to the next instruction
-	// relative to the beginning of this function body.
+	// As we cannot read RIP register directly, we calculate now the offset to the next
+	// instruction after return instruction for function call.
 	const operandSizeBytes = 8
-	for _, obj := range c.requireFunctionCallReturnAddressOffsetResolution {
+	for _, inst := range c.requireFunctionCallReturnAddressOffsetResolution {
+		afterReturnInst := inst
+		// Iterate the linked list of instructions until we find the return instruction.
+		for ; afterReturnInst != nil; afterReturnInst = afterReturnInst.Link {
+			if afterReturnInst.As == obj.ARET {
+				// Now we found the return instruction, move forward once again.
+				afterReturnInst = afterReturnInst.Link
+				break
+			}
+		}
+		if afterReturnInst == nil {
+			return nil, 0, fmt.Errorf("invalid function call at %v", inst)
+		}
 		// Skip MOV, and the register(rax): "0x49, 0xbd"
-		start := obj.Pc + 2
-		// obj.Link = setting offset to memory
-		// obj.Link.Link = writing back the stack pointer to eng.stackPointer.
-		// obj.Link.Link.Link = Return instruction.
-		// Therefore obj.Link.Link.Link.Link means the next instruction after the return.
-		afterReturnInst := obj.Link.Link.Link.Link
+		start := inst.Pc + 2
+		// Set the move target to the program counter (offset to the beginning to this binary).
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
 
@@ -187,7 +194,7 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
-	for _, t := range c.f.Signature.Params {
+	for _, t := range c.f.FunctionType.Type.Params {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -542,6 +549,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		jmpWithCond = c.newProg()
 		jmpWithCond.As = x86.AJNE
 		jmpWithCond.To.Type = obj.TYPE_BRANCH
+		c.locationStack.markRegisterUnused(cond.register)
 	}
 
 	// Make sure that the next coming label is the else jump target.
@@ -625,6 +633,10 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	return nil
 }
 
+func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
+	panic("TODO implement!")
+}
+
 // If a jump target has multiple callesr (origins),
 // we must have unique register states, so this function
 // must be called before such jump instruction.
@@ -693,25 +705,141 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	if target.HostFunction != nil {
-		index := c.eng.compiledHostFunctionIndex[target]
-		if err := c.callHostFunctionFromConstIndex(index); err != nil {
-			return err
-		}
-	} else {
-		index := c.eng.compiledWasmFunctionIndex[target]
-		if err := c.callFunctionFromConstIndex(index); err != nil {
-			return err
-		}
+	if err := c.compileFunctionCallFromAddress(jitCallStatusCodeCallFunction, target.Address); err != nil {
+		return err
 	}
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(target.Signature.Params); i++ {
+	for i := 0; i < len(target.FunctionType.Type.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range target.Signature.Results {
+	for _, t := range target.FunctionType.Type.Results {
+		loc := c.locationStack.pushValueOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
+	return nil
+}
+
+const (
+	tableElementFunctionAddressOffest = 0
+	tableElementTypeIDOffest          = 8
+)
+
+// compileCallIndirect adds instructions to perform call_indirect operation.
+// This consumes the one value from the top of stack (called "offset"),
+// and make a function call against the function whose function address equals "table[offset]".
+//
+// Note: This is called indirect function call in the sense that the target function is indirectly
+// determined by the current state (top value) of the stack.
+// Therefore, two checks are performed at runtime before entering the target function:
+// 1) If "offset" exceeds the length of table, "out of bounds table access" states (jitCallStatusCodeTableOutOfBounds) is returned.
+// 2) If the type of the function table[offset] doesn't match the specified function type, "type mismatch" status (jitCallStatusCodeTypeMismatchOnIndirectCall) is returned.
+// Otherwise, we successfully enter the target function.
+//
+// Note: WebAssembly 1.0 (MVP) supports at most one table, so this doesn't support multiple tables.
+func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
+	offset := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(offset); err != nil {
+		return nil
+	}
+
+	// First, we need to check if the offset doesn't exceed the length of table.
+	cmpLength := c.newProg()
+	cmpLength.As = x86.ACMPQ
+	cmpLength.To.Type = obj.TYPE_REG
+	cmpLength.To.Reg = offset.register
+	cmpLength.From.Type = obj.TYPE_MEM
+	cmpLength.From.Reg = reservedRegisterForEngine
+	cmpLength.From.Offset = engineTableSliceLenOffset
+	c.addInstruction(cmpLength)
+
+	notLengthExceedJump := c.newProg()
+	notLengthExceedJump.To.Type = obj.TYPE_BRANCH
+	notLengthExceedJump.As = x86.AJCC
+	c.addInstruction(notLengthExceedJump)
+
+	// If it exceeds, we return the function with jitCallStatusCodeTableOutOfBounds.
+	c.setJITStatus(jitCallStatusCodeTableOutOfBounds)
+	c.returnFunction()
+
+	// Next we check if the target's type matches the operation's one.
+	// In order to get the type instance's address, we have to multiply the offset
+	// by 16 as the offset is the "length" of table in Go's "[]wasm.TableElement",
+	// and size of wasm.TableInstance equals 128 bit (64-bit wasm.FunctionAddress and 64-bit wasm.TypeID).
+	getTypeInstanceAddress := c.newProg()
+	notLengthExceedJump.To.SetTarget(getTypeInstanceAddress)
+	getTypeInstanceAddress.As = x86.ASHLQ
+	getTypeInstanceAddress.To.Type = obj.TYPE_REG
+	getTypeInstanceAddress.To.Reg = offset.register
+	getTypeInstanceAddress.From.Type = obj.TYPE_CONST
+	getTypeInstanceAddress.From.Offset = 4
+	c.addInstruction(getTypeInstanceAddress)
+
+	// Adds the address of wasm.TableInstance[0] stored as engine.tableSliceAddress to the offset.
+	movTableSliceAddress := c.newProg()
+	movTableSliceAddress.As = x86.AADDQ
+	movTableSliceAddress.To.Type = obj.TYPE_REG
+	movTableSliceAddress.To.Reg = offset.register
+	movTableSliceAddress.From.Type = obj.TYPE_MEM
+	movTableSliceAddress.From.Reg = reservedRegisterForEngine
+	movTableSliceAddress.From.Offset = engineTableSliceAddressOffset
+	c.addInstruction(movTableSliceAddress)
+
+	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset]
+	// So the target type ID lives at offset+tableElementTypeIDOffest, and we compare it
+	// with targetFunctionType.TypeID.
+	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
+	cmpTypeID := c.newProg()
+	cmpTypeID.As = x86.ACMPQ
+	cmpTypeID.From.Type = obj.TYPE_MEM
+	cmpTypeID.From.Reg = offset.register
+	cmpTypeID.From.Offset = tableElementTypeIDOffest
+	cmpTypeID.To.Type = obj.TYPE_CONST
+	cmpTypeID.To.Offset = int64(targetFunctionType.TypeID)
+	c.addInstruction(cmpTypeID)
+
+	// Jump if the type matches.
+	typeMatchJump := c.newProg()
+	typeMatchJump.To.Type = obj.TYPE_BRANCH
+	typeMatchJump.As = x86.AJEQ
+	c.addInstruction(typeMatchJump)
+
+	// Otherwise, we return the function with jitCallStatusCodeTypeMismatchOnIndirectCall.
+	c.setJITStatus(jitCallStatusCodeTypeMismatchOnIndirectCall)
+	c.returnFunction()
+
+	// Now all checks passeed, so we start making function call.
+	readValue := c.newProg()
+	typeMatchJump.To.SetTarget(readValue)
+	readValue.As = x86.AMOVQ
+	readValue.To.Type = obj.TYPE_REG
+	readValue.To.Reg = offset.register
+	readValue.From.Offset = tableElementFunctionAddressOffest
+	readValue.From.Type = obj.TYPE_MEM
+	readValue.From.Reg = offset.register
+	c.addInstruction(readValue)
+
+	if err := c.compileFunctionCallFromRegister(offset.register); err != nil {
+		return nil
+	}
+
+	// The offset register should be marked as un-used as we consumed in the function call.
+	c.locationStack.markRegisterUnused(offset.register)
+
+	// We consumed the function parameters from the stack after call.
+	for i := 0; i < len(targetFunctionType.Type.Params); i++ {
+		c.locationStack.pop()
+	}
+
+	// Also, the function results were pushed by the call.
+	for _, t := range targetFunctionType.Type.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -3802,7 +3930,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemoryGrow)
+	return c.compileFunctionCallFromAddress(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemoryGrow)
 }
 
 func (c *amd64Compiler) compileMemorySize() error {
@@ -3811,25 +3939,11 @@ func (c *amd64Compiler) compileMemorySize() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	if err := c.callBuiltinFunctionFromConstIndex(builtinFunctionIndexMemorySize); err != nil {
+	if err := c.compileFunctionCallFromAddress(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemorySize); err != nil {
 		return err
 	}
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
-	return nil
-}
-
-func (c *amd64Compiler) callBuiltinFunctionFromConstIndex(index int64) error {
-	c.setJITStatus(jitCallStatusCodeCallBuiltInFunction)
-	c.setFunctionCallIndexFromConst(index)
-	// Release all the registers as our calling convention requires the callee-save.
-	if err := c.releaseAllRegistersToStack(); err != nil {
-		return err
-	}
-	c.setContinuationOffsetAtNextInstructionAndReturn()
-	// Once we return from the function call,
-	// we must setup the reserved registers again.
-	c.initializeReservedRegisters()
 	return nil
 }
 
@@ -4115,11 +4229,21 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	c.addInstruction(prog)
 }
 
-func (c *amd64Compiler) callHostFunctionFromConstIndex(index int64) error {
-	// Set the jit status as jitCallStatusCodeCallHostFunction
-	c.setJITStatus(jitCallStatusCodeCallHostFunction)
-	// Set the function index.
-	c.setFunctionCallIndexFromConst(index)
+// compileFunctionCallFromAddress adds instructions to call a function whose address equals the addr parameter.
+// jitStatus is set before making call, and it should either jitCallStatusCodeCallBuiltInFunction or
+// jitCallStatusCodeCallFunction.
+func (c *amd64Compiler) compileFunctionCallFromAddress(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
+	c.setJITStatus(jitStatus)
+
+	prog := c.newProg()
+	prog.As = x86.AMOVQ
+	prog.From.Type = obj.TYPE_CONST
+	prog.From.Offset = int64(addr)
+	prog.To.Type = obj.TYPE_MEM
+	prog.To.Reg = reservedRegisterForEngine
+	prog.To.Offset = engineFunctionCallAddressOffset
+	c.addInstruction(prog)
+
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4131,11 +4255,20 @@ func (c *amd64Compiler) callHostFunctionFromConstIndex(index int64) error {
 	return nil
 }
 
-func (c *amd64Compiler) callFunctionFromConstIndex(index int64) error {
-	// Set the jit status as jitCallStatusCodeCallWasmFunction
-	c.setJITStatus(jitCallStatusCodeCallWasmFunction)
-	// Set the function index.
-	c.setFunctionCallIndexFromConst(index)
+// compileFunctionCallFromRegister adds instructions to call a function whose address equals the value on
+// the functionCallAddressRegister.
+func (c *amd64Compiler) compileFunctionCallFromRegister(functionCallAddressRegister int16) error {
+	c.setJITStatus(jitCallStatusCodeCallFunction)
+
+	setFunctionAddressFromReg := c.newProg()
+	setFunctionAddressFromReg.As = x86.AMOVQ
+	setFunctionAddressFromReg.From.Type = obj.TYPE_REG
+	setFunctionAddressFromReg.From.Reg = functionCallAddressRegister
+	setFunctionAddressFromReg.To.Type = obj.TYPE_MEM
+	setFunctionAddressFromReg.To.Reg = reservedRegisterForEngine
+	setFunctionAddressFromReg.To.Offset = engineFunctionCallAddressOffset
+	c.addInstruction(setFunctionAddressFromReg)
+
 	// Release all the registers as our calling convention requires the callee-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4164,11 +4297,6 @@ func (c *amd64Compiler) releaseAllRegistersToStack() error {
 	return nil
 }
 
-// TODO: If this function call is the tail call,
-// we don't need to return back to this function.
-// Maybe better have another status for that case
-// so that we don't call back again to this function
-// and instead just release the call frame.
 func (c *amd64Compiler) setContinuationOffsetAtNextInstructionAndReturn() {
 	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
 	// all the registers, so at this point we always have free registers.
@@ -4210,18 +4338,7 @@ func (c *amd64Compiler) setFunctionCallIndexFromRegister(reg int16) {
 	prog.From.Reg = reg
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineFunctionCallIndexOffset
-	c.addInstruction(prog)
-}
-
-func (c *amd64Compiler) setFunctionCallIndexFromConst(index int64) {
-	prog := c.newProg()
-	prog.As = x86.AMOVL
-	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = index
-	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineFunctionCallIndexOffset
+	prog.To.Offset = engineFunctionCallAddressOffset
 	c.addInstruction(prog)
 }
 

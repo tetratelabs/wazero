@@ -191,14 +191,14 @@ func TestJIT(t *testing.T) {
 		"break-drop.wast":             false, // Needs br_table support
 		"br_if.wast":                  false, // Needs br_table support
 		"br.wast":                     false, // Needs br_table support
-		"call_indirect.wast":          false, // Needs call_indirect support
-		"call.wast":                   false, // Needs call_indirect support
+		"call_indirect.wast":          false, // Needs br_table support
+		"call.wast":                   false, // Needs br_table support
 		"comments.wast":               true,
 		"const.wast":                  true,
 		"conversions.wast":            true,
 		"custom.wast":                 true,
 		"data.wast":                   true,
-		"elem.wast":                   false, // Needs call_indirect support
+		"elem.wast":                   true,
 		"endianness.wast":             true,
 		"exports.wast":                true,
 		"f32_bitwise.wast":            true,
@@ -213,25 +213,25 @@ func TestJIT(t *testing.T) {
 		"float_memory.wast":           true,
 		"float_misc.wast":             true,
 		"forward.wast":                true,
-		"func_ptrs.wast":              false, // Needs call_indirect support
+		"func_ptrs.wast":              true,
 		"func.wast":                   false, // Needs br_table support
 		"globals.wast":                false, // Needs br_table support
 		"i32.wast":                    true,
 		"i64.wast":                    true,
 		"if.wast":                     false, // Needs br_table support
-		"imports.wast":                false, // Needs call_indirect support
+		"imports.wast":                true,
 		"inline-module.wast":          true,
 		"int_exprs.wast":              true,
 		"int_literals.wast":           true,
 		"labels.wast":                 false, // Needs br_table support
 		"left-to-right.wast":          false, // Needs br_table support
-		"linking.wast":                false, // Needs call_indirect support
-		"load.wast":                   false, // Needs call_indirect support
+		"linking.wast":                true,
+		"load.wast":                   false, // Needs br_table support
 		"local_get.wast":              false, // Needs br_table support
 		"local_set.wast":              false, // Needs br_table support
 		"local_tee.wast":              false, // Needs br_table support
-		"loop.wast":                   false, // Needs call_indirect support
-		"memory_grow.wast":            false, // Needs call_indirect support
+		"loop.wast":                   false, // Needs br_table support
+		"memory_grow.wast":            false, // Needs br_table support
 		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
 		"memory_trap.wast":            true,
@@ -241,7 +241,7 @@ func TestJIT(t *testing.T) {
 		"return.wast":                 true,
 		"select.wast":                 false, // Needs br_table support
 		"skip-stack-guard-page.wast":  true,
-		"stack.wast":                  false, // Needs call_indirect support
+		"stack.wast":                  true,
 		"start.wast":                  true,
 		"store.wast":                  false, // Needs br_table support
 		"switch.wast":                 false, // Needs br_table support

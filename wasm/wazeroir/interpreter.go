@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strings"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
@@ -20,21 +19,23 @@ var callStackCeiling = buildoptions.CallStackCeiling
 // This is the direct interpreter of wazeroir operations.
 type interpreter struct {
 	// Stores compiled functions.
-	functions map[*wasm.FunctionInstance]*interpreterFunction
-	// Cached function type IDs assigned to
-	// function signatures.
-	// Type IDs are used to check the signature of
-	// functions on call_indirect operation at runtime
-	functionTypeIDs map[string]uint64
+	functions map[wasm.FunctionAddress]*interpreterFunction
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
 	// Function call stack.
 	frames []*interpreterFrame
-	// The callbacks when an function instance is compiled.
+	// onCompilationDoneCallbacks call back when a function instance is compiled.
 	// See the comment where this is used below for detail.
 	// Not used at runtime, and only in the compilation phase.
-	onCompilationDoneCallbacks map[*wasm.FunctionInstance][]func(*interpreterFunction)
+	onCompilationDoneCallbacks map[wasm.FunctionAddress][]func(*interpreterFunction)
+}
+
+func NewEngine() wasm.Engine {
+	return &interpreter{
+		functions:                  map[wasm.FunctionAddress]*interpreterFunction{},
+		onCompilationDoneCallbacks: map[wasm.FunctionAddress][]func(*interpreterFunction){},
+	}
 }
 
 func (it *interpreter) push(v uint64) {
@@ -44,7 +45,7 @@ func (it *interpreter) push(v uint64) {
 func (it *interpreter) pop() (v uint64) {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase
 	// and wazeroir translation
 	// before compilation.
@@ -56,7 +57,7 @@ func (it *interpreter) pop() (v uint64) {
 func (it *interpreter) drop(r *InclusiveRange) {
 	// No need to check stack bound
 	// as we can assume that all the operations
-	// are valid thanks to analyzeFunction
+	// are valid thanks to validateFunction
 	// at module validation phase
 	// and wazeroir translation
 	// before compilation.
@@ -79,7 +80,7 @@ func (it *interpreter) pushFrame(frame *interpreterFrame) {
 }
 
 func (it *interpreter) popFrame() (frame *interpreterFrame) {
-	// No need to check stack bound as we can assume that all the operations are valid thanks to analyzeFunction at
+	// No need to check stack bound as we can assume that all the operations are valid thanks to validateFunction at
 	// module validation phase and wazeroir translation before compilation.
 	oneLess := len(it.frames) - 1
 	frame = it.frames[oneLess]
@@ -99,8 +100,6 @@ type interpreterFunction struct {
 	funcInstance *wasm.FunctionInstance
 	body         []*interpreterOp
 	hostFn       *reflect.Value
-	signature    *wasm.FunctionType
-	typeID       uint64
 }
 
 // Non-interface union of all the wazeroir operations.
@@ -112,60 +111,39 @@ type interpreterOp struct {
 	f      *interpreterFunction
 }
 
-func (it *interpreter) PreCompile(fs []*wasm.FunctionInstance) error {
-	// We have nothing to do on the precompile phase, in contrast to JIT engine.
-	return nil
-}
-
 // Compile Implements wasm.Engine for interpreter.
 func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
-	if _, ok := it.functions[f]; ok {
-		return nil
-	} else if f.HostFunction != nil {
+	funcaddr := f.Address
+
+	if f.IsHostFunction() {
 		ret := &interpreterFunction{
 			hostFn: f.HostFunction, funcInstance: f,
-			signature: f.Signature,
 		}
-		if id, ok := it.functionTypeIDs[funcTypeString(f.Signature)]; !ok {
-			id = uint64(len(it.functionTypeIDs))
-			it.functionTypeIDs[funcTypeString(f.Signature)] = id
-			ret.typeID = id
-		} else {
-			ret.typeID = id
-		}
-		it.functions[f] = ret
+		it.functions[funcaddr] = ret
 		return nil
-	}
+	} else {
+		ir, err := Compile(f)
+		if err != nil {
+			return fmt.Errorf("failed to compile Wasm to wazeroir: %w", err)
+		}
 
-	ir, err := Compile(f)
-	if err != nil {
-		return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
+		fn, err := it.lowerIROps(f, ir.Operations)
+		if err != nil {
+			return fmt.Errorf("failed to convert wazeroir operations to interpreter ones: %w", err)
+		}
+		it.functions[funcaddr] = fn
+		for _, cb := range it.onCompilationDoneCallbacks[funcaddr] {
+			cb(fn)
+		}
+		delete(it.onCompilationDoneCallbacks, funcaddr)
 	}
-
-	fn, err := it.lowerIROps(f, ir.Operations)
-	if err != nil {
-		return fmt.Errorf("failed to lower wazeroir operations to interpreter operations: %w", err)
-	}
-
-	it.functions[f] = fn
-	for _, cb := range it.onCompilationDoneCallbacks[f] {
-		cb(fn)
-	}
-	delete(it.onCompilationDoneCallbacks, f)
 	return nil
 }
 
 // Lowers the wazeroir operations to interpreter friendly struct.
 func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 	ops []Operation) (*interpreterFunction, error) {
-	ret := &interpreterFunction{funcInstance: f, signature: f.Signature}
-	if id, ok := it.functionTypeIDs[funcTypeString(f.Signature)]; !ok {
-		id = uint64(len(it.functionTypeIDs))
-		it.functionTypeIDs[funcTypeString(f.Signature)] = id
-		ret.typeID = id
-	} else {
-		ret.typeID = id
-	}
+	ret := &interpreterFunction{funcInstance: f}
 	labelAddress := map[string]uint64{}
 	onLabelAddressResolved := map[string][]func(addr uint64){}
 	for _, original := range ops {
@@ -255,27 +233,22 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 				}
 			}
 		case *OperationCall:
-			targetInst := f.ModuleInstance.Functions[o.FunctionIndex]
-			target, ok := it.functions[targetInst]
+			target := f.ModuleInstance.Functions[o.FunctionIndex]
+			compiledTarget, ok := it.functions[target.Address]
 			if !ok {
 				// If the target function instance is not compiled,
 				// we set the callback so we can set the pointer to the target when the compilation done.
-				it.onCompilationDoneCallbacks[targetInst] = append(it.onCompilationDoneCallbacks[targetInst],
+				it.onCompilationDoneCallbacks[target.Address] = append(it.onCompilationDoneCallbacks[target.Address],
 					func(compiled *interpreterFunction) {
 						op.f = compiled
 					})
 			} else {
-				op.f = target
+				op.f = compiledTarget
 			}
 		case *OperationCallIndirect:
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.TableIndex)
-			key := funcTypeString(f.ModuleInstance.Types[o.TypeIndex])
-			typeid, ok := it.functionTypeIDs[key]
-			if !ok {
-				it.functionTypeIDs[key] = uint64(len(it.functionTypeIDs))
-			}
-			op.us[1] = typeid
+			op.us[1] = uint64(f.ModuleInstance.Types[o.TypeIndex].TypeID)
 		case *OperationDrop:
 			op.rs = make([]*InclusiveRange, 1)
 			op.rs[0] = o.Range
@@ -481,7 +454,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		}
 	}()
 
-	g, ok := it.functions[f]
+	g, ok := it.functions[f.Address]
 	if !ok {
 		err = fmt.Errorf("function not compiled")
 		return
@@ -495,7 +468,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		}
 		it.callNativeFunc(g)
 	}
-	results = make([]uint64, len(f.Signature.Results))
+	results = make([]uint64, len(f.FunctionType.Type.Results))
 	for i := range results {
 		results[len(results)-1-i] = it.pop()
 	}
@@ -547,9 +520,13 @@ func (it *interpreter) callHostFunc(f *interpreterFunction, _ ...uint64) {
 
 func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
-	memoryInst := frame.f.funcInstance.ModuleInstance.Memory
-	globals := frame.f.funcInstance.ModuleInstance.Globals
-	tables := f.funcInstance.ModuleInstance.Tables
+	moduleInst := f.funcInstance.ModuleInstance
+	memoryInst := moduleInst.Memory
+	globals := moduleInst.Globals
+	var table *wasm.TableInstance
+	if len(moduleInst.Tables) > 0 {
+		table = moduleInst.Tables[0] // WebAssembly 1.0 (MVP) defines at most one table
+	}
 	it.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -588,7 +565,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCall:
 			{
 				if op.f.hostFn != nil {
-					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.signature.Params):]...)
+					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.funcInstance.FunctionType.Type.Params):]...)
 				} else {
 					it.callNativeFunc(op.f)
 				}
@@ -596,15 +573,16 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case OperationKindCallIndirect:
 			{
-				index := it.pop()
-				target := it.functions[tables[op.us[0]].Table[index].Function]
+				offset := it.pop()
+				target := it.functions[table.Table[offset].FunctionAddress]
 				// Type check.
-				if target.typeID != op.us[1] {
-					panic("function signature mismatch on call_indirect")
+				expType := target.funcInstance.FunctionType
+				if uint64(expType.TypeID) != op.us[1] {
+					panic("function type mismatch on call_indirect")
 				}
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(target.signature.Params):]...)
+					it.callHostFunc(target, it.stack[len(it.stack)-len(expType.Type.Params):]...)
 				} else {
 					it.callNativeFunc(target)
 				}
@@ -1468,16 +1446,6 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		}
 	}
 	it.popFrame()
-}
-
-func funcTypeString(t *wasm.FunctionType) string {
-	return fmt.Sprintf("%s-%s",
-		// Fast stringification of byte slice.
-		// This is safe anyway as the results are copied
-		// into the return value string.
-		*(*string)(unsafe.Pointer(&t.Params)),
-		*(*string)(unsafe.Pointer(&t.Results)),
-	)
 }
 
 // math.Min doen't comply with the Wasm spec, so we borrow from the original

@@ -12,26 +12,67 @@ import (
 )
 
 type (
+	// Store is the runtime representation of "instantiated" Wasm module and objects.
+	// Multiple modules can be instantiated within a single store, and each instance,
+	// (e.g. function instance) can be referenced by other module instances in a Store via Module.ImportSection.
+	//
+	// Every type whose name ends with "Instance" suffix belongs to exactly one store.
+	//
+	// Note that store is not thread (concurrency) safe, meaning that using single Store
+	// via multiple goroutines might result in race conditions. In that case, the invocation
+	// and access to any methods and field of Store must be guarded by mutex.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0
 	Store struct {
-		engine          Engine
-		ModuleInstances map[string]*ModuleInstance
+		// The following fields are wazero-specific fields of Store.
 
+		// engine is a global context for a Store which is in reponsible for compilation and execution of Wasm modules.
+		engine Engine
+		// ModuleInstances holds the instantiated Wasm modules keyed on names given at Instantiate.
+		ModuleInstances map[string]*ModuleInstance
+		// TypeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
+		// do type-checks on indirect function calls.
+		TypeIDs map[string]FunctionTypeID
+
+		// The followings fields match the definition of Store in the specification.
+
+		// Functions holds function instances (https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr).
 		Functions []*FunctionInstance
-		Globals   []*GlobalInstance
-		Memories  []*MemoryInstance
-		Tables    []*TableInstance
+		// Globals holds global instances (https://www.w3.org/TR/wasm-core-1/#global-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as globaladdr (https://www.w3.org/TR/wasm-core-1/#syntax-globaladdr).
+		Globals []*GlobalInstance
+		// Memories holds memory instances (https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as memaddr (https://www.w3.org/TR/wasm-core-1/#syntax-memaddr).
+		Memories []*MemoryInstance
+		// Tables holds table instances (https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/wasm-core-1/#syntax-tableaddr).
+		Tables []*TableInstance
 	}
 
+	// ModuleInstance represents instantiated wasm module.
+	// The difference from the spec is that in wazero, a ModuleInstance holds pointers
+	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#syntax-moduleinst
 	ModuleInstance struct {
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
 		Memory    *MemoryInstance
 		Tables    []*TableInstance
-
-		Types []*FunctionType
+		Types     []*TypeInstance
 	}
 
+	// ExportInstance represents an exported instance in a Store.
+	// The difference from the spec is that in wazero, a ExportInstance holds pointers
+	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#syntax-exportinst
 	ExportInstance struct {
 		Kind     byte
 		Function *FunctionInstance
@@ -40,59 +81,115 @@ type (
 		Table    *TableInstance
 	}
 
+	// FunctionInstance represents a function instance in a Store.
+	// See https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0
 	FunctionInstance struct {
-		Name           string
+		// ModuleInstance holds the pointer to the module instance to which this function belongs.
 		ModuleInstance *ModuleInstance
-		Body           []byte
-		Signature      *FunctionType
-		NumLocals      uint32
-		LocalTypes     []ValueType
-		HostFunction   *reflect.Value
+		// Body is the function body in WebAssembly Binary Format
+		Body []byte
+		// FunctionType holds the pointer to TypeInstance whose functionType field equals that of this function.
+		FunctionType *TypeInstance
+		// LocalTypes holds types of locals.
+		LocalTypes []ValueType
+		// HostFunction holds the runtime representation of host functions.
+		// If this is not nil, all the above fields are ignored as they are specific to non-host functions.
+		HostFunction *reflect.Value
+		// Address is the funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) of this function insntance.
+		// More precisely, this equals the index of this function instance in store.FunctionInstances.
+		// All function calls are made via funcaddr at runtime, not the index (scoped to a module).
+		//
+		// This is used by both host and non-host functions.
+		Address FunctionAddress
+		// Name is for debugging purpose, and is used to argument the stack traces.
+		//
+		// When HostFunction is not nil, this returns dot-delimited parameters given to
+		// Store.AddHostFunction. Ex. something.realistic
+		//
+		// Otherwise, this is the corresponding value in NameSection.FunctionNames or "unknown" if unavailable.
+		Name string
 	}
 
-	HostFunctionCallContext struct {
-		Memory *MemoryInstance
-		// TODO: Add others if necessary.
+	// TypeInstance is a store-specific representation of FunctionType where the function type
+	// is coupled with TypeID which is specific in a store.
+	TypeInstance struct {
+		Type *FunctionType
+		// TypeID is assigned by a store for FunctionType.
+		TypeID FunctionTypeID
 	}
 
-	FunctionInstanceBlock struct {
-		StartAt, ElseAt, EndAt uint64
-		BlockType              *FunctionType
-		BlockTypeBytes         uint64
-		IsLoop                 bool // TODO: might not be necessary
-		IsIf                   bool // TODO: might not be necessary
-	}
-
+	// GlobalInstance represents a global instance in a store.
+	// See https://www.w3.org/TR/wasm-core-1/#global-instances%E2%91%A0
 	GlobalInstance struct {
 		Type *GlobalType
-		Val  uint64
+		// Val holds a 64-bit representation of the actual value.
+		Val uint64
 	}
 
+	// TableInstance represents a table instance in a store.
+	// See https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0
+	//
+	// Note this is fixed to function type until post MVP reference type is implemented.
 	TableInstance struct {
-		Table    []*TableInstanceElm
-		Min      uint32
-		Max      *uint32
+		// Table holds the table elements managed by this table instance.
+		//
+		// Note: we intentionally use "[]TableElement", not "[]*TableElement",
+		// because the JIT engine accesses this slice directly from assembly.
+		// If pointer type is used, the access becomes two level indirection (two hops of pointer jumps)
+		// which is a bit costly. TableElement is 128 bit (two 64bit fields) so the cost of using value type
+		// would be ignorable.
+		Table []TableElement
+		Min   uint32
+		Max   *uint32
+		// Currently fixed to 0x70 (funcref type).
 		ElemType byte
 	}
 
-	TableInstanceElm struct {
-		Function *FunctionInstance
-		// Other ref types will be added.
+	// TableElement represents an item in a table instance.
+	//
+	// Note: this is fixed to function type as it is the only supported type in WebAssembly 1.0 (MVP)
+	TableElement struct {
+		// FunctionAddress is funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr)
+		// of the target function instance. More precisely, this equals the index of
+		// the target function instance in Store.FunctionInstances.
+		FunctionAddress FunctionAddress
+		// FunctionTypeID is the type ID of the target function's type, which
+		// equals store.Functions[FunctionAddress].FunctionType.TypeID.
+		FunctionTypeID FunctionTypeID
 	}
 
+	// MemoryInstance represents a memory instance in a store.
+	// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
 	MemoryInstance struct {
 		Buffer []byte
 		Min    uint32
 		Max    *uint32
 	}
+
+	// FunctionAddress is funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr),
+	// and the index to Store.Functions.
+	FunctionAddress uint64
+
+	// FunctionTypeID is an uniquely assigned integer for a function type.
+	// This is wazero specific runtime object and specific to a store,
+	// and used at runtime to do type-checks on indirect function calls.
+	FunctionTypeID uint64
 )
 
+func (f *FunctionInstance) IsHostFunction() bool {
+	return f.HostFunction != nil
+}
+
 func NewStore(engine Engine) *Store {
-	return &Store{ModuleInstances: map[string]*ModuleInstance{}, engine: engine}
+	return &Store{ModuleInstances: map[string]*ModuleInstance{}, TypeIDs: map[string]FunctionTypeID{}, engine: engine}
 }
 
 func (s *Store) Instantiate(module *Module, name string) error {
-	instance := &ModuleInstance{Types: module.TypeSection}
+	instance := &ModuleInstance{}
+	for _, t := range module.TypeSection {
+		instance.Types = append(instance.Types, s.getTypeInstance(t))
+	}
+
 	s.ModuleInstances[name] = instance
 	// Resolve the imports before doing the actual instantiation (mutating store).
 	if err := s.resolveImports(module, instance); err != nil {
@@ -133,13 +230,6 @@ func (s *Store) Instantiate(module *Module, name string) error {
 		return fmt.Errorf("exports: %w", err)
 	}
 
-	// We compile functions after successfully finished building all instances.
-	// This is not only because we want to do early feedback on malicious binaries,
-	// but also during the compilation phase, the compilers have to see all the possible
-	// instances (function, memory, table) in the module instance.
-	if err = s.engine.PreCompile(instance.Functions); err != nil {
-		return fmt.Errorf("failed to precompile: %w", err)
-	}
 	for i, f := range instance.Functions {
 		if err := s.engine.Compile(f); err != nil {
 			return fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
@@ -147,14 +237,14 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	}
 
 	// Check the start function is valid.
-	if module.StartSection != nil {
-		index := *module.StartSection
+	if startIndex := module.StartSection; startIndex != nil {
+		index := *startIndex
 		if int(index) >= len(instance.Functions) {
 			return fmt.Errorf("invalid start function index: %d", index)
 		}
-		signature := instance.Functions[index].Signature
-		if len(signature.Params) != 0 || len(signature.Results) != 0 {
-			return fmt.Errorf("start function must have the empty signature")
+		ft := instance.Functions[index].FunctionType
+		if len(ft.Type.Params) != 0 || len(ft.Type.Results) != 0 {
+			return fmt.Errorf("start function must have the empty function type")
 		}
 	}
 
@@ -162,8 +252,8 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	rollbackFuncs = nil
 
 	// Execute the start function.
-	if module.StartSection != nil {
-		f := instance.Functions[*module.StartSection]
+	if startIndex := module.StartSection; startIndex != nil {
+		f := instance.Functions[*startIndex]
 		if _, err := s.engine.Call(f); err != nil {
 			return fmt.Errorf("calling start function failed: %v", err)
 		}
@@ -187,12 +277,17 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 	}
 
 	f := exp.Function
-	if len(f.Signature.Params) != len(params) {
+	if len(f.FunctionType.Type.Params) != len(params) {
 		return nil, nil, fmt.Errorf("invalid number of parameters")
 	}
 
 	ret, err := s.engine.Call(f, params...)
-	return ret, f.Signature.Results, err
+	return ret, f.FunctionType.Type.Results, err
+}
+
+func (s *Store) addFunctionInstance(f *FunctionInstance) {
+	f.Address = FunctionAddress(len(s.Functions))
+	s.Functions = append(s.Functions, f)
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
@@ -247,11 +342,11 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex uint32, ex
 	if int(typeIndex) >= len(target.Types) {
 		return fmt.Errorf("unknown type for function import")
 	}
-	iSig := target.Types[typeIndex]
-	if !HasSameSignature(iSig.Results, f.Signature.Results) {
-		return fmt.Errorf("return signature mimatch: %#x != %#x", iSig.Results, f.Signature.Results)
-	} else if !HasSameSignature(iSig.Params, f.Signature.Params) {
-		return fmt.Errorf("input signature mimatch: %#x != %#x", iSig.Params, f.Signature.Params)
+	expectedType := target.Types[typeIndex].Type
+	if !ValueTypesEqual(expectedType.Results, f.FunctionType.Type.Results) {
+		return fmt.Errorf("return signature mimatch: %#x != %#x", expectedType.Results, f.FunctionType.Type.Results)
+	} else if !ValueTypesEqual(expectedType.Params, f.FunctionType.Type.Params) {
+		return fmt.Errorf("input signature mimatch: %#x != %#x", expectedType.Params, f.FunctionType.Type.Params)
 	}
 	target.Functions = append(target.Functions, f)
 	return nil
@@ -452,15 +547,14 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 		f := &FunctionInstance{
 			Name:           name,
-			Signature:      module.TypeSection[typeIndex],
+			FunctionType:   s.getTypeInstance(module.TypeSection[typeIndex]),
 			Body:           module.CodeSection[codeIndex].Body,
-			NumLocals:      module.CodeSection[codeIndex].NumLocals,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
 			ModuleInstance: target,
 		}
 
 		if _, ok := analysisCache[codeIndex]; !ok {
-			err := analyzeFunction(
+			err := validateFunction(
 				module, f, functionDeclarations, globalDeclarations,
 				memoryDeclarations, tableDeclarations,
 			)
@@ -470,7 +564,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		target.Functions = append(target.Functions, f)
-		s.Functions = append(s.Functions, f)
+		s.addFunctionInstance(f)
 	}
 	return rollbackFuncs, nil
 }
@@ -552,14 +646,9 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	// Allocate table instances.
 	for _, tableSeg := range module.TableSection {
-		tableInst := &TableInstance{
-			Table:    make([]*TableInstanceElm, tableSeg.Limit.Min),
-			Min:      tableSeg.Limit.Min,
-			Max:      tableSeg.Limit.Max,
-			ElemType: tableSeg.ElemType,
-		}
-		target.Tables = append(target.Tables, tableInst)
-		s.Tables = append(s.Tables, tableInst)
+		instance := newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
+		target.Tables = append(target.Tables, instance)
+		s.Tables = append(s.Tables, instance)
 	}
 
 	for _, elem := range module.ElementSection {
@@ -609,8 +698,10 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 			rollbackFuncs = append(rollbackFuncs, func() {
 				tableInst.Table[pos] = original
 			})
-			tableInst.Table[pos] = &TableInstanceElm{
-				Function: target.Functions[elm],
+			targetFunc := target.Functions[elm]
+			tableInst.Table[pos] = TableElement{
+				FunctionAddress: targetFunc.Address,
+				FunctionTypeID:  targetFunc.FunctionType.TypeID,
 			}
 		}
 	}
@@ -770,17 +861,28 @@ func (s *valueTypeStack) String() string {
 		strings.Join(typeStrs, ", "), strings.Join(limits, ","))
 }
 
-type BlockType = FunctionType
+type functionBlock struct {
+	StartAt, ElseAt, EndAt uint64
+	BlockType              *FunctionType
+	BlockTypeBytes         uint64
+	IsLoop                 bool
+	IsIf                   bool
+}
 
-func analyzeFunction(
-	module *Module, f *FunctionInstance,
+// validateFunction validates the instruction sequence of a function instance body
+// following the specification https://www.w3.org/TR/wasm-core-1/#instructions%E2%91%A2.
+//
+// TODO: put this in a separate file like validate.go.
+func validateFunction(
+	module *Module,
+	f *FunctionInstance,
 	functionDeclarations []uint32,
 	globalDeclarations []*GlobalType,
 	memoryDeclarations []*MemoryType,
 	tableDeclarations []*TableType,
 ) error {
-	labelStack := []*FunctionInstanceBlock{
-		{BlockType: f.Signature, StartAt: math.MaxUint64},
+	labelStack := []*functionBlock{
+		{BlockType: f.FunctionType.Type, StartAt: math.MaxUint64},
 	}
 	valueTypeStack := &valueTypeStack{}
 	for pc := uint64(0); pc < uint64(len(f.Body)); pc++ {
@@ -1028,23 +1130,23 @@ func analyzeFunction(
 			pc += num - 1
 			switch Opcode(op) {
 			case OpcodeLocalGet:
-				inputLen := uint32(len(f.Signature.Params))
-				if l := f.NumLocals + inputLen; index >= l {
+				inputLen := uint32(len(f.FunctionType.Type.Params))
+				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				if index < inputLen {
-					valueTypeStack.push(f.Signature.Params[index])
+					valueTypeStack.push(f.FunctionType.Type.Params[index])
 				} else {
 					valueTypeStack.push(f.LocalTypes[index-inputLen])
 				}
 			case OpcodeLocalSet:
-				inputLen := uint32(len(f.Signature.Params))
-				if l := f.NumLocals + inputLen; index >= l {
+				inputLen := uint32(len(f.FunctionType.Type.Params))
+				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.Params[index]
+					expType = f.FunctionType.Type.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1052,13 +1154,13 @@ func analyzeFunction(
 					return err
 				}
 			case OpcodeLocalTee:
-				inputLen := uint32(len(f.Signature.Params))
-				if l := f.NumLocals + inputLen; index >= l {
+				inputLen := uint32(len(f.FunctionType.Type.Params))
+				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.Signature.Params[index]
+					expType = f.FunctionType.Type.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1440,11 +1542,11 @@ func analyzeFunction(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &FunctionInstanceBlock{
+			labelStack = append(labelStack, &functionBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1452,11 +1554,11 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &FunctionInstanceBlock{
+			labelStack = append(labelStack, &functionBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1465,11 +1567,11 @@ func analyzeFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := ReadBlockType(module.TypeSection, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			labelStack = append(labelStack, &FunctionInstanceBlock{
+			labelStack = append(labelStack, &functionBlock{
 				StartAt:        pc,
 				BlockType:      bt,
 				BlockTypeBytes: num,
@@ -1516,7 +1618,7 @@ func analyzeFunction(
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			expTypes := f.Signature.Results
+			expTypes := f.FunctionType.Type.Results
 			for i := 0; i < len(expTypes); i++ {
 				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
 					return fmt.Errorf("return type mismatch on return: %v; want %v", err, expTypes)
@@ -1565,31 +1667,38 @@ func analyzeFunction(
 	return nil
 }
 
-func ReadBlockType(types []*FunctionType, r io.Reader) (*BlockType, uint64, error) {
+func ReadBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
 	}
 
-	var ret *BlockType
+	var ret *FunctionType
 	switch raw {
 	case -64: // 0x40 in original byte = nil
-		ret = &BlockType{}
+		ret = &FunctionType{}
 	case -1: // 0x7f in original byte = i32
-		ret = &BlockType{Results: []ValueType{ValueTypeI32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI32}}
 	case -2: // 0x7e in original byte = i64
-		ret = &BlockType{Results: []ValueType{ValueTypeI64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI64}}
 	case -3: // 0x7d in original byte = f32
-		ret = &BlockType{Results: []ValueType{ValueTypeF32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
-		ret = &BlockType{Results: []ValueType{ValueTypeF64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
 	default:
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
 		}
-		ret = types[raw]
+		ret = types[raw].Type
 	}
 	return ret, num, nil
+}
+
+// HostFunctionCallContext is the first argument of all host functions.
+type HostFunctionCallContext struct {
+	// Memory is the currently used memory instance at the time when the host function call is made.
+	Memory *MemoryInstance
+	// TODO: Add others if necessary.
 }
 
 func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
@@ -1607,7 +1716,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 			return 0x00, fmt.Errorf("invalid type: %s", kind.String())
 		}
 	}
-	getSignature := func(p reflect.Type) (*FunctionType, error) {
+	getType := func(p reflect.Type) (*FunctionType, error) {
 		var err error
 		if p.NumIn() == 0 {
 			return nil, fmt.Errorf("host function must accept *wasm.HostFunctionCallContext as the first param")
@@ -1637,7 +1746,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		return fmt.Errorf("name %s already exists in module %s", funcName, moduleName)
 	}
 
-	sig, err := getSignature(fn.Type())
+	sig, err := getType(fn.Type())
 	if err != nil {
 		return fmt.Errorf("invalid signature: %w", err)
 	}
@@ -1645,18 +1754,15 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	f := &FunctionInstance{
 		Name:           fmt.Sprintf("%s.%s", moduleName, funcName),
 		HostFunction:   &fn,
-		Signature:      sig,
+		FunctionType:   s.getTypeInstance(sig),
 		ModuleInstance: m,
-	}
-	if err := s.engine.PreCompile([]*FunctionInstance{f}); err != nil {
-		return fmt.Errorf("failed to precompile %s: %v", f.Name, err)
 	}
 
 	if err := s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
 	m.Exports[funcName] = &ExportInstance{Kind: ExportKindFunction, Function: f}
-	s.Functions = append(s.Functions, f)
+	s.addFunctionInstance(f)
 	return nil
 }
 
@@ -1684,14 +1790,9 @@ func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint3
 		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
 	}
 
-	table := &TableInstance{
-		Table:    make([]*TableInstanceElm, min),
-		Min:      min,
-		Max:      max,
-		ElemType: 0x70, // funcref
-	}
-	m.Exports[name] = &ExportInstance{Kind: ExportKindTable, Table: table}
-	s.Tables = append(s.Tables, table)
+	instance := newTableInstance(min, max)
+	m.Exports[name] = &ExportInstance{Kind: ExportKindTable, Table: instance}
+	s.Tables = append(s.Tables, instance)
 	return nil
 }
 
@@ -1713,6 +1814,16 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 	return nil
 }
 
+func (s *Store) getTypeInstance(t *FunctionType) *TypeInstance {
+	key := t.String()
+	id, ok := s.TypeIDs[key]
+	if !ok {
+		id = FunctionTypeID(len(s.TypeIDs))
+		s.TypeIDs[key] = id
+	}
+	return &TypeInstance{Type: t, TypeID: id}
+}
+
 // getModuleInstance returns an existing ModuleInstance if exists, or assigns a new one.
 func (s *Store) getModuleInstance(name string) *ModuleInstance {
 	m, ok := s.ModuleInstances[name]
@@ -1721,4 +1832,20 @@ func (s *Store) getModuleInstance(name string) *ModuleInstance {
 		s.ModuleInstances[name] = m
 	}
 	return m
+}
+
+func newTableInstance(min uint32, max *uint32) *TableInstance {
+	tableInst := &TableInstance{
+		Table:    make([]TableElement, min),
+		Min:      min,
+		Max:      max,
+		ElemType: 0x70, // funcref
+	}
+	for i := range tableInst.Table {
+		tableInst.Table[i] = TableElement{
+			// We use math.MaxUint64 to represent the uninitialized elements.
+			FunctionAddress: math.MaxUint32,
+		}
+	}
+	return tableInst
 }
