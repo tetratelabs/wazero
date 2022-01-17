@@ -36,10 +36,22 @@ type (
 
 		// The followings fields match the definition of Store in the specification.
 
+		// Functions holds function instances (https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr).
 		Functions []*FunctionInstance
-		Globals   []*GlobalInstance
-		Memories  []*MemoryInstance
-		Tables    []*TableInstance
+		// Globals holds global instances (https://www.w3.org/TR/wasm-core-1/#global-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as globaladdr(https://www.w3.org/TR/wasm-core-1/#syntax-globaladdr).
+		Globals []*GlobalInstance
+		// Memories holds memory instances (https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as memoaddr(https://www.w3.org/TR/wasm-core-1/#syntax-memaddr).
+		Memories []*MemoryInstance
+		// Tables holds table instances (https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0),
+		// in this store.
+		// The slice index is to be interpreted as tableaddr(https://www.w3.org/TR/wasm-core-1/#syntax-tableaddr).
+		Tables []*TableInstance
 	}
 
 	// ModuleInstance represents instantiated wasm module.
@@ -151,6 +163,8 @@ type (
 		FunctionTypeID FunctionTypeID
 	}
 
+	// MemoryInstance represents a memory instance in a store.
+	// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
 	MemoryInstance struct {
 		Buffer []byte
 		Min    uint32
@@ -162,8 +176,8 @@ type (
 	FunctionAddress uint64
 
 	// FunctionTypeID is an uniquely assigned integer for a function type.
-	// This is wazero specific runtime object and specific to a store.
-	// This is used at runtime to do type-checks on indirect function calls.
+	// This is wazero specific runtime object and specific to a store,
+	// and used at runtime to do type-checks on indirect function calls.
 	FunctionTypeID uint64
 )
 
