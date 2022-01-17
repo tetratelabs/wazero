@@ -102,13 +102,13 @@ func (j *jitEnv) setTable(table []wasm.TableElement) {
 }
 
 func (j *jitEnv) exec(code []byte) {
-	j.eng.memorySliceLen = int64(len(j.mem.Buffer))
+	j.eng.memorySliceLen = uint64(len(j.mem.Buffer))
 	if len(j.globals) > 0 {
 		j.eng.globalSliceAddress = uintptr(unsafe.Pointer(&j.globals[0]))
 	}
 	if l := len(j.table.Table); l > 0 {
 		j.eng.tableSliceAddress = uintptr(unsafe.Pointer(&j.table.Table[0]))
-		j.eng.tableSliceLen = int64(l)
+		j.eng.tableSliceLen = uint64(l)
 	}
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),

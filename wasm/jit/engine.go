@@ -44,11 +44,11 @@ type engine struct {
 	// The current compiledFunction.globalSliceAddress
 	globalSliceAddress uintptr
 	// memorySliceLen stores the length of memory slice used by the currently executed function.
-	memorySliceLen int64
+	memorySliceLen uint64
 	// The current compiledFunction.tableSliceAddress
 	tableSliceAddress uintptr
 	// tableSliceLen stores the length of the unique table used by the currently executed function.
-	tableSliceLen int64
+	tableSliceLen uint64
 	// Function call frames in linked list
 	callFrameStack *callFrame
 	// callFrameNum tracks the current number of call frames.
@@ -206,7 +206,7 @@ func (e *engine) callFramePush(callee *callFrame) {
 	e.tableSliceLen = callee.compiledFunction.tableSliceLen
 	e.tableSliceAddress = callee.compiledFunction.tableSliceAddress
 	if callee.compiledFunction.memory != nil {
-		e.memorySliceLen = int64(len(callee.compiledFunction.memory.Buffer))
+		e.memorySliceLen = uint64(len(callee.compiledFunction.memory.Buffer))
 	}
 }
 
@@ -226,7 +226,7 @@ func (e *engine) callFramePop() {
 		e.tableSliceLen = caller.compiledFunction.tableSliceLen
 		e.tableSliceAddress = caller.compiledFunction.tableSliceAddress
 		if caller.compiledFunction.memory != nil {
-			e.memorySliceLen = int64(len(caller.compiledFunction.memory.Buffer))
+			e.memorySliceLen = uint64(len(caller.compiledFunction.memory.Buffer))
 		}
 	}
 }
@@ -307,7 +307,7 @@ type compiledFunction struct {
 	// tableSliceAddress and tableSliceLen are like codeInitialAddress, but for tables.
 	// Note we don't support multiple tables yet.
 	tableSliceAddress uintptr
-	tableSliceLen     int64
+	tableSliceLen     uint64
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
 }
@@ -374,7 +374,7 @@ func (e *engine) execHostFunction(f *compiledFunction, ctx *wasm.HostFunctionCal
 	}
 }
 
-func (e *engine) execWasmFunction(f *compiledFunction) {
+func (e *engine) execFunction(f *compiledFunction) {
 	// Push a new call frame for the target function.
 	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, compiledFunction: f})
 
@@ -670,7 +670,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		if len(table.Table) > 0 {
 			cf.tableSliceAddress = uintptr(unsafe.Pointer(&table.Table[0]))
 		}
-		cf.tableSliceLen = int64(len(table.Table))
+		cf.tableSliceLen = uint64(len(table.Table))
 	}
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 	return cf, nil
