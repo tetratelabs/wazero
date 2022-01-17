@@ -401,6 +401,9 @@ func (e *engine) execFunction(f *compiledFunction) {
 			// so restore the caller's frame.
 			e.callFramePop()
 		case jitCallStatusCodeCallFunction:
+			// We consolidate host function calls with normal wasm function calls.
+			// This reduced the cost of checking isHost in the assembly as well as
+			// the cost of doing fully native function calls between wasm functions we will do later.
 			nextFunc := e.compiledFunctions[e.functionCallAddress]
 			// Calculate the continuation address so we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
