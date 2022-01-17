@@ -729,8 +729,8 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 // and make a function call against the function whose index equals "table[offset]".
 // This is called indirect function call in the sense that the target function is indirectly
 // determined by the current state (top value) of the stack.
-// Therefore, two checks are performed before entering the target function:
-// 1) If "offset" doesn't exceed the length of table, "out of bounds table access" is raised.
+// Therefore, two checks are performed at runtime before entering the target function:
+// 1) If "offset" exceeds the length of table, "out of bounds table access" is raised.
 // 2) If the type of the function table[offset] doesn't match the specified function type, "type mismatch" is raised.
 // Otherwise, we successfully enther the target function.
 //
