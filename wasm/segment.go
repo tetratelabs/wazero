@@ -22,7 +22,6 @@ const (
 // Import is the binary representation of an import indicated by Kind
 // See https://www.w3.org/TR/wasm-core-1/#binary-import
 type Import struct {
-	// Kind
 	Kind ImportKind
 	// Module is the possibly empty primary namespace of this import
 	Module string
@@ -99,6 +98,8 @@ func readGlobal(r io.Reader) (*Global, error) {
 	}, nil
 }
 
+// ExportKind indicates which index Export.Index points to
+// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
 type ExportKind = byte
 
 const (
@@ -108,11 +109,14 @@ const (
 	ExportKindGlobal ExportKind = 0x03
 )
 
+// Export is the binary representation of an export indicated by Kind
+// See https://www.w3.org/TR/wasm-core-1/#binary-export
 type Export struct {
-	// Name is the what the host refers to this definition as.
-	Name string
 	Kind ExportKind
-	// Index is the index of the definition to export, determined by Kind
+	// Name is what the host refers to this definition as.
+	Name string
+	// Index is the index of the definition to export, the index namespace is by Kind
+	// Ex. If ExportKindFunc, this is an index to ModuleInstance.Functions
 	Index uint32
 }
 

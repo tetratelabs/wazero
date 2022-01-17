@@ -730,7 +730,7 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			}
 			target.Exports[name] = &ExportInstance{
 				Kind:   exp.Kind,
-				Global: target.Globals[exp.Index],
+				Global: target.Globals[index],
 			}
 		case ExportKindMemory:
 			if index != 0 || target.Memory == nil {
@@ -746,7 +746,7 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			}
 			target.Exports[name] = &ExportInstance{
 				Kind:  exp.Kind,
-				Table: target.Tables[exp.Index],
+				Table: target.Tables[index],
 			}
 		}
 
