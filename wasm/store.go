@@ -12,10 +12,29 @@ import (
 )
 
 type (
+	// Store is the runtime representation of "instantiated" Wasm module and objects.
+	// Multiple modules can be instantiated within a single store, and each instance,
+	// (e.g. function instance) can be referenced by other modules in a Store via imports.
+	//
+	// Every type whose name ends with *"Instance" suffix belongs to exactly one store.
+	//
+	// Note that store is not thread (concurrency) safe, meaning that using single Store
+	// multiple goroutines by might result in race conditions. In that case, the invocation
+	// and access to any methods and field of Store must be guarded by mutex.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0
 	Store struct {
-		engine          Engine
+		// The following fields are wazero-specific fields of Store.
+
+		// engine is a global context for a Store which is in reponsible for compilation and execution of Wasm modules.
+		engine Engine
+		// ModuleInstances holds the instantiated Wasm modules keyed on names given at Instantiate.
 		ModuleInstances map[string]*ModuleInstance
-		TypeIDs         map[string]uint64
+		// TypeIDs maps each FunctionType.String() to an unique integer. This is used at runtime to
+		// do type-checks on indirect function calls.
+		TypeIDs map[string]uint64
+
+		// The followings fields match the definition of Store in the specification.
 
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
@@ -23,6 +42,11 @@ type (
 		Tables    []*TableInstance
 	}
 
+	// ModuleInstance represents instantiated wasm module.
+	// The difference from the spec is that in wazero, a ModuleInstance holds  pointers
+	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#syntax-moduleinst for the original specification.
 	ModuleInstance struct {
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
@@ -32,6 +56,11 @@ type (
 		Types     []*TypeInstance
 	}
 
+	// ExportInstance represents an exported instance in a Store.
+	// The difference from the spec is that in wazero, a ExportInstance holds  pointers
+	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#syntax-exportinst
 	ExportInstance struct {
 		Kind     byte
 		Function *FunctionInstance
@@ -55,8 +84,6 @@ type (
 		Type   *FunctionType
 		TypeID uint64
 	}
-
-	FunctionAddress uint64
 
 	HostFunctionCallContext struct {
 		Memory *MemoryInstance
@@ -88,6 +115,8 @@ type (
 		FunctionAddress FunctionAddress
 		FunctionTypeID  uint64
 	}
+
+	FunctionAddress uint64
 
 	MemoryInstance struct {
 		Buffer []byte
