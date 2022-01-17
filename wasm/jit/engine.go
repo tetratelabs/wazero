@@ -402,8 +402,9 @@ func (e *engine) execFunction(f *compiledFunction) {
 			e.callFramePop()
 		case jitCallStatusCodeCallFunction:
 			nextFunc := e.compiledFunctions[e.functionCallAddress]
+			// Calculate the continuation address so we can resume this caller function frame.
+			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 			if nextFunc.isHostFunction() {
-				currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 				// Push the call frame for this host function.
 				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
 				// Call into the host function.
@@ -411,17 +412,14 @@ func (e *engine) execFunction(f *compiledFunction) {
 				// Pop the call frame.
 				e.callFrameStack = currentFrame
 			} else {
-				// Calculate the continuation address so we can resume this caller function frame.
-				currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 				currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
-				// Create the callee frame.
-				frame := &callFrame{
+				callee := &callFrame{
 					continuationAddress: nextFunc.codeInitialAddress,
 					compiledFunction:    nextFunc,
 					// Set the base pointer to the beginning of the function params
 					stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
 				}
-				e.callFramePush(frame)
+				e.callFramePush(callee)
 				// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 				e.maybeGrowStack(nextFunc.maxStackPointer)
 			}
