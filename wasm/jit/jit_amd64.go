@@ -167,12 +167,15 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	for _, inst := range c.requireFunctionCallReturnAddressOffsetResolution {
 		afterReturnInst := inst
 		// Iterate the linked list of instructions until we find the return instruction.
-		for ; ; afterReturnInst = afterReturnInst.Link {
+		for ; afterReturnInst != nil; afterReturnInst = afterReturnInst.Link {
 			if afterReturnInst.As == obj.ARET {
 				// Now we found the return instruction, move forward once again.
 				afterReturnInst = afterReturnInst.Link
 				break
 			}
+		}
+		if afterReturnInst == nil {
+			return nil, 0, fmt.Errorf("invalid function call at %v", inst)
 		}
 		// Skip MOV, and the register(rax): "0x49, 0xbd"
 		start := inst.Pc + 2
@@ -702,7 +705,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	if err := c.makeFunctionCallFromConsts(jitCallStatusCodeCallFunction, target.Address); err != nil {
+	if err := c.compileFunctionCallFromAddress(jitCallStatusCodeCallFunction, target.Address); err != nil {
 		return err
 	}
 
@@ -823,7 +826,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	readValue.From.Reg = offset.register
 	c.addInstruction(readValue)
 
-	if err := c.makeFunctionCallFromRegister(offset.register); err != nil {
+	if err := c.compileFunctionCallFromRegister(offset.register); err != nil {
 		return nil
 	}
 
@@ -3927,7 +3930,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	return c.makeFunctionCallFromConsts(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemoryGrow)
+	return c.compileFunctionCallFromAddress(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemoryGrow)
 }
 
 func (c *amd64Compiler) compileMemorySize() error {
@@ -3936,7 +3939,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	if err := c.makeFunctionCallFromConsts(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemorySize); err != nil {
+	if err := c.compileFunctionCallFromAddress(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemorySize); err != nil {
 		return err
 	}
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.

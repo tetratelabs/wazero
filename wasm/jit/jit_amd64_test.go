@@ -145,6 +145,55 @@ func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *
 	return prog
 }
 
+func TestAmd64Compiler_generate(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+
+		// Emit a good move instruction which is followed by return and continuation.
+		inst := compiler.newProg()
+		inst.As = x86.AMOVQ
+		inst.From.Type = obj.TYPE_CONST
+		inst.To.Type = obj.TYPE_REG
+		inst.To.Reg = x86.REG_R10
+		inst.From.Offset = int64(1 << 33)
+		compiler.addInstruction(inst)
+		compiler.requireFunctionCallReturnAddressOffsetResolution = append(
+			compiler.requireFunctionCallReturnAddressOffsetResolution, inst)
+
+		ret := compiler.newProg()
+		ret.As = obj.ARET
+		compiler.addInstruction(ret)
+
+		afterFunctionCallInst := compiler.newProg()
+		afterFunctionCallInst.As = obj.ANOP
+		compiler.addInstruction(afterFunctionCallInst)
+
+		// Check the error is NOT returned.
+		_, _, err := compiler.generate()
+		require.NoError(t, err)
+	})
+	t.Run("invalid function call", func(t *testing.T) {
+		compiler := requireNewCompiler(t)
+		compiler.initializeReservedRegisters()
+
+		// Set the invalid function call origin which the return instruction doesn't follow.
+		invalidInst := compiler.newProg()
+		invalidInst.As = x86.AMOVQ
+		invalidInst.To.Type = obj.TYPE_REG
+		invalidInst.To.Reg = x86.REG_R10
+		invalidInst.To.Type = obj.TYPE_REG
+		invalidInst.To.Reg = x86.REG_R10
+		compiler.addInstruction(invalidInst)
+		compiler.requireFunctionCallReturnAddressOffsetResolution = append(
+			compiler.requireFunctionCallReturnAddressOffsetResolution, invalidInst)
+
+		// Check the error is returned.
+		_, _, err := compiler.generate()
+		require.Error(t, err)
+	})
+}
+
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 	f := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{
 		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
