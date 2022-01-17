@@ -1701,7 +1701,7 @@ func ReadBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, e
 	return ret, num, nil
 }
 
-// HostFunctionCallContext is passed as a first argument of all host functions.
+// HostFunctionCallContext is the first argument of all host functions.
 type HostFunctionCallContext struct {
 	// Memory is the currently used memory instance at the time when the host function call is made.
 	Memory *MemoryInstance
