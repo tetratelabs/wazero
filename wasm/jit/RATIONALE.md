@@ -62,7 +62,7 @@ This way, the engine, which enters the native code via `jitcall`, can know the c
 
 ```go
 case jitCallStatusCodeCallFunction:
-    nextFunc := e.compiledWasmFunctions[e.functionCallIndex]
+    nextFunc := e.compiledFunctions[e.functionCallIndex]
     // Calculate the continuation address so
     // we can resume this caller function frame.
     currentFrame.continuationAddress = currentFrame.f.codeInitialAddress + e.continuationAddressOffset

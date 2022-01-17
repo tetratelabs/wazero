@@ -41,11 +41,11 @@ type engine struct {
 	// Instructions after [base+continuationAddressOffset] must start with
 	// restoring reserved registeres.
 	continuationAddressOffset uintptr
-	// The current compiledWasmFunction.globalSliceAddress
+	// The current compiledFunction.globalSliceAddress
 	globalSliceAddress uintptr
 	// memorySliceLen stores the length of memory slice used by the currently executed function.
 	memorySliceLen int64
-	// The current compiledWasmFunction.tableSliceAddress
+	// The current compiledFunction.tableSliceAddress
 	tableSliceAddress uintptr
 	// tableSliceLen stores the length of the unique table used by the currently executed function.
 	tableSliceLen int64
@@ -137,7 +137,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	if compiled.isHostFunction() {
 		e.execHostFunction(compiled, &wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
 	} else {
-		e.execWasmFunction(compiled)
+		e.execFunction(compiled)
 	}
 
 	// Note the top value is the tail of the results,
@@ -664,7 +664,8 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		cf.globalSliceAddress = uintptr(unsafe.Pointer(&f.ModuleInstance.Globals[0]))
 	}
 	if tables := f.ModuleInstance.Tables; len(tables) > 0 {
-		// We don't support multiple tables yet.
+		// WebAssembly 1.0 (MVP) has at most 1 table
+		// See https://www.w3.org/TR/wasm-core-1/#tables%E2%91%A0
 		table := tables[0]
 		if len(table.Table) > 0 {
 			cf.tableSliceAddress = uintptr(unsafe.Pointer(&table.Table[0]))
