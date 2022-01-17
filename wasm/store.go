@@ -97,7 +97,6 @@ type (
 		// HostFunction holds the runtime representation of host functions.
 		// If this is not nil, all the above fields are ignored as they are specific to non-host functions.
 		HostFunction *reflect.Value
-
 		// Address is the funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) of this function insntance.
 		// More precisely, this equals the index of this function instance in store.FunctionInstances.
 		// All function calls are made via funcaddr at runtime, not the index (scoped to a module).
