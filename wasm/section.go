@@ -230,9 +230,9 @@ func (m *Module) readSectionImports(r *reader) error {
 		return fmt.Errorf("get size of vector: %v", err)
 	}
 
-	m.ImportSection = make([]*ImportSegment, vs)
+	m.ImportSection = make([]*Import, vs)
 	for i := range m.ImportSection {
-		m.ImportSection[i], err = readImportSegment(r)
+		m.ImportSection[i], err = readImport(r)
 		if err != nil {
 			return fmt.Errorf("read import: %v", err)
 		}
@@ -294,9 +294,9 @@ func (m *Module) readSectionGlobals(r *reader) error {
 		return fmt.Errorf("get size of vector: %v", err)
 	}
 
-	m.GlobalSection = make([]*GlobalSegment, vs)
+	m.GlobalSection = make([]*Global, vs)
 	for i := range m.GlobalSection {
-		m.GlobalSection[i], err = readGlobalSegment(r)
+		m.GlobalSection[i], err = readGlobal(r)
 		if err != nil {
 			return fmt.Errorf("read global segment: %v ", err)
 		}
@@ -310,9 +310,9 @@ func (m *Module) readSectionExports(r *reader) error {
 		return fmt.Errorf("get size of vector: %v", err)
 	}
 
-	m.ExportSection = make(map[string]*ExportSegment, vs)
+	m.ExportSection = make(map[string]*Export, vs)
 	for i := uint32(0); i < vs; i++ {
-		expDesc, err := readExportSegment(r)
+		expDesc, err := readExport(r)
 		if err != nil {
 			return fmt.Errorf("read export: %v", err)
 		}
@@ -355,10 +355,10 @@ func (m *Module) readSectionCodes(r *reader) error {
 	if err != nil {
 		return fmt.Errorf("get size of vector: %v", err)
 	}
-	m.CodeSection = make([]*CodeSegment, vs)
+	m.CodeSection = make([]*Code, vs)
 
 	for i := range m.CodeSection {
-		m.CodeSection[i], err = readCodeSegment(r)
+		m.CodeSection[i], err = readCode(r)
 		if err != nil {
 			return fmt.Errorf("read %d-th code segment: %v", i, err)
 		}

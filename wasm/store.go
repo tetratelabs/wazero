@@ -272,7 +272,7 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 		return nil, nil, fmt.Errorf("exported function '%s' not found in '%s'", funcName, moduleName)
 	}
 
-	if exp.Kind != ExportKindFunction {
+	if exp.Kind != ExportKindFunc {
 		return nil, nil, fmt.Errorf("'%s' is not functype", funcName)
 	}
 
@@ -299,7 +299,7 @@ func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
 	return nil
 }
 
-func (s *Store) resolveImport(target *ModuleInstance, is *ImportSegment) error {
+func (s *Store) resolveImport(target *ModuleInstance, is *Import) error {
 	em, ok := s.ModuleInstances[is.Module]
 	if !ok {
 		return fmt.Errorf("failed to resolve import of module name %s", is.Module)
@@ -310,28 +310,28 @@ func (s *Store) resolveImport(target *ModuleInstance, is *ImportSegment) error {
 		return fmt.Errorf("not exported in module %s", is.Module)
 	}
 
-	if is.Desc.Kind != e.Kind {
-		return fmt.Errorf("type mismatch on export: got %#x but want %#x", e.Kind, is.Desc.Kind)
+	if is.Kind != e.Kind {
+		return fmt.Errorf("type mismatch on export: got %#x but want %#x", e.Kind, is.Kind)
 	}
-	switch is.Desc.Kind {
-	case ImportKindFunction:
-		if err := s.applyFunctionImport(target, is.Desc.FuncTypeIndex, e); err != nil {
+	switch is.Kind {
+	case ImportKindFunc:
+		if err := s.applyFunctionImport(target, is.DescFunc, e); err != nil {
 			return fmt.Errorf("applyFunctionImport: %w", err)
 		}
 	case ImportKindTable:
-		if err := s.applyTableImport(target, is.Desc.TableTypePtr, e); err != nil {
+		if err := s.applyTableImport(target, is.DescTable, e); err != nil {
 			return fmt.Errorf("applyTableImport: %w", err)
 		}
 	case ImportKindMemory:
-		if err := s.applyMemoryImport(target, is.Desc.MemTypePtr, e); err != nil {
+		if err := s.applyMemoryImport(target, is.DescMem, e); err != nil {
 			return fmt.Errorf("applyMemoryImport: %w", err)
 		}
 	case ImportKindGlobal:
-		if err := s.applyGlobalImport(target, is.Desc.GlobalTypePtr, e); err != nil {
+		if err := s.applyGlobalImport(target, is.DescGlobal, e); err != nil {
 			return fmt.Errorf("applyGlobalImport: %w", err)
 		}
 	default:
-		return fmt.Errorf("invalid kind of import: %#x", is.Desc.Kind)
+		return fmt.Errorf("invalid kind of import: %#x", is.Kind)
 	}
 
 	return nil
@@ -509,15 +509,15 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	var memoryDeclarations []*MemoryType
 	var tableDeclarations []*TableType
 	for _, imp := range module.ImportSection {
-		switch imp.Desc.Kind {
-		case ImportKindFunction:
-			functionDeclarations = append(functionDeclarations, imp.Desc.FuncTypeIndex)
+		switch imp.Kind {
+		case ImportKindFunc:
+			functionDeclarations = append(functionDeclarations, imp.DescFunc)
 		case ImportKindGlobal:
-			globalDeclarations = append(globalDeclarations, imp.Desc.GlobalTypePtr)
+			globalDeclarations = append(globalDeclarations, imp.DescGlobal)
 		case ImportKindMemory:
-			memoryDeclarations = append(memoryDeclarations, imp.Desc.MemTypePtr)
+			memoryDeclarations = append(memoryDeclarations, imp.DescMem)
 		case ImportKindTable:
-			tableDeclarations = append(tableDeclarations, imp.Desc.TableTypePtr)
+			tableDeclarations = append(tableDeclarations, imp.DescTable)
 		}
 	}
 	importedFunctionCount := len(functionDeclarations)
@@ -714,14 +714,14 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	target.Exports = make(map[string]*ExportInstance, len(module.ExportSection))
 	for name, exp := range module.ExportSection {
-		index := int(exp.Desc.Index)
-		switch exp.Desc.Kind {
-		case ExportKindFunction:
+		index := int(exp.Index)
+		switch exp.Kind {
+		case ExportKindFunc:
 			if index >= len(target.Functions) {
 				return nil, fmt.Errorf("unknown function for export")
 			}
 			target.Exports[name] = &ExportInstance{
-				Kind:     exp.Desc.Kind,
+				Kind:     exp.Kind,
 				Function: target.Functions[index],
 			}
 		case ExportKindGlobal:
@@ -729,15 +729,15 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 				return nil, fmt.Errorf("unknown global for export")
 			}
 			target.Exports[name] = &ExportInstance{
-				Kind:   exp.Desc.Kind,
-				Global: target.Globals[exp.Desc.Index],
+				Kind:   exp.Kind,
+				Global: target.Globals[exp.Index],
 			}
 		case ExportKindMemory:
 			if index != 0 || target.Memory == nil {
 				return nil, fmt.Errorf("unknown memory for export")
 			}
 			target.Exports[name] = &ExportInstance{
-				Kind:   exp.Desc.Kind,
+				Kind:   exp.Kind,
 				Memory: target.Memory,
 			}
 		case ExportKindTable:
@@ -745,8 +745,8 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 				return nil, fmt.Errorf("unknown memory for export")
 			}
 			target.Exports[name] = &ExportInstance{
-				Kind:  exp.Desc.Kind,
-				Table: target.Tables[exp.Desc.Index],
+				Kind:  exp.Kind,
+				Table: target.Tables[exp.Index],
 			}
 		}
 
@@ -1761,7 +1761,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	if err := s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
-	m.Exports[funcName] = &ExportInstance{Kind: ExportKindFunction, Function: f}
+	m.Exports[funcName] = &ExportInstance{Kind: ExportKindFunc, Function: f}
 	s.addFunctionInstance(f)
 	return nil
 }
