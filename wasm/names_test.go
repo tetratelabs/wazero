@@ -14,15 +14,14 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 	}{
 		{
 			name:  "empty",
-			input: &CustomNameSection{FunctionNames: map[uint32]string{}, LocalNames: map[uint32]map[uint32]string{}},
+			input: &CustomNameSection{},
 		},
 		{
 			name: "only module",
 			// Ex. (module $simple )
 			input: &CustomNameSection{ModuleName: "simple"},
 			expected: []byte{
-				0x00, // Module subsection ID zero
-				0x07, // 7 bytes to follow
+				subsectionIDModuleName, 0x07, // 7 bytes
 				0x06, // the Module name simple is 6 bytes long
 				's', 'i', 'm', 'p', 'l', 'e',
 			},
@@ -38,12 +37,10 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 				FunctionNames: map[uint32]string{0x00: "hello"},
 			},
 			expected: []byte{
-				0x00, // Module subsection ID zero
-				0x07, // 7 bytes to follow
+				subsectionIDModuleName, 0x07, // 7 bytes
 				0x06, // the Module name simple is 6 bytes long
 				's', 'i', 'm', 'p', 'l', 'e',
-				0x01, // function subsection ID one
-				0x08, // 8 bytes to follow
+				subsectionIDFunctionNames, 0x08, // 8 bytes
 				0x01, // one function name
 				0x00, // the function index is zero
 				0x05, // the function name hello is 5 bytes long
@@ -63,8 +60,7 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 				},
 			},
 			expected: []byte{
-				0x01, // function subsection ID one
-				0x2b, // 43 bytes to follow
+				subsectionIDFunctionNames, 0x2b, // 43 bytes
 				0x02, // two function names
 				0x00, // the function index is zero
 				0x16, // the function name runtime.args_sizes_get is 22 bytes long
@@ -91,11 +87,11 @@ func TestCustomNameSection_EncodeData(t *testing.T) {
 				},
 			},
 			expected: []byte{
-				0x01, 0x0b, // function subsection ID one (7 bytes)
+				subsectionIDFunctionNames, 0x0b, // 7 bytes
 				0x02,                      // two function names
 				0x00, 0x03, 'm', 'u', 'l', // index 0, size of "mul", "mul"
 				0x01, 0x03, 'a', 'd', 'd', // index 1, size of "add", "add"
-				0x02, 0x11, // local subsection ID two (17 bytes)
+				subsectionIDLocalNames, 0x11, // 17 bytes
 				0x02,       // two functions
 				0x00, 0x02, // index 0 has 2 locals
 				0x00, 0x01, 'x', // index 0, size of "x", "x"
@@ -165,48 +161,46 @@ func TestEncodeSizePrefixed(t *testing.T) {
 	require.Equal(t, []byte{5, 'h', 'e', 'l', 'l', 'o'}, encodeSizePrefixed([]byte("hello")))
 }
 
+// TestDecodeCustomNameSection relies on unit tests for CustomNameSection.EncodeData, specifically that the encoding is
+// both known and correct. This avoids having to copy/paste or share variables to assert against byte arrays.
 func TestDecodeCustomNameSection(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []byte
-		expected *CustomNameSection
-	}{
+		name  string
+		input *CustomNameSection // round trip test!
+	}{{
+		name:  "empty",
+		input: &CustomNameSection{},
+	},
 		{
-			name: "one function name",
-			//	(module (import "" "Hello" (func $hello)))
-			input: []byte{
-				0x01, // function subsection ID one
-				0x08, // 8 bytes to follow
-				0x01, // one function name
-				0x00, // the function index is zero
-				0x05, // the function name hello is 5 bytes long
-				'h', 'e', 'l', 'l', 'o',
-			},
-			expected: &CustomNameSection{
+			name:  "only module",
+			input: &CustomNameSection{ModuleName: "simple"},
+		},
+		{
+			name: "module and function name",
+			input: &CustomNameSection{
+				ModuleName:    "simple",
 				FunctionNames: map[uint32]string{0x00: "hello"},
 			},
 		},
 		{
-			name: "two function names", // Ex. TinyGo which at one point didn't set a module name
-			//	(module
-			//		(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (param i32, i32) (result i32)))
-			//		(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32, i32, i32, i32) (result i32)))
-			//	)
-			input: []byte{
-				0x01, // function subsection ID one
-				0x2b, // 43 bytes to follow
-				0x02, // two function names
-				0x00, // the function index is zero
-				0x16, // the function name runtime.args_sizes_get is 22 bytes long
-				'r', 'u', 'n', 't', 'i', 'm', 'e', '.', 'a', 'r', 'g', 's', '_', 's', 'i', 'z', 'e', 's', '_', 'g', 'e', 't',
-				0x01, // the function index is zero
-				0x10, // the function name runtime.fd_write is 16 bytes long
-				'r', 'u', 'n', 't', 'i', 'm', 'e', '.', 'f', 'd', '_', 'w', 'r', 'i', 't', 'e',
-			},
-			expected: &CustomNameSection{
+			name: "two function names",
+			input: &CustomNameSection{
 				FunctionNames: map[uint32]string{
 					0x00: "runtime.args_sizes_get",
 					0x01: "runtime.fd_write",
+				},
+			},
+		},
+		{
+			name: "function with local names",
+			input: &CustomNameSection{
+				FunctionNames: map[uint32]string{
+					0x00: "mul",
+					0x01: "add",
+				},
+				LocalNames: map[uint32]map[uint32]string{
+					0x00: {0x00: "x", 0x01: "y"},
+					0x01: {0x00: "l", 0x01: "r"},
 				},
 			},
 		},
@@ -216,48 +210,100 @@ func TestDecodeCustomNameSection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ns, err := DecodeCustomNameSection(tc.input)
+			ns, err := DecodeCustomNameSection(tc.input.EncodeData())
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, ns)
+			require.Equal(t, tc.input, ns)
 		})
 	}
 }
 
 func TestDecodeCustomNameSection_Errors(t *testing.T) {
+	// currently, we ignore the size of known subsections
+	ignoredSubsectionSize := byte(50)
 	tests := []struct {
 		name        string
 		input       []byte
 		expectedErr string
 	}{
 		{
-			name:        "empty",
-			input:       []byte{},
-			expectedErr: "failed to read subsection ID: EOF",
+			name:        "EOF after module name subsection ID",
+			input:       []byte{subsectionIDModuleName},
+			expectedErr: "failed to read the size of subsection[0]: EOF",
 		},
 		{
-			name:        "EOF after subsection ID",
-			input:       []byte{0x01},
-			expectedErr: "failed to read the size of subsection 1: EOF",
+			name:        "EOF after function names subsection ID",
+			input:       []byte{subsectionIDFunctionNames},
+			expectedErr: "failed to read the size of subsection[1]: EOF",
 		},
 		{
-			name:        "EOF after size",
-			input:       []byte{0x01, 0x10},
-			expectedErr: "failed to read the size of name vector: EOF",
+			name:        "EOF after local names subsection ID",
+			input:       []byte{subsectionIDLocalNames},
+			expectedErr: "failed to read the size of subsection[2]: EOF",
 		},
 		{
-			name:        "EOF after function name vector size",
-			input:       []byte{0x01, 0x10, 0x01},
-			expectedErr: "failed to read function index: EOF",
+			name:        "EOF after unknown subsection ID",
+			input:       []byte{4},
+			expectedErr: "failed to read the size of subsection[4]: EOF",
+		},
+		{
+			name:        "EOF after module name subsection size",
+			input:       []byte{subsectionIDModuleName, ignoredSubsectionSize},
+			expectedErr: "failed to read module name size: EOF",
+		},
+		{
+			name:        "EOF after function names subsection size",
+			input:       []byte{subsectionIDFunctionNames, ignoredSubsectionSize},
+			expectedErr: "failed to read the function count of subsection[1]: EOF",
+		},
+		{
+			name:        "EOF after local names subsection size",
+			input:       []byte{subsectionIDLocalNames, ignoredSubsectionSize},
+			expectedErr: "failed to read the function count of subsection[2]: EOF",
+		},
+		{
+			name:        "EOF skipping unknown subsection size",
+			input:       []byte{4, 100},
+			expectedErr: "failed to skip subsection[4]: EOF",
+		},
+		{
+			name:        "EOF after module name size",
+			input:       []byte{subsectionIDModuleName, ignoredSubsectionSize, 5},
+			expectedErr: "failed to read module name: EOF",
+		},
+		{
+			name:        "EOF after function name count",
+			input:       []byte{subsectionIDFunctionNames, ignoredSubsectionSize, 2},
+			expectedErr: "failed to read a function index in subsection[1]: EOF",
+		},
+		{
+			name:        "EOF after local names function count",
+			input:       []byte{subsectionIDLocalNames, ignoredSubsectionSize, 2},
+			expectedErr: "failed to read a function index in subsection[2]: EOF",
 		},
 		{
 			name:        "EOF after function name index",
-			input:       []byte{0x01, 0x10, 0x01, 0x00},
-			expectedErr: "failed to read function name size: EOF",
+			input:       []byte{subsectionIDFunctionNames, ignoredSubsectionSize, 2, 0},
+			expectedErr: "failed to read function[0] name size: EOF",
+		},
+		{
+			name:        "EOF after local names function index",
+			input:       []byte{subsectionIDLocalNames, ignoredSubsectionSize, 2, 0},
+			expectedErr: "failed to read the local count for function[0]: EOF",
 		},
 		{
 			name:        "EOF after function name size",
-			input:       []byte{0x01, 0x10, 0x01, 0x00, 0x01},
-			expectedErr: "failed to read function name: EOF",
+			input:       []byte{subsectionIDFunctionNames, ignoredSubsectionSize, 2, 0, 5},
+			expectedErr: "failed to read function[0] name: EOF",
+		},
+		{
+			name:        "EOF after local names count for a function index",
+			input:       []byte{subsectionIDLocalNames, ignoredSubsectionSize, 2, 0, 2},
+			expectedErr: "failed to read a local index of function[0]: EOF",
+		},
+		{
+			name:        "EOF after local name size",
+			input:       []byte{subsectionIDLocalNames, ignoredSubsectionSize, 2, 0, 2, 1},
+			expectedErr: "failed to read function[0] local[1] name size: EOF",
 		},
 	}
 

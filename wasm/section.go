@@ -11,6 +11,7 @@ import (
 type SectionID = byte
 
 const (
+	// SectionIDCustom includes the standard defined CustomNameSection and possibly others not defined in the standard.
 	SectionIDCustom   SectionID = 0
 	SectionIDType     SectionID = 1
 	SectionIDImport   SectionID = 2
@@ -30,9 +31,6 @@ const (
 // See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%93%AA
 func (m *Module) encodeSections(buffer []byte) (bytes []byte) {
 	bytes = buffer
-	for name, data := range m.CustomSections {
-		bytes = append(bytes, encodeCustomSection(name, data)...)
-	}
 	if len(m.TypeSection) > 0 {
 		panic("TODO: TypeSection")
 	}
@@ -65,6 +63,13 @@ func (m *Module) encodeSections(buffer []byte) (bytes []byte) {
 	}
 	if len(m.DataSection) > 0 {
 		panic("TODO: DataSection")
+	}
+
+	// We encode custom sections after data as that ensures the correct order in the only section where order matters:
+	// >> The name section should appear only once in a module, and only after the data section.
+	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
+	for name, data := range m.CustomSections {
+		bytes = append(bytes, encodeCustomSection(name, data)...)
 	}
 	return
 }
