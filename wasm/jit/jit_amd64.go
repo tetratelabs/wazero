@@ -166,7 +166,7 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	const operandSizeBytes = 8
 	for _, inst := range c.requireFunctionCallReturnAddressOffsetResolution {
 		afterReturnInst := inst
-		// We move forward on the linked list of instructions until the return instrucion found.
+		// Iterate the linked list of instructions until we find the return instruction.
 		for ; ; afterReturnInst = afterReturnInst.Link {
 			if afterReturnInst.As == obj.ARET {
 				// Now we found the return instruction, move forward once again.
@@ -732,14 +732,15 @@ const (
 // compileCallIndirect adds instructions to perform call_indirect operation.
 // This consumes the one value from the top of stack (called "offset"),
 // and make a function call against the function whose function address equals "table[offset]".
-// This is called indirect function call in the sense that the target function is indirectly
+//
+// Note: This is called indirect function call in the sense that the target function is indirectly
 // determined by the current state (top value) of the stack.
 // Therefore, two checks are performed at runtime before entering the target function:
-// 1) If "offset" exceeds the length of table, "out of bounds table access" is raised.
-// 2) If the type of the function table[offset] doesn't match the specified function type, "type mismatch" is raised.
-// Otherwise, we successfully enther the target function.
+// 1) If "offset" exceeds the length of table, "out of bounds table access" states (jitCallStatusCodeTableOutOfBounds) is returned.
+// 2) If the type of the function table[offset] doesn't match the specified function type, "type mismatch" status (jitCallStatusCodeTypeMismatchOnIndirectCall) is returned.
+// Otherwise, we successfully enter the target function.
 //
-// Note that we don't yet support multiple tables.
+// Note: WebAssembly 1.0 (MVP) supports at most one table, so this doesn't support multiple tables.
 func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
 	offset := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(offset); err != nil {
@@ -4225,10 +4226,10 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	c.addInstruction(prog)
 }
 
-// makeFunctionCallFromConsts makes a function call against the function whose address equals addr parameter.
+// compileFunctionCallFromAddress adds instructions to call a function whose address equals the addr parameter.
 // jitStatus is set before making call, and it should either jitCallStatusCodeCallBuiltInFunction or
 // jitCallStatusCodeCallFunction.
-func (c *amd64Compiler) makeFunctionCallFromConsts(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
+func (c *amd64Compiler) compileFunctionCallFromAddress(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
 	c.setJITStatus(jitStatus)
 
 	prog := c.newProg()
@@ -4251,9 +4252,9 @@ func (c *amd64Compiler) makeFunctionCallFromConsts(jitStatus jitCallStatusCode, 
 	return nil
 }
 
-// makeFunctionCallFromConsts makes a function call against the function whose address equals the value on
+// compileFunctionCallFromRegister adds instructions to call a function whose address equals the value on
 // the functionCallAddressRegister.
-func (c *amd64Compiler) makeFunctionCallFromRegister(functionCallAddressRegister int16) error {
+func (c *amd64Compiler) compileFunctionCallFromRegister(functionCallAddressRegister int16) error {
 	c.setJITStatus(jitCallStatusCodeCallFunction)
 
 	setFunctionAddressFromReg := c.newProg()

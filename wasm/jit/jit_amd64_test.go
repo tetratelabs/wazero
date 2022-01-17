@@ -4389,7 +4389,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileCall(t *testing.T) {
-	const functionAddress wasm.FunctionAddress = 5
+	const functionAddress wasm.FunctionAddress = 5 // arbitrary value for testing
 	env := newJITEnvironment()
 	compiler := requireNewCompiler(t)
 	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
@@ -5576,7 +5576,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				compiler.initializeReservedRegisters()
 				require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
-				// At this point, we consumed the function inputs and offset value, but the functino result (four float values)
+				// At this point, we consumed the function inputs and offset value, but the function result (four float values)
 				// are pushed onto the register.
 				require.Equal(t, uint64(4), compiler.locationStack.sp)
 

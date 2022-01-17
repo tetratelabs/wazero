@@ -38,27 +38,27 @@ type (
 
 		// Functions holds function instances (https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr).
+		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr).
 		Functions []*FunctionInstance
 		// Globals holds global instances (https://www.w3.org/TR/wasm-core-1/#global-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as globaladdr(https://www.w3.org/TR/wasm-core-1/#syntax-globaladdr).
+		// The slice index is to be interpreted as globaladdr (https://www.w3.org/TR/wasm-core-1/#syntax-globaladdr).
 		Globals []*GlobalInstance
 		// Memories holds memory instances (https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as memoaddr(https://www.w3.org/TR/wasm-core-1/#syntax-memaddr).
+		// The slice index is to be interpreted as memaddr (https://www.w3.org/TR/wasm-core-1/#syntax-memaddr).
 		Memories []*MemoryInstance
 		// Tables holds table instances (https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as tableaddr(https://www.w3.org/TR/wasm-core-1/#syntax-tableaddr).
+		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/wasm-core-1/#syntax-tableaddr).
 		Tables []*TableInstance
 	}
 
 	// ModuleInstance represents instantiated wasm module.
-	// The difference from the spec is that in wazero, a ModuleInstance holds  pointers
+	// The difference from the spec is that in wazero, a ModuleInstance holds pointers
 	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#syntax-moduleinst for the original specification.
+	// See https://www.w3.org/TR/wasm-core-1/#syntax-moduleinst
 	ModuleInstance struct {
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
@@ -69,7 +69,7 @@ type (
 	}
 
 	// ExportInstance represents an exported instance in a Store.
-	// The difference from the spec is that in wazero, a ExportInstance holds  pointers
+	// The difference from the spec is that in wazero, a ExportInstance holds pointers
 	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#syntax-exportinst
@@ -86,7 +86,7 @@ type (
 	FunctionInstance struct {
 		// ModuleInstance holds the pointer to the module instance to which this function belongs.
 		ModuleInstance *ModuleInstance
-		// Body is the raw function body.
+		// Body is the function body in WebAssembly Binary Format
 		Body []byte
 		// FunctionType holds the pointer to TypeInstance whose functionType field equals that of this function.
 		FunctionType *TypeInstance
@@ -138,7 +138,7 @@ type (
 		// Table holds the table elements managed by this table instance.
 		//
 		// Note: we intentionally use "[]TableElement", not "[]*TableElement",
-		// as JIT engine access this slice directly from assembly.
+		// because the JIT engine accesses this slice directly from assembly.
 		// If pointer type is used, the access becomes two level indirection (two hops of pointer jumps)
 		// which is a bit costly. TableElement is 128 bit (two 64bit fields) so the cost of using value type
 		// would be ignorable.
@@ -151,11 +151,11 @@ type (
 
 	// TableElement represents an item in a table instance.
 	//
-	// Note this is fixed to function type until post MVP reference type is implemented.
+	// Note: this is fixed to function type as it is the only supported type in WebAssembly 1.0 (MVP)
 	TableElement struct {
-		// FunctionAddress is funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr)
+		// FunctionAddress is funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr)
 		// of the target function instance. More precisely, this equals the index of
-		// the target function instance in store.FunctionInstances.
+		// the target function instance in Store.FunctionInstances.
 		FunctionAddress FunctionAddress
 		// FunctionTypeID is the type ID of the target function's type, which
 		// equals store.Functions[FunctionAddress].FunctionType.TypeID.
@@ -170,8 +170,8 @@ type (
 		Max    *uint32
 	}
 
-	// FunctionAddress is funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr),
-	// and the index to store.Functions.
+	// FunctionAddress is funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr),
+	// and the index to Store.Functions.
 	FunctionAddress uint64
 
 	// FunctionTypeID is an uniquely assigned integer for a function type.
