@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
-	"reflect"
 	"runtime"
 	"testing"
 	"unsafe"
@@ -147,12 +146,12 @@ func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *
 }
 
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
-	f := &wasm.FunctionInstance{FunctionType: &wasm.FunctionType{
+	f := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{
 		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
-	}}
+	}}}
 	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
 	compiler.pushFunctionParams()
-	require.Equal(t, uint64(len(f.FunctionType.Params)), compiler.locationStack.sp)
+	require.Equal(t, uint64(len(f.FunctionType.Type.Params)), compiler.locationStack.sp)
 	loc := compiler.locationStack.pop()
 	require.Equal(t, uint64(1), loc.stackPointer)
 	loc = compiler.locationStack.pop()
@@ -4391,75 +4390,32 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 
 func TestAmd64Compiler_compileCall(t *testing.T) {
 	const functionAddress wasm.FunctionAddress = 5
-	t.Run("host function", func(t *testing.T) {
-		env := newJITEnvironment()
-		compiler := requireNewCompiler(t)
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
+	env := newJITEnvironment()
+	compiler := requireNewCompiler(t)
+	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
 
-		// Setup.
-		compiler.eng = env.eng
-		hostFuncRefValue := reflect.ValueOf(func() {})
-		hostFuncInstance := &wasm.FunctionInstance{HostFunction: &hostFuncRefValue, FunctionType: &wasm.FunctionType{}, Address: functionAddress}
-		compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{hostFuncInstance}
+	// Setup.
+	compiler.eng = env.eng
+	wasmFuncInstance := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}}, Address: functionAddress}
+	compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{wasmFuncInstance}
 
-		// Build codes.
-		compiler.initializeReservedRegisters()
-		// Push the value onto stack.
-		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
-		compiler.movIntConstToRegister(int64(50), loc.register)
-		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
-		require.NoError(t, err)
+	compiler.initializeReservedRegisters()
 
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
+	err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
+	require.NoError(t, err)
 
-		// Run code.
-		env.exec(code)
+	// Generate the code under test.
+	code, _, err := compiler.generate()
+	require.NoError(t, err)
 
-		// Check the status.
-		require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
-		require.Equal(t, functionAddress, env.functionCallAddress())
+	// Run code.
+	env.exec(code)
 
-		// All the registers must be written back to stack.
-		require.Equal(t, uint64(2), env.stackPointer())
-		require.Equal(t, uint64(50), env.stackTopAsUint64())
-	})
-	t.Run("wasm function", func(t *testing.T) {
-		env := newJITEnvironment()
-		compiler := requireNewCompiler(t)
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
-
-		// Setup.
-		compiler.eng = env.eng
-		wasmFuncInstance := &wasm.FunctionInstance{FunctionType: &wasm.FunctionType{}, Address: functionAddress}
-		compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{wasmFuncInstance}
-
-		// Build codes.
-		compiler.initializeReservedRegisters()
-		// Push the value onto stack.
-		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
-		_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
-		loc := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
-		compiler.movIntConstToRegister(int64(50), loc.register)
-		err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
-		require.NoError(t, err)
-
-		// Generate the code under test.
-		code, _, err := compiler.generate()
-		require.NoError(t, err)
-
-		// Run code.
-		env.exec(code)
-
-		// Check the status.
-		require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
-		require.Equal(t, functionAddress, env.functionCallAddress())
-		// All the registers must be written back to stack.
-		require.Equal(t, uint64(3), env.stackPointer())
-		require.Equal(t, uint64(50), env.stackTopAsUint64())
-	})
+	// Check the status.
+	require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
+	require.Equal(t, functionAddress, env.functionCallAddress())
+	// All the registers must be written back to stack.
+	require.Equal(t, uint64(0), env.stackPointer())
 }
 
 func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
@@ -5526,7 +5482,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		// Place the offfset value.
 		loc := compiler.locationStack.pushValueOnStack()
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{FunctionType: &wasm.FunctionType{}}}}}
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}}}
 		env.stack()[loc.stackPointer] = 1000000000
 
 		// Now emit the code.
@@ -5551,7 +5507,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		env.setTable(table)
 
 		compiler := requireNewCompiler(t)
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{FunctionType: &wasm.FunctionType{}, FunctionTypeID: 1000}}}}
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}}}
 
 		// Place the offfset value.
 		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(0)})
@@ -5588,7 +5544,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 					Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 					Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32}}
 				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
-					Types: []*wasm.TypeInstance{{FunctionType: targetType, FunctionTypeID: uint64(i)}}},
+					Types: []*wasm.TypeInstance{{Type: targetType, TypeID: uint64(i)}}},
 				}
 
 				// Put the function call params.

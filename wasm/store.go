@@ -15,7 +15,7 @@ type (
 	Store struct {
 		engine          Engine
 		ModuleInstances map[string]*ModuleInstance
-		FunctionTypeIDs map[string]uint64
+		TypeIDs         map[string]uint64
 
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
@@ -32,11 +32,6 @@ type (
 		Types     []*TypeInstance
 	}
 
-	TypeInstance struct {
-		FunctionType   *FunctionType
-		FunctionTypeID uint64
-	}
-
 	ExportInstance struct {
 		Kind     byte
 		Function *FunctionInstance
@@ -50,11 +45,15 @@ type (
 		Address        FunctionAddress
 		ModuleInstance *ModuleInstance
 		Body           []byte
-		FunctionType   *FunctionType
-		FunctionTypeID uint64
+		FunctionType   *TypeInstance
 		NumLocals      uint32
 		LocalTypes     []ValueType
 		HostFunction   *reflect.Value
+	}
+
+	TypeInstance struct {
+		Type   *FunctionType
+		TypeID uint64
 	}
 
 	FunctionAddress uint64
@@ -102,16 +101,13 @@ func (f *FunctionInstance) IsHostFunction() bool {
 }
 
 func NewStore(engine Engine) *Store {
-	return &Store{ModuleInstances: map[string]*ModuleInstance{}, FunctionTypeIDs: map[string]uint64{}, engine: engine}
+	return &Store{ModuleInstances: map[string]*ModuleInstance{}, TypeIDs: map[string]uint64{}, engine: engine}
 }
 
 func (s *Store) Instantiate(module *Module, name string) error {
 	instance := &ModuleInstance{}
 	for _, t := range module.TypeSection {
-		instance.Types = append(instance.Types, &TypeInstance{
-			FunctionType:   t,
-			FunctionTypeID: s.funcTypeID(t),
-		})
+		instance.Types = append(instance.Types, s.getTypeInstance(t))
 	}
 
 	s.ModuleInstances[name] = instance
@@ -166,8 +162,8 @@ func (s *Store) Instantiate(module *Module, name string) error {
 		if int(index) >= len(instance.Functions) {
 			return fmt.Errorf("invalid start function index: %d", index)
 		}
-		funcType := instance.Functions[index].FunctionType
-		if len(funcType.Params) != 0 || len(funcType.Results) != 0 {
+		ft := instance.Functions[index].FunctionType
+		if len(ft.Type.Params) != 0 || len(ft.Type.Results) != 0 {
 			return fmt.Errorf("start function must have the empty function type")
 		}
 	}
@@ -201,17 +197,16 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 	}
 
 	f := exp.Function
-	if len(f.FunctionType.Params) != len(params) {
+	if len(f.FunctionType.Type.Params) != len(params) {
 		return nil, nil, fmt.Errorf("invalid number of parameters")
 	}
 
 	ret, err := s.engine.Call(f, params...)
-	return ret, f.FunctionType.Results, err
+	return ret, f.FunctionType.Type.Results, err
 }
 
 func (s *Store) addFunctionInstance(f *FunctionInstance) {
 	f.Address = FunctionAddress(len(s.Functions))
-	f.FunctionTypeID = s.funcTypeID(f.FunctionType)
 	s.Functions = append(s.Functions, f)
 }
 
@@ -267,11 +262,11 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex uint32, ex
 	if int(typeIndex) >= len(target.Types) {
 		return fmt.Errorf("unknown type for function import")
 	}
-	expectedType := target.Types[typeIndex].FunctionType
-	if !SameFunctionTypes(expectedType.Results, f.FunctionType.Results) {
-		return fmt.Errorf("return signature mimatch: %#x != %#x", expectedType.Results, f.FunctionType.Results)
-	} else if !SameFunctionTypes(expectedType.Params, f.FunctionType.Params) {
-		return fmt.Errorf("input signature mimatch: %#x != %#x", expectedType.Params, f.FunctionType.Params)
+	expectedType := target.Types[typeIndex].Type
+	if !SameFunctionTypes(expectedType.Results, f.FunctionType.Type.Results) {
+		return fmt.Errorf("return signature mimatch: %#x != %#x", expectedType.Results, f.FunctionType.Type.Results)
+	} else if !SameFunctionTypes(expectedType.Params, f.FunctionType.Type.Params) {
+		return fmt.Errorf("input signature mimatch: %#x != %#x", expectedType.Params, f.FunctionType.Type.Params)
 	}
 	target.Functions = append(target.Functions, f)
 	return nil
@@ -474,7 +469,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 		f := &FunctionInstance{
 			Name:           name,
-			FunctionType:   module.TypeSection[typeIndex],
+			FunctionType:   s.getTypeInstance(module.TypeSection[typeIndex]),
 			Body:           module.CodeSection[codeIndex].Body,
 			NumLocals:      module.CodeSection[codeIndex].NumLocals,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
@@ -626,9 +621,10 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 			rollbackFuncs = append(rollbackFuncs, func() {
 				tableInst.Table[pos] = original
 			})
+			targetFunc := target.Functions[elm]
 			tableInst.Table[pos] = TableElement{
-				FunctionAddress: target.Functions[elm].Address,
-				FunctionTypeID:  target.Functions[elm].FunctionTypeID,
+				FunctionAddress: targetFunc.Address,
+				FunctionTypeID:  targetFunc.FunctionType.TypeID,
 			}
 		}
 	}
@@ -799,7 +795,7 @@ func analyzeFunction(
 	tableDeclarations []*TableType,
 ) error {
 	labelStack := []*FunctionInstanceBlock{
-		{BlockType: f.FunctionType, StartAt: math.MaxUint64},
+		{BlockType: f.FunctionType.Type, StartAt: math.MaxUint64},
 	}
 	valueTypeStack := &valueTypeStack{}
 	for pc := uint64(0); pc < uint64(len(f.Body)); pc++ {
@@ -1047,23 +1043,23 @@ func analyzeFunction(
 			pc += num - 1
 			switch Opcode(op) {
 			case OpcodeLocalGet:
-				inputLen := uint32(len(f.FunctionType.Params))
+				inputLen := uint32(len(f.FunctionType.Type.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				if index < inputLen {
-					valueTypeStack.push(f.FunctionType.Params[index])
+					valueTypeStack.push(f.FunctionType.Type.Params[index])
 				} else {
 					valueTypeStack.push(f.LocalTypes[index-inputLen])
 				}
 			case OpcodeLocalSet:
-				inputLen := uint32(len(f.FunctionType.Params))
+				inputLen := uint32(len(f.FunctionType.Type.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.FunctionType.Params[index]
+					expType = f.FunctionType.Type.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1071,13 +1067,13 @@ func analyzeFunction(
 					return err
 				}
 			case OpcodeLocalTee:
-				inputLen := uint32(len(f.FunctionType.Params))
+				inputLen := uint32(len(f.FunctionType.Type.Params))
 				if l := f.NumLocals + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.FunctionType.Params[index]
+					expType = f.FunctionType.Type.Params[index]
 				} else {
 					expType = f.LocalTypes[index-inputLen]
 				}
@@ -1535,7 +1531,7 @@ func analyzeFunction(
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			expTypes := f.FunctionType.Results
+			expTypes := f.FunctionType.Type.Results
 			for i := 0; i < len(expTypes); i++ {
 				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
 					return fmt.Errorf("return type mismatch on return: %v; want %v", err, expTypes)
@@ -1606,7 +1602,7 @@ func ReadBlockType(types []*TypeInstance, r io.Reader) (*BlockType, uint64, erro
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
 		}
-		ret = types[raw].FunctionType
+		ret = types[raw].Type
 	}
 	return ret, num, nil
 }
@@ -1626,7 +1622,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 			return 0x00, fmt.Errorf("invalid type: %s", kind.String())
 		}
 	}
-	getSignature := func(p reflect.Type) (*FunctionType, error) {
+	getType := func(p reflect.Type) (*FunctionType, error) {
 		var err error
 		if p.NumIn() == 0 {
 			return nil, fmt.Errorf("host function must accept *wasm.HostFunctionCallContext as the first param")
@@ -1656,7 +1652,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		return fmt.Errorf("name %s already exists in module %s", funcName, moduleName)
 	}
 
-	sig, err := getSignature(fn.Type())
+	sig, err := getType(fn.Type())
 	if err != nil {
 		return fmt.Errorf("invalid signature: %w", err)
 	}
@@ -1664,9 +1660,10 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	f := &FunctionInstance{
 		Name:           fmt.Sprintf("%s.%s", moduleName, funcName),
 		HostFunction:   &fn,
-		FunctionType:   sig,
+		FunctionType:   s.getTypeInstance(sig),
 		ModuleInstance: m,
 	}
+
 	if err := s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
@@ -1723,14 +1720,18 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 	return nil
 }
 
-func (s *Store) funcTypeID(t *FunctionType) uint64 {
+func (s *Store) getTypeInstance(t *FunctionType) *TypeInstance {
+	return &TypeInstance{Type: t, TypeID: s.TypeID(t)}
+}
+
+func (s *Store) TypeID(t *FunctionType) uint64 {
 	key := t.String()
-	id, ok := s.FunctionTypeIDs[key]
+	id, ok := s.TypeIDs[key]
 	if ok {
 		return id
 	}
-	id = uint64(len(s.FunctionTypeIDs))
-	s.FunctionTypeIDs[key] = id
+	id = uint64(len(s.TypeIDs))
+	s.TypeIDs[key] = id
 	return id
 }
 

@@ -189,7 +189,7 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
-	for _, t := range c.f.FunctionType.Params {
+	for _, t := range c.f.FunctionType.Type.Params {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -705,12 +705,12 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(target.FunctionType.Params); i++ {
+	for i := 0; i < len(target.FunctionType.Type.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range target.FunctionType.Results {
+	for _, t := range target.FunctionType.Type.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -775,7 +775,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	cmpTypeID.From.Reg = offset.register
 	cmpTypeID.From.Offset = 8
 	cmpTypeID.To.Type = obj.TYPE_CONST
-	cmpTypeID.To.Offset = int64(targetFunctionType.FunctionTypeID)
+	cmpTypeID.To.Offset = int64(targetFunctionType.TypeID)
 	c.addInstruction(cmpTypeID)
 
 	typeMatchJump := c.newProg()
@@ -803,12 +803,12 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.locationStack.markRegisterUnused(offset.register)
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(targetFunctionType.FunctionType.Params); i++ {
+	for i := 0; i < len(targetFunctionType.Type.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range targetFunctionType.FunctionType.Results {
+	for _, t := range targetFunctionType.Type.Results {
 		loc := c.locationStack.pushValueOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:

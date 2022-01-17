@@ -248,7 +248,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 		case *OperationCallIndirect:
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.TableIndex)
-			op.us[1] = f.ModuleInstance.Types[o.TypeIndex].FunctionTypeID
+			op.us[1] = f.ModuleInstance.Types[o.TypeIndex].TypeID
 		case *OperationDrop:
 			op.rs = make([]*InclusiveRange, 1)
 			op.rs[0] = o.Range
@@ -468,7 +468,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		}
 		it.callNativeFunc(g)
 	}
-	results = make([]uint64, len(f.FunctionType.Results))
+	results = make([]uint64, len(f.FunctionType.Type.Results))
 	for i := range results {
 		results[len(results)-1-i] = it.pop()
 	}
@@ -565,7 +565,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCall:
 			{
 				if op.f.hostFn != nil {
-					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.funcInstance.FunctionType.Params):]...)
+					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.funcInstance.FunctionType.Type.Params):]...)
 				} else {
 					it.callNativeFunc(op.f)
 				}
@@ -576,12 +576,13 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				offset := it.pop()
 				target := it.functions[table.Table[offset].FunctionAddress]
 				// Type check.
-				if target.funcInstance.FunctionTypeID != op.us[1] {
+				expType := target.funcInstance.FunctionType
+				if expType.TypeID != op.us[1] {
 					panic("function type mismatch on call_indirect")
 				}
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(target.funcInstance.FunctionType.Params):]...)
+					it.callHostFunc(target, it.stack[len(it.stack)-len(expType.Type.Params):]...)
 				} else {
 					it.callNativeFunc(target)
 				}
