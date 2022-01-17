@@ -724,6 +724,11 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	return nil
 }
 
+const (
+	tableElementFunctionAddressOffest = 0
+	tableElementTypeIDOffest          = 8
+)
+
 // compileCallIndirect adds instructions to perform call_indirect operation.
 // This consumes the one value from the top of stack (called "offset"),
 // and make a function call against the function whose function address equals "table[offset]".
@@ -762,7 +767,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
-	// by 16 as the offset is the "length" of table in Go's "[]wasm.TableInstance",
+	// by 16 as the offset is the "length" of table in Go's "[]wasm.TableElement",
 	// and size of wasm.TableInstance equals 128 bit (64-bit wasm.FunctionAddress and 64-bit wasm.TypeID).
 	getTypeInstanceAddress := c.newProg()
 	notLengthExceedJump.To.SetTarget(getTypeInstanceAddress)
@@ -773,7 +778,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	getTypeInstanceAddress.From.Offset = 4
 	c.addInstruction(getTypeInstanceAddress)
 
-	// Adds the address of []wasm.TableInstance[0] stored as engine.tableSliceAddress to the offset.
+	// Adds the address of wasm.TableInstance[0] stored as engine.tableSliceAddress to the offset.
 	movTableSliceAddress := c.newProg()
 	movTableSliceAddress.As = x86.AADDQ
 	movTableSliceAddress.To.Type = obj.TYPE_REG
@@ -783,14 +788,15 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.From.Offset = engineTableSliceAddressOffset
 	c.addInstruction(movTableSliceAddress)
 
-	// At this point offset.register holds the address of wasm.TableInstance at TableInstance[offset]
-	// So the target type ID lives at offset+8, and we compare it with targetFunctionType.TypeID.
+	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset]
+	// So the target type ID lives at offset+tableElementTypeIDOffest, and we compare it
+	// with targetFunctionType.TypeID.
 	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
 	cmpTypeID := c.newProg()
 	cmpTypeID.As = x86.ACMPQ
 	cmpTypeID.From.Type = obj.TYPE_MEM
 	cmpTypeID.From.Reg = offset.register
-	cmpTypeID.From.Offset = 8
+	cmpTypeID.From.Offset = tableElementTypeIDOffest
 	cmpTypeID.To.Type = obj.TYPE_CONST
 	cmpTypeID.To.Offset = int64(targetFunctionType.TypeID)
 	c.addInstruction(cmpTypeID)
@@ -811,6 +817,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	readValue.As = x86.AMOVQ
 	readValue.To.Type = obj.TYPE_REG
 	readValue.To.Reg = offset.register
+	readValue.From.Offset = tableElementFunctionAddressOffest
 	readValue.From.Type = obj.TYPE_MEM
 	readValue.From.Reg = offset.register
 	c.addInstruction(readValue)
