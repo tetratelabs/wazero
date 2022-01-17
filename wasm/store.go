@@ -69,15 +69,38 @@ type (
 		Table    *TableInstance
 	}
 
+	// FunctionInstance represents a function instance in a Store.
+	// See https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0
 	FunctionInstance struct {
-		Name           string
-		Address        FunctionAddress
+		// ModuleInstance holds the pointer to the module instance to which this function belongs.
 		ModuleInstance *ModuleInstance
-		Body           []byte
-		FunctionType   *TypeInstance
-		NumLocals      uint32
-		LocalTypes     []ValueType
-		HostFunction   *reflect.Value
+		// Body is the raw function body.
+		Body []byte
+		// FunctionType holds the pointer to TypeInstance whose functionType field equals that of this function.
+		FunctionType *TypeInstance
+		// NumLocals holds the number of locals in this function.
+		NumLocals uint32
+		// LocalTypes holds types of locals.
+		LocalTypes []ValueType
+		// HostFunction holds the runtime representation of host functions.
+		// If this is not nil, all the above fields are ignored as they are specific to non-host functions.
+		HostFunction *reflect.Value
+
+		// Address is the funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) of this function insntance.
+		// More precisely, this equals the index of this function instance in store.FunctionInstances.
+		// All function calls are made via funcaddr at runtime, not the index (scoped to a module).
+		//
+		// This is used by both host and non-host functions.
+		Address FunctionAddress
+		// Name is the debugging purpose name, and is used to argument the stack traces.
+		//
+		// For non-host functions, this holds the value of
+		// name for this function which might be stored in the "name" custom section.
+		// Otherwise, the value is set to "unknown".
+		//
+		// For host functions, this is in the form of "{moduleName}.{funcName}" where these params
+		// are given via storeAddHostFunction.
+		Name string
 	}
 
 	TypeInstance struct {
