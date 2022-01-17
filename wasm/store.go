@@ -876,7 +876,7 @@ type functionBlock struct {
 	IsIf                   bool
 }
 
-// validateFunction validates the instruction sequence in a given function isntance's body
+// validateFunction validates the instruction sequence of a function instance body
 // following the specification https://www.w3.org/TR/wasm-core-1/#instructions%E2%91%A2.
 //
 // TODO: put this in a separate file like validate.go.

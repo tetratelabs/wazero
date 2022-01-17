@@ -25,7 +25,7 @@ type interpreter struct {
 	stack []uint64
 	// Function call stack.
 	frames []*interpreterFrame
-	// The callbacks when an function instance is compiled.
+	// onCompilationDoneCallbacks call back when a function instance is compiled.
 	// See the comment where this is used below for detail.
 	// Not used at runtime, and only in the compilation phase.
 	onCompilationDoneCallbacks map[wasm.FunctionAddress][]func(*interpreterFunction)
@@ -124,12 +124,12 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	} else {
 		ir, err := Compile(f)
 		if err != nil {
-			return fmt.Errorf("failed to lower Wasm to wazeroir: %w", err)
+			return fmt.Errorf("failed to compile Wasm to wazeroir: %w", err)
 		}
 
 		fn, err := it.lowerIROps(f, ir.Operations)
 		if err != nil {
-			return fmt.Errorf("failed to lower wazeroir operations to interpreter operations: %w", err)
+			return fmt.Errorf("failed to convert wazeroir operations to interpreter ones: %w", err)
 		}
 		it.functions[funcaddr] = fn
 		for _, cb := range it.onCompilationDoneCallbacks[funcaddr] {
@@ -525,7 +525,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 	globals := moduleInst.Globals
 	var table *wasm.TableInstance
 	if len(moduleInst.Tables) > 0 {
-		table = moduleInst.Tables[0] // We don't support yet.
+		table = moduleInst.Tables[0] // WebAssembly 1.0 (MVP) defines at most one table
 	}
 	it.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
