@@ -544,6 +544,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		jmpWithCond = c.newProg()
 		jmpWithCond.As = x86.AJNE
 		jmpWithCond.To.Type = obj.TYPE_BRANCH
+		c.locationStack.markRegisterUnused(cond.register)
 	}
 
 	// Make sure that the next coming label is the else jump target.
@@ -798,6 +799,8 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	if err := c.makeFunctionCallFromRegister(offset.register); err != nil {
 		return nil
 	}
+
+	c.locationStack.markRegisterUnused(offset.register)
 
 	// We consumed the function parameters from the stack after call.
 	for i := 0; i < len(targetFunctionType.FunctionType.Params); i++ {

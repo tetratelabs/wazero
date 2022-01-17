@@ -147,7 +147,11 @@ func (v *valueLocationStack) String() string {
 	for i := uint64(0); i < v.sp; i++ {
 		stackStr = append(stackStr, v.stack[i].String())
 	}
-	return fmt.Sprintf("sp=%d, stack=[%s]", v.sp, strings.Join(stackStr, ","))
+	var usedRegisters []string
+	for reg := range v.usedRegisters {
+		usedRegisters = append(usedRegisters, fmt.Sprintf("%d", reg))
+	}
+	return fmt.Sprintf("sp=%d, stack=[%s], used_registers=[%s]", v.sp, strings.Join(stackStr, ","), strings.Join(usedRegisters, ","))
 }
 
 func (s *valueLocationStack) clone() *valueLocationStack {
