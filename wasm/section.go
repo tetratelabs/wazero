@@ -35,7 +35,7 @@ func (m *Module) encodeSections(buffer []byte) (bytes []byte) {
 		bytes = append(bytes, encodeCustomSection(name, data)...)
 	}
 	if len(m.TypeSection) > 0 {
-		panic("TODO: TypeSection")
+		bytes = append(bytes, encodeTypeSection(m.TypeSection)...)
 	}
 	if len(m.ImportSection) > 0 {
 		panic("TODO: ImportSection")
@@ -87,6 +87,25 @@ func encodeCustomSection(name string, data []byte) []byte {
 // See https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
 func encodeSection(sectionID SectionID, contents []byte) []byte {
 	return append([]byte{sectionID}, encodeSizePrefixed(contents)...)
+}
+
+// encodeTypeSection encodes a SectionIDType with any types in the Module.TypeSection
+// See https://www.w3.org/TR/wasm-core-1/#type-section%E2%91%A0
+func encodeTypeSection(ts []*FunctionType) []byte {
+	typeCount := len(ts)
+	data := leb128.EncodeUint32(uint32(typeCount))
+	for _, ft := range ts {
+		// Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
+		// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
+		data = append(data, 0x60)
+		data = append(data, encodeValTypes(ft.Params)...)
+		data = append(data, encodeValTypes(ft.Results)...)
+	}
+
+	// Finally, make the header
+	dataSize := leb128.EncodeUint32(uint32(len(data)))
+	header := append([]byte{SectionIDType}, dataSize...)
+	return append(header, data...)
 }
 
 func (m *Module) readSections(r *reader) error {

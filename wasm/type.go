@@ -11,6 +11,24 @@ type FunctionType struct {
 	Params, Results []ValueType
 }
 
+var nullary = []byte{0x60, 0, 0}
+
+// encodedOneParam is a cache of FunctionType.encode values for param length 1 and result length 0
+var encodedOneParam = map[ValueType][]byte{
+	ValueTypeI32: {0x60, 1, ValueTypeI32, 0},
+	ValueTypeI64: {0x60, 1, ValueTypeI64, 0},
+	ValueTypeF32: {0x60, 1, ValueTypeF32, 0},
+	ValueTypeF64: {0x60, 1, ValueTypeF64, 0},
+}
+
+// encodedOneResult is a cache of FunctionType.encode values for param length 0 and result length 1
+var encodedOneResult = map[ValueType][]byte{
+	ValueTypeI32: {0x60, 0, 1, ValueTypeI32},
+	ValueTypeI64: {0x60, 0, 1, ValueTypeI64},
+	ValueTypeF32: {0x60, 0, 1, ValueTypeF32},
+	ValueTypeF64: {0x60, 0, 1, ValueTypeF64},
+}
+
 func (t *FunctionType) String() (ret string) {
 	for _, b := range t.Params {
 		ret += formatValueType(b)
@@ -26,6 +44,35 @@ func (t *FunctionType) String() (ret string) {
 		ret += "null"
 	}
 	return
+}
+
+// encode returns a byte slice in WebAssembly 1.0 (MVP) Binary Format.
+//
+// Note: Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
+// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
+func (t *FunctionType) encode() []byte {
+	paramCount, resultCount := len(t.Params), len(t.Results)
+	if paramCount == 0 && resultCount == 0 {
+		return nullary
+	}
+	if resultCount == 0 {
+		if paramCount == 1 {
+			if encoded, ok := encodedOneParam[t.Params[0]]; ok {
+				return encoded
+			}
+		}
+		return append(append([]byte{0x60}, encodeValTypes(t.Params)...), 0)
+	} else if resultCount == 1 {
+		if paramCount == 0 {
+			if encoded, ok := encodedOneResult[t.Results[0]]; ok {
+				return encoded
+			}
+		}
+		return append(append([]byte{0x60}, encodeValTypes(t.Params)...), 1, t.Results[0])
+	}
+	// This branch should never be reaches as WebAssembly 1.0 (MVP) supports at most 1 result
+	data := append([]byte{0x60}, encodeValTypes(t.Params)...)
+	return append(data, encodeValTypes(t.Results)...)
 }
 
 func readFunctionType(r io.Reader) (*FunctionType, error) {

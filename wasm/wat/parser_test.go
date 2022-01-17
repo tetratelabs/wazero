@@ -20,7 +20,8 @@ import (
 var example = []byte(`(module $example
 	(type $i32i32_i32 (func (param i32 i32) (result i32)))
 	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type $i32i32_i32)))
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write
+		(param $fd i32) (param $iovs_ptr i32) (param $iovs_len i32) (param $nwritten_ptr i32) (result i32)))
 	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
 	(import "Math" "Add" (func $add (type $i32i32_i32) (param $l i32) (param $r i32) (result i32)))
 	(type (func))
@@ -509,7 +510,13 @@ func TestParseModule(t *testing.T) {
 					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
 						typeIndex: &index{numeric: 0, line: 3, col: 86}},
 					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
-						typeIndex: &index{numeric: 2, line: 3, col: 81}},
+						typeIndex: &index{numeric: 2, line: 3, col: 81},
+						paramNames: paramNames{
+							&paramNameIndex{uint32(0), []byte("fd")},
+							&paramNameIndex{uint32(1), []byte("iovs_ptr")},
+							&paramNameIndex{uint32(2), []byte("iovs_len")},
+							&paramNameIndex{uint32(3), []byte("nwritten_ptr")},
+						}},
 					{importIndex: 2, module: "Math", name: "Mul", funcName: "mul",
 						typeIndex: &index{numeric: 3, line: 3, col: 81},
 						paramNames: paramNames{
@@ -518,10 +525,10 @@ func TestParseModule(t *testing.T) {
 						},
 					},
 					{importIndex: 3, module: "Math", name: "Add", funcName: "add",
-						typeIndex: &index{numeric: 0, line: 6, col: 40},
+						typeIndex: &index{numeric: 0, line: 7, col: 40},
 						typeInlined: &inlinedTypeFunc{
 							typeFunc: &typeFunc{name: "i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
-							line:     6, col: 35,
+							line:     7, col: 35,
 						},
 						paramNames: paramNames{
 							&paramNameIndex{uint32(0), []byte{'l'}},
@@ -529,9 +536,9 @@ func TestParseModule(t *testing.T) {
 						},
 					},
 					{importIndex: 4, module: "", name: "hello", funcName: "hello",
-						typeIndex: &index{numeric: 1, line: 8, col: 40}},
+						typeIndex: &index{numeric: 1, line: 9, col: 40}},
 				},
-				startFunction: &index{numeric: 4, line: 9, col: 9},
+				startFunction: &index{numeric: 4, line: 10, col: 9},
 			},
 		},
 	}
