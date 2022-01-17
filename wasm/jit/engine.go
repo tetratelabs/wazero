@@ -93,7 +93,9 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	defer func() {
 		if shouldRecover {
 			if v := recover(); v != nil {
-				debug.PrintStack()
+				if buildoptions.IsDebugMode {
+					debug.PrintStack()
+				}
 				top := e.callFrameStack
 				var frames []string
 				var counter int
@@ -133,9 +135,9 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	}
 
 	if compiled.isHostFunction() {
-		compiled.hostFunc(&wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
+		e.execHostFunction(compiled, &wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
 	} else {
-		e.exec(compiled)
+		e.execWasmFunction(compiled)
 	}
 
 	// Note the top value is the tail of the results,
@@ -149,40 +151,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	if f.IsHostFunction() {
-		hf := func(ctx *wasm.HostFunctionCallContext) {
-			tp := f.HostFunction.Type()
-			in := make([]reflect.Value, tp.NumIn())
-			for i := len(in) - 1; i >= 1; i-- {
-				val := reflect.New(tp.In(i)).Elem()
-				raw := e.pop()
-				kind := tp.In(i).Kind()
-				switch kind {
-				case reflect.Float64, reflect.Float32:
-					val.SetFloat(math.Float64frombits(raw))
-				case reflect.Uint32, reflect.Uint64:
-					val.SetUint(raw)
-				case reflect.Int32, reflect.Int64:
-					val.SetInt(int64(raw))
-				}
-				in[i] = val
-			}
-			val := reflect.New(tp.In(0)).Elem()
-			val.Set(reflect.ValueOf(ctx))
-			in[0] = val
-			for _, ret := range f.HostFunction.Call(in) {
-				switch ret.Kind() {
-				case reflect.Float64, reflect.Float32:
-					e.push(math.Float64bits(ret.Float()))
-				case reflect.Uint32, reflect.Uint64:
-					e.push(ret.Uint())
-				case reflect.Int32, reflect.Int64:
-					e.push(uint64(ret.Int()))
-				default:
-					panic("invalid return type")
-				}
-			}
-		}
-		e.compiledFunctions[f.Address] = &compiledFunction{source: f, hostFunc: hf, memory: f.ModuleInstance.Memory}
+		e.compiledFunctions[f.Address] = &compiledFunction{source: f, memory: f.ModuleInstance.Memory}
 	} else {
 		cf, err := e.compileWasmFunction(f)
 		if err != nil {
@@ -321,7 +290,6 @@ func (c *callFrame) getFunctionName() string {
 type compiledFunction struct {
 	// The source function instance from which this is compiled.
 	source                  *wasm.FunctionInstance
-	hostFunc                func(ctx *wasm.HostFunctionCallContext)
 	paramCount, resultCount uint64
 	// codeSegment is holding the compiled native code as a byte slice.
 	codeSegment []byte
@@ -345,7 +313,7 @@ type compiledFunction struct {
 }
 
 func (f *compiledFunction) isHostFunction() bool {
-	return f.hostFunc != nil
+	return f.source.HostFunction != nil
 }
 
 const (
@@ -371,7 +339,42 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 	// TODO: maybe better think about how to shrink the stack as well.
 }
 
-func (e *engine) exec(f *compiledFunction) {
+func (e *engine) execHostFunction(f *compiledFunction, ctx *wasm.HostFunctionCallContext) {
+	hostFunc := f.source.HostFunction
+	tp := hostFunc.Type()
+	in := make([]reflect.Value, tp.NumIn())
+	for i := len(in) - 1; i >= 1; i-- {
+		val := reflect.New(tp.In(i)).Elem()
+		raw := e.pop()
+		kind := tp.In(i).Kind()
+		switch kind {
+		case reflect.Float64, reflect.Float32:
+			val.SetFloat(math.Float64frombits(raw))
+		case reflect.Uint32, reflect.Uint64:
+			val.SetUint(raw)
+		case reflect.Int32, reflect.Int64:
+			val.SetInt(int64(raw))
+		}
+		in[i] = val
+	}
+	val := reflect.New(tp.In(0)).Elem()
+	val.Set(reflect.ValueOf(ctx))
+	in[0] = val
+	for _, ret := range hostFunc.Call(in) {
+		switch ret.Kind() {
+		case reflect.Float64, reflect.Float32:
+			e.push(math.Float64bits(ret.Float()))
+		case reflect.Uint32, reflect.Uint64:
+			e.push(ret.Uint())
+		case reflect.Int32, reflect.Int64:
+			e.push(uint64(ret.Int()))
+		default:
+			panic("invalid return type")
+		}
+	}
+}
+
+func (e *engine) execWasmFunction(f *compiledFunction) {
 	// Push a new call frame for the target function.
 	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, compiledFunction: f})
 
@@ -404,9 +407,7 @@ func (e *engine) exec(f *compiledFunction) {
 				// Push the call frame for this host function.
 				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
 				// Call into the host function.
-				nextFunc.hostFunc(
-					&wasm.HostFunctionCallContext{Memory: nextFunc.memory},
-				)
+				e.execHostFunction(nextFunc, &wasm.HostFunctionCallContext{Memory: nextFunc.memory})
 				// Pop the call frame.
 				e.callFrameStack = currentFrame
 			} else {
