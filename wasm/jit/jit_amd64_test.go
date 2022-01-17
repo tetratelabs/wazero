@@ -5484,14 +5484,17 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		env.setTable(make([]wasm.TableElement, 10))
 		compiler := requireNewCompiler(t)
 
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}}}
+
 		// Place the offfset value.
 		loc := compiler.locationStack.pushValueOnStack()
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}}}
 		env.stack()[loc.stackPointer] = 1000000000
 
 		// Now emit the code.
 		compiler.initializeReservedRegisters()
-		require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
+		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 		compiler.returnFunction()
 
 		// Generate the code under test.
@@ -5506,20 +5509,25 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	})
 
 	t.Run("type not match", func(t *testing.T) {
-		table := make([]wasm.TableElement, 10)
 		env := newJITEnvironment()
+		table := make([]wasm.TableElement, 10)
 		env.setTable(table)
 
 		compiler := requireNewCompiler(t)
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}}}
+		// and the typeID doesn't match the table[targetOffset]'s type ID.
+		table[0] = wasm.TableElement{FunctionTypeID: 50}
 
 		// Place the offfset value.
-		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(0)})
+		err := compiler.compileConstI32(targetOffset)
 		require.NoError(t, err)
 
 		// Now emit the code.
 		compiler.initializeReservedRegisters()
-		require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{}))
+		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
 		// Generate the code under test.
 		compiler.returnFunction()
@@ -5533,23 +5541,25 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	})
 
 	t.Run("ok", func(t *testing.T) {
-		// Setup table.
 		table := make([]wasm.TableElement, 10)
-		for i := range table {
-			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: uint64(i)}
-		}
-
 		for i := 0; i < len(table); i++ {
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				env := newJITEnvironment()
 				env.setTable(table)
 				compiler := requireNewCompiler(t)
+
 				targetType := &wasm.FunctionType{
 					Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 					Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32}}
+				targetOffset := &wazeroir.OperationConstI32{Value: uint32(i)}
+				targetOperation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
+
+				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
 					Types: []*wasm.TypeInstance{{Type: targetType, TypeID: uint64(i)}}},
 				}
+				// and the typeID  matches the table[targetOffset]'s type ID.
+				table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: uint64(i)}
 
 				// Put the function call params.
 				for i := 0; i < len(targetType.Params); i++ {
@@ -5557,7 +5567,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				}
 
 				// Place the offfset value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
+				err := compiler.compileConstI32(targetOffset)
 				require.NoError(t, err)
 
 				// At this point, we should have three elements (function params + offset value) on the stack
@@ -5565,7 +5575,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 				// Now emit the code.
 				compiler.initializeReservedRegisters()
-				require.NoError(t, compiler.compileCallIndirect(&wazeroir.OperationCallIndirect{TypeIndex: 0}))
+				require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
 				// At this point, we consumed the function inputs and offset value, but the functino result (four float values)
 				// are pushed onto the register.
