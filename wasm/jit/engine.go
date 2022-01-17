@@ -135,7 +135,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	}
 
 	if compiled.isHostFunction() {
-		e.execHostFunction(compiled, &wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
+		e.execHostFunction(compiled.source.HostFunction, &wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
 	} else {
 		e.execFunction(compiled)
 	}
@@ -339,10 +339,23 @@ func (e *engine) maybeGrowStack(maxStackPointer uint64) {
 	// TODO: maybe better think about how to shrink the stack as well.
 }
 
-func (e *engine) execHostFunction(f *compiledFunction, ctx *wasm.HostFunctionCallContext) {
-	hostFunc := f.source.HostFunction
-	tp := hostFunc.Type()
+// execHostFunction executes the given host function represented as *reflect.Value.
+//
+// The arguments to the function are popped from the stack stack following the convension of
+// Wasm stack machine.
+// For example, if the host function F requires the (x1 uint32, x2 float32) parameters, and
+// the stack is [..., A, B], then the function is called as F(A, B) where A and B are interpreted
+// as uint32 and float32 respectively.
+//
+// After the execution, the result of host function is pushed onto the stack.
+//
+// ctx parameter is passed to the host function as a first argument.
+func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallContext) {
+	tp := f.Type()
 	in := make([]reflect.Value, tp.NumIn())
+
+	// We pop the value and pass them as arguments in a reverse order according to the
+	// stack machine convension.
 	for i := len(in) - 1; i >= 1; i-- {
 		val := reflect.New(tp.In(i)).Elem()
 		raw := e.pop()
@@ -357,10 +370,14 @@ func (e *engine) execHostFunction(f *compiledFunction, ctx *wasm.HostFunctionCal
 		}
 		in[i] = val
 	}
+
+	// Host function must receive *wasm.HostFunctionCallContext as a first argument.
 	val := reflect.New(tp.In(0)).Elem()
 	val.Set(reflect.ValueOf(ctx))
 	in[0] = val
-	for _, ret := range hostFunc.Call(in) {
+
+	// Excute the host function and push back the call result onto the stack.
+	for _, ret := range f.Call(in) {
 		switch ret.Kind() {
 		case reflect.Float64, reflect.Float32:
 			e.push(math.Float64bits(ret.Float()))
@@ -411,7 +428,7 @@ func (e *engine) execFunction(f *compiledFunction) {
 				// Push the call frame for this host function.
 				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
 				// Call into the host function.
-				e.execHostFunction(nextFunc, &wasm.HostFunctionCallContext{Memory: nextFunc.memory})
+				e.execHostFunction(nextFunc.source.HostFunction, &wasm.HostFunctionCallContext{Memory: nextFunc.memory})
 				// Pop the call frame.
 				e.callFrameStack = currentFrame
 			} else {
