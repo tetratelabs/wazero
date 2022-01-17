@@ -347,9 +347,9 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex uint32, ex
 		return fmt.Errorf("unknown type for function import")
 	}
 	expectedType := target.Types[typeIndex].Type
-	if !SameFunctionTypes(expectedType.Results, f.FunctionType.Type.Results) {
+	if !ValueTypesEqual(expectedType.Results, f.FunctionType.Type.Results) {
 		return fmt.Errorf("return signature mimatch: %#x != %#x", expectedType.Results, f.FunctionType.Type.Results)
-	} else if !SameFunctionTypes(expectedType.Params, f.FunctionType.Type.Params) {
+	} else if !ValueTypesEqual(expectedType.Params, f.FunctionType.Type.Params) {
 		return fmt.Errorf("input signature mimatch: %#x != %#x", expectedType.Params, f.FunctionType.Type.Params)
 	}
 	target.Functions = append(target.Functions, f)
