@@ -726,7 +726,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 
 // compileCallIndirect adds instructions to perform call_indirect operation.
 // This consumes the one value from the top of stack (called "offset"),
-// and make a function call against the function whose index equals "table[offset]".
+// and make a function call against the function whose function address equals "table[offset]".
 // This is called indirect function call in the sense that the target function is indirectly
 // determined by the current state (top value) of the stack.
 // Therefore, two checks are performed at runtime before entering the target function:
@@ -4218,6 +4218,9 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	c.addInstruction(prog)
 }
 
+// makeFunctionCallFromConsts makes a function call against the function whose address equals addr parameter.
+// jitStatus is set before making call, and it should either jitCallStatusCodeCallBuiltInFunction or
+// jitCallStatusCodeCallFunction.
 func (c *amd64Compiler) makeFunctionCallFromConsts(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
 	c.setJITStatus(jitStatus)
 
@@ -4241,6 +4244,8 @@ func (c *amd64Compiler) makeFunctionCallFromConsts(jitStatus jitCallStatusCode, 
 	return nil
 }
 
+// makeFunctionCallFromConsts makes a function call against the function whose address equals the value on
+// the functionCallAddressRegister.
 func (c *amd64Compiler) makeFunctionCallFromRegister(functionCallAddressRegister int16) error {
 	c.setJITStatus(jitCallStatusCodeCallFunction)
 
