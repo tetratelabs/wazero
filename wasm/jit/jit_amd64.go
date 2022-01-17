@@ -161,20 +161,22 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	// As we cannot read RIP register directly,
-	// we calculate now the offset to the next instruction
-	// relative to the beginning of this function body.
+	// As we cannot read RIP register directly, we calculate now the offset to the next
+	// instruction after return instruction for function call.
 	const operandSizeBytes = 8
 	for _, inst := range c.requireFunctionCallReturnAddressOffsetResolution {
 		afterReturnInst := inst
+		// We move forward on the linked list of instructions until the return instrucion found.
 		for ; ; afterReturnInst = afterReturnInst.Link {
 			if afterReturnInst.As == obj.ARET {
+				// Now we found the return instruction, move forward once again.
 				afterReturnInst = afterReturnInst.Link
 				break
 			}
 		}
 		// Skip MOV, and the register(rax): "0x49, 0xbd"
 		start := inst.Pc + 2
+		// Set the move target to the program counter (offset to the beginning to this binary).
 		binary.LittleEndian.PutUint64(code[start:start+operandSizeBytes], uint64(afterReturnInst.Pc))
 	}
 
@@ -722,9 +724,18 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	return nil
 }
 
+// compileCallIndirect adds instructions to perform call_indirect operation.
+// This consumes the one value from the top of stack (called "offset"),
+// and make a function call against the function whose index equals "table[offset]".
+// This is called indirect function call in the sense that the target function is indirectly
+// determined by the current state (top value) of the stack.
+// Therefore, two checks are performed before entering the target function:
+// 1) If "offset" doesn't exceed the length of table, "out of bounds table access" is raised.
+// 2) If the type of the function table[offset] doesn't match the specified function type, "type mismatch" is raised.
+// Otherwise, we successfully enther the target function.
+//
+// Note that we don't yet support multiple tables.
 func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
-	// We don't yet support multiple tables.
-
 	offset := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(offset); err != nil {
 		return nil
@@ -750,6 +761,9 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.returnFunction()
 
 	// Next we check if the target's type matches the operation's one.
+	// In order to get the type instance's address, we have to multiply the offset
+	// by 16 as the offset is the "length" of table in Go's "[]wasm.TableInstance",
+	// and size of wasm.TableInstance equals 128 bit (64-bit wasm.FunctionAddress and 64-bit wasm.TypeID).
 	getTypeInstanceAddress := c.newProg()
 	notLengthExceedJump.To.SetTarget(getTypeInstanceAddress)
 	getTypeInstanceAddress.As = x86.ASHLQ
@@ -759,6 +773,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	getTypeInstanceAddress.From.Offset = 4
 	c.addInstruction(getTypeInstanceAddress)
 
+	// Adds the address of []wasm.TableInstance[0] stored as engine.tableSliceAddress to the offset.
 	movTableSliceAddress := c.newProg()
 	movTableSliceAddress.As = x86.AADDQ
 	movTableSliceAddress.To.Type = obj.TYPE_REG
@@ -768,6 +783,8 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.From.Offset = engineTableSliceAddressOffset
 	c.addInstruction(movTableSliceAddress)
 
+	// At this point offset.register holds the address of wasm.TableInstance at TableInstance[offset]
+	// So the target type ID lives at offset+8, and we compare it with targetFunctionType.TypeID.
 	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
 	cmpTypeID := c.newProg()
 	cmpTypeID.As = x86.ACMPQ
@@ -778,15 +795,17 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	cmpTypeID.To.Offset = int64(targetFunctionType.TypeID)
 	c.addInstruction(cmpTypeID)
 
+	// Jump if the type matches.
 	typeMatchJump := c.newProg()
 	typeMatchJump.To.Type = obj.TYPE_BRANCH
 	typeMatchJump.As = x86.AJEQ
 	c.addInstruction(typeMatchJump)
 
-	// If type doesn't match, we return the function with jitCallStatusCodeTypeMismatchOnIndirectCall.
+	// Otherwise, we return the function with jitCallStatusCodeTypeMismatchOnIndirectCall.
 	c.setJITStatus(jitCallStatusCodeTypeMismatchOnIndirectCall)
 	c.returnFunction()
 
+	// Now all checks passeed, so we start making function call.
 	readValue := c.newProg()
 	typeMatchJump.To.SetTarget(readValue)
 	readValue.As = x86.AMOVQ
@@ -800,6 +819,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		return nil
 	}
 
+	// The offset register should be marked as un-used as we consumed in the function call.
 	c.locationStack.markRegisterUnused(offset.register)
 
 	// We consumed the function parameters from the stack after call.

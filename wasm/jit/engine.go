@@ -32,10 +32,10 @@ type engine struct {
 	stackBasePointer uint64
 	// Where we store the status code of JIT execution.
 	jitCallStatusCode jitCallStatusCode
-	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
+	// Set when statusCode == jitStatusCall{Function,BuiltInFunction}
 	// Indicating the function call index.
 	functionCallAddress wasm.FunctionAddress
-	// Set when statusCode == jitStatusCall{Function,BuiltInFunction,HostFunction}
+	// Set when statusCode == jitStatusCall{Function,BuiltInFunction}
 	// We use this value to continue the current function
 	// after calling the target function exits.
 	// Instructions after [base+continuationAddressOffset] must start with
@@ -47,7 +47,7 @@ type engine struct {
 	memorySliceLen int64
 	// The current compiledWasmFunction.tableSliceAddress
 	tableSliceAddress uintptr
-	// tableSliceLen stores the length of the unique table by the currently executed function.
+	// tableSliceLen stores the length of the unique table used by the currently executed function.
 	tableSliceLen int64
 	// Function call frames in linked list
 	callFrameStack *callFrame
@@ -674,30 +674,3 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 	return cf, nil
 }
-
-/*
-.entrypoint:
-	f32.const 0.000000
-	pick 1
-	f32.convert_from.s32
-	swap 1
-	drop 0..0
-	pick 1
-	call 0
-	pick 1
-	i32.const 1
-	i32.add
-	f32.const 42.000000
-	call 4
-	pick 1
-	call 1
-	pick 1
-	call 6
-	pick 0
-	call 2
-	pick 1
-	i32.const 0
-	call_indirect: type=0, table=0
-	drop 0..1
-	br .return
-*/
