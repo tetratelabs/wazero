@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/binary"
 )
 
 // Ensures that the offset consts do not drift when we manipulate the engine struct.
@@ -29,7 +30,7 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 func TestEngine_fibonacci(t *testing.T) {
 	buf, err := os.ReadFile("testdata/fib.wasm")
 	require.NoError(t, err)
-	mod, err := wasm.DecodeModule(buf)
+	mod, err := binary.DecodeModule(buf)
 	require.NoError(t, err)
 
 	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
@@ -55,7 +56,7 @@ func TestEngine_fibonacci(t *testing.T) {
 func TestEngine_fac(t *testing.T) {
 	buf, err := os.ReadFile("testdata/fac.wasm")
 	require.NoError(t, err)
-	mod, err := wasm.DecodeModule(buf)
+	mod, err := binary.DecodeModule(buf)
 	require.NoError(t, err)
 	store := wasm.NewStore(NewEngine())
 	require.NoError(t, err)
@@ -83,7 +84,7 @@ func TestEngine_fac(t *testing.T) {
 func TestEngine_unreachable(t *testing.T) {
 	buf, err := os.ReadFile("testdata/unreachable.wasm")
 	require.NoError(t, err)
-	mod, err := wasm.DecodeModule(buf)
+	mod, err := binary.DecodeModule(buf)
 	require.NoError(t, err)
 	store := wasm.NewStore(NewEngine())
 	require.NoError(t, err)
@@ -103,7 +104,7 @@ wasm backtrace:
 func TestEngine_memory(t *testing.T) {
 	buf, err := os.ReadFile("testdata/memory.wasm")
 	require.NoError(t, err)
-	mod, err := wasm.DecodeModule(buf)
+	mod, err := binary.DecodeModule(buf)
 	require.NoError(t, err)
 	store := wasm.NewStore(NewEngine())
 	require.NoError(t, err)

@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/wat"
+	"github.com/tetratelabs/wazero/wasm/text"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 // Test_Simple implements a basic function in go: hello. This is imported as the Wasm name "$hello" and run on start.
 func Test_Simple(t *testing.T) {
-	mod, err := wat.TextToBinary([]byte(`(module
+	mod, err := text.DecodeModule([]byte(`(module
 	(import "" "hello" (func $hello))
 	(start $hello)
 )`))

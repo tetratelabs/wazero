@@ -10,13 +10,14 @@ import (
 
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 func Test_stdio(t *testing.T) {
 	buf, err := os.ReadFile("testdata/stdio.wasm")
 	require.NoError(t, err)
-	mod, err := wasm.DecodeModule(buf)
+	mod, err := binary.DecodeModule(buf)
 	require.NoError(t, err)
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
 	stdoutBuf := bytes.NewBuffer(nil)
