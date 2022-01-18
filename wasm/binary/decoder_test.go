@@ -11,6 +11,8 @@ import (
 // TestDecodeModule relies on unit tests for Module.Encode, specifically that the encoding is both known and correct.
 // This avoids having to copy/paste or share variables to assert against byte arrays.
 func TestDecodeModule(t *testing.T) {
+	i32, f32 := wasm.ValueTypeI32, wasm.ValueTypeF32
+
 	tests := []struct {
 		name  string
 		input *wasm.Module // round trip test!
@@ -35,6 +37,36 @@ func TestDecodeModule(t *testing.T) {
 				NameSection: &wasm.NameSection{ModuleName: "simple"},
 				CustomSections: map[string][]byte{
 					"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
+				},
+			},
+		},
+		{
+			name: "type section",
+			input: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+				},
+			},
+		},
+		{
+			name: "type and import section",
+			input: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
+				},
+				ImportSection: []*wasm.Import{
+					{
+						Module: "Math", Name: "Mul",
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 1,
+					}, {
+						Module: "Math", Name: "Add",
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 0,
+					},
 				},
 			},
 		},

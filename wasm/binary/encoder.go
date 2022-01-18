@@ -16,7 +16,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		bytes = append(bytes, encodeTypeSection(m.TypeSection)...)
 	}
 	if len(m.ImportSection) > 0 {
-		panic("TODO: ImportSection")
+		bytes = append(bytes, encodeImportSection(m.ImportSection)...)
 	}
 	if len(m.FunctionSection) > 0 {
 		panic("TODO: FunctionSection")
@@ -34,7 +34,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		panic("TODO: ExportSection")
 	}
 	if m.StartSection != nil {
-		panic("TODO: StartSection")
+		bytes = append(bytes, encodeStartSection(*m.StartSection)...)
 	}
 	if len(m.ElementSection) > 0 {
 		panic("TODO: ElementSection")

@@ -43,6 +43,9 @@ func encodeValTypes(vt []wasm.ValueType) []byte {
 }
 
 func decodeValueTypes(r io.Reader, num uint32) ([]wasm.ValueType, error) {
+	if num == 0 {
+		return nil, nil
+	}
 	ret := make([]wasm.ValueType, num)
 	buf := make([]wasm.ValueType, num)
 	_, err := io.ReadFull(r, buf)

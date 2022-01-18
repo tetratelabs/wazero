@@ -120,7 +120,7 @@ var encodedOneResult = map[wasm.ValueType][]byte{
 	wasm.ValueTypeF64: {0x60, 0, 1, wasm.ValueTypeF64},
 }
 
-// encodeFunctionType returns a byte slice in WebAssembly 1.0 (MVP) Binary Format.
+// encodeFunctionType returns the wasm.FunctionType encoded in WebAssembly 1.0 (MVP) Binary Format.
 //
 // Note: Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
 // See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
