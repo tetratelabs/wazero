@@ -211,7 +211,7 @@ operatorSwitch:
 	case wasm.OpcodeNop:
 		// Nop is noop!
 	case wasm.OpcodeBlock:
-		bt, num, err := wasm.ReadBlockType(c.f.ModuleInstance.Types,
+		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
 			bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for block instruction: %w", err)
@@ -237,7 +237,7 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 	case wasm.OpcodeLoop:
-		bt, num, err := wasm.ReadBlockType(c.f.ModuleInstance.Types,
+		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
 			bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for loop instruction: %w", err)
@@ -275,7 +275,7 @@ operatorSwitch:
 		)
 
 	case wasm.OpcodeIf:
-		bt, num, err := wasm.ReadBlockType(c.f.ModuleInstance.Types,
+		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
 			bytes.NewBuffer(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for if instruction: %w", err)

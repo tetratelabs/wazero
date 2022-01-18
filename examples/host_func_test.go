@@ -11,6 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
+	binary2 "github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -18,7 +19,7 @@ func Test_hostFunc(t *testing.T) {
 	buf, err := os.ReadFile("testdata/host_func.wasm")
 	require.NoError(t, err)
 
-	mod, err := wasm.DecodeModule((buf))
+	mod, err := binary2.DecodeModule((buf))
 	require.NoError(t, err)
 
 	store := wasm.NewStore(wazeroir.NewEngine())

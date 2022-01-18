@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
+	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -26,7 +27,7 @@ func setUpStore(store *wasm.Store) {
 	if err != nil {
 		panic(err)
 	}
-	mod, err := wasm.DecodeModule((buf))
+	mod, err := binaryFormat.DecodeModule(buf)
 	if err != nil {
 		panic(err)
 	}

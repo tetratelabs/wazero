@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/tetratelabs/wazero/wasm/ieee754"
 	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
@@ -343,9 +344,9 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex uint32, ex
 		return fmt.Errorf("unknown type for function import")
 	}
 	expectedType := target.Types[typeIndex].Type
-	if !ValueTypesEqual(expectedType.Results, f.FunctionType.Type.Results) {
+	if !bytes.Equal(expectedType.Results, f.FunctionType.Type.Results) {
 		return fmt.Errorf("return signature mimatch: %#x != %#x", expectedType.Results, f.FunctionType.Type.Results)
-	} else if !ValueTypesEqual(expectedType.Params, f.FunctionType.Type.Params) {
+	} else if !bytes.Equal(expectedType.Params, f.FunctionType.Type.Params) {
 		return fmt.Errorf("input signature mimatch: %#x != %#x", expectedType.Params, f.FunctionType.Type.Params)
 	}
 	target.Functions = append(target.Functions, f)
@@ -427,13 +428,13 @@ func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExp
 		}
 		return v, ValueTypeI64, nil
 	case OpcodeF32Const:
-		v, err = readFloat32(r)
+		v, err = ieee754.DecodeFloat32(r)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read f32: %w", err)
 		}
 		return v, ValueTypeF32, nil
 	case OpcodeF64Const:
-		v, err = readFloat64(r)
+		v, err = ieee754.DecodeFloat64(r)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read f64: %w", err)
 		}
@@ -1542,7 +1543,7 @@ func validateFunction(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := DecodeBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1554,7 +1555,7 @@ func validateFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := DecodeBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1567,7 +1568,7 @@ func validateFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := ReadBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := DecodeBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -1667,7 +1668,8 @@ func validateFunction(
 	return nil
 }
 
-func ReadBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, error) {
+// DecodeBlockType is exported for use in the compiler
+func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)
