@@ -12,7 +12,7 @@ import (
 func decodeCode(r io.Reader) (*wasm.Code, error) {
 	ss, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size of code segment: %w", err)
+		return nil, fmt.Errorf("get the size of code: %w", err)
 	}
 
 	r = io.LimitReader(r, int64(ss))
