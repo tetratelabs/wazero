@@ -12,6 +12,7 @@ import (
 // This avoids having to copy/paste or share variables to assert against byte arrays.
 func TestDecodeModule(t *testing.T) {
 	i32, f32 := wasm.ValueTypeI32, wasm.ValueTypeF32
+	zero := uint32(0)
 
 	tests := []struct {
 		name  string
@@ -68,6 +69,18 @@ func TestDecodeModule(t *testing.T) {
 						DescFunc: 0,
 					},
 				},
+			},
+		},
+		{
+			name: "type function and start section",
+			input: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{{}},
+				ImportSection: []*wasm.Import{{
+					Module: "", Name: "hello",
+					Kind:     wasm.ImportKindFunc,
+					DescFunc: 0,
+				}},
+				StartSection: &zero,
 			},
 		},
 	}

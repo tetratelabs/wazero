@@ -26,7 +26,7 @@ func decodeTypeSection(r io.Reader) ([]*wasm.FunctionType, error) {
 	result := make([]*wasm.FunctionType, vs)
 	for i := uint32(0); i < vs; i++ {
 		if result[i], err = decodeFunctionType(r); err != nil {
-			return nil, fmt.Errorf("read %d-th function import: %v", i, err)
+			return nil, fmt.Errorf("read %d-th type: %v", i, err)
 		}
 	}
 	return result, nil
@@ -44,17 +44,17 @@ func decodeFunctionType(r io.Reader) (*wasm.FunctionType, error) {
 
 	s, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size of input value imports: %w", err)
+		return nil, fmt.Errorf("could not read parameter count: %w", err)
 	}
 
 	paramTypes, err := decodeValueTypes(r, s)
 	if err != nil {
-		return nil, fmt.Errorf("read value imports of inputs: %w", err)
+		return nil, fmt.Errorf("could not read parameter type: %w", err)
 	}
 
 	s, _, err = leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size of output value imports: %w", err)
+		return nil, fmt.Errorf("could not read result count: %w", err)
 	} else if s > 1 {
 		return nil, fmt.Errorf("multi value results not supported")
 	}
@@ -94,7 +94,7 @@ func decodeFunctionSection(r *bytes.Reader) ([]uint32, error) {
 	result := make([]uint32, vs)
 	for i := uint32(0); i < vs; i++ {
 		if result[i], _, err = leb128.DecodeUint32(r); err != nil {
-			return nil, fmt.Errorf("get import index: %w", err)
+			return nil, fmt.Errorf("get type index: %w", err)
 		}
 	}
 	return result, err
@@ -109,7 +109,7 @@ func decodeTableSection(r *bytes.Reader) ([]*wasm.TableType, error) {
 	result := make([]*wasm.TableType, vs)
 	for i := uint32(0); i < vs; i++ {
 		if result[i], err = decodeTableType(r); err != nil {
-			return nil, fmt.Errorf("read table import: %w", err)
+			return nil, fmt.Errorf("read table type: %w", err)
 		}
 	}
 	return result, nil
@@ -124,7 +124,7 @@ func decodeMemorySection(r *bytes.Reader) ([]*wasm.MemoryType, error) {
 	result := make([]*wasm.MemoryType, vs)
 	for i := uint32(0); i < vs; i++ {
 		if result[i], err = decodeMemoryType(r); err != nil {
-			return nil, fmt.Errorf("read memory import: %w", err)
+			return nil, fmt.Errorf("read memory type: %w", err)
 		}
 	}
 	return result, nil
