@@ -29,12 +29,10 @@ func TestTextToBinary(t *testing.T) {
 			input: "(module (import \"foo\" \"bar\" (func)))", // ok empty sig
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{{}},
-				ImportSection: []*wasm.ImportSegment{{
+				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
-					Desc: &wasm.ImportDesc{
-						Kind:          wasm.ImportKindFunction,
-						FuncTypeIndex: 0,
-					},
+					Kind:     wasm.ImportKindFunc,
+					DescFunc: 0,
 				}},
 			},
 		},
@@ -51,19 +49,15 @@ func TestTextToBinary(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
-				ImportSection: []*wasm.ImportSegment{
+				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "path_open",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 1,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 1,
 					}, {
 						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 2,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 2,
 					},
 				},
 				NameSection: &wasm.NameSection{
@@ -89,19 +83,15 @@ func TestTextToBinary(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
-				ImportSection: []*wasm.ImportSegment{
+				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "arg_sizes_get",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 1,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 1,
 					}, {
 						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 2,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 2,
 					},
 				},
 				NameSection: &wasm.NameSection{
@@ -120,12 +110,10 @@ func TestTextToBinary(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{{}},
-				ImportSection: []*wasm.ImportSegment{{
+				ImportSection: []*wasm.Import{{
 					Module: "", Name: "hello",
-					Desc: &wasm.ImportDesc{
-						Kind:          wasm.ImportKindFunction,
-						FuncTypeIndex: 0,
-					},
+					Kind:     wasm.ImportKindFunc,
+					DescFunc: 0,
 				}},
 				StartSection: &zero,
 				NameSection: &wasm.NameSection{
@@ -143,12 +131,10 @@ func TestTextToBinary(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{{}},
-				ImportSection: []*wasm.ImportSegment{{
+				ImportSection: []*wasm.Import{{
 					Module: "", Name: "hello",
-					Desc: &wasm.ImportDesc{
-						Kind:          wasm.ImportKindFunction,
-						FuncTypeIndex: 0,
-					},
+					Kind:     wasm.ImportKindFunc,
+					DescFunc: 0,
 				}},
 				StartSection: &zero,
 			},
@@ -163,37 +149,27 @@ func TestTextToBinary(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
-				ImportSection: []*wasm.ImportSegment{
+				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "arg_sizes_get",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 0,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 0,
 					}, {
 						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 2,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 2,
 					}, {
 						Module: "Math", Name: "Mul",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 3,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 3,
 					}, {
 						Module: "Math", Name: "Add",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 0,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 0,
 					}, {
 						Module: "", Name: "hello",
-						Desc: &wasm.ImportDesc{
-							Kind:          wasm.ImportKindFunction,
-							FuncTypeIndex: 1,
-						},
+						Kind:     wasm.ImportKindFunc,
+						DescFunc: 1,
 					},
 				},
 				StartSection: &four,

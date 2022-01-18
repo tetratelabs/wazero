@@ -28,15 +28,21 @@ func (r *reader) Read(p []byte) (n int, err error) {
 
 // Module is a WebAssembly binary representation.
 // See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A8
+//
+// Differences from the specification:
+// * The NameSection is decoded, so not present as a key "name" in CustomSections.
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#type-section%E2%91%A0
 	TypeSection []*FunctionType
-	// ImportSection contains any types, tables, memories or globals imported into this module.
+	// ImportSection contains imported functions, tables, memories or globals required for instantiation
+	// (Store.Instantiate).
+	//
+	// Note: there are no unique constraints relating to the two-level namespace of Import.Module and Import.Name.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
-	ImportSection []*ImportSegment
+	ImportSection []*Import
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//
 	// Function indexes are offset by any imported functions because the function index space begins with imports,
@@ -77,11 +83,11 @@ type Module struct {
 	// global at index 3 is defined in this module at GlobalSection[0].
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#global-section%E2%91%A0
-	GlobalSection []*GlobalSegment
-	ExportSection map[string]*ExportSegment
+	GlobalSection []*Global
+	ExportSection map[string]*Export
 	// StartSection is the index of a function to call before returning from Store.Instantiate.
 	//
-	// Note: The function index space begins with any ImportKindFunction in ImportSection, then the FunctionSection.
+	// Note: The function index space begins with any ImportKindFunc in ImportSection, then the FunctionSection.
 	// For example, if there are two imported functions and three defined in this module, the index space is five.
 	// Note: This is a pointer to avoid conflating no start section with the valid index zero.
 	//
@@ -91,7 +97,7 @@ type Module struct {
 	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
-	CodeSection []*CodeSegment
+	CodeSection []*Code
 	DataSection []*DataSegment
 	// NameSection is set when the custom section "name" was successfully decoded from the binary format.
 	//

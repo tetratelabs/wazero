@@ -53,12 +53,10 @@ func TextToBinary(source []byte) (result *wasm.Module, err error) {
 				localNames[funcidx] = locals
 			}
 		}
-		result.ImportSection = append(result.ImportSection, &wasm.ImportSegment{
+		result.ImportSection = append(result.ImportSection, &wasm.Import{
 			Module: f.module, Name: f.name,
-			Desc: &wasm.ImportDesc{
-				Kind:          wasm.ImportKindFunction,
-				FuncTypeIndex: f.typeIndex.numeric,
-			},
+			Kind:     wasm.ImportKindFunc,
+			DescFunc: f.typeIndex.numeric,
 		})
 	}
 

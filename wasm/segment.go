@@ -8,104 +8,80 @@ import (
 	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
+// ImportKind indicates which import description is present
+// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
 type ImportKind = byte
 
 const (
-	ImportKindFunction ImportKind = 0x00
-	ImportKindTable    ImportKind = 0x01
-	ImportKindMemory   ImportKind = 0x02
-	ImportKindGlobal   ImportKind = 0x03
+	ImportKindFunc   ImportKind = 0x00
+	ImportKindTable  ImportKind = 0x01
+	ImportKindMemory ImportKind = 0x02
+	ImportKindGlobal ImportKind = 0x03
 )
 
-type ImportDesc struct {
-	Kind byte
-
-	// FuncTypeIndex is the index in Module.TypeSection corresponding to this import's FunctionType.
-	// This is only valid when Kind equals ImportKindFunction
-	FuncTypeIndex uint32
-	TableTypePtr  *TableType
-	MemTypePtr    *MemoryType
-	GlobalTypePtr *GlobalType
+// Import is the binary representation of an import indicated by Kind
+// See https://www.w3.org/TR/wasm-core-1/#binary-import
+type Import struct {
+	Kind ImportKind
+	// Module is the possibly empty primary namespace of this import
+	Module string
+	// Module is the possibly empty secondary namespace of this import
+	Name string
+	// DescFunc is the index in Module.TypeSection when Kind equals ImportKindFunc
+	DescFunc uint32
+	// DescTable is the inlined TableType when Kind equals ImportKindTable
+	DescTable *TableType
+	// DescMem is the inlined MemoryType when Kind equals ImportKindMemory
+	DescMem *MemoryType
+	// DescGlobal is the inlined GlobalType when Kind equals ImportKindGlobal
+	DescGlobal *GlobalType
 }
 
-func readImportDesc(r io.Reader) (*ImportDesc, error) {
-	b := make([]byte, 1)
-	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("read value kind: %v", err)
+func readImport(r io.Reader) (i *Import, err error) {
+	i = &Import{}
+	if i.Module, err = readNameValue(r); err != nil {
+		return nil, fmt.Errorf("error decoding import module: %w", err)
 	}
 
-	switch b[0] {
-	case ImportKindFunction:
-		tID, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("read typeindex: %v", err)
+	if i.Name, err = readNameValue(r); err != nil {
+		return nil, fmt.Errorf("error decoding import name: %w", err)
+	}
+
+	b := make([]byte, 1)
+	if _, err = io.ReadFull(r, b); err != nil {
+		return nil, fmt.Errorf("error decoding import kind: %w", err)
+	}
+
+	i.Kind = b[0]
+	switch i.Kind {
+	case ImportKindFunc:
+		if i.DescFunc, _, err = leb128.DecodeUint32(r); err != nil {
+			return nil, fmt.Errorf("error decoding import func typeindex: %w", err)
 		}
-		return &ImportDesc{
-			Kind:          ImportKindFunction,
-			FuncTypeIndex: tID,
-		}, nil
 	case ImportKindTable:
-		tt, err := readTableType(r)
-		if err != nil {
-			return nil, fmt.Errorf("read table type: %v", err)
+		if i.DescTable, err = readTableType(r); err != nil {
+			return nil, fmt.Errorf("error decoding import table desc: %w", err)
 		}
-		return &ImportDesc{
-			Kind:         ImportKindTable,
-			TableTypePtr: tt,
-		}, nil
 	case ImportKindMemory:
-		mt, err := readMemoryType(r)
-		if err != nil {
-			return nil, fmt.Errorf("read table type: %v", err)
+		if i.DescMem, err = readMemoryType(r); err != nil {
+			return nil, fmt.Errorf("error decoding import mem desc: %w", err)
 		}
-		return &ImportDesc{
-			Kind:       ImportKindMemory,
-			MemTypePtr: mt,
-		}, nil
 	case ImportKindGlobal:
-		gt, err := readGlobalType(r)
-		if err != nil {
-			return nil, fmt.Errorf("read global type: %v", err)
+		if i.DescGlobal, err = readGlobalType(r); err != nil {
+			return nil, fmt.Errorf("error decoding import global desc: %w", err)
 		}
-		return &ImportDesc{
-			Kind:          ImportKindGlobal,
-			GlobalTypePtr: gt,
-		}, nil
 	default:
 		return nil, fmt.Errorf("%w: invalid byte for importdesc: %#x", ErrInvalidByte, b[0])
 	}
+	return
 }
 
-type ImportSegment struct {
-	Module, Name string
-	Desc         *ImportDesc
-}
-
-func readImportSegment(r io.Reader) (*ImportSegment, error) {
-	mn, err := readNameValue(r)
-	if err != nil {
-		return nil, fmt.Errorf("read name of imported module: %v", err)
-	}
-
-	n, err := readNameValue(r)
-	if err != nil {
-		return nil, fmt.Errorf("read name of imported module component: %v", err)
-	}
-
-	d, err := readImportDesc(r)
-	if err != nil {
-		return nil, fmt.Errorf("read import description : %v", err)
-	}
-
-	return &ImportSegment{Module: mn, Name: n, Desc: d}, nil
-}
-
-type GlobalSegment struct {
+type Global struct {
 	Type *GlobalType
 	Init *ConstantExpression
 }
 
-func readGlobalSegment(r io.Reader) (*GlobalSegment, error) {
+func readGlobal(r io.Reader) (*Global, error) {
 	gt, err := readGlobalType(r)
 	if err != nil {
 		return nil, fmt.Errorf("read global type: %v", err)
@@ -116,66 +92,56 @@ func readGlobalSegment(r io.Reader) (*GlobalSegment, error) {
 		return nil, fmt.Errorf("get init expression: %v", err)
 	}
 
-	return &GlobalSegment{
+	return &Global{
 		Type: gt,
 		Init: init,
 	}, nil
 }
 
-type ExportDesc struct {
-	Kind  byte
-	Index uint32
-}
-
+// ExportKind indicates which index Export.Index points to
+// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
 type ExportKind = byte
 
 const (
-	ExportKindFunction ExportKind = 0x00
-	ExportKindTable    ExportKind = 0x01
-	ExportKindMemory   ExportKind = 0x02
-	ExportKindGlobal   ExportKind = 0x03
+	ExportKindFunc   ExportKind = 0x00
+	ExportKindTable  ExportKind = 0x01
+	ExportKindMemory ExportKind = 0x02
+	ExportKindGlobal ExportKind = 0x03
 )
 
-func readExportDesc(r io.Reader) (*ExportDesc, error) {
-	b := make([]byte, 1)
-	if _, err := io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("read value kind: %w", err)
-	}
-
-	kind := b[0]
-	if kind >= 0x04 {
-		return nil, fmt.Errorf("%w: invalid byte for exportdesc: %#x", ErrInvalidByte, kind)
-	}
-
-	id, _, err := leb128.DecodeUint32(r)
-	if err != nil {
-		return nil, fmt.Errorf("read funcidx: %w", err)
-	}
-
-	return &ExportDesc{
-		Kind:  kind,
-		Index: id,
-	}, nil
-
-}
-
-type ExportSegment struct {
+// Export is the binary representation of an export indicated by Kind
+// See https://www.w3.org/TR/wasm-core-1/#binary-export
+type Export struct {
+	Kind ExportKind
+	// Name is what the host refers to this definition as.
 	Name string
-	Desc *ExportDesc
+	// Index is the index of the definition to export, the index namespace is by Kind
+	// Ex. If ExportKindFunc, this is an index to ModuleInstance.Functions
+	Index uint32
 }
 
-func readExportSegment(r io.Reader) (*ExportSegment, error) {
-	name, err := readNameValue(r)
-	if err != nil {
-		return nil, fmt.Errorf("read name of export module: %w", err)
+func readExport(r io.Reader) (i *Export, err error) {
+	i = &Export{}
+
+	if i.Name, err = readNameValue(r); err != nil {
+		return nil, fmt.Errorf("error decoding export name: %w", err)
 	}
 
-	d, err := readExportDesc(r)
-	if err != nil {
-		return nil, fmt.Errorf("read export description: %w", err)
+	b := make([]byte, 1)
+	if _, err = io.ReadFull(r, b); err != nil {
+		return nil, fmt.Errorf("error decoding export kind: %w", err)
 	}
 
-	return &ExportSegment{Name: name, Desc: d}, nil
+	i.Kind = b[0]
+	switch i.Kind {
+	case ExportKindFunc, ExportKindTable, ExportKindMemory, ExportKindGlobal:
+		if i.Index, _, err = leb128.DecodeUint32(r); err != nil {
+			return nil, fmt.Errorf("error decoding export index: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("%w: invalid byte for exportdesc: %#x", ErrInvalidByte, b[0])
+	}
+	return
 }
 
 type ElementSegment struct {
@@ -216,13 +182,13 @@ func readElementSegment(r io.Reader) (*ElementSegment, error) {
 	}, nil
 }
 
-type CodeSegment struct {
+type Code struct {
 	NumLocals  uint32
 	LocalTypes []ValueType
 	Body       []byte
 }
 
-func readCodeSegment(r io.Reader) (*CodeSegment, error) {
+func readCode(r io.Reader) (*Code, error) {
 	ss, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get the size of code segment: %w", err)
@@ -281,7 +247,7 @@ func readCodeSegment(r io.Reader) (*CodeSegment, error) {
 		return nil, fmt.Errorf("expr not end with OpcodeEnd")
 	}
 
-	return &CodeSegment{
+	return &Code{
 		Body:       body,
 		NumLocals:  uint32(sum),
 		LocalTypes: localTypes,
