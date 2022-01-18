@@ -184,7 +184,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 func TestJIT(t *testing.T) {
 	targets := map[string]bool{
 		"address.wast":                true,
-		"align.wast":                  false, // Needs br_table support
+		"align.wast":                  false, // Needs br_table fix
 		"binary.wast":                 true,
 		"binary-leb128.wast":          true,
 		"block.wast":                  true,
@@ -231,7 +231,7 @@ func TestJIT(t *testing.T) {
 		"local_set.wast":              true,
 		"local_tee.wast":              true,
 		"loop.wast":                   true,
-		"memory_grow.wast":            false, // Needs br_table support
+		"memory_grow.wast":            false, // Needs fix
 		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
 		"memory_trap.wast":            true,
@@ -244,18 +244,17 @@ func TestJIT(t *testing.T) {
 		"stack.wast":                  true,
 		"start.wast":                  true,
 		"store.wast":                  true,
-		"switch.wast":                 false, // Needs br_table support
+		"switch.wast":                 false, // Needs fix!
 		"token.wast":                  true,
 		"traps.wast":                  true,
 		"type.wast":                   true,
 		"unreachable.wast":            true,
 		"unreached-invalid.wast":      true,
-		"unwind.wast":                 false, // Needs br_table support
+		"unwind.wast":                 true,
 		"utf8-custom-section-id.wast": true,
 		"utf8-import-field.wast":      true,
 		"utf8-import-module.wast":     true,
 	}
-	// targets = map[string]bool{"block.wast": true}
 	runTest(t, jit.NewEngine, targets)
 }
 
@@ -294,7 +293,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 			for _, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
-					fmt.Println(msg)
+					t.Log(msg)
 					switch c.CommandType {
 					case "module":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
