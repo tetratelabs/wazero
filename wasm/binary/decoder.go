@@ -9,23 +9,10 @@ import (
 	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
-// TODO: maybe io.ByteReader
-type reader struct {
-	binary []byte
-	read   int
-	buffer *bytes.Buffer
-}
-
-func (r *reader) Read(p []byte) (n int, err error) {
-	n, err = r.buffer.Read(p)
-	r.read += n
-	return
-}
-
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (MVP) Binary Format
 // See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
 func DecodeModule(binary []byte) (*wasm.Module, error) {
-	r := &reader{binary: binary, buffer: bytes.NewBuffer(binary)}
+	r := bytes.NewReader(binary)
 
 	// Magic number.
 	buf := make([]byte, 4)
@@ -52,13 +39,16 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 			return nil, fmt.Errorf("get size of section for id=%d: %v", sectionID[0], err)
 		}
 
-		sectionContentStart := r.read
+		sectionContentStart := r.Len()
 		switch sectionID[0] {
 		case SectionIDCustom:
 			// First, validate the section and determine if the section for this name has already been set
-			name, dataSize, decodeErr := decodeCustomSectionNameAndDataSize(r, sectionSize)
+			name, nameSize, decodeErr := decodeUTF8(r, "custom section name")
 			if decodeErr != nil {
 				err = decodeErr
+				break
+			} else if sectionSize < nameSize {
+				err = fmt.Errorf("malformed custom section %s", name)
 				break
 			} else if name == "name" && m.NameSection != nil {
 				err = fmt.Errorf("redundant custom section %s", name)
@@ -70,7 +60,7 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 
 			// Now, either decode the NameSection or store an unsupported one
 			// TODO: Do we care to store something we don't use? We could also skip it!
-			data, dataErr := readCustomSectionData(r, dataSize)
+			data, dataErr := readCustomSectionData(r, sectionSize-nameSize)
 			if dataErr != nil {
 				err = dataErr
 			} else if name == "name" {
@@ -108,8 +98,9 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 			err = ErrInvalidSectionID
 		}
 
-		if err == nil && sectionContentStart+int(sectionSize) != r.read {
-			err = fmt.Errorf("invalid section length: expected to be %d but got %d", sectionSize, r.read-sectionContentStart)
+		readBytes := sectionContentStart - r.Len()
+		if err == nil && int(sectionSize) != readBytes {
+			err = fmt.Errorf("invalid section length: expected to be %d but got %d", sectionSize, readBytes)
 		}
 
 		if err != nil {

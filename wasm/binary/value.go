@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"unicode/utf8"
@@ -60,20 +61,22 @@ func decodeValueTypes(r io.Reader, num uint32) ([]wasm.ValueType, error) {
 	return ret, nil
 }
 
-func decodeNameValue(r io.Reader) (string, error) {
-	vs, _, err := leb128.DecodeUint32(r)
+// decodeUTF8 decodes a size prefixed string from the reader, returning it and the count of bytes read.
+// contextFormat and contextArgs apply an error format when present
+func decodeUTF8(r *bytes.Reader, contextFormat string, contextArgs ...interface{}) (string, uint32, error) {
+	size, sizeOfSize, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return "", fmt.Errorf("read size of name: %v", err)
+		return "", 0, fmt.Errorf("failed to read %s size: %w", fmt.Sprintf(contextFormat, contextArgs...), err)
 	}
 
-	buf := make([]byte, vs)
-	if _, err := io.ReadFull(r, buf); err != nil {
-		return "", fmt.Errorf("read bytes of name: %v", err)
+	buf := make([]byte, size)
+	if _, err = io.ReadFull(r, buf); err != nil {
+		return "", 0, fmt.Errorf("failed to read %s: %w", fmt.Sprintf(contextFormat, contextArgs...), err)
 	}
 
 	if !utf8.Valid(buf) {
-		return "", fmt.Errorf("name must be valid as utf8")
+		return "", 0, fmt.Errorf("%s is not valid UTF-8", fmt.Sprintf(contextFormat, contextArgs...))
 	}
 
-	return string(buf), nil
+	return string(buf), size + uint32(sizeOfSize), nil
 }
