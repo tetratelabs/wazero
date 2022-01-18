@@ -1,20 +1,17 @@
 package text
 
 import (
-	"os"
+	_ "embed"
 	"testing"
-	"unicode/utf8"
 
-	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/binary"
 )
 
-func TestTextToBinary(t *testing.T) {
-	zero, four := uint32(0), uint32(4)
-	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
+func TestDecodeModule(t *testing.T) {
+	zero := uint32(0)
+	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
 	tests := []struct {
 		name     string
 		input    string
@@ -140,57 +137,6 @@ func TestTextToBinary(t *testing.T) {
 				StartSection: &zero,
 			},
 		},
-		{
-			name:  "example",
-			input: string(example),
-			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
-					{},
-					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
-				},
-				ImportSection: []*wasm.Import{
-					{
-						Module: "wasi_snapshot_preview1", Name: "arg_sizes_get",
-						Kind:     wasm.ImportKindFunc,
-						DescFunc: 0,
-					}, {
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
-						Kind:     wasm.ImportKindFunc,
-						DescFunc: 2,
-					}, {
-						Module: "Math", Name: "Mul",
-						Kind:     wasm.ImportKindFunc,
-						DescFunc: 3,
-					}, {
-						Module: "Math", Name: "Add",
-						Kind:     wasm.ImportKindFunc,
-						DescFunc: 0,
-					}, {
-						Module: "", Name: "hello",
-						Kind:     wasm.ImportKindFunc,
-						DescFunc: 1,
-					},
-				},
-				StartSection: &four,
-				NameSection: &wasm.NameSection{
-					ModuleName: "example",
-					FunctionNames: map[uint32]string{
-						0: "runtime.arg_sizes_get",
-						1: "runtime.fd_write",
-						2: "mul",
-						3: "add",
-						4: "hello",
-					},
-					LocalNames: map[uint32]map[uint32]string{
-						1: {0: "fd", 1: "iovs_ptr", 2: "iovs_len", 3: "nwritten_ptr"},
-						2: {0: "x", 1: "y"},
-						3: {0: "l", 1: "r"},
-					},
-				},
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -204,7 +150,7 @@ func TestTextToBinary(t *testing.T) {
 	}
 }
 
-func TestTextToBinary_Errors(t *testing.T) {
+func TestDecodeModule_Errors(t *testing.T) {
 	tests := []struct{ name, input, expectedErr string }{
 		{
 			name:        "invalid",
@@ -221,67 +167,4 @@ func TestTextToBinary_Errors(t *testing.T) {
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
-}
-
-func BenchmarkTextToBinaryExample(b *testing.B) {
-	var exampleBinary []byte // wat2wasm --debug-names example.wat
-	if bin, err := os.ReadFile("testdata/example.wasm"); err != nil {
-		b.Fatal(err)
-	} else {
-		exampleBinary = bin
-	}
-
-	b.Run("vs utf8.Valid", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			if !utf8.Valid(example) {
-				panic("unexpected")
-			}
-		}
-	})
-	// Not a fair comparison as while DecodeModule parses into the binary format, we don't encode it into a byte slice.
-	// We also don't know if wasmtime.Wat2Wasm encodes the custom name section or not.
-	b.Run("vs wasmtime.Wat2Wasm", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			_, err := wasmtime.Wat2Wasm(string(example))
-			if err != nil {
-				panic(err)
-			}
-		}
-	})
-	// This compares against reading the same binary data directly (encoded via wat2wasm --debug-names).
-	// Note: This will be more similar once DecodeModule writes CustomSection["name"]
-	b.Run("vs binary.DecodeModule", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleBinary); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	b.Run("vs wat.lex", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			if line, col, err := lex(noopTokenParser, example); err != nil {
-				b.Fatalf("%d:%d: %s", line, col, err)
-			}
-		}
-	})
-	b.Run("vs wat.parseModule", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			if _, err := parseModule(example); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	b.Run("DecodeModule", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			if _, err := DecodeModule(example); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
 }

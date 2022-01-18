@@ -1,33 +1,13 @@
 package text
 
 import (
+	_ "embed"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
 )
-
-// example has a work-in-progress of supported functionality, used primarily for benchmarking. This includes:
-// * module and function names
-// * explicit, and inlined type definitions (including anonymous)
-// * inlined and overridden type parameter names
-// * start function
-//
-// Note: This is different from exampleWat because the parser doesn't yet support all features.
-// Note: When changing this, regenerate example.wasm like `wat2wasm --debug-names --debug-parser -v example.wat`
-// TODO: this has drifted because neither wabt, nor wasm-tools properly encodes the name section.
-var example = []byte(`(module $example
-	(type $i32i32_i32 (func (param i32 i32) (result i32)))
-	(import "wasi_snapshot_preview1" "arg_sizes_get" (func $runtime.arg_sizes_get (type $i32i32_i32)))
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write
-		(param $fd i32) (param $iovs_ptr i32) (param $iovs_len i32) (param $nwritten_ptr i32) (result i32)))
-	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
-	(import "Math" "Add" (func $add (type $i32i32_i32) (param $l i32) (param $r i32) (result i32)))
-	(type (func))
-	(import "" "hello" (func $hello (type 1)))
-	(start $hello)
-)`)
 
 func TestParseModule(t *testing.T) {
 	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
@@ -493,52 +473,6 @@ func TestParseModule(t *testing.T) {
 				types:         []*typeFunc{typeFuncEmpty},
 				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
 				startFunction: &index{numeric: 0, line: 3, col: 9},
-			},
-		},
-		{
-			name:  "example",
-			input: string(example),
-			expected: &module{
-				name: "example",
-				types: []*typeFunc{
-					{name: "i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
-					typeFuncEmpty, // Note: inlined types come after explicit ones even if the latter are defined later
-					{params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
-					{params: []wasm.ValueType{f32, f32}, result: f32},
-				},
-				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
-						typeIndex: &index{numeric: 0, line: 3, col: 86}},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
-						typeIndex: &index{numeric: 2, line: 3, col: 81},
-						paramNames: paramNames{
-							&paramNameIndex{uint32(0), []byte("fd")},
-							&paramNameIndex{uint32(1), []byte("iovs_ptr")},
-							&paramNameIndex{uint32(2), []byte("iovs_len")},
-							&paramNameIndex{uint32(3), []byte("nwritten_ptr")},
-						}},
-					{importIndex: 2, module: "Math", name: "Mul", funcName: "mul",
-						typeIndex: &index{numeric: 3, line: 3, col: 81},
-						paramNames: paramNames{
-							&paramNameIndex{uint32(0), []byte{'x'}},
-							&paramNameIndex{uint32(1), []byte{'y'}},
-						},
-					},
-					{importIndex: 3, module: "Math", name: "Add", funcName: "add",
-						typeIndex: &index{numeric: 0, line: 7, col: 40},
-						typeInlined: &inlinedTypeFunc{
-							typeFunc: &typeFunc{name: "i32i32_i32", params: []wasm.ValueType{i32, i32}, result: i32},
-							line:     7, col: 35,
-						},
-						paramNames: paramNames{
-							&paramNameIndex{uint32(0), []byte{'l'}},
-							&paramNameIndex{uint32(1), []byte{'r'}},
-						},
-					},
-					{importIndex: 4, module: "", name: "hello", funcName: "hello",
-						typeIndex: &index{numeric: 1, line: 9, col: 40}},
-				},
-				startFunction: &index{numeric: 4, line: 10, col: 9},
 			},
 		},
 	}

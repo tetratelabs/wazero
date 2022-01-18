@@ -26,7 +26,7 @@ func decodeTypeSection(r io.Reader) ([]*wasm.FunctionType, error) {
 	result := make([]*wasm.FunctionType, vs)
 	for i := uint32(0); i < vs; i++ {
 		if result[i], err = decodeFunctionType(r); err != nil {
-			return nil, fmt.Errorf("read %d-th function type: %v", i, err)
+			return nil, fmt.Errorf("read %d-th type: %v", i, err)
 		}
 	}
 	return result, nil
@@ -44,24 +44,24 @@ func decodeFunctionType(r io.Reader) (*wasm.FunctionType, error) {
 
 	s, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size of input value types: %w", err)
+		return nil, fmt.Errorf("could not read parameter count: %w", err)
 	}
 
 	paramTypes, err := decodeValueTypes(r, s)
 	if err != nil {
-		return nil, fmt.Errorf("read value types of inputs: %w", err)
+		return nil, fmt.Errorf("could not read parameter types: %w", err)
 	}
 
 	s, _, err = leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get the size of output value types: %w", err)
+		return nil, fmt.Errorf("could not read result count: %w", err)
 	} else if s > 1 {
 		return nil, fmt.Errorf("multi value results not supported")
 	}
 
 	resultTypes, err := decodeValueTypes(r, s)
 	if err != nil {
-		return nil, fmt.Errorf("read value types of outputs: %w", err)
+		return nil, fmt.Errorf("could not read result types: %w", err)
 	}
 
 	return &wasm.FunctionType{
@@ -232,21 +232,33 @@ func encodeSection(sectionID SectionID, contents []byte) []byte {
 	return append([]byte{sectionID}, encodeSizePrefixed(contents)...)
 }
 
-// encodeTypeSection encodes a SectionIDType with any types in the Module.TypeSection
+// encodeTypeSection encodes a SectionIDType for the given imports in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See encodeFunctionType
 // See https://www.w3.org/TR/wasm-core-1/#type-section%E2%91%A0
-func encodeTypeSection(ts []*wasm.FunctionType) []byte {
-	typeCount := len(ts)
-	data := leb128.EncodeUint32(uint32(typeCount))
-	for _, ft := range ts {
-		// Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
-		// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
-		data = append(data, 0x60)
-		data = append(data, encodeValTypes(ft.Params)...)
-		data = append(data, encodeValTypes(ft.Results)...)
+func encodeTypeSection(types []*wasm.FunctionType) []byte {
+	contents := leb128.EncodeUint32(uint32(len(types)))
+	for _, t := range types {
+		contents = append(contents, encodeFunctionType(t)...)
 	}
+	return encodeSection(SectionIDType, contents)
+}
 
-	// Finally, make the header
-	dataSize := leb128.EncodeUint32(uint32(len(data)))
-	header := append([]byte{SectionIDType}, dataSize...)
-	return append(header, data...)
+// encodeImportSection encodes a SectionIDImport for the given imports in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See encodeImport
+// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
+func encodeImportSection(imports []*wasm.Import) []byte {
+	contents := leb128.EncodeUint32(uint32(len(imports)))
+	for _, i := range imports {
+		contents = append(contents, encodeImport(i)...)
+	}
+	return encodeSection(SectionIDImport, contents)
+}
+
+// encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
+func encodeStartSection(funcidx uint32) []byte {
+	return encodeSection(SectionIDStart, leb128.EncodeUint32(funcidx))
 }
