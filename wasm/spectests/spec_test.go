@@ -230,7 +230,7 @@ func TestJIT(t *testing.T) {
 		"local_get.wast":              true,
 		"local_set.wast":              true,
 		"local_tee.wast":              true,
-		"loop.wast":                   false, // Needs br_table support
+		"loop.wast":                   true,
 		"memory_grow.wast":            false, // Needs br_table support
 		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
@@ -255,7 +255,7 @@ func TestJIT(t *testing.T) {
 		"utf8-import-field.wast":      true,
 		"utf8-import-module.wast":     true,
 	}
-	targets = map[string]bool{"loop.wast": true}
+	// targets = map[string]bool{"block.wast": true}
 	runTest(t, jit.NewEngine, targets)
 }
 
@@ -294,6 +294,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 			for _, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
+					fmt.Println(msg)
 					switch c.CommandType {
 					case "module":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))

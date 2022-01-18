@@ -509,16 +509,22 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 
 	compiler.emitPreamble()
 
+	var skip bool
 	for _, op := range ir.Operations {
 		if buildoptions.IsDebugMode {
 			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
+		}
+
+		if op.Kind() == wazeroir.OperationKindLabel {
+			skip = compiler.compileLabel(op.(*wazeroir.OperationLabel))
+		}
+		if skip {
+			continue
 		}
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
 			err = compiler.compileUnreachable()
-		case *wazeroir.OperationLabel:
-			err = compiler.compileLabel(o)
 		case *wazeroir.OperationBr:
 			err = compiler.compileBr(o)
 		case *wazeroir.OperationBrIf:

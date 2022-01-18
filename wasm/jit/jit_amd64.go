@@ -91,7 +91,8 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 	}
 	return &amd64Compiler{
 		eng: eng, f: f, builder: b, locationStack: newValueLocationStack(),
-		labels: labels,
+		labels:       labels,
+		currentLabel: ".entrypoint",
 	}, nil
 }
 
@@ -114,8 +115,7 @@ type amd64Compiler struct {
 	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
 	maxStackPointer uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
-	currentLabel string
-
+	currentLabel                                     string
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 	onGenerateCallbacks                              []func(code []byte)
 }
@@ -780,22 +780,26 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 	}
 }
 
-func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
+func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
 	if buildoptions.IsDebugMode {
-		if c.currentLabel == "" {
-			c.currentLabel = ".entrypoint"
+		if c.currentLabel != "" {
+			fmt.Printf("[label %s ends]\n", c.currentLabel)
 		}
-		fmt.Printf("[label %s ends]\n", c.currentLabel)
 	}
 
 	labelKey := o.Label.String()
+	labelInfo := c.label(labelKey)
+	if labelInfo.callers == 0 {
+		skipLabel = true
+		c.currentLabel = ""
+		return
+	}
+
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
 	labelBegin := c.newProg()
 	labelBegin.As = obj.ANOP
 	c.addInstruction(labelBegin)
-
-	labelInfo := c.label(labelKey)
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
@@ -816,7 +820,8 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
 	}
 	c.currentLabel = labelKey
-	return nil
+	skipLabel = false
+	return
 }
 
 func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {

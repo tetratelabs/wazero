@@ -14,6 +14,7 @@ type compiler interface {
 	// maxStackPointer is the max stack pointer that the target function would reach.
 	generate() (code []byte, maxStackPointer uint64, err error)
 	// Followings are resinposible for compiling each wazeroir operation.
+	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)
 	compileUnreachable() error
 	compileSwap(o *wazeroir.OperationSwap) error
 	compileGlobalGet(o *wazeroir.OperationGlobalGet) error
@@ -21,7 +22,6 @@ type compiler interface {
 	compileBr(o *wazeroir.OperationBr) error
 	compileBrIf(o *wazeroir.OperationBrIf) error
 	compileBrTable(o *wazeroir.OperationBrTable) error
-	compileLabel(o *wazeroir.OperationLabel) error
 	compileCall(o *wazeroir.OperationCall) error
 	compileCallIndirect(o *wazeroir.OperationCallIndirect) error
 	compileDrop(o *wazeroir.OperationDrop) error

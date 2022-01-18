@@ -199,11 +199,9 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		// Emit code for each label which returns the frame ID.
 		for _, returnValue := range []uint32{1, 2, 3, 4, 5, 6} {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
-			err := c.compileLabel(&wazeroir.OperationLabel{Label: label})
-			require.NoError(t, err)
-			err = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
-			require.NoError(t, err)
-			err = c.releaseAllRegistersToStack()
+			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
+			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
+			err := c.releaseAllRegistersToStack()
 			require.NoError(t, err)
 			c.returnFunction()
 		}
@@ -543,21 +541,19 @@ func TestAmd64Compiler_compileLabel(t *testing.T) {
 	var called bool
 	compiler.labels[labelKey] = &labelInfo{
 		labelBeginningCallbacks: []func(*obj.Prog){func(p *obj.Prog) { called = true }},
+		callers:                 10,
 	}
 
-	err := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
-	require.NoError(t, err)
+	// If callers > 0, the label must not be skipped.
+	skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+	require.False(t, skip)
 	require.NotNil(t, compiler.labels[labelKey].initialInstruction)
 	require.True(t, called)
 
-	// Generate the code under test.
-	compiler.returnFunction()
-	code, _, err := compiler.generate()
-	require.NoError(t, err)
-
-	// Run code.
-	env := newJITEnvironment()
-	env.exec(code)
+	// Otherwise, skip.
+	compiler.labels[labelKey].callers = 0
+	skip = compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+	require.True(t, skip)
 }
 
 func TestAmd64Compiler_compilePick(t *testing.T) {

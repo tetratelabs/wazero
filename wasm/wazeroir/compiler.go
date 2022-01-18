@@ -386,7 +386,7 @@ operatorSwitch:
 			if frame.kind == controlFrameKindIfWithoutElse {
 				// Emit the else label.
 				elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
-				c.result.LabelCallers[elseLabel.String()]++
+				c.result.LabelCallers[continuationLabel.String()]++
 				c.emit(
 					&OperationLabel{Label: elseLabel},
 					&OperationBr{Target: continuationLabel.asBranchTarget()},
