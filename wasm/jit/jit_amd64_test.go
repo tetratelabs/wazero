@@ -364,6 +364,9 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 						err := compiler.compileBrTable(tc.o)
 						require.NoError(t, err)
 
+						require.NotContains(t, compiler.locationStack.usedRegisters, indexReg)
+						require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
+
 						requireRunAndExpectedValueReturned(t, compiler, tc.expectedValue)
 					})
 				}

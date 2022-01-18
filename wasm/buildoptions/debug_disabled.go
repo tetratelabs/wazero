@@ -3,4 +3,4 @@
 
 package buildoptions
 
-const IsDebugMode = false
+const IsDebugMode = true

@@ -751,6 +751,8 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			return err
 		}
 	}
+
+	c.locationStack.markRegisterUnused(index.register)
 	return nil
 }
 
@@ -780,7 +782,10 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	if buildoptions.IsDebugMode {
-		fmt.Printf("[label %s ends]\n%s\n", c.currentLabel, c.locationStack)
+		if c.currentLabel == "" {
+			c.currentLabel = ".entrypoint"
+		}
+		fmt.Printf("[label %s ends]\n", c.currentLabel)
 	}
 
 	labelKey := o.Label.String()
@@ -808,7 +813,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 	}
 
 	if buildoptions.IsDebugMode {
-		fmt.Printf("[label %s]\n%s\n", labelKey, c.locationStack)
+		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
 	}
 	c.currentLabel = labelKey
 	return nil
