@@ -144,7 +144,7 @@ func decodeNameSection(data []byte) (result *wasm.NameSection, err error) {
 
 		switch subsectionID {
 		case subsectionIDModuleName:
-			if result.ModuleName, err = decodeName(r, "module"); err != nil {
+			if result.ModuleName, _, err = decodeUTF8(r, "module name"); err != nil {
 				return nil, err
 			}
 		case subsectionIDFunctionNames:
@@ -177,7 +177,7 @@ func decodeFunctionNames(r *bytes.Reader) (map[uint32]string, error) {
 			return nil, err
 		}
 
-		if result[functionIndex], err = decodeName(r, "function[%d]", functionIndex); err != nil {
+		if result[functionIndex], _, err = decodeUTF8(r, "function[%d] name", functionIndex); err != nil {
 			return nil, err
 		}
 	}
@@ -208,7 +208,7 @@ func decodeLocalNames(r *bytes.Reader) (map[uint32]map[uint32]string, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to read a local index of function[%d]: %w", functionIndex, err)
 			}
-			locals[localIndex], err = decodeName(r, "function[%d] local[%d]", functionIndex, localIndex)
+			locals[localIndex], _, err = decodeUTF8(r, "function[%d] local[%d] name", functionIndex, localIndex)
 			if err != nil {
 				return nil, err
 			}
@@ -232,19 +232,4 @@ func decodeFunctionCount(r *bytes.Reader, subsectionID uint8) (uint32, error) {
 		return 0, fmt.Errorf("failed to read the function count of subsection[%d]: %w", subsectionID, err)
 	}
 	return functionCount, nil
-}
-
-// decodeName decodes a size prefixed string from the reader.
-// contextFormat and contextArgs apply an error format when present
-func decodeName(r *bytes.Reader, contextFormat string, contextArgs ...interface{}) (string, error) {
-	size, _, err := leb128.DecodeUint32(r)
-	if err != nil {
-		return "", fmt.Errorf("failed to read %s name size: %w", fmt.Sprintf(contextFormat, contextArgs...), err)
-	}
-
-	namebuf := make([]byte, size)
-	if _, err = io.ReadFull(r, namebuf); err != nil {
-		return "", fmt.Errorf("failed to read %s name: %w", fmt.Sprintf(contextFormat, contextArgs...), err)
-	}
-	return string(namebuf), nil
 }

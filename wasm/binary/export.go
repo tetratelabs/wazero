@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -8,11 +9,11 @@ import (
 	"github.com/tetratelabs/wazero/wasm/leb128"
 )
 
-func decodeExport(r io.Reader) (i *wasm.Export, err error) {
+func decodeExport(r *bytes.Reader) (i *wasm.Export, err error) {
 	i = &wasm.Export{}
 
-	if i.Name, err = decodeNameValue(r); err != nil {
-		return nil, fmt.Errorf("error decoding export name: %w", err)
+	if i.Name, _, err = decodeUTF8(r, "export name"); err != nil {
+		return nil, err
 	}
 
 	b := make([]byte, 1)
