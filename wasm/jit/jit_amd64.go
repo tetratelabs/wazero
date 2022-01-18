@@ -110,12 +110,14 @@ type amd64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
 	// labels holds per wazeroir label specific informationsin this function.
-	labels                                           map[string]*labelInfo
-	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
+	labels map[string]*labelInfo
 	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
 	maxStackPointer uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel string
+
+	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
+	onGenerateCallbacks                              []func(code []byte)
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
@@ -161,6 +163,11 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+
+	for _, cb := range c.onGenerateCallbacks {
+		cb(code)
+	}
+
 	// As we cannot read RIP register directly, we calculate now the offset to the next
 	// instruction after return instruction for function call.
 	const operandSizeBytes = 8
@@ -452,8 +459,11 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
+	return c.branchInto(o.Target)
+}
 
-	if o.Target.IsReturnTarget() {
+func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
+	if target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		if err := c.releaseAllRegistersToStack(); err != nil {
 			return err
@@ -462,7 +472,7 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		// Then return from this function.
 		c.returnFunction()
 	} else {
-		labelKey := o.Target.String()
+		labelKey := target.String()
 		targetLabel := c.label(labelKey)
 		if targetLabel.callers > 1 {
 			// If the number of callers to the target label is larget than one,
@@ -476,6 +486,8 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		if targetLabel.initialStack == nil {
+			// It seems unnecessary to clone as branchInto is always the tail of the current block.
+			// TODO: veirfy ^^.
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 		jmp := c.newProg()
@@ -634,7 +646,112 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 }
 
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
-	panic("TODO implement!")
+	index := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(index); err != nil {
+		return err
+	}
+
+	// Otherwise, we jump into the selected branch.
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	movLengthToTmp := c.newProg()
+	movLengthToTmp.As = x86.AMOVQ
+	movLengthToTmp.To.Type = obj.TYPE_REG
+	movLengthToTmp.To.Reg = tmp
+	movLengthToTmp.From.Type = obj.TYPE_CONST
+	movLengthToTmp.From.Offset = int64(len(o.Targets))
+	c.addInstruction(movLengthToTmp)
+
+	// First, we compare the value with the length of targets.
+	cmpLength := c.newProg()
+	cmpLength.As = x86.ACMPL
+	cmpLength.To.Type = obj.TYPE_REG
+	cmpLength.To.Reg = index.register
+	cmpLength.From.Type = obj.TYPE_REG
+	cmpLength.From.Reg = tmp
+	c.addInstruction(cmpLength)
+
+	// If the value is larger than the length,
+	// we round the index to the length.
+	roundIndex := c.newProg()
+	roundIndex.As = x86.ACMOVQCS
+	roundIndex.To.Type = obj.TYPE_REG
+	roundIndex.To.Reg = index.register
+	roundIndex.From.Type = obj.TYPE_REG
+	roundIndex.From.Reg = tmp
+	c.addInstruction(roundIndex)
+
+	readRIP := c.newProg()
+	readRIP.As = x86.ALEAQ
+	readRIP.To.Reg = tmp
+	readRIP.To.Type = obj.TYPE_REG
+	readRIP.From.Type = obj.TYPE_MEM
+	readRIP.From.Offset = 0xffff // Place holder!
+	readRIP.From.Reg = x86.REG_BP
+	c.addInstruction(readRIP)
+
+	doubleIndex := c.newProg()
+	doubleIndex.As = x86.ASHLQ
+	doubleIndex.To.Type = obj.TYPE_REG
+	doubleIndex.To.Reg = index.register
+	doubleIndex.From.Type = obj.TYPE_CONST
+	doubleIndex.From.Offset = 1
+	c.addInstruction(doubleIndex)
+
+	calcAbsoluteAddressofSelectedTrampoline := c.newProg()
+	calcAbsoluteAddressofSelectedTrampoline.As = x86.AADDQ
+	calcAbsoluteAddressofSelectedTrampoline.To.Type = obj.TYPE_REG
+	calcAbsoluteAddressofSelectedTrampoline.To.Reg = tmp
+	calcAbsoluteAddressofSelectedTrampoline.From.Type = obj.TYPE_REG
+	calcAbsoluteAddressofSelectedTrampoline.From.Reg = index.register
+	c.addInstruction(calcAbsoluteAddressofSelectedTrampoline)
+
+	jmpToTrampoline := c.newProg()
+	jmpToTrampoline.As = obj.AJMP
+	jmpToTrampoline.To.Reg = tmp
+	jmpToTrampoline.To.Type = obj.TYPE_REG
+	c.addInstruction(jmpToTrampoline)
+
+	// Emit trampolines for each target labels.
+	trampolineJumps := make([]*obj.Prog, len(o.Targets)+1)
+	for i := range trampolineJumps {
+		jmp := c.newProg()
+		jmp.As = obj.AJMP
+		jmp.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmp)
+		trampolineJumps[i] = jmp
+	}
+
+	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) {
+		code[readRIP.Pc+2] = code[readRIP.Pc+2] & 0b01111111
+		binary.LittleEndian.PutUint32(code[readRIP.Pc+3:], uint32(trampolineJumps[0].Pc)-uint32(doubleIndex.Pc))
+	})
+
+	// Implement the actual branching into each label.
+	saved := c.locationStack
+	for i, trampoline := range trampolineJumps {
+		var locationStack *valueLocationStack
+		var target *wazeroir.BranchTargetDrop
+		if i < len(o.Targets) {
+			locationStack = saved.clone()
+			target = o.Targets[i]
+		} else {
+			locationStack = saved
+			target = o.Default
+		}
+		c.replaceLocationStack(locationStack)
+		c.addSetJmpOrigins(trampoline)
+		if err := c.emitDropRange(target.ToDrop); err != nil {
+			return err
+		}
+		if err := c.branchInto(target.Target); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // If a jump target has multiple callesr (origins),

@@ -194,6 +194,142 @@ func TestAmd64Compiler_generate(t *testing.T) {
 	})
 }
 
+func TestAmd64Compiler_compileBrTable(t *testing.T) {
+	requireRunAndExpectedValueReturned := func(t *testing.T, c *amd64Compiler, expValue uint32) {
+		// Emit codes for each labels.
+		for _, returnValue := range []uint32{1, 2, 3, 4, 5, 6, 7, 8} {
+			// Emit code for each label which returns the frame ID.
+			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
+			err := c.compileLabel(&wazeroir.OperationLabel{Label: label})
+			require.NoError(t, err)
+			err = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
+			require.NoError(t, err)
+			err = c.releaseAllRegistersToStack()
+			require.NoError(t, err)
+			c.returnFunction()
+		}
+
+		// Generate the code under test.
+		code, _, err := c.generate()
+		require.NoError(t, err)
+
+		// Run codes
+		env := newJITEnvironment()
+		env.exec(code)
+
+		// Check the returned value.
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, expValue, env.stackTopAsUint32())
+	}
+
+	getBranchTargetDropFromFrameID := func(frameid uint32) *wazeroir.BranchTargetDrop {
+		return &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{
+			Label: &wazeroir.Label{FrameID: frameid, Kind: wazeroir.LabelKindHeader}},
+		}
+	}
+
+	for _, indexReg := range unreservedGeneralPurposeIntRegisters {
+		for _, tmpReg := range unreservedGeneralPurposeIntRegisters {
+			if indexReg == tmpReg {
+				continue
+			}
+			indexReg := indexReg
+			tmpReg := tmpReg
+			t.Run(fmt.Sprintf("index_register=%d,tmpRegister=%d", indexReg, tmpReg), func(t *testing.T) {
+				for _, tc := range []struct {
+					name          string
+					index         int64
+					o             *wazeroir.OperationBrTable
+					expectedValue uint32
+				}{
+					{
+						name:          "only default with index 0",
+						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(5)},
+						index:         0,
+						expectedValue: 5,
+					},
+					{
+						name:          "only default with index 100",
+						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(5)},
+						index:         100,
+						expectedValue: 5,
+					},
+					{
+						name: "select default with targets and good index",
+						o: &wazeroir.OperationBrTable{
+							Targets: []*wazeroir.BranchTargetDrop{
+								getBranchTargetDropFromFrameID(1),
+								getBranchTargetDropFromFrameID(2),
+							},
+							Default: getBranchTargetDropFromFrameID(5),
+						},
+						index:         3,
+						expectedValue: 5,
+					},
+					{
+						name: "select default with targets and huge index",
+						o: &wazeroir.OperationBrTable{
+							Targets: []*wazeroir.BranchTargetDrop{
+								getBranchTargetDropFromFrameID(1),
+								getBranchTargetDropFromFrameID(2),
+							},
+							Default: getBranchTargetDropFromFrameID(5),
+						},
+						index:         100000,
+						expectedValue: 5,
+					},
+					{
+						name: "select first target",
+						o: &wazeroir.OperationBrTable{
+							Targets: []*wazeroir.BranchTargetDrop{
+								getBranchTargetDropFromFrameID(1),
+								getBranchTargetDropFromFrameID(2),
+							},
+							Default: getBranchTargetDropFromFrameID(5),
+						},
+						index:         0,
+						expectedValue: 1,
+					},
+					{
+						name: "select last target",
+						o: &wazeroir.OperationBrTable{
+							Targets: []*wazeroir.BranchTargetDrop{
+								getBranchTargetDropFromFrameID(1),
+								getBranchTargetDropFromFrameID(2),
+								getBranchTargetDropFromFrameID(3),
+								getBranchTargetDropFromFrameID(4),
+							},
+							Default: getBranchTargetDropFromFrameID(5),
+						},
+						index:         3,
+						expectedValue: 4,
+					},
+				} {
+					tc := tc
+					t.Run(tc.name, func(t *testing.T) {
+						compiler := requireNewCompiler(t)
+						compiler.initializeReservedRegisters()
+
+						for _, r := range unreservedGeneralPurposeIntRegisters {
+							if r != indexReg && r != tmpReg {
+								compiler.locationStack.markRegisterUsed(r)
+							}
+						}
+
+						compiler.locationStack.pushValueOnRegister(indexReg)
+						compiler.movIntConstToRegister(tc.index, indexReg)
+
+						err := compiler.compileBrTable(tc.o)
+						require.NoError(t, err)
+
+						requireRunAndExpectedValueReturned(t, compiler, tc.expectedValue)
+					})
+				}
+			})
+		}
+	}
+}
+
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 	f := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{
 		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
