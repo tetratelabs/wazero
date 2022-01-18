@@ -162,7 +162,7 @@ func decodeGlobalSection(r *reader) ([]*wasm.Global, error) {
 	result := make([]*wasm.Global, vs)
 	for i := uint32(0); i < vs; i++ {
 		if result[i], err = decodeGlobal(r); err != nil {
-			return nil, fmt.Errorf("read global segment: %v ", err)
+			return nil, fmt.Errorf("read global: %v ", err)
 		}
 	}
 	return result, nil
