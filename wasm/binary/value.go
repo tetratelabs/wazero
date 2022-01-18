@@ -61,7 +61,7 @@ func decodeValueTypes(r io.Reader, num uint32) ([]wasm.ValueType, error) {
 	return ret, nil
 }
 
-// decodeName decodes a size prefixed string from the reader, returning it and the count of bytes read.
+// decodeUTF8 decodes a size prefixed string from the reader, returning it and the count of bytes read.
 // contextFormat and contextArgs apply an error format when present
 func decodeUTF8(r *bytes.Reader, contextFormat string, contextArgs ...interface{}) (string, uint32, error) {
 	size, sizeOfSize, err := leb128.DecodeUint32(r)
