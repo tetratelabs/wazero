@@ -701,13 +701,13 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	doubleIndex.From.Offset = 1
 	c.addInstruction(doubleIndex)
 
-	calcAbsoluteAddressofSelectedTrampoline := c.newProg()
-	calcAbsoluteAddressofSelectedTrampoline.As = x86.AADDQ
-	calcAbsoluteAddressofSelectedTrampoline.To.Type = obj.TYPE_REG
-	calcAbsoluteAddressofSelectedTrampoline.To.Reg = tmp
-	calcAbsoluteAddressofSelectedTrampoline.From.Type = obj.TYPE_REG
-	calcAbsoluteAddressofSelectedTrampoline.From.Reg = index.register
-	c.addInstruction(calcAbsoluteAddressofSelectedTrampoline)
+	calcAbsoluteAddressOfSelectedTrampoline := c.newProg()
+	calcAbsoluteAddressOfSelectedTrampoline.As = x86.AADDQ
+	calcAbsoluteAddressOfSelectedTrampoline.To.Type = obj.TYPE_REG
+	calcAbsoluteAddressOfSelectedTrampoline.To.Reg = tmp
+	calcAbsoluteAddressOfSelectedTrampoline.From.Type = obj.TYPE_REG
+	calcAbsoluteAddressOfSelectedTrampoline.From.Reg = index.register
+	c.addInstruction(calcAbsoluteAddressOfSelectedTrampoline)
 
 	jmpToTrampoline := c.newProg()
 	jmpToTrampoline.As = obj.AJMP
