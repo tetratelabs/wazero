@@ -49,7 +49,7 @@ func decodeFunctionType(r io.Reader) (*wasm.FunctionType, error) {
 
 	paramTypes, err := decodeValueTypes(r, s)
 	if err != nil {
-		return nil, fmt.Errorf("could not read parameter type: %w", err)
+		return nil, fmt.Errorf("could not read parameter types: %w", err)
 	}
 
 	s, _, err = leb128.DecodeUint32(r)
@@ -61,7 +61,7 @@ func decodeFunctionType(r io.Reader) (*wasm.FunctionType, error) {
 
 	resultTypes, err := decodeValueTypes(r, s)
 	if err != nil {
-		return nil, fmt.Errorf("read value imports of outputs: %w", err)
+		return nil, fmt.Errorf("could not read result types: %w", err)
 	}
 
 	return &wasm.FunctionType{
