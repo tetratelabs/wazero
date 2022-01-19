@@ -72,14 +72,14 @@ type typeParser struct {
 	// Note: names can be missing because they were never assigned, ex. (param i32), or due to abbreviated format which
 	// does not support names. Ex. (param i32 i32)
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A2
-	currentParamNames paramNames
+	currentParamNames wasm.NameMap
 
 	// currentParamField is a field index and used to give an appropriate errorContext. Due to abbreviation it may be
 	// unrelated to the length of currentParams
 	currentParamField uint32
 
-	// currentParamName is the name of the currentParamField, added on tokenRParen to currentParamNames
-	currentParamName []byte
+	// currentLocalName is the name of the currentParamField, added on tokenRParen to currentParamNames
+	currentLocalName []byte
 
 	// foundParam allows us to check if we found a type in a "param" field. We can't use currentParamField because when
 	// parameters are abbreviated, ex. (param i32 i32), the currentParamField will be less than the type count.
@@ -165,7 +165,7 @@ func (p *typeParser) beginParamOrResult(tok tokenType, tokenBytes []byte, line, 
 		case "param":
 			p.state = parsingParam
 			p.foundParam = false
-			p.currentParamName = nil
+			p.currentLocalName = nil
 			p.m.tokenParser = p.parseParamName
 		case "result":
 			p.state = parsingResult
@@ -200,7 +200,7 @@ func (p *typeParser) parseMoreParamsOrResult(tok tokenType, tokenBytes []byte, l
 //        calls parseParam --^
 func (p *typeParser) parseParamName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $len
-		p.currentParamName = stripDollar(tokenBytes)
+		p.currentLocalName = stripDollar(tokenBytes)
 		p.m.tokenParser = p.parseParam
 		return nil
 	}
@@ -229,7 +229,7 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) e
 		if err != nil {
 			return err
 		}
-		if p.foundParam && p.currentParamName != nil {
+		if p.foundParam && p.currentLocalName != nil {
 			return errors.New("cannot name parameters in abbreviated form")
 		}
 		p.currentParams = append(p.currentParams, vt)
@@ -241,9 +241,11 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) e
 
 		// Note: currentParamField is the index of the param field, but due to mixing and matching of abbreviated params
 		// it can be less than the param index. Ex. (param i32 i32) (param $v i32) is param field 2, but the 3rd param.
-		if p.currentParamName != nil {
-			nameIndex := &paramNameIndex{uint32(len(p.currentParams) - 1), p.currentParamName}
-			p.currentParamNames = append(p.currentParamNames, nameIndex)
+		if p.currentLocalName != nil {
+			p.currentParamNames = append(p.currentParamNames, &wasm.NameAssoc{
+				Index: uint32(len(p.currentParams) - 1),
+				Name:  string(p.currentLocalName),
+			})
 		}
 
 		// since multiple param fields are valid, ex `(func (param i32) (param i64))`, prepare for any next.
@@ -295,11 +297,11 @@ func (p *typeParser) errorContext() string {
 
 var typeFuncEmpty = &typeFunc{}
 
-// getTypeUse finalizes any current params or result and returns the current typeIndex and/or type. paramNames are only
+// getTypeUse finalizes any current params or result and returns the current typeIndex and/or type. localNames are only
 // returned if defined inline.
-func (p *typeParser) getTypeUse() (typeIndex *index, inlined *inlinedTypeFunc, paramNames paramNames) {
+func (p *typeParser) getTypeUse() (typeIndex *index, inlined *inlinedTypeFunc, localNames wasm.NameMap) {
 	typeIndex = p.currentTypeIndex
-	paramNames = p.currentParamNames
+	localNames = p.currentParamNames
 
 	// Don't conflate lack of verification type with nullary
 	if typeIndex != nil && funcTypeEquals(typeFuncEmpty, p.currentParams, p.currentResult) {
@@ -339,7 +341,7 @@ func (p *typeParser) getTypeUse() (typeIndex *index, inlined *inlinedTypeFunc, p
 // getType finalizes any current params or result and returns the current type and any paramNames for it.
 //
 // If the current type is in typeParser.inlinedTypes, it is removed prior to returning.
-func (p *typeParser) getType(typeName string) (sig *typeFunc, paramNames paramNames) {
+func (p *typeParser) getType(typeName string) (sig *typeFunc, paramNames wasm.NameMap) {
 	paramNames = p.currentParamNames
 
 	// Search inlined types in case a matching type was found after its type use.

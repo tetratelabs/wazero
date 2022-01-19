@@ -23,16 +23,17 @@ func TestBindIndices(t *testing.T) {
 			input: &module{
 				types: []*typeFunc{paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "fd_write",
 						typeInlined: &inlinedTypeFunc{paramI32I32I32I32ResultI32, 0, 0}},
 				},
+				importFuncNames: wasm.NameMap{{Index: wasm.Index(0), Name: "runtime.fd_write"}},
 			},
 			expected: &module{
 				types: []*typeFunc{paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
-						typeIndex: indexZero},
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "fd_write", typeIndex: indexZero},
 				},
+				importFuncNames: wasm.NameMap{{Index: wasm.Index(0), Name: "runtime.fd_write"}},
 			},
 		},
 		{
@@ -40,19 +41,25 @@ func TestBindIndices(t *testing.T) {
 			input: &module{
 				types: []*typeFunc{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_sizes_get",
 						typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "fd_write",
 						typeInlined: &inlinedTypeFunc{paramI32I32I32I32ResultI32, 0, 0}},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 			expected: &module{
 				types: []*typeFunc{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
-						typeIndex: indexZero},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
-						typeIndex: indexOne},
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_sizes_get", typeIndex: indexZero},
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "fd_write", typeIndex: indexOne},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 		},
@@ -61,19 +68,25 @@ func TestBindIndices(t *testing.T) {
 			input: &module{
 				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "runtime.args_get",
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_get",
 						typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "args_sizes_get",
 						typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 			expected: &module{
 				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "args_get", funcName: "runtime.args_get",
-						typeIndex: indexOne},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
-						typeIndex: indexOne},
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_get", typeIndex: indexOne},
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "args_sizes_get", typeIndex: indexOne},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 		},
@@ -86,10 +99,14 @@ func TestBindIndices(t *testing.T) {
 					{name: "i32i32i32i32_i32", params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
 				},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_sizes_get",
 						typeIndex: &index{ID: "i32i32_i32", line: 5, col: 86}},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "fd_write",
 						typeIndex: &index{ID: "i32i32i32i32_i32", line: 6, col: 76}},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 			expected: &module{
@@ -99,10 +116,14 @@ func TestBindIndices(t *testing.T) {
 					{name: "i32i32i32i32_i32", params: []wasm.ValueType{i32, i32, i32, i32}, result: i32},
 				},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_sizes_get",
 						typeIndex: &index{numeric: 1, line: 5, col: 86}},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "fd_write",
 						typeIndex: &index{numeric: 2, line: 6, col: 76}},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 		},
@@ -111,51 +132,55 @@ func TestBindIndices(t *testing.T) {
 			input: &module{
 				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_sizes_get",
 						typeIndex: &index{numeric: 1, line: 5, col: 86}},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "fd_write",
 						typeIndex: &index{numeric: 2, line: 6, col: 76}},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 			expected: &module{
 				types: []*typeFunc{typeFuncEmpty, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				importFuncs: []*importFunc{
-					{importIndex: 0, module: "wasi_snapshot_preview1", name: "arg_sizes_get", funcName: "runtime.arg_sizes_get",
+					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_sizes_get",
 						typeIndex: &index{numeric: 1, line: 5, col: 86}},
-					{importIndex: 1, module: "wasi_snapshot_preview1", name: "fd_write", funcName: "runtime.fd_write",
+					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "fd_write",
 						typeIndex: &index{numeric: 2, line: 6, col: 76}},
+				},
+				importFuncNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 		},
 		{
 			name: "start: imported function name to numeric index",
 			input: &module{
-				types: []*typeFunc{typeFuncEmpty},
-				importFuncs: []*importFunc{
-					{funcName: "one", typeIndex: indexZero},
-					{funcName: "two", typeIndex: indexZero},
-				},
-				startFunction: &index{ID: "two", line: 3, col: 9},
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{typeIndex: indexZero}, {typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{{Index: wasm.Index(0), Name: "one"}, {Index: wasm.Index(1), Name: "two"}},
+				startFunction:   &index{ID: "two", line: 3, col: 9},
 			},
 			expected: &module{
-				types: []*typeFunc{typeFuncEmpty},
-				importFuncs: []*importFunc{
-					{funcName: "one", typeIndex: indexZero},
-					{funcName: "two", typeIndex: indexZero},
-				},
-				startFunction: &index{numeric: 1, line: 3, col: 9},
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{typeIndex: indexZero}, {typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{{Index: wasm.Index(0), Name: "one"}, {Index: wasm.Index(1), Name: "two"}},
+				startFunction:   &index{numeric: 1, line: 3, col: 9},
 			},
 		},
 		{
 			name: "start: imported function numeric index left alone",
 			input: &module{
 				types:         []*typeFunc{typeFuncEmpty},
-				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
+				importFuncs:   []*importFunc{{name: "hello", importIndex: wasm.Index(0), typeIndex: indexZero}},
 				startFunction: &index{numeric: 0, line: 3, col: 9},
 			},
 			expected: &module{
 				types:         []*typeFunc{typeFuncEmpty},
-				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
+				importFuncs:   []*importFunc{{name: "hello", importIndex: wasm.Index(0), typeIndex: indexZero}},
 				startFunction: &index{numeric: 0, line: 3, col: 9},
 			},
 		},
@@ -173,6 +198,7 @@ func TestBindIndices(t *testing.T) {
 }
 
 func TestBindIndices_Errors(t *testing.T) {
+	i32 := wasm.ValueTypeI32
 	indexZero := &index{}
 
 	tests := []struct {
@@ -197,10 +223,21 @@ func TestBindIndices_Errors(t *testing.T) {
 			expectedErr: "3:9: unknown ID $main in module.import[0].func.type",
 		},
 		{
+			name: "import function: inlined type doesn't match indexed",
+			input: &module{
+				types: []*typeFunc{typeFuncEmpty},
+				importFuncs: []*importFunc{
+					{importIndex: wasm.Index(0), module: "", name: "hello", typeIndex: indexZero,
+						typeInlined: &inlinedTypeFunc{&typeFunc{params: []wasm.ValueType{i32, i32}}, 3, 9}},
+				},
+			},
+			expectedErr: "3:9: inlined type doesn't match type index 0 in module.import[0].func.type",
+		},
+		{
 			name: "start points out of range",
 			input: &module{
 				types:         []*typeFunc{typeFuncEmpty},
-				importFuncs:   []*importFunc{{name: "hello", importIndex: 0, typeIndex: indexZero}},
+				importFuncs:   []*importFunc{{name: "hello", importIndex: wasm.Index(0), typeIndex: indexZero}},
 				startFunction: &index{numeric: 1, line: 3, col: 9},
 			},
 			expectedErr: "3:9: index 1 is out of range [0..0] in module.start",
