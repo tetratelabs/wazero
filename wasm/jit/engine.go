@@ -429,7 +429,7 @@ func (e *engine) execFunction(f *compiledFunction) {
 				// Push the call frame for this host function.
 				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
 				// Call into the host function.
-				e.execHostFunction(nextFunc.source.HostFunction, &wasm.HostFunctionCallContext{Memory: nextFunc.source.ModuleInstance.Memory})
+				e.execHostFunction(nextFunc.source.HostFunction, &wasm.HostFunctionCallContext{Memory: currentFrame.compiledFunction.source.ModuleInstance.Memory})
 				// Pop the call frame.
 				e.callFrameStack = currentFrame
 			} else {

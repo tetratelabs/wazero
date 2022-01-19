@@ -3,6 +3,7 @@ package jit
 import (
 	"errors"
 	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"unsafe"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/text"
 )
 
 // Ensures that the offset consts do not drift when we manipulate the engine struct.
@@ -26,6 +28,34 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).memorySliceLen)), engineMemorySliceLenOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceAddress)), engineTableSliceAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceLen)), engineTableSliceLenOffset)
+}
+
+func Test_Simple(t *testing.T) {
+	mod, err := text.DecodeModule([]byte(`(module
+	(import "" "hello" (func $hello))
+	(start $hello)
+)`))
+	require.NoError(t, err)
+
+	engine := newEngine()
+	store := wasm.NewStore(engine)
+
+	msg := "hello!"
+	hostFunction := func(ctx *wasm.HostFunctionCallContext) {
+		require.NotNil(t, ctx.Memory)
+		copy(ctx.Memory.Buffer, msg)
+	}
+	require.NoError(t, store.AddHostFunction("", "hello", reflect.ValueOf(hostFunction)))
+
+	memoryInstance := &wasm.MemoryInstance{Buffer: make([]byte, len(msg))}
+	engine.compiledFunctions[0].source.ModuleInstance.Memory = memoryInstance
+
+	moduleName := "simple"
+	require.NoError(t, store.Instantiate(mod, moduleName))
+
+	// The "hello" function was imported as $hello in Wasm. Since it was marked as the start
+	// function, it is invoked on instantiation. Ensure that worked: "hello" was called!
+	require.Equal(t, msg, string(memoryInstance.Buffer))
 }
 
 func TestEngine_fibonacci(t *testing.T) {
