@@ -85,7 +85,7 @@ func bindExportFuncs(m *module, funcNameToIndex map[string]uint32) (err error) {
 	for _, e := range m.exportFuncs {
 		err = bindIndex(indexCount, funcNameToIndex, e.funcIndex, "module.exports[%d].func", int64(e.exportIndex))
 		if err != nil {
-			return err
+			return
 		}
 	}
 	return
