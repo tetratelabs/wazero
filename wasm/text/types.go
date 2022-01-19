@@ -29,23 +29,30 @@ type module struct {
 	// See https://www.w3.org/TR/wasm-core-1/#types%E2%91%A0%E2%91%A0
 	types []*typeFunc
 
-	// typeParamNames include any parameter names for the corresponding index of types.
-	typeParamNames []*typeParamNames
+	// typeParamNames are nil when no types had named (param) fields.
+	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
+	typeParamNames map[wasm.Index]wasm.NameMap
 
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
+
+	// importFuncNames are nil when no importFunc had a name
+	//
+	// See wasm.NameSection FunctionNames
+	importFuncNames wasm.NameMap
+
+	// importFuncParamNames are nil when no importFuncs had named (param) fields.
+	//
+	// Note: When set, this combines with any typeParamNames to produce wasm.NameSection LocalNames.
+	// This can't be done when parsing an import because types can be declared after the import that uses them.
+	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
+	importFuncParamNames wasm.IndirectNameMap
 
 	// startFunction is the index of the function to call during wasm.Store Instantiate. When a tokenID, this must match
 	// importFunc.funcName.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
 	startFunction *index
-}
-
-// typeParamNames include any parameter names for the corresponding index of module.types.
-type typeParamNames struct {
-	index      uint32
-	paramNames paramNames
 }
 
 type inlinedTypeFunc struct {
@@ -71,12 +78,12 @@ type index struct {
 	// Ex. This is $t0 from (import "Math" "PI" (func (type $t0))), but (type $t0 (func ...)) does not exist.
 	ID string
 
-	// numeric is set when its corresponding token is tokenUN to a numeric index. Ex. 3
+	// numeric is set when its corresponding token is tokenUN is a wasm.Index. Ex. 3
 	//
 	// Note: To avoid conflating unset with the valid index zero, only read this value when ID is unset.
 	// Note: This must be checked for range as there's a possible out-of-bonds condition.
 	// Ex. This is 32 from (import "Math" "PI" (func (type 32))), but there are only 10 types defined in the module.
-	numeric uint32
+	numeric wasm.Index
 
 	// line is the line in the source where the index was defined.
 	line uint32
@@ -91,7 +98,7 @@ type index struct {
 //
 // See https://www.w3.org/TR/wasm-core-1/#text-functype
 type typeFunc struct {
-	// name is only set when explicitly defined in module.types. Ex. v_v
+	// name is a symbolic index.ID present when explicitly defined in module.types. Ex. v_v
 	//
 	// name is only used for debugging. At runtime, types are called based on raw numeric index. The type index space
 	// begins those explicitly defined in module.types, followed by any inlined ones.
@@ -115,23 +122,6 @@ func funcTypeEquals(t *typeFunc, params []wasm.ValueType, result wasm.ValueType)
 	return bytes.Equal(t.params, params) && t.result == result
 }
 
-// paramNames are the possibly empty association of names that correspond with params. The index is to params and
-// the name will never be empty. Ex. x is the name of (param $x i32)
-//
-// paramNames are only used for debugging. At runtime, parameters are called based on raw numeric index.
-//
-// Note: paramNames may be stored in the wasm.Module CustomSection under the key "name" subsection 2 (locals). For
-// example, `wat2wasm --debug-names` will do this.
-// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-type paramNames []*paramNameIndex // type is only to re-use documentation
-
-type paramNameIndex struct {
-	// index is in currentParams, not necessarily related to currentParamField due to abbreviated format.
-	index uint32
-	// name is the tokenID of the param field.
-	name []byte
-}
-
 // importFunc corresponds to the text format of a WebAssembly function import.
 //
 // Note: nothing is required per specification. Ex `(import "" "" (func))` is valid!
@@ -139,7 +129,7 @@ type paramNameIndex struct {
 // See https://www.w3.org/TR/wasm-core-1/#imports%E2%91%A0
 type importFunc struct {
 	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
-	importIndex uint32
+	importIndex wasm.Index
 
 	// typeIndex is the optional index in module.types for the function signature. If index.ID is set, it must match
 	// typeFunc.name.
@@ -153,9 +143,6 @@ type importFunc struct {
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
 	typeInlined *inlinedTypeFunc
 
-	// paramNames include any parameter names for typeInlined.
-	paramNames paramNames
-
 	// module is the possibly empty module name to import. Ex. "" or "Math"
 	//
 	// Note: This is not necessarily the module.name
@@ -165,17 +152,6 @@ type importFunc struct {
 	//
 	// Note: This is not necessarily the funcName
 	name string
-
-	// funcName is optional. Ex. main
-	//
-	// funcName is only used for debugging. At runtime, functions are called based on raw numeric index. The function
-	// index space begins with imported functions, followed by any defined in this module.
-	// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
-	//
-	// Note: funcName may be stored in the wasm.Module CustomSection under the key "name" subsection 1. For example,
-	// `wat2wasm --debug-names` will do this.
-	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-	funcName string // TODO: presumably, this must be unique as it is a symbolic identifier?
 }
 
 // FormatError allows control over the format of errors parsing the WebAssembly Text Format.

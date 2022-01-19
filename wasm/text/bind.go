@@ -2,14 +2,16 @@ package text
 
 import (
 	"fmt"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 // bindIndices ensures any indices point are numeric or returns a FormatError if they cannot be bound.
 func bindIndices(m *module) error {
-	typeToIndex := map[*typeFunc]uint32{}
-	typeNameToIndex := map[string]uint32{}
+	typeToIndex := map[*typeFunc]wasm.Index{}
+	typeNameToIndex := map[string]wasm.Index{}
 	for i, t := range m.types {
-		ui := uint32(i)
+		ui := wasm.Index(i)
 		if t.name != "" {
 			typeNameToIndex[t.name] = ui
 		}
@@ -36,13 +38,13 @@ func bindIndices(m *module) error {
 // Ex. (import "Math" "PI" (func (type $t0))) exists, but (type $t0 (func ...)) does not.
 //  or (import "Math" "PI" (func (type 32))) exists, but there are only 10 types.
 func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIndex map[string]uint32) (map[string]uint32, error) {
-	funcNameToIndex := map[string]uint32{}
+	funcNameToIndex := map[string]wasm.Index{}
+	for _, na := range m.importFuncNames {
+		funcNameToIndex[na.Name] = na.Index
+	}
+
 	typeCount := uint32(len(m.types))
 	for i, f := range m.importFuncs {
-		if f.funcName != "" {
-			funcNameToIndex[f.funcName] = uint32(i)
-		}
-
 		idx := f.typeIndex
 		if idx == nil { // inlined type
 			ti := f.typeInlined
@@ -60,7 +62,7 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 		}
 
 		// If there's an inlined type now, it must contain the same signature as the index, and may contain names.
-		if f.typeInlined != nil { // TODO: test me please!
+		if f.typeInlined != nil {
 			realType := m.types[idx.numeric]
 			ti := f.typeInlined
 			if !funcTypeEquals(realType, ti.typeFunc.params, ti.typeFunc.result) {

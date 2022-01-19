@@ -3,6 +3,8 @@ package text
 import (
 	"errors"
 	"fmt"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 // currentField holds the positional state of parser. Values are also useful as they allow you to do a reference search
@@ -300,9 +302,14 @@ func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col
 // the token is tokenRParen and sets the next parser to parseType on tokenRParen.
 func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		sig, names := p.typeParser.getType(string(p.currentValue0))
-		if names != nil {
-			p.module.typeParamNames = append(p.module.typeParamNames, &typeParamNames{uint32(len(p.module.types)), names})
+		sig, localNames := p.typeParser.getType(string(p.currentValue0))
+		if localNames != nil {
+			idx := wasm.Index(len(p.module.types))
+			if p.module.typeParamNames == nil {
+				p.module.typeParamNames = map[wasm.Index]wasm.NameMap{idx: localNames}
+			} else {
+				p.module.typeParamNames[idx] = localNames
+			}
 		}
 		p.module.types = append(p.module.types, sig)
 		p.currentValue0 = nil
@@ -407,8 +414,8 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 //                    calls parseImportFunc here --^
 func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
-		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
-		fn.funcName = string(stripDollar(tokenBytes))
+		na := &wasm.NameAssoc{Index: wasm.Index(len(p.module.importFuncs) - 1), Name: string(stripDollar(tokenBytes))}
+		p.module.importFuncNames = append(p.module.importFuncNames, na)
 		p.tokenParser = p.parseImportFunc
 		return nil
 	}
@@ -440,8 +447,14 @@ func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, c
 // and/or importFunc.typeInlined and sets the next parser to parseImport.
 func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		fn := p.module.importFuncs[len(p.module.importFuncs)-1]
-		fn.typeIndex, fn.typeInlined, fn.paramNames = p.typeParser.getTypeUse()
+		idx := wasm.Index(len(p.module.importFuncs) - 1)
+		fn := p.module.importFuncs[idx]
+		var localNames wasm.NameMap
+		fn.typeIndex, fn.typeInlined, localNames = p.typeParser.getTypeUse()
+		if localNames != nil {
+			p.module.importFuncParamNames =
+				append(p.module.importFuncParamNames, &wasm.NameMapAssoc{Index: idx, NameMap: localNames})
+		}
 		p.currentField = fieldModuleImport
 		p.tokenParser = p.parseImport
 		return nil

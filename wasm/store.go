@@ -338,8 +338,8 @@ func (s *Store) resolveImport(target *ModuleInstance, is *Import) error {
 	return nil
 }
 
-func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex uint32, externModuleExportIsntance *ExportInstance) error {
-	f := externModuleExportIsntance.Function
+func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex Index, externModuleExportInstance *ExportInstance) error {
+	f := externModuleExportInstance.Function
 	if int(typeIndex) >= len(target.Types) {
 		return fmt.Errorf("unknown type for function import")
 	}
@@ -459,7 +459,7 @@ func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExp
 			v = math.Float32frombits(uint32(g.Val))
 			return v, ValueTypeF32, nil
 		case ValueTypeF64:
-			v = math.Float64frombits(uint64(g.Val))
+			v = math.Float64frombits(g.Val)
 			return v, ValueTypeF64, nil
 		}
 	}
@@ -505,7 +505,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	rollbackFuncs = append(rollbackFuncs, func() {
 		s.Functions = s.Functions[:prevLen]
 	})
-	var functionDeclarations []uint32
+	var functionDeclarations []Index
 	var globalDeclarations []*GlobalType
 	var memoryDeclarations []*MemoryType
 	var tableDeclarations []*TableType
@@ -529,14 +529,15 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	memoryDeclarations = append(memoryDeclarations, module.MemorySection...)
 	tableDeclarations = append(tableDeclarations, module.TableSection...)
 
-	var functionNames map[uint32]string
-	if module.NameSection != nil && module.NameSection.FunctionNames != nil {
+	var functionNames NameMap
+	if module.NameSection != nil {
 		functionNames = module.NameSection.FunctionNames
-	} else {
-		functionNames = map[uint32]string{}
 	}
 
+	n, nLen := 0, len(functionNames)
+
 	analysisCache := map[int]map[uint64]struct{}{}
+
 	for codeIndex, typeIndex := range module.FunctionSection {
 		if typeIndex >= uint32(len(module.TypeSection)) {
 			return rollbackFuncs, fmt.Errorf("function type index out of range")
@@ -544,7 +545,20 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
-		name := getFunctionName(functionNames, importedFunctionCount, codeIndex)
+		// function index namespace starts with imported functions
+		funcIdx := Index(importedFunctionCount + codeIndex)
+
+		// Seek to see if there's a better name than "unknown"
+		name := "unknown"
+		for ; n < nLen; n++ {
+			next := functionNames[n]
+			if next.Index > funcIdx {
+				break // we have function names, but starting at a later index
+			} else if next.Index == funcIdx {
+				name = next.Name
+				break
+			}
+		}
 
 		f := &FunctionInstance{
 			Name:           name,
@@ -568,18 +582,6 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		s.addFunctionInstance(f)
 	}
 	return rollbackFuncs, nil
-}
-
-// getFunctionName gets the name of the function corresponding to the codeIndex.
-func getFunctionName(functionNames map[uint32]string, importedFunctionCount int, codeIndex int) string {
-	// Per spec: "... function indices, starting with the smallest index not referencing a function import."
-	// This means we have to add an offset of the imported function count to resolve the correct function index.
-	// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A0
-	name, ok := functionNames[uint32(importedFunctionCount)+uint32(codeIndex)]
-	if !ok {
-		name = "unknown"
-	}
-	return name
 }
 
 func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
@@ -653,7 +655,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 	}
 
 	for _, elem := range module.ElementSection {
-		if elem.TableIndex >= uint32(len(target.Tables)) {
+		if elem.TableIndex >= Index(len(target.Tables)) {
 			return rollbackFuncs, fmt.Errorf("index out of range of index space")
 		}
 
@@ -877,7 +879,7 @@ type functionBlock struct {
 func validateFunction(
 	module *Module,
 	f *FunctionInstance,
-	functionDeclarations []uint32,
+	functionDeclarations []Index,
 	globalDeclarations []*GlobalType,
 	memoryDeclarations []*MemoryType,
 	tableDeclarations []*TableType,
@@ -1129,7 +1131,7 @@ func validateFunction(
 				return fmt.Errorf("read immediate: %v", err)
 			}
 			pc += num - 1
-			switch Opcode(op) {
+			switch op {
 			case OpcodeLocalGet:
 				inputLen := uint32(len(f.FunctionType.Type.Params))
 				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {

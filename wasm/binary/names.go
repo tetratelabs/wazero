@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"sort"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/leb128"
@@ -74,33 +73,35 @@ func decodeNameSection(data []byte) (result *wasm.NameSection, err error) {
 	}
 }
 
-func decodeFunctionNames(r *bytes.Reader) (map[uint32]string, error) {
+func decodeFunctionNames(r *bytes.Reader) (wasm.NameMap, error) {
 	functionCount, err := decodeFunctionCount(r, subsectionIDFunctionNames)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[uint32]string, functionCount)
+	result := make(wasm.NameMap, functionCount)
 	for i := uint32(0); i < functionCount; i++ {
 		functionIndex, err := decodeFunctionIndex(r, subsectionIDFunctionNames)
 		if err != nil {
 			return nil, err
 		}
 
-		if result[functionIndex], _, err = decodeUTF8(r, "function[%d] name", functionIndex); err != nil {
+		name, _, err := decodeUTF8(r, "function[%d] name", functionIndex)
+		if err != nil {
 			return nil, err
 		}
+		result[i] = &wasm.NameAssoc{Index: functionIndex, Name: name}
 	}
 	return result, nil
 }
 
-func decodeLocalNames(r *bytes.Reader) (map[uint32]map[uint32]string, error) {
+func decodeLocalNames(r *bytes.Reader) (wasm.IndirectNameMap, error) {
 	functionCount, err := decodeFunctionCount(r, subsectionIDLocalNames)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[uint32]map[uint32]string, functionCount)
+	result := make(wasm.IndirectNameMap, functionCount)
 	for i := uint32(0); i < functionCount; i++ {
 		functionIndex, err := decodeFunctionIndex(r, subsectionIDLocalNames)
 		if err != nil {
@@ -112,18 +113,20 @@ func decodeLocalNames(r *bytes.Reader) (map[uint32]map[uint32]string, error) {
 			return nil, fmt.Errorf("failed to read the local count for function[%d]: %w", functionIndex, err)
 		}
 
-		locals := make(map[uint32]string, localCount)
-		for i := uint32(0); i < localCount; i++ {
+		locals := make(wasm.NameMap, localCount)
+		for j := uint32(0); j < localCount; j++ {
 			localIndex, _, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read a local index of function[%d]: %w", functionIndex, err)
 			}
-			locals[localIndex], _, err = decodeUTF8(r, "function[%d] local[%d] name", functionIndex, localIndex)
+
+			name, _, err := decodeUTF8(r, "function[%d] local[%d] name", functionIndex, localIndex)
 			if err != nil {
 				return nil, err
 			}
+			locals[j] = &wasm.NameAssoc{Index: localIndex, Name: name}
 		}
-		result[functionIndex] = locals
+		result[i] = &wasm.NameMapAssoc{Index: functionIndex, NameMap: locals}
 	}
 	return result, nil
 }
@@ -168,22 +171,15 @@ func encodeFunctionNameData(n *wasm.NameSection) []byte {
 	if len(n.FunctionNames) == 0 {
 		return nil
 	}
-	return encodeSortedAndSizePrefixed(n.FunctionNames)
+
+	return encodeNameMap(n.FunctionNames)
 }
 
-func encodeSortedAndSizePrefixed(m map[uint32]string) []byte {
+func encodeNameMap(m wasm.NameMap) []byte {
 	count := uint32(len(m))
 	data := leb128.EncodeUint32(count)
-
-	// Sort the keys so that they encode in ascending order
-	keys := make([]uint32, 0, count)
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-
-	for _, i := range keys {
-		data = append(data, encodeNameMapEntry(i, []byte(m[i]))...)
+	for _, na := range m {
+		data = append(data, encodeNameAssoc(na)...)
 	}
 	return data
 }
@@ -198,16 +194,9 @@ func encodeLocalNameData(n *wasm.NameSection) []byte {
 	funcNameCount := uint32(len(n.LocalNames))
 	subsection := leb128.EncodeUint32(funcNameCount)
 
-	// Sort the function indices so that they encode in ascending order
-	funcIndex := make([]uint32, 0, funcNameCount)
-	for k := range n.LocalNames {
-		funcIndex = append(funcIndex, k)
-	}
-	sort.Slice(funcIndex, func(i, j int) bool { return funcIndex[i] < funcIndex[j] })
-
-	for _, i := range funcIndex {
-		locals := encodeSortedAndSizePrefixed(n.LocalNames[i])
-		subsection = append(subsection, append(leb128.EncodeUint32(i), locals...)...)
+	for _, na := range n.LocalNames {
+		locals := encodeNameMap(na.NameMap)
+		subsection = append(subsection, append(leb128.EncodeUint32(na.Index), locals...)...)
 	}
 	return subsection
 }
@@ -222,10 +211,10 @@ func encodeNameSubsection(subsectionID uint8, content []byte) []byte {
 	return result
 }
 
-// encodeNameMapEntry encodes the index and data prefixed by their size.
+// encodeNameAssoc encodes the index and data prefixed by their size.
 // See https://www.w3.org/TR/wasm-core-1/#binary-namemap
-func encodeNameMapEntry(i uint32, data []byte) []byte {
-	return append(leb128.EncodeUint32(i), encodeSizePrefixed(data)...)
+func encodeNameAssoc(na *wasm.NameAssoc) []byte {
+	return append(leb128.EncodeUint32(na.Index), encodeSizePrefixed([]byte(na.Name))...)
 }
 
 // encodeSizePrefixed encodes the data prefixed by their size.

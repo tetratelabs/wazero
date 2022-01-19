@@ -36,7 +36,7 @@ func TestEncodeNameSectionData(t *testing.T) {
 			//	)
 			input: &wasm.NameSection{
 				ModuleName:    "simple",
-				FunctionNames: map[uint32]string{0x00: "hello"},
+				FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "hello"}},
 			},
 			expected: []byte{
 				subsectionIDModuleName, 0x07, // 7 bytes
@@ -56,9 +56,9 @@ func TestEncodeNameSectionData(t *testing.T) {
 			//		(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32, i32, i32, i32) (result i32)))
 			//	)
 			input: &wasm.NameSection{
-				FunctionNames: map[uint32]string{
-					0x00: "runtime.args_sizes_get",
-					0x01: "runtime.fd_write",
+				FunctionNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 			expected: []byte{
@@ -79,13 +79,19 @@ func TestEncodeNameSectionData(t *testing.T) {
 			//		(import "Math" "Add" (func $add (param $l f32) (param $r f32) (result f32)))
 			//	)
 			input: &wasm.NameSection{
-				FunctionNames: map[uint32]string{
-					0x00: "mul",
-					0x01: "add",
+				FunctionNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "mul"},
+					{Index: wasm.Index(1), Name: "add"},
 				},
-				LocalNames: map[uint32]map[uint32]string{
-					0x00: {0x00: "x", 0x01: "y"},
-					0x01: {0x00: "l", 0x01: "r"},
+				LocalNames: wasm.IndirectNameMap{
+					{Index: wasm.Index(0), NameMap: wasm.NameMap{
+						{Index: wasm.Index(0), Name: "x"},
+						{Index: wasm.Index(1), Name: "y"},
+					}},
+					{Index: wasm.Index(1), NameMap: wasm.NameMap{
+						{Index: wasm.Index(0), Name: "l"},
+						{Index: wasm.Index(1), Name: "r"},
+					}},
 				},
 			},
 			expected: []byte{
@@ -102,34 +108,6 @@ func TestEncodeNameSectionData(t *testing.T) {
 				0x00, 0x01, 'l', // index 0, size of "l", "l"
 				0x01, 0x01, 'r', // index 1, size of "r", "r"
 			},
-		},
-		{
-			name: "function with local names - out of order",
-			// Names are associated with functions and parameters which are ordered in the module, but decoupled via
-			// NameSection. The impact is they can become out-of-order, so we have to sort during encode.
-			//
-			// Note: We can't force map iteration out of order. However, reversing the order of the same values across
-			// two tests improves the likelihood of needing to sort!
-			input: &wasm.NameSection{
-				FunctionNames: map[uint32]string{
-					0x01: "add",
-					0x00: "mul",
-				},
-				LocalNames: map[uint32]map[uint32]string{
-					0x01: {0x01: "r", 0x00: "l"},
-					0x00: {0x01: "y", 0x00: "x"},
-				},
-			},
-			expected: encodeNameSectionData(&wasm.NameSection{
-				FunctionNames: map[uint32]string{
-					0x00: "mul",
-					0x01: "add",
-				},
-				LocalNames: map[uint32]map[uint32]string{
-					0x00: {0x00: "x", 0x01: "y"},
-					0x01: {0x00: "l", 0x01: "r"},
-				},
-			}),
 		},
 	}
 
@@ -152,10 +130,15 @@ func TestEncodeNameSubsection(t *testing.T) {
 		6, 's', 'i', 'm', 'p', 'l', 'e'}, encodeNameSubsection(subsectionID, encodeSizePrefixed(name)))
 }
 
-func TestEncodeNameMapEntry(t *testing.T) {
-	index := uint32(1)
-	name := []byte("hello")
-	require.Equal(t, []byte{byte(index), 5, 'h', 'e', 'l', 'l', 'o'}, encodeNameMapEntry(index, name))
+func TestEncodeNameAssoc(t *testing.T) {
+	na := &wasm.NameAssoc{Index: 1, Name: "hello"}
+	require.Equal(t, []byte{byte(na.Index), 5, 'h', 'e', 'l', 'l', 'o'}, encodeNameAssoc(na))
+}
+
+func TestEncodeNameMap(t *testing.T) {
+	na := &wasm.NameAssoc{Index: 1, Name: "hello"}
+	m := wasm.NameMap{na}
+	require.Equal(t, []byte{byte(1), byte(na.Index), 5, 'h', 'e', 'l', 'l', 'o'}, encodeNameMap(m))
 }
 
 func TestEncodeSizePrefixed(t *testing.T) {
@@ -181,28 +164,34 @@ func TestDecodeNameSection(t *testing.T) {
 			name: "module and function name",
 			input: &wasm.NameSection{
 				ModuleName:    "simple",
-				FunctionNames: map[uint32]string{0x00: "hello"},
+				FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "runtime.hello"}},
 			},
 		},
 		{
 			name: "two function names",
 			input: &wasm.NameSection{
-				FunctionNames: map[uint32]string{
-					0x00: "runtime.args_sizes_get",
-					0x01: "runtime.fd_write",
+				FunctionNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 		},
 		{
 			name: "function with local names",
 			input: &wasm.NameSection{
-				FunctionNames: map[uint32]string{
-					0x00: "mul",
-					0x01: "add",
+				FunctionNames: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "mul"},
+					{Index: wasm.Index(1), Name: "add"},
 				},
-				LocalNames: map[uint32]map[uint32]string{
-					0x00: {0x00: "x", 0x01: "y"},
-					0x01: {0x00: "l", 0x01: "r"},
+				LocalNames: wasm.IndirectNameMap{
+					{Index: wasm.Index(0), NameMap: wasm.NameMap{
+						{Index: wasm.Index(0), Name: "x"},
+						{Index: wasm.Index(1), Name: "y"},
+					}},
+					{Index: wasm.Index(1), NameMap: wasm.NameMap{
+						{Index: wasm.Index(0), Name: "l"},
+						{Index: wasm.Index(1), Name: "r"},
+					}},
 				},
 			},
 		},

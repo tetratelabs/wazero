@@ -9,7 +9,7 @@ import (
 	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/text"
 )
@@ -26,7 +26,7 @@ var exampleText []byte
 var exampleBinary []byte
 
 func newExample() *wasm.Module {
-	four := uint32(4)
+	four := wasm.Index(4)
 	f32, i32 := wasm.ValueTypeF32, wasm.ValueTypeI32
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
@@ -37,7 +37,7 @@ func newExample() *wasm.Module {
 		},
 		ImportSection: []*wasm.Import{
 			{
-				Module: "wasi_snapshot_preview1", Name: "arg_sizes_get",
+				Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 				Kind:     wasm.ImportKindFunc,
 				DescFunc: 0,
 			}, {
@@ -61,17 +61,28 @@ func newExample() *wasm.Module {
 		StartSection: &four,
 		NameSection: &wasm.NameSection{
 			ModuleName: "example",
-			FunctionNames: map[uint32]string{
-				0: "runtime.arg_sizes_get",
-				1: "runtime.fd_write",
-				2: "mul",
-				3: "add",
-				4: "hello",
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+				{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				{Index: wasm.Index(2), Name: "mul"},
+				{Index: wasm.Index(3), Name: "add"},
+				{Index: wasm.Index(4), Name: "hello"},
 			},
-			LocalNames: map[uint32]map[uint32]string{
-				1: {0: "fd", 1: "iovs_ptr", 2: "iovs_len", 3: "nwritten_ptr"},
-				2: {0: "x", 1: "y"},
-				3: {0: "l", 1: "r"},
+			LocalNames: wasm.IndirectNameMap{
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "fd"},
+					{Index: wasm.Index(1), Name: "iovs_ptr"},
+					{Index: wasm.Index(2), Name: "iovs_len"},
+					{Index: wasm.Index(3), Name: "nwritten_ptr"},
+				}},
+				{Index: wasm.Index(2), NameMap: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "x"},
+					{Index: wasm.Index(1), Name: "y"},
+				}},
+				{Index: wasm.Index(3), NameMap: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "l"},
+					{Index: wasm.Index(1), Name: "r"},
+				}},
 			},
 		},
 	}
