@@ -503,7 +503,9 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 		compiler.initializeReservedRegisters()
 		// Use up all the Int regs.
 		for _, r := range unreservedGeneralPurposeIntRegisters {
-			compiler.locationStack.markRegisterUsed(r)
+			if r != stealTarget {
+				compiler.locationStack.markRegisterUsed(r)
+			}
 		}
 		stealTargetLocation := compiler.locationStack.pushValueOnRegister(stealTarget)
 		compiler.movIntConstToRegister(int64(50), stealTargetLocation.register)
@@ -542,7 +544,7 @@ func TestAmd64Compiler_compileLabel(t *testing.T) {
 	var called bool
 	compiler.labels[labelKey] = &labelInfo{
 		labelBeginningCallbacks: []func(*obj.Prog){func(p *obj.Prog) { called = true }},
-		callers:                 10,
+		initialStack:            newValueLocationStack(),
 	}
 
 	// If callers > 0, the label must not be skipped.
@@ -552,7 +554,7 @@ func TestAmd64Compiler_compileLabel(t *testing.T) {
 	require.True(t, called)
 
 	// Otherwise, skip.
-	compiler.labels[labelKey].callers = 0
+	compiler.labels[labelKey].initialStack = nil
 	skip = compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
 	require.True(t, skip)
 }

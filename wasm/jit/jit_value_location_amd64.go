@@ -176,6 +176,9 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 
 func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
+	if _, ok := s.usedRegisters[loc.register]; ok {
+		panic("bug in compiler")
+	}
 	s.markRegisterUsed(reg)
 	s.push(loc)
 	return

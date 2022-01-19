@@ -269,6 +269,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 		x1.register, x2.register = x2.register, x1.register
 	} else if x1.onRegister() && x2.onStack() {
 		reg := x1.register
+		c.locationStack.markRegisterUnused(reg)
 		// Save x1's value to the temporary top of the stack.
 		tmpStackLocation := c.locationStack.pushValueOnRegister(reg)
 		c.releaseRegisterToStack(tmpStackLocation)
@@ -288,6 +289,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 		_ = c.locationStack.pop() // Delete tmpStackLocation.
 	} else if x1.onStack() && x2.onRegister() {
 		reg := x2.register
+		c.locationStack.markRegisterUnused(reg)
 		// Save x2's value to the temporary top of the stack.
 		tmpStackLocation := c.locationStack.pushValueOnRegister(reg)
 		c.releaseRegisterToStack(tmpStackLocation)
@@ -894,7 +896,9 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 
 	labelKey := o.Label.String()
 	labelInfo := c.label(labelKey)
-	if labelInfo.callers == 0 {
+
+	if labelInfo.initialStack == nil {
+		// If initialStack is not set, that means this label has never been reached.
 		skipLabel = true
 		c.currentLabel = ""
 		return
@@ -911,9 +915,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	if labelInfo.initialStack != nil {
-		c.replaceLocationStack(labelInfo.initialStack)
-	}
+	c.replaceLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
@@ -1420,12 +1422,13 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 	mul.From.Type = obj.TYPE_REG
 	if x1 == valueOnAX {
 		mul.From.Reg = x2.register
-		c.locationStack.markRegisterUnused(x2.register)
 	} else {
 		mul.From.Reg = x1.register
-		c.locationStack.markRegisterUnused(x1.register)
 	}
 	c.addInstruction(mul)
+
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(x1.register)
 
 	// Now we have the result in the AX register,
 	// so we record it.
@@ -1553,6 +1556,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	}
 
 	// We reused the same register of target for the result.
+	c.locationStack.markRegisterUnused(target.register)
 	result := c.locationStack.pushValueOnRegister(target.register)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
@@ -1632,6 +1636,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	}
 
 	// We reused the same register of target for the result.
+	c.locationStack.markRegisterUnused(target.register)
 	result := c.locationStack.pushValueOnRegister(target.register)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
@@ -1659,6 +1664,7 @@ func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	c.addInstruction(countBits)
 
 	// We reused the same register of target for the result.
+	c.locationStack.markRegisterUnused(target.register)
 	result := c.locationStack.pushValueOnRegister(target.register)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
@@ -1912,6 +1918,10 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	if signedRemMinusOneDivisorJmp != nil {
 		c.addSetJmpOrigins(signedRemMinusOneDivisorJmp)
 	}
+
+	// We mark them as unused so that we can push one of them onto the location stack at call sites.
+	c.locationStack.markRegisterUnused(remainderRegister)
+	c.locationStack.markRegisterUnused(quotientRegister)
 	return nil
 }
 
@@ -1990,6 +2000,7 @@ func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 
 	// We already stored the result in the register used by x1
 	// so we record it.
+	c.locationStack.markRegisterUnused(x1.register)
 	result := c.locationStack.pushValueOnRegister(x1.register)
 	result.setRegisterType(x1.registerType())
 	return nil
@@ -2398,6 +2409,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 
 	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(x1.register)
 	c.locationStack.pushValueOnRegister(x1.register)
 	return nil
 }
@@ -2490,6 +2502,7 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 
 	// Record that we consumed the x2 and placed the copysign result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(x1.register)
 	c.locationStack.pushValueOnRegister(x1.register)
 	return nil
 }
@@ -3511,12 +3524,12 @@ func (c *amd64Compiler) emitEqOrNeForInts(x1Reg, x2Reg int16, cmpInstruction obj
 // the result must be zero for EQ or one for NE.
 func (c *amd64Compiler) emitEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
 	// Before we allocate the result, we have to reserve two int registers.
-	cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
-	c.locationStack.markRegisterUsed(cmpResultReg)
-	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	c.locationStack.markRegisterUsed(nanFragReg)
+	cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -3578,6 +3591,8 @@ func (c *amd64Compiler) emitEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction o
 	// Now we have the result in cmpResultReg register, so we record it.
 	loc := c.locationStack.pushValueOnRegister(cmpResultReg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	// Also, we no longer need nanFragRegister.
+	c.locationStack.markRegisterUnused(nanFragReg)
 	return nil
 }
 
@@ -4100,6 +4115,8 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	c.returnFunction()
 
 	c.addSetJmpOrigins(okJmp)
+
+	c.locationStack.markRegisterUnused(base.register)
 	return base.register, nil
 }
 
