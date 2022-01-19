@@ -499,7 +499,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 	}
 
 	if buildoptions.IsDebugMode {
-		fmt.Printf("----------------- %s ---------------\n", f.Name)
 		fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
 	}
 

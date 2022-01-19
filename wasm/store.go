@@ -231,9 +231,6 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	}
 
 	for i, f := range instance.Functions {
-		if f.Name == "unknown" {
-			f.Name = fmt.Sprintf("index %d/%d", i, len(module.FunctionSection)-1)
-		}
 		if err := s.engine.Compile(f); err != nil {
 			return fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
 		}

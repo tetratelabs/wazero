@@ -797,6 +797,9 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	jmp.To.Type = obj.TYPE_REG
 	c.addInstruction(jmp)
 
+	// We no longer need the index's register, so mark it unused.
+	c.locationStack.markRegisterUnused(index.register)
+
 	// [Emit the code for each targets and default branch]
 	labelInitialInstructions := make([]*obj.Prog, len(o.Targets)+1)
 	saved := c.locationStack
@@ -857,9 +860,6 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		}
 		return nil
 	})
-
-	// We no longer need the index's register, so mark it unused.
-	c.locationStack.markRegisterUnused(index.register)
 	return nil
 }
 
@@ -890,7 +890,7 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
 	if buildoptions.IsDebugMode {
 		if c.currentLabel != "" {
-			fmt.Printf("[label %s ends]\n", c.currentLabel)
+			fmt.Printf("[label %s ends]\n\n", c.currentLabel)
 		}
 	}
 

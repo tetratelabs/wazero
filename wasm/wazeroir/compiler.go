@@ -430,8 +430,7 @@ operatorSwitch:
 			// This case we have to emit "empty" else label.
 			elseLabel := &Label{Kind: LabelKindElse, FrameID: frame.frameID, OriginalStackLen: frame.originalStackLen}
 			continuationLabel := &Label{Kind: LabelKindContinuation, FrameID: frame.frameID, OriginalStackLen: len(c.stack)}
-			c.result.LabelCallers[elseLabel.String()]++
-			c.result.LabelCallers[continuationLabel.String()]++
+			c.result.LabelCallers[continuationLabel.String()] += 2
 			c.emit(
 				dropOp,
 				&OperationBr{Target: continuationLabel.asBranchTarget()},

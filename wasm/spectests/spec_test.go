@@ -184,7 +184,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 func TestJIT(t *testing.T) {
 	targets := map[string]bool{
 		"address.wast":                true,
-		"align.wast":                  false, // Needs br_table fix
+		"align.wast":                  true,
 		"binary.wast":                 true,
 		"binary-leb128.wast":          true,
 		"block.wast":                  true,
