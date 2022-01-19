@@ -655,16 +655,29 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
+
+	// If the operation doesn't have target but default,
+	// we just branch into the deault label and do early return.
+	if len(o.Targets) == 0 {
+		c.locationStack.releaseRegister(index)
+		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
+			return err
+		}
+		return c.branchInto(o.Default.Target)
+	}
+
+	// Otherwise, we jump into the selected branch.
+
 	if err := c.ensureOnGeneralPurposeRegister(index); err != nil {
 		return err
 	}
 
-	// Otherwise, we jump into the selected branch.
 	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
 
+	// First, we move the length of target list into the tmp register.
 	movLengthToTmp := c.newProg()
 	movLengthToTmp.As = x86.AMOVQ
 	movLengthToTmp.To.Type = obj.TYPE_REG
@@ -673,7 +686,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	movLengthToTmp.From.Offset = int64(len(o.Targets))
 	c.addInstruction(movLengthToTmp)
 
-	// First, we compare the value with the length of targets.
+	// Then, we compare the value with the length of targets.
 	cmpLength := c.newProg()
 	cmpLength.As = x86.ACMPL
 	cmpLength.To.Type = obj.TYPE_REG
@@ -683,7 +696,9 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	c.addInstruction(cmpLength)
 
 	// If the value is larger than the length,
-	// we round the index to the length.
+	// we round the index to the length as the spec states that
+	// if the index is larger than or equal the length of list,
+	// branch into the default branch.
 	roundIndex := c.newProg()
 	roundIndex.As = x86.ACMOVQCS
 	roundIndex.To.Type = obj.TYPE_REG
@@ -692,7 +707,31 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	roundIndex.From.Reg = tmp
 	c.addInstruction(roundIndex)
 
-	// Get the offset of target instruction from the jump.
+	// We prapare the static data which holds the offset of
+	// each target's first instruction (incl. default)
+	// relative to the beginning of label tables.
+	//
+	// For example, if we have targest=[L0, L1], default=L_DEFAULT,
+	// we emit the the code like this at [Emit the code for each targets and default branch] below.
+	//
+	// L0:
+	//  0x123001: XXXX, ...
+	//  .....
+	// L1:
+	//  0x123005: YYY, ...
+	//  .....
+	// L_DEFAULT:
+	//  0x123009: ZZZ, ...
+	//
+	// then offsetData becomes like [0x0, 0x5, 0x8].
+	// By using this offset list, we could jump into the label for the index by
+	// "jmp offsetData[index]+0x123001" and "0x123001" can be acquired by "LEA"
+	// instruction.
+	//
+	// Note: We store each offset of 32-bite unsigned integer as 4 consequtive bytes. So more precisely,
+	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
+	//
+	// Note: this is similar to how GCC implements Switch statements in C.
 	offsetData := make([]byte, 4*(len(o.Targets)+1))
 	c.addStaticData(offsetData)
 
@@ -704,6 +743,10 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	moveOffsetPointer.From.Offset = int64(uintptr(unsafe.Pointer(&offsetData[0])))
 	c.addInstruction(moveOffsetPointer)
 
+	// Now we have the address of first byte of offsetData in tmp register.
+	// So the target offset's first byte is at tmp+index*4 as we store
+	// the offset as 4 bytes for a 32-byte integer.
+	// Here, we store the offset into the index.register.
 	readOffsetData := c.newProg()
 	readOffsetData.As = x86.AMOVL
 	readOffsetData.To.Type = obj.TYPE_REG
@@ -714,22 +757,34 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	readOffsetData.From.Scale = 4
 	c.addInstruction(readOffsetData)
 
+	// Now we read the address of the beginning of the jump table.
+	// In the above example, this corresponds to reading the address of 0x123001.
+	// This is equivalent to emit "LEA tmp, [rip + offset]" where rip is the instruction's
+	// address of right next instruction of this LEA and that is the address of calcAbsoluteAddressOfSelectedLabel below.
 	readRIP := c.newProg()
 	readRIP.As = x86.ALEAQ
 	readRIP.To.Reg = tmp
 	readRIP.To.Type = obj.TYPE_REG
 	readRIP.From.Type = obj.TYPE_MEM
-	readRIP.From.Offset = 0xffff // Place holder!
+	// We use place holder here as we don't yet know at this point the offset of the first instruction
+	// in the branch table relative to the next instruction (calcAbsoluteAddressOfSelectedLabel) stored in RIP register.
+	readRIP.From.Offset = 0xffff
+	// Since the assembler cannot directly emit "LEA foo [rip + bar]", we use the some hack here:
+	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
+	// exactly the same as "LEA foo [rip + bar]" except the *last bit of second byte*.
+	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
 	readRIP.From.Reg = x86.REG_BP
 	c.addInstruction(readRIP)
 
-	calcAbsoluteAddressOfSelectedTrampoline := c.newProg()
-	calcAbsoluteAddressOfSelectedTrampoline.As = x86.AADDQ
-	calcAbsoluteAddressOfSelectedTrampoline.To.Type = obj.TYPE_REG
-	calcAbsoluteAddressOfSelectedTrampoline.To.Reg = tmp
-	calcAbsoluteAddressOfSelectedTrampoline.From.Type = obj.TYPE_REG
-	calcAbsoluteAddressOfSelectedTrampoline.From.Reg = index.register
-	c.addInstruction(calcAbsoluteAddressOfSelectedTrampoline)
+	// Now we have the address of L0 in tmp register, and the offset to the target label in the index.register.
+	// So we could achieve the br_table jump by adding them and jump into the resulting address.
+	calcAbsoluteAddressOfSelectedLabel := c.newProg()
+	calcAbsoluteAddressOfSelectedLabel.As = x86.AADDQ
+	calcAbsoluteAddressOfSelectedLabel.To.Type = obj.TYPE_REG
+	calcAbsoluteAddressOfSelectedLabel.To.Reg = tmp
+	calcAbsoluteAddressOfSelectedLabel.From.Type = obj.TYPE_REG
+	calcAbsoluteAddressOfSelectedLabel.From.Reg = index.register
+	c.addInstruction(calcAbsoluteAddressOfSelectedLabel)
 
 	jmp := c.newProg()
 	jmp.As = obj.AJMP
@@ -737,17 +792,28 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	jmp.To.Type = obj.TYPE_REG
 	c.addInstruction(jmp)
 
-	// Implement the branches into each label.
-	nops := make([]*obj.Prog, len(o.Targets)+1)
+	// [Emit the code for each targets and default branch]
+	labelInitialInstructions := make([]*obj.Prog, len(o.Targets)+1)
 	saved := c.locationStack
-	for i, target := range o.Targets {
-		// Emit noop as a separator of each target.
-		nop := c.newProg()
-		nop.As = obj.ANOP
-		nops[i] = nop
-		c.addInstruction(nop)
+	for i := range labelInitialInstructions {
+		// Emit the initial instruction of each target.
+		init := c.newProg()
+		// We use NOP as we don't yet know the next instruction in each label.
+		// Assembler would optimize out this NOP during code generation, so this is harmless.
+		init.As = obj.ANOP
+		labelInitialInstructions[i] = init
+		c.addInstruction(init)
 
-		locationStack := saved.clone()
+		var locationStack *valueLocationStack
+		var target *wazeroir.BranchTargetDrop
+		if i < len(o.Targets) {
+			target = o.Targets[i]
+			locationStack = saved.clone()
+		} else {
+			target = o.Default
+			locationStack = saved
+		}
+
 		c.replaceLocationStack(locationStack)
 		if err := c.emitDropRange(target.ToDrop); err != nil {
 			return err
@@ -757,33 +823,33 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		}
 	}
 
-	// Emit default branch.
-	nop := c.newProg()
-	nop.As = obj.ANOP
-	nops[len(nops)-1] = nop
-	c.addInstruction(nop)
-	c.replaceLocationStack(saved)
-	if err := c.emitDropRange(o.Default.ToDrop); err != nil {
-		return err
-	}
-	if err := c.branchInto(o.Default.Target); err != nil {
-		return err
-	}
-
+	// Set up the callbacks to do tasks which cannot be done at the compilation phase.
 	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-		base := nops[0].Pc
-		for i, nop := range nops {
+		// See the comment at readRIP.From.Offset.
+		binary.LittleEndian.PutUint32(code[readRIP.Pc+3:],
+			uint32(labelInitialInstructions[0].Pc)-uint32(calcAbsoluteAddressOfSelectedLabel.Pc))
+		// See the comment at readRIP.From.Reg above. Here we drop the first bit of third byte of the LEA instruction.
+		code[readRIP.Pc+2] = code[readRIP.Pc+2] & 0b01111111
+
+		// Builds the offset table for each targets including default one.
+		base := labelInitialInstructions[0].Pc // This corresponds to the L0's address in the example.
+		for i, nop := range labelInitialInstructions {
 			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
+				// TODO: this happens when users try loading an extremely large webassembly binary
+				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
+				// We would like to support that binary, but realistically speacking, that kind of binary
+				// could result in more than ten giga bytes of native JITed code where we have to care about
+				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
+				// current implementation.
 				return fmt.Errorf("too large br_table")
 			}
+			// We store the offset from the beiggning of the L0's initial instruction.
 			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
 		}
-
-		code[readRIP.Pc+2] = code[readRIP.Pc+2] & 0b01111111
-		binary.LittleEndian.PutUint32(code[readRIP.Pc+3:], uint32(nops[0].Pc)-uint32(calcAbsoluteAddressOfSelectedTrampoline.Pc))
 		return nil
 	})
 
+	// We no longer need the index's register, so mark it unused.
 	c.locationStack.markRegisterUnused(index.register)
 	return nil
 }

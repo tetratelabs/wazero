@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -215,8 +214,6 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		// Run codes
 		env := newJITEnvironment()
 		env.exec(code)
-
-		fmt.Println(hex.EncodeToString(code))
 
 		// Check the returned value.
 		require.Equal(t, uint64(1), env.stackPointer())
