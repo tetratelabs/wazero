@@ -774,7 +774,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	readRIP.From.Offset = 0xffff
 	// Since the assembler cannot directly emit "LEA foo [rip + bar]", we use the some hack here:
 	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
-	// exactly the same as "LEA foo [rip + bar]" except the *last bit of second byte*.
+	// exactly the same as "LEA foo [rip + bar]" except the most significant bit of the third byte.
 	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
 	readRIP.From.Reg = x86.REG_BP
 	c.addInstruction(readRIP)
@@ -835,7 +835,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		// See the comment at readRIP.From.Offset.
 		binary.LittleEndian.PutUint32(code[readRIP.Pc+3:],
 			uint32(labelInitialInstructions[0].Pc)-uint32(calcAbsoluteAddressOfSelectedLabel.Pc))
-		// See the comment at readRIP.From.Reg above. Here we drop the first bit of third byte of the LEA instruction.
+		// See the comment at readRIP.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
 		code[readRIP.Pc+2] = code[readRIP.Pc+2] & 0b01111111
 
 		// Builds the offset table for each targets including default one.
