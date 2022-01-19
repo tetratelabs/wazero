@@ -5,6 +5,7 @@ package jit
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -170,7 +171,7 @@ func TestAmd64Compiler_generate(t *testing.T) {
 		compiler.addInstruction(afterFunctionCallInst)
 
 		// Check the error is NOT returned.
-		_, _, err := compiler.generate()
+		_, _, _, err := compiler.generate()
 		require.NoError(t, err)
 	})
 	t.Run("invalid function call", func(t *testing.T) {
@@ -189,7 +190,7 @@ func TestAmd64Compiler_generate(t *testing.T) {
 			compiler.requireFunctionCallReturnAddressOffsetResolution, invalidInst)
 
 		// Check the error is returned.
-		_, _, err := compiler.generate()
+		_, _, _, err := compiler.generate()
 		require.Error(t, err)
 	})
 }
@@ -197,7 +198,7 @@ func TestAmd64Compiler_generate(t *testing.T) {
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
 	requireRunAndExpectedValueReturned := func(t *testing.T, c *amd64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
-		for _, returnValue := range []uint32{1, 2, 3, 4, 5, 6} {
+		for returnValue := uint32(0); returnValue < 10; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
 			c.label(label.String()).callers = 1
 			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
@@ -208,12 +209,14 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		}
 
 		// Generate the code under test.
-		code, _, err := c.generate()
+		code, _, _, err := c.generate()
 		require.NoError(t, err)
 
 		// Run codes
 		env := newJITEnvironment()
 		env.exec(code)
+
+		fmt.Println(hex.EncodeToString(code))
 
 		// Check the returned value.
 		require.Equal(t, uint64(1), env.stackPointer())
@@ -404,7 +407,7 @@ func Test_setJITStatus(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run codes
@@ -428,7 +431,7 @@ func Test_setFunctionCallIndexFromRegister(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run codes
@@ -458,7 +461,7 @@ func Test_setContinuationAtNextInstruction(t *testing.T) {
 	compiler.setJITStatus(jitCallStatusCodeCallFunction)
 	compiler.returnFunction()
 	// Generate the code under test.
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run codes
@@ -481,7 +484,7 @@ func TestAmd64Compiler_initializeReservedRegisters(t *testing.T) {
 	compiler.returnFunction()
 
 	// Generate the code under test.
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	newJITEnvironment().exec(code)
@@ -521,7 +524,7 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -590,7 +593,7 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -635,7 +638,7 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -672,7 +675,7 @@ func TestAmd64Compiler_compileConstI32(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -711,7 +714,7 @@ func TestAmd64Compiler_compileConstI64(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -752,7 +755,7 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -793,7 +796,7 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -832,7 +835,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -866,7 +869,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -910,7 +913,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -956,7 +959,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -1027,7 +1030,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1091,7 +1094,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1178,7 +1181,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1256,7 +1259,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1311,7 +1314,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -1356,7 +1359,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -1435,7 +1438,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.returnFunction()
 
 						// Generate the code under test.
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1514,7 +1517,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.returnFunction()
 
 						// Generate the code under test.
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1595,7 +1598,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.returnFunction()
 
 						// Generate the code under test.
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1673,7 +1676,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.returnFunction()
 
 						// Generate the code under test.
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1759,7 +1762,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1840,7 +1843,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1922,7 +1925,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -2001,7 +2004,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, err := compiler.generate()
+						code, _, _, err := compiler.generate()
 						require.NoError(t, err)
 
 						// Run code.
@@ -2046,7 +2049,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -2080,7 +2083,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -2124,7 +2127,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2170,7 +2173,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2288,7 +2291,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 				// Run code.
 				env.exec(code)
@@ -2400,7 +2403,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2447,7 +2450,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2497,7 +2500,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2547,7 +2550,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 				env := newJITEnvironment()
 				env.exec(code)
@@ -2594,7 +2597,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 				env := newJITEnvironment()
 				env.exec(code)
@@ -2642,7 +2645,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 				env := newJITEnvironment()
 				env.exec(code)
@@ -2689,7 +2692,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 				env := newJITEnvironment()
 				env.exec(code)
@@ -2736,7 +2739,7 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 				env := newJITEnvironment()
 				env.exec(code)
@@ -2784,7 +2787,7 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate and run the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 				env := newJITEnvironment()
 				env.exec(code)
@@ -3029,7 +3032,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 							compiler.returnFunction()
 
 							// Generate and run the code under test.
-							code, _, err := compiler.generate()
+							code, _, _, err := compiler.generate()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -3174,7 +3177,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								compiler.returnFunction()
 
 								// Generate the code under test.
-								code, _, err := compiler.generate()
+								code, _, _, err := compiler.generate()
 								require.NoError(t, err)
 
 								// Run code.
@@ -3325,7 +3328,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								compiler.returnFunction()
 
 								// Generate the code under test.
-								code, _, err := compiler.generate()
+								code, _, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
 								if vs.x2Value == 0 {
@@ -3395,7 +3398,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -3468,7 +3471,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				compiler.returnFunction()
 
 				// Generate the code under test.
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
@@ -3620,7 +3623,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								compiler.returnFunction()
 
 								// Generate the code under test.
-								code, _, err := compiler.generate()
+								code, _, _, err := compiler.generate()
 								require.NoError(t, err)
 
 								// Run code.
@@ -3776,7 +3779,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								compiler.returnFunction()
 
 								// Generate the code under test.
-								code, _, err := compiler.generate()
+								code, _, _, err := compiler.generate()
 								require.NoError(t, err)
 								// Run code.
 								if vs.x2Value == 0 {
@@ -3832,7 +3835,7 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate and run the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -3878,7 +3881,7 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate and run the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 			env := newJITEnvironment()
 			env.exec(code)
@@ -3968,7 +3971,7 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 							compiler.returnFunction()
 
 							// Generate and run the code under test.
-							code, _, err := compiler.generate()
+							code, _, _, err := compiler.generate()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -4012,7 +4015,7 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
-					code, _, err := compiler.generate()
+					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 					env := newJITEnvironment()
 					env.exec(code)
@@ -4108,7 +4111,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
-					code, _, err := compiler.generate()
+					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 					env := newJITEnvironment()
 					env.exec(code)
@@ -4221,7 +4224,7 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
-					code, _, err := compiler.generate()
+					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 					env := newJITEnvironment()
 					env.exec(code)
@@ -4448,7 +4451,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
-					code, _, err := compiler.generate()
+					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 					env := newJITEnvironment()
 					env.exec(code)
@@ -4587,7 +4590,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 					compiler.returnFunction()
 
 					// Generate and run the code under test.
-					code, _, err := compiler.generate()
+					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 					env := newJITEnvironment()
 					env.exec(code)
@@ -4632,7 +4635,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test.
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -4674,7 +4677,7 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
 					compiler.returnFunction()
-					code, _, err := compiler.generate()
+					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 
 					// Run code.
@@ -4755,7 +4758,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.returnFunction()
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Place the load target value to the memory.
@@ -4831,7 +4834,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.returnFunction()
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// For testing, arbitrary byte is be fine.
@@ -4890,7 +4893,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.returnFunction()
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// For testing, arbitrary uint16 is be fine.
@@ -4941,7 +4944,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.returnFunction()
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// For testing, arbitrary uint32 is be fine.
@@ -4997,7 +5000,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.returnFunction()
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5049,7 +5052,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.returnFunction()
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5091,7 +5094,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.returnFunction()
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5133,7 +5136,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.returnFunction()
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5158,7 +5161,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test.
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5180,7 +5183,7 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
 
 	// Generate the code under test.
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5313,7 +5316,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5353,7 +5356,7 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	compiler.returnFunction()
 
 	// Generate the code under test.
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5377,7 +5380,7 @@ func TestAmd64Compiler_assemble(t *testing.T) {
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = x86.REG_R10
 	compiler.addInstruction(prog)
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 	actual := binary.LittleEndian.Uint64(code[2:10])
 	require.Equal(t, uint64(prog.Pc), actual)
@@ -5396,7 +5399,7 @@ func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test.
-	code, _, err := compiler.generate()
+	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5522,7 +5525,7 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 			compiler.returnFunction()
 
 			// Run code.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -5592,7 +5595,7 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5648,7 +5651,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run the code assembled above.
@@ -5687,7 +5690,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			compiler.returnFunction()
 
 			// Generate the code under test.
-			code, _, err := compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5725,7 +5728,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		compiler.returnFunction()
 
 		// Generate the code under test.
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -5757,7 +5760,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		// Generate the code under test.
 		compiler.returnFunction()
-		code, _, err := compiler.generate()
+		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
 		// Run code.
@@ -5809,7 +5812,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 				// Generate the code under test.
 				compiler.returnFunction()
-				code, _, err := compiler.generate()
+				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.

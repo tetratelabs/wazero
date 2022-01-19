@@ -310,6 +310,7 @@ type compiledFunction struct {
 	tableSliceLen     uint64
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
+	staticData      [][]byte
 }
 
 func (f *compiledFunction) isHostFunction() bool {
@@ -511,15 +512,14 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 
 	var skip bool
 	for _, op := range ir.Operations {
-		if buildoptions.IsDebugMode {
-			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
-		}
-
 		if op.Kind() == wazeroir.OperationKindLabel {
 			skip = compiler.compileLabel(op.(*wazeroir.OperationLabel))
 		}
 		if skip {
 			continue
+		}
+		if buildoptions.IsDebugMode {
+			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
 		}
 		var err error
 		switch o := op.(type) {
@@ -665,7 +665,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		}
 	}
 
-	code, maxStackPointer, err := compiler.generate()
+	code, staticData, maxStackPointer, err := compiler.generate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
@@ -681,6 +681,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		resultCount:     uint64(len(f.FunctionType.Type.Results)),
 		memory:          f.ModuleInstance.Memory,
 		maxStackPointer: maxStackPointer,
+		staticData:      staticData,
 	}
 	if cf.memory != nil && len(cf.memory.Buffer) > 0 {
 		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))

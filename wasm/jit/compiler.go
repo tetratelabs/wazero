@@ -12,7 +12,7 @@ type compiler interface {
 	emitPreamble()
 	// Generates the byte slice of native codes.
 	// maxStackPointer is the max stack pointer that the target function would reach.
-	generate() (code []byte, maxStackPointer uint64, err error)
+	generate() (code []byte, staticData [][]byte, maxStackPointer uint64, err error)
 	// Followings are resinposible for compiling each wazeroir operation.
 	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)
 	compileUnreachable() error

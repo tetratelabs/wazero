@@ -117,7 +117,8 @@ type amd64Compiler struct {
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel                                     string
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
-	onGenerateCallbacks                              []func(code []byte)
+	onGenerateCallbacks                              []func(code []byte) error
+	staticData                                       [][]byte
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
@@ -128,6 +129,10 @@ func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
 		c.maxStackPointer = c.locationStack.maxStackPointer
 	}
 	c.locationStack = newStack
+}
+
+func (c *amd64Compiler) addStaticData(d []byte) {
+	c.staticData = append(c.staticData, d)
 }
 
 type labelInfo struct {
@@ -158,10 +163,10 @@ func (c *amd64Compiler) emitPreamble() {
 	c.initializeReservedRegisters()
 }
 
-func (c *amd64Compiler) generate() ([]byte, uint64, error) {
-	code, err := mmapCodeSegment(c.builder.Assemble())
+func (c *amd64Compiler) generate() (code []byte, staticData [][]byte, maxStackPointer uint64, err error) {
+	code, err = mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
-		return nil, 0, err
+		return
 	}
 
 	for _, cb := range c.onGenerateCallbacks {
@@ -182,7 +187,8 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 			}
 		}
 		if afterReturnInst == nil {
-			return nil, 0, fmt.Errorf("invalid function call at %v", inst)
+			err = fmt.Errorf("invalid function call at %v", inst)
+			return
 		}
 		// Skip MOV, and the register(rax): "0x49, 0xbd"
 		start := inst.Pc + 2
@@ -193,11 +199,13 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack
 	// used for all labels (via replaceLocationStack), excluding the current one.
 	// Hense, we check here if the final block's max one exceeds the current c.maxStackPointer.
-	maxStackPointer := c.maxStackPointer
+	maxStackPointer = c.maxStackPointer
 	if maxStackPointer < c.locationStack.maxStackPointer {
 		maxStackPointer = c.locationStack.maxStackPointer
 	}
-	return code, maxStackPointer, nil
+
+	staticData = c.staticData
+	return
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
@@ -684,6 +692,28 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	roundIndex.From.Reg = tmp
 	c.addInstruction(roundIndex)
 
+	// Get the offset of target instruction from the jump.
+	offsetData := make([]byte, 4*(len(o.Targets)+1))
+	c.addStaticData(offsetData)
+
+	moveOffsetPointer := c.newProg()
+	moveOffsetPointer.As = x86.AMOVQ
+	moveOffsetPointer.To.Type = obj.TYPE_REG
+	moveOffsetPointer.To.Reg = tmp
+	moveOffsetPointer.From.Type = obj.TYPE_CONST
+	moveOffsetPointer.From.Offset = int64(uintptr(unsafe.Pointer(&offsetData[0])))
+	c.addInstruction(moveOffsetPointer)
+
+	readOffsetData := c.newProg()
+	readOffsetData.As = x86.AMOVL
+	readOffsetData.To.Type = obj.TYPE_REG
+	readOffsetData.To.Reg = index.register
+	readOffsetData.From.Type = obj.TYPE_MEM
+	readOffsetData.From.Reg = tmp
+	readOffsetData.From.Index = index.register
+	readOffsetData.From.Scale = 4
+	c.addInstruction(readOffsetData)
+
 	readRIP := c.newProg()
 	readRIP.As = x86.ALEAQ
 	readRIP.To.Reg = tmp
@@ -693,14 +723,6 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	readRIP.From.Reg = x86.REG_BP
 	c.addInstruction(readRIP)
 
-	doubleIndex := c.newProg()
-	doubleIndex.As = x86.ASHLQ
-	doubleIndex.To.Type = obj.TYPE_REG
-	doubleIndex.To.Reg = index.register
-	doubleIndex.From.Type = obj.TYPE_CONST
-	doubleIndex.From.Offset = 1
-	c.addInstruction(doubleIndex)
-
 	calcAbsoluteAddressOfSelectedTrampoline := c.newProg()
 	calcAbsoluteAddressOfSelectedTrampoline.As = x86.AADDQ
 	calcAbsoluteAddressOfSelectedTrampoline.To.Type = obj.TYPE_REG
@@ -709,41 +731,24 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	calcAbsoluteAddressOfSelectedTrampoline.From.Reg = index.register
 	c.addInstruction(calcAbsoluteAddressOfSelectedTrampoline)
 
-	jmpToTrampoline := c.newProg()
-	jmpToTrampoline.As = obj.AJMP
-	jmpToTrampoline.To.Reg = tmp
-	jmpToTrampoline.To.Type = obj.TYPE_REG
-	c.addInstruction(jmpToTrampoline)
+	jmp := c.newProg()
+	jmp.As = obj.AJMP
+	jmp.To.Reg = tmp
+	jmp.To.Type = obj.TYPE_REG
+	c.addInstruction(jmp)
 
-	// Emit trampolines for each target labels.
-	trampolineJumps := make([]*obj.Prog, len(o.Targets)+1)
-	for i := range trampolineJumps {
-		jmp := c.newProg()
-		jmp.As = obj.AJMP
-		jmp.To.Type = obj.TYPE_BRANCH
-		c.addInstruction(jmp)
-		trampolineJumps[i] = jmp
-	}
-
-	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) {
-		code[readRIP.Pc+2] = code[readRIP.Pc+2] & 0b01111111
-		binary.LittleEndian.PutUint32(code[readRIP.Pc+3:], uint32(trampolineJumps[0].Pc)-uint32(doubleIndex.Pc))
-	})
-
-	// Implement the actual branching into each label.
+	// Implement the branches into each label.
+	nops := make([]*obj.Prog, len(o.Targets)+1)
 	saved := c.locationStack
-	for i, trampoline := range trampolineJumps {
-		var locationStack *valueLocationStack
-		var target *wazeroir.BranchTargetDrop
-		if i < len(o.Targets) {
-			locationStack = saved.clone()
-			target = o.Targets[i]
-		} else {
-			locationStack = saved
-			target = o.Default
-		}
+	for i, target := range o.Targets {
+		// Emit noop as a separator of each target.
+		nop := c.newProg()
+		nop.As = obj.ANOP
+		nops[i] = nop
+		c.addInstruction(nop)
+
+		locationStack := saved.clone()
 		c.replaceLocationStack(locationStack)
-		c.addSetJmpOrigins(trampoline)
 		if err := c.emitDropRange(target.ToDrop); err != nil {
 			return err
 		}
@@ -751,6 +756,33 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			return err
 		}
 	}
+
+	// Emit default branch.
+	nop := c.newProg()
+	nop.As = obj.ANOP
+	nops[len(nops)-1] = nop
+	c.addInstruction(nop)
+	c.replaceLocationStack(saved)
+	if err := c.emitDropRange(o.Default.ToDrop); err != nil {
+		return err
+	}
+	if err := c.branchInto(o.Default.Target); err != nil {
+		return err
+	}
+
+	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
+		base := nops[0].Pc
+		for i, nop := range nops {
+			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
+				return fmt.Errorf("too large br_table")
+			}
+			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
+		}
+
+		code[readRIP.Pc+2] = code[readRIP.Pc+2] & 0b01111111
+		binary.LittleEndian.PutUint32(code[readRIP.Pc+3:], uint32(nops[0].Pc)-uint32(calcAbsoluteAddressOfSelectedTrampoline.Pc))
+		return nil
+	})
 
 	c.locationStack.markRegisterUnused(index.register)
 	return nil

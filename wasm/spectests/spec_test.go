@@ -244,7 +244,7 @@ func TestJIT(t *testing.T) {
 		"stack.wast":                  true,
 		"start.wast":                  true,
 		"store.wast":                  true,
-		"switch.wast":                 false, // Needs fix!
+		"switch.wast":                 true,
 		"token.wast":                  true,
 		"traps.wast":                  true,
 		"type.wast":                   true,
