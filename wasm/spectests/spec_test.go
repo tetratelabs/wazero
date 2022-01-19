@@ -231,7 +231,7 @@ func TestJIT(t *testing.T) {
 		"local_set.wast":              true,
 		"local_tee.wast":              true,
 		"loop.wast":                   true,
-		"memory_grow.wast":            false, // Needs fix
+		"memory_grow.wast":            true,
 		"memory_redundancy.wast":      true,
 		"memory_size.wast":            true,
 		"memory_trap.wast":            true,
@@ -294,6 +294,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 					t.Log(msg)
+					fmt.Println(msg)
 					switch c.CommandType {
 					case "module":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
