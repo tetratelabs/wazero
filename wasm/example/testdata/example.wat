@@ -12,5 +12,7 @@
 	(import "Math" "Add" (func $add (type $i32i32_i32) (param $l i32) (param $r i32) (result i32)))
 	(type (func))
 	(import "" "hello" (func $hello (type 1)))
+	;; re-export a.k.a. proxy a function!
+    (export "args_sizes_get" (func $runtime.args_sizes_get))
 	(start $hello)
 )

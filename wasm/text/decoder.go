@@ -14,25 +14,48 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 		return nil, err
 	}
 
+	result = &wasm.Module{}
+
 	// Next, we need to convert the types from the text format into the binary one. This is easy because the only
 	// difference is that the text format has type names and the binary format does not.
-	result = &wasm.Module{}
-	for _, t := range m.types {
-		var results []wasm.ValueType
-		if t.result != 0 {
-			results = []wasm.ValueType{t.result}
+	typeCount := len(m.types)
+	if typeCount > 0 {
+		result.TypeSection = make([]*wasm.FunctionType, typeCount)
+		for i, t := range m.types {
+			var results []wasm.ValueType
+			if t.result != 0 {
+				results = []wasm.ValueType{t.result}
+			}
+			result.TypeSection[i] = &wasm.FunctionType{Params: t.params, Results: results}
 		}
-		result.TypeSection = append(result.TypeSection, &wasm.FunctionType{Params: t.params, Results: results})
 	}
 
 	// Now, handle any imported functions. Notably, we retain the same insertion order as defined in the text format in
 	// case a numeric index is used for the start function (or another reason such as the call instruction).
-	for _, f := range m.importFuncs {
-		result.ImportSection = append(result.ImportSection, &wasm.Import{
-			Module: f.module, Name: f.name,
-			Kind:     wasm.ImportKindFunc,
-			DescFunc: f.typeIndex.numeric,
-		})
+	importFuncCount := len(m.importFuncs)
+	if importFuncCount > 0 {
+		result.ImportSection = make([]*wasm.Import, importFuncCount)
+		for i, f := range m.importFuncs {
+			result.ImportSection[i] = &wasm.Import{
+				Module: f.module, Name: f.name,
+				Kind:     wasm.ImportKindFunc,
+				DescFunc: f.typeIndex.numeric,
+			}
+		}
+	}
+
+	// Now, handle any exported functions. Notably, we retain the same insertion order as defined in the text format.
+	exportFuncCount := len(m.exportFuncs)
+	if exportFuncCount > 0 {
+		result.ExportSection = make(map[string]*wasm.Export, exportFuncCount)
+		for _, f := range m.exportFuncs {
+			e := &wasm.Export{
+				Name:  f.name,
+				Kind:  wasm.ExportKindFunc,
+				Index: f.funcIndex.numeric,
+			}
+			result.ExportSection[e.Name] = e
+		}
 	}
 
 	// The start function is called on Module.Instantiate.

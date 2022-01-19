@@ -256,6 +256,18 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 	return encodeSection(SectionIDImport, contents)
 }
 
+// encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See encodeExport
+// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
+func encodeExportSection(exports map[string]*wasm.Export) []byte {
+	contents := leb128.EncodeUint32(uint32(len(exports)))
+	for _, e := range exports {
+		contents = append(contents, encodeExport(e)...)
+	}
+	return encodeSection(SectionIDExport, contents)
+}
+
 // encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0

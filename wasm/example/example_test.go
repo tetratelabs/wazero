@@ -58,6 +58,13 @@ func newExample() *wasm.Module {
 				DescFunc: 1,
 			},
 		},
+		ExportSection: map[string]*wasm.Export{
+			"args_sizes_get": {
+				Name:  "args_sizes_get",
+				Kind:  wasm.ExportKindFunc,
+				Index: wasm.Index(0),
+			},
+		},
 		StartSection: &four,
 		NameSection: &wasm.NameSection{
 			ModuleName: "example",
