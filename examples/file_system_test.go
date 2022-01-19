@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
@@ -45,7 +46,7 @@ func Test_file_system(t *testing.T) {
 	buf, err := os.ReadFile("testdata/file_system.wasm")
 	require.NoError(t, err)
 
-	mod, err := wasm.DecodeModule(buf)
+	mod, err := binary.DecodeModule(buf)
 	require.NoError(t, err)
 
 	memFS := wasi.MemFS()

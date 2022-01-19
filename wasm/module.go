@@ -1,42 +1,36 @@
 package wasm
 
-import (
-	"bytes"
-	"fmt"
-	"io"
-)
+// DecodeModule parses the configured source into a wasm.Module. This function returns when the source is exhausted or
+// an error occurs. The result can be initialized for use via Store.Instantiate.
+//
+// Here's a description of the return values:
+// * result is the module parsed or nil on error
+// * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
+// See binary.DecodeModule and text.DecodeModule
+type DecodeModule func(source []byte) (result *Module, err error)
 
-// magic is the 4 byte preamble (literally "\0asm") of the binary format
-// See https://www.w3.org/TR/wasm-core-1/#binary-magic
-var magic = []byte{0x00, 0x61, 0x73, 0x6D}
-
-// version is format version and doesn't change between known specification versions
-// See https://www.w3.org/TR/wasm-core-1/#binary-version
-var version = []byte{0x01, 0x00, 0x00, 0x00}
-
-type reader struct {
-	binary []byte
-	read   int
-	buffer *bytes.Buffer
-}
-
-func (r *reader) Read(p []byte) (n int, err error) {
-	n, err = r.buffer.Read(p)
-	r.read += n
-	return
-}
+// EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
+// See binary.EncodeModule
+type EncodeModule func(m *Module) (bytes []byte)
 
 // Module is a WebAssembly binary representation.
 // See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A8
+//
+// Differences from the specification:
+// * The NameSection is decoded, so not present as a key "name" in CustomSections.
+// * The ExportSection is represented as a map for lookup convenience.
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#type-section%E2%91%A0
 	TypeSection []*FunctionType
-	// ImportSection contains any types, tables, memories or globals imported into this module.
+	// ImportSection contains imported functions, tables, memories or globals required for instantiation
+	// (Store.Instantiate).
+	//
+	// Note: there are no unique constraints relating to the two-level namespace of Import.Module and Import.Name.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
-	ImportSection []*ImportSegment
+	ImportSection []*Import
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
 	//
 	// Function indexes are offset by any imported functions because the function index space begins with imports,
@@ -77,11 +71,11 @@ type Module struct {
 	// global at index 3 is defined in this module at GlobalSection[0].
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#global-section%E2%91%A0
-	GlobalSection []*GlobalSegment
-	ExportSection map[string]*ExportSegment
+	GlobalSection []*Global
+	ExportSection map[string]*Export
 	// StartSection is the index of a function to call before returning from Store.Instantiate.
 	//
-	// Note: The function index space begins with any ImportKindFunction in ImportSection, then the FunctionSection.
+	// Note: The function index space begins with any ImportKindFunc in ImportSection, then the FunctionSection.
 	// For example, if there are two imported functions and three defined in this module, the index space is five.
 	// Note: This is a pointer to avoid conflating no start section with the valid index zero.
 	//
@@ -91,7 +85,7 @@ type Module struct {
 	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
-	CodeSection []*CodeSegment
+	CodeSection []*Code
 	DataSection []*DataSegment
 	// NameSection is set when the custom section "name" was successfully decoded from the binary format.
 	//
@@ -109,43 +103,178 @@ type Module struct {
 	CustomSections map[string][]byte
 }
 
-// Encode encodes the given module into a byte slice. The result can be used directly or saved as a %.wasm file.
-func (m *Module) Encode() (bytes []byte) {
-	return m.encodeSections(append(magic, version...))
+type FunctionType struct {
+	Params, Results []ValueType
 }
 
-// DecodeModule decodes a `raw` module from io.Reader whose index spaces are yet to be initialized
-func DecodeModule(binary []byte) (*Module, error) {
-	r := &reader{binary: binary, buffer: bytes.NewBuffer(binary)}
+// ValueType is the binary encoding of a type such as i32
+// See https://www.w3.org/TR/wasm-core-1/#binary-valtype
+//
+// Note: This is a type alias as it is easier to encode and decode in the binary format.
+type ValueType = byte
 
-	// Magic number.
-	buf := make([]byte, 4)
-	if n, err := io.ReadFull(r, buf); err != nil || n != 4 {
-		return nil, ErrInvalidMagicNumber
-	}
-	for i := 0; i < 4; i++ {
-		if buf[i] != magic[i] {
-			return nil, ErrInvalidMagicNumber
-		}
-	}
+const (
+	ValueTypeI32 ValueType = 0x7f
+	ValueTypeI64 ValueType = 0x7e
+	ValueTypeF32 ValueType = 0x7d
+	ValueTypeF64 ValueType = 0x7c
+)
 
-	// Version.
-	if n, err := io.ReadFull(r, buf); err != nil || n != 4 {
-		return nil, ErrInvalidVersion
+func valueTypeName(t ValueType) (ret string) {
+	switch t {
+	case ValueTypeI32:
+		ret = "i32"
+	case ValueTypeI64:
+		ret = "i64"
+	case ValueTypeF32:
+		ret = "f32"
+	case ValueTypeF64:
+		ret = "f64"
 	}
-	for i := 0; i < 4; i++ {
-		if buf[i] != version[i] {
-			return nil, ErrInvalidVersion
-		}
-	}
+	return
+}
 
-	ret := &Module{}
-	if err := ret.readSections(r); err != nil {
-		return nil, fmt.Errorf("readSections failed: %w", err)
+func (t *FunctionType) String() (ret string) {
+	for _, b := range t.Params {
+		ret += valueTypeName(b)
 	}
+	if len(t.Params) == 0 {
+		ret += "null"
+	}
+	ret += "_"
+	for _, b := range t.Results {
+		ret += valueTypeName(b)
+	}
+	if len(t.Results) == 0 {
+		ret += "null"
+	}
+	return
+}
 
-	if len(ret.FunctionSection) != len(ret.CodeSection) {
-		return nil, fmt.Errorf("function and code section have inconsistent lengths")
-	}
-	return ret, nil
+// ImportKind indicates which import description is present
+// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
+type ImportKind = byte
+
+const (
+	ImportKindFunc   ImportKind = 0x00
+	ImportKindTable  ImportKind = 0x01
+	ImportKindMemory ImportKind = 0x02
+	ImportKindGlobal ImportKind = 0x03
+)
+
+// Import is the binary representation of an import indicated by Kind
+// See https://www.w3.org/TR/wasm-core-1/#binary-import
+type Import struct {
+	Kind ImportKind
+	// Module is the possibly empty primary namespace of this import
+	Module string
+	// Module is the possibly empty secondary namespace of this import
+	Name string
+	// DescFunc is the index in Module.TypeSection when Kind equals ImportKindFunc
+	DescFunc uint32
+	// DescTable is the inlined TableType when Kind equals ImportKindTable
+	DescTable *TableType
+	// DescMem is the inlined MemoryType when Kind equals ImportKindMemory
+	DescMem *MemoryType
+	// DescGlobal is the inlined GlobalType when Kind equals ImportKindGlobal
+	DescGlobal *GlobalType
+}
+
+type LimitsType struct {
+	Min uint32
+	Max *uint32
+}
+type TableType struct {
+	ElemType byte
+	Limit    *LimitsType
+}
+
+type MemoryType = LimitsType
+
+type GlobalType struct {
+	ValType ValueType
+	Mutable bool
+}
+
+type Global struct {
+	Type *GlobalType
+	Init *ConstantExpression
+}
+
+type ConstantExpression struct {
+	Opcode Opcode
+	Data   []byte
+}
+
+// ExportKind indicates which index Export.Index points to
+// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
+type ExportKind = byte
+
+const (
+	ExportKindFunc   ExportKind = 0x00
+	ExportKindTable  ExportKind = 0x01
+	ExportKindMemory ExportKind = 0x02
+	ExportKindGlobal ExportKind = 0x03
+)
+
+// Export is the binary representation of an export indicated by Kind
+// See https://www.w3.org/TR/wasm-core-1/#binary-export
+type Export struct {
+	Kind ExportKind
+	// Name is what the host refers to this definition as.
+	Name string
+	// Index is the index of the definition to export, the index namespace is by Kind
+	// Ex. If ExportKindFunc, this is an index to ModuleInstance.Functions
+	Index uint32
+}
+
+type ElementSegment struct {
+	TableIndex uint32
+	OffsetExpr *ConstantExpression
+	Init       []uint32
+}
+
+type Code struct {
+	NumLocals  uint32
+	LocalTypes []ValueType
+	Body       []byte
+}
+
+type DataSegment struct {
+	MemoryIndex      uint32 // supposed to be zero
+	OffsetExpression *ConstantExpression
+	Init             []byte
+}
+
+// NameSection represent the known custom name subsections defined in the WebAssembly Binary Format
+// See https://www.w3.org/TR/wasm-core-1/#name-section%E2%91%A0
+// See https://github.com/tetratelabs/wazero/issues/134 about adding this to Module
+type NameSection struct {
+	// ModuleName is the symbolic identifier for a module. Ex. math
+	// The corresponding subsection is subsectionIDModuleName.
+	ModuleName string
+	// FunctionNames is an association of a function index to its symbolic identifier. Ex. add
+	// The corresponding subsection is subsectionIDFunctionNames.
+	//
+	// * the key (idx) is in the function namespace, where module defined functions are preceded by imported ones.
+	//
+	// Ex. Assuming the below text format is the second import, you would expect FunctionNames[1] = "mul"
+	//	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
+	//
+	// Note: FunctionNames are a map because the specification requires function indices to be unique. These are sorted
+	// during EncodeData
+	FunctionNames map[uint32]string
+
+	// LocalNames is an association of a function index to any locals which have a symbolic identifier. Ex. add x
+	// The corresponding subsection is subsectionIDLocalNames.
+	//
+	// * the key (funcIndex) is in the function namespace, where module defined functions are preceded by imported ones.
+	// * the second key (idx) is in the local namespace, where parameters precede any function locals.
+	//
+	// Ex. Assuming the below text format is the second import, you would expect LocalNames[1][1] = "y"
+	//	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
+	//
+	// Note: LocalNames are a map because the specification requires both function and local indices to be unique. These
+	// are sorted during EncodeData
+	LocalNames map[uint32]map[uint32]string
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/jit"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
@@ -222,7 +223,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
 
-						mod, err := wasm.DecodeModule(buf)
+						mod, err := binary.DecodeModule(buf)
 						require.NoError(t, err, msg)
 
 						lastInstanceName = c.Name
@@ -295,7 +296,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := wasm.DecodeModule(buf)
+						mod, err := binary.DecodeModule(buf)
 						if err == nil {
 							err = store.Instantiate(mod, "")
 						}
@@ -324,7 +325,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := wasm.DecodeModule(buf)
+						mod, err := binary.DecodeModule(buf)
 						if err == nil {
 							err = store.Instantiate(mod, "")
 						}
@@ -354,7 +355,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := wasm.DecodeModule(buf)
+						mod, err := binary.DecodeModule(buf)
 						if err == nil {
 							err = store.Instantiate(mod, "")
 						}
@@ -363,7 +364,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
 						require.NoError(t, err, msg)
 
-						mod, err := wasm.DecodeModule(buf)
+						mod, err := binary.DecodeModule(buf)
 						require.NoError(t, err, msg)
 
 						err = store.Instantiate(mod, "")
