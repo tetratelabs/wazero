@@ -44,8 +44,7 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 		}
 	}
 
-	// Now, handle any exported functions. Notably, we retain the same insertion order as defined in the text format in
-	// case a numeric index is used for the start function (or another reason such as the call instruction).
+	// Now, handle any exported functions. Notably, we retain the same insertion order as defined in the text format.
 	exportFuncCount := len(m.exportFuncs)
 	if exportFuncCount > 0 {
 		result.ExportSection = make(map[string]*wasm.Export, exportFuncCount)
