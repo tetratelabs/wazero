@@ -33,9 +33,8 @@ const (
 	fieldModuleImportFunc
 	// fieldModuleExport is at the position module.export and can repeat in the same module.
 	//
-	// At the start of the field, moduleParser.currentValue0 tracks exportFunc.module while moduleParser.currentValue1
-	// tracks exportFunc.name. If a field named "func" is encountered, these names are recorded while
-	// fieldModuleExportFunc takes over parsing.
+	// At the start of the field, moduleParser.currentValue0 tracks exportFunc.name. If a field named "func" is
+	// encountered, these names are recorded while fieldModuleExportFunc takes over parsing.
 	fieldModuleExport
 	// fieldModuleExportFunc is at the position module.export.func and cannot repeat in the same export.
 	fieldModuleExportFunc
