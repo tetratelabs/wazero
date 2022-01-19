@@ -157,6 +157,79 @@ func TestBindIndices(t *testing.T) {
 			},
 		},
 		{
+			name: "export imported func",
+			input: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{ID: "bar", line: 3, col: 22}},
+				},
+			},
+			expected: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 0, line: 3, col: 22}},
+				},
+			},
+		},
+		{
+			name: "export imported func twice",
+			input: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{ID: "bar", line: 3, col: 22}},
+					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{ID: "bar", line: 4, col: 22}},
+				},
+			},
+			expected: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 0, line: 3, col: 22}},
+					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: 0, line: 4, col: 22}},
+				},
+			},
+		},
+		{
+			name: "export different func",
+			input: &module{
+				types: []*typeFunc{typeFuncEmpty},
+				importFuncs: []*importFunc{
+					{module: "foo", name: "bar", importIndex: wasm.Index(0), typeIndex: indexZero},
+					{module: "baz", name: "qux", importIndex: wasm.Index(1), typeIndex: indexZero},
+				},
+				importFuncNames: wasm.NameMap{
+					&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"},
+					&wasm.NameAssoc{Index: wasm.Index(1), Name: "qux"},
+				},
+				exportFuncs: []*exportFunc{
+					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{ID: "bar", line: 4, col: 22}},
+					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{ID: "qux", line: 5, col: 22}},
+				},
+			},
+			expected: &module{
+				types: []*typeFunc{typeFuncEmpty},
+				importFuncs: []*importFunc{
+					{module: "foo", name: "bar", importIndex: wasm.Index(0), typeIndex: indexZero},
+					{module: "baz", name: "qux", importIndex: wasm.Index(1), typeIndex: indexZero},
+				},
+				importFuncNames: wasm.NameMap{
+					&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"},
+					&wasm.NameAssoc{Index: wasm.Index(1), Name: "qux"},
+				},
+				exportFuncs: []*exportFunc{
+					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 0, line: 4, col: 22}},
+					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: 1, line: 5, col: 22}},
+				},
+			},
+		},
+		{
 			name: "start: imported function name to numeric index",
 			input: &module{
 				types:           []*typeFunc{typeFuncEmpty},
@@ -232,6 +305,30 @@ func TestBindIndices_Errors(t *testing.T) {
 				},
 			},
 			expectedErr: "3:9: inlined type doesn't match type index 0 in module.import[0].func.type",
+		},
+		{
+			name: "export func points out of range",
+			input: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 3, line: 3, col: 22}},
+				},
+			},
+			expectedErr: "3:22: index 3 is out of range [0..0] in module.exports[0].func",
+		},
+		{
+			name: "export func points nowhere",
+			input: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{ID: "qux", line: 3, col: 22}},
+				},
+			},
+			expectedErr: "3:22: unknown ID $qux in module.exports[0].func",
 		},
 		{
 			name: "start points out of range",

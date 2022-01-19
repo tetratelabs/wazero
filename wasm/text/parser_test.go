@@ -451,6 +451,94 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
+			name: "export imported func",
+			input: `(module
+	(import "foo" "bar" (func $bar))
+	(export "bar" (func $bar))
+)`,
+			expected: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 3, col: 22}},
+				},
+			},
+		},
+		{
+			name: "export imported func - numeric",
+			input: `(module
+	(import "foo" "bar" (func))
+	(export "bar" (func 0))
+)`,
+			expected: &module{
+				types:       []*typeFunc{typeFuncEmpty},
+				importFuncs: []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				exportFuncs: []*exportFunc{{name: "bar", funcIndex: &index{numeric: 0, line: 3, col: 22}}},
+			},
+		},
+		{
+			name: "export imported func twice",
+			input: `(module
+	(import "foo" "bar" (func $bar))
+	(export "foo" (func $bar))
+	(export "bar" (func $bar))
+)`,
+			expected: &module{
+				types:           []*typeFunc{typeFuncEmpty},
+				importFuncs:     []*importFunc{{module: "foo", name: "bar", typeIndex: indexZero}},
+				importFuncNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
+				exportFuncs: []*exportFunc{
+					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 3, col: 22}},
+					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: wasm.Index(0), line: 4, col: 22}},
+				},
+			},
+		},
+		{
+			name: "export different func",
+			input: `(module
+	(import "foo" "bar" (func $bar))
+	(import "baz" "qux" (func $qux))
+	(export "foo" (func $bar))
+	(export "bar" (func $qux))
+)`,
+			expected: &module{
+				types: []*typeFunc{typeFuncEmpty},
+				importFuncs: []*importFunc{
+					{module: "foo", name: "bar", importIndex: wasm.Index(0), typeIndex: indexZero},
+					{module: "baz", name: "qux", importIndex: wasm.Index(1), typeIndex: indexZero},
+				},
+				importFuncNames: wasm.NameMap{
+					&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"},
+					&wasm.NameAssoc{Index: wasm.Index(1), Name: "qux"},
+				},
+				exportFuncs: []*exportFunc{
+					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 4, col: 22}},
+					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: wasm.Index(1), line: 5, col: 22}},
+				},
+			},
+		},
+		{
+			name: "export different func - numeric",
+			input: `(module
+	(import "foo" "bar" (func))
+	(import "baz" "qux" (func))
+	(export "foo" (func 0))
+	(export "bar" (func 1))
+)`,
+			expected: &module{
+				types: []*typeFunc{typeFuncEmpty},
+				importFuncs: []*importFunc{
+					{module: "foo", name: "bar", importIndex: wasm.Index(0), typeIndex: indexZero},
+					{module: "baz", name: "qux", importIndex: wasm.Index(1), typeIndex: indexZero},
+				},
+				exportFuncs: []*exportFunc{
+					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 4, col: 22}},
+					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: wasm.Index(1), line: 5, col: 22}},
+				},
+			},
+		},
+		{
 			name: "start imported function by name",
 			input: `(module
 	(import "" "hello" (func $hello))
@@ -734,6 +822,44 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "import func double desc",
 			input:       "(module (import \"foo\" \"bar\" (func $main) (func $mein)))",
 			expectedErr: "1:42: unexpected '(' in module.import[0]",
+		},
+		{
+			name:        "export double name",
+			input:       "(module (export \"PI\" \"PI\" (func main)))",
+			expectedErr: "1:22: redundant name: PI in module.export[0]",
+		},
+		{
+			name:        "export wrong name",
+			input:       "(module (export PI (func $main)))",
+			expectedErr: "1:17: unexpected reserved: PI in module.export[0]",
+		},
+		{
+			name:        "export func missing index",
+			input:       "(module (export \"PI\" (func)))",
+			expectedErr: "1:27: missing index in module.export[0].func",
+		},
+		{
+			name:        "export func double index",
+			input:       "(module (export \"PI\" (func $main $main)))",
+			expectedErr: "1:34: redundant index in module.export[0].func",
+		},
+		{
+			name:        "export func wrong index",
+			input:       "(module (export \"PI\" (func main)))",
+			expectedErr: "1:28: unexpected keyword: main in module.export[0].func",
+		},
+		{
+			name: "export func points out of range",
+			input: `(module
+	(import "" "hello" (func))
+	(export "PI" (func 1))
+)`,
+			expectedErr: "3:21: index 1 is out of range [0..0] in module.exports[0].func",
+		},
+		{
+			name:        "export func points nowhere",
+			input:       "(module (export \"PI\" (func $main)))",
+			expectedErr: "1:28: unknown ID $main in module.exports[0].func",
 		},
 		{
 			name:        "start missing index",

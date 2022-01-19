@@ -48,8 +48,11 @@ type module struct {
 	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
 	importFuncParamNames wasm.IndirectNameMap
 
-	// startFunction is the index of the function to call during wasm.Store Instantiate. When a tokenID, this must match
-	// importFunc.funcName.
+	// exportFuncs are exports describing functions added in insertion order. Ex (export... (func...))
+	exportFuncs []*exportFunc
+
+	// startFunction is the index of the function to call during wasm.Store Instantiate. When index.ID is set, it must
+	// match a wasm.NameAssoc Name in wasm.NameSection FunctionNames
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
 	startFunction *index
@@ -131,6 +134,16 @@ type importFunc struct {
 	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
 	importIndex wasm.Index
 
+	// module is the possibly empty module name to import. Ex. "" or "Math"
+	//
+	// Note: This is not necessarily the module.name
+	module string
+
+	// name is the possibly empty entity name to import. Ex. "" or "PI"
+	//
+	// Note this is not necessarily a wasm.NameAssoc Name in wasm.NameSection FunctionNames
+	name string
+
 	// typeIndex is the optional index in module.types for the function signature. If index.ID is set, it must match
 	// typeFunc.name.
 	//
@@ -142,16 +155,25 @@ type importFunc struct {
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A6
 	typeInlined *inlinedTypeFunc
+}
 
-	// module is the possibly empty module name to import. Ex. "" or "Math"
+// exportFunc corresponds to the text format of a WebAssembly function export.
+//
+// See https://www.w3.org/TR/wasm-core-1/#exports%E2%91%A0
+type exportFunc struct {
+	// name is the possibly empty entity name to export. Ex. "" or "PI"
 	//
-	// Note: This is not necessarily the module.name
-	module string
-
-	// name is the possibly empty entity name to import. Ex. "" or "PI"
-	//
-	// Note: This is not necessarily the funcName
+	// Note: This is not necessarily the same in a wasm.NameSection FunctionNames
 	name string
+
+	// exportIndex is the zero-based index in module.exports. This is needed because exports are not always functions.
+	exportIndex wasm.Index
+
+	// funcIndex is the index of the function to export. When index.ID is set, it must match a wasm.NameAssoc Name in
+	// wasm.NameSection FunctionNames
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
+	funcIndex *index
 }
 
 // FormatError allows control over the format of errors parsing the WebAssembly Text Format.

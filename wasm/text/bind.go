@@ -23,8 +23,14 @@ func bindIndices(m *module) error {
 		return err
 	}
 
+	if err = bindExportFuncs(m, funcNameToIndex); err != nil {
+		return err
+	}
+
 	if m.startFunction != nil {
-		if err = bindStartFunction(m, funcNameToIndex); err != nil {
+		indexCount := uint32(len(m.importFuncs)) // TODO len(m.importFuncs + m.funcs) when we add them!
+		err = bindIndex(indexCount, funcNameToIndex, m.startFunction, "module.start", -1)
+		if err != nil {
 			return err
 		}
 	}
@@ -53,11 +59,8 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 			continue
 		}
 
-		if idx.ID == "" { // already bound to a numeric index: verify it is in range
-			if err := checkIndexInRange(idx, typeCount, "module.import[%d].func.type", i); err != nil {
-				return nil, err
-			}
-		} else if err := bindSymbolicIDToNumericIndex(typeNameToIndex, idx, "module.import[%d].func.type", i); err != nil {
+		err := bindIndex(typeCount, typeNameToIndex, idx, "module.import[%d].func.type", int64(i))
+		if err != nil {
 			return nil, err
 		}
 
@@ -75,24 +78,33 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 	return funcNameToIndex, nil
 }
 
-// bindStartFunction ensures the module.startFunction points to a valid numeric index or returns a FormatError if it
+// bindExportFuncs ensures all module.exportFuncs point to valid numeric indices or returns a FormatError if one
 // cannot be bound.
+func bindExportFuncs(m *module, funcNameToIndex map[string]uint32) (err error) {
+	indexCount := uint32(len(m.importFuncs)) // TODO len(m.importFuncs + m.funcs) when we add them!
+	for _, e := range m.exportFuncs {
+		err = bindIndex(indexCount, funcNameToIndex, e.funcIndex, "module.exports[%d].func", int64(e.exportIndex))
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+// bindIndex ensures the idx points to a valid numeric function index or returns a FormatError if it cannot be bound.
 //
 // Failure cases are when a symbolic identifier points nowhere or a numeric index is out of range.
 // Ex. (start $t0) exists, but there's no import or module defined function with that name.
 //  or (start 32) exists, but there are only 10 functions.
-func bindStartFunction(m *module, funcNameToIndex map[string]uint32) error {
-	idx := m.startFunction
-
+func bindIndex(indexCount uint32, nameToIndex map[string]uint32, idx *index, context string, contextArg0 int64) error {
 	if idx.ID == "" { // already bound to a numeric index, but we have to verify it is in range
-		indexCount := uint32(len(m.importFuncs)) // TODO len(m.importFuncs + m.funcs) when we add them!
-		return checkIndexInRange(idx, indexCount, "module.start", -1)
+		return checkIndexInRange(idx, indexCount, context, contextArg0)
 	}
 
-	return bindSymbolicIDToNumericIndex(funcNameToIndex, idx, "module.start", -1)
+	return bindSymbolicIDToNumericIndex(nameToIndex, idx, context, contextArg0)
 }
 
-func bindSymbolicIDToNumericIndex(idToIndex map[string]uint32, idx *index, context string, contextArg0 int) error {
+func bindSymbolicIDToNumericIndex(idToIndex map[string]uint32, idx *index, context string, contextArg0 int64) error {
 	if numeric, ok := idToIndex[idx.ID]; ok {
 		idx.ID = ""
 		idx.numeric = numeric
@@ -107,7 +119,7 @@ func bindSymbolicIDToNumericIndex(idToIndex map[string]uint32, idx *index, conte
 	}
 }
 
-func checkIndexInRange(idx *index, count uint32, context string, contextArg0 int) error {
+func checkIndexInRange(idx *index, count uint32, context string, contextArg0 int64) error {
 	if idx.numeric >= count {
 		// This check allows us to defer Sprintf until there's an error, and reuse the same logic for non-indexed types.
 		if contextArg0 >= 0 {

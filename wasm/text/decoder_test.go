@@ -101,6 +101,69 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name: "export imported func",
+			input: `(module
+	(import "foo" "bar" (func $bar))
+	(export "bar" (func $bar))
+)`,
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{{}},
+				ImportSection: []*wasm.Import{
+					{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"bar": {Name: "bar", Kind: wasm.ExportKindFunc, Index: wasm.Index(0)},
+				},
+				NameSection: &wasm.NameSection{FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "bar"}}},
+			},
+		},
+		{
+			name: "export different func",
+			input: `(module
+	(import "foo" "bar" (func $bar))
+	(import "baz" "qux" (func $qux))
+	(export "foo" (func $bar))
+	(export "bar" (func $qux))
+)`,
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{{}},
+				ImportSection: []*wasm.Import{
+					{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0},
+					{Module: "baz", Name: "qux", Kind: wasm.ImportKindFunc, DescFunc: 0},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"foo": {Name: "foo", Kind: wasm.ExportKindFunc, Index: wasm.Index(0)},
+					"bar": {Name: "bar", Kind: wasm.ExportKindFunc, Index: wasm.Index(1)},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						{Index: wasm.Index(0), Name: "bar"},
+						{Index: wasm.Index(1), Name: "qux"},
+					},
+				},
+			},
+		},
+		{
+			name: "export different func - numeric",
+			input: `(module
+	(import "foo" "bar" (func))
+	(import "baz" "qux" (func))
+	(export "foo" (func 0))
+	(export "bar" (func 1))
+)`,
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{{}},
+				ImportSection: []*wasm.Import{
+					{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0},
+					{Module: "baz", Name: "qux", Kind: wasm.ImportKindFunc, DescFunc: 0},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"foo": {Name: "foo", Kind: wasm.ExportKindFunc, Index: wasm.Index(0)},
+					"bar": {Name: "bar", Kind: wasm.ExportKindFunc, Index: wasm.Index(1)},
+				},
+			},
+		},
+		{
 			name: "start imported function by name",
 			input: `(module
 	(import "" "hello" (func $hello))

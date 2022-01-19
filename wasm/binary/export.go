@@ -32,3 +32,13 @@ func decodeExport(r *bytes.Reader) (i *wasm.Export, err error) {
 	}
 	return
 }
+
+// encodeExport returns the wasm.Export encoded in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
+func encodeExport(i *wasm.Export) []byte {
+	data := encodeSizePrefixed([]byte(i.Name))
+	data = append(data, i.Kind)
+	data = append(data, leb128.EncodeUint32(i.Index)...)
+	return data
+}
