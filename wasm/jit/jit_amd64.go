@@ -117,8 +117,9 @@ type amd64Compiler struct {
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel                                     string
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
-	onGenerateCallbacks                              []func(code []byte) error
-	staticData                                       [][]byte
+	//
+	onGenerateCallbacks []func(code []byte) error
+	staticData          [][]byte
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
@@ -170,7 +171,9 @@ func (c *amd64Compiler) generate() (code []byte, staticData [][]byte, maxStackPo
 	}
 
 	for _, cb := range c.onGenerateCallbacks {
-		cb(code)
+		if err = cb(code); err != nil {
+			return
+		}
 	}
 
 	// As we cannot read RIP register directly, we calculate now the offset to the next
@@ -657,7 +660,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
 
 	// If the operation doesn't have target but default,
-	// we just branch into the deault label and do early return.
+	// we just branch into the default label and do early return.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
 		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
@@ -711,7 +714,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// each target's first instruction (incl. default)
 	// relative to the beginning of label tables.
 	//
-	// For example, if we have targest=[L0, L1], default=L_DEFAULT,
+	// For example, if we have targets=[L0, L1] and default=L_DEFAULT,
 	// we emit the the code like this at [Emit the code for each targets and default branch] below.
 	//
 	// L0:
@@ -808,9 +811,13 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		var target *wazeroir.BranchTargetDrop
 		if i < len(o.Targets) {
 			target = o.Targets[i]
+			// Clone the location stack so the branch-specific code doesn't
+			// affect others.
 			locationStack = saved.clone()
 		} else {
 			target = o.Default
+			// If this is the deafult branch, we just use the original one
+			// as this is the last code in this block.
 			locationStack = saved
 		}
 
