@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"unsafe"
@@ -154,7 +155,11 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	if f.IsHostFunction() {
-		e.compiledFunctions[f.Address] = &compiledFunction{source: f}
+		e.compiledFunctions[f.Address] = &compiledFunction{
+			source:      f,
+			paramCount:  uint64(len(f.FunctionType.Type.Params)),
+			resultCount: uint64(len(f.FunctionType.Type.Results)),
+		}
 	} else {
 		cf, err := e.compileWasmFunction(f)
 		if err != nil {
@@ -197,10 +202,12 @@ func (e *engine) callFramePush(callee *callFrame) {
 	if callStackCeiling < e.callFrameNum {
 		panic(wasm.ErrCallStackOverflow)
 	}
+
 	// Push the new frame to the top of stack.
 	callee.caller = e.callFrameStack
 	e.callFrameStack = callee
 
+	e.callFrameStack.stackBasePointer = e.stackBasePointer + e.stackPointer - callee.compiledFunction.paramCount
 	e.stackBasePointer = callee.stackBasePointer
 	e.stackPointer = callee.compiledFunction.paramCount
 	e.setModuleInstance(callee.compiledFunction.source.ModuleInstance)
@@ -320,6 +327,7 @@ func (f *compiledFunction) isHostFunction() bool {
 const (
 	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
 	builtinFunctionAddressMemorySize
+	builtinFunctionAddressBreakPoint
 )
 
 // Grow the stack size according to maxStackPointer argument
@@ -393,12 +401,14 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 }
 
 func (e *engine) execFunction(f *compiledFunction) {
+	prev := e.callFrameStack
+
 	// Push a new call frame for the target function.
 	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, compiledFunction: f})
 
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
-	for e.callFrameStack != nil {
+	for e.callFrameStack != prev {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
 			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
@@ -425,21 +435,15 @@ func (e *engine) execFunction(f *compiledFunction) {
 			nextFunc := e.compiledFunctions[e.functionCallAddress]
 			// Calculate the continuation address so we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
+			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
+
+			callee := &callFrame{compiledFunction: nextFunc}
 			if nextFunc.isHostFunction() {
-				// Push the call frame for this host function.
-				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
-				// Call into the host function.
+				e.callFramePush(callee)
 				e.execHostFunction(nextFunc.source.HostFunction, &wasm.HostFunctionCallContext{Memory: currentFrame.compiledFunction.source.ModuleInstance.Memory})
-				// Pop the call frame.
-				e.callFrameStack = currentFrame
+				e.callFramePop()
 			} else {
-				currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
-				callee := &callFrame{
-					continuationAddress: nextFunc.codeInitialAddress,
-					compiledFunction:    nextFunc,
-					// Set the base pointer to the beginning of the function params
-					stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
-				}
+				callee.continuationAddress = nextFunc.codeInitialAddress
 				e.callFramePush(callee)
 				// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 				e.maybeGrowStack(nextFunc.maxStackPointer)
@@ -450,6 +454,8 @@ func (e *engine) execFunction(f *compiledFunction) {
 				e.builtinFunctionMemoryGrow(currentFrame.compiledFunction.source.ModuleInstance.Memory)
 			case builtinFunctionAddressMemorySize:
 				e.builtinFunctionMemorySize(currentFrame.compiledFunction.source.ModuleInstance.Memory)
+			case builtinFunctionAddressBreakPoint:
+				runtime.Breakpoint()
 			}
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeInvalidFloatToIntConversion:

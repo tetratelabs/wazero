@@ -161,6 +161,28 @@ func TestEngine_memory(t *testing.T) {
 	require.Equal(t, newPages, out[0])
 }
 
+func TestEngine_RecursiveEntry(t *testing.T) {
+	buf, err := os.ReadFile("testdata/recursive.wasm")
+	require.NoError(t, err)
+	mod, err := binary.DecodeModule(buf)
+	require.NoError(t, err)
+
+	eng := newEngine()
+	store := wasm.NewStore(eng)
+
+	externEmpty := func(ctx *wasm.HostFunctionCallContext) {
+		_, _, err := store.CallFunction("test", "called_by_host_func")
+		require.NoError(t, err)
+	}
+	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(externEmpty))
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+	_, _, err = store.CallFunction("test", "main", uint64(1))
+	require.NoError(t, err)
+}
+
 func TestEngine_maybeGrowStack(t *testing.T) {
 	t.Run("grow", func(t *testing.T) {
 		eng := &engine{stack: make([]uint64, 10)}

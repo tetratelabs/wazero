@@ -170,6 +170,11 @@ func (c *amd64Compiler) generate() (code []byte, staticData [][]byte, maxStackPo
 		return
 	}
 
+	for _, l := range c.labels {
+		if len(l.labelBeginningCallbacks) > 0 {
+			panic("bug for labelBeginningCallbacks")
+		}
+	}
 	for _, cb := range c.onGenerateCallbacks {
 		if err = cb(code); err != nil {
 			return
@@ -612,7 +617,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		if labelInfo.initialStack == nil {
-			labelInfo.initialStack = c.locationStack.clone()
+			labelInfo.initialStack = c.locationStack
 		}
 		elseJmp := c.newProg()
 		elseJmp.As = obj.AJMP
@@ -647,7 +652,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		if labelInfo.initialStack == nil {
-			labelInfo.initialStack = c.locationStack.clone()
+			labelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.newProg()
 		thenJmp.As = obj.AJMP
@@ -901,6 +906,9 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 		// If initialStack is not set, that means this label has never been reached.
 		skipLabel = true
 		c.currentLabel = ""
+		if len(labelInfo.labelBeginningCallbacks) > 0 {
+			panic("bug")
+		}
 		return
 	}
 
@@ -922,6 +930,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	for _, cb := range labelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
+	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
 		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
@@ -4530,17 +4539,14 @@ func (c *amd64Compiler) compileFunctionCallFromRegister(functionCallAddressRegis
 }
 
 func (c *amd64Compiler) releaseAllRegistersToStack() error {
-	used := len(c.locationStack.usedRegisters)
-	for i := uint64(0); i < c.locationStack.sp && used > 0; i++ {
+	for i := uint64(0); i < c.locationStack.sp; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
 			c.releaseRegisterToStack(loc)
-			used--
 		} else if loc.onConditionalRegister() {
 			if err := c.moveConditionalToFreeGeneralPurposeRegister(loc); err != nil {
 				return err
 			}
 			c.releaseRegisterToStack(loc)
-			used--
 		}
 	}
 	return nil
@@ -4550,6 +4556,7 @@ func (c *amd64Compiler) setContinuationOffsetAtNextInstructionAndReturn() {
 	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
 	// all the registers, so at this point we always have free registers.
 	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+
 	// Create the instruction for setting offset.
 	// We use tmp register to store the const, not directly movq to memory
 	// as it is not valid to move 64-bit const to memory directly.
@@ -4576,6 +4583,7 @@ func (c *amd64Compiler) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineContinuationAddressOffset
 	c.addInstruction(prog)
+
 	// Then return temporarily -- giving control to normal Go code.
 	c.returnFunction()
 }
