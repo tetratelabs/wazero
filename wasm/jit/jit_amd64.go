@@ -940,6 +940,8 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	for _, cb := range labelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
+
+	// Clear for debuggin purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
 	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
