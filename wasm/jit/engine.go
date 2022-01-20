@@ -210,7 +210,7 @@ func (e *engine) callFramePush(callee *callFrame) {
 	e.callFrameStack.stackBasePointer = e.stackBasePointer + e.stackPointer - callee.compiledFunction.paramCount
 	e.stackBasePointer = callee.stackBasePointer
 	e.stackPointer = callee.compiledFunction.paramCount
-	e.setModuleInstance(callee.compiledFunction.source.ModuleInstance)
+	e.initModuleInstance(callee.compiledFunction.source.ModuleInstance)
 }
 
 func (e *engine) callFramePop() {
@@ -223,11 +223,12 @@ func (e *engine) callFramePop() {
 	if caller != nil {
 		e.stackBasePointer = caller.stackBasePointer
 		e.stackPointer = caller.continuationStackPointer
-		e.setModuleInstance(caller.compiledFunction.source.ModuleInstance)
+		e.initModuleInstance(caller.compiledFunction.source.ModuleInstance)
 	}
 }
 
-func (e *engine) setModuleInstance(m *wasm.ModuleInstance) {
+// initModuleInstance initializes the engine's state based on the given module instance.
+func (e *engine) initModuleInstance(m *wasm.ModuleInstance) {
 	if len(m.Globals) > 0 {
 		e.globalSliceAddress = uintptr(unsafe.Pointer(&m.Globals[0]))
 	}
@@ -317,7 +318,9 @@ type compiledFunction struct {
 	codeInitialAddress uintptr
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
-	staticData      [][]byte
+	// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
+	// This is used to store jump tables for br_table instructions.
+	staticData [][]byte
 }
 
 func (f *compiledFunction) isHostFunction() bool {
@@ -327,6 +330,7 @@ func (f *compiledFunction) isHostFunction() bool {
 const (
 	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
 	builtinFunctionAddressMemorySize
+	// builtinFunctionAddressBreakPoint is only for wazero developers. Disabled by default.
 	builtinFunctionAddressBreakPoint
 )
 
@@ -458,8 +462,11 @@ func (e *engine) execFunction(f *compiledFunction) {
 				e.builtinFunctionMemoryGrow(currentFrame.compiledFunction.source.ModuleInstance.Memory)
 			case builtinFunctionAddressMemorySize:
 				e.builtinFunctionMemorySize(currentFrame.compiledFunction.source.ModuleInstance.Memory)
-			case builtinFunctionAddressBreakPoint:
-				runtime.Breakpoint()
+			}
+			if buildoptions.IsDebugMode {
+				if e.functionCallAddress == builtinFunctionAddressBreakPoint {
+					runtime.Breakpoint()
+				}
 			}
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeInvalidFloatToIntConversion:
@@ -521,12 +528,16 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 
 	var skip bool
 	for _, op := range ir.Operations {
+		// Compiler determines whether or not skip the entire label.
+		// For example, if the label doesn't have any caller,
+		// we don't need to generate native code at all as we never reach the region.
 		if op.Kind() == wazeroir.OperationKindLabel {
 			skip = compiler.compileLabel(op.(*wazeroir.OperationLabel))
 		}
 		if skip {
 			continue
 		}
+
 		if buildoptions.IsDebugMode {
 			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
 		}
