@@ -117,9 +117,11 @@ type amd64Compiler struct {
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel                                     string
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
-	//
+	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
 	onGenerateCallbacks []func(code []byte) error
-	staticData          [][]byte
+	// staticData holds the per-function read-only data. For example, this is used to store
+	// the branch table for br_table instruction.
+	staticData [][]byte
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
@@ -170,11 +172,15 @@ func (c *amd64Compiler) generate() (code []byte, staticData [][]byte, maxStackPo
 		return
 	}
 
-	for _, l := range c.labels {
-		if len(l.labelBeginningCallbacks) > 0 {
-			panic("bug for labelBeginningCallbacks")
+	if buildoptions.IsDebugMode {
+		for _, l := range c.labels {
+			if len(l.labelBeginningCallbacks) > 0 {
+				// Meaning that some labels are not compiled even though there's a jump origin.
+				panic("labelBeginningCallbacks must be empty after code generation")
+			}
 		}
 	}
+
 	for _, cb := range c.onGenerateCallbacks {
 		if err = cb(code); err != nil {
 			return
@@ -906,8 +912,12 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 		// If initialStack is not set, that means this label has never been reached.
 		skipLabel = true
 		c.currentLabel = ""
-		if len(labelInfo.labelBeginningCallbacks) > 0 {
-			panic("bug")
+		if buildoptions.IsDebugMode {
+			if len(labelInfo.labelBeginningCallbacks) > 0 {
+				// Meaning that some instruction is trying to jump to this label,
+				// but initialStack is not set. There must be a bug at the callsite of br or br_if.
+				panic("labelBeginningCallbacks must be empty")
+			}
 		}
 		return
 	}
