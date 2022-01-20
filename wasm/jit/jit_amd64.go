@@ -486,6 +486,7 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	return c.branchInto(o.Target)
 }
 
+// branchInto adds instruction necessary to jump into the given branch target.
 func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 	if target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
@@ -511,7 +512,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		// manipulate the stack before compiler reaches the label.
 		if targetLabel.initialStack == nil {
 			// It seems unnecessary to clone as branchInto is always the tail of the current block.
-			// TODO: veirfy ^^.
+			// TODO: verify ^^.
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 		jmp := c.newProg()
@@ -669,6 +670,13 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	return nil
 }
 
+// compileBrTable adds instructions to do br_table operation.
+// A br_table operation has list of targets and default target, and
+// this pops a value from the stack (called "index") and decide which branch we go into next
+// based on the value.
+// For example, assume we have operations like {default: L_DEFAULT, targets: [L0, L1, L2]}.
+// If "index" >= len(defaults), then branch into the L_DEFAULT label.
+// Othewise, we enter label of targets[index].
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
 
