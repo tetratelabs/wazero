@@ -6,6 +6,7 @@ import (
 
 	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/stretchr/testify/require"
+
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/jit"
