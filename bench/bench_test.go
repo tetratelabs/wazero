@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/tetratelabs/wazero/wasi"
@@ -21,11 +22,13 @@ func BenchmarkEngines(b *testing.B) {
 		setUpStore(store)
 		runAllBenches(b, store)
 	})
-	b.Run("jit", func(b *testing.B) {
-		store := newStore(jit.NewEngine())
-		setUpStore(store)
-		runAllBenches(b, store)
-	})
+	if runtime.GOARCH == "amd64" {
+		b.Run("jit", func(b *testing.B) {
+			store := newStore(jit.NewEngine())
+			setUpStore(store)
+			runAllBenches(b, store)
+		})
+	}
 }
 
 func setUpStore(store *wasm.Store) {
