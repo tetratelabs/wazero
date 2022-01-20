@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tetratelabs/wazero/wasm/buildoptions"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
+
+	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
 // Reserved registers.
