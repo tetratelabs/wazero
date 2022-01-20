@@ -50,7 +50,7 @@ func decodeImport(r *bytes.Reader) (i *wasm.Import, err error) {
 
 // encodeImport returns the wasm.Import encoded in WebAssembly 1.0 (MVP) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
+// See https://www.w3.org/TR/wasm-core-1/#binary-import
 func encodeImport(i *wasm.Import) []byte {
 	data := encodeSizePrefixed([]byte(i.Module))
 	data = append(data, encodeSizePrefixed([]byte(i.Name))...)
@@ -68,4 +68,13 @@ func encodeImport(i *wasm.Import) []byte {
 		panic(fmt.Errorf("invalid kind: %#x", i.Kind))
 	}
 	return data
+}
+
+// encodeCode returns the wasm.Code encoded in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See https://www.w3.org/TR/wasm-core-1/#binary-code
+func encodeCode(c *wasm.Code) []byte {
+	code := append(leb128.EncodeUint32(c.NumLocals), c.LocalTypes...)
+	code = append(code, c.Body...)
+	return append(leb128.EncodeUint32(uint32(len(code))), code...)
 }

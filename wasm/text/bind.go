@@ -23,12 +23,13 @@ func bindIndices(m *module) error {
 		return err
 	}
 
-	if err = bindExportFuncs(m, funcNameToIndex); err != nil {
+	indexCount := uint32(len(m.importFuncs) + len(m.funcs))
+
+	if err = bindExportFuncs(m, indexCount, funcNameToIndex); err != nil {
 		return err
 	}
 
 	if m.startFunction != nil {
-		indexCount := uint32(len(m.importFuncs)) // TODO len(m.importFuncs + m.funcs) when we add them!
 		err = bindIndex(indexCount, funcNameToIndex, m.startFunction, "module.start", -1)
 		if err != nil {
 			return err
@@ -45,31 +46,41 @@ func bindIndices(m *module) error {
 //  or (import "Math" "PI" (func (type 32))) exists, but there are only 10 types.
 func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIndex map[string]uint32) (map[string]uint32, error) {
 	funcNameToIndex := map[string]wasm.Index{}
-	for _, na := range m.importFuncNames {
+	for _, na := range m.funcNames {
 		funcNameToIndex[na.Name] = na.Index
 	}
 
 	typeCount := uint32(len(m.types))
-	for i, f := range m.importFuncs {
-		idx := f.typeIndex
+	importCount := uint32(len(m.importFuncs))
+
+	for i, tu := range m.typeUses {
+
+		var context string
+		if uint32(i) >= importCount {
+			context = "module.func[%d].type"
+		} else {
+			context = "module.import[%d].func.type"
+		}
+
+		idx := tu.typeIndex
 		if idx == nil { // inlined type
-			ti := f.typeInlined
-			f.typeIndex = &index{numeric: typeToIndex[ti.typeFunc], line: ti.line, col: ti.col}
-			f.typeInlined = nil
+			ti := tu.typeInlined
+			tu.typeIndex = &index{numeric: typeToIndex[ti.typeFunc], line: ti.line, col: ti.col}
+			tu.typeInlined = nil
 			continue
 		}
 
-		err := bindIndex(typeCount, typeNameToIndex, idx, "module.import[%d].func.type", int64(i))
+		err := bindIndex(typeCount, typeNameToIndex, idx, context, int64(i))
 		if err != nil {
 			return nil, err
 		}
 
 		// If there's an inlined type now, it must contain the same signature as the index, and may contain names.
-		if f.typeInlined != nil {
+		if tu.typeInlined != nil {
 			realType := m.types[idx.numeric]
-			ti := f.typeInlined
+			ti := tu.typeInlined
 			if !funcTypeEquals(realType, ti.typeFunc.params, ti.typeFunc.result) {
-				return nil, &FormatError{ti.line, ti.col, fmt.Sprintf("module.import[%d].func.type", i),
+				return nil, &FormatError{ti.line, ti.col, fmt.Sprintf(context, i),
 					fmt.Errorf("inlined type doesn't match type index %d", idx.numeric),
 				}
 			}
@@ -80,8 +91,7 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 
 // bindExportFuncs ensures all module.exportFuncs point to valid numeric indices or returns a FormatError if one
 // cannot be bound.
-func bindExportFuncs(m *module, funcNameToIndex map[string]uint32) (err error) {
-	indexCount := uint32(len(m.importFuncs)) // TODO len(m.importFuncs + m.funcs) when we add them!
+func bindExportFuncs(m *module, indexCount uint32, funcNameToIndex map[string]uint32) (err error) {
 	for _, e := range m.exportFuncs {
 		err = bindIndex(indexCount, funcNameToIndex, e.funcIndex, "module.exports[%d].func", int64(e.exportIndex))
 		if err != nil {

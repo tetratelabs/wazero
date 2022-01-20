@@ -4,6 +4,8 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+var sizePrefixedName = []byte{4, 'n', 'a', 'm', 'e'}
+
 // EncodeModule implements wasm.EncodeModule for the WebAssembly 1.0 (MVP) Binary Format.
 // Note: If saving to a file, the conventional extension is wasm
 // See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
@@ -19,7 +21,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		bytes = append(bytes, encodeImportSection(m.ImportSection)...)
 	}
 	if len(m.FunctionSection) > 0 {
-		panic("TODO: FunctionSection")
+		bytes = append(bytes, encodeFunctionSection(m.FunctionSection)...)
 	}
 	if len(m.TableSection) > 0 {
 		panic("TODO: TableSection")
@@ -40,7 +42,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		panic("TODO: ElementSection")
 	}
 	if len(m.CodeSection) > 0 {
-		panic("TODO: CodeSection")
+		bytes = append(bytes, encodeCodeSection(m.CodeSection)...)
 	}
 	if len(m.DataSection) > 0 {
 		panic("TODO: DataSection")
@@ -48,7 +50,8 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 	// >> The name section should appear only once in a module, and only after the data section.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	if m.NameSection != nil {
-		bytes = append(bytes, encodeCustomSection("name", encodeNameSectionData(m.NameSection))...)
+		nameSection := append(sizePrefixedName, encodeNameSectionData(m.NameSection)...)
+		bytes = append(bytes, encodeSection(SectionIDCustom, nameSection)...)
 	}
 	return
 }

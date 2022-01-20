@@ -256,6 +256,30 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 	return encodeSection(SectionIDImport, contents)
 }
 
+// encodeFunctionSection encodes a SectionIDFunction for the type indices associated with module-defined functions in
+// WebAssembly 1.0 (MVP) Binary Format.
+//
+// See https://www.w3.org/TR/wasm-core-1/#function-section%E2%91%A0
+func encodeFunctionSection(functions []wasm.Index) []byte {
+	contents := leb128.EncodeUint32(uint32(len(functions)))
+	for _, typeIndex := range functions {
+		contents = append(contents, leb128.EncodeUint32(typeIndex)...)
+	}
+	return encodeSection(SectionIDFunction, contents)
+}
+
+// encodeCodeSection encodes a SectionIDCode for the module-defined function in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See encodeCode
+// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
+func encodeCodeSection(codes []*wasm.Code) []byte {
+	contents := leb128.EncodeUint32(uint32(len(codes)))
+	for _, i := range codes {
+		contents = append(contents, encodeCode(i)...)
+	}
+	return encodeSection(SectionIDCode, contents)
+}
+
 // encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See encodeExport

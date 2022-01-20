@@ -132,6 +132,60 @@ func TestModule_Encode(t *testing.T) {
 				0x00, // start function index
 			),
 		},
+		{
+			name: "exported func with instructions",
+			input: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+				},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{
+					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(0)},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "addInt"}},
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{
+							{Index: wasm.Index(0), Name: "value_1"},
+							{Index: wasm.Index(1), Name: "value_2"},
+						}},
+					},
+				},
+			},
+			expected: append(append(magic, version...),
+				SectionIDType, 0x07, // 7 bytes in this section
+				0x01,                            // 1 type
+				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
+				SectionIDFunction, 0x02, // 2 bytes in this section
+				0x01,                  // 1 function
+				0x00,                  // func[0] type index 0
+				SectionIDExport, 0x0a, // 10 bytes in this section
+				0x01,                               // 1 export
+				0x06, 'A', 'd', 'd', 'I', 'n', 't', // size of "AddInt", "AddInt"
+				wasm.ExportKindFunc, 0x00, // func[0]
+				SectionIDCode, 0x09, // 9 bytes in this section
+				01,                     // one code section
+				07,                     // length of the body + locals
+				00,                     // count of locals
+				wasm.OpcodeLocalGet, 0, // local.get 0
+				wasm.OpcodeLocalGet, 1, // local.get 1
+				wasm.OpcodeI32Add,     // i32.add
+				wasm.OpcodeEnd,        // end of instructions/code
+				SectionIDCustom, 0x27, // 39 bytes in this section
+				0x04, 'n', 'a', 'm', 'e',
+				subsectionIDFunctionNames, 0x09, // 9 bytes
+				0x01,                                     // two function names
+				0x00, 0x06, 'a', 'd', 'd', 'I', 'n', 't', // index 0, size of "addInt", "addInt"
+				subsectionIDLocalNames, 0x15, // 21 bytes
+				0x01,       // one function
+				0x00, 0x02, // index 0 has 2 locals
+				0x00, 0x07, 'v', 'a', 'l', 'u', 'e', '_', '1', // index 0, size of "value_1", "value_1"
+				0x01, 0x07, 'v', 'a', 'l', 'u', 'e', '_', '2', // index 1, size of "value_2", "value_2"
+			),
+		},
 	}
 
 	for _, tt := range tests {

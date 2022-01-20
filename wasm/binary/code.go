@@ -39,7 +39,7 @@ func decodeCode(r io.Reader) (*wasm.Code, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read type of local: %v", err)
 		}
-		switch vt := wasm.ValueType(b[0]); vt {
+		switch vt := b[0]; vt {
 		case wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeI64, wasm.ValueTypeF64:
 			types = append(types, vt)
 		default:
