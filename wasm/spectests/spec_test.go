@@ -216,8 +216,6 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 			for _, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
-					t.Log(msg)
-					fmt.Println(msg)
 					switch c.CommandType {
 					case "module":
 						buf, err := os.ReadFile(filepath.Join(caseDir, c.Filename))
