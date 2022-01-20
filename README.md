@@ -12,18 +12,18 @@ another language that targets Wasm, such as Rust.
 
 ```golang
 func main() {
-    // Read WebAssembly binary.
-    source, _ := os.ReadFile("fibonacci.wasm")
-    // Decode the binary as WebAssembly module.
+	// Read WebAssembly binary.
+	source, _ := os.ReadFile("fibonacci.wasm")
+	// Decode the binary as WebAssembly module.
 	mod, _ := binary.DecodeModule(source)
-    // Initialize the execution environment called "store" with Interpreter-based engine.
+	// Initialize the execution environment called "store" with Interpreter-based engine.
 	store := wasm.NewStore(wazeroir.NewEngine())
-    // Instantiate the decoded module.
+	// Instantiate the decoded module.
 	store.Instantiate(mod, "test")
-    // Execute the exported "fibonacci" function from the instantiated module.
-    ret, _, err := store.CallFunction("test", "fibonacci", 20)
-    // Give us the fibonacci number for 20, namely 6765!
-    fmt.Println(ret[0])
+	// Execute the exported "fibonacci" function from the instantiated module.
+	ret, _, err := store.CallFunction("test", "fibonacci", 20)
+	// Give us the fibonacci number for 20, namely 6765!
+	fmt.Println(ret[0])
 }
 ```
 
