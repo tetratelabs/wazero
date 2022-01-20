@@ -334,7 +334,7 @@ func (f *compiledFunction) isHostFunction() bool {
 const (
 	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
 	builtinFunctionAddressMemorySize
-	// builtinFunctionAddressBreakPoint is only for wazero developers. Disabled by default.
+	// builtinFunctionAddressBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionAddressBreakPoint
 )
 

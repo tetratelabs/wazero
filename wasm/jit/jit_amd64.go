@@ -672,6 +672,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 // A br_table operation has list of targets and default target, and
 // this pops a value from the stack (called "index") and decide which branch we go into next
 // based on the value.
+//
 // For example, assume we have operations like {default: L_DEFAULT, targets: [L0, L1, L2]}.
 // If "index" >= len(defaults), then branch into the L_DEFAULT label.
 // Othewise, we enter label of targets[index].
@@ -679,7 +680,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
 
 	// If the operation doesn't have target but default,
-	// we just branch into the default label and do early return.
+	// branch into the default label and return early.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
 		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
@@ -689,7 +690,6 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	}
 
 	// Otherwise, we jump into the selected branch.
-
 	if err := c.ensureOnGeneralPurposeRegister(index); err != nil {
 		return err
 	}
@@ -905,7 +905,7 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 }
 
 // compileLabel initiates the given label's machine code generation, and emit the
-// NOP instruction as a initial one so that bracnh operations can target it without
+// NOP instruction as a initial one so that branch operations can target it without
 // knowing the following instructions.
 // Returns true if the label doesn't have any caller, and it is ok to skip the
 // entire operations in the given label.
