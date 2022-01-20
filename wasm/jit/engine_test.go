@@ -119,15 +119,27 @@ func TestEngine_unreachable(t *testing.T) {
 	require.NoError(t, err)
 	store := wasm.NewStore(NewEngine())
 	require.NoError(t, err)
-	err = store.Instantiate(mod, "test")
+
+	const moduleName = "test"
+
+	callUnreachable := func(ctx *wasm.HostFunctionCallContext) {
+		_, _, err := store.CallFunction(moduleName, "unreachable_func")
+		require.NoError(t, err)
+	}
+	err = store.AddHostFunction("host", "cause_unreachable", reflect.ValueOf(callUnreachable))
 	require.NoError(t, err)
-	_, _, err = store.CallFunction("test", "cause_unreachable")
+
+	err = store.Instantiate(mod, moduleName)
+	require.NoError(t, err)
+
+	_, _, err = store.CallFunction(moduleName, "main")
 	exp := `wasm runtime error: unreachable
 wasm backtrace:
-	0: three
-	1: two
-	2: one
-	3: cause_unreachable`
+	0: unreachable_func
+	1: host.cause_unreachable
+	2: two
+	3: one
+	4: main`
 	require.Error(t, err)
 	require.Equal(t, exp, err.Error())
 }
@@ -171,7 +183,7 @@ func TestEngine_RecursiveEntry(t *testing.T) {
 	store := wasm.NewStore(eng)
 
 	externEmpty := func(ctx *wasm.HostFunctionCallContext) {
-		_, _, err := store.CallFunction("test", "called_by_host_func")
+		_, _, err := store.CallFunction("test", "called_by_host_ok")
 		require.NoError(t, err)
 	}
 	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(externEmpty))
@@ -179,6 +191,7 @@ func TestEngine_RecursiveEntry(t *testing.T) {
 
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
+
 	_, _, err = store.CallFunction("test", "main", uint64(1))
 	require.NoError(t, err)
 }

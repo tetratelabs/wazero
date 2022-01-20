@@ -401,14 +401,18 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 }
 
 func (e *engine) execFunction(f *compiledFunction) {
-	prev := e.callFrameStack
+	previousTopFrame := e.callFrameStack
 
 	// Push a new call frame for the target function.
 	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, compiledFunction: f})
 
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
-	for e.callFrameStack != prev {
+
+	// We continuously execute functions until we reach the previous top frame which is either
+	// nil if this is the initial call into Wasm, or the host function frame if this is the
+	// recursive function call.
+	for e.callFrameStack != previousTopFrame {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
 			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
