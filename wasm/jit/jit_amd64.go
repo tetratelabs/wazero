@@ -731,7 +731,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	roundIndex.From.Reg = tmp
 	c.addInstruction(roundIndex)
 
-	// We prapare the static data which holds the offset of
+	// We prepare the static data which holds the offset of
 	// each target's first instruction (incl. default)
 	// relative to the beginning of label tables.
 	//
@@ -752,7 +752,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// "jmp offsetData[index]+0x123001" and "0x123001" can be acquired by "LEA"
 	// instruction.
 	//
-	// Note: We store each offset of 32-bite unsigned integer as 4 consequtive bytes. So more precisely,
+	// Note: We store each offset of 32-bite unsigned integer as 4 consecutive bytes. So more precisely,
 	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
 	//
 	// Note: this is similar to how GCC implements Switch statements in C.
@@ -906,6 +906,11 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 	}
 }
 
+// compileLabel initiates the given label's machine code generation, and emit the
+// NOP instruction as a initial one so that bracnh operations can target it without
+// knowing the following instructions.
+// Returns true if the label doesn't have any caller, and it is ok to skip the
+// entire operations in the given label.
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
 	if buildoptions.IsDebugMode {
 		if c.currentLabel != "" {
@@ -916,8 +921,8 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	labelKey := o.Label.String()
 	labelInfo := c.label(labelKey)
 
+	// If initialStack is not set, that means this label has never been reached.
 	if labelInfo.initialStack == nil {
-		// If initialStack is not set, that means this label has never been reached.
 		skipLabel = true
 		c.currentLabel = ""
 		if buildoptions.IsDebugMode {
