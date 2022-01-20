@@ -34,7 +34,7 @@ wazero is an early project, so APIs are subject to change until version 1.0.
 There's the concept called "engine" in wazero (which is a word commonly used in Wasm runtimes). Engines are responsible for compiling and executing WebAssembly modules.
 There are two types of engines are available for wazero, and you have to choose one of them to use wazero runtime:
 
-1. _Interpreter_: a naive interpreter-based implementation of Wasm virtual machine. Its implementation doesn't have any platform (GOARCH, GOOS) specific code, threfore _interpreter_ engine can be used for any compilation target available for Go.
+1. _Interpreter_: a naive interpreter-based implementation of Wasm virtual machine. Its implementation doesn't have any platform (GOARCH, GOOS) specific code, therefore _interpreter_ engine can be used for any compilation target available for Go (such as `arm64`).
 2. _JIT engine_: compiles WebAssembly modules, generates the machine code, and executing it all at runtime. Currently wazero only implements the JIT compiler for `amd64` target. Generally speaking, _JIT engine_ is faster than _Interpreter_ by order of magnitude. However, the implementation is immature and has bunch of aspects that could be impvoved (for example, it just does a singlepass compilation and doesn't do any optimizations, etc.). Please refer to [wasm/jit/RATIONALE.md](wasm/jit/RATIONALE.md) for the design choices and considerations in our JIT engine.
 
 Both of engines passes 100% of [WebAssembly spec test suites]((https://github.com/WebAssembly/spec/tree/wg-1.0/test/core)) (on supported platforms).
@@ -58,4 +58,4 @@ Currently any performance optimization hasn't been done to this runtime yet, and
 
 However _theoretically speaking_, this project have the potential to compete with these state-of-the-art JIT-style runtimes. The rationale for that is it is well-know that [CGO is slow](https://github.com/golang/go/issues/19574). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
 
-Since we can do JIT compilation purely in Go, this runtime could be the fastest one for some usecases where we have to make large amount of CGO calls (e.g. Proxy-Wasm host environment, or request-based plugin systems).
+Since we can do JIT compilation purely in Go, this runtime could be the fastest one for some use cases where we have to make large amount of CGO calls (e.g. Proxy-Wasm host environment, or request-based plugin systems).
