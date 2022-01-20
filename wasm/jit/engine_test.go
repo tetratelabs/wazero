@@ -183,7 +183,7 @@ func TestEngine_RecursiveEntry(t *testing.T) {
 	store := wasm.NewStore(eng)
 
 	externEmpty := func(ctx *wasm.HostFunctionCallContext) {
-		_, _, err := store.CallFunction("test", "called_by_host_ok")
+		_, _, err := store.CallFunction("test", "called_by_host_func")
 		require.NoError(t, err)
 	}
 	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(externEmpty))
