@@ -7,7 +7,7 @@ language!
 ## Example
 Here's an example of using wazero to invoke a Fibonacci function included in a Wasm binary.
 
-While our [source for this](examples/wasm/fibonacci.go) is [TinyGo](https://tinygo.org/), it could have been written in
+While our [source for this](examples/testdata/fibonacci.go) is [TinyGo](https://tinygo.org/), it could have been written in
 another language that targets Wasm, such as Rust.
 
 ```golang
