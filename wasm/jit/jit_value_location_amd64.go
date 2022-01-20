@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/tetratelabs/wazero/wasm/buildoptions"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 )
 
@@ -176,8 +177,10 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 
 func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
-	if _, ok := s.usedRegisters[loc.register]; ok {
-		panic("bug in compiler")
+	if buildoptions.IsDebugMode {
+		if _, ok := s.usedRegisters[loc.register]; ok {
+			panic("bug in compiler: try pushing a register which is already in use")
+		}
 	}
 	s.markRegisterUsed(reg)
 	s.push(loc)
