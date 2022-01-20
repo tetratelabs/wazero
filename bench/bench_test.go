@@ -11,12 +11,18 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/jit"
 	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 func BenchmarkEngines(b *testing.B) {
 	b.Run("wazeroir", func(b *testing.B) {
 		store := newStore(wazeroir.NewEngine())
+		setUpStore(store)
+		runAllBenches(b, store)
+	})
+	b.Run("jit", func(b *testing.B) {
+		store := newStore(jit.NewEngine())
 		setUpStore(store)
 		runAllBenches(b, store)
 	})
@@ -109,7 +115,7 @@ func runReverseArrayBenches(b *testing.B, store *wasm.Store) {
 }
 
 func runRandomMatMul(b *testing.B, store *wasm.Store) {
-	for _, matrixSize := range []int{5, 10, 100} {
+	for _, matrixSize := range []int{5, 10, 20} {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("random_mat_mul_size_%d", matrixSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
