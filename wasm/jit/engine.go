@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"unsafe"
@@ -43,6 +44,8 @@ type engine struct {
 	continuationAddressOffset uintptr
 	// The current compiledFunction.globalSliceAddress
 	globalSliceAddress uintptr
+	// memorySliceLen stores the address of the first byte in the memory slice used by the currently executed function.
+	memorySliceAddress uintptr
 	// memorySliceLen stores the length of memory slice used by the currently executed function.
 	memorySliceLen uint64
 	// The current compiledFunction.tableSliceAddress
@@ -70,9 +73,10 @@ const (
 	engineFunctionCallAddressOffset = 48
 	engineContinuationAddressOffset = 56
 	engineglobalSliceAddressOffset  = 64
-	engineMemorySliceLenOffset      = 72
-	engineTableSliceAddressOffset   = 80
-	engineTableSliceLenOffset       = 88
+	engineMemorySliceAddressOffset  = 72
+	engineMemorySliceLenOffset      = 80
+	engineTableSliceAddressOffset   = 88
+	engineTableSliceLenOffset       = 96
 )
 
 func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
@@ -151,7 +155,11 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	if f.IsHostFunction() {
-		e.compiledFunctions[f.Address] = &compiledFunction{source: f, memory: f.ModuleInstance.Memory}
+		e.compiledFunctions[f.Address] = &compiledFunction{
+			source:      f,
+			paramCount:  uint64(len(f.FunctionType.Type.Params)),
+			resultCount: uint64(len(f.FunctionType.Type.Results)),
+		}
 	} else {
 		cf, err := e.compileWasmFunction(f)
 		if err != nil {
@@ -194,20 +202,15 @@ func (e *engine) callFramePush(callee *callFrame) {
 	if callStackCeiling < e.callFrameNum {
 		panic(wasm.ErrCallStackOverflow)
 	}
+
 	// Push the new frame to the top of stack.
 	callee.caller = e.callFrameStack
 	e.callFrameStack = callee
 
-	// Initialize the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
+	e.callFrameStack.stackBasePointer = e.stackBasePointer + e.stackPointer - callee.compiledFunction.paramCount
 	e.stackBasePointer = callee.stackBasePointer
-	// Set the stack pointer so that base+sp would point to the top of function params.
 	e.stackPointer = callee.compiledFunction.paramCount
-	e.globalSliceAddress = callee.compiledFunction.globalSliceAddress
-	e.tableSliceLen = callee.compiledFunction.tableSliceLen
-	e.tableSliceAddress = callee.compiledFunction.tableSliceAddress
-	if callee.compiledFunction.memory != nil {
-		e.memorySliceLen = uint64(len(callee.compiledFunction.memory.Buffer))
-	}
+	e.initModuleInstance(callee.compiledFunction.source.ModuleInstance)
 }
 
 func (e *engine) callFramePop() {
@@ -218,15 +221,30 @@ func (e *engine) callFramePop() {
 
 	// If the caller is not nil, we have to go back into the caller's frame.
 	if caller != nil {
-		// Revert the callframe-specific fields (stackBasePointer, stackPointer, globalSliceAddress, memorySliceLen).
-		// so we can go back to the exact state when the caller made the function call.
 		e.stackBasePointer = caller.stackBasePointer
 		e.stackPointer = caller.continuationStackPointer
-		e.globalSliceAddress = caller.compiledFunction.globalSliceAddress
-		e.tableSliceLen = caller.compiledFunction.tableSliceLen
-		e.tableSliceAddress = caller.compiledFunction.tableSliceAddress
-		if caller.compiledFunction.memory != nil {
-			e.memorySliceLen = uint64(len(caller.compiledFunction.memory.Buffer))
+		e.initModuleInstance(caller.compiledFunction.source.ModuleInstance)
+	}
+}
+
+// initModuleInstance initializes the engine's state based on the given module instance.
+func (e *engine) initModuleInstance(m *wasm.ModuleInstance) {
+	if len(m.Globals) > 0 {
+		e.globalSliceAddress = uintptr(unsafe.Pointer(&m.Globals[0]))
+	}
+	if tables := m.Tables; len(tables) > 0 {
+		// WebAssembly 1.0 (MVP) has at most 1 table
+		// See https://www.w3.org/TR/wasm-core-1/#tables%E2%91%A0
+		table := tables[0]
+		if len(table.Table) > 0 {
+			e.tableSliceAddress = uintptr(unsafe.Pointer(&table.Table[0]))
+		}
+		e.tableSliceLen = uint64(len(table.Table))
+	}
+	if m.Memory != nil {
+		e.memorySliceLen = uint64(len(m.Memory.Buffer))
+		if len(m.Memory.Buffer) > 0 {
+			e.memorySliceAddress = uintptr(unsafe.Pointer(&m.Memory.Buffer[0]))
 		}
 	}
 }
@@ -293,24 +311,21 @@ type compiledFunction struct {
 	paramCount, resultCount uint64
 	// codeSegment is holding the compiled native code as a byte slice.
 	codeSegment []byte
-	// memory is the pointer to a memory instance which the original function instance refers to.
-	memory *wasm.MemoryInstance
 	// Pre-calculated pointer pointing to the initial byte of .codeSegment slice.
 	// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
 	// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field
 	// so we don't need to repeat the calculation on each function call.
 	codeInitialAddress uintptr
-	// The same purpose as codeInitialAddress, but for memory.Buffer.
-	memoryAddress uintptr
-	// globalSliceAddress is like codeInitialAddress, but for .globals.
-	globalSliceAddress uintptr
-	// tableSliceAddress and tableSliceLen are like codeInitialAddress, but for tables.
-	// Note we don't support multiple tables yet.
-	tableSliceAddress uintptr
-	tableSliceLen     uint64
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
+	staticData      compiledFunctionStaticData
 }
+
+// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
+// This is used to store jump tables for br_table instructions.
+// The primary index is the logical sepration of multiple data, for example data[0] and data[1]
+// correspond to different jump tables for different br_table instructions.
+type compiledFunctionStaticData = [][]byte
 
 func (f *compiledFunction) isHostFunction() bool {
 	return f.source.HostFunction != nil
@@ -319,6 +334,8 @@ func (f *compiledFunction) isHostFunction() bool {
 const (
 	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
 	builtinFunctionAddressMemorySize
+	// builtinFunctionAddressBreakPoint is internal (only for wazero developers). Disabled by default.
+	builtinFunctionAddressBreakPoint
 )
 
 // Grow the stack size according to maxStackPointer argument
@@ -392,12 +409,18 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 }
 
 func (e *engine) execFunction(f *compiledFunction) {
+	previousTopFrame := e.callFrameStack
+
 	// Push a new call frame for the target function.
 	e.callFramePush(&callFrame{continuationAddress: f.codeInitialAddress, compiledFunction: f})
 
 	// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 	e.maybeGrowStack(f.maxStackPointer)
-	for e.callFrameStack != nil {
+
+	// We continuously execute functions until we reach the previous top frame which is either
+	// nil if this is the initial call into Wasm, or the host function frame if this is the
+	// recursive function call.
+	for e.callFrameStack != previousTopFrame {
 		currentFrame := e.callFrameStack
 		if buildoptions.IsDebugMode {
 			fmt.Printf("callframe=%s (at %d), stackBasePointer: %d, stackPointer: %d\n",
@@ -408,7 +431,7 @@ func (e *engine) execFunction(f *compiledFunction) {
 		jitcall(
 			currentFrame.continuationAddress,
 			uintptr(unsafe.Pointer(e)),
-			currentFrame.compiledFunction.memoryAddress,
+			e.memorySliceAddress,
 		)
 
 		// Check the status code from JIT code.
@@ -424,21 +447,15 @@ func (e *engine) execFunction(f *compiledFunction) {
 			nextFunc := e.compiledFunctions[e.functionCallAddress]
 			// Calculate the continuation address so we can resume this caller function frame.
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
+			currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
+
+			callee := &callFrame{compiledFunction: nextFunc}
 			if nextFunc.isHostFunction() {
-				// Push the call frame for this host function.
-				e.callFrameStack = &callFrame{compiledFunction: nextFunc, caller: currentFrame}
-				// Call into the host function.
-				e.execHostFunction(nextFunc.source.HostFunction, &wasm.HostFunctionCallContext{Memory: nextFunc.memory})
-				// Pop the call frame.
-				e.callFrameStack = currentFrame
+				e.callFramePush(callee)
+				e.execHostFunction(nextFunc.source.HostFunction, &wasm.HostFunctionCallContext{Memory: currentFrame.compiledFunction.source.ModuleInstance.Memory})
+				e.callFramePop()
 			} else {
-				currentFrame.continuationStackPointer = e.stackPointer + nextFunc.resultCount - nextFunc.paramCount
-				callee := &callFrame{
-					continuationAddress: nextFunc.codeInitialAddress,
-					compiledFunction:    nextFunc,
-					// Set the base pointer to the beginning of the function params
-					stackBasePointer: e.stackBasePointer + e.stackPointer - nextFunc.paramCount,
-				}
+				callee.continuationAddress = nextFunc.codeInitialAddress
 				e.callFramePush(callee)
 				// If the Go-allocated stack is running out, we grow it before calling into JITed code.
 				e.maybeGrowStack(nextFunc.maxStackPointer)
@@ -446,9 +463,14 @@ func (e *engine) execFunction(f *compiledFunction) {
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.functionCallAddress {
 			case builtinFunctionAddressMemoryGrow:
-				e.builtinFunctionMemoryGrow(currentFrame.compiledFunction)
+				e.builtinFunctionMemoryGrow(currentFrame.compiledFunction.source.ModuleInstance.Memory)
 			case builtinFunctionAddressMemorySize:
-				e.builtinFunctionMemorySize(currentFrame.compiledFunction)
+				e.builtinFunctionMemorySize(currentFrame.compiledFunction.source.ModuleInstance.Memory)
+			}
+			if buildoptions.IsDebugMode {
+				if e.functionCallAddress == builtinFunctionAddressBreakPoint {
+					runtime.Breakpoint()
+				}
 			}
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeInvalidFloatToIntConversion:
@@ -470,25 +492,25 @@ func (e *engine) execFunction(f *compiledFunction) {
 	}
 }
 
-func (e *engine) builtinFunctionMemoryGrow(f *compiledFunction) {
+func (e *engine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	newPages := e.pop()
 	max := uint64(math.MaxUint32)
-	if f.memory.Max != nil {
-		max = uint64(*f.memory.Max) * wasm.PageSize
+	if mem.Max != nil {
+		max = uint64(*mem.Max) * wasm.PageSize
 	}
 	// If exceeds the max of memory size, we push -1 according to the spec.
-	if uint64(newPages*wasm.PageSize+uint64(len(f.memory.Buffer))) > max {
+	if uint64(newPages*wasm.PageSize+uint64(len(mem.Buffer))) > max {
 		v := int32(-1)
 		e.push(uint64(v))
 	} else {
-		e.builtinFunctionMemorySize(f) // Grow returns the prior memory size on change.
-		f.memory.Buffer = append(f.memory.Buffer, make([]byte, newPages*wasm.PageSize)...)
-		f.memoryAddress = uintptr(unsafe.Pointer(&f.memory.Buffer[0]))
+		e.builtinFunctionMemorySize(mem) // Grow returns the prior memory size on change.
+		mem.Buffer = append(mem.Buffer, make([]byte, newPages*wasm.PageSize)...)
+		e.memorySliceLen = uint64(len(mem.Buffer))
 	}
 }
 
-func (e *engine) builtinFunctionMemorySize(f *compiledFunction) {
-	e.push(uint64(len(f.memory.Buffer)) / wasm.PageSize)
+func (e *engine) builtinFunctionMemorySize(mem *wasm.MemoryInstance) {
+	e.push(uint64(len(mem.Buffer)) / wasm.PageSize)
 }
 
 func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
@@ -508,7 +530,18 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 
 	compiler.emitPreamble()
 
+	var skip bool
 	for _, op := range ir.Operations {
+		// Compiler determines whether or not skip the entire label.
+		// For example, if the label doesn't have any caller,
+		// we don't need to generate native code at all as we never reach the region.
+		if op.Kind() == wazeroir.OperationKindLabel {
+			skip = compiler.compileLabel(op.(*wazeroir.OperationLabel))
+		}
+		if skip {
+			continue
+		}
+
 		if buildoptions.IsDebugMode {
 			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
 		}
@@ -516,8 +549,6 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		switch o := op.(type) {
 		case *wazeroir.OperationUnreachable:
 			err = compiler.compileUnreachable()
-		case *wazeroir.OperationLabel:
-			err = compiler.compileLabel(o)
 		case *wazeroir.OperationBr:
 			err = compiler.compileBr(o)
 		case *wazeroir.OperationBrIf:
@@ -658,7 +689,7 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 		}
 	}
 
-	code, maxStackPointer, err := compiler.generate()
+	code, staticData, maxStackPointer, err := compiler.generate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
@@ -668,28 +699,13 @@ func (e *engine) compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunctio
 	}
 
 	cf := &compiledFunction{
-		source:          f,
-		codeSegment:     code,
-		paramCount:      uint64(len(f.FunctionType.Type.Params)),
-		resultCount:     uint64(len(f.FunctionType.Type.Results)),
-		memory:          f.ModuleInstance.Memory,
-		maxStackPointer: maxStackPointer,
+		source:             f,
+		codeSegment:        code,
+		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+		paramCount:         uint64(len(f.FunctionType.Type.Params)),
+		resultCount:        uint64(len(f.FunctionType.Type.Results)),
+		maxStackPointer:    maxStackPointer,
+		staticData:         staticData,
 	}
-	if cf.memory != nil && len(cf.memory.Buffer) > 0 {
-		cf.memoryAddress = uintptr(unsafe.Pointer(&cf.memory.Buffer[0]))
-	}
-	if len(f.ModuleInstance.Globals) > 0 {
-		cf.globalSliceAddress = uintptr(unsafe.Pointer(&f.ModuleInstance.Globals[0]))
-	}
-	if tables := f.ModuleInstance.Tables; len(tables) > 0 {
-		// WebAssembly 1.0 (MVP) has at most 1 table
-		// See https://www.w3.org/TR/wasm-core-1/#tables%E2%91%A0
-		table := tables[0]
-		if len(table.Table) > 0 {
-			cf.tableSliceAddress = uintptr(unsafe.Pointer(&table.Table[0]))
-		}
-		cf.tableSliceLen = uint64(len(table.Table))
-	}
-	cf.codeInitialAddress = uintptr(unsafe.Pointer(&cf.codeSegment[0]))
 	return cf, nil
 }

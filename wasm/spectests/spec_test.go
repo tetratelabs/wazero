@@ -183,88 +183,14 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 }
 
 func TestJIT(t *testing.T) {
-	targets := map[string]bool{
-		"address.wast":                true,
-		"align.wast":                  false, // Needs br_table support
-		"binary.wast":                 false, // Needs br_table support
-		"binary-leb128.wast":          true,
-		"block.wast":                  false, // Needs br_table support
-		"break-drop.wast":             false, // Needs br_table support
-		"br_if.wast":                  false, // Needs br_table support
-		"br.wast":                     false, // Needs br_table support
-		"call_indirect.wast":          false, // Needs br_table support
-		"call.wast":                   false, // Needs br_table support
-		"comments.wast":               true,
-		"const.wast":                  true,
-		"conversions.wast":            true,
-		"custom.wast":                 true,
-		"data.wast":                   true,
-		"elem.wast":                   true,
-		"endianness.wast":             true,
-		"exports.wast":                true,
-		"f32_bitwise.wast":            true,
-		"f32_cmp.wast":                true,
-		"f32.wast":                    true,
-		"f64_bitwise.wast":            true,
-		"f64_cmp.wast":                true,
-		"f64.wast":                    true,
-		"fac.wast":                    true,
-		"float_exprs.wast":            true,
-		"float_literals.wast":         true,
-		"float_memory.wast":           true,
-		"float_misc.wast":             true,
-		"forward.wast":                true,
-		"func_ptrs.wast":              true,
-		"func.wast":                   false, // Needs br_table support
-		"globals.wast":                false, // Needs br_table support
-		"i32.wast":                    true,
-		"i64.wast":                    true,
-		"if.wast":                     false, // Needs br_table support
-		"imports.wast":                true,
-		"inline-module.wast":          true,
-		"int_exprs.wast":              true,
-		"int_literals.wast":           true,
-		"labels.wast":                 false, // Needs br_table support
-		"left-to-right.wast":          false, // Needs br_table support
-		"linking.wast":                true,
-		"load.wast":                   false, // Needs br_table support
-		"local_get.wast":              false, // Needs br_table support
-		"local_set.wast":              false, // Needs br_table support
-		"local_tee.wast":              false, // Needs br_table support
-		"loop.wast":                   false, // Needs br_table support
-		"memory_grow.wast":            false, // Needs br_table support
-		"memory_redundancy.wast":      true,
-		"memory_size.wast":            true,
-		"memory_trap.wast":            true,
-		"memory.wast":                 true,
-		"names.wast":                  true,
-		"nop.wast":                    false, // Needs br_table support
-		"return.wast":                 true,
-		"select.wast":                 false, // Needs br_table support
-		"skip-stack-guard-page.wast":  true,
-		"stack.wast":                  true,
-		"start.wast":                  true,
-		"store.wast":                  false, // Needs br_table support
-		"switch.wast":                 false, // Needs br_table support
-		"token.wast":                  true,
-		"traps.wast":                  true,
-		"type.wast":                   true,
-		"unreachable.wast":            true,
-		"unreached-invalid.wast":      true,
-		"unwind.wast":                 false, // Needs br_table support
-		"utf8-custom-section-id.wast": true,
-		"utf8-import-field.wast":      true,
-		"utf8-import-module.wast":     true,
-	}
-	runTest(t, jit.NewEngine, targets)
+	runTest(t, jit.NewEngine)
 }
 
 func TestInterpreter(t *testing.T) {
-	runTest(t, wazeroir.NewEngine, nil)
+	runTest(t, wazeroir.NewEngine)
 }
 
-// TODO: delete wastTargets after JIT passes all tests.
-func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]bool) {
+func runTest(t *testing.T, newEngine func() wasm.Engine) {
 	const caseDir = "./cases"
 	files, err := os.ReadDir(caseDir)
 	require.NoError(t, err)
@@ -282,10 +208,6 @@ func runTest(t *testing.T, newEngine func() wasm.Engine, wastTargets map[string]
 
 		wastName := filepath.Base(base.SourceFile)
 
-		// TODO: delet after JIT passes all tests.
-		if wastTargets != nil && !wastTargets[wastName] {
-			continue
-		}
 		t.Run(wastName, func(t *testing.T) {
 			store := wasm.NewStore(newEngine())
 			addSpectestModule(t, store)

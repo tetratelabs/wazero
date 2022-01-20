@@ -1,14 +1,16 @@
 (module
-	(func $cause_unreachable (export "cause_unreachable")
+	(import "host" "cause_unreachable" (func $cause_unreachable ))
+
+	(func $main (export "main")
 		(call $one)
 	)
 	(func $one
 		(call $two)
 	)
 	(func $two
-		(call $three)
+		(call $cause_unreachable)
 	)
-	(func $three
+	(func $unreachable_func  (export "unreachable_func")
 		(unreachable)
 	)
 )

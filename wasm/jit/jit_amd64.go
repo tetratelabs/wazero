@@ -91,7 +91,8 @@ func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.Compilation
 	}
 	return &amd64Compiler{
 		eng: eng, f: f, builder: b, locationStack: newValueLocationStack(),
-		labels: labels,
+		labels:       labels,
+		currentLabel: ".entrypoint",
 	}, nil
 }
 
@@ -110,12 +111,15 @@ type amd64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
 	// labels holds per wazeroir label specific informationsin this function.
-	labels                                           map[string]*labelInfo
-	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
+	labels map[string]*labelInfo
 	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
 	maxStackPointer uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
-	currentLabel string
+	currentLabel                                     string
+	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
+	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
+	onGenerateCallbacks []func(code []byte) error
+	staticData          compiledFunctionStaticData
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
@@ -126,6 +130,10 @@ func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
 		c.maxStackPointer = c.locationStack.maxStackPointer
 	}
 	c.locationStack = newStack
+}
+
+func (c *amd64Compiler) addStaticData(d []byte) {
+	c.staticData = append(c.staticData, d)
 }
 
 type labelInfo struct {
@@ -156,11 +164,27 @@ func (c *amd64Compiler) emitPreamble() {
 	c.initializeReservedRegisters()
 }
 
-func (c *amd64Compiler) generate() ([]byte, uint64, error) {
-	code, err := mmapCodeSegment(c.builder.Assemble())
+func (c *amd64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
+	code, err = mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
-		return nil, 0, err
+		return
 	}
+
+	if buildoptions.IsDebugMode {
+		for _, l := range c.labels {
+			if len(l.labelBeginningCallbacks) > 0 {
+				// Meaning that some labels are not compiled even though there's a jump origin.
+				panic("labelBeginningCallbacks must be empty after code generation")
+			}
+		}
+	}
+
+	for _, cb := range c.onGenerateCallbacks {
+		if err = cb(code); err != nil {
+			return
+		}
+	}
+
 	// As we cannot read RIP register directly, we calculate now the offset to the next
 	// instruction after return instruction for function call.
 	const operandSizeBytes = 8
@@ -175,7 +199,8 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 			}
 		}
 		if afterReturnInst == nil {
-			return nil, 0, fmt.Errorf("invalid function call at %v", inst)
+			err = fmt.Errorf("invalid function call at %v", inst)
+			return
 		}
 		// Skip MOV, and the register(rax): "0x49, 0xbd"
 		start := inst.Pc + 2
@@ -186,11 +211,13 @@ func (c *amd64Compiler) generate() ([]byte, uint64, error) {
 	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack
 	// used for all labels (via replaceLocationStack), excluding the current one.
 	// Hense, we check here if the final block's max one exceeds the current c.maxStackPointer.
-	maxStackPointer := c.maxStackPointer
+	maxStackPointer = c.maxStackPointer
 	if maxStackPointer < c.locationStack.maxStackPointer {
 		maxStackPointer = c.locationStack.maxStackPointer
 	}
-	return code, maxStackPointer, nil
+
+	staticData = c.staticData
+	return
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
@@ -251,6 +278,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 		x1.register, x2.register = x2.register, x1.register
 	} else if x1.onRegister() && x2.onStack() {
 		reg := x1.register
+		c.locationStack.markRegisterUnused(reg)
 		// Save x1's value to the temporary top of the stack.
 		tmpStackLocation := c.locationStack.pushValueOnRegister(reg)
 		c.releaseRegisterToStack(tmpStackLocation)
@@ -270,6 +298,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 		_ = c.locationStack.pop() // Delete tmpStackLocation.
 	} else if x1.onStack() && x2.onRegister() {
 		reg := x2.register
+		c.locationStack.markRegisterUnused(reg)
 		// Save x2's value to the temporary top of the stack.
 		tmpStackLocation := c.locationStack.pushValueOnRegister(reg)
 		c.releaseRegisterToStack(tmpStackLocation)
@@ -452,8 +481,12 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
+	return c.branchInto(o.Target)
+}
 
-	if o.Target.IsReturnTarget() {
+// branchInto adds instruction necessary to jump into the given branch target.
+func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
+	if target.IsReturnTarget() {
 		// Release all the registers as our calling convention requires the callee-save.
 		if err := c.releaseAllRegistersToStack(); err != nil {
 			return err
@@ -462,7 +495,7 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		// Then return from this function.
 		c.returnFunction()
 	} else {
-		labelKey := o.Target.String()
+		labelKey := target.String()
 		targetLabel := c.label(labelKey)
 		if targetLabel.callers > 1 {
 			// If the number of callers to the target label is larget than one,
@@ -476,6 +509,8 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		if targetLabel.initialStack == nil {
+			// It seems unnecessary to clone as branchInto is always the tail of the current block.
+			// TODO: verify ^^.
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 		jmp := c.newProg()
@@ -587,7 +622,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		if labelInfo.initialStack == nil {
-			labelInfo.initialStack = c.locationStack.clone()
+			labelInfo.initialStack = c.locationStack
 		}
 		elseJmp := c.newProg()
 		elseJmp.As = obj.AJMP
@@ -622,7 +657,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
 		if labelInfo.initialStack == nil {
-			labelInfo.initialStack = c.locationStack.clone()
+			labelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.newProg()
 		thenJmp.As = obj.AJMP
@@ -633,8 +668,216 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	return nil
 }
 
+// compileBrTable adds instructions to do br_table operation.
+// A br_table operation has list of targets and default target, and
+// this pops a value from the stack (called "index") and decide which branch we go into next
+// based on the value.
+//
+// For example, assume we have operations like {default: L_DEFAULT, targets: [L0, L1, L2]}.
+// If "index" >= len(defaults), then branch into the L_DEFAULT label.
+// Othewise, we enter label of targets[index].
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
-	panic("TODO implement!")
+	index := c.locationStack.pop()
+
+	// If the operation doesn't have target but default,
+	// branch into the default label and return early.
+	if len(o.Targets) == 0 {
+		c.locationStack.releaseRegister(index)
+		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
+			return err
+		}
+		return c.branchInto(o.Default.Target)
+	}
+
+	// Otherwise, we jump into the selected branch.
+	if err := c.ensureOnGeneralPurposeRegister(index); err != nil {
+		return err
+	}
+
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// First, we move the length of target list into the tmp register.
+	movLengthToTmp := c.newProg()
+	movLengthToTmp.As = x86.AMOVQ
+	movLengthToTmp.To.Type = obj.TYPE_REG
+	movLengthToTmp.To.Reg = tmp
+	movLengthToTmp.From.Type = obj.TYPE_CONST
+	movLengthToTmp.From.Offset = int64(len(o.Targets))
+	c.addInstruction(movLengthToTmp)
+
+	// Then, we compare the value with the length of targets.
+	cmpLength := c.newProg()
+	cmpLength.As = x86.ACMPL
+	cmpLength.To.Type = obj.TYPE_REG
+	cmpLength.To.Reg = index.register
+	cmpLength.From.Type = obj.TYPE_REG
+	cmpLength.From.Reg = tmp
+	c.addInstruction(cmpLength)
+
+	// If the value is larger than the length,
+	// we round the index to the length as the spec states that
+	// if the index is larger than or equal the length of list,
+	// branch into the default branch.
+	roundIndex := c.newProg()
+	roundIndex.As = x86.ACMOVQCS
+	roundIndex.To.Type = obj.TYPE_REG
+	roundIndex.To.Reg = index.register
+	roundIndex.From.Type = obj.TYPE_REG
+	roundIndex.From.Reg = tmp
+	c.addInstruction(roundIndex)
+
+	// We prepare the static data which holds the offset of
+	// each target's first instruction (incl. default)
+	// relative to the beginning of label tables.
+	//
+	// For example, if we have targets=[L0, L1] and default=L_DEFAULT,
+	// we emit the the code like this at [Emit the code for each targets and default branch] below.
+	//
+	// L0:
+	//  0x123001: XXXX, ...
+	//  .....
+	// L1:
+	//  0x123005: YYY, ...
+	//  .....
+	// L_DEFAULT:
+	//  0x123009: ZZZ, ...
+	//
+	// then offsetData becomes like [0x0, 0x5, 0x8].
+	// By using this offset list, we could jump into the label for the index by
+	// "jmp offsetData[index]+0x123001" and "0x123001" can be acquired by "LEA"
+	// instruction.
+	//
+	// Note: We store each offset of 32-bite unsigned integer as 4 consecutive bytes. So more precisely,
+	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
+	//
+	// Note: this is similar to how GCC implements Switch statements in C.
+	offsetData := make([]byte, 4*(len(o.Targets)+1))
+	c.addStaticData(offsetData)
+
+	moveOffsetPointer := c.newProg()
+	moveOffsetPointer.As = x86.AMOVQ
+	moveOffsetPointer.To.Type = obj.TYPE_REG
+	moveOffsetPointer.To.Reg = tmp
+	moveOffsetPointer.From.Type = obj.TYPE_CONST
+	moveOffsetPointer.From.Offset = int64(uintptr(unsafe.Pointer(&offsetData[0])))
+	c.addInstruction(moveOffsetPointer)
+
+	// Now we have the address of first byte of offsetData in tmp register.
+	// So the target offset's first byte is at tmp+index*4 as we store
+	// the offset as 4 bytes for a 32-byte integer.
+	// Here, we store the offset into the index.register.
+	readOffsetData := c.newProg()
+	readOffsetData.As = x86.AMOVL
+	readOffsetData.To.Type = obj.TYPE_REG
+	readOffsetData.To.Reg = index.register
+	readOffsetData.From.Type = obj.TYPE_MEM
+	readOffsetData.From.Reg = tmp
+	readOffsetData.From.Index = index.register
+	readOffsetData.From.Scale = 4
+	c.addInstruction(readOffsetData)
+
+	// Now we read the address of the beginning of the jump table.
+	// In the above example, this corresponds to reading the address of 0x123001.
+	// This is equivalent to emit "LEA tmp, [rip + offset]" where rip is the instruction's
+	// address of right next instruction of this LEA and that is the address of calcAbsoluteAddressOfSelectedLabel below.
+	readRIP := c.newProg()
+	readRIP.As = x86.ALEAQ
+	readRIP.To.Reg = tmp
+	readRIP.To.Type = obj.TYPE_REG
+	readRIP.From.Type = obj.TYPE_MEM
+	// We use place holder here as we don't yet know at this point the offset of the first instruction
+	// in the branch table relative to the next instruction (calcAbsoluteAddressOfSelectedLabel) stored in RIP register.
+	readRIP.From.Offset = 0xffff
+	// Since the assembler cannot directly emit "LEA foo [rip + bar]", we use the some hack here:
+	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
+	// exactly the same as "LEA foo [rip + bar]" except the most significant bit of the third byte.
+	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
+	readRIP.From.Reg = x86.REG_BP
+	c.addInstruction(readRIP)
+
+	// Now we have the address of L0 in tmp register, and the offset to the target label in the index.register.
+	// So we could achieve the br_table jump by adding them and jump into the resulting address.
+	calcAbsoluteAddressOfSelectedLabel := c.newProg()
+	calcAbsoluteAddressOfSelectedLabel.As = x86.AADDQ
+	calcAbsoluteAddressOfSelectedLabel.To.Type = obj.TYPE_REG
+	calcAbsoluteAddressOfSelectedLabel.To.Reg = tmp
+	calcAbsoluteAddressOfSelectedLabel.From.Type = obj.TYPE_REG
+	calcAbsoluteAddressOfSelectedLabel.From.Reg = index.register
+	c.addInstruction(calcAbsoluteAddressOfSelectedLabel)
+
+	jmp := c.newProg()
+	jmp.As = obj.AJMP
+	jmp.To.Reg = tmp
+	jmp.To.Type = obj.TYPE_REG
+	c.addInstruction(jmp)
+
+	// We no longer need the index's register, so mark it unused.
+	c.locationStack.markRegisterUnused(index.register)
+
+	// [Emit the code for each targets and default branch]
+	labelInitialInstructions := make([]*obj.Prog, len(o.Targets)+1)
+	saved := c.locationStack
+	for i := range labelInitialInstructions {
+		// Emit the initial instruction of each target.
+		init := c.newProg()
+		// We use NOP as we don't yet know the next instruction in each label.
+		// Assembler would optimize out this NOP during code generation, so this is harmless.
+		init.As = obj.ANOP
+		labelInitialInstructions[i] = init
+		c.addInstruction(init)
+
+		var locationStack *valueLocationStack
+		var target *wazeroir.BranchTargetDrop
+		if i < len(o.Targets) {
+			target = o.Targets[i]
+			// Clone the location stack so the branch-specific code doesn't
+			// affect others.
+			locationStack = saved.clone()
+		} else {
+			target = o.Default
+			// If this is the deafult branch, we just use the original one
+			// as this is the last code in this block.
+			locationStack = saved
+		}
+
+		c.replaceLocationStack(locationStack)
+		if err := c.emitDropRange(target.ToDrop); err != nil {
+			return err
+		}
+		if err := c.branchInto(target.Target); err != nil {
+			return err
+		}
+	}
+
+	// Set up the callbacks to do tasks which cannot be done at the compilation phase.
+	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
+		// See the comment at readRIP.From.Offset.
+		binary.LittleEndian.PutUint32(code[readRIP.Pc+3:],
+			uint32(labelInitialInstructions[0].Pc)-uint32(calcAbsoluteAddressOfSelectedLabel.Pc))
+		// See the comment at readRIP.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
+		code[readRIP.Pc+2] = code[readRIP.Pc+2] & 0b01111111
+
+		// Builds the offset table for each targets including default one.
+		base := labelInitialInstructions[0].Pc // This corresponds to the L0's address in the example.
+		for i, nop := range labelInitialInstructions {
+			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
+				// TODO: this happens when users try loading an extremely large webassembly binary
+				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
+				// We would like to support that binary, but realistically speacking, that kind of binary
+				// could result in more than ten giga bytes of native JITed code where we have to care about
+				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
+				// current implementation.
+				return fmt.Errorf("too large br_table")
+			}
+			// We store the offset from the beiggning of the L0's initial instruction.
+			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
+		}
+		return nil
+	})
+	return nil
 }
 
 // If a jump target has multiple callesr (origins),
@@ -661,28 +904,47 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 	}
 }
 
-func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
+// compileLabel initiates the given label's machine code generation, and emit the
+// NOP instruction as a initial one so that branch operations can target it without
+// knowing the following instructions.
+// Returns true if the label doesn't have any caller, and it is ok to skip the
+// entire operations in the given label.
+func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
 	if buildoptions.IsDebugMode {
-		fmt.Printf("[label %s ends]\n%s\n", c.currentLabel, c.locationStack)
+		if c.currentLabel != "" {
+			fmt.Printf("[label %s ends]\n\n", c.currentLabel)
+		}
 	}
 
 	labelKey := o.Label.String()
+	labelInfo := c.label(labelKey)
+
+	// If initialStack is not set, that means this label has never been reached.
+	if labelInfo.initialStack == nil {
+		skipLabel = true
+		c.currentLabel = ""
+		if buildoptions.IsDebugMode {
+			if len(labelInfo.labelBeginningCallbacks) > 0 {
+				// Meaning that some instruction is trying to jump to this label,
+				// but initialStack is not set. There must be a bug at the callsite of br or br_if.
+				panic("labelBeginningCallbacks must be empty")
+			}
+		}
+		return
+	}
+
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
 	labelBegin := c.newProg()
 	labelBegin.As = obj.ANOP
 	c.addInstruction(labelBegin)
 
-	labelInfo := c.label(labelKey)
-
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
 	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	if labelInfo.initialStack != nil {
-		c.replaceLocationStack(labelInfo.initialStack)
-	}
+	c.replaceLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
@@ -690,11 +952,14 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) error {
 		cb(labelBegin)
 	}
 
+	// Clear for debuggin purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
+	labelInfo.labelBeginningCallbacks = nil
+
 	if buildoptions.IsDebugMode {
-		fmt.Printf("[label %s]\n%s\n", labelKey, c.locationStack)
+		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
 	}
 	c.currentLabel = labelKey
-	return nil
+	return
 }
 
 func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
@@ -1188,12 +1453,13 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 	mul.From.Type = obj.TYPE_REG
 	if x1 == valueOnAX {
 		mul.From.Reg = x2.register
-		c.locationStack.markRegisterUnused(x2.register)
 	} else {
 		mul.From.Reg = x1.register
-		c.locationStack.markRegisterUnused(x1.register)
 	}
 	c.addInstruction(mul)
+
+	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(x1.register)
 
 	// Now we have the result in the AX register,
 	// so we record it.
@@ -1321,6 +1587,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	}
 
 	// We reused the same register of target for the result.
+	c.locationStack.markRegisterUnused(target.register)
 	result := c.locationStack.pushValueOnRegister(target.register)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
@@ -1400,6 +1667,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	}
 
 	// We reused the same register of target for the result.
+	c.locationStack.markRegisterUnused(target.register)
 	result := c.locationStack.pushValueOnRegister(target.register)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
@@ -1427,6 +1695,7 @@ func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	c.addInstruction(countBits)
 
 	// We reused the same register of target for the result.
+	c.locationStack.markRegisterUnused(target.register)
 	result := c.locationStack.pushValueOnRegister(target.register)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
@@ -1680,6 +1949,10 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	if signedRemMinusOneDivisorJmp != nil {
 		c.addSetJmpOrigins(signedRemMinusOneDivisorJmp)
 	}
+
+	// We mark them as unused so that we can push one of them onto the location stack at call sites.
+	c.locationStack.markRegisterUnused(remainderRegister)
+	c.locationStack.markRegisterUnused(quotientRegister)
 	return nil
 }
 
@@ -1758,6 +2031,7 @@ func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 
 	// We already stored the result in the register used by x1
 	// so we record it.
+	c.locationStack.markRegisterUnused(x1.register)
 	result := c.locationStack.pushValueOnRegister(x1.register)
 	result.setRegisterType(x1.registerType())
 	return nil
@@ -2166,6 +2440,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 
 	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(x1.register)
 	c.locationStack.pushValueOnRegister(x1.register)
 	return nil
 }
@@ -2258,6 +2533,7 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 
 	// Record that we consumed the x2 and placed the copysign result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
+	c.locationStack.markRegisterUnused(x1.register)
 	c.locationStack.pushValueOnRegister(x1.register)
 	return nil
 }
@@ -3279,12 +3555,12 @@ func (c *amd64Compiler) emitEqOrNeForInts(x1Reg, x2Reg int16, cmpInstruction obj
 // the result must be zero for EQ or one for NE.
 func (c *amd64Compiler) emitEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
 	// Before we allocate the result, we have to reserve two int registers.
-	cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
-	c.locationStack.markRegisterUsed(cmpResultReg)
-	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	c.locationStack.markRegisterUsed(nanFragReg)
+	cmpResultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
@@ -3346,6 +3622,8 @@ func (c *amd64Compiler) emitEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction o
 	// Now we have the result in cmpResultReg register, so we record it.
 	loc := c.locationStack.pushValueOnRegister(cmpResultReg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
+	// Also, we no longer need nanFragRegister.
+	c.locationStack.markRegisterUnused(nanFragReg)
 	return nil
 }
 
@@ -3868,6 +4146,8 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	c.returnFunction()
 
 	c.addSetJmpOrigins(okJmp)
+
+	c.locationStack.markRegisterUnused(base.register)
 	return base.register, nil
 }
 
@@ -4281,17 +4561,14 @@ func (c *amd64Compiler) compileFunctionCallFromRegister(functionCallAddressRegis
 }
 
 func (c *amd64Compiler) releaseAllRegistersToStack() error {
-	used := len(c.locationStack.usedRegisters)
-	for i := uint64(0); i < c.locationStack.sp && used > 0; i++ {
+	for i := uint64(0); i < c.locationStack.sp; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
 			c.releaseRegisterToStack(loc)
-			used--
 		} else if loc.onConditionalRegister() {
 			if err := c.moveConditionalToFreeGeneralPurposeRegister(loc); err != nil {
 				return err
 			}
 			c.releaseRegisterToStack(loc)
-			used--
 		}
 	}
 	return nil
@@ -4301,6 +4578,7 @@ func (c *amd64Compiler) setContinuationOffsetAtNextInstructionAndReturn() {
 	// setContinuationOffsetAtNextInstructionAndReturn is called after releasing
 	// all the registers, so at this point we always have free registers.
 	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+
 	// Create the instruction for setting offset.
 	// We use tmp register to store the const, not directly movq to memory
 	// as it is not valid to move 64-bit const to memory directly.
@@ -4327,6 +4605,7 @@ func (c *amd64Compiler) setContinuationOffsetAtNextInstructionAndReturn() {
 	prog.To.Reg = reservedRegisterForEngine
 	prog.To.Offset = engineContinuationAddressOffset
 	c.addInstruction(prog)
+
 	// Then return temporarily -- giving control to normal Go code.
 	c.returnFunction()
 }

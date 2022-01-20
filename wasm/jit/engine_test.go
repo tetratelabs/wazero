@@ -3,6 +3,7 @@ package jit
 import (
 	"errors"
 	"os"
+	"reflect"
 	"sync"
 	"testing"
 	"unsafe"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/text"
 )
 
 // Ensures that the offset consts do not drift when we manipulate the engine struct.
@@ -22,9 +24,38 @@ func TestEngine_veifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallAddress)), engineFunctionCallAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).globalSliceAddress)), engineglobalSliceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof((&engine{}).memorySliceAddress)), engineMemorySliceAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).memorySliceLen)), engineMemorySliceLenOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceAddress)), engineTableSliceAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceLen)), engineTableSliceLenOffset)
+}
+
+func Test_Simple(t *testing.T) {
+	mod, err := text.DecodeModule([]byte(`(module
+	(import "" "hello" (func $hello))
+	(start $hello)
+)`))
+	require.NoError(t, err)
+
+	engine := newEngine()
+	store := wasm.NewStore(engine)
+
+	msg := "hello!"
+	hostFunction := func(ctx *wasm.HostFunctionCallContext) {
+		require.NotNil(t, ctx.Memory)
+		copy(ctx.Memory.Buffer, msg)
+	}
+	require.NoError(t, store.AddHostFunction("", "hello", reflect.ValueOf(hostFunction)))
+
+	memoryInstance := &wasm.MemoryInstance{Buffer: make([]byte, len(msg))}
+	engine.compiledFunctions[0].source.ModuleInstance.Memory = memoryInstance
+
+	moduleName := "simple"
+	require.NoError(t, store.Instantiate(mod, moduleName))
+
+	// The "hello" function was imported as $hello in Wasm. Since it was marked as the start
+	// function, it is invoked on instantiation. Ensure that worked: "hello" was called!
+	require.Equal(t, msg, string(memoryInstance.Buffer))
 }
 
 func TestEngine_fibonacci(t *testing.T) {
@@ -88,15 +119,27 @@ func TestEngine_unreachable(t *testing.T) {
 	require.NoError(t, err)
 	store := wasm.NewStore(NewEngine())
 	require.NoError(t, err)
-	err = store.Instantiate(mod, "test")
+
+	const moduleName = "test"
+
+	callUnreachable := func(ctx *wasm.HostFunctionCallContext) {
+		_, _, err := store.CallFunction(moduleName, "unreachable_func")
+		require.NoError(t, err)
+	}
+	err = store.AddHostFunction("host", "cause_unreachable", reflect.ValueOf(callUnreachable))
 	require.NoError(t, err)
-	_, _, err = store.CallFunction("test", "cause_unreachable")
+
+	err = store.Instantiate(mod, moduleName)
+	require.NoError(t, err)
+
+	_, _, err = store.CallFunction(moduleName, "main")
 	exp := `wasm runtime error: unreachable
 wasm backtrace:
-	0: three
-	1: two
-	2: one
-	3: cause_unreachable`
+	0: unreachable_func
+	1: host.cause_unreachable
+	2: two
+	3: one
+	4: main`
 	require.Error(t, err)
 	require.Equal(t, exp, err.Error())
 }
@@ -128,6 +171,29 @@ func TestEngine_memory(t *testing.T) {
 	out, _, err = store.CallFunction("test", "grow", 0)
 	require.NoError(t, err)
 	require.Equal(t, newPages, out[0])
+}
+
+func TestEngine_RecursiveEntry(t *testing.T) {
+	buf, err := os.ReadFile("testdata/recursive.wasm")
+	require.NoError(t, err)
+	mod, err := binary.DecodeModule(buf)
+	require.NoError(t, err)
+
+	eng := newEngine()
+	store := wasm.NewStore(eng)
+
+	externEmpty := func(ctx *wasm.HostFunctionCallContext) {
+		_, _, err := store.CallFunction("test", "called_by_host_func")
+		require.NoError(t, err)
+	}
+	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(externEmpty))
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	_, _, err = store.CallFunction("test", "main", uint64(1))
+	require.NoError(t, err)
 }
 
 func TestEngine_maybeGrowStack(t *testing.T) {
