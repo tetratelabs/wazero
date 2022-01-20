@@ -62,6 +62,7 @@ func runAllBenches(b *testing.B, store *wasm.Store) {
 
 func runBase64Benches(b *testing.B, store *wasm.Store) {
 	for _, numPerExec := range []int{5, 100, 10000} {
+		numPerExec := numPerExec
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("base64_%d_per_exec", numPerExec), func(b *testing.B) {
 			_, _, err := store.CallFunction("test", "base64", uint64(numPerExec))
@@ -74,6 +75,7 @@ func runBase64Benches(b *testing.B, store *wasm.Store) {
 
 func runFibBenches(b *testing.B, store *wasm.Store) {
 	for _, num := range []int{5, 10, 20} {
+		num := num
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("fib_for_%d", num), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
@@ -88,6 +90,7 @@ func runFibBenches(b *testing.B, store *wasm.Store) {
 
 func runStringsManipulationBenches(b *testing.B, store *wasm.Store) {
 	for _, initialSize := range []int{50, 100, 1000} {
+		initialSize := initialSize
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("string_manipulation_size_%d", initialSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
@@ -102,6 +105,7 @@ func runStringsManipulationBenches(b *testing.B, store *wasm.Store) {
 
 func runReverseArrayBenches(b *testing.B, store *wasm.Store) {
 	for _, arraySize := range []int{500, 1000, 10000} {
+		arraySize := arraySize
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("reverse_array_size_%d", arraySize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
@@ -116,6 +120,7 @@ func runReverseArrayBenches(b *testing.B, store *wasm.Store) {
 
 func runRandomMatMul(b *testing.B, store *wasm.Store) {
 	for _, matrixSize := range []int{5, 10, 20} {
+		matrixSize := matrixSize
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("random_mat_mul_size_%d", matrixSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
