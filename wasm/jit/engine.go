@@ -318,10 +318,14 @@ type compiledFunction struct {
 	codeInitialAddress uintptr
 	// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
 	maxStackPointer uint64
-	// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
-	// This is used to store jump tables for br_table instructions.
-	staticData [][]byte
+	staticData      compiledFunctionStaticData
 }
+
+// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
+// This is used to store jump tables for br_table instructions.
+// The primary index is the logical sepration of multiple data, for example data[0] and data[1]
+// correspond to different jump tables for different br_table instructions.
+type compiledFunctionStaticData = [][]byte
 
 func (f *compiledFunction) isHostFunction() bool {
 	return f.source.HostFunction != nil

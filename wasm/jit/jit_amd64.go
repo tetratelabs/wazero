@@ -119,9 +119,7 @@ type amd64Compiler struct {
 	requireFunctionCallReturnAddressOffsetResolution []*obj.Prog
 	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
 	onGenerateCallbacks []func(code []byte) error
-	// staticData holds the per-function read-only data. For example, this is used to store
-	// the branch table for br_table instruction.
-	staticData [][]byte
+	staticData          compiledFunctionStaticData
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
@@ -961,7 +959,6 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
 	}
 	c.currentLabel = labelKey
-	skipLabel = false
 	return
 }
 
