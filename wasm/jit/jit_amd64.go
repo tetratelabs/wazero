@@ -164,7 +164,7 @@ func (c *amd64Compiler) emitPreamble() {
 	c.initializeReservedRegisters()
 }
 
-func (c *amd64Compiler) generate() (code []byte, staticData [][]byte, maxStackPointer uint64, err error) {
+func (c *amd64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
 	code, err = mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
 		return
