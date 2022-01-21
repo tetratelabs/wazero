@@ -3104,7 +3104,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							{x1Value: 0, x2Value: 2},
 							{x1Value: 1, x2Value: 0},
 							{x1Value: 0, x2Value: 0},
-							{x1Value: 0x80000000, x2Value: 0xffffffff}, // This equals (-2^63 / -1) and results in overflow.
+							{x1Value: 0x80000000, x2Value: 0xffffffff}, // This is equivalent to (-2^31 / -1) and results in overflow.
 							// Following cases produce different resulting bit patterns for signed and unsigned.
 							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 1},
 							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 0xfffffffe /* -2 in signed 32bit */},
@@ -3176,6 +3176,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 									require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
 									return
 								} else if signed.signed && int32(vs.x2Value) == -1 && int32(vs.x1Value) == int32(math.MinInt32) {
+									// (-2^31 / -1) = 2 ^31 is larger than the upper limit of 32-bit signed integer.
 									require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
 									return
 								}
@@ -3333,6 +3334,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 									require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
 									return
 								} else if signed.signed && int64(vs.x2Value) == -1 && int64(vs.x1Value) == int64(math.MinInt64) {
+									// (-2^63 / -1) = 2 ^63 is larger than the upper limit of 64-bit signed integer.
 									require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
 									return
 								}
