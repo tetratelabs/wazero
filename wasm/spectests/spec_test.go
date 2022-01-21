@@ -2,7 +2,6 @@ package spectests
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -366,8 +365,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								msg += " in module " + c.Action.Module
 							}
 							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
-							require.Error(t, err, msg)
-							require.True(t, errors.Is(err, wasm.ErrRuntimeCallStackOverflow), msg)
+							require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
