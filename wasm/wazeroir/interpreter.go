@@ -577,7 +577,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCallIndirect:
 			{
 				offset := it.pop()
-				if offset > uint64(len(table.Table)) {
+				if offset >= uint64(len(table.Table)) {
 					panic(wasm.ErrRuntimeOutOfBoundsTableAcces)
 				}
 				target, ok := it.functions[table.Table[offset].FunctionAddress]
@@ -640,8 +640,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				base := op.us[1] + it.pop()
 				switch UnsignedType(op.b1) {
 				case UnsignedTypeI32, UnsignedTypeF32:
+					if uint64(len(memoryInst.Buffer)) < base+4 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					it.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
 				case UnsignedTypeI64, UnsignedTypeF64:
+					if uint64(len(memoryInst.Buffer)) < base+8 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					it.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
 				}
 				frame.pc++
@@ -649,6 +655,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad8:
 			{
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+1 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				switch SignedInt(op.b1) {
 				case SignedInt32, SignedInt64:
 					it.push(uint64(int8(memoryInst.Buffer[base])))
@@ -660,6 +669,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad16:
 			{
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+2 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				switch SignedInt(op.b1) {
 				case SignedInt32, SignedInt64:
 					it.push(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
@@ -671,6 +683,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad32:
 			{
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+4 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				if op.b1 == 1 {
 					it.push(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
 				} else {
@@ -684,8 +699,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				base := op.us[1] + it.pop()
 				switch UnsignedType(op.b1) {
 				case UnsignedTypeI32, UnsignedTypeF32:
+					if uint64(len(memoryInst.Buffer)) < base+4 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], uint32(val))
 				case UnsignedTypeI64, UnsignedTypeF64:
+					if uint64(len(memoryInst.Buffer)) < base+8 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					binary.LittleEndian.PutUint64(memoryInst.Buffer[base:], val)
 				}
 				frame.pc++
@@ -694,6 +715,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				val := byte(it.pop())
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+1 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				memoryInst.Buffer[base] = val
 				frame.pc++
 			}
@@ -701,6 +725,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				val := uint16(it.pop())
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+2 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				binary.LittleEndian.PutUint16(memoryInst.Buffer[base:], val)
 				frame.pc++
 			}
@@ -708,6 +735,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				val := uint32(it.pop())
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+4 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], val)
 				frame.pc++
 			}
