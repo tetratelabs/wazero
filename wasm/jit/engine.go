@@ -111,7 +111,6 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 				}
 				runtimeErr, ok := v.(error)
 				if ok {
-					// TODO: wrtap the floating point exception or etc as wasm.ErrRuntime**
 					err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
 				} else {
 					err = fmt.Errorf("wasm runtime error: %v", v)
@@ -265,14 +264,14 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
-	// TODO:
-	jitCallStatusIntegerOverflow
 	// jitCallStatusCodeMemoryOutOfBounds means a out of bounds memory access happened.
 	jitCallStatusCodeMemoryOutOfBounds
-	// jitCallStatusCodeTableOutOfBounds means the offset to table exceeds the length of table during call_indirect.
-	jitCallStatusCodeTableOutOfBounds
+	// TODO:
+	jitCallStatusCodeInvalidTableAccess
 	// jitCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
 	jitCallStatusCodeTypeMismatchOnIndirectCall
+	jitCallStatusIntegerOverflow
+	jitCallStatusIntegerDivisionByZero
 )
 
 func (s jitCallStatusCode) String() (ret string) {
@@ -478,14 +477,16 @@ func (e *engine) execFunction(f *compiledFunction) {
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusIntegerOverflow:
 			panic(wasm.ErrRuntimeIntegerOverflow)
+		case jitCallStatusIntegerDivisionByZero:
+			panic(wasm.ErrRuntimeIntegerDivideByZero)
 		case jitCallStatusCodeInvalidFloatToIntConversion:
 			panic(wasm.ErrRuntimeInvalidConversionToInteger)
 		case jitCallStatusCodeUnreachable:
 			panic(wasm.ErrRuntimeUnreachable)
 		case jitCallStatusCodeMemoryOutOfBounds:
 			panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
-		case jitCallStatusCodeTableOutOfBounds:
-			panic(wasm.ErrRuntimeOutOfBoundsTableAcces)
+		case jitCallStatusCodeInvalidTableAccess:
+			panic(wasm.ErrRuntimeInvalidTableAcces)
 		case jitCallStatusCodeTypeMismatchOnIndirectCall:
 			panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
 		}

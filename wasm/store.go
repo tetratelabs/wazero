@@ -1847,9 +1847,11 @@ func newTableInstance(min uint32, max *uint32) *TableInstance {
 	}
 	for i := range tableInst.Table {
 		tableInst.Table[i] = TableElement{
-			// We use math.MaxUint64 to represent the uninitialized elements.
-			FunctionAddress: math.MaxUint32,
+			FunctionTypeID: UninitializedTableElelemtTypeID,
 		}
 	}
 	return tableInst
 }
+
+// We use math.MaxUint64 to represent the uninitialized elements.
+var UninitializedTableElelemtTypeID FunctionTypeID = math.MaxUint64

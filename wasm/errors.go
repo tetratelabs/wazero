@@ -9,6 +9,6 @@ var (
 	ErrRuntimeIntegerDivideByZero        = errors.New("integer divide by zero")
 	ErrRuntimeUnreachable                = errors.New("unreachable")
 	ErrRuntimeOutOfBoundsMemoryAccess    = errors.New("out of bounds memory access")
-	ErrRuntimeOutOfBoundsTableAcces      = errors.New("out of bounds table access")
+	ErrRuntimeInvalidTableAcces          = errors.New("invalid table access")
 	ErrRuntimeIndirectCallTypeMismatch   = errors.New("indirect call type mismatch")
 )

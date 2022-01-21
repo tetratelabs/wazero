@@ -157,7 +157,7 @@ func (c command) expectedError() (err error) {
 	case "indirect call type mismatch", "indirect call" /* this is at line 152 in linking.wast*/ :
 		err = wasm.ErrRuntimeIndirectCallTypeMismatch
 	case "undefined element", "undefined":
-		err = wasm.ErrRuntimeOutOfBoundsTableAcces
+		err = wasm.ErrRuntimeInvalidTableAcces
 	case "integer overflow":
 		err = wasm.ErrRuntimeIntegerOverflow
 	case "invalid conversion to integer":
@@ -168,7 +168,7 @@ func (c command) expectedError() (err error) {
 		err = wasm.ErrRuntimeUnreachable
 	default:
 		if strings.HasPrefix(c.Text, "uninitialized") {
-			err = wasm.ErrRuntimeOutOfBoundsTableAcces
+			err = wasm.ErrRuntimeInvalidTableAcces
 		}
 	}
 	return

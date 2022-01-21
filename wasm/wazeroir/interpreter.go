@@ -578,20 +578,20 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				offset := it.pop()
 				if offset >= uint64(len(table.Table)) {
-					panic(wasm.ErrRuntimeOutOfBoundsTableAcces)
+					panic(wasm.ErrRuntimeInvalidTableAcces)
 				}
-				target, ok := it.functions[table.Table[offset].FunctionAddress]
-				if !ok {
-					panic(wasm.ErrRuntimeOutOfBoundsTableAcces)
-				}
+				tableElement := table.Table[offset]
 				// Type check.
-				expType := target.funcInstance.FunctionType
-				if uint64(expType.TypeID) != op.us[1] {
+				if uint64(tableElement.FunctionTypeID) != op.us[1] {
+					if tableElement.FunctionTypeID == wasm.UninitializedTableElelemtTypeID {
+						panic(wasm.ErrRuntimeInvalidTableAcces)
+					}
 					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
 				}
+				target := it.functions[table.Table[offset].FunctionAddress]
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(expType.Type.Params):]...)
+					it.callHostFunc(target, it.stack[len(it.stack)-len(target.funcInstance.FunctionType.Type.Params):]...)
 				} else {
 					it.callNativeFunc(target)
 				}
