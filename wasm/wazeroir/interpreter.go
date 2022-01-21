@@ -443,6 +443,9 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 			it.frames = it.frames[:prevFrameLen]
 			err2, ok := v.(error)
 			if ok {
+				if err2.Error() == "runtime error: integer divide by zero" {
+					err2 = wasm.ErrRuntimeIntegerDivideByZero
+				}
 				err = fmt.Errorf("wasm runtime error: %w", err2)
 			} else {
 				err = fmt.Errorf("wasm runtime error: %v", v)
@@ -577,7 +580,10 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				if offset > uint64(len(table.Table)) {
 					panic(wasm.ErrRuntimeOutOfBoundsTableAcces)
 				}
-				target := it.functions[table.Table[offset].FunctionAddress]
+				target, ok := it.functions[table.Table[offset].FunctionAddress]
+				if !ok {
+					panic(wasm.ErrRuntimeOutOfBoundsTableAcces)
+				}
 				// Type check.
 				expType := target.funcInstance.FunctionType
 				if uint64(expType.TypeID) != op.us[1] {
@@ -977,18 +983,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				case SignedTypeInt32:
 					v2 := int32(it.pop())
 					v1 := int32(it.pop())
-					if v2 == 0 {
-						panic(wasm.ErrRuntimeIntegerDivideByZero)
-					} else if v1 == math.MinInt32 && v2 == -1 {
+					if v1 == math.MinInt32 && v2 == -1 {
 						panic(wasm.ErrRuntimeIntegerOverflow)
 					}
 					it.push(uint64(uint32(v1 / v2)))
 				case SignedTypeInt64:
 					v2 := int64(it.pop())
 					v1 := int64(it.pop())
-					if v2 == 0 {
-						panic(wasm.ErrRuntimeIntegerDivideByZero)
-					} else if v1 == math.MinInt64 && v2 == -1 {
+					if v1 == math.MinInt64 && v2 == -1 {
 						panic(wasm.ErrRuntimeIntegerOverflow)
 					}
 					it.push(uint64(v1 / v2))
