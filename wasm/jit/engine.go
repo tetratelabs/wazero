@@ -265,6 +265,8 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
+	// TODO:
+	jitCallStatusIntegerOverflow
 	// jitCallStatusCodeMemoryOutOfBounds means a out of bounds memory access happened.
 	jitCallStatusCodeMemoryOutOfBounds
 	// jitCallStatusCodeTableOutOfBounds means the offset to table exceeds the length of table during call_indirect.
@@ -474,6 +476,8 @@ func (e *engine) execFunction(f *compiledFunction) {
 				}
 			}
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
+		case jitCallStatusIntegerOverflow:
+			panic(wasm.ErrRuntimeIntegerOverflow)
 		case jitCallStatusCodeInvalidFloatToIntConversion:
 			panic(wasm.ErrRuntimeInvalidConversionToInteger)
 		case jitCallStatusCodeUnreachable:

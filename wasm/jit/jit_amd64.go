@@ -2641,19 +2641,19 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	cmpWithMaxInt32PlusOne.To.Reg = source.register
 	c.addInstruction(cmpWithMaxInt32PlusOne)
 
-	// Jump if the source float values is above or equal math.MaxInt32+1.
-	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
-	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
-	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
-
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
 	jmpIfNaN := c.newProg()
 	jmpIfNaN.As = x86.AJPS // jump if parity is set.
 	jmpIfNaN.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfNaN)
 
-	// Next we conver the value as a signed integer.
+	// Jump if the source float value is above or equal math.MaxInt32+1.
+	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
+	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
+	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
+
+	// Next we convert the value as a signed integer.
 	convert := c.newProg()
 	if isFloat32Bit {
 		convert.As = x86.ACVTTSS2SL
@@ -2728,10 +2728,10 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(testIfMinus)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfNaNOrPlusInf := c.newProg()
-	jmpIfNaNOrPlusInf.As = x86.AJMI
-	jmpIfNaNOrPlusInf.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaNOrPlusInf)
+	jmpIfPlusInf := c.newProg()
+	jmpIfPlusInf.As = x86.AJMI
+	jmpIfPlusInf.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfPlusInf)
 
 	// Otherwise, we successfully converted the the source float minus (math.MaxInt32+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
@@ -2748,10 +2748,12 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	okJmpForAboveOrEqualMaxInt32PlusOne.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmpForAboveOrEqualMaxInt32PlusOne)
 
-	// Start emitting the error handling. These invalid float conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfNaN, jmpIfNaNOrPlusInf)
+	c.addSetJmpOrigins(jmpIfNaN)
 	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
+
+	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfPlusInf)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.
@@ -2791,17 +2793,17 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	cmpWithMaxInt32PlusOne.To.Reg = source.register
 	c.addInstruction(cmpWithMaxInt32PlusOne)
 
-	// Jump if the source float values is above or equal math.MaxInt64+1.
-	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
-	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
-	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
-
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
 	jmpIfNaN := c.newProg()
 	jmpIfNaN.As = x86.AJPS // jump if parity is set.
 	jmpIfNaN.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfNaN)
+
+	// Jump if the source float values is above or equal math.MaxInt64+1.
+	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
+	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
+	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
 
 	// Next we convert the value as a signed integer.
 	convert := c.newProg()
@@ -2878,10 +2880,10 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(testIfMinus)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfNaNOrPlusInf := c.newProg()
-	jmpIfNaNOrPlusInf.As = x86.AJMI
-	jmpIfNaNOrPlusInf.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaNOrPlusInf)
+	jmpIfPlusInf := c.newProg()
+	jmpIfPlusInf.As = x86.AJMI
+	jmpIfPlusInf.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfPlusInf)
 
 	// Otherwise, we successfully converted the the source float minus (math.MaxInt64+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
@@ -2898,10 +2900,12 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	okJmpForAboveOrEqualMaxInt64PlusOne.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmpForAboveOrEqualMaxInt64PlusOne)
 
-	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfNaN, jmpIfNaNOrPlusInf)
+	c.addSetJmpOrigins(jmpIfNaN)
 	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
+
+	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfPlusInf)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.
@@ -2973,14 +2977,19 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(checkIfNaN)
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNaN := c.newProg()
-	jmpIfNaN.As = x86.AJPS // jump if parity is set.
-	jmpIfNaN.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaN)
+	jmpIfNotNaN := c.newProg()
+	jmpIfNotNaN.As = x86.AJPC // jump if parity is not set.
+	jmpIfNotNaN.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNotNaN)
+
+	// If the value is NaN, we return the function with jitCallStatusCodeInvalidFloatToIntConversion.
+	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
 
 	// Check if the value is larger than or equal the minimum 32-bit integer value,
 	// meaning that the value exceeds the lower bound of 32-bit signed integer range.
 	checkIfExceedsLowerBound := c.newProg()
+	jmpIfNotNaN.To.SetTarget(checkIfExceedsLowerBound)
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
 		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned32bitIntegerAdddress)
@@ -2993,9 +3002,13 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	checkIfExceedsLowerBound.To.Reg = source.register
 	c.addInstruction(checkIfExceedsLowerBound)
 
-	// Jump if the value is -Inf.
+	// Jump if the value exceeds the lower bound.
 	jmpIfExceedsLowerBound := c.newProg()
-	jmpIfExceedsLowerBound.As = x86.AJCS
+	if isFloat32Bit {
+		jmpIfExceedsLowerBound.As = x86.AJCS
+	} else {
+		jmpIfExceedsLowerBound.As = x86.AJLS
+	}
 	jmpIfExceedsLowerBound.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfExceedsLowerBound)
 
@@ -3014,21 +3027,12 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(checkIfMinimumSignedInt)
 
 	jmpIfMinimumSignedInt := c.newProg()
-	if isFloat32Bit {
-		jmpIfExceedsLowerBound.As = x86.AJCS
-	} else {
-		jmpIfExceedsLowerBound.As = x86.AJLS
-	}
 	jmpIfMinimumSignedInt.As = x86.AJCS // jump if the value is minus (= the minimum signed 32-bit int).
 	jmpIfMinimumSignedInt.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfMinimumSignedInt)
 
-	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	// These existing code are jumped from cases where the original float value
-	// is either +-Inf, NaN or not in representative ranges of 32bit signed integer
-	c.addSetJmpOrigins(jmpIfExceedsLowerBound, jmpIfNaN)
-	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.addSetJmpOrigins(jmpIfExceedsLowerBound)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.
@@ -3100,14 +3104,18 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(checkIfNaN)
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNaN := c.newProg()
-	jmpIfNaN.As = x86.AJPS // jump if parity is set.
-	jmpIfNaN.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaN)
+	jmpIfNotNaN := c.newProg()
+	jmpIfNotNaN.As = x86.AJPC // jump if parity is not set.
+	jmpIfNotNaN.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNotNaN)
+
+	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
 
 	// Check if the value is larger than or equal the minimum 64-bit integer value,
 	// meaning that the value exceeds the lower bound of 64-bit signed integer range.
 	checkIfExceedsLowerBound := c.newProg()
+	jmpIfNotNaN.To.SetTarget(checkIfExceedsLowerBound)
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
 		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned64bitIntegerAdddress)
@@ -3145,12 +3153,8 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfMinimumSignedInt.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfMinimumSignedInt)
 
-	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	// These existing code are jumped from cases where the original float value
-	// is either +-Inf, NaN or not in representative ranges of 64 bit signed integer
-	c.addSetJmpOrigins(jmpIfExceedsLowerBound, jmpIfNaN)
-	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.addSetJmpOrigins(jmpIfExceedsLowerBound)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.

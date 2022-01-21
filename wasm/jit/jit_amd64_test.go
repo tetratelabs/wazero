@@ -4057,6 +4057,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				1.37438953472e+11, /* = 1 << 37 */
 				-1.37438953472e+11,
 				-2147483649.0,
+				2147483648.0,
 				math.MinInt32,
 				math.MaxInt32,
 				math.MaxUint32,
@@ -4116,49 +4117,69 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					env.exec(code)
 
 					// Check the result.
-					var shouldInvalidStatus bool
+					expStatus := jitCallStatusCodeReturned
+					if math.IsNaN(v) {
+						expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+					}
 					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt32 || f32 >= math.MaxInt32
-						if !shouldInvalidStatus {
+						if f32 < math.MinInt32 || f32 >= math.MaxInt32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(float64(f32))), env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt64 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt64 || f32 >= math.MaxInt64
-						if !shouldInvalidStatus {
+						if f32 < math.MinInt64 || f32 >= math.MaxInt64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int64(math.Trunc(float64(f32))), env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
-						shouldInvalidStatus = math.IsNaN(v) || v < math.MinInt32 || v > math.MaxInt32
-						if !shouldInvalidStatus {
+						// ???????
+						if v < math.MinInt32 || v > math.MaxInt32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(v)), env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt64 {
-						shouldInvalidStatus = math.IsNaN(v) || v < math.MinInt64 || v >= math.MaxInt64
-						if !shouldInvalidStatus {
+						if v < math.MinInt64 || v >= math.MaxInt64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int64(math.Trunc(v)), env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < 0 || f32 >= math.MaxUint32
-						if !shouldInvalidStatus {
+						if f32 < 0 || f32 >= math.MaxUint32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint32(math.Trunc(float64(f32))), env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
-						shouldInvalidStatus = math.IsNaN(v) || v < 0 || v > math.MaxUint32
-						if !shouldInvalidStatus {
+						if v < 0 || v > math.MaxUint32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint32(math.Trunc(v)), env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < 0 || f32 >= math.MaxUint64
-						if !shouldInvalidStatus {
+						if f32 < 0 || f32 >= math.MaxUint64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint64(math.Trunc(float64(f32))), env.stackTopAsUint64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
-						shouldInvalidStatus = math.IsNaN(v) || v < 0 || v >= math.MaxUint64
-						if !shouldInvalidStatus {
+						if v < 0 || v >= math.MaxUint64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint64(math.Trunc(v)), env.stackTopAsUint64())
 						}
 					} else {
@@ -4166,7 +4187,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					}
 
 					// Check the jit status code if necessary.
-					require.True(t, !shouldInvalidStatus || env.jitStatus() == jitCallStatusCodeInvalidFloatToIntConversion)
+					require.Equal(t, expStatus, env.jitStatus())
 				})
 			}
 		})
