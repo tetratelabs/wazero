@@ -159,7 +159,7 @@ func (c command) expectedError() (err error) {
 	switch c.Text {
 	case "out of bounds memory access":
 		err = wasm.ErrRuntimeOutOfBoundsMemoryAccess
-	case "indirect call type mismatch", "indirect call" /* this is at line 152 in linking.wast*/ :
+	case "indirect call type mismatch", "indirect call":
 		err = wasm.ErrRuntimeIndirectCallTypeMismatch
 	case "undefined element", "undefined":
 		err = wasm.ErrRuntimeInvalidTableAcces
