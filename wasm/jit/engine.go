@@ -264,9 +264,10 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
-	// jitCallStatusCodeMemoryOutOfBounds means a out of bounds memory access happened.
+	// jitCallStatusCodeMemoryOutOfBounds means an out of bounds memory access happened.
 	jitCallStatusCodeMemoryOutOfBounds
-	// TODO:
+	// jitCallStatusCodeInvalidTableAccess means either offset to the table was out of bounds of table, or
+	// the target element in the table was uninitialized during call_indirect instruction.
 	jitCallStatusCodeInvalidTableAccess
 	// jitCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
 	jitCallStatusCodeTypeMismatchOnIndirectCall

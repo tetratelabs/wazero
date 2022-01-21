@@ -3262,7 +3262,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							{x1Value: 0, x2Value: 1},
 							{x1Value: 1, x2Value: 0},
 							{x1Value: 0, x2Value: 0},
-							{x1Value: 0x8000000000000000, x2Value: 0xffffffffffffffff}, // This equals (-2^63 / -1) and results in overflow.
+							{x1Value: 0x8000000000000000, x2Value: 0xffffffffffffffff}, // This is equivalent to (-2^63 / -1) and results in overflow.
 							// Following cases produce different resulting bit patterns for signed and unsigned.
 							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 1},
 							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 0xfffffffffffffffe /* -2 in signed 64bit */},
