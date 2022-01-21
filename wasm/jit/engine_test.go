@@ -109,7 +109,7 @@ func TestEngine_fac(t *testing.T) {
 	}
 
 	_, _, err = store.CallFunction("test", "fac-rec", 1073741824)
-	require.True(t, errors.Is(err, wasm.ErrCallStackOverflow))
+	require.True(t, errors.Is(err, wasm.ErrRuntimeCallStackOverflow))
 }
 
 func TestEngine_unreachable(t *testing.T) {

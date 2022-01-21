@@ -111,6 +111,7 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 				}
 				runtimeErr, ok := v.(error)
 				if ok {
+					// TODO: wrtap the floating point exception or etc as wasm.ErrRuntime**
 					err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
 				} else {
 					err = fmt.Errorf("wasm runtime error: %v", v)
@@ -200,7 +201,7 @@ var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 func (e *engine) callFramePush(callee *callFrame) {
 	e.callFrameNum++
 	if callStackCeiling < e.callFrameNum {
-		panic(wasm.ErrCallStackOverflow)
+		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
 
 	// Push the new frame to the top of stack.
@@ -474,20 +475,15 @@ func (e *engine) execFunction(f *compiledFunction) {
 			}
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
 		case jitCallStatusCodeInvalidFloatToIntConversion:
-			// TODO: have wasm.ErrInvalidFloatToIntConversion and use it here.
-			panic("invalid float to int conversion")
+			panic(wasm.ErrRuntimeInvalidConversionToInteger)
 		case jitCallStatusCodeUnreachable:
-			// TODO: have wasm.ErrUnreachable and use it here.
-			panic("unreachable")
+			panic(wasm.ErrRuntimeUnreachable)
 		case jitCallStatusCodeMemoryOutOfBounds:
-			// TODO: have wasm.ErrMemoryOutOfBounds and use it here.
-			panic("out of bounds memory access")
+			panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 		case jitCallStatusCodeTableOutOfBounds:
-			// TODO: have wasm.ErrTableOutOfBounds and use it here.
-			panic("out of bounds table access")
+			panic(wasm.ErrRuntimeOutOfBoundsTableAcces)
 		case jitCallStatusCodeTypeMismatchOnIndirectCall:
-			// TODO: have wasm.ErrTypeMismatchOnIndirectCall and use it here.
-			panic("type mismatch on indirect function call")
+			panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
 		}
 	}
 }

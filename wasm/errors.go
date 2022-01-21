@@ -2,4 +2,13 @@ package wasm
 
 import "errors"
 
-var ErrCallStackOverflow = errors.New("callstack overflow")
+var (
+	ErrRuntimeCallStackOverflow          = errors.New("callstack overflow")
+	ErrRuntimeInvalidConversionToInteger = errors.New("invalid conversion to integer")
+	ErrRuntimeIntegerOverflow            = errors.New("integer overflow")
+	ErrRuntimeIntegerDivideByZero        = errors.New("integer divide by zero")
+	ErrRuntimeUnreachable                = errors.New("unreachable")
+	ErrRuntimeOutOfBoundsMemoryAccess    = errors.New("out of bounds memory access")
+	ErrRuntimeOutOfBoundsTableAcces      = errors.New("out of bounds table access")
+	ErrRuntimeIndirectCallTypeMismatch   = errors.New("indirect call type mismatch")
+)

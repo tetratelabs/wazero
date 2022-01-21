@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -45,6 +44,9 @@ type (
 
 		// Set when type == "assert_malformed"
 		ModuleType string `json:"module_type"`
+
+		// Set when type == "assert_trap"
+		Text string `json:"text"`
 	}
 
 	commandAction struct {
@@ -100,7 +102,7 @@ func (c command) String() string {
 	case "assert_malformed":
 		// TODO:
 	case "assert_trap":
-		// TODO:
+		msg += fmt.Sprintf(", args: %v, error text:  %s", c.Action.Args, c.Text)
 	case "assert_invalid":
 		// TODO:
 	case "assert_exhaustion":
@@ -147,6 +149,30 @@ func (v commandActionVal) toUint64() uint64 {
 		ret, _ := strconv.ParseUint(v.Value, 10, 64)
 		return ret
 	}
+}
+
+func (c command) expectedError() (err error) {
+	switch c.Text {
+	case "out of bounds memory access":
+		err = wasm.ErrRuntimeOutOfBoundsMemoryAccess
+	case "indirect call type mismatch":
+		err = wasm.ErrRuntimeIndirectCallTypeMismatch
+	case "undefined element":
+		err = wasm.ErrRuntimeOutOfBoundsTableAcces
+	case "integer overflow":
+		err = wasm.ErrRuntimeIntegerOverflow
+	case "invalid conversion to integer":
+		err = wasm.ErrRuntimeInvalidConversionToInteger
+	case "integer divide by zero":
+		err = wasm.ErrRuntimeIntegerDivideByZero
+	case "unreachable":
+		err = wasm.ErrRuntimeUnreachable
+	default:
+		if strings.HasPrefix(c.Text, "uninitialized") {
+			err = wasm.ErrRuntimeOutOfBoundsTableAcces
+		}
+	}
+	return
 }
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
@@ -249,12 +275,11 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								msg += " in module " + c.Action.Module
 							}
 							vals, types, err := store.CallFunction(moduleName, c.Action.Field, args...)
-							if assert.NoError(t, err, msg) &&
-								assert.Equal(t, len(exps), len(vals), msg) &&
-								assert.Equal(t, len(exps), len(types), msg) {
-								for i, exp := range exps {
-									assertValueEq(t, vals[i], exp, types[i], msg)
-								}
+							require.NoError(t, err, msg)
+							require.Equal(t, len(exps), len(vals), msg)
+							require.Equal(t, len(exps), len(types), msg)
+							for i, exp := range exps {
+								requireValueEq(t, vals[i], exp, types[i], msg)
 							}
 						case "get":
 							_, exps := c.getAssertReturnArgsExps()
@@ -282,8 +307,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								expType = wasm.ValueTypeF64
 							}
 							require.NotNil(t, actual, msg)
-							assert.Equal(t, expType, actual.Type.ValType, msg)
-							assert.Equal(t, exps[0], actual.Val, expType, msg)
+							require.Equal(t, expType, actual.Type.ValType, msg)
+							require.Equal(t, exps[0], actual.Val, expType, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
@@ -312,7 +337,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								msg += " in module " + c.Action.Module
 							}
 							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
-							assert.Error(t, err, msg)
+							require.ErrorIs(t, err, c.expectedError(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
@@ -341,8 +366,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								msg += " in module " + c.Action.Module
 							}
 							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
-							assert.Error(t, err, msg)
-							assert.True(t, errors.Is(err, wasm.ErrCallStackOverflow), msg)
+							require.Error(t, err, msg)
+							require.True(t, errors.Is(err, wasm.ErrRuntimeCallStackOverflow), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
@@ -376,27 +401,27 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 	}
 }
 
-func assertValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueType, msg string) {
+func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueType, msg string) {
 	switch valType {
 	case wasm.ValueTypeI32:
-		assert.Equal(t, uint32(expected), uint32(actual), msg)
+		require.Equal(t, uint32(expected), uint32(actual), msg)
 	case wasm.ValueTypeI64:
-		assert.Equal(t, expected, actual, msg)
+		require.Equal(t, expected, actual, msg)
 	case wasm.ValueTypeF32:
 		expF := math.Float32frombits(uint32(expected))
 		actualF := math.Float32frombits(uint32(actual))
 		if math.IsNaN(float64(expF)) {
-			assert.True(t, math.IsNaN(float64(actualF)), msg)
+			require.True(t, math.IsNaN(float64(actualF)), msg)
 		} else {
-			assert.Equal(t, expF, actualF, msg)
+			require.Equal(t, expF, actualF, msg)
 		}
 	case wasm.ValueTypeF64:
 		expF := math.Float64frombits(expected)
 		actualF := math.Float64frombits(actual)
 		if math.IsNaN(expF) {
-			assert.True(t, math.IsNaN(actualF), msg)
+			require.True(t, math.IsNaN(actualF), msg)
 		} else {
-			assert.Equal(t, expF, actualF, msg)
+			require.Equal(t, expF, actualF, msg)
 		}
 	default:
 		t.Fail()
