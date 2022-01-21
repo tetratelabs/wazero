@@ -150,7 +150,7 @@ func (v commandActionVal) toUint64() uint64 {
 	}
 }
 
-// Returns the expected runtime errors when the command type equals assert_trap
+// Returns the expected runtime error when the command type equals assert_trap
 // which expectes engines to emit the errors corresponding command.Text field.
 func (c command) expectedError() (err error) {
 	if c.CommandType != "assert_trap" {

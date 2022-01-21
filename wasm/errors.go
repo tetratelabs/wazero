@@ -2,7 +2,7 @@ package wasm
 
 import "errors"
 
-// All the erros were returned by Engine during the excecution of Wasm functions,
+// All the erros are returned by Engine during the excecution of Wasm functions,
 // and they indicate that the Wasm virtual machine's state is unrecoverable.
 var (
 	// ErrRuntimeCallStackOverflow indicates that there are too many function calls,

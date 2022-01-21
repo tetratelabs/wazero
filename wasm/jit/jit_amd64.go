@@ -1075,7 +1075,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	checkIfInitialized.To.Offset = int64(wasm.UninitializedTableElelemtTypeID)
 	c.addInstruction(checkIfInitialized)
 
-	// Jump if the type matches.
+	// Jump if the target is initialized element.
 	jumpIfInitialized := c.newProg()
 	jumpIfInitialized.To.Type = obj.TYPE_BRANCH
 	jumpIfInitialized.As = x86.AJNE
