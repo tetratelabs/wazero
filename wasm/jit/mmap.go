@@ -1,5 +1,5 @@
-//go:build darwin
-// +build darwin
+//go:build !windows
+// +build !windows
 
 package jit
 
@@ -7,8 +7,7 @@ import "syscall"
 
 const mmapFlags = syscall.MAP_ANON
 
-// Copy the code into the executable region
-// and returns the byte slice of the region.
+// mmapCodeSegment copies the code into the executable region and returns the byte slice of the region.
 func mmapCodeSegment(code []byte) ([]byte, error) {
 	mmapFunc, err := syscall.Mmap(
 		-1,
