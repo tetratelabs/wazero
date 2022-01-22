@@ -17,14 +17,14 @@ const (
 	wasiSnapshotPreview1Name = "wasi_snapshot_preview1"
 )
 
-type WASIEnvirnment struct {
+type WASIEnvironment struct {
 	stdin io.Reader
 	stdout,
 	stderr io.Writer
 	opened map[uint32]fileEntry
 }
 
-func (w *WASIEnvirnment) Register(store *wasm.Store) (err error) {
+func (w *WASIEnvironment) Register(store *wasm.Store) (err error) {
 	for _, wasiName := range []string{
 		wasiUnstableName,
 		wasiSnapshotPreview1Name,
@@ -87,28 +87,28 @@ type fileEntry struct {
 	file    File
 }
 
-type Option func(*WASIEnvirnment)
+type Option func(*WASIEnvironment)
 
 func Stdin(reader io.Reader) Option {
-	return func(w *WASIEnvirnment) {
+	return func(w *WASIEnvironment) {
 		w.stdin = reader
 	}
 }
 
 func Stdout(writer io.Writer) Option {
-	return func(w *WASIEnvirnment) {
+	return func(w *WASIEnvironment) {
 		w.stdout = writer
 	}
 }
 
 func Stderr(writer io.Writer) Option {
-	return func(w *WASIEnvirnment) {
+	return func(w *WASIEnvironment) {
 		w.stderr = writer
 	}
 }
 
 func Preopen(dir string, fileSys FS) Option {
-	return func(w *WASIEnvirnment) {
+	return func(w *WASIEnvironment) {
 		w.opened[uint32(len(w.opened))+3] = fileEntry{
 			path:    dir,
 			fileSys: fileSys,
@@ -116,8 +116,8 @@ func Preopen(dir string, fileSys FS) Option {
 	}
 }
 
-func NewEnvironment(opts ...Option) *WASIEnvirnment {
-	ret := &WASIEnvirnment{
+func NewEnvironment(opts ...Option) *WASIEnvironment {
+	ret := &WASIEnvironment{
 		stdin:  os.Stdin,
 		stdout: os.Stdout,
 		stderr: os.Stderr,
@@ -132,7 +132,7 @@ func NewEnvironment(opts ...Option) *WASIEnvirnment {
 	return ret
 }
 
-func (w *WASIEnvirnment) randUnusedFD() uint32 {
+func (w *WASIEnvironment) randUnusedFD() uint32 {
 	fd := uint32(rand.Int31())
 	for {
 		if _, ok := w.opened[fd]; !ok {
@@ -142,14 +142,14 @@ func (w *WASIEnvirnment) randUnusedFD() uint32 {
 	}
 }
 
-func (w *WASIEnvirnment) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+func (w *WASIEnvironment) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := w.opened[fd]; !ok {
 		return EBADF
 	}
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
+func (w *WASIEnvironment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
 	f, ok := w.opened[fd]
 	if !ok {
 		return EINVAL
@@ -163,7 +163,7 @@ func (w *WASIEnvirnment) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, 
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+func (w *WASIEnvironment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := w.opened[fd]; !ok {
 		return EBADF
 	}
@@ -171,7 +171,7 @@ func (w *WASIEnvirnment) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uin
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+func (w *WASIEnvironment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
 	fsRightsBase, fsRightsInheriting uint64,
 	fdFlags, fdPtr uint32) (errno Errno) {
 	dir, ok := w.opened[fd]
@@ -200,7 +200,7 @@ func (w *WASIEnvirnment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFla
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
+func (w *WASIEnvironment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
 	var writer io.Writer
 
 	switch fd {
@@ -231,7 +231,7 @@ func (w *WASIEnvirnment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, 
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
+func (w *WASIEnvironment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
 	var reader io.Reader
 
 	switch fd {
@@ -262,7 +262,7 @@ func (w *WASIEnvirnment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, i
 	return ESUCCESS
 }
 
-func (w *WASIEnvirnment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
+func (w *WASIEnvironment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
 	f, ok := w.opened[fd]
 	if !ok {
 		return EBADF
