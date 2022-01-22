@@ -28,6 +28,10 @@ import (
 var (
 	zero64Bit                                     uint64 = 0
 	zero64BitAddress                              uintptr
+	minimum32BitSignedInt                         int32 = math.MinInt32
+	minimum32BitSignedIntAddress                  uintptr
+	minimum64BitSignedInt                         int64 = math.MinInt64
+	minimum64BitSignedIntAddress                  uintptr
 	float32SignBitMask                            uint32 = 1 << 31
 	float32RestBitMask                            uint32 = ^float32SignBitMask
 	float32SignBitMaskAddress                     uintptr
@@ -56,6 +60,8 @@ var (
 
 func init() {
 	zero64BitAddress = uintptr(unsafe.Pointer(&zero64Bit))
+	minimum32BitSignedIntAddress = uintptr(unsafe.Pointer(&minimum32BitSignedInt))
+	minimum64BitSignedIntAddress = uintptr(unsafe.Pointer(&minimum64BitSignedInt))
 	float32SignBitMaskAddress = uintptr(unsafe.Pointer(&float32SignBitMask))
 	float32RestBitMaskAddress = uintptr(unsafe.Pointer(&float32RestBitMask))
 	float64SignBitMaskAddress = uintptr(unsafe.Pointer(&float64SignBitMask))
@@ -1027,11 +1033,11 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	notLengthExceedJump := c.newProg()
 	notLengthExceedJump.To.Type = obj.TYPE_BRANCH
-	notLengthExceedJump.As = x86.AJCC
+	notLengthExceedJump.As = x86.AJHI
 	c.addInstruction(notLengthExceedJump)
 
-	// If it exceeds, we return the function with jitCallStatusCodeTableOutOfBounds.
-	c.setJITStatus(jitCallStatusCodeTableOutOfBounds)
+	// If it exceeds, we return the function with jitCallStatusCodeInvalidTableAccess.
+	c.setJITStatus(jitCallStatusCodeInvalidTableAccess)
 	c.returnFunction()
 
 	// Next we check if the target's type matches the operation's one.
@@ -1059,22 +1065,42 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset]
 	// So the target type ID lives at offset+tableElementTypeIDOffest, and we compare it
-	// with targetFunctionType.TypeID.
+	// with wasm.UninitializedTableElelemtTypeID to check if the element is initialized.
+	checkIfInitialized := c.newProg()
+	checkIfInitialized.As = x86.ACMPQ
+	checkIfInitialized.From.Type = obj.TYPE_MEM
+	checkIfInitialized.From.Reg = offset.register
+	checkIfInitialized.From.Offset = tableElementTypeIDOffest
+	checkIfInitialized.To.Type = obj.TYPE_CONST
+	checkIfInitialized.To.Offset = int64(wasm.UninitializedTableElelemtTypeID)
+	c.addInstruction(checkIfInitialized)
+
+	// Jump if the target is initialized element.
+	jumpIfInitialized := c.newProg()
+	jumpIfInitialized.To.Type = obj.TYPE_BRANCH
+	jumpIfInitialized.As = x86.AJNE
+	c.addInstruction(jumpIfInitialized)
+
+	// Otherwise, we return the function with jitCallStatusCodeInvalidTableAccess.
+	c.setJITStatus(jitCallStatusCodeInvalidTableAccess)
+	c.returnFunction()
+
 	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
-	cmpTypeID := c.newProg()
-	cmpTypeID.As = x86.ACMPQ
-	cmpTypeID.From.Type = obj.TYPE_MEM
-	cmpTypeID.From.Reg = offset.register
-	cmpTypeID.From.Offset = tableElementTypeIDOffest
-	cmpTypeID.To.Type = obj.TYPE_CONST
-	cmpTypeID.To.Offset = int64(targetFunctionType.TypeID)
-	c.addInstruction(cmpTypeID)
+	checkIfTypeMatch := c.newProg()
+	jumpIfInitialized.To.SetTarget(checkIfTypeMatch)
+	checkIfTypeMatch.As = x86.ACMPQ
+	checkIfTypeMatch.From.Type = obj.TYPE_MEM
+	checkIfTypeMatch.From.Reg = offset.register
+	checkIfTypeMatch.From.Offset = tableElementTypeIDOffest
+	checkIfTypeMatch.To.Type = obj.TYPE_CONST
+	checkIfTypeMatch.To.Offset = int64(targetFunctionType.TypeID)
+	c.addInstruction(checkIfTypeMatch)
 
 	// Jump if the type matches.
-	typeMatchJump := c.newProg()
-	typeMatchJump.To.Type = obj.TYPE_BRANCH
-	typeMatchJump.As = x86.AJEQ
-	c.addInstruction(typeMatchJump)
+	jumpIfTypeMatch := c.newProg()
+	jumpIfTypeMatch.To.Type = obj.TYPE_BRANCH
+	jumpIfTypeMatch.As = x86.AJEQ
+	c.addInstruction(jumpIfTypeMatch)
 
 	// Otherwise, we return the function with jitCallStatusCodeTypeMismatchOnIndirectCall.
 	c.setJITStatus(jitCallStatusCodeTypeMismatchOnIndirectCall)
@@ -1082,7 +1108,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Now all checks passeed, so we start making function call.
 	readValue := c.newProg()
-	typeMatchJump.To.SetTarget(readValue)
+	jumpIfTypeMatch.To.SetTarget(readValue)
 	readValue.As = x86.AMOVQ
 	readValue.To.Type = obj.TYPE_REG
 	readValue.To.Reg = offset.register
@@ -1732,9 +1758,6 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	// so we record it.
 	result := c.locationStack.pushValueOnRegister(x86.REG_AX)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
-
-	// Make sure that the DX register (holding remainder of the division) is marked unused.
-	c.locationStack.markRegisterUnused(x86.REG_DX)
 	return nil
 }
 
@@ -1761,9 +1784,6 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 	// so we record it.
 	result := c.locationStack.pushValueOnRegister(x86.REG_DX)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
-
-	// Make sure that the AX register (holding quotient of the division) is marked unused.
-	c.locationStack.markRegisterUnused(x86.REG_AX)
 	return
 }
 
@@ -1787,18 +1807,81 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		remainderRegister = x86.REG_DX
 	)
 
+	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
+		return err
+	}
+
+	// Ensures that previous values on thses registers are saved to memory.
+	c.onValueReleaseRegisterToStack(quotientRegister)
+	c.onValueReleaseRegisterToStack(remainderRegister)
+
+	// In order to ensure x2 is placed on a temporary register for x2 value other than AX and DX,
+	// we mark them as used here.
+	c.locationStack.markRegisterUsed(quotientRegister)
+	c.locationStack.markRegisterUsed(remainderRegister)
+
+	// Ensure that x2 is placed on a register which is not either AX or DX.
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return err
 	}
 
-	// We have to save the existing value on DX as the division instruction
-	// place the remainder of the result there.
-	if x2.register != remainderRegister {
-		c.onValueReleaseRegisterToStack(remainderRegister)
+	// Now we successfully place x2 on a temp register, so we no longer need to
+	// mark these regiseters used.
+	c.locationStack.markRegisterUnused(quotientRegister)
+	c.locationStack.markRegisterUnused(remainderRegister)
+
+	// Check if the x2 equals zero.
+	checkDivisorZero := c.newProg()
+	if is32Bit {
+		checkDivisorZero.As = x86.ACMPL
+	} else {
+		checkDivisorZero.As = x86.ACMPQ
+	}
+	checkDivisorZero.From.Type = obj.TYPE_REG
+	checkDivisorZero.From.Reg = x2.register
+	checkDivisorZero.To.Type = obj.TYPE_CONST
+	checkDivisorZero.To.Offset = 0
+	c.addInstruction(checkDivisorZero)
+
+	// Jump if the divisor is not zero.
+	jmpIfNotZero := c.newProg()
+	jmpIfNotZero.As = x86.AJNE
+	jmpIfNotZero.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNotZero)
+
+	// Otherwise, we return with jitCallStatusIntegerDivisionByZero status.
+	c.setJITStatus(jitCallStatusIntegerDivisionByZero)
+	c.returnFunction()
+
+	c.addSetJmpOrigins(jmpIfNotZero)
+
+	// Next, we ensure that x1 is placed on AX.
+	x1 := c.locationStack.pop()
+	if x1.onRegister() && x1.register != quotientRegister {
+		// Move x1 to quotientRegister.
+		movX1ToDX := c.newProg()
+		movX1ToDX.To.Type = obj.TYPE_REG
+		movX1ToDX.To.Reg = quotientRegister
+		movX1ToDX.From.Type = obj.TYPE_REG
+		movX1ToDX.From.Reg = x1.register
+		if is32Bit {
+			movX1ToDX.As = x86.AMOVL
+		} else {
+			movX1ToDX.As = x86.AMOVQ
+		}
+		c.addInstruction(movX1ToDX)
+		c.locationStack.markRegisterUnused(x1.register)
+		x1.setRegister(quotientRegister)
+	} else if x1.onStack() {
+		x1.setRegister(quotientRegister)
+		c.moveStackToRegister(x1)
 	}
 
+	// Note: at this point, x1 is placed on AX, x2 is on a register which is not AX or DX.
+
 	isSignedRem := isRem && signed
+	isSignedDiv := !isRem && signed
 	var signedRemMinusOneDivisorJmp *obj.Prog
 	if isSignedRem {
 		// If this is for getting remainder of signed division,
@@ -1851,50 +1934,66 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 		// Set the normal case's jump target.
 		c.addSetJmpOrigins(okJmp)
-	}
+	} else if isSignedDiv {
+		// For sigined division, we have to have branches for "math.MinInt{32,64} / -1"
+		// case which results in the floating point exception via division error as
+		// the resulting value exceeds the maximum of signed int.
 
-	// If x2 is placed in the quotient (AX) register, we just release it to the memory stack
-	// as AX must be set to the x1's value below.
-	if x2.register == quotientRegister {
-		c.releaseRegisterToStack(x2)
-	}
-
-	x1 := c.locationStack.pop()
-	// Ensure that x1 is placed on the quotient (AX) register.
-	if x1.register != quotientRegister {
-		c.onValueReleaseRegisterToStack(quotientRegister)
-		if x2.onConditionalRegister() {
-			c.moveConditionalToGeneralPurposeRegister(x1, quotientRegister)
-		} else if x1.onStack() {
-			x1.setRegister(quotientRegister)
-			c.moveStackToRegister(x1)
-			c.locationStack.markRegisterUsed(quotientRegister)
+		// First we compare the division with -1.
+		cmpDivisorWithMinusOne := c.newProg()
+		if is32Bit {
+			cmpDivisorWithMinusOne.As = x86.ACMPL
 		} else {
-			moveX1ToQuotientRegister := c.newProg()
-			if is32Bit {
-				moveX1ToQuotientRegister.As = x86.AMOVL
-			} else {
-				moveX1ToQuotientRegister.As = x86.AMOVQ
-			}
-			moveX1ToQuotientRegister.To.Reg = quotientRegister
-			moveX1ToQuotientRegister.To.Type = obj.TYPE_REG
-			moveX1ToQuotientRegister.From.Reg = x1.register
-			moveX1ToQuotientRegister.From.Type = obj.TYPE_REG
-			c.addInstruction(moveX1ToQuotientRegister)
-			// We no longer uses the prev register of x1.
-			c.locationStack.releaseRegister(x1)
-			x1.setRegister(quotientRegister)
-			c.locationStack.markRegisterUsed(quotientRegister)
+			cmpDivisorWithMinusOne.As = x86.ACMPQ
 		}
-	}
+		cmpDivisorWithMinusOne.From.Type = obj.TYPE_REG
+		cmpDivisorWithMinusOne.From.Reg = x2.register
+		cmpDivisorWithMinusOne.To.Type = obj.TYPE_CONST
+		cmpDivisorWithMinusOne.To.Offset = -1
+		c.addInstruction(cmpDivisorWithMinusOne)
 
-	// We have to save the existing value on DX as the division instruction
-	// place the remainder of the result there.
-	c.onValueReleaseRegisterToStack(remainderRegister)
+		// If it doesn't equal minus one, we jump to the normal case.
+		nonMinusOneDivisorJmp := c.newProg()
+		nonMinusOneDivisorJmp.As = x86.AJNE
+		nonMinusOneDivisorJmp.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(nonMinusOneDivisorJmp)
+
+		// Next we check if the quotient is the most negative value for the signed integer.
+		// That means whether or not we try to do (math.MaxInt32 / -1) or (math.Math.Int64 / -1) respectively.
+		cmpQuotientWithMinInt := c.newProg()
+		cmpQuotientWithMinInt.To.Type = obj.TYPE_MEM
+		if is32Bit {
+			cmpQuotientWithMinInt.As = x86.ACMPL
+			cmpQuotientWithMinInt.To.Offset = int64(minimum32BitSignedIntAddress)
+		} else {
+			cmpQuotientWithMinInt.As = x86.ACMPQ
+			cmpQuotientWithMinInt.To.Offset = int64(minimum64BitSignedIntAddress)
+		}
+		cmpQuotientWithMinInt.From.Type = obj.TYPE_REG
+		cmpQuotientWithMinInt.From.Reg = x1.register
+		c.addInstruction(cmpQuotientWithMinInt)
+
+		// If it doesn't equal, we jump to the normal case.
+		jmpOK := c.newProg()
+		jmpOK.As = x86.AJNE
+		jmpOK.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(jmpOK)
+
+		// Otherwise, we are trying to do (math.MaxInt32 / -1) or (math.Math.Int64 / -1),
+		// and that is the overflow in division as the result becomes 2^31 which is larger than
+		// the maximum of signed 32-bit int (2^31-1).
+		c.setJITStatus(jitCallStatusIntegerOverflow)
+		c.returnFunction()
+
+		// Set the normal case's jump target.
+		c.addSetJmpOrigins(nonMinusOneDivisorJmp, jmpOK)
+	}
 
 	// Now ready to emit the div instruction.
 	div := c.newProg()
 	div.To.Type = obj.TYPE_NONE
+	div.From.Reg = x2.register
+	div.From.Type = obj.TYPE_REG
 	// Since the div instructions takes 2n byte dividend placed in DX:AX registers...
 	// * signed case - we need to sign-extend the dividend into DX register via CDQ (32 bit) or CQO (64 bit).
 	// * unsigned case - we need to zero DX register via "XOR DX DX"
@@ -1932,16 +2031,6 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		c.addInstruction(zerosDX)
 	}
 
-	if x2.onRegister() {
-		div.From.Reg = x2.register
-		div.From.Type = obj.TYPE_REG
-		c.locationStack.markRegisterUnused(x2.register)
-	} else {
-		// On stack case.
-		div.From.Type = obj.TYPE_MEM
-		div.From.Reg = reservedRegisterForStackBasePointer
-		div.From.Offset = int64(x2.stackPointer) * 8
-	}
 	c.addInstruction(div)
 
 	// If this is signed rem instruction, we must set the jump target of
@@ -1953,6 +2042,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	// We mark them as unused so that we can push one of them onto the location stack at call sites.
 	c.locationStack.markRegisterUnused(remainderRegister)
 	c.locationStack.markRegisterUnused(quotientRegister)
+	c.locationStack.markRegisterUnused(x2.register)
 	return nil
 }
 
@@ -2641,19 +2731,19 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	cmpWithMaxInt32PlusOne.To.Reg = source.register
 	c.addInstruction(cmpWithMaxInt32PlusOne)
 
-	// Jump if the source float values is above or equal math.MaxInt32+1.
-	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
-	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
-	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
-
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
 	jmpIfNaN := c.newProg()
 	jmpIfNaN.As = x86.AJPS // jump if parity is set.
 	jmpIfNaN.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfNaN)
 
-	// Next we conver the value as a signed integer.
+	// Jump if the source float value is above or equal math.MaxInt32+1.
+	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
+	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
+	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
+
+	// Next we convert the value as a signed integer.
 	convert := c.newProg()
 	if isFloat32Bit {
 		convert.As = x86.ACVTTSS2SL
@@ -2728,10 +2818,10 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(testIfMinus)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfNaNOrPlusInf := c.newProg()
-	jmpIfNaNOrPlusInf.As = x86.AJMI
-	jmpIfNaNOrPlusInf.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaNOrPlusInf)
+	jmpIfPlusInf := c.newProg()
+	jmpIfPlusInf.As = x86.AJMI
+	jmpIfPlusInf.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfPlusInf)
 
 	// Otherwise, we successfully converted the the source float minus (math.MaxInt32+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
@@ -2748,10 +2838,12 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	okJmpForAboveOrEqualMaxInt32PlusOne.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmpForAboveOrEqualMaxInt32PlusOne)
 
-	// Start emitting the error handling. These invalid float conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfNaN, jmpIfNaNOrPlusInf)
+	c.addSetJmpOrigins(jmpIfNaN)
 	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
+
+	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfPlusInf)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.
@@ -2791,17 +2883,17 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	cmpWithMaxInt32PlusOne.To.Reg = source.register
 	c.addInstruction(cmpWithMaxInt32PlusOne)
 
-	// Jump if the source float values is above or equal math.MaxInt64+1.
-	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
-	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
-	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
-
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
 	jmpIfNaN := c.newProg()
 	jmpIfNaN.As = x86.AJPS // jump if parity is set.
 	jmpIfNaN.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfNaN)
+
+	// Jump if the source float values is above or equal math.MaxInt64+1.
+	jmpAboveOrEqualMaxIn32PlusOne := c.newProg()
+	jmpAboveOrEqualMaxIn32PlusOne.As = x86.AJCC
+	jmpAboveOrEqualMaxIn32PlusOne.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpAboveOrEqualMaxIn32PlusOne)
 
 	// Next we convert the value as a signed integer.
 	convert := c.newProg()
@@ -2878,10 +2970,10 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(testIfMinus)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfNaNOrPlusInf := c.newProg()
-	jmpIfNaNOrPlusInf.As = x86.AJMI
-	jmpIfNaNOrPlusInf.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaNOrPlusInf)
+	jmpIfPlusInf := c.newProg()
+	jmpIfPlusInf.As = x86.AJMI
+	jmpIfPlusInf.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfPlusInf)
 
 	// Otherwise, we successfully converted the the source float minus (math.MaxInt64+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
@@ -2898,10 +2990,12 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	okJmpForAboveOrEqualMaxInt64PlusOne.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmpForAboveOrEqualMaxInt64PlusOne)
 
-	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfNaN, jmpIfNaNOrPlusInf)
+	c.addSetJmpOrigins(jmpIfNaN)
 	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
+
+	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfPlusInf)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.
@@ -2973,14 +3067,19 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(checkIfNaN)
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNaN := c.newProg()
-	jmpIfNaN.As = x86.AJPS // jump if parity is set.
-	jmpIfNaN.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaN)
+	jmpIfNotNaN := c.newProg()
+	jmpIfNotNaN.As = x86.AJPC // jump if parity is not set.
+	jmpIfNotNaN.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNotNaN)
+
+	// If the value is NaN, we return the function with jitCallStatusCodeInvalidFloatToIntConversion.
+	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
 
 	// Check if the value is larger than or equal the minimum 32-bit integer value,
 	// meaning that the value exceeds the lower bound of 32-bit signed integer range.
 	checkIfExceedsLowerBound := c.newProg()
+	jmpIfNotNaN.To.SetTarget(checkIfExceedsLowerBound)
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
 		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned32bitIntegerAdddress)
@@ -2993,9 +3092,13 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	checkIfExceedsLowerBound.To.Reg = source.register
 	c.addInstruction(checkIfExceedsLowerBound)
 
-	// Jump if the value is -Inf.
+	// Jump if the value exceeds the lower bound.
 	jmpIfExceedsLowerBound := c.newProg()
-	jmpIfExceedsLowerBound.As = x86.AJCS
+	if isFloat32Bit {
+		jmpIfExceedsLowerBound.As = x86.AJCS
+	} else {
+		jmpIfExceedsLowerBound.As = x86.AJLS
+	}
 	jmpIfExceedsLowerBound.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfExceedsLowerBound)
 
@@ -3014,21 +3117,12 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(checkIfMinimumSignedInt)
 
 	jmpIfMinimumSignedInt := c.newProg()
-	if isFloat32Bit {
-		jmpIfExceedsLowerBound.As = x86.AJCS
-	} else {
-		jmpIfExceedsLowerBound.As = x86.AJLS
-	}
 	jmpIfMinimumSignedInt.As = x86.AJCS // jump if the value is minus (= the minimum signed 32-bit int).
 	jmpIfMinimumSignedInt.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfMinimumSignedInt)
 
-	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	// These existing code are jumped from cases where the original float value
-	// is either +-Inf, NaN or not in representative ranges of 32bit signed integer
-	c.addSetJmpOrigins(jmpIfExceedsLowerBound, jmpIfNaN)
-	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.addSetJmpOrigins(jmpIfExceedsLowerBound)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.
@@ -3100,14 +3194,18 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	c.addInstruction(checkIfNaN)
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNaN := c.newProg()
-	jmpIfNaN.As = x86.AJPS // jump if parity is set.
-	jmpIfNaN.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNaN)
+	jmpIfNotNaN := c.newProg()
+	jmpIfNotNaN.As = x86.AJPC // jump if parity is not set.
+	jmpIfNotNaN.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNotNaN)
+
+	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.returnFunction()
 
 	// Check if the value is larger than or equal the minimum 64-bit integer value,
 	// meaning that the value exceeds the lower bound of 64-bit signed integer range.
 	checkIfExceedsLowerBound := c.newProg()
+	jmpIfNotNaN.To.SetTarget(checkIfExceedsLowerBound)
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
 		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned64bitIntegerAdddress)
@@ -3145,12 +3243,8 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfMinimumSignedInt.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfMinimumSignedInt)
 
-	// Start emitting the error handling. These invalid flaot conversions are unrecoverable,
-	// so we must exit from the function with the dedicated status code.
-	// These existing code are jumped from cases where the original float value
-	// is either +-Inf, NaN or not in representative ranges of 64 bit signed integer
-	c.addSetJmpOrigins(jmpIfExceedsLowerBound, jmpIfNaN)
-	c.setJITStatus(jitCallStatusCodeInvalidFloatToIntConversion)
+	c.addSetJmpOrigins(jmpIfExceedsLowerBound)
+	c.setJITStatus(jitCallStatusIntegerOverflow)
 	c.returnFunction()
 
 	// We jump to the next instructions for valid cases.

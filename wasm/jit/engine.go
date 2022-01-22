@@ -200,7 +200,7 @@ var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 func (e *engine) callFramePush(callee *callFrame) {
 	e.callFrameNum++
 	if callStackCeiling < e.callFrameNum {
-		panic(wasm.ErrCallStackOverflow)
+		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
 
 	// Push the new frame to the top of stack.
@@ -264,12 +264,15 @@ const (
 	jitCallStatusCodeUnreachable
 	// jitCallStatusCodeInvalidFloatToIntConversion means a invalid conversion of integer to floats happened.
 	jitCallStatusCodeInvalidFloatToIntConversion
-	// jitCallStatusCodeMemoryOutOfBounds means a out of bounds memory access happened.
+	// jitCallStatusCodeMemoryOutOfBounds means an out of bounds memory access happened.
 	jitCallStatusCodeMemoryOutOfBounds
-	// jitCallStatusCodeTableOutOfBounds means the offset to table exceeds the length of table during call_indirect.
-	jitCallStatusCodeTableOutOfBounds
+	// jitCallStatusCodeInvalidTableAccess means either offset to the table was out of bounds of table, or
+	// the target element in the table was uninitialized during call_indirect instruction.
+	jitCallStatusCodeInvalidTableAccess
 	// jitCallStatusCodeTypeMismatchOnIndirectCall means the type check failed during call_indirect.
 	jitCallStatusCodeTypeMismatchOnIndirectCall
+	jitCallStatusIntegerOverflow
+	jitCallStatusIntegerDivisionByZero
 )
 
 func (s jitCallStatusCode) String() (ret string) {
@@ -473,21 +476,20 @@ func (e *engine) execFunction(f *compiledFunction) {
 				}
 			}
 			currentFrame.continuationAddress = currentFrame.compiledFunction.codeInitialAddress + e.continuationAddressOffset
+		case jitCallStatusIntegerOverflow:
+			panic(wasm.ErrRuntimeIntegerOverflow)
+		case jitCallStatusIntegerDivisionByZero:
+			panic(wasm.ErrRuntimeIntegerDivideByZero)
 		case jitCallStatusCodeInvalidFloatToIntConversion:
-			// TODO: have wasm.ErrInvalidFloatToIntConversion and use it here.
-			panic("invalid float to int conversion")
+			panic(wasm.ErrRuntimeInvalidConversionToInteger)
 		case jitCallStatusCodeUnreachable:
-			// TODO: have wasm.ErrUnreachable and use it here.
-			panic("unreachable")
+			panic(wasm.ErrRuntimeUnreachable)
 		case jitCallStatusCodeMemoryOutOfBounds:
-			// TODO: have wasm.ErrMemoryOutOfBounds and use it here.
-			panic("out of bounds memory access")
-		case jitCallStatusCodeTableOutOfBounds:
-			// TODO: have wasm.ErrTableOutOfBounds and use it here.
-			panic("out of bounds table access")
+			panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+		case jitCallStatusCodeInvalidTableAccess:
+			panic(wasm.ErrRuntimeInvalidTableAcces)
 		case jitCallStatusCodeTypeMismatchOnIndirectCall:
-			// TODO: have wasm.ErrTypeMismatchOnIndirectCall and use it here.
-			panic("type mismatch on indirect function call")
+			panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
 		}
 	}
 }

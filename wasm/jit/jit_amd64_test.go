@@ -2799,17 +2799,6 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 	})
 }
 
-// The division by zero error must be caught by Go's runtime via x86's exception caught by kernel.
-func getDivisionByZeroErrorRecoverFunc(t *testing.T) func() {
-	return func() {
-		if e := recover(); e != nil {
-			err, ok := e.(error)
-			require.True(t, ok)
-			require.Equal(t, "runtime error: integer divide by zero", err.Error())
-		}
-	}
-}
-
 func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -3107,7 +3096,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 						const dxValue uint64 = 111111
-						for i, vs := range []struct {
+						for _, vs := range []struct {
 							x1Value, x2Value uint32
 						}{
 							{x1Value: 2, x2Value: 1},
@@ -3115,12 +3104,13 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							{x1Value: 0, x2Value: 2},
 							{x1Value: 1, x2Value: 0},
 							{x1Value: 0, x2Value: 0},
+							{x1Value: 0x80000000, x2Value: 0xffffffff}, // This is equivalent to (-2^31 / -1) and results in overflow.
 							// Following cases produce different resulting bit patterns for signed and unsigned.
 							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 1},
 							{x1Value: 0xffffffff /* -1 in signed 32bit */, x2Value: 0xfffffffe /* -2 in signed 32bit */},
 						} {
 							vs := vs
-							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+							t.Run(fmt.Sprintf("%d/%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
 								compiler := requireNewCompiler(t)
@@ -3180,10 +3170,16 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								require.NoError(t, err)
 
 								// Run code.
-								if vs.x2Value == 0 {
-									defer getDivisionByZeroErrorRecoverFunc(t)()
-								}
 								env.exec(code)
+
+								if vs.x2Value == 0 {
+									require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									return
+								} else if signed.signed && int32(vs.x2Value) == -1 && int32(vs.x1Value) == int32(math.MinInt32) {
+									// (-2^31 / -1) = 2 ^31 is larger than the upper limit of 32-bit signed integer.
+									require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
+									return
+								}
 
 								// Verify the stack is in the form of ["any value previously used by DX" + x1 / x2]
 								require.Equal(t, uint64(1), env.stackPointer())
@@ -3258,7 +3254,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 						const dxValue uint64 = 111111
-						for i, vs := range []struct {
+						for _, vs := range []struct {
 							x1Value, x2Value uint64
 						}{
 							{x1Value: 2, x2Value: 1},
@@ -3266,12 +3262,13 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							{x1Value: 0, x2Value: 1},
 							{x1Value: 1, x2Value: 0},
 							{x1Value: 0, x2Value: 0},
+							{x1Value: 0x8000000000000000, x2Value: 0xffffffffffffffff}, // This is equivalent to (-2^63 / -1) and results in overflow.
 							// Following cases produce different resulting bit patterns for signed and unsigned.
 							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 1},
 							{x1Value: 0xffffffffffffffff /* -1 in signed 64bit */, x2Value: 0xfffffffffffffffe /* -2 in signed 64bit */},
 						} {
 							vs := vs
-							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+							t.Run(fmt.Sprintf("%d/%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
 								compiler := requireNewCompiler(t)
@@ -3329,11 +3326,18 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// Generate the code under test.
 								code, _, _, err := compiler.generate()
 								require.NoError(t, err)
+
 								// Run code.
-								if vs.x2Value == 0 {
-									defer getDivisionByZeroErrorRecoverFunc(t)()
-								}
 								env.exec(code)
+
+								if vs.x2Value == 0 {
+									require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									return
+								} else if signed.signed && int64(vs.x2Value) == -1 && int64(vs.x1Value) == int64(math.MinInt64) {
+									// (-2^63 / -1) = 2 ^63 is larger than the upper limit of 64-bit signed integer.
+									require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
+									return
+								}
 
 								// Verify the stack is in the form of ["any value previously used by DX" + x1 / x2]
 								require.Equal(t, uint64(1), env.stackPointer())
@@ -3626,10 +3630,11 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								require.NoError(t, err)
 
 								// Run code.
-								if vs.x2Value == 0 {
-									defer getDivisionByZeroErrorRecoverFunc(t)()
-								}
 								env.exec(code)
+								if vs.x2Value == 0 {
+									require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									return
+								}
 
 								// Verify the stack is in the form of ["any value previously used by DX" + x1 / x2]
 								require.Equal(t, uint64(1), env.stackPointer())
@@ -3780,13 +3785,13 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// Generate the code under test.
 								code, _, _, err := compiler.generate()
 								require.NoError(t, err)
-								// Run code.
-								if vs.x2Value == 0 {
-									defer getDivisionByZeroErrorRecoverFunc(t)()
-								}
 
 								// Run code.
 								env.exec(code)
+								if vs.x2Value == 0 {
+									require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									return
+								}
 
 								// Verify the stack is in the form of ["any value previously used by DX" + x1 / x2]
 								require.Equal(t, uint64(1), env.stackPointer())
@@ -4057,6 +4062,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				1.37438953472e+11, /* = 1 << 37 */
 				-1.37438953472e+11,
 				-2147483649.0,
+				2147483648.0,
 				math.MinInt32,
 				math.MaxInt32,
 				math.MaxUint32,
@@ -4116,49 +4122,69 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					env.exec(code)
 
 					// Check the result.
-					var shouldInvalidStatus bool
+					expStatus := jitCallStatusCodeReturned
+					if math.IsNaN(v) {
+						expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+					}
 					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt32 || f32 >= math.MaxInt32
-						if !shouldInvalidStatus {
+						if f32 < math.MinInt32 || f32 >= math.MaxInt32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(float64(f32))), env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt64 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < math.MinInt64 || f32 >= math.MaxInt64
-						if !shouldInvalidStatus {
+						if f32 < math.MinInt64 || f32 >= math.MaxInt64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int64(math.Trunc(float64(f32))), env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
-						shouldInvalidStatus = math.IsNaN(v) || v < math.MinInt32 || v > math.MaxInt32
-						if !shouldInvalidStatus {
+						// ???????
+						if v < math.MinInt32 || v > math.MaxInt32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(v)), env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt64 {
-						shouldInvalidStatus = math.IsNaN(v) || v < math.MinInt64 || v >= math.MaxInt64
-						if !shouldInvalidStatus {
+						if v < math.MinInt64 || v >= math.MaxInt64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int64(math.Trunc(v)), env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < 0 || f32 >= math.MaxUint32
-						if !shouldInvalidStatus {
+						if f32 < 0 || f32 >= math.MaxUint32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint32(math.Trunc(float64(f32))), env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
-						shouldInvalidStatus = math.IsNaN(v) || v < 0 || v > math.MaxUint32
-						if !shouldInvalidStatus {
+						if v < 0 || v > math.MaxUint32 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint32(math.Trunc(v)), env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
 						f32 := float32(v)
-						shouldInvalidStatus = math.IsNaN(v) || f32 < 0 || f32 >= math.MaxUint64
-						if !shouldInvalidStatus {
+						if f32 < 0 || f32 >= math.MaxUint64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint64(math.Trunc(float64(f32))), env.stackTopAsUint64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
-						shouldInvalidStatus = math.IsNaN(v) || v < 0 || v >= math.MaxUint64
-						if !shouldInvalidStatus {
+						if v < 0 || v >= math.MaxUint64 {
+							expStatus = jitCallStatusIntegerOverflow
+						}
+						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint64(math.Trunc(v)), env.stackTopAsUint64())
 						}
 					} else {
@@ -4166,7 +4192,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					}
 
 					// Check the jit status code if necessary.
-					require.True(t, !shouldInvalidStatus || env.jitStatus() == jitCallStatusCodeInvalidFloatToIntConversion)
+					require.Equal(t, expStatus, env.jitStatus())
 				})
 			}
 		})
@@ -5719,7 +5745,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		// Place the offfset value.
 		loc := compiler.locationStack.pushValueOnStack()
-		env.stack()[loc.stackPointer] = 1000000000
+		env.stack()[loc.stackPointer] = 10
 
 		// Now emit the code.
 		compiler.initializeReservedRegisters()
@@ -5733,7 +5759,40 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		// Run code.
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeTableOutOfBounds, env.jitStatus())
+		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+	})
+
+	t.Run("uninitialized", func(t *testing.T) {
+		env := newJITEnvironment()
+		table := make([]wasm.TableElement, 10)
+		env.setTable(table)
+
+		compiler := requireNewCompiler(t)
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{
+			Type: &wasm.FunctionType{}, TypeID: 1000}}}}
+		// and the typeID doesn't match the table[targetOffset]'s type ID.
+		table[0] = wasm.TableElement{FunctionTypeID: wasm.UninitializedTableElelemtTypeID}
+
+		// Place the offfset value.
+		err := compiler.compileConstI32(targetOffset)
+		require.NoError(t, err)
+
+		// Now emit the code.
+		compiler.initializeReservedRegisters()
+		require.NoError(t, compiler.compileCallIndirect(targetOperation))
+
+		// Generate the code under test.
+		compiler.returnFunction()
+		code, _, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
 	})
 
 	t.Run("type not match", func(t *testing.T) {

@@ -74,7 +74,7 @@ func (it *interpreter) drop(r *InclusiveRange) {
 
 func (it *interpreter) pushFrame(frame *interpreterFrame) {
 	if callStackCeiling <= len(it.frames) {
-		panic(wasm.ErrCallStackOverflow)
+		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
 	it.frames = append(it.frames, frame)
 }
@@ -443,6 +443,9 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 			it.frames = it.frames[:prevFrameLen]
 			err2, ok := v.(error)
 			if ok {
+				if err2.Error() == "runtime error: integer divide by zero" {
+					err2 = wasm.ErrRuntimeIntegerDivideByZero
+				}
 				err = fmt.Errorf("wasm runtime error: %w", err2)
 			} else {
 				err = fmt.Errorf("wasm runtime error: %v", v)
@@ -536,7 +539,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		// how the stack is modified, etc.
 		switch op.kind {
 		case OperationKindUnreachable:
-			panic("unreachable")
+			panic(wasm.ErrRuntimeUnreachable)
 		case OperationKindBr:
 			{
 				frame.pc = op.us[0]
@@ -574,15 +577,21 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindCallIndirect:
 			{
 				offset := it.pop()
-				target := it.functions[table.Table[offset].FunctionAddress]
-				// Type check.
-				expType := target.funcInstance.FunctionType
-				if uint64(expType.TypeID) != op.us[1] {
-					panic("function type mismatch on call_indirect")
+				if offset >= uint64(len(table.Table)) {
+					panic(wasm.ErrRuntimeInvalidTableAcces)
 				}
+				tableElement := table.Table[offset]
+				// Type check.
+				if uint64(tableElement.FunctionTypeID) != op.us[1] {
+					if tableElement.FunctionTypeID == wasm.UninitializedTableElelemtTypeID {
+						panic(wasm.ErrRuntimeInvalidTableAcces)
+					}
+					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
+				}
+				target := it.functions[table.Table[offset].FunctionAddress]
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(expType.Type.Params):]...)
+					it.callHostFunc(target, it.stack[len(it.stack)-len(target.funcInstance.FunctionType.Type.Params):]...)
 				} else {
 					it.callNativeFunc(target)
 				}
@@ -631,8 +640,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				base := op.us[1] + it.pop()
 				switch UnsignedType(op.b1) {
 				case UnsignedTypeI32, UnsignedTypeF32:
+					if uint64(len(memoryInst.Buffer)) < base+4 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					it.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
 				case UnsignedTypeI64, UnsignedTypeF64:
+					if uint64(len(memoryInst.Buffer)) < base+8 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					it.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
 				}
 				frame.pc++
@@ -640,6 +655,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad8:
 			{
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+1 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				switch SignedInt(op.b1) {
 				case SignedInt32, SignedInt64:
 					it.push(uint64(int8(memoryInst.Buffer[base])))
@@ -651,6 +669,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad16:
 			{
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+2 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				switch SignedInt(op.b1) {
 				case SignedInt32, SignedInt64:
 					it.push(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
@@ -662,6 +683,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case OperationKindLoad32:
 			{
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+4 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				if op.b1 == 1 {
 					it.push(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
 				} else {
@@ -675,8 +699,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				base := op.us[1] + it.pop()
 				switch UnsignedType(op.b1) {
 				case UnsignedTypeI32, UnsignedTypeF32:
+					if uint64(len(memoryInst.Buffer)) < base+4 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], uint32(val))
 				case UnsignedTypeI64, UnsignedTypeF64:
+					if uint64(len(memoryInst.Buffer)) < base+8 {
+						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+					}
 					binary.LittleEndian.PutUint64(memoryInst.Buffer[base:], val)
 				}
 				frame.pc++
@@ -685,6 +715,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				val := byte(it.pop())
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+1 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				memoryInst.Buffer[base] = val
 				frame.pc++
 			}
@@ -692,6 +725,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				val := uint16(it.pop())
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+2 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				binary.LittleEndian.PutUint16(memoryInst.Buffer[base:], val)
 				frame.pc++
 			}
@@ -699,6 +735,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			{
 				val := uint32(it.pop())
 				base := op.us[1] + it.pop()
+				if uint64(len(memoryInst.Buffer)) < base+4 {
+					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
+				}
 				binary.LittleEndian.PutUint32(memoryInst.Buffer[base:], val)
 				frame.pc++
 			}
@@ -974,15 +1013,15 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				case SignedTypeInt32:
 					v2 := int32(it.pop())
 					v1 := int32(it.pop())
-					if v2 == 0 || (v1 == math.MinInt32 && v2 == -1) {
-						panic("undefined")
+					if v1 == math.MinInt32 && v2 == -1 {
+						panic(wasm.ErrRuntimeIntegerOverflow)
 					}
 					it.push(uint64(uint32(v1 / v2)))
 				case SignedTypeInt64:
 					v2 := int64(it.pop())
 					v1 := int64(it.pop())
-					if v2 == 0 || (v1 == math.MinInt64 && v2 == -1) {
-						panic("undefined")
+					if v1 == math.MinInt64 && v2 == -1 {
+						panic(wasm.ErrRuntimeIntegerOverflow)
 					}
 					it.push(uint64(v1 / v2))
 				case SignedTypeUint32:
@@ -1300,35 +1339,35 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 					case SignedInt32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(int32(v)))
 					case SignedInt64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := int64(v)
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v > 0 && res < 0 {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(res))
 					case SignedUint32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(uint32(v)))
 					case SignedUint64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := uint64(v)
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > float64(res) {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(res)
 					}
@@ -1338,35 +1377,35 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 					case SignedInt32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(int32(v)))
 					case SignedInt64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := int64(v)
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v > 0 && res < 0 {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(res))
 					case SignedUint32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(uint32(v)))
 					case SignedUint64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := uint64(v)
 						if math.IsNaN(v) {
-							panic("invalid conversion")
+							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > float64(res) {
-							panic("integer overflow")
+							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(res)
 					}
