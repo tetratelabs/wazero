@@ -1826,10 +1826,6 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		return err
 	}
 
-	if x2.register == quotientRegister || x2.register == remainderRegister {
-		panic("a?")
-	}
-
 	// Check if the x2 equals zero.
 	checkDivisorZero := c.newProg()
 	if is32Bit {
@@ -1856,9 +1852,6 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	c.addSetJmpOrigins(jmpIfNotZero)
 
 	// Ensure that previously existing values on AX and DX registers are saved and unused.
-	if x2.register == quotientRegister || x2.register == remainderRegister {
-		panic("aa?")
-	}
 	c.locationStack.markRegisterUnused(quotientRegister)
 	c.locationStack.markRegisterUnused(remainderRegister)
 
