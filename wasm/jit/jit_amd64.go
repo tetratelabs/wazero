@@ -1815,7 +1815,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	c.onValueReleaseRegisterToStack(quotientRegister)
 	c.onValueReleaseRegisterToStack(remainderRegister)
 
-	// In order to ensure x2 is placed on a register temporary register for x2 value other than AX and DX,
+	// In order to ensure x2 is placed on a temporary register for x2 value other than AX and DX,
 	// we mark them as used here.
 	c.locationStack.markRegisterUsed(quotientRegister)
 	c.locationStack.markRegisterUsed(remainderRegister)
@@ -1825,6 +1825,11 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return err
 	}
+
+	// Now we successfully place x2 on a temp register, so we no longer need to
+	// mark these regiseters used.
+	c.locationStack.markRegisterUnused(quotientRegister)
+	c.locationStack.markRegisterUnused(remainderRegister)
 
 	// Check if the x2 equals zero.
 	checkDivisorZero := c.newProg()
@@ -1850,10 +1855,6 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	c.returnFunction()
 
 	c.addSetJmpOrigins(jmpIfNotZero)
-
-	// Ensure that previously existing values on AX and DX registers are saved and unused.
-	c.locationStack.markRegisterUnused(quotientRegister)
-	c.locationStack.markRegisterUnused(remainderRegister)
 
 	// Next, we ensure that x1 is placed on AX.
 	x1 := c.locationStack.pop()
@@ -1934,6 +1935,10 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		// Set the normal case's jump target.
 		c.addSetJmpOrigins(okJmp)
 	} else if isSignedDiv {
+		// For sigined division, we have to have branches for "math.MinInt{32,64} / -1"
+		// case which results in the floating point exception via division error as
+		// the resulting value exceeds the maximum of signed int.
+
 		// First we compare the division with -1.
 		cmpDivisorWithMinusOne := c.newProg()
 		if is32Bit {
