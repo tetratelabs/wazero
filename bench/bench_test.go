@@ -12,13 +12,13 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/jit"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 func BenchmarkEngines(b *testing.B) {
 	b.Run("wazeroir", func(b *testing.B) {
-		store := newStore(wazeroir.NewEngine())
+		store := newStore(interpreter.NewEngine())
 		setUpStore(store)
 		runAllBenches(b, store)
 	})

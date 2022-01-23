@@ -17,7 +17,7 @@ func main() {
 	// Decode the binary as WebAssembly module.
 	mod, _ := binary.DecodeModule(source)
 	// Initialize the execution environment called "store" with Interpreter-based engine.
-	store := wasm.NewStore(wazeroir.NewEngine())
+	store := wasm.NewStore(interpreter.NewEngine())
 	// Instantiate the decoded module.
 	store.Instantiate(mod, "test")
 	// Execute the exported "fibonacci" function from the instantiated module.
@@ -41,7 +41,7 @@ Both of engines passes 100% of [WebAssembly spec test suites]((https://github.co
 
 | Engine     | Usage|GOARCH=amd64 | GOARCH=others | 
 |:----------:|:---:|:-------------:|:------:|
-| Interpreter|`wazeroir.NewEngine()`| ✅    | ✅ | 
+| Interpreter|`interpreter.NewEngine()`| ✅    | ✅ | 
 | JIT engine |`jit.NewEngine()`|   ✅   | ❌  |
 
 

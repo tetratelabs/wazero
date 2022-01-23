@@ -1,4 +1,4 @@
-package wazeroir
+package interpreter
 
 import (
 	"testing"

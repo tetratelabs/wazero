@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/tetratelabs/wazero/wasm/ieee754"
-	"github.com/tetratelabs/wazero/wasm/leb128"
+	"github.com/tetratelabs/wazero/wasm/internal/ieee754"
+	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
 type (

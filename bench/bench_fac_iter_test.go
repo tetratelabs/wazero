@@ -9,8 +9,8 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/jit"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 // TestFacIter ensures that the code in BenchmarkFacIter works as expected.
@@ -54,7 +54,7 @@ func TestFacIter(t *testing.T) {
 func BenchmarkFacIter(b *testing.B) {
 	const in = 30
 	b.Run("wazeroir", func(b *testing.B) {
-		store := newStoreForFacIterBench(wazeroir.NewEngine())
+		store := newStoreForFacIterBench(interpreter.NewEngine())
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_, _, err := store.CallFunction("test", "fac-iter", in)

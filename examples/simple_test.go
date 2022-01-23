@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/text"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 // Test_Simple implements a basic function in go: hello. This is imported as the Wasm name "$hello" and run on start.
@@ -22,7 +22,7 @@ func Test_Simple(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a new store and add the function "hello" which the module imports
-	store := wasm.NewStore(wazeroir.NewEngine())
+	store := wasm.NewStore(interpreter.NewEngine())
 
 	stdout := new(bytes.Buffer)
 	hostFunction := func(_ *wasm.HostFunctionCallContext) {

@@ -22,7 +22,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
+	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
 var (

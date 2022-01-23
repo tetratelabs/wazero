@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/ieee754"
-	"github.com/tetratelabs/wazero/wasm/leb128"
+	"github.com/tetratelabs/wazero/wasm/internal/ieee754"
+	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
 func decodeConstantExpression(r io.Reader) (*wasm.ConstantExpression, error) {

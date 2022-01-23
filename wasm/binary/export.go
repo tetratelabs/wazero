@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/leb128"
+	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
 func decodeExport(r *bytes.Reader) (i *wasm.Export, err error) {
