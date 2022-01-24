@@ -20,10 +20,6 @@ type indexParser struct {
 // Ex. Given the source `(module (start $main))`
 //             parseIndex starts here --^    ^
 //               onIndexEnd is called here --+
-//
-// The onIndexEnd parameter is invoked once any "param" and "result" fields have been consumed.
-//
-// NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (import (func)))`
 func (p *indexParser) beginParsingIndex(onIndexEnd func(*index)) tokenParser {
 	p.onIndexEnd = onIndexEnd
 	p.currentIndex = nil

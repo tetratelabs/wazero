@@ -33,20 +33,26 @@ type module struct {
 	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
 	typeParamNames map[wasm.Index]wasm.NameMap
 
+	// funcNames are nil when no importFunc or function had a name
+	//
+	// See wasm.NameSection FunctionNames
+	funcNames wasm.NameMap
+
+	// paramNames are nil when no importFuncs or function had named (param) fields.
+	//
+	// Note: When set, this combines with any typeParamNames to produce wasm.NameSection LocalNames.
+	// This can't be done when parsing a function because types can be declared after the function that uses them.
+	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
+	paramNames wasm.IndirectNameMap
+
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
 
-	// importFuncNames are nil when no importFunc had a name
-	//
-	// See wasm.NameSection FunctionNames
-	importFuncNames wasm.NameMap
+	// funcs are functions added in insertion order. Ex (module (func...))
+	funcs []*function
 
-	// importFuncParamNames are nil when no importFuncs had named (param) fields.
-	//
-	// Note: When set, this combines with any typeParamNames to produce wasm.NameSection LocalNames.
-	// This can't be done when parsing an import because types can be declared after the import that uses them.
-	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
-	importFuncParamNames wasm.IndirectNameMap
+	// typeUses comprise the function index namespace of importFuncs followed by funcs
+	typeUses []*typeUse
 
 	// exportFuncs are exports describing functions added in insertion order. Ex (export... (func...))
 	exportFuncs []*exportFunc
@@ -75,7 +81,7 @@ type inlinedTypeFunc struct {
 //
 // https://www.w3.org/TR/wasm-core-1/#indices%E2%91%A4
 type index struct {
-	// ID is set when its corresponding token is tokenID to a symbolic identifier index. Ex. $main
+	// ID is set when its corresponding token is tokenID to a symbolic identifier index. Ex. main
 	//
 	// Note: This must be checked for a corresponding index element name, as it is possible it doesn't exist.
 	// Ex. This is $t0 from (import "Math" "PI" (func (type $t0))), but (type $t0 (func ...)) does not exist.
@@ -127,6 +133,7 @@ func funcTypeEquals(t *typeFunc, params []wasm.ValueType, result wasm.ValueType)
 
 // importFunc corresponds to the text format of a WebAssembly function import.
 //
+// Note: the type usage of this import is at module.typeUses the same index as module.importFuncs
 // Note: nothing is required per specification. Ex `(import "" "" (func))` is valid!
 //
 // See https://www.w3.org/TR/wasm-core-1/#imports%E2%91%A0
@@ -143,7 +150,28 @@ type importFunc struct {
 	//
 	// Note this is not necessarily a wasm.NameAssoc Name in wasm.NameSection FunctionNames
 	name string
+}
 
+// function corresponds to the text format of a WebAssembly function.
+//
+// Note: the type usage of this function is in module.typeUses at the index in module.funcs offset by the length of
+// module.importFuncs. For example, if this function is module.funcs[2] and there are 3 module.importFuncs. The type use
+// is at module.typeUses[5]
+//
+// Note: nothing is required per specification. Ex `(func)` is valid!
+//
+// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
+type function struct {
+	// body are the instructions of this function encoded WebAssembly 1.0 (MVP) binary format
+	body []byte
+}
+
+// typeUse corresponds to the text format of an indexed or inlined type signature.
+//
+// Note: nothing is required per specification. Ex `(func)` is valid!
+//
+// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
+type typeUse struct {
 	// typeIndex is the optional index in module.types for the function signature. If index.ID is set, it must match
 	// typeFunc.name.
 	//

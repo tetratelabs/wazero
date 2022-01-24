@@ -27,7 +27,7 @@ func TestBuildFunctionInstances_FunctionNames(t *testing.T) {
 	mi := s.getModuleInstance(name)
 
 	zero := Index(0)
-	nopCode := &Code{0, nil, []byte{OpcodeNop, OpcodeEnd}}
+	nopCode := &Code{nil, []byte{OpcodeEnd}}
 	m := &Module{
 		TypeSection:     []*FunctionType{{}},
 		FunctionSection: []Index{zero, zero, zero, zero, zero},

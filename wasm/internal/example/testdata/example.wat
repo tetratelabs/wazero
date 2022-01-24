@@ -12,7 +12,14 @@
 	(import "Math" "Add" (func $add (type $i32i32_i32) (param $l i32) (param $r i32) (result i32)))
 	(type (func))
 	(import "" "hello" (func $hello (type 1)))
-	;; re-export a.k.a. proxy a function!
-    (export "args_sizes_get" (func $runtime.args_sizes_get))
 	(start $hello)
+	;; from https://github.com/summerwind/the-art-of-webassembly-go/blob/main/chapter1/addint/addint.wat
+    (func $addInt ;; TODO: function exports (export "AddInt")
+        (param $value_1 i32) (param $value_2 i32)
+        (result i32)
+        local.get 0 ;; TODO: instruction variables $value_1
+        local.get 1 ;; TODO: instruction variables $value_2
+        i32.add
+    )
+    (export "AddInt" (func $addInt))
 )

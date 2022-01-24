@@ -50,7 +50,7 @@ func decodeImport(r *bytes.Reader) (i *wasm.Import, err error) {
 
 // encodeImport returns the wasm.Import encoded in WebAssembly 1.0 (MVP) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
+// See https://www.w3.org/TR/wasm-core-1/#binary-import
 func encodeImport(i *wasm.Import) []byte {
 	data := encodeSizePrefixed([]byte(i.Module))
 	data = append(data, encodeSizePrefixed([]byte(i.Name))...)

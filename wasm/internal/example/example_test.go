@@ -58,12 +58,12 @@ func newExample() *wasm.Module {
 				DescFunc: 1,
 			},
 		},
+		FunctionSection: []wasm.Index{wasm.Index(0)},
 		ExportSection: map[string]*wasm.Export{
-			"args_sizes_get": {
-				Name:  "args_sizes_get",
-				Kind:  wasm.ExportKindFunc,
-				Index: wasm.Index(0),
-			},
+			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(5)},
+		},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 		},
 		StartSection: &four,
 		NameSection: &wasm.NameSection{
@@ -74,6 +74,7 @@ func newExample() *wasm.Module {
 				{Index: wasm.Index(2), Name: "mul"},
 				{Index: wasm.Index(3), Name: "add"},
 				{Index: wasm.Index(4), Name: "hello"},
+				{Index: wasm.Index(5), Name: "addInt"},
 			},
 			LocalNames: wasm.IndirectNameMap{
 				{Index: wasm.Index(1), NameMap: wasm.NameMap{
@@ -89,6 +90,10 @@ func newExample() *wasm.Module {
 				{Index: wasm.Index(3), NameMap: wasm.NameMap{
 					{Index: wasm.Index(0), Name: "l"},
 					{Index: wasm.Index(1), Name: "r"},
+				}},
+				{Index: wasm.Index(5), NameMap: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "value_1"},
+					{Index: wasm.Index(1), Name: "value_2"},
 				}},
 			},
 		},

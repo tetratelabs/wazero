@@ -108,8 +108,9 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		}
 	}
 
-	if len(m.FunctionSection) != len(m.CodeSection) {
-		return nil, fmt.Errorf("function and code section have inconsistent lengths")
+	functionCount, codeCount := len(m.FunctionSection), len(m.CodeSection)
+	if functionCount != codeCount {
+		return nil, fmt.Errorf("function and code section have inconsistent lengths: %d != %d", functionCount, codeCount)
 	}
 	return m, nil
 }
