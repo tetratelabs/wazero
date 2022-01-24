@@ -511,7 +511,7 @@ func (p *moduleParser) parseFuncName(tok tokenType, tokenBytes []byte, line, col
 	return p.parseFunc(tok, tokenBytes, line, col)
 }
 
-// parseFunc is the second parser inside the ed function field. This passes control to the typeParser until
+// parseFunc is the second parser inside a module defined function field. This passes control to the typeParser until
 // any signature is read, then funcParser for any locals. Finally, this sets the next parser to parseFuncEnd.
 //
 // Ex. `(module (func $math.pi (result f32))`
