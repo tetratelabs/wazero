@@ -82,6 +82,21 @@ type moduleParser struct {
 	typeParser  *typeParser
 	indexParser *indexParser
 	funcParser  *funcParser
+
+	// typeNameToIndex is only used for resolving symbolic index names to numeric ones.
+	//
+	// Note: This is not encoded in the wasm.NameSection as there is no type name section in WebAssembly 1.0 (MVP)
+	typeNameToIndex map[string]wasm.Index
+
+	// funcNameToIndex is only used for resolving symbolic index names to numeric ones. It contains any imported or
+	// module-defined function names and points to the function index which is preceded by imports.
+	//
+	// Note: this should be updated alongside module.names FunctionNames
+	funcNameToIndex map[string]wasm.Index
+
+	// typeParamNames are nil when no types had named (param) fields.
+	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
+	typeParamNames map[wasm.Index]wasm.NameMap
 }
 
 // parse has the same signature as tokenParser and called by lex on each token.
@@ -99,7 +114,7 @@ func (p *moduleParser) parse(tok tokenType, tokenBytes []byte, line, col uint32)
 // * module is the result of parsing or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 func parseModule(source []byte) (*module, error) {
-	p := moduleParser{source: source, module: &module{}, indexParser: &indexParser{}}
+	p := moduleParser{source: source, module: &module{names: &wasm.NameSection{}}, indexParser: &indexParser{}}
 	p.typeParser = &typeParser{m: &p}
 	p.funcParser = &funcParser{m: &p, onBodyEnd: p.parseFuncEnd}
 
@@ -115,8 +130,15 @@ func parseModule(source []byte) (*module, error) {
 	p.module.types = append(p.module.types, p.typeParser.inlinedTypes...)
 
 	// Ensure indices only point to numeric values
-	if err = bindIndices(p.module); err != nil {
+	if err = bindIndices(p.module, p.typeNameToIndex, p.funcNameToIndex); err != nil {
 		return nil, err
+	}
+
+	// Don't set the name section unless we found a name!
+	names := p.module.names
+	names.LocalNames = mergeLocalNames(p.module, p.typeParamNames)
+	if names.ModuleName == "" && names.FunctionNames == nil && names.LocalNames == nil {
+		p.module.names = nil
 	}
 
 	return p.module, nil
@@ -162,7 +184,7 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 			p.tokenParser = p.parseImportModule
 		case "func":
 			p.currentField = fieldModuleFunc
-			p.module.funcs = append(p.module.funcs, &function{})
+			p.module.code = append(p.module.code, &wasm.Code{})
 			p.tokenParser = p.parseFuncName
 		case "export":
 			p.currentField = fieldModuleExport
@@ -183,9 +205,8 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 		// Add the next import func object and ready for parsing it.
 		if string(fieldName) == "func" {
 			p.module.importFuncs = append(p.module.importFuncs, &importFunc{
-				module:      string(p.currentValue0),
-				name:        string(p.currentValue1),
-				importIndex: p.currentFuncIndex,
+				module: string(p.currentValue0),
+				name:   string(p.currentValue1),
 			})
 
 			p.currentField = fieldModuleImportFunc
@@ -237,7 +258,7 @@ func (p *moduleParser) endField() {
 //   calls parseModule here --^
 func (p *moduleParser) parseModuleName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $Math
-		p.module.name = string(stripDollar(tokenBytes))
+		p.module.names.ModuleName = string(stripDollar(tokenBytes))
 		p.tokenParser = p.parseModule
 		return nil
 	}
@@ -334,15 +355,26 @@ func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col
 // the token is tokenRParen and sets the next parser to parseType on tokenRParen.
 func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		sig, localNames := p.typeParser.getType(string(p.currentValue0))
-		if localNames != nil {
-			idx := wasm.Index(len(p.module.types))
-			if p.module.typeParamNames == nil {
-				p.module.typeParamNames = map[wasm.Index]wasm.NameMap{idx: localNames}
+		sig, localNames := p.typeParser.getType()
+		idx := wasm.Index(len(p.module.types))
+
+		typeName := string(p.currentValue0)
+		if typeName != "" {
+			if p.typeNameToIndex == nil {
+				p.typeNameToIndex = map[string]wasm.Index{typeName: idx}
 			} else {
-				p.module.typeParamNames[idx] = localNames
+				p.typeNameToIndex[typeName] = idx
 			}
 		}
+
+		if localNames != nil {
+			if p.typeParamNames == nil {
+				p.typeParamNames = map[wasm.Index]wasm.NameMap{idx: localNames}
+			} else {
+				p.typeParamNames[idx] = localNames
+			}
+		}
+
 		p.module.types = append(p.module.types, sig)
 		p.currentValue0 = nil
 		p.currentField = fieldModuleType
@@ -446,12 +478,22 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 //                    calls parseImportFunc here --^
 func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
-		na := &wasm.NameAssoc{Index: p.currentFuncIndex, Name: string(stripDollar(tokenBytes))}
-		p.module.funcNames = append(p.module.funcNames, na)
+		p.addFuncName(tokenBytes)
 		p.tokenParser = p.parseImportFunc
 		return nil
 	}
 	return p.parseImportFunc(tok, tokenBytes, line, col)
+}
+
+// addFuncName adds the normalized ('$' stripped) function name to the parser cache and the wasm.NameSection.
+func (p *moduleParser) addFuncName(idToken []byte) {
+	na := &wasm.NameAssoc{Index: p.currentFuncIndex, Name: string(stripDollar(idToken))}
+	p.module.names.FunctionNames = append(p.module.names.FunctionNames, na)
+	if p.funcNameToIndex == nil {
+		p.funcNameToIndex = map[string]wasm.Index{na.Name: na.Index}
+	} else {
+		p.funcNameToIndex[na.Name] = na.Index
+	}
 }
 
 // parseImportFunc is the second parser inside the imported function field. This passes control to the typeParser until
@@ -482,8 +524,8 @@ func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _
 		tu, paramNames := p.typeParser.getTypeUse()
 		p.module.typeUses = append(p.module.typeUses, tu)
 		if paramNames != nil {
-			p.module.paramNames =
-				append(p.module.paramNames, &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames})
+			p.module.names.LocalNames =
+				append(p.module.names.LocalNames, &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames})
 		}
 		p.currentField = fieldModuleImport
 		p.tokenParser = p.parseImport
@@ -503,8 +545,7 @@ func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _
 //              calls parseFunc here --^
 func (p *moduleParser) parseFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
-		na := &wasm.NameAssoc{Index: p.currentFuncIndex, Name: string(stripDollar(tokenBytes))}
-		p.module.funcNames = append(p.module.funcNames, na)
+		p.addFuncName(tokenBytes)
 		p.tokenParser = p.parseFunc
 		return nil
 	}
@@ -552,11 +593,12 @@ func (p *moduleParser) parseFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint3
 		tu, paramNames := p.typeParser.getTypeUse()
 		p.module.typeUses = append(p.module.typeUses, tu)
 		if paramNames != nil {
-			p.module.paramNames =
-				append(p.module.paramNames, &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames})
+			p.module.names.LocalNames =
+				append(p.module.names.LocalNames, &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames})
 		}
-		fn := p.module.funcs[p.currentFuncIndex-uint32(len(p.module.importFuncs))]
-		fn.body = p.funcParser.getBody()
+		code := p.module.code[p.currentFuncIndex-uint32(len(p.module.importFuncs))]
+		// TODO: localTypes
+		code.Body = p.funcParser.getBody()
 
 		// Multiple funcs are allowed, so advance in case there's a next.
 		p.currentFuncIndex++

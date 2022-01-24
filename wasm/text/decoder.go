@@ -15,20 +15,7 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	}
 
 	result = &wasm.Module{}
-
-	// Next, we need to convert the types from the text format into the binary one. This is easy because the only
-	// difference is that the text format has type names and the binary format does not.
-	typeCount := len(m.types)
-	if typeCount > 0 {
-		result.TypeSection = make([]*wasm.FunctionType, typeCount)
-		for i, t := range m.types {
-			var results []wasm.ValueType
-			if t.result != 0 {
-				results = []wasm.ValueType{t.result}
-			}
-			result.TypeSection[i] = &wasm.FunctionType{Params: t.params, Results: results}
-		}
-	}
+	result.TypeSection = m.types
 
 	// Now, handle any imported functions. Notably, we retain the same insertion order as defined in the text format in
 	// case a numeric index is used for the start function (or another reason such as the call instruction).
@@ -44,18 +31,14 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 		}
 	}
 
-	// Next, split the function into the Function and CodeSection
-	funcCount := len(m.funcs)
-	if funcCount > 0 {
+	// Add the type use of the function into the function section.
+	funcCount := len(m.code)
+	if funcCount != 0 {
 		result.FunctionSection = make([]wasm.Index, funcCount)
-		result.CodeSection = make([]*wasm.Code, funcCount)
-		for i, f := range m.funcs {
-			result.FunctionSection[i] = m.typeUses[importFuncCount+i].typeIndex.numeric
-			result.CodeSection[i] = &wasm.Code{
-				LocalTypes: nil, // TODO: locals
-				Body:       f.body,
-			}
+		for i := 0; i < funcCount; i++ {
+			result.FunctionSection[i] = m.typeUses[i+importFuncCount].typeIndex.numeric
 		}
+		result.CodeSection = m.code
 	}
 
 	// Now, handle any exported functions. Notably, we retain the same insertion order as defined in the text format.
@@ -76,55 +59,6 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	if m.startFunction != nil {
 		result.StartSection = &m.startFunction.numeric
 	}
-
-	// Don't set the name section unless we found a name!
-	if localNames := mergeLocalNames(m); localNames != nil || m.name != "" || m.funcNames != nil {
-		result.NameSection = &wasm.NameSection{
-			ModuleName:    m.name,
-			FunctionNames: m.funcNames,
-			LocalNames:    localNames,
-		}
-	}
+	result.NameSection = m.names
 	return
-}
-
-// mergeLocalNames produces wasm.NameSection LocalNames. This has to be done post-parse as types can be defined after
-// functions that use them.
-func mergeLocalNames(m *module) wasm.IndirectNameMap {
-	j, jLen := 0, len(m.paramNames)
-	if m.typeParamNames == nil && jLen == 0 {
-		return nil
-	}
-
-	// Parameters can be named on the type, and overridden via a function. This loop collects the final name for each
-	// function's parameters regardless of if it is an imported function or module defined.
-	var result wasm.IndirectNameMap
-	funcIndexSize := uint32(len(m.typeUses))
-	for i := uint32(0); i < funcIndexSize; i++ {
-		// seek to see if we have any function-defined parameter names
-		var inlinedNames wasm.NameMap
-		for ; j < jLen; j++ {
-			next := m.paramNames[j]
-			if next.Index > i {
-				break // we have parameter names, but starting at a later index
-			} else if next.Index == i {
-				inlinedNames = next.NameMap
-				break
-			}
-		}
-		typeNames, hasType := m.typeParamNames[m.typeUses[i].typeIndex.numeric]
-		var localNames wasm.NameMap
-		if inlinedNames == nil && !hasType {
-			continue
-		} else if inlinedNames == nil {
-			localNames = typeNames
-		} else {
-			// On conflict, choose the function names, as merge rules aren't defined in the specification. If there are
-			// names on the function, the user added them. They may not intend to inherit names they didn't define!
-			localNames = inlinedNames
-		}
-		result = append(result, &wasm.NameMapAssoc{Index: i, NameMap: localNames})
-	}
-	// TODO: function local names
-	return result
 }

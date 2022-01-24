@@ -22,8 +22,12 @@ type EncodeModule func(m *Module) (bytes []byte)
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#type-section%E2%91%A0
+	// Note: Currently, there is no type ambiguity in the index as WebAssembly 1.0 only defines function type.
+	// In the future, other types may be introduced to support features such as module linking.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#types%E2%91%A0%E2%91%A0
 	TypeSection []*FunctionType
+
 	// ImportSection contains imported functions, tables, memories or globals required for instantiation
 	// (Store.Instantiate).
 	//
@@ -122,8 +126,18 @@ type Module struct {
 // See https://www.w3.org/TR/wasm-core-1/#binary-index
 type Index = uint32
 
+// FunctionType is a possibly empty function signature.
+//
+// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A0
 type FunctionType struct {
-	Params, Results []ValueType
+	// Params are the possibly empty sequence of value types accepted by a function with this signature.
+	Params []ValueType
+
+	// Results are the possibly empty sequence of value types returned by a function with this signature.
+	//
+	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
+	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
+	Results []ValueType
 }
 
 // ValueType is the binary encoding of a type such as i32
