@@ -485,6 +485,7 @@ func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, lin
 	return p.parseImportFunc(tok, tokenBytes, line, col)
 }
 
+// addFuncName adds the normalized ('$' stripped) function name to the parser index and the wasm.NameSection.
 func (p *moduleParser) addFuncName(idToken []byte) {
 	na := &wasm.NameAssoc{Index: p.currentFuncIndex, Name: string(stripDollar(idToken))}
 	p.module.names.FunctionNames = append(p.module.names.FunctionNames, na)
