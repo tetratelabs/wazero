@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
 // typeParsingState is used to give an appropriate typeParser.errorContext
@@ -340,7 +340,7 @@ func (p *typeParser) getTypeUse() (ty *typeUse, paramNames wasm.NameMap) {
 	}
 
 	ty.typeInlined = &inlinedTypeFunc{
-		typeFunc: &wasm.FunctionType{p.currentParams, p.currentResults},
+		typeFunc: &wasm.FunctionType{Params: p.currentParams, Results: p.currentResults},
 		line:     p.currentTypeUseStartLine,
 		col:      p.currentTypeUseStartCol,
 	}

@@ -16,34 +16,6 @@ type module struct {
 	// types are the wasm.Module TypeSection
 	types []*wasm.FunctionType
 
-	// typeNameToIndex is only used for resolving symbolic index names to numeric ones.
-	//
-	// Note: This is not encoded in the wasm.NameSection as there is no type name section in WebAssembly 1.0 (MVP)
-	typeNameToIndex map[string]wasm.Index
-
-	// typeParamNames are nil when no types had named (param) fields.
-	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
-	typeParamNames map[wasm.Index]wasm.NameMap
-
-	// name is optional. For example, "test".
-	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
-	//
-	// Note: The name may also be stored in the wasm.Module CustomSection under the key "name" subsection 0.
-	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-	name string
-
-	// funcNames are nil when no importFunc or function had a name
-	//
-	// See wasm.NameSection FunctionNames
-	funcNames wasm.NameMap
-
-	// paramNames are nil when no importFuncs or function had named (param) fields.
-	//
-	// Note: When set, this combines with any typeParamNames to produce wasm.NameSection LocalNames.
-	// This can't be done when parsing a function because types can be declared after the function that uses them.
-	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
-	paramNames wasm.IndirectNameMap
-
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
 
@@ -65,6 +37,17 @@ type module struct {
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A4
 	startFunction *index
+
+	// names are the wasm.Module NameSection
+	//
+	// * ModuleName: ex. "test" if (module $test)
+	// * FunctionNames: nil when no importFunc or function had a name
+	// * LocalNames: nil when no importFuncs or function had named (param) fields.
+	//
+	// Note: LocalNames will be incomplete until the end of parsing because types can be declared after a function that
+	// uses them. typeUses are analyzed later for this reason.
+	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
+	names *wasm.NameSection
 }
 
 type inlinedTypeFunc struct {

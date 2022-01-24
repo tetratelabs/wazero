@@ -15,29 +15,31 @@ func TestBindIndices(t *testing.T) {
 	indexZero, indexOne := &index{numeric: 0}, &index{numeric: 1}
 
 	tests := []struct {
-		name            string
-		input, expected *module
+		name                 string
+		inputModule          *module
+		inputTypeNameToIndex map[string]wasm.Index
+		inputFuncNameToIndex map[string]wasm.Index
+		expected             *module
 	}{
 		{
 			name: "import function: inlined type to numeric index",
-			input: &module{
+			inputModule: &module{
 				types: []*wasm.FunctionType{paramI32I32I32I32ResultI32},
 				typeUses: []*typeUse{
 					{typeInlined: &inlinedTypeFunc{paramI32I32I32I32ResultI32, 0, 0}},
 				},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "fd_write"}},
-				funcNames: wasm.NameMap{{Index: wasm.Index(0), Name: "runtime.fd_write"}},
 			},
+			inputFuncNameToIndex: map[string]wasm.Index{"runtime.fd_write": wasm.Index(0)},
 			expected: &module{
-				types:    []*wasm.FunctionType{paramI32I32I32I32ResultI32},
-				typeUses: []*typeUse{{typeIndex: indexZero}},
+				types:       []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "fd_write"}},
-				funcNames: wasm.NameMap{{Index: wasm.Index(0), Name: "runtime.fd_write"}},
 			},
 		},
 		{
 			name: "import function: multiple inlined types to numeric indices",
-			input: &module{
+			inputModule: &module{
 				types: []*wasm.FunctionType{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				typeUses: []*typeUse{
 					{typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
@@ -47,10 +49,10 @@ func TestBindIndices(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
 				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				},
+			},
+			inputFuncNameToIndex: map[string]wasm.Index{
+				"runtime.args_sizes_get": wasm.Index(0),
+				"runtime.fd_write":       wasm.Index(1),
 			},
 			expected: &module{
 				types:    []*wasm.FunctionType{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
@@ -59,15 +61,11 @@ func TestBindIndices(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
 				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				},
 			},
 		},
 		{
 			name: "import function: multiple inlined types to same numeric index",
-			input: &module{
+			inputModule: &module{
 				types: []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses: []*typeUse{
 					{typeInlined: &inlinedTypeFunc{paramI32I32ResultI32, 0, 0}},
@@ -77,10 +75,10 @@ func TestBindIndices(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_get"},
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				},
+			},
+			inputFuncNameToIndex: map[string]wasm.Index{
+				"runtime.args_sizes_get": wasm.Index(0),
+				"runtime.fd_write":       wasm.Index(1),
 			},
 			expected: &module{
 				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
@@ -89,22 +87,15 @@ func TestBindIndices(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_get"},
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				},
 			},
 		},
 		{
 			name: "import function: multiple type names to numeric indices",
-			input: &module{
+			inputModule: &module{
 				types: []*wasm.FunctionType{
 					{},
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
-				},
-				typeNameToIndex: map[string]wasm.Index{
-					"i32i32_i32": wasm.Index(1), "i32i32i32i32_i32": wasm.Index(2),
 				},
 				typeUses: []*typeUse{
 					{typeIndex: &index{ID: "i32i32_i32", line: 5, col: 86}},
@@ -114,10 +105,13 @@ func TestBindIndices(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
 				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				},
+			},
+			inputTypeNameToIndex: map[string]wasm.Index{
+				"i32i32_i32": wasm.Index(1), "i32i32i32i32_i32": wasm.Index(2),
+			},
+			inputFuncNameToIndex: map[string]wasm.Index{
+				"runtime.args_sizes_get": wasm.Index(0),
+				"runtime.fd_write":       wasm.Index(1),
 			},
 			expected: &module{
 				types: []*wasm.FunctionType{
@@ -125,9 +119,6 @@ func TestBindIndices(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
-				typeNameToIndex: map[string]wasm.Index{
-					"i32i32_i32": wasm.Index(1), "i32i32i32i32_i32": wasm.Index(2),
-				},
 				typeUses: []*typeUse{
 					{typeIndex: &index{numeric: 1, line: 5, col: 86}},
 					{typeIndex: &index{numeric: 2, line: 6, col: 76}},
@@ -135,16 +126,12 @@ func TestBindIndices(t *testing.T) {
 				importFuncs: []*importFunc{
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
-				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 		},
 		{
 			name: "import function: multiple type numeric indices left alone",
-			input: &module{
+			inputModule: &module{
 				types: []*wasm.FunctionType{{}, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				typeUses: []*typeUse{
 					{typeIndex: &index{numeric: 1, line: 5, col: 86}},
@@ -154,10 +141,10 @@ func TestBindIndices(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
 				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				},
+			},
+			inputFuncNameToIndex: map[string]wasm.Index{
+				"runtime.args_sizes_get": wasm.Index(0),
+				"runtime.fd_write":       wasm.Index(1),
 			},
 			expected: &module{
 				types: []*wasm.FunctionType{{}, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
@@ -168,29 +155,24 @@ func TestBindIndices(t *testing.T) {
 				importFuncs: []*importFunc{
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
-				},
-				funcNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
 				},
 			},
 		},
 		{
 			name: "export imported func",
-			input: &module{
+			inputModule: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{ID: "bar", line: 3, col: 22}},
 				},
 			},
+			inputFuncNameToIndex: map[string]wasm.Index{"bar": wasm.Index(0)},
 			expected: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 0, line: 3, col: 22}},
 				},
@@ -198,21 +180,20 @@ func TestBindIndices(t *testing.T) {
 		},
 		{
 			name: "export imported func twice",
-			input: &module{
+			inputModule: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{ID: "bar", line: 3, col: 22}},
 					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{ID: "bar", line: 4, col: 22}},
 				},
 			},
+			inputFuncNameToIndex: map[string]wasm.Index{"bar": wasm.Index(0)},
 			expected: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 0, line: 3, col: 22}},
 					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: 0, line: 4, col: 22}},
@@ -221,27 +202,20 @@ func TestBindIndices(t *testing.T) {
 		},
 		{
 			name: "export different func",
-			input: &module{
-				types:    []*wasm.FunctionType{{}},
-				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}},
+				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}, {module: "baz", name: "qux"}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "qux"},
-				},
 				exportFuncs: []*exportFunc{
 					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{ID: "bar", line: 4, col: 22}},
 					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{ID: "qux", line: 5, col: 22}},
 				},
 			},
+			inputFuncNameToIndex: map[string]wasm.Index{"bar": wasm.Index(0), "qux": wasm.Index(1)},
 			expected: &module{
-				types:    []*wasm.FunctionType{{}},
-				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
+				types:       []*wasm.FunctionType{{}},
+				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}, {module: "baz", name: "qux"}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "qux"},
-				},
 				exportFuncs: []*exportFunc{
 					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 0, line: 4, col: 22}},
 					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: 1, line: 5, col: 22}},
@@ -250,24 +224,23 @@ func TestBindIndices(t *testing.T) {
 		},
 		{
 			name: "start: imported function name to numeric index",
-			input: &module{
+			inputModule: &module{
 				types:         []*wasm.FunctionType{{}},
 				typeUses:      []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
 				importFuncs:   []*importFunc{{}, {}},
-				funcNames:     wasm.NameMap{{Index: wasm.Index(0), Name: "one"}, {Index: wasm.Index(1), Name: "two"}},
 				startFunction: &index{ID: "two", line: 3, col: 9},
 			},
+			inputFuncNameToIndex: map[string]wasm.Index{"one": wasm.Index(0), "two": wasm.Index(1)},
 			expected: &module{
 				types:         []*wasm.FunctionType{{}},
 				typeUses:      []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
 				importFuncs:   []*importFunc{{}, {}},
-				funcNames:     wasm.NameMap{{Index: wasm.Index(0), Name: "one"}, {Index: wasm.Index(1), Name: "two"}},
 				startFunction: &index{numeric: 1, line: 3, col: 9},
 			},
 		},
 		{
 			name: "start: imported function numeric index left alone",
-			input: &module{
+			inputModule: &module{
 				types:         []*wasm.FunctionType{{}},
 				typeUses:      []*typeUse{{typeIndex: indexZero}},
 				importFuncs:   []*importFunc{{name: "hello"}},
@@ -286,9 +259,9 @@ func TestBindIndices(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := bindIndices(tc.input)
+			err := bindIndices(tc.inputModule, tc.inputTypeNameToIndex, tc.inputFuncNameToIndex)
 			require.NoError(t, err)
-			require.Equal(t, tc.expected, tc.input)
+			require.Equal(t, tc.expected, tc.inputModule)
 		})
 	}
 }
@@ -298,13 +271,15 @@ func TestBindIndices_Errors(t *testing.T) {
 	indexZero := &index{}
 
 	tests := []struct {
-		name        string
-		input       *module
-		expectedErr string
+		name                 string
+		inputModule          *module
+		inputTypeNameToIndex map[string]wasm.Index
+		inputFuncNameToIndex map[string]wasm.Index
+		expectedErr          string
 	}{
 		{
 			name: "import function: type points out of range",
-			input: &module{
+			inputModule: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: &index{numeric: 1, line: 3, col: 9}}},
 				importFuncs: []*importFunc{{name: "hello"}},
@@ -313,7 +288,7 @@ func TestBindIndices_Errors(t *testing.T) {
 		},
 		{
 			name: "import function: type points nowhere",
-			input: &module{
+			inputModule: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: &index{ID: "main", line: 3, col: 9}}},
 				importFuncs: []*importFunc{{name: "hello"}},
@@ -322,7 +297,7 @@ func TestBindIndices_Errors(t *testing.T) {
 		},
 		{
 			name: "import function: inlined type doesn't match indexed",
-			input: &module{
+			inputModule: &module{
 				types: []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{
 					{typeIndex: indexZero, typeInlined: &inlinedTypeFunc{&wasm.FunctionType{Params: []wasm.ValueType{i32, i32}}, 3, 9}},
@@ -333,63 +308,63 @@ func TestBindIndices_Errors(t *testing.T) {
 		},
 		{
 			name: "function: type points out of range",
-			input: &module{
+			inputModule: &module{
 				types:    []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{{typeIndex: &index{numeric: 1, line: 3, col: 9}}},
-				code:    []*wasm.Code{{Body: end}},
+				code:     []*wasm.Code{{Body: end}},
 			},
 			expectedErr: "3:9: index 1 is out of range [0..0] in module.func[0].type",
 		},
 		{
 			name: "function: type points nowhere",
-			input: &module{
+			inputModule: &module{
 				types:    []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{{typeIndex: &index{ID: "main", line: 3, col: 9}}},
-				code:    []*wasm.Code{{Body: end}},
+				code:     []*wasm.Code{{Body: end}},
 			},
 			expectedErr: "3:9: unknown ID $main in module.func[0].type",
 		},
 		{
 			name: "function: inlined type doesn't match indexed",
-			input: &module{
+			inputModule: &module{
 				types: []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{
 					{typeIndex: indexZero,
 						typeInlined: &inlinedTypeFunc{&wasm.FunctionType{Params: []wasm.ValueType{i32, i32}}, 3, 9}},
 				},
-				code:    []*wasm.Code{{Body: end}},
+				code: []*wasm.Code{{Body: end}},
 			},
 			expectedErr: "3:9: inlined type doesn't match type index 0 in module.func[0].type",
 		},
 		{
 			name: "export func points out of range",
-			input: &module{
+			inputModule: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{numeric: 3, line: 3, col: 22}},
 				},
 			},
-			expectedErr: "3:22: index 3 is out of range [0..0] in module.exports[0].func",
+			inputFuncNameToIndex: map[string]wasm.Index{"bar": wasm.Index(0)},
+			expectedErr:          "3:22: index 3 is out of range [0..0] in module.exports[0].func",
 		},
 		{
 			name: "export func points nowhere",
-			input: &module{
+			inputModule: &module{
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{ID: "qux", line: 3, col: 22}},
 				},
 			},
-			expectedErr: "3:22: unknown ID $qux in module.exports[0].func",
+			inputFuncNameToIndex: map[string]wasm.Index{"bar": wasm.Index(0)},
+			expectedErr:          "3:22: unknown ID $qux in module.exports[0].func",
 		},
 		{
 			name: "start points out of range",
-			input: &module{
+			inputModule: &module{
 				types:         []*wasm.FunctionType{{}},
 				typeUses:      []*typeUse{{typeIndex: indexZero}},
 				importFuncs:   []*importFunc{{name: "hello"}},
@@ -399,7 +374,7 @@ func TestBindIndices_Errors(t *testing.T) {
 		},
 		{
 			name: "start points nowhere",
-			input: &module{
+			inputModule: &module{
 				startFunction: &index{ID: "main", line: 1, col: 16},
 			},
 			expectedErr: "1:16: unknown ID $main in module.start",
@@ -410,8 +385,221 @@ func TestBindIndices_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := bindIndices(tc.input)
+			err := bindIndices(tc.inputModule, tc.inputTypeNameToIndex, tc.inputFuncNameToIndex)
 			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
+func TestMergeLocalNames(t *testing.T) {
+	i32 := wasm.ValueTypeI32
+	paramI32I32ResultI32 := &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
+	indexZero, indexOne := &index{numeric: 0}, &index{numeric: 1}
+	localGet0End := []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}
+
+	tests := []struct {
+		name                string
+		inputModule         *module
+		inputTypeParamNames map[wasm.Index]wasm.NameMap
+		expected            wasm.IndirectNameMap
+	}{
+		{
+			name: "no parameter names",
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
+				names:       &wasm.NameSection{},
+			},
+		},
+		{
+			name: "type parameter names, but no import function parameter names",
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
+				names:       &wasm.NameSection{},
+			},
+			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
+				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "import function parameter names, but no type parameter names",
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+					},
+				},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "type parameter names, but no import function parameter names - function 2",
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "", name: ""}, {module: "wasi_snapshot_preview1", name: "args_get"}},
+				names:       &wasm.NameSection{},
+			},
+			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
+				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "import function parameter names, but no type parameter names - function 2",
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "", name: ""}, {module: "wasi_snapshot_preview1", name: "args_get"}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+					},
+				},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "conflict on import function parameter names and type parameter names",
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+					},
+				},
+			},
+			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
+				wasm.Index(1): {{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "type parameter names, but no function parameter names",
+			inputModule: &module{
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexOne}},
+				code:     []*wasm.Code{{Body: localGet0End}},
+				names:    &wasm.NameSection{},
+			},
+			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
+				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "function parameter names, but no type parameter names",
+			inputModule: &module{
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexOne}},
+				code:     []*wasm.Code{{Body: localGet0End}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+					},
+				},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "type parameter names, but no function parameter names - function 2",
+			inputModule: &module{
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
+				code:     []*wasm.Code{{Body: end}, {Body: localGet0End}},
+				names:    &wasm.NameSection{},
+			},
+			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
+				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "function parameter names, but no type parameter names - function 2",
+			inputModule: &module{
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
+				code:     []*wasm.Code{{Body: end}, {Body: localGet0End}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+					},
+				},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "conflict on function parameter names and type parameter names",
+			inputModule: &module{
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexOne}},
+				code:     []*wasm.Code{{Body: localGet0End}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+					},
+				},
+			},
+			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
+				wasm.Index(1): {{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+			},
+		},
+		{
+			name: "import and module defined function have same type, but different parameter names",
+			inputModule: &module{
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}, {typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "", name: ""}},
+				code:        []*wasm.Code{{Body: localGet0End}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}}},
+						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "l"}, {Index: wasm.Index(0), Name: "r"}}},
+					},
+				},
+			},
+			expected: wasm.IndirectNameMap{
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}}},
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "l"}, {Index: wasm.Index(0), Name: "r"}}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, mergeLocalNames(tc.inputModule, tc.inputTypeParamNames))
 		})
 	}
 }

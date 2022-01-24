@@ -35,7 +35,7 @@ func TestParseModule(t *testing.T) {
 		{
 			name:     "only name",
 			input:    "(module $tools)",
-			expected: &module{name: "tools"},
+			expected: &module{names: &wasm.NameSection{ModuleName: "tools"}},
 		},
 		{
 			name:  "type func one empty",
@@ -45,19 +45,13 @@ func TestParseModule(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{},
 				},
-				typeNameToIndex: map[string]wasm.Index{"i32i32_i32": wasm.Index(0)},
 			},
 		},
 		{
 			name:  "type func param names",
 			input: "(module (type $mul (func (param $x f32) (param $y f32) (result f32))))",
 			expected: &module{
-				types:           []*wasm.FunctionType{{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}}},
-				typeNameToIndex: map[string]wasm.Index{"mul": wasm.Index(0)},
-				typeParamNames: map[wasm.Index]wasm.NameMap{wasm.Index(0): {
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "x"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "y"},
-				}},
+				types: []*wasm.FunctionType{{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}}},
 			},
 		},
 		{
@@ -67,10 +61,6 @@ func TestParseModule(t *testing.T) {
 				types: []*wasm.FunctionType{
 					{Params: []wasm.ValueType{i32, i32, i32, i64, f32}},
 				},
-				typeParamNames: map[wasm.Index]wasm.NameMap{wasm.Index(0): {
-					&wasm.NameAssoc{Index: wasm.Index(2), Name: "v"},
-					&wasm.NameAssoc{Index: wasm.Index(4), Name: "t"},
-				}},
 			},
 		},
 		{
@@ -85,17 +75,6 @@ func TestParseModule(t *testing.T) {
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 					{},
 					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
-				},
-				typeNameToIndex: map[string]wasm.Index{"mul": wasm.Index(0), "add": wasm.Index(2)},
-				typeParamNames: map[wasm.Index]wasm.NameMap{
-					wasm.Index(0): {
-						&wasm.NameAssoc{Index: wasm.Index(0), Name: "x"},
-						&wasm.NameAssoc{Index: wasm.Index(1), Name: "y"},
-					},
-					wasm.Index(2): {
-						&wasm.NameAssoc{Index: wasm.Index(0), Name: "l"},
-						&wasm.NameAssoc{Index: wasm.Index(1), Name: "r"},
-					},
 				},
 			},
 		},
@@ -112,7 +91,9 @@ func TestParseModule(t *testing.T) {
 				},
 				typeUses:    []*typeUse{{typeIndex: indexOne}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "fd_write"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -191,7 +172,9 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{paramI32I32I32I32ResultI32},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "fd_write"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -203,7 +186,9 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{paramI32I32I32I32ResultI32},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "fd_write"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -217,7 +202,9 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{paramI32I32I32I32ResultI32},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "fd_write"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -229,7 +216,9 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{paramI32},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "proc_exit"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.proc_exit"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.proc_exit"}},
+				},
 			},
 		},
 		{
@@ -250,7 +239,9 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "path_open"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				},
 			},
 		},
 		{
@@ -262,7 +253,9 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "path_open"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				},
 			},
 		},
 		{
@@ -278,9 +271,11 @@ func TestParseModule(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
 				},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					},
 				},
 			},
 		},
@@ -299,9 +294,6 @@ func TestParseModule(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
-				typeNameToIndex: map[string]wasm.Index{
-					"i32i32_i32": wasm.Index(1), "i32i32i32i32_i32": wasm.Index(2),
-				},
 				typeUses: []*typeUse{
 					{typeIndex: &index{numeric: wasm.Index(1), line: 5, col: 88}},
 					{typeIndex: &index{numeric: wasm.Index(2), line: 6, col: 76}},
@@ -310,9 +302,11 @@ func TestParseModule(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
 				},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					},
 				},
 			},
 		},
@@ -335,9 +329,11 @@ func TestParseModule(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 					{module: "wasi_snapshot_preview1", name: "fd_write"},
 				},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					},
 				},
 			},
 		},
@@ -355,9 +351,11 @@ func TestParseModule(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_get"},
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 				},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+					},
 				},
 			},
 		},
@@ -379,9 +377,11 @@ func TestParseModule(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_get"},
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 				},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+					},
 				},
 			},
 		},
@@ -403,9 +403,11 @@ func TestParseModule(t *testing.T) {
 					{module: "wasi_snapshot_preview1", name: "args_get"},
 					{module: "wasi_snapshot_preview1", name: "args_sizes_get"},
 				},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+					},
 				},
 			},
 		},
@@ -418,9 +420,11 @@ func TestParseModule(t *testing.T) {
 				},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "Math", name: "Mul"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "mul"}},
-				paramNames: wasm.IndirectNameMap{
-					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "mul"}},
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
+					},
 				},
 			},
 		},
@@ -436,10 +440,12 @@ func TestParseModule(t *testing.T) {
 				},
 				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "Math", name: "Mul"}, {module: "Math", name: "Add"}},
-				funcNames:   wasm.NameMap{{Index: wasm.Index(0), Name: "mul"}, {Index: wasm.Index(1), Name: "add"}},
-				paramNames: wasm.IndirectNameMap{
-					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
-					{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "l"}, {Index: wasm.Index(1), Name: "r"}}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "mul"}, {Index: wasm.Index(1), Name: "add"}},
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
+						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "l"}, {Index: wasm.Index(1), Name: "r"}}},
+					},
 				},
 			},
 		},
@@ -452,8 +458,10 @@ func TestParseModule(t *testing.T) {
 				},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "", name: ""}},
-				paramNames: wasm.IndirectNameMap{
-					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(2), Name: "v"}, {Index: wasm.Index(4), Name: "t"}}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(2), Name: "v"}, {Index: wasm.Index(4), Name: "t"}}},
+					},
 				},
 			},
 		},
@@ -463,7 +471,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{{typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: end}},
+				code:     []*wasm.Code{{Body: end}},
 			},
 		},
 		{
@@ -475,7 +483,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{{typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: end}},
+				code:     []*wasm.Code{{Body: end}},
 			},
 		},
 		{
@@ -487,7 +495,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{{typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: end}},
+				code:     []*wasm.Code{{Body: end}},
 			},
 		},
 		{
@@ -500,7 +508,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: end}, {Body: end}},
+				code:     []*wasm.Code{{Body: end}, {Body: end}},
 			},
 		},
 		{
@@ -512,7 +520,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{paramI32I32I32I32ResultI32, {}},
 				typeUses: []*typeUse{{typeIndex: indexOne}},
-				code:    []*wasm.Code{{Body: end}},
+				code:     []*wasm.Code{{Body: end}},
 			},
 		},
 		{
@@ -521,7 +529,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{{}},
 				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: end}, {Body: end}},
+				code:     []*wasm.Code{{Body: end}, {Body: end}},
 			},
 		},
 		{
@@ -530,10 +538,12 @@ func TestParseModule(t *testing.T) {
 	(func $runtime.fd_write (param i32) (param i32) (param i32) (param i32) (result i32) local.get 0 )
 )`,
 			expected: &module{
-				types:     []*wasm.FunctionType{paramI32I32I32I32ResultI32},
-				typeUses:  []*typeUse{{typeIndex: indexZero}},
+				types:    []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}},
 				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -542,10 +552,12 @@ func TestParseModule(t *testing.T) {
 	(func $runtime.fd_write (param i32 i32 i32 i32) (result i32) local.get 0)
 )`,
 			expected: &module{
-				types:     []*wasm.FunctionType{paramI32I32I32I32ResultI32},
-				typeUses:  []*typeUse{{typeIndex: indexZero}},
+				types:    []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}},
 				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -556,10 +568,12 @@ func TestParseModule(t *testing.T) {
 	(func $runtime.fd_write (param i32) (param i32 i32) (param i32) (result i32) local.get 0)
 )`,
 			expected: &module{
-				types:     []*wasm.FunctionType{paramI32I32I32I32ResultI32},
-				typeUses:  []*typeUse{{typeIndex: indexZero}},
+				types:    []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}},
 				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -568,10 +582,12 @@ func TestParseModule(t *testing.T) {
 	(func $runtime.proc_exit (param i32))
 )`,
 			expected: &module{
-				types:     []*wasm.FunctionType{paramI32},
-				typeUses:  []*typeUse{{typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: end}},
-				funcNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.proc_exit"}},
+				types:    []*wasm.FunctionType{paramI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}},
+				code:     []*wasm.Code{{Body: end}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.proc_exit"}},
+				},
 			},
 		},
 		{
@@ -580,7 +596,7 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{resultI32},
 				typeUses: []*typeUse{{typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: localGet0End}},
+				code:     []*wasm.Code{{Body: localGet0End}},
 			},
 		},
 		{
@@ -589,10 +605,12 @@ func TestParseModule(t *testing.T) {
 	(func $runtime.path_open (param i32) (param i32) (param i32) (param i32) (param i32) (param i64) (param i64) (param i32) (param i32) (result i32) local.get 0)
 )`,
 			expected: &module{
-				types:     []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
-				typeUses:  []*typeUse{{typeIndex: indexZero}},
+				types:    []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}},
 				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				},
 			},
 		},
 		{
@@ -601,10 +619,12 @@ func TestParseModule(t *testing.T) {
 	(func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32) local.get 0)
 )`,
 			expected: &module{
-				types:     []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
-				typeUses:  []*typeUse{{typeIndex: indexZero}},
+				types:    []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
+				typeUses: []*typeUse{{typeIndex: indexZero}},
 				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.path_open"}},
+				},
 			},
 		},
 		{
@@ -617,9 +637,11 @@ func TestParseModule(t *testing.T) {
 				types:    []*wasm.FunctionType{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
 				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
 				code:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					},
 				},
 			},
 		},
@@ -638,17 +660,16 @@ func TestParseModule(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
-				typeNameToIndex: map[string]wasm.Index{
-					"i32i32_i32": wasm.Index(1), "i32i32i32i32_i32": wasm.Index(2),
-				},
 				typeUses: []*typeUse{
 					{typeIndex: &index{numeric: wasm.Index(1), line: 5, col: 38}},
 					{typeIndex: &index{numeric: wasm.Index(2), line: 6, col: 32}},
 				},
-				code:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				code: []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					},
 				},
 			},
 		},
@@ -667,10 +688,12 @@ func TestParseModule(t *testing.T) {
 					{typeIndex: &index{numeric: wasm.Index(1), line: 5, col: 38}},
 					{typeIndex: &index{numeric: wasm.Index(2), line: 6, col: 32}},
 				},
-				code:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				code: []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					},
 				},
 			},
 		},
@@ -685,10 +708,12 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses:    []*typeUse{{typeIndex: indexOne}, {typeIndex: indexOne}},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
-				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+				code:        []*wasm.Code{{Body: localGet0End}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+					},
 				},
 			},
 		},
@@ -707,10 +732,12 @@ func TestParseModule(t *testing.T) {
 					{typeIndex: &index{numeric: wasm.Index(1), line: 5, col: 38}},
 				},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
-				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+				code:        []*wasm.Code{{Body: localGet0End}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+					},
 				},
 			},
 		},
@@ -729,10 +756,12 @@ func TestParseModule(t *testing.T) {
 					{typeIndex: &index{numeric: wasm.Index(1), line: 4, col: 38}},
 				},
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
-				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+				code:        []*wasm.Code{{Body: localGet0End}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "runtime.args_sizes_get"},
+					},
 				},
 			},
 		},
@@ -740,12 +769,14 @@ func TestParseModule(t *testing.T) {
 			name:  "func param names",
 			input: "(module (func $one (param $x i32) (param $y i32) (result i32) local.get 0))",
 			expected: &module{
-				types:     []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
-				typeUses:  []*typeUse{{typeIndex: indexZero}},
+				types:    []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
+				typeUses: []*typeUse{{typeIndex: indexZero}},
 				code:     []*wasm.Code{{Body: localGet0End}},
-				funcNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "one"}},
-				paramNames: wasm.IndirectNameMap{
-					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "one"}},
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
+					},
 				},
 			},
 		},
@@ -758,10 +789,12 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
 				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
-				paramNames: wasm.IndirectNameMap{
-					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
-					{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "l"}, {Index: wasm.Index(1), Name: "r"}}},
+				code:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(1), Name: "y"}}},
+						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "l"}, {Index: wasm.Index(1), Name: "r"}}},
+					},
 				},
 			},
 		},
@@ -771,9 +804,11 @@ func TestParseModule(t *testing.T) {
 			expected: &module{
 				types:    []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32, i32, i64, f32}}},
 				typeUses: []*typeUse{{typeIndex: indexZero}},
-				code:    []*wasm.Code{{Body: end}},
-				paramNames: wasm.IndirectNameMap{
-					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(2), Name: "v"}, {Index: wasm.Index(4), Name: "t"}}},
+				code:     []*wasm.Code{{Body: end}},
+				names: &wasm.NameSection{
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(2), Name: "v"}, {Index: wasm.Index(4), Name: "t"}}},
+					},
 				},
 			},
 		},
@@ -787,9 +822,11 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "bar", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 3, col: 22}},
+				},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				},
 			},
 		},
@@ -817,10 +854,12 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}},
-				funcNames:   wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				exportFuncs: []*exportFunc{
 					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 3, col: 22}},
 					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: wasm.Index(0), line: 4, col: 22}},
+				},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"}},
 				},
 			},
 		},
@@ -836,13 +875,15 @@ func TestParseModule(t *testing.T) {
 				types:       []*wasm.FunctionType{{}},
 				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexZero}},
 				importFuncs: []*importFunc{{module: "foo", name: "bar"}, {module: "baz", name: "qux"}},
-				funcNames: wasm.NameMap{
-					&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"},
-					&wasm.NameAssoc{Index: wasm.Index(1), Name: "qux"},
-				},
 				exportFuncs: []*exportFunc{
 					{name: "foo", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 4, col: 22}},
 					{name: "bar", exportIndex: wasm.Index(1), funcIndex: &index{numeric: wasm.Index(1), line: 5, col: 22}},
+				},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{
+						&wasm.NameAssoc{Index: wasm.Index(0), Name: "bar"},
+						&wasm.NameAssoc{Index: wasm.Index(1), Name: "qux"},
+					},
 				},
 			},
 		},
@@ -874,8 +915,10 @@ func TestParseModule(t *testing.T) {
 				types:         []*wasm.FunctionType{{}},
 				typeUses:      []*typeUse{{typeIndex: indexZero}},
 				importFuncs:   []*importFunc{{name: "hello"}},
-				funcNames:     wasm.NameMap{{Index: wasm.Index(0), Name: "hello"}},
 				startFunction: &index{numeric: wasm.Index(0), line: 3, col: 9},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "hello"}},
+				},
 			},
 		},
 		{
@@ -913,12 +956,14 @@ func TestParseModule(t *testing.T) {
 				exportFuncs: []*exportFunc{
 					{name: "AddInt", exportIndex: wasm.Index(0), funcIndex: &index{numeric: wasm.Index(0), line: 10, col: 28}},
 				},
-				funcNames: wasm.NameMap{{Index: wasm.Index(0), Name: "addInt"}},
-				paramNames: wasm.IndirectNameMap{
-					{Index: wasm.Index(0), NameMap: wasm.NameMap{
-						{Index: wasm.Index(0), Name: "value_1"},
-						{Index: wasm.Index(1), Name: "value_2"},
-					}},
+				names: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "addInt"}},
+					LocalNames: wasm.IndirectNameMap{
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{
+							{Index: wasm.Index(0), Name: "value_1"},
+							{Index: wasm.Index(1), Name: "value_2"},
+						}},
+					},
 				},
 			},
 		},
