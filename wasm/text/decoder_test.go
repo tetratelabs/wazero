@@ -332,7 +332,7 @@ func TestDecodeModule(t *testing.T) {
 
 func TestMergeLocalNames(t *testing.T) {
 	i32 := wasm.ValueTypeI32
-	paramI32I32ResultI32 := &typeFunc{params: []wasm.ValueType{i32, i32}, result: i32}
+	paramI32I32ResultI32 := &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
 	indexZero, indexOne := &index{numeric: 0}, &index{numeric: 1}
 	localGet0End := []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}
 
@@ -344,21 +344,17 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "no parameter names",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
-				typeUses: []*typeUse{{typeIndex: indexOne}},
-				importFuncs: []*importFunc{
-					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_get"},
-				},
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
 			},
 		},
 		{
 			name: "type parameter names, but no import function parameter names",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
-				typeUses: []*typeUse{{typeIndex: indexOne}},
-				importFuncs: []*importFunc{
-					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_get"},
-				},
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
 				typeParamNames: map[wasm.Index]wasm.NameMap{
 					wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
 				},
@@ -370,11 +366,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "import function parameter names, but no type parameter names",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
-				typeUses: []*typeUse{{typeIndex: indexOne}},
-				importFuncs: []*importFunc{
-					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_get"},
-				},
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
 				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
 				},
@@ -386,12 +380,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "type parameter names, but no import function parameter names - function 2",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
-				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
-				importFuncs: []*importFunc{
-					{importIndex: wasm.Index(0), module: "", name: ""},
-					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "args_get"},
-				},
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "", name: ""}, {module: "wasi_snapshot_preview1", name: "args_get"}},
 				typeParamNames: map[wasm.Index]wasm.NameMap{
 					wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
 				},
@@ -403,12 +394,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "import function parameter names, but no type parameter names - function 2",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
-				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
-				importFuncs: []*importFunc{
-					{importIndex: wasm.Index(0), module: "", name: ""},
-					{importIndex: wasm.Index(1), module: "wasi_snapshot_preview1", name: "args_get"},
-				},
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "", name: ""}, {module: "wasi_snapshot_preview1", name: "args_get"}},
 				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
 				},
@@ -420,11 +408,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "conflict on import function parameter names and type parameter names",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
-				typeUses: []*typeUse{{typeIndex: indexOne}},
-				importFuncs: []*importFunc{
-					{importIndex: wasm.Index(0), module: "wasi_snapshot_preview1", name: "args_get"},
-				},
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				typeUses:    []*typeUse{{typeIndex: indexOne}},
+				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
 				typeParamNames: map[wasm.Index]wasm.NameMap{
 					wasm.Index(1): {{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}},
 				},
@@ -439,9 +425,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "type parameter names, but no function parameter names",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses: []*typeUse{{typeIndex: indexOne}},
-				funcs:    []*function{{body: localGet0End}},
+				code:    []*wasm.Code{{Body: localGet0End}},
 				typeParamNames: map[wasm.Index]wasm.NameMap{
 					wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
 				},
@@ -453,9 +439,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "function parameter names, but no type parameter names",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses: []*typeUse{{typeIndex: indexOne}},
-				funcs:    []*function{{body: localGet0End}},
+				code:    []*wasm.Code{{Body: localGet0End}},
 				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
 				},
@@ -467,9 +453,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "type parameter names, but no function parameter names - function 2",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
-				funcs:    []*function{{body: end}, {body: localGet0End}},
+				code:    []*wasm.Code{{Body: end}, {Body: localGet0End}},
 				typeParamNames: map[wasm.Index]wasm.NameMap{
 					wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
 				},
@@ -481,9 +467,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "function parameter names, but no type parameter names - function 2",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses: []*typeUse{{typeIndex: indexZero}, {typeIndex: indexOne}},
-				funcs:    []*function{{body: end}, {body: localGet0End}},
+				code:    []*wasm.Code{{Body: end}, {Body: localGet0End}},
 				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
 				},
@@ -495,9 +481,9 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "conflict on function parameter names and type parameter names",
 			input: &module{
-				types:    []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types:    []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses: []*typeUse{{typeIndex: indexOne}},
-				funcs:    []*function{{body: localGet0End}},
+				code:    []*wasm.Code{{Body: localGet0End}},
 				typeParamNames: map[wasm.Index]wasm.NameMap{
 					wasm.Index(1): {{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}},
 				},
@@ -512,10 +498,10 @@ func TestMergeLocalNames(t *testing.T) {
 		{
 			name: "import and module defined function have same type, but different parameter names",
 			input: &module{
-				types:       []*typeFunc{typeFuncEmpty, paramI32I32ResultI32},
+				types:       []*wasm.FunctionType{{}, paramI32I32ResultI32},
 				typeUses:    []*typeUse{{typeIndex: indexOne}, {typeIndex: indexOne}},
-				importFuncs: []*importFunc{{importIndex: wasm.Index(0), module: "", name: ""}},
-				funcs:       []*function{{body: localGet0End}},
+				importFuncs: []*importFunc{{module: "", name: ""}},
+				code:    []*wasm.Code{{Body: localGet0End}},
 				paramNames: wasm.IndirectNameMap{
 					{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}}},
 					{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "l"}, {Index: wasm.Index(0), Name: "r"}}},

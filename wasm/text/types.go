@@ -1,7 +1,6 @@
 package text
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -14,24 +13,24 @@ import (
 //
 // See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
 type module struct {
+	// types are the wasm.Module TypeSection
+	types []*wasm.FunctionType
+
+	// typeNameToIndex is only used for resolving symbolic index names to numeric ones.
+	//
+	// Note: This is not encoded in the wasm.NameSection as there is no type name section in WebAssembly 1.0 (MVP)
+	typeNameToIndex map[string]wasm.Index
+
+	// typeParamNames are nil when no types had named (param) fields.
+	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
+	typeParamNames map[wasm.Index]wasm.NameMap
+
 	// name is optional. For example, "test".
 	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
 	//
 	// Note: The name may also be stored in the wasm.Module CustomSection under the key "name" subsection 0.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	name string
-
-	// types are the unique function signatures of this module added in insertion order. Ex. (type... (func...))
-	//
-	// Note: Currently, there is no type ambiguity in the index as WebAssembly 1.0 only defines function type.
-	// In the future, other types may be introduced to support features such as module linking.
-	//
-	// See https://www.w3.org/TR/wasm-core-1/#types%E2%91%A0%E2%91%A0
-	types []*typeFunc
-
-	// typeParamNames are nil when no types had named (param) fields.
-	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
-	typeParamNames map[wasm.Index]wasm.NameMap
 
 	// funcNames are nil when no importFunc or function had a name
 	//
@@ -48,8 +47,12 @@ type module struct {
 	// importFuncs are imports describing functions added in insertion order. Ex (import... (func...))
 	importFuncs []*importFunc
 
-	// funcs are functions added in insertion order. Ex (module (func...))
-	funcs []*function
+	// code are wasm.Module CodeSection, holding the function locals and body
+	//
+	// Note: the type usage of this function is in module.typeUses at the index in module.funcs offset by the length of
+	// module.importFuncs. For example, if this function is module.funcs[2] and there are 3 module.importFuncs. The type use
+	// is at module.typeUses[5]
+	code []*wasm.Code
 
 	// typeUses comprise the function index namespace of importFuncs followed by funcs
 	typeUses []*typeUse
@@ -65,7 +68,7 @@ type module struct {
 }
 
 type inlinedTypeFunc struct {
-	typeFunc *typeFunc
+	typeFunc *wasm.FunctionType
 
 	// line is the line in the source where the typeFunc was defined.
 	line uint32
@@ -101,36 +104,6 @@ type index struct {
 	col uint32
 }
 
-// typeFunc corresponds to the text format of a WebAssembly type use.
-//
-// Note: nothing is required per specification. Ex `(type (func))` is valid!
-//
-// See https://www.w3.org/TR/wasm-core-1/#text-functype
-type typeFunc struct {
-	// name is a symbolic index.ID present when explicitly defined in module.types. Ex. v_v
-	//
-	// name is only used for debugging. At runtime, types are called based on raw numeric index. The type index space
-	// begins those explicitly defined in module.types, followed by any inlined ones.
-	name string // TODO: presumably, this must be unique as it is a symbolic identifier?
-
-	// params are the possibly empty sequence of value types accepted by a function with this signature.
-	//
-	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
-	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
-	params []wasm.ValueType
-
-	// result is the value type of the signature or zero if there is none.
-	//
-	// Note: We use this shortcut instead of a slice because in WebAssembly 1.0 (MVP), there can be at most one result.
-	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
-	result wasm.ValueType
-}
-
-// funcTypeEquals allows you to compare signatures ignoring names
-func funcTypeEquals(t *typeFunc, params []wasm.ValueType, result wasm.ValueType) bool {
-	return bytes.Equal(t.params, params) && t.result == result
-}
-
 // importFunc corresponds to the text format of a WebAssembly function import.
 //
 // Note: the type usage of this import is at module.typeUses the same index as module.importFuncs
@@ -138,9 +111,6 @@ func funcTypeEquals(t *typeFunc, params []wasm.ValueType, result wasm.ValueType)
 //
 // See https://www.w3.org/TR/wasm-core-1/#imports%E2%91%A0
 type importFunc struct {
-	// importIndex is the zero-based index in module.imports. This is needed because imports are not always functions.
-	importIndex wasm.Index
-
 	// module is the possibly empty module name to import. Ex. "" or "Math"
 	//
 	// Note: This is not necessarily the module.name
@@ -150,20 +120,6 @@ type importFunc struct {
 	//
 	// Note this is not necessarily a wasm.NameAssoc Name in wasm.NameSection FunctionNames
 	name string
-}
-
-// function corresponds to the text format of a WebAssembly function.
-//
-// Note: the type usage of this function is in module.typeUses at the index in module.funcs offset by the length of
-// module.importFuncs. For example, if this function is module.funcs[2] and there are 3 module.importFuncs. The type use
-// is at module.typeUses[5]
-//
-// Note: nothing is required per specification. Ex `(func)` is valid!
-//
-// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
-type function struct {
-	// body are the instructions of this function encoded WebAssembly 1.0 (MVP) binary format
-	body []byte
 }
 
 // typeUse corresponds to the text format of an indexed or inlined type signature.

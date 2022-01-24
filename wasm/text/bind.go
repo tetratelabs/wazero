@@ -8,22 +8,18 @@ import (
 
 // bindIndices ensures any indices point are numeric or returns a FormatError if they cannot be bound.
 func bindIndices(m *module) error {
-	typeToIndex := map[*typeFunc]wasm.Index{}
-	typeNameToIndex := map[string]wasm.Index{}
+	typeToIndex := map[*wasm.FunctionType]wasm.Index{}
 	for i, t := range m.types {
 		ui := wasm.Index(i)
-		if t.name != "" {
-			typeNameToIndex[t.name] = ui
-		}
 		typeToIndex[t] = ui
 	}
 
-	funcNameToIndex, err := bindFunctionTypes(m, typeToIndex, typeNameToIndex)
+	funcNameToIndex, err := bindFunctionTypes(m, typeToIndex)
 	if err != nil {
 		return err
 	}
 
-	indexCount := uint32(len(m.importFuncs) + len(m.funcs))
+	indexCount := uint32(len(m.importFuncs) + len(m.code))
 
 	if err = bindExportFuncs(m, indexCount, funcNameToIndex); err != nil {
 		return err
@@ -44,7 +40,7 @@ func bindIndices(m *module) error {
 // Failure cases are when a symbolic identifier points nowhere or a numeric index is out of range.
 // Ex. (import "Math" "PI" (func (type $t0))) exists, but (type $t0 (func ...)) does not.
 //  or (import "Math" "PI" (func (type 32))) exists, but there are only 10 types.
-func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIndex map[string]uint32) (map[string]uint32, error) {
+func bindFunctionTypes(m *module, typeToIndex map[*wasm.FunctionType]wasm.Index) (map[string]wasm.Index, error) {
 	funcNameToIndex := map[string]wasm.Index{}
 	for _, na := range m.funcNames {
 		funcNameToIndex[na.Name] = na.Index
@@ -70,7 +66,7 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 			continue
 		}
 
-		err := bindIndex(typeCount, typeNameToIndex, idx, context, int64(i))
+		err := bindIndex(typeCount, m.typeNameToIndex, idx, context, int64(i))
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +75,7 @@ func bindFunctionTypes(m *module, typeToIndex map[*typeFunc]uint32, typeNameToIn
 		if tu.typeInlined != nil {
 			realType := m.types[idx.numeric]
 			ti := tu.typeInlined
-			if !funcTypeEquals(realType, ti.typeFunc.params, ti.typeFunc.result) {
+			if !funcTypeEquals(realType, ti.typeFunc.Params, ti.typeFunc.Results) {
 				return nil, &FormatError{ti.line, ti.col, fmt.Sprintf(context, i),
 					fmt.Errorf("inlined type doesn't match type index %d", idx.numeric),
 				}

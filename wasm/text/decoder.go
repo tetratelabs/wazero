@@ -15,20 +15,7 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	}
 
 	result = &wasm.Module{}
-
-	// Next, we need to convert the types from the text format into the binary one. This is easy because the only
-	// difference is that the text format has type names and the binary format does not.
-	typeCount := len(m.types)
-	if typeCount > 0 {
-		result.TypeSection = make([]*wasm.FunctionType, typeCount)
-		for i, t := range m.types {
-			var results []wasm.ValueType
-			if t.result != 0 {
-				results = []wasm.ValueType{t.result}
-			}
-			result.TypeSection[i] = &wasm.FunctionType{Params: t.params, Results: results}
-		}
-	}
+	result.TypeSection = m.types
 
 	// Now, handle any imported functions. Notably, we retain the same insertion order as defined in the text format in
 	// case a numeric index is used for the start function (or another reason such as the call instruction).
@@ -44,18 +31,14 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 		}
 	}
 
-	// Next, split the function into the Function and CodeSection
-	funcCount := len(m.funcs)
-	if funcCount > 0 {
+	// Add the type use of the function into the function section.
+	funcCount := len(m.code)
+	if funcCount != 0 {
 		result.FunctionSection = make([]wasm.Index, funcCount)
-		result.CodeSection = make([]*wasm.Code, funcCount)
-		for i, f := range m.funcs {
-			result.FunctionSection[i] = m.typeUses[importFuncCount+i].typeIndex.numeric
-			result.CodeSection[i] = &wasm.Code{
-				LocalTypes: nil, // TODO: locals
-				Body:       f.body,
-			}
+		for i:= 0; i< funcCount; i++ {
+			result.FunctionSection[i] = m.typeUses[i+importFuncCount].typeIndex.numeric
 		}
+		result.CodeSection = m.code
 	}
 
 	// Now, handle any exported functions. Notably, we retain the same insertion order as defined in the text format.

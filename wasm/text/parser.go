@@ -162,7 +162,7 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 			p.tokenParser = p.parseImportModule
 		case "func":
 			p.currentField = fieldModuleFunc
-			p.module.funcs = append(p.module.funcs, &function{})
+			p.module.code = append(p.module.code, &wasm.Code{})
 			p.tokenParser = p.parseFuncName
 		case "export":
 			p.currentField = fieldModuleExport
@@ -185,7 +185,6 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 			p.module.importFuncs = append(p.module.importFuncs, &importFunc{
 				module:      string(p.currentValue0),
 				name:        string(p.currentValue1),
-				importIndex: p.currentFuncIndex,
 			})
 
 			p.currentField = fieldModuleImportFunc
@@ -334,15 +333,26 @@ func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col
 // the token is tokenRParen and sets the next parser to parseType on tokenRParen.
 func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		sig, localNames := p.typeParser.getType(string(p.currentValue0))
+		sig, localNames := p.typeParser.getType()
+		idx := wasm.Index(len(p.module.types))
+
+		typeName := string(p.currentValue0)
+		if typeName != "" {
+			if p.module.typeNameToIndex == nil {
+				p.module.typeNameToIndex = map[string]wasm.Index{typeName: idx}
+			} else {
+				p.module.typeNameToIndex[typeName] = idx
+			}
+		}
+
 		if localNames != nil {
-			idx := wasm.Index(len(p.module.types))
 			if p.module.typeParamNames == nil {
 				p.module.typeParamNames = map[wasm.Index]wasm.NameMap{idx: localNames}
 			} else {
 				p.module.typeParamNames[idx] = localNames
 			}
 		}
+
 		p.module.types = append(p.module.types, sig)
 		p.currentValue0 = nil
 		p.currentField = fieldModuleType
@@ -555,8 +565,9 @@ func (p *moduleParser) parseFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint3
 			p.module.paramNames =
 				append(p.module.paramNames, &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames})
 		}
-		fn := p.module.funcs[p.currentFuncIndex-uint32(len(p.module.importFuncs))]
-		fn.body = p.funcParser.getBody()
+		code := p.module.code[p.currentFuncIndex-uint32(len(p.module.importFuncs))]
+		// TODO: localTypes
+		code.Body = p.funcParser.getBody()
 
 		// Multiple funcs are allowed, so advance in case there's a next.
 		p.currentFuncIndex++

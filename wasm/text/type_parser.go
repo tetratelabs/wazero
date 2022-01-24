@@ -1,8 +1,10 @@
 package text
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 
 	"github.com/tetratelabs/wazero/wasm"
 )
@@ -59,7 +61,7 @@ type typeParser struct {
 	//
 	// For example, here the `(param i32)` type is initially considered inlined until the module type with the same
 	// signature is read later: (module (import (func (param i32))) (type (func (param i32))))`
-	inlinedTypes []*typeFunc
+	inlinedTypes []*wasm.FunctionType
 
 	// currentTypeIndex is set when there's a "type" field in a type use
 	// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
@@ -88,8 +90,8 @@ type typeParser struct {
 	// parameters are abbreviated, ex. (param i32 i32), the currentParamField will be less than the type count.
 	foundParam bool
 
-	// currentResult is zero until set, and only set once as WebAssembly 1.0 only supports up to one result.
-	currentResult wasm.ValueType
+	// currentResults is empty until set, and only set once as WebAssembly 1.0 only supports up to one result.
+	currentResults []wasm.ValueType
 
 	// currentTypeUseStartLine tracks the start column of a type use in case there's an error later
 	currentTypeUseStartLine uint32
@@ -158,7 +160,7 @@ func (p *typeParser) reset() {
 	p.currentParams = nil
 	p.currentParamNames = nil
 	p.currentParamField = 0
-	p.currentResult = 0
+	p.currentResults = nil
 }
 
 func (p *typeParser) parseTypeIndexEnd(index *index) {
@@ -276,16 +278,16 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) e
 func (p *typeParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
 	case tokenKeyword: // Ex. i32
-		if p.currentResult != 0 {
+		if p.currentResults != nil {
 			return errors.New("redundant type")
 		}
 		vt, err := parseValueType(tokenBytes)
 		if err != nil {
 			return err
 		}
-		p.currentResult = vt
+		p.currentResults = leb128.EncodeUint32(uint32(vt)) // reuse cache
 	case tokenRParen: // end of this field
-		if p.currentResult == 0 {
+		if p.currentResults == nil {
 			return errors.New("expected a type")
 		}
 		p.m.tokenParser = p.onTypeEnd
@@ -308,7 +310,7 @@ func (p *typeParser) errorContext() string {
 	return ""
 }
 
-var typeFuncEmpty = &typeFunc{}
+var typeFuncEmpty = &wasm.FunctionType{}
 
 // getTypeUse finalizes any current params or result and returns the current typeIndex and/or type. localNames are only
 // returned if defined inline.
@@ -317,13 +319,13 @@ func (p *typeParser) getTypeUse() (ty *typeUse, paramNames wasm.NameMap) {
 	paramNames = p.currentParamNames
 
 	// Don't conflate lack of verification type with nullary
-	if ty.typeIndex != nil && funcTypeEquals(typeFuncEmpty, p.currentParams, p.currentResult) {
+	if ty.typeIndex != nil && funcTypeEquals(typeFuncEmpty, p.currentParams, p.currentResults) {
 		return
 	}
 
 	// Search for an existing signature that matches the current type in the module types.
 	for _, t := range p.m.module.types {
-		if funcTypeEquals(t, p.currentParams, p.currentResult) {
+		if funcTypeEquals(t, p.currentParams, p.currentResults) {
 			ty.typeInlined = &inlinedTypeFunc{t, p.currentTypeUseStartLine, p.currentTypeUseStartCol}
 			return
 		}
@@ -331,14 +333,14 @@ func (p *typeParser) getTypeUse() (ty *typeUse, paramNames wasm.NameMap) {
 
 	// Search for an existing signature that matches the current type in the pending inlined types
 	for _, t := range p.inlinedTypes {
-		if funcTypeEquals(t, p.currentParams, p.currentResult) {
+		if funcTypeEquals(t, p.currentParams, p.currentResults) {
 			ty.typeInlined = &inlinedTypeFunc{t, p.currentTypeUseStartLine, p.currentTypeUseStartCol}
 			return
 		}
 	}
 
 	ty.typeInlined = &inlinedTypeFunc{
-		typeFunc: &typeFunc{"", p.currentParams, p.currentResult},
+		typeFunc: &wasm.FunctionType{p.currentParams, p.currentResults},
 		line:     p.currentTypeUseStartLine,
 		col:      p.currentTypeUseStartCol,
 	}
@@ -351,15 +353,19 @@ func (p *typeParser) getTypeUse() (ty *typeUse, paramNames wasm.NameMap) {
 	return
 }
 
+func funcTypeEquals(f *wasm.FunctionType, params []wasm.ValueType, results []wasm.ValueType) bool {
+	return bytes.Equal(f.Params, params) && bytes.Equal(f.Results, results)
+}
+
 // getType finalizes any current params or result and returns the current type and any paramNames for it.
 //
 // If the current type is in typeParser.inlinedTypes, it is removed prior to returning.
-func (p *typeParser) getType(typeName string) (sig *typeFunc, paramNames wasm.NameMap) {
+func (p *typeParser) getType() (sig *wasm.FunctionType, paramNames wasm.NameMap) {
 	paramNames = p.currentParamNames
 
 	// Search inlined types in case a matching type was found after its type use.
 	for i, t := range p.inlinedTypes {
-		if funcTypeEquals(t, p.currentParams, p.currentResult) {
+		if funcTypeEquals(t, p.currentParams, p.currentResults) {
 			// If we got here, we found a type field after a type use. This means it wasn't an inlined type, rather an
 			// out-of-order type. Hence, remove it from the inlined types and add it to the module types.
 			p.inlinedTypes = append(p.inlinedTypes[:i], p.inlinedTypes[i+1:]...)
@@ -371,7 +377,7 @@ func (p *typeParser) getType(typeName string) (sig *typeFunc, paramNames wasm.Na
 	// While inlined types are supposed to re-use an existing type index, there's no no unique constraint on explicitly
 	// defined module types. This means a duplicate type is not a bug: we don't check module.types first.
 	if sig == nil {
-		sig = &typeFunc{typeName, p.currentParams, p.currentResult}
+		sig = &wasm.FunctionType{Params: p.currentParams, Results: p.currentResults}
 	}
 	return
 }
