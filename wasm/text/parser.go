@@ -258,7 +258,7 @@ func (p *moduleParser) endField() {
 //   calls parseModule here --^
 func (p *moduleParser) parseModuleName(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $Math
-		p.module.names = &wasm.NameSection{ModuleName: string(stripDollar(tokenBytes))}
+		p.module.names.ModuleName = string(stripDollar(tokenBytes))
 		p.tokenParser = p.parseModule
 		return nil
 	}
