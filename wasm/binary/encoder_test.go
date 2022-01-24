@@ -169,7 +169,7 @@ func TestModule_Encode(t *testing.T) {
 				SectionIDCode, 0x09, // 9 bytes in this section
 				01,                     // one code section
 				07,                     // length of the body + locals
-				00,                     // count of locals
+				00,                     // count of local blocks
 				wasm.OpcodeLocalGet, 0, // local.get 0
 				wasm.OpcodeLocalGet, 1, // local.get 1
 				wasm.OpcodeI32Add,     // i32.add

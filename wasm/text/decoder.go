@@ -52,7 +52,6 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 		for i, f := range m.funcs {
 			result.FunctionSection[i] = m.typeUses[importFuncCount+i].typeIndex.numeric
 			result.CodeSection[i] = &wasm.Code{
-				NumLocals:  0,   //TODO: locals
 				LocalTypes: nil, // TODO: locals
 				Body:       f.body,
 			}

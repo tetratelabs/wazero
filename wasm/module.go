@@ -253,10 +253,15 @@ type ElementSegment struct {
 	Init       []uint32
 }
 
+// Code is an entry in the Module.CodeSection containing the locals and body of the function.
+// See https://www.w3.org/TR/wasm-core-1/#binary-code
 type Code struct {
-	NumLocals  uint32
+	// LocalTypes are any function-scoped variables in insertion order.
+	// See https://www.w3.org/TR/wasm-core-1/#binary-local
 	LocalTypes []ValueType
-	Body       []byte
+	// Body is a sequence of expressions ending in OpcodeEnd
+	// See https://www.w3.org/TR/wasm-core-1/#binary-expr
+	Body []byte
 }
 
 type DataSegment struct {
