@@ -11,7 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
 func writeFile(fs wasi.FS, path string, data []byte) error {
@@ -55,7 +55,7 @@ func Test_file_system(t *testing.T) {
 
 	wasiEnv := wasi.NewEnvironment(wasi.Preopen(".", memFS))
 
-	store := wasm.NewStore(wazeroir.NewEngine())
+	store := wasm.NewStore(interpreter.NewEngine())
 
 	err = wasiEnv.Register(store)
 	require.NoError(t, err)

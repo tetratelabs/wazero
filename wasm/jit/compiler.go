@@ -1,6 +1,6 @@
 package jit
 
-import "github.com/tetratelabs/wazero/wasm/wazeroir"
+import "github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 
 // compiler is the interface of architecture-specific native code compiler,
 // and this is responsible for compiling native code for all wazeroir operations.

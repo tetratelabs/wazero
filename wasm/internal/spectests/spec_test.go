@@ -15,8 +15,8 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/jit"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
 )
 
 type (
@@ -217,7 +217,7 @@ func TestJIT(t *testing.T) {
 }
 
 func TestInterpreter(t *testing.T) {
-	runTest(t, wazeroir.NewEngine)
+	runTest(t, interpreter.NewEngine)
 }
 
 func runTest(t *testing.T, newEngine func() wasm.Engine) {

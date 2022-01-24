@@ -12,7 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
 func Test_hostFunc(t *testing.T) {
@@ -22,7 +22,7 @@ func Test_hostFunc(t *testing.T) {
 	mod, err := binaryFormat.DecodeModule((buf))
 	require.NoError(t, err)
 
-	store := wasm.NewStore(wazeroir.NewEngine())
+	store := wasm.NewStore(interpreter.NewEngine())
 
 	// Host-side implementation of get_random_string on Wasm import.
 	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {

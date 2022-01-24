@@ -5,7 +5,7 @@ package jit
 
 import (
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
+	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
 func jitcall(codeSegment, engine, memory uintptr) {

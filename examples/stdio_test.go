@@ -11,7 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
 func Test_stdio(t *testing.T) {
@@ -27,7 +27,7 @@ func Test_stdio(t *testing.T) {
 		wasi.Stdout(stdoutBuf),
 		wasi.Stderr(stderrBuf),
 	)
-	store := wasm.NewStore(wazeroir.NewEngine())
+	store := wasm.NewStore(interpreter.NewEngine())
 	err = wasiEnv.Register(store)
 	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")

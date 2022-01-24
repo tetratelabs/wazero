@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/wazeroir"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
 func Test_fibonacci(t *testing.T) {
@@ -19,7 +19,7 @@ func Test_fibonacci(t *testing.T) {
 	mod, err := binary.DecodeModule(buf)
 	require.NoError(t, err)
 
-	store := wasm.NewStore(wazeroir.NewEngine())
+	store := wasm.NewStore(interpreter.NewEngine())
 	require.NoError(t, err)
 
 	err = wasi.NewEnvironment().Register(store)

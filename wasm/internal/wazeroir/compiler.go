@@ -10,7 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
-	"github.com/tetratelabs/wazero/wasm/leb128"
+	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
 type controlFrameKind byte
