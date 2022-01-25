@@ -337,11 +337,9 @@ type NameAssoc struct {
 
 // NewNameMap constructs a new NameMap from the given name to index map and returns it ordered by index ascending.
 func NewNameMap(m map[string]Index) NameMap {
-	result := make(NameMap, len(m))
-	i := 0
+	result := make(NameMap, 0, len(m))
 	for n, idx := range m {
-		result[i] = &NameAssoc{Name: n, Index: idx}
-		i++
+		result = append(result, &NameAssoc{Name: n, Index: idx})
 	}
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Index < result[j].Index
