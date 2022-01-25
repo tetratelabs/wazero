@@ -400,7 +400,7 @@ func TestMergeLocalNames(t *testing.T) {
 	tests := []struct {
 		name                string
 		inputModule         *module
-		inputTypeParamNames map[wasm.Index]wasm.NameMap
+		inputTypeParamNames map[wasm.Index]idContext
 		expected            wasm.IndirectNameMap
 	}{
 		{
@@ -420,11 +420,11 @@ func TestMergeLocalNames(t *testing.T) {
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
 				names:       &wasm.NameSection{},
 			},
-			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
-				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			inputTypeParamNames: map[wasm.Index]idContext{
+				wasm.Index(1): {"argv": wasm.Index(0), "argv_buf": wasm.Index(1)},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -435,12 +435,12 @@ func TestMergeLocalNames(t *testing.T) {
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
 				names: &wasm.NameSection{
 					LocalNames: wasm.IndirectNameMap{
-						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 					},
 				},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -451,11 +451,11 @@ func TestMergeLocalNames(t *testing.T) {
 				importFuncs: []*importFunc{{module: "", name: ""}, {module: "wasi_snapshot_preview1", name: "args_get"}},
 				names:       &wasm.NameSection{},
 			},
-			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
-				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			inputTypeParamNames: map[wasm.Index]idContext{
+				wasm.Index(1): {"argv": wasm.Index(0), "argv_buf": wasm.Index(1)},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -466,12 +466,12 @@ func TestMergeLocalNames(t *testing.T) {
 				importFuncs: []*importFunc{{module: "", name: ""}, {module: "wasi_snapshot_preview1", name: "args_get"}},
 				names: &wasm.NameSection{
 					LocalNames: wasm.IndirectNameMap{
-						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 					},
 				},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -482,15 +482,15 @@ func TestMergeLocalNames(t *testing.T) {
 				importFuncs: []*importFunc{{module: "wasi_snapshot_preview1", name: "args_get"}},
 				names: &wasm.NameSection{
 					LocalNames: wasm.IndirectNameMap{
-						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 					},
 				},
 			},
-			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
-				wasm.Index(1): {{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}},
+			inputTypeParamNames: map[wasm.Index]idContext{
+				wasm.Index(1): {"x": wasm.Index(0), "y": wasm.Index(1)},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -501,11 +501,11 @@ func TestMergeLocalNames(t *testing.T) {
 				code:     []*wasm.Code{{Body: localGet0End}},
 				names:    &wasm.NameSection{},
 			},
-			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
-				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			inputTypeParamNames: map[wasm.Index]idContext{
+				wasm.Index(1): {"argv": wasm.Index(0), "argv_buf": wasm.Index(1)},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -516,12 +516,12 @@ func TestMergeLocalNames(t *testing.T) {
 				code:     []*wasm.Code{{Body: localGet0End}},
 				names: &wasm.NameSection{
 					LocalNames: wasm.IndirectNameMap{
-						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 					},
 				},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -532,11 +532,11 @@ func TestMergeLocalNames(t *testing.T) {
 				code:     []*wasm.Code{{Body: end}, {Body: localGet0End}},
 				names:    &wasm.NameSection{},
 			},
-			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
-				wasm.Index(1): {{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}},
+			inputTypeParamNames: map[wasm.Index]idContext{
+				wasm.Index(1): {"argv": wasm.Index(0), "argv_buf": wasm.Index(1)},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -547,12 +547,12 @@ func TestMergeLocalNames(t *testing.T) {
 				code:     []*wasm.Code{{Body: end}, {Body: localGet0End}},
 				names: &wasm.NameSection{
 					LocalNames: wasm.IndirectNameMap{
-						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+						{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 					},
 				},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{
@@ -563,15 +563,15 @@ func TestMergeLocalNames(t *testing.T) {
 				code:     []*wasm.Code{{Body: localGet0End}},
 				names: &wasm.NameSection{
 					LocalNames: wasm.IndirectNameMap{
-						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+						{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 					},
 				},
 			},
-			inputTypeParamNames: map[wasm.Index]wasm.NameMap{
-				wasm.Index(1): {{Index: wasm.Index(0), Name: "x"}, {Index: wasm.Index(0), Name: "y"}},
+			inputTypeParamNames: map[wasm.Index]idContext{
+				wasm.Index(1): {"x": wasm.Index(0), "y": wasm.Index(1)},
 			},
 			expected: wasm.IndirectNameMap{
-				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(0), Name: "argv_buf"}}},
+				{Index: wasm.Index(0), NameMap: wasm.NameMap{{Index: wasm.Index(0), Name: "argv"}, {Index: wasm.Index(1), Name: "argv_buf"}}},
 			},
 		},
 		{

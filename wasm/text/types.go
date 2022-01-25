@@ -87,6 +87,17 @@ type index struct {
 	col uint32
 }
 
+type idContext map[string]wasm.Index
+
+func (ctx idContext) setID(idToken []byte, idx uint32) (string, error) {
+	id := string(stripDollar(idToken))
+	if _, ok := ctx[id]; ok {
+		return id, fmt.Errorf("duplicate ID %s", idToken)
+	}
+	ctx[id] = idx
+	return id, nil
+}
+
 // importFunc corresponds to the text format of a WebAssembly function import.
 //
 // Note: the type usage of this import is at module.typeUses the same index as module.importFuncs

@@ -2,7 +2,6 @@ package text
 
 import (
 	"fmt"
-
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -133,16 +132,17 @@ func checkIndexInRange(idx *index, count uint32, context string, contextArg0 int
 
 // mergeLocalNames produces wasm.NameSection LocalNames. This has to be done post-parse as types can be defined after
 // functions that use them.
-func mergeLocalNames(m *module, typeParamNames map[wasm.Index]wasm.NameMap) wasm.IndirectNameMap {
+func mergeLocalNames(m *module, typeParamIDContext map[wasm.Index]idContext) wasm.IndirectNameMap {
 	paramNames := m.names.LocalNames
 	j, jLen := 0, len(paramNames)
-	if typeParamNames == nil && jLen == 0 {
+	if typeParamIDContext == nil && jLen == 0 {
 		return nil
 	}
 
 	// Parameters can be named on the type, and overridden via a function. This loop collects the final name for each
 	// function's parameters regardless of if it is an imported function or module defined.
 	var result wasm.IndirectNameMap
+	typeParamNames := map[wasm.Index]wasm.NameMap{}
 	funcIndexSize := uint32(len(m.typeUses))
 	for i := uint32(0); i < funcIndexSize; i++ {
 		// Seek to see if we have any function-defined parameter names
@@ -158,12 +158,16 @@ func mergeLocalNames(m *module, typeParamNames map[wasm.Index]wasm.NameMap) wasm
 		}
 
 		// Use any inlined names or default to any on the type
-		typeNames, hasType := typeParamNames[m.typeUses[i].typeIndex.numeric]
+		typeIndex := m.typeUses[i].typeIndex.numeric
+		typeNames, hasType := typeParamIDContext[typeIndex]
 		var localNames wasm.NameMap
 		if inlinedNames == nil && !hasType {
 			continue
 		} else if inlinedNames == nil {
-			localNames = typeNames
+			if localNames, hasType = typeParamNames[typeIndex]; !hasType {
+				localNames = wasm.NewNameMap(typeNames)
+				typeParamNames[typeIndex] = localNames
+			}
 		} else {
 			// On conflict, choose the function names, as merge rules aren't defined in the specification. If there are
 			// names on the function, the user added them. They may not intend to inherit names they didn't define!

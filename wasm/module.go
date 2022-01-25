@@ -1,5 +1,7 @@
 package wasm
 
+import "sort"
+
 // DecodeModule parses the configured source into a wasm.Module. This function returns when the source is exhausted or
 // an error occurs. The result can be initialized for use via Store.Instantiate.
 //
@@ -331,6 +333,20 @@ type NameMap []*NameAssoc
 type NameAssoc struct {
 	Index Index
 	Name  string
+}
+
+// NewNameMap constructs a new NameMap from the given name to index map and returns it ordered by index ascending.
+func NewNameMap(m map[string]Index) NameMap {
+	result := make(NameMap, len(m))
+	i := 0
+	for n, idx := range m {
+		result[i] = &NameAssoc{Name: n, Index: idx}
+		i++
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Index < result[j].Index
+	})
+	return result
 }
 
 // IndirectNameMap associates an index with an association of names.
