@@ -119,6 +119,9 @@ type moduleParser struct {
 	// See https://www.w3.org/TR/wasm-core-1/#text-functype
 	// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
 	typeParamIDContext map[wasm.Index]idContext
+
+	// typeParamNames are the typeParamIDContext formatted for the wasm.NameSection LocalNames
+	typeParamNames map[wasm.Index]wasm.NameMap
 }
 
 // parse has the same signature as tokenParser and called by lex on each token.
@@ -142,6 +145,7 @@ func parseModule(source []byte) (*module, error) {
 		indexParser:        &indexParser{},
 		typeIDContext:      idContext{}, // initialize contexts to reduce the amount of runtime nil checks
 		typeParamIDContext: map[wasm.Index]idContext{},
+		typeParamNames:     map[wasm.Index]wasm.NameMap{},
 		funcIDContext:      idContext{},
 	}
 	p.typeParser = &typeParser{m: &p, paramIDContext: idContext{}}
@@ -165,7 +169,7 @@ func parseModule(source []byte) (*module, error) {
 
 	// Don't set the name section unless we found a name!
 	names := p.module.names
-	names.LocalNames = mergeLocalNames(p.module, p.typeParamIDContext)
+	names.LocalNames = mergeLocalNames(p.module, p.typeParamNames)
 	if names.ModuleName == "" && names.FunctionNames == nil && names.LocalNames == nil {
 		p.module.names = nil
 	}
@@ -382,9 +386,10 @@ func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col
 // the token is tokenRParen and sets the next parser to parseType on tokenRParen.
 func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		sig, paramNames := p.typeParser.getType()
-		if paramNames != nil {
-			p.typeParamIDContext[p.currentTypeIndex] = paramNames
+		sig, paramIDs, paramNames := p.typeParser.getType()
+		if paramIDs != nil {
+			p.typeParamIDContext[p.currentTypeIndex] = paramIDs
+			p.typeParamNames[p.currentTypeIndex] = paramNames
 		}
 		p.module.types = append(p.module.types, sig)
 		p.currentValue0 = nil
@@ -538,10 +543,10 @@ func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, c
 // and/or importFunc.typeInlined and sets the next parser to parseImport.
 func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		tu, paramIDs := p.typeParser.getTypeUse()
+		tu, _, paramNames := p.typeParser.getTypeUse()
 		p.module.typeUses = append(p.module.typeUses, tu)
-		if paramIDs != nil {
-			na := &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: wasm.NewNameMap(paramIDs)}
+		if paramNames != nil {
+			na := &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames}
 			p.module.names.LocalNames = append(p.module.names.LocalNames, na)
 		}
 		p.currentField = fieldModuleImport
@@ -606,14 +611,14 @@ func (p *moduleParser) parseFuncBodyField(tok tokenType, tokenBytes []byte, line
 // and/or Func.typeInlined and sets the next parser to parse.
 func (p *moduleParser) parseFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		tu, paramIDs := p.typeParser.getTypeUse()
+		tu, _, paramNames := p.typeParser.getTypeUse()
 		p.module.typeUses = append(p.module.typeUses, tu)
 		p.module.code = append(p.module.code, &wasm.Code{Body: p.funcParser.getBody()})
 
-		// TODO: locals and also check they don't conflict with parameter IDs on the type use
+		// TODO: locals and also check they don't conflict with paramIDs returned from the type use
 		// Note: locals may be unverifiable wrt ID collision if the type isn't known, yet (ex func before type)
-		if paramIDs != nil {
-			na := &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: wasm.NewNameMap(paramIDs)}
+		if paramNames != nil {
+			na := &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames}
 			p.module.names.LocalNames = append(p.module.names.LocalNames, na)
 		}
 

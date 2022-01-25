@@ -80,6 +80,9 @@ type typeParser struct {
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A2
 	paramIDContext idContext
 
+	// paramNames are the paramIDContext formatted for the wasm.NameSection LocalNames
+	paramNames wasm.NameMap
+
 	// currentParamField is a field index and used to give an appropriate errorContext. Due to abbreviation it may be
 	// unrelated to the length of currentParams
 	currentParamField wasm.Index
@@ -161,6 +164,7 @@ func (p *typeParser) reset() {
 	p.currentParams = nil
 	if len(p.paramIDContext) > 0 {
 		p.paramIDContext = idContext{}
+		p.paramNames = nil
 	}
 	p.currentParamField = 0
 	p.currentResults = nil
@@ -229,8 +233,12 @@ func (p *typeParser) setParamID(idToken []byte) error {
 	// Note: currentParamField is the index of the param field, but due to mixing and matching of abbreviated params
 	// it can be less than the param index. Ex. (param i32 i32) (param $v i32) is param field 2, but the 3rd param.
 	idx := wasm.Index(len(p.currentParams))
-	_, err := p.paramIDContext.setID(idToken, idx)
-	return err
+	id, err := p.paramIDContext.setID(idToken, idx)
+	if err != nil {
+		return err
+	}
+	p.paramNames = append(p.paramNames, &wasm.NameAssoc{Index: idx, Name: id})
+	return nil
 }
 
 // parseParam is the last parser inside the param field. This records value type and continues if it is an abbreviated
@@ -315,10 +323,11 @@ var typeFuncEmpty = &wasm.FunctionType{}
 
 // getTypeUse finalizes any current params or result and returns the current typeIndex and/or type. localNames are only
 // returned if defined inline.
-func (p *typeParser) getTypeUse() (ty *typeUse, paramIDs map[string]wasm.Index) {
+func (p *typeParser) getTypeUse() (ty *typeUse, paramIDs map[string]wasm.Index, paramNames wasm.NameMap) {
 	ty = &typeUse{typeIndex: p.currentTypeIndex}
 	if len(p.paramIDContext) > 0 {
 		paramIDs = p.paramIDContext
+		paramNames = p.paramNames
 	}
 
 	// Don't conflate lack of verification type with nullary
@@ -363,9 +372,10 @@ func funcTypeEquals(f *wasm.FunctionType, params []wasm.ValueType, results []was
 // getType finalizes any current params or result and returns the current type and any paramNames for it.
 //
 // If the current type is in typeParser.inlinedTypes, it is removed prior to returning.
-func (p *typeParser) getType() (sig *wasm.FunctionType, paramIDs map[string]wasm.Index) {
+func (p *typeParser) getType() (sig *wasm.FunctionType, paramIDs map[string]wasm.Index, paramNames wasm.NameMap) {
 	if len(p.paramIDContext) > 0 {
 		paramIDs = p.paramIDContext
+		paramNames = p.paramNames
 	}
 
 	// Search inlined types in case a matching type was found after its type use.
