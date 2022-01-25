@@ -67,28 +67,32 @@ type typeParser struct {
 	// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
 	currentTypeIndex *index
 
-	// currentParams allow us to accumulate typeFunc.params across multiple fields, as well support abbreviated
+	// currentParams allow us to accumulate wasm.FunctionType Params across multiple fields, as well support abbreviated
 	// anonymous parameters. ex. both (param i32) (param i32) and (param i32 i32) formats.
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A2
 	currentParams []wasm.ValueType
 
-	// currentParamNames accumulates any typeFunc.params for the current type. Ex. $x names (param $x i32)
+	// paramIDContext accumulates any symbolic identifier to numeric index mappings for the currentParams.
+	// Ex. x is the symbolic ID, and name, of the parameter (param $x i32)
 	//
-	// Note: names can be missing because they were never assigned, ex. (param i32), or due to abbreviated format which
-	// does not support names. Ex. (param i32 i32)
+	// Note: IDs can be missing because they were never assigned, ex. (param i32), or due to abbreviated format which
+	// does not support it. Ex. (param i32 i32)
 	// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A2
-	currentParamNames wasm.NameMap
+	paramIDContext idContext
+
+	// paramNames are the paramIDContext formatted for the wasm.NameSection LocalNames
+	paramNames wasm.NameMap
 
 	// currentParamField is a field index and used to give an appropriate errorContext. Due to abbreviation it may be
 	// unrelated to the length of currentParams
-	currentParamField uint32
-
-	// currentLocalName is the name of the currentParamField, added on tokenRParen to currentParamNames
-	currentLocalName []byte
+	currentParamField wasm.Index
 
 	// foundParam allows us to check if we found a type in a "param" field. We can't use currentParamField because when
 	// parameters are abbreviated, ex. (param i32 i32), the currentParamField will be less than the type count.
 	foundParam bool
+
+	// foundID is true when the field at currentParamField had an ID. Ex. (param $x i32)
+	foundID bool
 
 	// currentResults is empty until set, and only set once as WebAssembly 1.0 only supports up to one result.
 	currentResults []wasm.ValueType
@@ -158,7 +162,10 @@ func (p *typeParser) beginType(onTypeEnd tokenParser) {
 func (p *typeParser) reset() {
 	p.currentTypeIndex = nil
 	p.currentParams = nil
-	p.currentParamNames = nil
+	if len(p.paramIDContext) > 0 {
+		p.paramIDContext = idContext{}
+		p.paramNames = nil
+	}
 	p.currentParamField = 0
 	p.currentResults = nil
 }
@@ -176,9 +183,8 @@ func (p *typeParser) beginParamOrResult(tok tokenType, tokenBytes []byte, line, 
 		switch string(tokenBytes) {
 		case "param":
 			p.state = parsingParam
-			p.foundParam = false
-			p.currentLocalName = nil
-			p.m.tokenParser = p.parseParamName
+			p.foundParam, p.foundID = false, false
+			p.m.tokenParser = p.parseParamID
 			return nil
 		case "result":
 			p.state = parsingResult
@@ -204,22 +210,35 @@ func (p *typeParser) parseMoreParamsOrResult(tok tokenType, tokenBytes []byte, l
 	return p.onTypeEnd(tok, tokenBytes, line, col)
 }
 
-// parseParamName is the first parser inside a param field. This records the name if present or calls parseParam if not
+// parseParamID is the first parser inside a param field. This records the ID if present or calls parseParam if not
 // found.
 //
-// Ex. A param name is present `(param $x i32)`
-//                         records x --^  ^
-//              parseParam resumes here --+
+// Ex. A param ID is present `(param $x i32)`
+//                       records x --^  ^
+//            parseParam resumes here --+
 //
-// Ex. No param name `(param i32)`
-//        calls parseParam --^
-func (p *typeParser) parseParamName(tok tokenType, tokenBytes []byte, line, col uint32) error {
+// Ex. No param ID `(param i32)`
+//      calls parseParam --^
+func (p *typeParser) parseParamID(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $len
-		p.currentLocalName = stripDollar(tokenBytes)
+		p.foundID = true
 		p.m.tokenParser = p.parseParam
-		return nil
+		return p.setParamID(tokenBytes)
 	}
 	return p.parseParam(tok, tokenBytes, line, col)
+}
+
+// setParamID adds the normalized ('$' stripped) parameter ID to the paramIDContext and the wasm.NameSection.
+func (p *typeParser) setParamID(idToken []byte) error {
+	// Note: currentParamField is the index of the param field, but due to mixing and matching of abbreviated params
+	// it can be less than the param index. Ex. (param i32 i32) (param $v i32) is param field 2, but the 3rd param.
+	idx := wasm.Index(len(p.currentParams))
+	id, err := p.paramIDContext.setID(idToken, idx)
+	if err != nil {
+		return err
+	}
+	p.paramNames = append(p.paramNames, &wasm.NameAssoc{Index: idx, Name: id})
+	return nil
 }
 
 // parseParam is the last parser inside the param field. This records value type and continues if it is an abbreviated
@@ -238,14 +257,14 @@ func (p *typeParser) parseParamName(tok tokenType, tokenBytes []byte, line, col 
 func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
 	case tokenID: // Ex. $len
-		return errors.New("redundant name")
+		return fmt.Errorf("redundant ID %s", tokenBytes)
 	case tokenKeyword: // Ex. i32
 		vt, err := parseValueType(tokenBytes)
 		if err != nil {
 			return err
 		}
-		if p.foundParam && p.currentLocalName != nil {
-			return errors.New("cannot name parameters in abbreviated form")
+		if p.foundParam && p.foundID {
+			return errors.New("cannot assign IDs to parameters in abbreviated form")
 		}
 		p.currentParams = append(p.currentParams, vt)
 		p.foundParam = true
@@ -253,16 +272,6 @@ func (p *typeParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32) e
 		if !p.foundParam {
 			return errors.New("expected a type")
 		}
-
-		// Note: currentParamField is the index of the param field, but due to mixing and matching of abbreviated params
-		// it can be less than the param index. Ex. (param i32 i32) (param $v i32) is param field 2, but the 3rd param.
-		if p.currentLocalName != nil {
-			p.currentParamNames = append(p.currentParamNames, &wasm.NameAssoc{
-				Index: uint32(len(p.currentParams) - 1),
-				Name:  string(p.currentLocalName),
-			})
-		}
-
 		// since multiple param fields are valid, ex `(func (param i32) (param i64))`, prepare for any next.
 		p.currentParamField++
 		p.state = parsingParamOrResult
@@ -314,9 +323,12 @@ var typeFuncEmpty = &wasm.FunctionType{}
 
 // getTypeUse finalizes any current params or result and returns the current typeIndex and/or type. localNames are only
 // returned if defined inline.
-func (p *typeParser) getTypeUse() (ty *typeUse, paramNames wasm.NameMap) {
+func (p *typeParser) getTypeUse() (ty *typeUse, paramIDs map[string]wasm.Index, paramNames wasm.NameMap) {
 	ty = &typeUse{typeIndex: p.currentTypeIndex}
-	paramNames = p.currentParamNames
+	if len(p.paramIDContext) > 0 {
+		paramIDs = p.paramIDContext
+		paramNames = p.paramNames
+	}
 
 	// Don't conflate lack of verification type with nullary
 	if ty.typeIndex != nil && funcTypeEquals(typeFuncEmpty, p.currentParams, p.currentResults) {
@@ -360,8 +372,11 @@ func funcTypeEquals(f *wasm.FunctionType, params []wasm.ValueType, results []was
 // getType finalizes any current params or result and returns the current type and any paramNames for it.
 //
 // If the current type is in typeParser.inlinedTypes, it is removed prior to returning.
-func (p *typeParser) getType() (sig *wasm.FunctionType, paramNames wasm.NameMap) {
-	paramNames = p.currentParamNames
+func (p *typeParser) getType() (sig *wasm.FunctionType, paramIDs map[string]wasm.Index, paramNames wasm.NameMap) {
+	if len(p.paramIDContext) > 0 {
+		paramIDs = p.paramIDContext
+		paramNames = p.paramNames
+	}
 
 	// Search inlined types in case a matching type was found after its type use.
 	for i, t := range p.inlinedTypes {

@@ -48,14 +48,14 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name:  "type func param names",
+			name:  "type func param IDs",
 			input: "(module (type $mul (func (param $x f32) (param $y f32) (result f32))))",
 			expected: &module{
 				types: []*wasm.FunctionType{{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}}},
 			},
 		},
 		{
-			name:  "type func mixed param names", // Verifies we can handle less param fields than Params
+			name:  "type func mixed param IDs", // Verifies we can handle less param fields than Params
 			input: "(module (type (func (param i32 i32) (param $v i32) (param i64) (param $t f32))))",
 			expected: &module{
 				types: []*wasm.FunctionType{
@@ -412,7 +412,7 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name:  "import func param names",
+			name:  "import func param IDs",
 			input: "(module (import \"Math\" \"Mul\" (func $mul (param $x f32) (param $y f32) (result f32))))",
 			expected: &module{
 				types: []*wasm.FunctionType{
@@ -450,7 +450,7 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name:  "import func mixed param names", // Verifies we can handle less param fields than Params
+			name:  "import func mixed param IDs", // Verifies we can handle less param fields than Params
 			input: "(module (import \"\" \"\" (func (param i32 i32) (param $v i32) (param i64) (param $t f32))))",
 			expected: &module{
 				types: []*wasm.FunctionType{
@@ -766,7 +766,7 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name:  "func param names",
+			name:  "func param IDs",
 			input: "(module (func $one (param $x i32) (param $y i32) (result i32) local.get 0))",
 			expected: &module{
 				types:    []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}},
@@ -799,7 +799,7 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name:  "func mixed param names", // Verifies we can handle less param fields than Params
+			name:  "func mixed param IDs", // Verifies we can handle less param fields than Params
 			input: "(module (func (param i32 i32) (param $v i32) (param i64) (param $t f32)))",
 			expected: &module{
 				types:    []*wasm.FunctionType{{Params: []wasm.ValueType{i32, i32, i32, i64, f32}}},
@@ -1008,9 +1008,9 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:10: unexpected field: test in module",
 		},
 		{
-			name:        "module double name",
+			name:        "module double ID",
 			input:       "(module $foo $bar)",
-			expectedErr: "1:14: redundant name: $bar in module",
+			expectedErr: "1:14: redundant ID $bar in module",
 		},
 		{
 			name:        "module empty field",
@@ -1038,22 +1038,32 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:22: unexpected '(' in module.type[0]",
 		},
 		{
-			name:        "type func second name",
+			name:        "type func second ID",
 			input:       "(module (type $v_v $v_v func()))",
-			expectedErr: "1:20: redundant name in module.type[0]",
+			expectedErr: "1:20: redundant ID $v_v in module.type[0]",
 		},
 		{
-			name:        "type func param second name",
+			name:        "type ID clash",
+			input:       "(module (type $1 (func)) (type $1 (func (param i32))))",
+			expectedErr: "1:32: duplicate ID $1 in module.type[1]",
+		},
+		{
+			name:        "type func param second ID",
 			input:       "(module (type (func (param $x $y i32) ))",
-			expectedErr: "1:31: redundant name in module.type[0].func.param[0]",
+			expectedErr: "1:31: redundant ID $y in module.type[0].func.param[0]",
 		},
 		{
-			name:        "type func param name in abbreviation",
+			name:        "type func param ID clash",
+			input:       "(module (type (func (param $x i32) (param i32) (param $x i32)))",
+			expectedErr: "1:55: duplicate ID $x in module.type[0].func.param[2]",
+		},
+		{
+			name:        "type func param ID in abbreviation",
 			input:       "(module (type (func (param $x i32 i64) ))",
-			expectedErr: "1:35: cannot name parameters in abbreviated form in module.type[0].func.param[0]",
+			expectedErr: "1:35: cannot assign IDs to parameters in abbreviated form in module.type[0].func.param[0]",
 		},
 		{
-			name:        "type func name wrong place",
+			name:        "type func ID wrong place",
 			input:       "(module (type (func $v_v )))",
 			expectedErr: "1:21: unexpected id: $v_v in module.type[0].func",
 		},
@@ -1123,19 +1133,29 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:36: unexpected id: $param in module.import[0].func",
 		},
 		{
-			name:        "import func double name",
+			name:        "import func double ID",
 			input:       "(module (import \"foo\" \"bar\" (func $baz $qux)))",
-			expectedErr: "1:40: redundant name: $qux in module.import[0].func",
+			expectedErr: "1:40: redundant ID $qux in module.import[0].func",
 		},
 		{
-			name:        "import func param second name",
+			name:        "import func clash ID",
+			input:       "(module (import \"\" \"\" (func $main)) (import \"\" \"\" (func $main)))",
+			expectedErr: "1:57: duplicate ID $main in module.import[1].func",
+		},
+		{
+			name:        "import func param second ID",
 			input:       "(module (import \"\" \"\" (func (param $x $y i32) ))",
-			expectedErr: "1:39: redundant name in module.import[0].func.param[0]",
+			expectedErr: "1:39: redundant ID $y in module.import[0].func.param[0]",
 		},
 		{
-			name:        "import func param name in abbreviation",
+			name:        "import func param ID in abbreviation",
 			input:       "(module (import \"\" \"\" (func (param $x i32 i64) ))",
-			expectedErr: "1:43: cannot name parameters in abbreviated form in module.import[0].func.param[0]",
+			expectedErr: "1:43: cannot assign IDs to parameters in abbreviated form in module.import[0].func.param[0]",
+		},
+		{
+			name:        "import func param ID clash",
+			input:       "(module (import \"\" \"\" (func (param $x i32) (param i32) (param $x i32)))_",
+			expectedErr: "1:63: duplicate ID $x in module.import[0].func.param[2]",
 		},
 		{
 			name:        "import func missing param0 type",
@@ -1193,12 +1213,12 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:37: unexpected '(' in module.import[0].func.result",
 		},
 		{
-			name:        "import func name after param",
+			name:        "import func ID after param",
 			input:       "(module (import \"\" \"\" (func (param i32) $main)))",
 			expectedErr: "1:41: unexpected id: $main in module.import[0].func",
 		},
 		{
-			name:        "import func name after result",
+			name:        "import func ID after result",
 			input:       "(module (import \"\" \"\" (func (result i32) $main)))",
 			expectedErr: "1:42: unexpected id: $main in module.import[0].func",
 		},
@@ -1238,19 +1258,24 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:16: unexpected id: $param in module.func[0]",
 		},
 		{
-			name:        "func double name",
+			name:        "func double param ID",
 			input:       "(module (func $baz $qux)))",
-			expectedErr: "1:20: redundant name: $qux in module.func[0]",
+			expectedErr: "1:20: redundant ID $qux in module.func[0]",
 		},
 		{
-			name:        "func param second name",
+			name:        "func param ID clash",
+			input:       "(module (func (param $x i32) (param i32) (param $x i32)))",
+			expectedErr: "1:49: duplicate ID $x in module.func[0].param[2]",
+		},
+		{
+			name:        "func param second ID",
 			input:       "(module (func (param $x $y i32) ))",
-			expectedErr: "1:25: redundant name in module.func[0].param[0]",
+			expectedErr: "1:25: redundant ID $y in module.func[0].param[0]",
 		},
 		{
-			name:        "func param name in abbreviation",
+			name:        "func param ID in abbreviation",
 			input:       "(module (func (param $x i32 i64) ))",
-			expectedErr: "1:29: cannot name parameters in abbreviated form in module.func[0].param[0]",
+			expectedErr: "1:29: cannot assign IDs to parameters in abbreviated form in module.func[0].param[0]",
 		},
 		{
 			name:        "func missing param0 type",
@@ -1308,12 +1333,27 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:23: unexpected '(' in module.func[0].result",
 		},
 		{
-			name:        "func name after param",
+			name:        "func ID after param",
 			input:       "(module (func (param i32) $main)))",
 			expectedErr: "1:27: unexpected id: $main in module.func[0]",
 		},
 		{
-			name:        "func name after result",
+			name:        "clash on func ID",
+			input:       "(module (func $main) (func $main)))",
+			expectedErr: "1:28: duplicate ID $main in module.func[1]",
+		},
+		{
+			name:        "func ID clashes with import func ID",
+			input:       "(module (import \"\" \"\" (func $main)) (func $main)))",
+			expectedErr: "1:43: duplicate ID $main in module.func[1]",
+		},
+		{
+			name:        "import func ID clashes with func ID",
+			input:       "(module (func $main) (import \"\" \"\" (func $main)))",
+			expectedErr: "1:42: duplicate ID $main in module.import[1].func",
+		},
+		{
+			name:        "func ID after result",
 			input:       "(module (func (result i32) $main)))",
 			expectedErr: "1:28: unexpected id: $main in module.func[0]",
 		},

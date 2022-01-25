@@ -83,19 +83,44 @@ type moduleParser struct {
 	indexParser *indexParser
 	funcParser  *funcParser
 
-	// typeNameToIndex is only used for resolving symbolic index names to numeric ones.
+	// typeIDContext resolves symbolic identifiers, such as "v_v" to a numeric index in wasm.Module TypeSection, such
+	// as '2'. Duplicate identifiers are not allowed by specification.
 	//
 	// Note: This is not encoded in the wasm.NameSection as there is no type name section in WebAssembly 1.0 (MVP)
-	typeNameToIndex map[string]wasm.Index
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#text-context
+	typeIDContext idContext
 
-	// funcNameToIndex is only used for resolving symbolic index names to numeric ones. It contains any imported or
-	// module-defined function names and points to the function index which is preceded by imports.
+	// funcIDContext resolves symbolic identifiers, such as "main" to a numeric index in function index namespace, such
+	// as '2'. Duplicate identifiers are not allowed by specification.
+	//
+	// Note: the function index namespace starts with any wasm.ImportKindFunc in the wasm.Module TypeSection followed by
+	// the wasm.Module FunctionSection.
 	//
 	// Note: this should be updated alongside module.names FunctionNames
-	funcNameToIndex map[string]wasm.Index
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#text-context
+	funcIDContext idContext
 
-	// typeParamNames are nil when no types had named (param) fields.
+	// typeParamIDContext resolves symbolic identifiers, such as "x" to a numeric index in locals namespace for each
+	// function that uses this type, yet doesn't override the symbolic IDs of the parameters.
+	//
+	// For example, given `(module (type) (type (func (param $x i32) (param i64) (param $y i32))`, the mapping would be
+	// 1 -> [{0, "x"}, {2, "y"}].
+	//
+	// Given the above mapping, if a function refers to the type alone, like `(func (type 1))`, the parameter IDs from
+	// the type become that function's locals context: [{0, "x"}, {2, "y"}]
+	//
+	// However, a type use can override IDS like this: `(func (type 1) (param $1 i32) (param $2 i64) (param $3 i32))`.
+	// In this case, the parameter IDs from the type are ignored. Ex. [{0, "1"}, {1, "2"}, {2, "3"}]
+	//
 	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#text-functype
+	// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
+	typeParamIDContext map[wasm.Index]idContext
+
+	// typeParamNames are the typeParamIDContext formatted for the wasm.NameSection LocalNames
 	typeParamNames map[wasm.Index]wasm.NameMap
 }
 
@@ -114,8 +139,16 @@ func (p *moduleParser) parse(tok tokenType, tokenBytes []byte, line, col uint32)
 // * module is the result of parsing or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 func parseModule(source []byte) (*module, error) {
-	p := moduleParser{source: source, module: &module{names: &wasm.NameSection{}}, indexParser: &indexParser{}}
-	p.typeParser = &typeParser{m: &p}
+	p := moduleParser{
+		source:             source,
+		module:             &module{names: &wasm.NameSection{}},
+		indexParser:        &indexParser{},
+		typeIDContext:      idContext{}, // initialize contexts to reduce the amount of runtime nil checks
+		typeParamIDContext: map[wasm.Index]idContext{},
+		typeParamNames:     map[wasm.Index]wasm.NameMap{},
+		funcIDContext:      idContext{},
+	}
+	p.typeParser = &typeParser{m: &p, paramIDContext: idContext{}}
 	p.funcParser = &funcParser{m: &p, onBodyEnd: p.parseFuncEnd}
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
@@ -130,7 +163,7 @@ func parseModule(source []byte) (*module, error) {
 	p.module.types = append(p.module.types, p.typeParser.inlinedTypes...)
 
 	// Ensure indices only point to numeric values
-	if err = bindIndices(p.module, p.typeNameToIndex, p.funcNameToIndex); err != nil {
+	if err = bindIndices(p.module, p.typeIDContext, p.funcIDContext); err != nil {
 		return nil, err
 	}
 
@@ -178,14 +211,13 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 		switch string(fieldName) {
 		case "type":
 			p.currentField = fieldModuleType
-			p.tokenParser = p.parseTypeName
+			p.tokenParser = p.parseTypeID
 		case "import":
 			p.currentField = fieldModuleImport
 			p.tokenParser = p.parseImportModule
 		case "func":
 			p.currentField = fieldModuleFunc
-			p.module.code = append(p.module.code, &wasm.Code{})
-			p.tokenParser = p.parseFuncName
+			p.tokenParser = p.parseFuncID
 		case "export":
 			p.currentField = fieldModuleExport
 			p.tokenParser = p.parseExportName
@@ -210,7 +242,7 @@ func (p *moduleParser) beginField(tok tokenType, fieldName []byte, _, _ uint32) 
 			})
 
 			p.currentField = fieldModuleImportFunc
-			p.tokenParser = p.parseImportFuncName
+			p.tokenParser = p.parseImportFuncID
 		} // TODO: table, memory or global
 	case fieldModuleExport:
 		// Add the next export func object and ready for parsing it.
@@ -268,7 +300,7 @@ func (p *moduleParser) parseModuleName(tok tokenType, tokenBytes []byte, line, c
 func (p *moduleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
 	case tokenID:
-		return fmt.Errorf("redundant name: %s", string(tokenBytes))
+		return fmt.Errorf("redundant ID %s", tokenBytes)
 	case tokenLParen:
 		p.tokenParser = p.beginField // after this look for a field name
 		return nil
@@ -280,20 +312,19 @@ func (p *moduleParser) parseModule(tok tokenType, tokenBytes []byte, _, _ uint32
 	return nil
 }
 
-// parseTypeName is the first parser inside a type field. This records the typeFunc.name if present or calls parseType
+// parseTypeID is the first parser inside a type field. This records the symbolic ID, if present, or calls parseType
 // if not found.
 //
-// Ex. A type name is present `(type $t0 (func (result i32)))`
-//                      records t0 --^   ^
-//              parseType resumes here --+
+// Ex. A type ID is present `(type $t0 (func (result i32)))`
+//                    records t0 --^   ^
+//            parseType resumes here --+
 //
-// Ex. No type name `(type (func (result i32)))`
-//       calls parseType --^
-func (p *moduleParser) parseTypeName(tok tokenType, tokenBytes []byte, line, col uint32) error {
+// Ex. No type ID `(type (func (result i32)))`
+//     calls parseType --^
+func (p *moduleParser) parseTypeID(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $v_v
-		p.currentValue0 = stripDollar(tokenBytes)
 		p.tokenParser = p.parseType
-		return nil
+		return p.setTypeID(tokenBytes)
 	}
 	return p.parseType(tok, tokenBytes, line, col)
 }
@@ -310,7 +341,7 @@ func (p *moduleParser) parseTypeName(tok tokenType, tokenBytes []byte, line, col
 func (p *moduleParser) parseType(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	switch tok {
 	case tokenID:
-		return errors.New("redundant name")
+		return fmt.Errorf("redundant ID %s", tokenBytes)
 	case tokenLParen: // start fields, ex. (func
 		// Err if there's a second func. Ex. (type (func) (func))
 		if uint32(len(p.module.types)) > p.currentTypeIndex {
@@ -355,26 +386,11 @@ func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col
 // the token is tokenRParen and sets the next parser to parseType on tokenRParen.
 func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		sig, localNames := p.typeParser.getType()
-		idx := wasm.Index(len(p.module.types))
-
-		typeName := string(p.currentValue0)
-		if typeName != "" {
-			if p.typeNameToIndex == nil {
-				p.typeNameToIndex = map[string]wasm.Index{typeName: idx}
-			} else {
-				p.typeNameToIndex[typeName] = idx
-			}
+		sig, paramIDs, paramNames := p.typeParser.getType()
+		if paramIDs != nil {
+			p.typeParamIDContext[p.currentTypeIndex] = paramIDs
+			p.typeParamNames[p.currentTypeIndex] = paramNames
 		}
-
-		if localNames != nil {
-			if p.typeParamNames == nil {
-				p.typeParamNames = map[wasm.Index]wasm.NameMap{idx: localNames}
-			} else {
-				p.typeParamNames[idx] = localNames
-			}
-		}
-
 		p.module.types = append(p.module.types, sig)
 		p.currentValue0 = nil
 		p.currentField = fieldModuleType
@@ -467,33 +483,39 @@ func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32
 	return nil
 }
 
-// parseImportFuncName is the first parser inside an imported function field. This records the typeFunc.name if present
+// parseImportFuncID is the first parser inside an imported function field. This records the symbolic ID, if present,
 // and sets the next parser to parseImportFunc. If the token isn't a tokenID, this calls parseImportFunc.
 //
-// Ex. A function name is present `(import "Math" "PI" (func $math.pi (result f32))`
-//                                    records math.pi here --^
-//                                     parseImportFunc resumes here --^
+// Ex. A function ID is present `(import "Math" "PI" (func $math.pi (result f32))`
+//                                  records math.pi here --^
+//                                   parseImportFunc resumes here --^
 //
-// Ex. No function name `(import "Math" "PI" (func (result f32))`
-//                    calls parseImportFunc here --^
-func (p *moduleParser) parseImportFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
+// Ex. No function ID `(import "Math" "PI" (func (result f32))`
+//                  calls parseImportFunc here --^
+func (p *moduleParser) parseImportFuncID(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
-		p.addFuncName(tokenBytes)
 		p.tokenParser = p.parseImportFunc
-		return nil
+		return p.setFuncID(tokenBytes)
 	}
 	return p.parseImportFunc(tok, tokenBytes, line, col)
 }
 
-// addFuncName adds the normalized ('$' stripped) function name to the parser cache and the wasm.NameSection.
-func (p *moduleParser) addFuncName(idToken []byte) {
-	na := &wasm.NameAssoc{Index: p.currentFuncIndex, Name: string(stripDollar(idToken))}
-	p.module.names.FunctionNames = append(p.module.names.FunctionNames, na)
-	if p.funcNameToIndex == nil {
-		p.funcNameToIndex = map[string]wasm.Index{na.Name: na.Index}
-	} else {
-		p.funcNameToIndex[na.Name] = na.Index
+// setTypeID adds the normalized ('$' stripped) type ID to the typeIDContext.
+func (p *moduleParser) setTypeID(idToken []byte) error {
+	idx := p.currentTypeIndex
+	_, err := p.typeIDContext.setID(idToken, idx)
+	return err
+}
+
+// setFuncID adds the normalized ('$' stripped) function ID to the funcIDContext and the wasm.NameSection.
+func (p *moduleParser) setFuncID(idToken []byte) error {
+	idx := p.currentFuncIndex
+	id, err := p.funcIDContext.setID(idToken, idx)
+	if err != nil {
+		return err
 	}
+	p.module.names.FunctionNames = append(p.module.names.FunctionNames, &wasm.NameAssoc{Index: idx, Name: id})
+	return nil
 }
 
 // parseImportFunc is the second parser inside the imported function field. This passes control to the typeParser until
@@ -501,15 +523,15 @@ func (p *moduleParser) addFuncName(idToken []byte) {
 //
 // Ex. `(import "Math" "PI" (func $math.pi (result f32)))`
 //                           starts here --^           ^
-//             parseImportFuncEnd resumes here --+
+//                   parseImportFuncEnd resumes here --+
 //
 // Ex. If there is no signature `(import "" "main" (func))`
-//               calls parseImportFuncEnd here ---^
+//                     calls parseImportFuncEnd here ---^
 func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	p.typeParser.reset() // reset now in case there is never a tokenLParen
 	switch tok {
 	case tokenID: // Ex. (func $main $main)
-		return fmt.Errorf("redundant name: %s", tokenBytes)
+		return fmt.Errorf("redundant ID %s", tokenBytes)
 	case tokenLParen:
 		p.typeParser.beginTypeUse(p.parseImportFuncEnd, p.parseImportFuncEnd) // start fields, ex. (param or (result
 		return nil
@@ -521,11 +543,11 @@ func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, c
 // and/or importFunc.typeInlined and sets the next parser to parseImport.
 func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		tu, paramNames := p.typeParser.getTypeUse()
+		tu, _, paramNames := p.typeParser.getTypeUse()
 		p.module.typeUses = append(p.module.typeUses, tu)
 		if paramNames != nil {
-			p.module.names.LocalNames =
-				append(p.module.names.LocalNames, &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames})
+			na := &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames}
+			p.module.names.LocalNames = append(p.module.names.LocalNames, na)
 		}
 		p.currentField = fieldModuleImport
 		p.tokenParser = p.parseImport
@@ -534,20 +556,19 @@ func (p *moduleParser) parseImportFuncEnd(tok tokenType, tokenBytes []byte, _, _
 	return unexpectedToken(tok, tokenBytes)
 }
 
-// parseFuncName is the first parser inside a function field. This records the function name if present and sets the
-// next parser to parseFunc. If the token isn't a tokenID, this calls parseFunc.
+// parseFuncID is the first parser inside a function field. This records the function ID, if present, and sets the next
+// parser to parseFunc. If the token isn't a tokenID, this calls parseFunc.
 //
-// Ex. A function name is present `(module (func $math.pi (result f32))`
-//                        records math.pi here --^
-//                               parseFunc resumes here --^
+// Ex. A function ID is present `(module (func $math.pi (result f32))`
+//                      records math.pi here --^
+//                             parseFunc resumes here --^
 //
-// Ex. No function name `(module (func (result f32))`
-//              calls parseFunc here --^
-func (p *moduleParser) parseFuncName(tok tokenType, tokenBytes []byte, line, col uint32) error {
+// Ex. No function ID `(module (func (result f32))`
+//            calls parseFunc here --^
+func (p *moduleParser) parseFuncID(tok tokenType, tokenBytes []byte, line, col uint32) error {
 	if tok == tokenID { // Ex. $main
-		p.addFuncName(tokenBytes)
 		p.tokenParser = p.parseFunc
-		return nil
+		return p.setFuncID(tokenBytes)
 	}
 	return p.parseFunc(tok, tokenBytes, line, col)
 }
@@ -570,7 +591,7 @@ func (p *moduleParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uin
 	p.typeParser.reset() // reset now in case there is never a tokenLParen
 	switch tok {
 	case tokenID: // Ex. (func $main $main)
-		return fmt.Errorf("redundant name: %s", tokenBytes)
+		return fmt.Errorf("redundant ID %s", tokenBytes)
 	case tokenLParen: // start fields, ex. (local or (i32.const
 		p.typeParser.beginTypeUse(p.parseFuncBody, p.parseFuncBodyField)
 		return nil
@@ -590,15 +611,16 @@ func (p *moduleParser) parseFuncBodyField(tok tokenType, tokenBytes []byte, line
 // and/or Func.typeInlined and sets the next parser to parse.
 func (p *moduleParser) parseFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		tu, paramNames := p.typeParser.getTypeUse()
+		tu, _, paramNames := p.typeParser.getTypeUse()
 		p.module.typeUses = append(p.module.typeUses, tu)
+		p.module.code = append(p.module.code, &wasm.Code{Body: p.funcParser.getBody()})
+
+		// TODO: locals and also check they don't conflict with paramIDs returned from the type use
+		// Note: locals may be unverifiable wrt ID collision if the type isn't known, yet (ex func before type)
 		if paramNames != nil {
-			p.module.names.LocalNames =
-				append(p.module.names.LocalNames, &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames})
+			na := &wasm.NameMapAssoc{Index: p.currentFuncIndex, NameMap: paramNames}
+			p.module.names.LocalNames = append(p.module.names.LocalNames, na)
 		}
-		code := p.module.code[p.currentFuncIndex-uint32(len(p.module.importFuncs))]
-		// TODO: localTypes
-		code.Body = p.funcParser.getBody()
 
 		// Multiple funcs are allowed, so advance in case there's a next.
 		p.currentFuncIndex++

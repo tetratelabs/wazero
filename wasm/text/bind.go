@@ -158,7 +158,8 @@ func mergeLocalNames(m *module, typeParamNames map[wasm.Index]wasm.NameMap) wasm
 		}
 
 		// Use any inlined names or default to any on the type
-		typeNames, hasType := typeParamNames[m.typeUses[i].typeIndex.numeric]
+		typeIndex := m.typeUses[i].typeIndex.numeric
+		typeNames, hasType := typeParamNames[typeIndex]
 		var localNames wasm.NameMap
 		if inlinedNames == nil && !hasType {
 			continue

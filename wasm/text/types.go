@@ -87,6 +87,28 @@ type index struct {
 	col uint32
 }
 
+// idContext is an association of symbolic IDs to numeric indices.
+//
+// The Web Assembly Text Format allows use of symbolic identifiers, ex "$main", instead of numeric indices for most
+// sections, notably types, functions and parameters. For example, if a function is defined with the tokenID "$main",
+// the start section can use that symbolic ID instead of its numeric offset in the code section. These IDs require two
+// features, uniqueness and lookup, as implemented with a map. The key is stripped of the leading '$' to match other
+// tools, as described in stripDollar
+//
+// See https://www.w3.org/TR/wasm-core-1/#text-context
+type idContext map[string]wasm.Index
+
+// setID ensures the given tokenID is unique within this context and raises an error if not. The resulting mapping is
+// stripped of the leading '$' to match other tools, as described in stripDollar.
+func (ctx idContext) setID(idToken []byte, idx uint32) (string, error) {
+	id := string(stripDollar(idToken))
+	if _, ok := ctx[id]; ok {
+		return id, fmt.Errorf("duplicate ID %s", idToken)
+	}
+	ctx[id] = idx
+	return id, nil
+}
+
 // importFunc corresponds to the text format of a WebAssembly function import.
 //
 // Note: the type usage of this import is at module.typeUses the same index as module.importFuncs
