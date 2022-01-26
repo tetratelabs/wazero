@@ -8,8 +8,9 @@ import (
 
 	"github.com/bytecodealliance/wasmtime-go"
 	"github.com/stretchr/testify/require"
+	"github.com/wasmerio/wasmer-go/wasmer"
 
-	wasm "github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/text"
 )
@@ -153,8 +154,20 @@ func BenchmarkCodecExample(b *testing.B) {
 			}
 		}
 	})
+	// Note: We don't know if wasmer.Wat2Wasm encodes the custom name section or not.
+	// Note: wasmer.Wat2Wasm calls wasmer via CGO which is eventually implemented by wasm-tools
+	b.Run("wat2wasm vs wasmer.Wat2Wasm", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_, err := wasmer.Wat2Wasm(string(exampleText))
+			if err != nil {
+				panic(err)
+			}
+		}
+	})
 	// Note: We don't know if wasmtime.Wat2Wasm encodes the custom name section or not.
-	b.Run("wat2wasm via wasmtime.Wat2Wasm", func(b *testing.B) {
+	// Note: wasmtime.Wat2Wasm calls wasmtime via CGO which is eventually implemented by wasm-tools
+	b.Run("wat2wasm vs wasmtime.Wat2Wasm", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			_, err := wasmtime.Wat2Wasm(string(exampleText))
