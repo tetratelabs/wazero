@@ -3,8 +3,10 @@ package wasi
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"math/rand"
 	"os"
 	"reflect"
@@ -18,6 +20,7 @@ const (
 )
 
 type WASIEnvironment struct {
+	args  wasiStringArray
 	stdin io.Reader
 	stdout,
 	stderr io.Writer
@@ -69,11 +72,11 @@ func (w *WASIEnvironment) Register(store *wasm.Store) (err error) {
 		if err != nil {
 			return err
 		}
-		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(args_get))
+		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(w.args_get))
 		if err != nil {
 			return err
 		}
-		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(args_sizes_get))
+		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(w.args_sizes_get))
 		if err != nil {
 			return err
 		}
@@ -107,6 +110,48 @@ func Stderr(writer io.Writer) Option {
 	}
 }
 
+// wasiStringArray holds null-terminated strings. It ensures that
+// its length and total buffer size don't exceed the max of uint32.
+type wasiStringArray struct {
+	strings      [][]byte
+	totalBufSize uint32
+}
+
+// newWASIStringArray creates a cStringArray from the given string slice. It returns an error
+// if the length or the total buffer size of the result WASIStringArray exceeds the max of uint32
+func newWASIStringArray(args []string) (*wasiStringArray, error) {
+	if args == nil {
+		return &wasiStringArray{strings: [][]byte{}}, nil
+	}
+	if len(args) > math.MaxUint32 {
+		return nil, fmt.Errorf("the length of the args exceeds the max of uint32: %v", len(args))
+	}
+	strings := make([][]byte, len(args))
+	totalBufSize := uint32(0)
+	for i, arg := range args {
+		argLen := uint64(len(arg)) + 1 // + 1 for '\x00'
+		if argLen > uint64(math.MaxUint32-totalBufSize) {
+			return nil, fmt.Errorf("the required buffer size for the args exceeds the max of uint32: %v", uint64(totalBufSize)+argLen)
+		}
+		totalBufSize += uint32(argLen)
+		strings[i] = make([]byte, argLen)
+		copy(strings[i], arg)
+		strings[i][argLen-1] = byte(0)
+	}
+
+	return &wasiStringArray{strings: strings, totalBufSize: totalBufSize}, nil
+}
+
+func Args(args []string) (Option, error) {
+	wasiStrings, err := newWASIStringArray(args)
+	if err != nil {
+		return nil, err
+	}
+	return func(w *WASIEnvironment) {
+		w.args = *wasiStrings
+	}, nil
+}
+
 func Preopen(dir string, fileSys FS) Option {
 	return func(w *WASIEnvironment) {
 		w.opened[uint32(len(w.opened))+3] = fileEntry{
@@ -118,6 +163,7 @@ func Preopen(dir string, fileSys FS) Option {
 
 func NewEnvironment(opts ...Option) *WASIEnvironment {
 	ret := &WASIEnvironment{
+		args:   wasiStringArray{},
 		stdin:  os.Stdin,
 		stdout: os.Stdout,
 		stderr: os.Stderr,
@@ -277,16 +323,28 @@ func (w *WASIEnvironment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32)
 	return ESUCCESS
 }
 
-func args_sizes_get(ctx *wasm.HostFunctionCallContext, argcPtr uint32, argvPtr uint32) (err Errno) {
-	// not implemented yet
-	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argcPtr:], 0)
-	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argvPtr:], 0)
-	return 0
+func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, argsCountPtr uint32, argsBufSizePtr uint32) Errno {
+	if !ctx.Memory.PutUint32(argsCountPtr, uint32(len(w.args.strings))) {
+		return EINVAL
+	}
+	if !ctx.Memory.PutUint32(argsBufSizePtr, w.args.totalBufSize) {
+		return EINVAL
+	}
+
+	return ESUCCESS
 }
 
-func args_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	// not implemented yet
-	return
+func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
+	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.strings))*4) || !ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
+		return EINVAL
+	}
+	for _, arg := range w.args.strings {
+		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argsPtr:], argsBufPtr)
+		argsPtr += 4
+		argsBufPtr += uint32(copy(ctx.Memory.Buffer[argsBufPtr:], arg))
+	}
+
+	return ESUCCESS
 }
 
 func proc_exit(*wasm.HostFunctionCallContext, uint32) {
