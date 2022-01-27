@@ -48,15 +48,8 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name:  "type func param IDs",
-			input: "(module (type $mul (func (param $x f32) (param $y f32) (result f32))))",
-			expected: &module{
-				types: []*wasm.FunctionType{{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}}},
-			},
-		},
-		{
-			name:  "type func mixed param IDs", // Verifies we can handle less param fields than Params
-			input: "(module (type (func (param i32 i32) (param $v i32) (param i64) (param $t f32))))",
+			name:  "type func mixed param abbreviation", // Verifies we can handle less param fields than Params
+			input: "(module (type (func (param i32 i32) (param i32) (param i64) (param f32))))",
 			expected: &module{
 				types: []*wasm.FunctionType{
 					{Params: []wasm.ValueType{i32, i32, i32, i64, f32}},
@@ -64,11 +57,11 @@ func TestParseModule(t *testing.T) {
 			},
 		},
 		{
-			name: "type funcs same param types different names",
+			name: "type funcs same param types",
 			input: `(module
-	(type $mul (func (param $x f32) (param $y f32) (result f32)))
+	(type $mul (func (param f32) (param f32) (result f32)))
 	(type (func) (; here to ensure sparse indexes work ;))
-	(type $add (func (param $l f32) (param $r f32) (result f32)))
+	(type $add (func (param f32) (param f32) (result f32)))
 )`,
 			expected: &module{
 				types: []*wasm.FunctionType{
@@ -1046,16 +1039,6 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "type ID clash",
 			input:       "(module (type $1 (func)) (type $1 (func (param i32))))",
 			expectedErr: "1:32: duplicate ID $1 in module.type[1]",
-		},
-		{
-			name:        "type func param second ID",
-			input:       "(module (type (func (param $x $y i32) ))",
-			expectedErr: "1:31: redundant ID $y in module.type[0].func.param[0]",
-		},
-		{
-			name:        "type func param ID clash",
-			input:       "(module (type (func (param $x i32) (param i32) (param $x i32)))",
-			expectedErr: "1:55: duplicate ID $x in module.type[0].func.param[2]",
 		},
 		{
 			name:        "type func param ID in abbreviation",
