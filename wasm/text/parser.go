@@ -101,27 +101,6 @@ type moduleParser struct {
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#text-context
 	funcIDContext idContext
-
-	// typeParamIDContext resolves symbolic identifiers, such as "x" to a numeric index in locals namespace for each
-	// function that uses this type, yet doesn't override the symbolic IDs of the parameters.
-	//
-	// For example, given `(module (type) (type (func (param $x i32) (param i64) (param $y i32))`, the mapping would be
-	// 1 -> [{0, "x"}, {2, "y"}].
-	//
-	// Given the above mapping, if a function refers to the type alone, like `(func (type 1))`, the parameter IDs from
-	// the type become that function's locals context: [{0, "x"}, {2, "y"}]
-	//
-	// However, a type use can override IDS like this: `(func (type 1) (param $1 i32) (param $2 i64) (param $3 i32))`.
-	// In this case, the parameter IDs from the type are ignored. Ex. [{0, "1"}, {1, "2"}, {2, "3"}]
-	//
-	// Note: This is a map not a wasm.IndirectNameMap as late lookup is needed for after parsing
-	//
-	// See https://www.w3.org/TR/wasm-core-1/#text-functype
-	// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
-	typeParamIDContext map[wasm.Index]idContext
-
-	// typeParamNames are the typeParamIDContext formatted for the wasm.NameSection LocalNames
-	typeParamNames map[wasm.Index]wasm.NameMap
 }
 
 // parse has the same signature as tokenParser and called by lex on each token.
@@ -140,13 +119,11 @@ func (p *moduleParser) parse(tok tokenType, tokenBytes []byte, line, col uint32)
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 func parseModule(source []byte) (*module, error) {
 	p := moduleParser{
-		source:             source,
-		module:             &module{names: &wasm.NameSection{}},
-		indexParser:        &indexParser{},
-		typeIDContext:      idContext{}, // initialize contexts to reduce the amount of runtime nil checks
-		typeParamIDContext: map[wasm.Index]idContext{},
-		typeParamNames:     map[wasm.Index]wasm.NameMap{},
-		funcIDContext:      idContext{},
+		source:        source,
+		module:        &module{names: &wasm.NameSection{}},
+		indexParser:   &indexParser{},
+		typeIDContext: idContext{}, // initialize contexts to reduce the amount of runtime nil checks
+		funcIDContext: idContext{},
 	}
 	p.typeParser = &typeParser{m: &p, paramIDContext: idContext{}}
 	p.funcParser = &funcParser{m: &p, onBodyEnd: p.parseFuncEnd}
@@ -169,7 +146,6 @@ func parseModule(source []byte) (*module, error) {
 
 	// Don't set the name section unless we found a name!
 	names := p.module.names
-	names.LocalNames = mergeLocalNames(p.module, p.typeParamNames)
 	if names.ModuleName == "" && names.FunctionNames == nil && names.LocalNames == nil {
 		p.module.names = nil
 	}
@@ -386,12 +362,7 @@ func (p *moduleParser) parseTypeFunc(tok tokenType, tokenBytes []byte, line, col
 // the token is tokenRParen and sets the next parser to parseType on tokenRParen.
 func (p *moduleParser) parseTypeFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) error {
 	if tok == tokenRParen {
-		sig, paramIDs, paramNames := p.typeParser.getType()
-		if paramIDs != nil {
-			p.typeParamIDContext[p.currentTypeIndex] = paramIDs
-			p.typeParamNames[p.currentTypeIndex] = paramNames
-		}
-		p.module.types = append(p.module.types, sig)
+		p.module.types = append(p.module.types, p.typeParser.getType())
 		p.currentValue0 = nil
 		p.currentField = fieldModuleType
 		p.tokenParser = p.parseType

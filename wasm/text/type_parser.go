@@ -87,6 +87,9 @@ type typeParser struct {
 	// unrelated to the length of currentParams
 	currentParamField wasm.Index
 
+	// onParamID is ignoreParamID when beginType and setParamID when beginTypeUse
+	onParamID onParamID
+
 	// foundParam allows us to check if we found a type in a "param" field. We can't use currentParamField because when
 	// parameters are abbreviated, ex. (param i32 i32), the currentParamField will be less than the type count.
 	foundParam bool
@@ -120,6 +123,7 @@ type typeParser struct {
 //
 // NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (import (func)))`
 func (p *typeParser) beginTypeUse(onTypeEnd, onUnknownField tokenParser) {
+	p.onParamID = setParamID
 	p.onTypeEnd = onTypeEnd
 	p.onUnknownField = onUnknownField
 	p.state = parsingTypeUse
@@ -153,6 +157,7 @@ func (p *typeParser) beginTypeParamOrResult(tok tokenType, tokenBytes []byte, li
 //
 // NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (type (func)))`
 func (p *typeParser) beginType(onTypeEnd tokenParser) {
+	p.onParamID = ignoreParamID
 	p.onTypeEnd = onTypeEnd
 	p.onUnknownField = onTypeEnd
 	p.state = parsingParamOrResult
@@ -210,11 +215,11 @@ func (p *typeParser) parseMoreParamsOrResult(tok tokenType, tokenBytes []byte, l
 	return p.onTypeEnd(tok, tokenBytes, line, col)
 }
 
-// parseParamID is the first parser inside a param field. This records the ID if present or calls parseParam if not
-// found.
+// parseParamID is the first parser inside a param field. This calls onParamID with the ID if present or parseParam if
+// not found.
 //
 // Ex. A param ID is present `(param $x i32)`
-//                       records x --^  ^
+//                 calls onParamID --^  ^
 //            parseParam resumes here --+
 //
 // Ex. No param ID `(param i32)`
@@ -223,13 +228,24 @@ func (p *typeParser) parseParamID(tok tokenType, tokenBytes []byte, line, col ui
 	if tok == tokenID { // Ex. $len
 		p.foundID = true
 		p.m.tokenParser = p.parseParam
-		return p.setParamID(tokenBytes)
+		return p.onParamID(p, tokenBytes)
 	}
 	return p.parseParam(tok, tokenBytes, line, col)
 }
 
+// onParamID handles a tokenID in a param field
+type onParamID func(p *typeParser, idToken []byte) error
+
+// ignoreParamID is used for module.types, where parameter IDs are allowed to be present, but needn't be validated, and
+// serve no purpose.
+//
+// See https://github.com/WebAssembly/spec/issues/1411
+func ignoreParamID(_ *typeParser, _ []byte) error {
+	return nil
+}
+
 // setParamID adds the normalized ('$' stripped) parameter ID to the paramIDContext and the wasm.NameSection.
-func (p *typeParser) setParamID(idToken []byte) error {
+func setParamID(p *typeParser, idToken []byte) error {
 	// Note: currentParamField is the index of the param field, but due to mixing and matching of abbreviated params
 	// it can be less than the param index. Ex. (param i32 i32) (param $v i32) is param field 2, but the 3rd param.
 	idx := wasm.Index(len(p.currentParams))
@@ -372,12 +388,7 @@ func funcTypeEquals(f *wasm.FunctionType, params []wasm.ValueType, results []was
 // getType finalizes any current params or result and returns the current type and any paramNames for it.
 //
 // If the current type is in typeParser.inlinedTypes, it is removed prior to returning.
-func (p *typeParser) getType() (sig *wasm.FunctionType, paramIDs map[string]wasm.Index, paramNames wasm.NameMap) {
-	if len(p.paramIDContext) > 0 {
-		paramIDs = p.paramIDContext
-		paramNames = p.paramNames
-	}
-
+func (p *typeParser) getType() (sig *wasm.FunctionType) {
 	// Search inlined types in case a matching type was found after its type use.
 	for i, t := range p.inlinedTypes {
 		if funcTypeEquals(t, p.currentParams, p.currentResults) {

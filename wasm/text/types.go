@@ -43,10 +43,6 @@ type module struct {
 	// * ModuleName: ex. "test" if (module $test)
 	// * FunctionNames: nil when no importFunc or function had a name
 	// * LocalNames: nil when no importFuncs or function had named (param) fields.
-	//
-	// Note: LocalNames will be incomplete until the end of parsing because types can be declared after a function that
-	// uses them. typeUses are analyzed later for this reason.
-	// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
 	names *wasm.NameSection
 }
 
