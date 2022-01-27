@@ -32,7 +32,6 @@ func Test_WASI_args(t *testing.T) {
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	// Let TinyGo runtime initialize the WASI environment by calling main.
 	_, _, err = store.CallFunction("test", "_start")
 	require.NoError(t, err)
 }
