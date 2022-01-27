@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"math"
 	"os"
 	"reflect"
 	"sync"
@@ -14,19 +15,72 @@ import (
 	"github.com/tetratelabs/wazero/wasm/text"
 )
 
-// Ensures that the offset consts do not drift when we manipulate the engine struct.
-func TestEngine_veifyOffsetValue(t *testing.T) {
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).stack)), engineStackSliceOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).stackPointer)), enginestackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).stackBasePointer)), enginestackBasePointerOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).jitCallStatusCode)), engineJITCallStatusCodeOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).functionCallAddress)), engineFunctionCallAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).continuationAddressOffset)), engineContinuationAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).globalSliceAddress)), engineglobalSliceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).memorySliceAddress)), engineMemorySliceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).memorySliceLen)), engineMemorySliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceAddress)), engineTableSliceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof((&engine{}).tableSliceLen)), engineTableSliceLenOffset)
+// Ensures that the offset consts do not drift when we manipulate the target structs.
+func TestVeifyOffsetValue(t *testing.T) {
+	var eng engine
+	// Offsets for engine.globalContext.
+	require.Equal(t, int(unsafe.Offsetof(eng.valueStackFirstItemAddress)), engineGlobalContextValueStackFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.valueStackLen)), engineGlobalContextValueStackLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackFirstItemAddress)), engineGlobalContextCallFrameStackFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackLen)), engineGlobalContextCallFrameStackLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackPointer)), engineGlobalContextCallFrameStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.previousCallFrameStackPointer)), engineGlobalContextPreviouscallFrameStackPointer)
+	require.Equal(t, int(unsafe.Offsetof(eng.compiledFunctionsFirstItemAddress)), engineGlobalContextCompiledFunctionsFirstItemAddressOffset)
+
+	// Offsets for engine.moduleContext.
+	require.Equal(t, int(unsafe.Offsetof(eng.moduleInstanceAddress)), engineModuleContextModuleInstanceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.globalFirstItemAddress)), engineModuleContextGlobalFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.memoryFirstItemAddress)), engineModuleContextMemoryFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.memorySliceLen)), engineModuleContextMemorySliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.tableFirstItemAddress)), engineModuleContextTableFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.tableSliceLen)), engineModuleContextTableSliceLenOffset)
+
+	// Offsets for engine.valueStackContext
+	require.Equal(t, int(unsafe.Offsetof(eng.stackPointer)), engineValueStackContextStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.stackBasePointer)), engineValueStackContextStackBasePointerOffset)
+
+	// Offsets for engine.exitContext.
+	require.Equal(t, int(unsafe.Offsetof(eng.statusCode)), engineExitContextJITCallStatusCodeOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.functionCallAddress)), engineExitContextFunctionCallAddressOffset)
+
+	// Size and offsets for callFrame.
+	var frame callFrame
+	require.Equal(t, int(unsafe.Sizeof(frame)), callFrameDataSize)
+	// Sizeof callframe must be a power of 2 as we do SHL on the index by "callFrameDataSizeMostSignificantSetBit" to obtain the offset address.
+	require.True(t, callFrameDataSize&(callFrameDataSize-1) == 0)
+	require.Equal(t, math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit)
+	require.Equal(t, int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(frame.returnStackBasePointer)), callFrameReturnStackBasePointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(frame.compiledFunction)), callFrameCompiledFunctionOffset)
+
+	// Offsets for compiledFunction.
+	var compiledFunc compiledFunction
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), compiledFunctionCodeInitialAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.maxStackPointer)), compiledFunctionMaxStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.moduleInstanceAddress)), compiledFunctionModuleInstanceAddressOffset)
+
+	// Offsets for wasm.TableElement.
+	var tableElement wasm.TableElement
+	require.Equal(t, int(unsafe.Offsetof(tableElement.FunctionAddress)), tableElementFunctionAddressOffest)
+	require.Equal(t, int(unsafe.Offsetof(tableElement.FunctionTypeID)), tableElementFunctionTypeIDOffest)
+
+	// Offsets for wasm.ModuleInstance.
+	var moduleInstance wasm.ModuleInstance
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Tables)), moduleInstanceTablesOffset)
+
+	// Offsets for wasm.TableInstance.
+	var tableInstance wasm.TableInstance
+	require.Equal(t, int(unsafe.Offsetof(tableInstance.Table)), tableInstanceTableOffset)
+
+	// Offsets for wasm.MemoryInstance
+	var memoryInstance wasm.MemoryInstance
+	require.Equal(t, int(unsafe.Offsetof(memoryInstance.Buffer)), memoryInstanceBufferOffset)
+
+	// Offsets for wasm.GlobalInstance
+	var globalInstance wasm.GlobalInstance
+	require.Equal(t, int(unsafe.Offsetof(globalInstance.Val)), globalInstanceValueOffset)
 }
 
 func Test_Simple(t *testing.T) {
@@ -139,7 +193,7 @@ wasm backtrace:
 	2: two
 	3: one
 	4: main`
-	require.Error(t, err)
+	require.ErrorIs(t, err, wasm.ErrRuntimeUnreachable)
 	require.Equal(t, exp, err.Error())
 }
 
@@ -181,11 +235,11 @@ func TestEngine_RecursiveEntry(t *testing.T) {
 	eng := newEngine()
 	store := wasm.NewStore(eng)
 
-	externEmpty := func(ctx *wasm.HostFunctionCallContext) {
+	extern := func(ctx *wasm.HostFunctionCallContext) {
 		_, _, err := store.CallFunction("test", "called_by_host_func")
 		require.NoError(t, err)
 	}
-	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(externEmpty))
+	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(extern))
 	require.NoError(t, err)
 
 	err = store.Instantiate(mod, "test")
@@ -193,37 +247,4 @@ func TestEngine_RecursiveEntry(t *testing.T) {
 
 	_, _, err = store.CallFunction("test", "main", uint64(1))
 	require.NoError(t, err)
-}
-
-func TestEngine_maybeGrowStack(t *testing.T) {
-	t.Run("grow", func(t *testing.T) {
-		eng := &engine{stack: make([]uint64, 10)}
-		eng.stackBasePointer = 5
-		eng.push(10)
-		require.Equal(t, uint64(1), eng.stackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
-		eng.maybeGrowStack(100)
-		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
-		// but we require 100 max stack pointer for the next function,
-		// so this results in making the stack length 120 = 10(current len)*2+(100(maxStackPointer))
-		require.Len(t, eng.stack, 120)
-		// maybeAdjustStack only shrink the stack,
-		// and must not modify neither stack pointer nor the values in the stack.
-		require.Equal(t, uint64(1), eng.stackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
-	})
-	t.Run("noop", func(t *testing.T) {
-		eng := &engine{stack: make([]uint64, 10)}
-		eng.stackBasePointer = 1
-		eng.push(10)
-		require.Equal(t, uint64(1), eng.stackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
-		eng.maybeGrowStack(6)
-		// Currently we have 9 empty slots (10 - 1(base pointer)) above base pointer for new items,
-		// and we only require 6 max stack pointer for the next function, so we have enough empty slots.
-		// so maybeGrowStack must not modify neither stack pointer, the values in the stack nor stack len.
-		require.Len(t, eng.stack, 10)
-		require.Equal(t, uint64(1), eng.stackPointer)
-		require.Equal(t, uint64(10), eng.stack[eng.stackBasePointer+eng.stackPointer-1])
-	})
 }

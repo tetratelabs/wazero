@@ -16,9 +16,9 @@ import (
 const (
 	// reservedRegisterForEngine R13: pointer to engine instance (i.e. *engine as uintptr)
 	reservedRegisterForEngine = x86.REG_R13
-	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.stackBasePointer) in the current function call.
-	reservedRegisterForStackBasePointer = x86.REG_R14
-	// reservedRegisterForMemory R15: pointer to memory space (i.e. *[]byte as uintptr).
+	// reservedRegisterForStackBasePointerAddress R14: stack base pointer's address (engine.stackBasePointer) in the current function call.
+	reservedRegisterForStackBasePointerAddress = x86.REG_R14
+	// reservedRegisterForMemory R15: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
 	reservedRegisterForMemory = x86.REG_R15
 )
 
@@ -232,12 +232,16 @@ func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	loc.conditionalRegister = conditionalRegisterStateUnset
 }
 
-func (s *valueLocationStack) markRegisterUnused(reg int16) {
-	delete(s.usedRegisters, reg)
+func (s *valueLocationStack) markRegisterUnused(regs ...int16) {
+	for _, reg := range regs {
+		delete(s.usedRegisters, reg)
+	}
 }
 
-func (s *valueLocationStack) markRegisterUsed(reg int16) {
-	s.usedRegisters[reg] = struct{}{}
+func (s *valueLocationStack) markRegisterUsed(regs ...int16) {
+	for _, reg := range regs {
+		s.usedRegisters[reg] = struct{}{}
+	}
 }
 
 type generalPurposeRegisterType byte

@@ -1,6 +1,9 @@
 package jit
 
-import "github.com/tetratelabs/wazero/wasm/internal/wazeroir"
+import (
+	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
+)
 
 // compiler is the interface of architecture-specific native code compiler,
 // and this is responsible for compiling native code for all wazeroir operations.
@@ -9,10 +12,12 @@ type compiler interface {
 	String() string
 	// emitPreamble is called before compiling any wazeroir operation.
 	// This is used, for example, to initilize the reserved registers, etc.
-	emitPreamble()
+	emitPreamble() error
 	// Generates the byte slice of native codes.
 	// maxStackPointer is the max stack pointer that the target function would reach.
 	generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error)
+	// Emit the trampoline code from which native code can jump into the host function.
+	compileHostFunction(address wasm.FunctionAddress) error
 	// Return true if the compiler decided to skip the entire label.
 	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)
 	// Followings are resinposible for compiling each wazeroir operation.

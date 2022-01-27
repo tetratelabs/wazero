@@ -5,9 +5,11 @@ package jit
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
+	"reflect"
 	"runtime"
 	"testing"
 	"unsafe"
@@ -29,6 +31,8 @@ type jitEnv struct {
 	mem     *wasm.MemoryInstance
 	globals []*wasm.GlobalInstance
 	table   *wasm.TableInstance
+
+	moduleInstance *wasm.ModuleInstance
 }
 
 func (j *jitEnv) stackTopAsByte() byte {
@@ -67,23 +71,23 @@ func (j *jitEnv) memory() []byte {
 }
 
 func (j *jitEnv) stack() []uint64 {
-	return j.eng.stack
+	return j.eng.valueStack
 }
 
 func (j *jitEnv) jitStatus() jitCallStatusCode {
-	return j.eng.jitCallStatusCode
+	return j.eng.statusCode
 }
 
 func (j *jitEnv) functionCallAddress() wasm.FunctionAddress {
 	return j.eng.functionCallAddress
 }
 
-func (j *jitEnv) continuationAddressOffset() uintptr {
-	return j.eng.continuationAddressOffset
-}
-
 func (j *jitEnv) stackPointer() uint64 {
 	return j.eng.stackPointer
+}
+
+func (j *jitEnv) stackBasePointer() uint64 {
+	return j.eng.stackBasePointer
 }
 
 func (j *jitEnv) setStackPointer(sp uint64) {
@@ -102,19 +106,53 @@ func (j *jitEnv) setTable(table []wasm.TableElement) {
 	j.table.Table = table
 }
 
+func (j *jitEnv) callFrameStackPeek() *callFrame {
+	return &j.eng.callFrameStack[j.eng.callFrameStackPointer-1]
+}
+
+func (j *jitEnv) callFrameStackPointer() uint64 {
+	return j.eng.globalContext.callFrameStackPointer
+}
+
+func (j *jitEnv) setValueStackBasePointer(sp uint64) {
+	j.eng.valueStackContext.stackBasePointer = sp
+}
+
+func (j *jitEnv) setCallFrameStackPointer(sp uint64) {
+	j.eng.globalContext.callFrameStackPointer = sp
+}
+
+func (j *jitEnv) setPreviousCallFrameStackPointer(sp uint64) {
+	j.eng.globalContext.previousCallFrameStackPointer = sp
+}
+
+func (j *jitEnv) engine() *engine {
+	return j.eng
+}
+
 func (j *jitEnv) exec(code []byte) {
-	j.eng.memorySliceLen = uint64(len(j.mem.Buffer))
-	if len(j.globals) > 0 {
-		j.eng.globalSliceAddress = uintptr(unsafe.Pointer(&j.globals[0]))
+	j.moduleInstance = &wasm.ModuleInstance{
+		Globals: j.globals,
+		Memory:  j.mem,
+		Tables:  []*wasm.TableInstance{j.table},
 	}
-	if l := len(j.table.Table); l > 0 {
-		j.eng.tableSliceAddress = uintptr(unsafe.Pointer(&j.table.Table[0]))
-		j.eng.tableSliceLen = uint64(l)
+	j.execWithModule(code, j.moduleInstance)
+}
+
+func (j *jitEnv) execWithModule(code []byte, module *wasm.ModuleInstance) {
+	compiledFunction := &compiledFunction{
+		codeSegment:           code,
+		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+		moduleInstanceAddress: uintptr(unsafe.Pointer(module)),
+		source: &wasm.FunctionInstance{
+			FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
+		},
 	}
+	j.eng.pushInitialFrame(compiledFunction)
+
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
 		uintptr(unsafe.Pointer(j.eng)),
-		uintptr(unsafe.Pointer(&j.mem.Buffer[0])),
 	)
 }
 
@@ -129,7 +167,7 @@ func newJITEnvironment() *jitEnv {
 func requireNewCompiler(t *testing.T) *amd64Compiler {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
-	return &amd64Compiler{eng: nil, builder: b,
+	return &amd64Compiler{builder: b,
 		locationStack: newValueLocationStack(),
 		labels:        map[string]*labelInfo{},
 	}
@@ -146,53 +184,274 @@ func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *
 	return prog
 }
 
-func TestAmd64Compiler_generate(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
+func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
+	t.Run("not grow", func(t *testing.T) {
+		for _, baseOffset := range []uint64{5, 10, 20} {
+
+			env := newJITEnvironment()
+			compiler := requireNewCompiler(t)
+
+			compiler.initializeReservedStackBasePointer()
+			err := compiler.maybeGrowValueStack()
+			require.NoError(t, err)
+			require.NotNil(t, compiler.onMaxStackPointerDeterminedCallBack)
+
+			valueStackLen := uint64(len(env.stack()))
+			maxStackPointer := uint64(5)
+			stackBasePointer := valueStackLen - baseOffset // Base + Max <= valueStackLen = no need to grow!
+			fmt.Println(stackBasePointer)
+			compiler.onMaxStackPointerDeterminedCallBack(maxStackPointer)
+			compiler.onMaxStackPointerDeterminedCallBack = nil
+			env.setValueStackBasePointer(stackBasePointer)
+
+			compiler.exit(jitCallStatusCodeReturned)
+
+			// Generate the code under test.
+			code, _, _, err := compiler.generate()
+			require.NoError(t, err)
+
+			fmt.Println(hex.EncodeToString(code))
+
+			// Run codes
+			env.exec(code)
+
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		}
+	})
+	t.Run("grow", func(t *testing.T) {
+		env := newJITEnvironment()
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
 
-		// Emit a good move instruction which is followed by return and continuation.
-		inst := compiler.newProg()
-		inst.As = x86.AMOVQ
-		inst.From.Type = obj.TYPE_CONST
-		inst.To.Type = obj.TYPE_REG
-		inst.To.Reg = x86.REG_R10
-		inst.From.Offset = int64(1 << 33)
-		compiler.addInstruction(inst)
-		compiler.requireFunctionCallReturnAddressOffsetResolution = append(
-			compiler.requireFunctionCallReturnAddressOffsetResolution, inst)
-
-		ret := compiler.newProg()
-		ret.As = obj.ARET
-		compiler.addInstruction(ret)
-
-		afterFunctionCallInst := compiler.newProg()
-		afterFunctionCallInst.As = obj.ANOP
-		compiler.addInstruction(afterFunctionCallInst)
-
-		// Check the error is NOT returned.
-		_, _, _, err := compiler.generate()
+		compiler.initializeReservedStackBasePointer()
+		err := compiler.maybeGrowValueStack()
 		require.NoError(t, err)
+		require.NotNil(t, compiler.onMaxStackPointerDeterminedCallBack)
+
+		valueStackLen := uint64(len(env.stack()))
+		maxStackPointer := uint64(6)
+		stackBasePointer := valueStackLen - 5 // Base + Max > valueStackLen = need to grow!
+		compiler.onMaxStackPointerDeterminedCallBack(maxStackPointer)
+		compiler.onMaxStackPointerDeterminedCallBack = nil
+		env.setValueStackBasePointer(stackBasePointer)
+
+		compiler.exit(jitCallStatusCodeReturned)
+
+		// Generate the code under test.
+		code, _, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		fmt.Println(hex.EncodeToString(code))
+
+		// Run codes
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
 	})
-	t.Run("invalid function call", func(t *testing.T) {
+}
+
+func TestAmd64Compiler_returnFunction(t *testing.T) {
+	t.Run("last return", func(t *testing.T) {
+		env := newJITEnvironment()
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
 
-		// Set the invalid function call origin which the return instruction doesn't follow.
-		invalidInst := compiler.newProg()
-		invalidInst.As = x86.AMOVQ
-		invalidInst.To.Type = obj.TYPE_REG
-		invalidInst.To.Reg = x86.REG_R10
-		invalidInst.To.Type = obj.TYPE_REG
-		invalidInst.To.Reg = x86.REG_R10
-		compiler.addInstruction(invalidInst)
-		compiler.requireFunctionCallReturnAddressOffsetResolution = append(
-			compiler.requireFunctionCallReturnAddressOffsetResolution, invalidInst)
+		const expectedValue uint32 = 100
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedValue})
+		require.NoError(t, err)
 
-		// Check the error is returned.
-		_, _, _, err := compiler.generate()
-		require.Error(t, err)
+		require.Len(t, compiler.locationStack.usedRegisters, 1)
+		err = compiler.returnFunction()
+		require.NoError(t, err)
+		require.Len(t, compiler.locationStack.usedRegisters, 0)
+
+		// Generate the code under test.
+		code, _, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		const previousCallFrameStackPointer uint64 = 50
+		env.setCallFrameStackPointer(previousCallFrameStackPointer)
+		env.setPreviousCallFrameStackPointer(previousCallFrameStackPointer)
+
+		// Run codes
+		env.exec(code)
+
+		// Check the exit status.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, previousCallFrameStackPointer, env.callFrameStackPointer())
+
+		require.Equal(t, expectedValue, env.stackTopAsUint32())
 	})
+	t.Run("deep call stack", func(t *testing.T) {
+		env := newJITEnvironment()
+		engine := env.engine()
+
+		// Push the callFrames.
+		const callFrameNums = 10
+		var code []byte
+		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
+			compiler := requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(funcaddr)})
+			require.NoError(t, err)
+
+			err = compiler.returnFunction()
+			require.NoError(t, err)
+
+			code, _, _, err = compiler.generate()
+			require.NoError(t, err)
+
+			codeInitialAddress := uintptr(unsafe.Pointer(&code[0]))
+			compiledFunction := &compiledFunction{codeSegment: code, codeInitialAddress: codeInitialAddress}
+			engine.addCompiledFunction(funcaddr, compiledFunction)
+			engine.callFrameStack[engine.globalContext.callFrameStackPointer] = callFrame{
+				returnAddress:          codeInitialAddress,
+				returnStackBasePointer: uint64(funcaddr) * 10,
+				compiledFunction:       compiledFunction,
+			}
+			engine.globalContext.callFrameStackPointer++
+		}
+
+		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
+
+		lastModuleInstance := &wasm.ModuleInstance{}
+		expPtr := uintptr(unsafe.Pointer(lastModuleInstance))
+		engine.callFrameStack[0].compiledFunction.moduleInstanceAddress = expPtr
+
+		// Run codes
+		env.exec(code)
+
+		require.Equal(t, expPtr, engine.moduleContext.moduleInstanceAddress)
+
+		// Check the exit status.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(0), env.callFrameStackPointer())
+
+		for i := 0; i < callFrameNums; i++ {
+			require.Equal(t, uint64(i), env.stack()[i*10])
+		}
+	})
+}
+
+func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		moduleInstance *wasm.ModuleInstance
+	}{
+		{
+			name: "no nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "memory nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "memory zero length",
+			moduleInstance: &wasm.ModuleInstance{
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+			},
+		},
+		{
+			name: "table length zero",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: nil}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "table length zero part2",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "table nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "table nil part2",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "globals nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Globals: []*wasm.GlobalInstance{},
+			},
+		},
+		{
+			name: "globals nil part2",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables: []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			compiler := requireNewCompiler(t)
+			compiler.initializeReservedStackBasePointer()
+
+			require.Empty(t, compiler.locationStack.usedRegisters)
+			compiler.initializeModuleContext()
+			require.Empty(t, compiler.locationStack.usedRegisters)
+
+			const expectedStatus = jitCallStatusCodeReturned
+			compiler.exit(expectedStatus)
+
+			// Generate the code under test.
+			code, _, _, err := compiler.generate()
+			require.NoError(t, err)
+
+			// Run codes
+			env := newJITEnvironment()
+			env.execWithModule(code, tc.moduleInstance)
+
+			// Check the exit status.
+			require.Equal(t, expectedStatus, env.jitStatus())
+
+			// Check if the fields of engine.moduleContext are updated.
+			engine := env.engine()
+
+			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
+			require.Equal(t, bufSliceHeader.Data, engine.moduleContext.globalFirstItemAddress)
+
+			if tc.moduleInstance.Memory != nil {
+				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
+				require.Equal(t, uint64(bufSliceHeader.Len), engine.moduleContext.memorySliceLen)
+				require.Equal(t, bufSliceHeader.Data, engine.moduleContext.memoryFirstItemAddress)
+			}
+
+			if len(tc.moduleInstance.Tables) > 0 {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
+				require.Equal(t, uint64(tableHeader.Len), engine.moduleContext.tableSliceLen)
+				require.Equal(t, tableHeader.Data, engine.moduleContext.tableFirstItemAddress)
+			}
+		})
+	}
 }
 
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
@@ -205,7 +464,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
 			err := c.releaseAllRegistersToStack()
 			require.NoError(t, err)
-			c.returnFunction()
+			c.exit(jitCallStatusCodeReturned)
 		}
 
 		// Generate the code under test.
@@ -350,7 +609,8 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 
 						for _, r := range unreservedGeneralPurposeIntRegisters {
 							if r != indexReg && r != tmpReg {
@@ -361,7 +621,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 						compiler.locationStack.pushValueOnRegister(indexReg)
 						compiler.movIntConstToRegister(tc.index, indexReg)
 
-						err := compiler.compileBrTable(tc.o)
+						err = compiler.compileBrTable(tc.o)
 						require.NoError(t, err)
 
 						require.NotContains(t, compiler.locationStack.usedRegisters, indexReg)
@@ -391,18 +651,17 @@ func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 func Test_setJITStatus(t *testing.T) {
 	for _, s := range []jitCallStatusCode{
 		jitCallStatusCodeReturned,
-		jitCallStatusCodeCallFunction,
+		jitCallStatusCodeCallHostFunction,
 		jitCallStatusCodeCallBuiltInFunction,
-		jitCallStatusCodeCallFunction,
 		jitCallStatusCodeUnreachable,
 	} {
 		t.Run(s.String(), func(t *testing.T) {
 
 			// Build codes.
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
-			compiler.setJITStatus(s)
-			compiler.returnFunction()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+			compiler.exit(s)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -418,68 +677,11 @@ func Test_setJITStatus(t *testing.T) {
 	}
 }
 
-func Test_setFunctionCallIndexFromRegister(t *testing.T) {
-	reg := int16(x86.REG_R10)
-	for _, index := range []wasm.FunctionAddress{1, 5, 20} {
-		// Build codes.
-		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		compiler.movIntConstToRegister(int64(index), reg)
-		compiler.setFunctionCallIndexFromRegister(reg)
-		compiler.returnFunction()
-
-		// Generate the code under test.
-		code, _, _, err := compiler.generate()
-		require.NoError(t, err)
-
-		// Run codes
-		env := newJITEnvironment()
-		env.exec(code)
-
-		// Check index.
-		require.Equal(t, index, env.functionCallAddress())
-	}
-}
-
-func Test_setContinuationAtNextInstruction(t *testing.T) {
-	const tmpReg = x86.REG_AX
-	// Build codes.
-	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
-	compiler.setContinuationOffsetAtNextInstructionAndReturn()
-	exp := uintptr(len(compiler.builder.Assemble()))
-	// On the continuation, we have to setup the registers again.
-	compiler.initializeReservedRegisters()
-	// The continuation after function calls.
-	_ = compiler.locationStack.pushValueOnStack() // dummy value, not actually used!
-	loc := compiler.locationStack.pushValueOnRegister(tmpReg)
-	compiler.movIntConstToRegister(int64(50), tmpReg)
-	compiler.releaseRegisterToStack(loc)
-	require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
-	compiler.setJITStatus(jitCallStatusCodeCallFunction)
-	compiler.returnFunction()
-	// Generate the code under test.
-	code, _, _, err := compiler.generate()
-	require.NoError(t, err)
-
-	// Run codes
-	env := newJITEnvironment()
-	env.exec(code)
-
-	// Check offset.
-	require.Equal(t, exp, env.continuationAddressOffset())
-
-	// Run code again on the continuation.
-	env.exec(code[env.continuationAddressOffset():])
-
-	require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
-	require.Equal(t, uint64(50), env.stack()[1])
-}
-
 func TestAmd64Compiler_initializeReservedRegisters(t *testing.T) {
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
-	compiler.returnFunction()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
+	compiler.exit(jitCallStatusCodeReturned)
 
 	// Generate the code under test.
 	code, _, _, err := compiler.generate()
@@ -501,7 +703,8 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 	t.Run("steal", func(t *testing.T) {
 		const stealTarget = x86.REG_AX
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
 		// Use up all the Int regs.
 		for _, r := range unreservedGeneralPurposeIntRegisters {
 			if r != stealTarget {
@@ -521,7 +724,7 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 		loc := compiler.locationStack.pushValueOnRegister(reg)
 		compiler.movIntConstToRegister(int64(2000), loc.register)
 		compiler.releaseRegisterToStack(loc)
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -539,7 +742,8 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 
 func TestAmd64Compiler_compileLabel(t *testing.T) {
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
 	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
 	labelKey := label.String()
 	var called bool
@@ -566,7 +770,8 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 	// The case when the original value is already in register.
 	t.Run("on reg", func(t *testing.T) {
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
 
 		// Set up the pick target original value.
 		pickTargetLocation := compiler.locationStack.pushValueOnRegister(int16(x86.REG_R10))
@@ -574,7 +779,7 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		compiler.locationStack.pushValueOnStack() // Dummy value!
 		compiler.movIntConstToRegister(100, pickTargetLocation.register)
 		// Now insert pick code.
-		err := compiler.compilePick(o)
+		err = compiler.compilePick(o)
 		require.NoError(t, err)
 		// Increment the picked value.
 		pickedLocation := compiler.locationStack.peek()
@@ -590,7 +795,7 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		compiler.releaseRegisterToStack(pickedLocation)
 		// Also write the original location back to the stack.
 		compiler.releaseRegisterToStack(pickTargetLocation)
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -610,18 +815,18 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 	// The case when the original value is in stack.
 	t.Run("on stack", func(t *testing.T) {
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
 		env := newJITEnvironment()
 
 		// Setup the original value.
 		compiler.locationStack.pushValueOnStack() // Dummy value!
 		pickTargetLocation := compiler.locationStack.pushValueOnStack()
-		compiler.locationStack.pushValueOnStack() // Dummy value!
-		env.setStackPointer(5)
 		env.stack()[pickTargetLocation.stackPointer] = 100
+		compiler.locationStack.pushValueOnStack() // Dummy value!
 
 		// Now insert pick code.
-		err := compiler.compilePick(o)
+		err = compiler.compilePick(o)
 		require.NoError(t, err)
 
 		// Increment the picked value.
@@ -632,10 +837,9 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		prog.To.Reg = pickedLocation.register
 		compiler.addInstruction(prog)
 
-		// To verify the behavior, we push the incremented picked value
-		// to the stack.
-		compiler.releaseRegisterToStack(pickedLocation)
-		compiler.returnFunction()
+		err = compiler.releaseAllRegistersToStack()
+		require.NoError(t, err)
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -655,11 +859,12 @@ func TestAmd64Compiler_compileConstI32(t *testing.T) {
 	for _, v := range []uint32{1, 1 << 5, 1 << 31} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstI32{Value: v}
-			err := compiler.compileConstI32(o)
+			err = compiler.compileConstI32(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we increment and push the const value
@@ -672,7 +877,7 @@ func TestAmd64Compiler_compileConstI32(t *testing.T) {
 			prog.To.Reg = loc.register
 			compiler.addInstruction(prog)
 			compiler.releaseRegisterToStack(loc)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -694,11 +899,12 @@ func TestAmd64Compiler_compileConstI64(t *testing.T) {
 	for _, v := range []uint64{1, 1 << 5, 1 << 35, 1 << 63} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstI64{Value: v}
-			err := compiler.compileConstI64(o)
+			err = compiler.compileConstI64(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we increment and push the const value
@@ -711,7 +917,7 @@ func TestAmd64Compiler_compileConstI64(t *testing.T) {
 			prog.To.Reg = loc.register
 			compiler.addInstruction(prog)
 			compiler.releaseRegisterToStack(loc)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -733,11 +939,12 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 	for _, v := range []float32{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstF32{Value: v}
-			err := compiler.compileConstF32(o)
+			err = compiler.compileConstF32(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we double and push the const value
@@ -752,7 +959,7 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 			prog.From.Reg = loc.register
 			compiler.addInstruction(prog)
 			compiler.releaseRegisterToStack(loc)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -774,11 +981,12 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 	for _, v := range []float64{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Now emit the const instruction.
 			o := &wazeroir.OperationConstF64{Value: v}
-			err := compiler.compileConstF64(o)
+			err = compiler.compileConstF64(o)
 			require.NoError(t, err)
 
 			// To verify the behavior, we double and push the const value
@@ -793,7 +1001,7 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 			prog.From.Reg = loc.register
 			compiler.addInstruction(prog)
 			compiler.releaseRegisterToStack(loc)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -816,8 +1024,9 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		const x1Value uint32 = 113
 		const x2Value uint32 = 41
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
 		require.NoError(t, err)
 		x1 := compiler.locationStack.peek()
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2Value})
@@ -832,7 +1041,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		// To verify the behavior, we push the value
 		// to the stack.
 		compiler.releaseRegisterToStack(x1)
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -850,8 +1059,9 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		const x1Value uint64 = 1 << 35
 		const x2Value uint64 = 41
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
 		require.NoError(t, err)
 		x1 := compiler.locationStack.peek()
 		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2Value})
@@ -866,7 +1076,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		// To verify the behavior, we push the value
 		// to the stack.
 		compiler.releaseRegisterToStack(x1)
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -894,8 +1104,9 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
@@ -910,7 +1121,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -940,8 +1151,9 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
@@ -956,7 +1168,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -997,10 +1209,11 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 
 						// Push the cmp target values.
-						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
@@ -1026,7 +1239,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1061,10 +1274,11 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 
 						// Push the cmp target values.
-						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
@@ -1090,7 +1304,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1149,11 +1363,12 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 				} {
 					t.Run(fmt.Sprintf("x1=%f,x2=%f", tc.x1, tc.x2), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 						useUpIntRegistersFunc(compiler)
 
 						// Push the cmp target values.
-						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
@@ -1177,7 +1392,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						err = compiler.releaseAllRegistersToStack()
 						require.NoError(t, err)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1226,11 +1441,12 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 						useUpIntRegistersFunc(compiler)
 
 						// Push the cmp target values.
-						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
@@ -1255,7 +1471,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// to the stack.
 						err = compiler.releaseAllRegistersToStack()
 						require.NoError(t, err)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1289,10 +1505,11 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 			v := v
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 
 				// Push the cmp target value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
 				require.NoError(t, err)
 				loc := compiler.locationStack.peek()
 
@@ -1311,7 +1528,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, !top.onConditionalRegister() && top.onRegister())
 				compiler.releaseRegisterToStack(top)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -1334,10 +1551,11 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 			v := v
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 
 				// Push the cmp target values.
-				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
 				require.NoError(t, err)
 				loc := compiler.locationStack.peek()
 
@@ -1356,7 +1574,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, !top.onConditionalRegister() && top.onRegister())
 				compiler.releaseRegisterToStack(top)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -1398,10 +1616,11 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 
 						// Push the target values.
-						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
@@ -1435,7 +1654,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						code, _, _, err := compiler.generate()
@@ -1477,10 +1696,11 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 
 						// Push the target values.
-						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
@@ -1514,7 +1734,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						code, _, _, err := compiler.generate()
@@ -1565,8 +1785,9 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					t.Run(fmt.Sprintf("x1=%f,x2=%f", tc.x1, tc.x2), func(t *testing.T) {
 						// Prepare operands.
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
-						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
@@ -1595,7 +1816,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						code, _, _, err := compiler.generate()
@@ -1643,8 +1864,9 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						// Prepare operands.
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
-						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
@@ -1673,7 +1895,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						code, _, _, err := compiler.generate()
@@ -1721,10 +1943,11 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 
 						// Push the target values.
-						err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.x2)})
@@ -1758,7 +1981,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1802,10 +2025,11 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
 
 						// Push the target values.
-						err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x1)})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: uint64(tc.x2)})
@@ -1839,7 +2063,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !top.onConditionalRegister() && top.onRegister())
 						compiler.releaseRegisterToStack(top)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1891,8 +2115,9 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						// Prepare operands.
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
-						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
@@ -1921,7 +2146,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1970,8 +2195,9 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						// Prepare operands.
 						compiler := requireNewCompiler(t)
-						compiler.initializeReservedRegisters()
-						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
 						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
@@ -2000,7 +2226,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
 						compiler.releaseRegisterToStack(flag)
-						compiler.returnFunction()
+						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -2030,8 +2256,9 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		const x1Value uint32 = 1 << 31
 		const x2Value uint32 = 51
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
 		require.NoError(t, err)
 		x1 := compiler.locationStack.peek()
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2Value})
@@ -2046,7 +2273,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		// To verify the behavior, we push the value
 		// to the stack.
 		compiler.releaseRegisterToStack(x1)
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -2064,8 +2291,9 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		const x1Value uint64 = 1 << 35
 		const x2Value uint64 = 51
 		compiler := requireNewCompiler(t)
-		compiler.initializeReservedRegisters()
-		err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
 		require.NoError(t, err)
 		x1 := compiler.locationStack.peek()
 		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x2Value})
@@ -2080,7 +2308,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		// To verify the behavior, we push the value
 		// to the stack.
 		compiler.releaseRegisterToStack(x1)
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -2108,8 +2336,9 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v2})
@@ -2124,7 +2353,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -2154,8 +2383,9 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v2})
@@ -2170,7 +2400,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -2245,7 +2475,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				const dxValue uint64 = 111111
 
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 
 				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
@@ -2269,7 +2500,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 					env.stack()[loc.stackPointer] = uint64(x2Value)
 				}
 
-				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
+				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
 				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
 				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
@@ -2288,7 +2519,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -2357,7 +2588,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 
 				env := newJITEnvironment()
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 
 				// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
@@ -2381,7 +2613,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 					env.stack()[loc.stackPointer] = uint64(x2Value)
 				}
 
-				err := compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
+				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
 				require.NoError(t, err)
 				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
 				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
@@ -2400,7 +2632,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -2431,8 +2663,9 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
@@ -2447,7 +2680,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -2481,8 +2714,9 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
@@ -2497,7 +2731,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -2526,9 +2760,10 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 				// Setup the target value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2547,7 +2782,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
@@ -2573,9 +2808,10 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%064b", tc.expectedLeadingZeros), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 				// Setup the target value.
-				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.input})
+				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2594,7 +2830,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
@@ -2621,9 +2857,10 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 				// Setup the target value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2642,7 +2879,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
@@ -2668,9 +2905,10 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%064b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 				// Setup the target value.
-				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.input})
+				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2689,7 +2927,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
@@ -2718,9 +2956,10 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 				// Setup the target value.
-				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2736,7 +2975,7 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
@@ -2766,9 +3005,10 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%064b", tc.in), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 				// Setup the target value.
-				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.in})
+				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.in})
 				require.NoError(t, err)
 
 				// Emit the clz instruction.
@@ -2784,7 +3024,7 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				// to the stack.
 				err = compiler.releaseAllRegistersToStack()
 				require.NoError(t, err)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
@@ -2889,7 +3129,8 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 						vs := vs
 						t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 							compiler := requireNewCompiler(t)
-							compiler.initializeReservedRegisters()
+							err := compiler.emitPreamble()
+							require.NoError(t, err)
 
 							var is32Bit bool
 							var expectedValue uint64
@@ -3016,9 +3257,9 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 
 							// To verify the behavior, we release the value
 							// to the stack.
-							err := compiler.releaseAllRegistersToStack()
+							err = compiler.releaseAllRegistersToStack()
 							require.NoError(t, err)
-							compiler.returnFunction()
+							compiler.exit(jitCallStatusCodeReturned)
 
 							// Generate and run the code under test.
 							code, _, _, err := compiler.generate()
@@ -3115,7 +3356,8 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 
 								env := newJITEnvironment()
 								compiler := requireNewCompiler(t)
-								compiler.initializeReservedRegisters()
+								err := compiler.emitPreamble()
+								require.NoError(t, err)
 
 								// Pretend there was an existing value on the DX register. We expect compileDivForInts to save this to the stack.
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
@@ -3139,7 +3381,6 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
-								var err error
 								if signed.signed {
 									err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeInt32})
 								} else {
@@ -3164,7 +3405,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// to the stack.
 								err = compiler.releaseAllRegistersToStack()
 								require.NoError(t, err)
-								compiler.returnFunction()
+								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
 								code, _, _, err := compiler.generate()
@@ -3273,7 +3514,8 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 
 								env := newJITEnvironment()
 								compiler := requireNewCompiler(t)
-								compiler.initializeReservedRegisters()
+								err := compiler.emitPreamble()
+								require.NoError(t, err)
 
 								// Pretend there was an existing value on the DX register. We expect compileDivForInts to save this to the stack.
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
@@ -3297,7 +3539,6 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
-								var err error
 								if signed.signed {
 									err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeInt64})
 								} else {
@@ -3322,7 +3563,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// to the stack.
 								err = compiler.releaseAllRegistersToStack()
 								require.NoError(t, err)
-								compiler.returnFunction()
+								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
 								code, _, _, err := compiler.generate()
@@ -3383,8 +3624,9 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
@@ -3399,7 +3641,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -3456,8 +3698,9 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				compiler := requireNewCompiler(t)
-				compiler.initializeReservedRegisters()
-				err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
@@ -3472,7 +3715,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				// To verify the behavior, we push the value
 				// to the stack.
 				compiler.releaseRegisterToStack(x1)
-				compiler.returnFunction()
+				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.generate()
@@ -3575,7 +3818,8 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 
 								env := newJITEnvironment()
 								compiler := requireNewCompiler(t)
-								compiler.initializeReservedRegisters()
+								err := compiler.emitPreamble()
+								require.NoError(t, err)
 
 								// Pretend there was an existing value on the DX register. We expect compileDivForInts to save this to the stack.
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
@@ -3599,7 +3843,6 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
-								var err error
 								if signed.signed {
 									err = compiler.compileRem(&wazeroir.OperationRem{Type: wazeroir.SignedInt32})
 								} else {
@@ -3624,7 +3867,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// to the stack.
 								err = compiler.releaseAllRegistersToStack()
 								require.NoError(t, err)
-								compiler.returnFunction()
+								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
 								code, _, _, err := compiler.generate()
@@ -3732,7 +3975,8 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 								env := newJITEnvironment()
 								compiler := requireNewCompiler(t)
-								compiler.initializeReservedRegisters()
+								err := compiler.emitPreamble()
+								require.NoError(t, err)
 
 								// Pretend there was an existing value on the DX register. We expect compileDivForInts to save this to the stack.
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
@@ -3756,7 +4000,6 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
-								var err error
 								if signed.signed {
 									err = compiler.compileRem(&wazeroir.OperationRem{Type: wazeroir.SignedInt64})
 								} else {
@@ -3781,7 +4024,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// to the stack.
 								err = compiler.releaseAllRegistersToStack()
 								require.NoError(t, err)
-								compiler.returnFunction()
+								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
 								code, _, _, err := compiler.generate()
@@ -3824,10 +4067,11 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Setup the demote target.
-			err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
+			err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
 			require.NoError(t, err)
 
 			err = compiler.compileF32DemoteFromF64()
@@ -3837,7 +4081,7 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 			// to the stack.
 			err = compiler.releaseAllRegistersToStack()
 			require.NoError(t, err)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate and run the code under test.
 			code, _, _, err := compiler.generate()
@@ -3870,10 +4114,11 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Setup the promote target.
-			err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: v})
+			err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: v})
 			require.NoError(t, err)
 
 			err = compiler.compileF64PromoteFromF32()
@@ -3883,7 +4128,7 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 			// to the stack.
 			err = compiler.releaseAllRegistersToStack()
 			require.NoError(t, err)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate and run the code under test.
 			code, _, _, err := compiler.generate()
@@ -3923,7 +4168,8 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 						v := v
 						t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
 							compiler := requireNewCompiler(t)
-							compiler.initializeReservedRegisters()
+							err := compiler.emitPreamble()
+							require.NoError(t, err)
 
 							env := newJITEnvironment()
 							if originOnStack {
@@ -3933,7 +4179,6 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 							}
 
 							var is32Bit bool
-							var err error
 							switch kind {
 							case wazeroir.OperationKindF32ReinterpretFromI32:
 								is32Bit = true
@@ -3973,7 +4218,7 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 							// to the stack.
 							err = compiler.releaseAllRegistersToStack()
 							require.NoError(t, err)
-							compiler.returnFunction()
+							compiler.exit(jitCallStatusCodeReturned)
 
 							// Generate and run the code under test.
 							code, _, _, err := compiler.generate()
@@ -4004,10 +4249,11 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 				v := v
 				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
 
 					// Setup the promote target.
-					err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
 					require.NoError(t, err)
 
 					err = compiler.compileExtend(&wazeroir.OperationExtend{Signed: signed})
@@ -4017,7 +4263,7 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 					// to the stack.
 					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
-					compiler.returnFunction()
+					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
@@ -4094,10 +4340,10 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 
 				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
 
 					// Setup the conversion target.
-					var err error
 					if tc.inputType == wazeroir.Float32 {
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: float32(v)})
 					} else {
@@ -4114,7 +4360,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					// to the stack.
 					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
-					compiler.returnFunction()
+					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
@@ -4227,10 +4473,10 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 			} {
 				t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
 
 					// Setup the conversion target.
-					var err error
 					if tc.inputType == wazeroir.SignedInt32 || tc.inputType == wazeroir.SignedUint32 {
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
 					} else {
@@ -4247,7 +4493,7 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 					// to the stack.
 					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
-					compiler.returnFunction()
+					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
@@ -4342,7 +4588,8 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 			} {
 				t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
 
 					var is32Bit bool
 					var expFloat32 float32
@@ -4459,7 +4706,6 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					}
 
 					// Setup the target values.
-					var err error
 					if is32Bit {
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
 					} else {
@@ -4474,7 +4720,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					// to the stack.
 					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
-					compiler.returnFunction()
+					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
@@ -4551,7 +4797,8 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 			} {
 				t.Run(fmt.Sprintf("x1=%f_x2=%f", vs.x1, vs.x2), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
 
 					var is32Bit bool
 					var expFloat32 float32
@@ -4611,9 +4858,9 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 
 					// To verify the behavior, we release the value
 					// to the stack.
-					err := compiler.releaseAllRegistersToStack()
+					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
-					compiler.returnFunction()
+					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
@@ -4644,36 +4891,6 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_compileCall(t *testing.T) {
-	const functionAddress wasm.FunctionAddress = 5 // arbitrary value for testing
-	env := newJITEnvironment()
-	compiler := requireNewCompiler(t)
-	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{}}
-
-	// Setup.
-	compiler.eng = env.eng
-	wasmFuncInstance := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}}, Address: functionAddress}
-	compiler.f.ModuleInstance.Functions = []*wasm.FunctionInstance{wasmFuncInstance}
-
-	compiler.initializeReservedRegisters()
-
-	err := compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
-	require.NoError(t, err)
-
-	// Generate the code under test.
-	code, _, _, err := compiler.generate()
-	require.NoError(t, err)
-
-	// Run code.
-	env.exec(code)
-
-	// Check the status.
-	require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
-	require.Equal(t, functionAddress, env.functionCallAddress())
-	// All the registers must be written back to stack.
-	require.Equal(t, uint64(0), env.stackPointer())
-}
-
 func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
 	offsets := []uint32{0,
@@ -4689,9 +4906,10 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 				targetSizeInByte := targetSizeInByte
 				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
 					compiler := requireNewCompiler(t)
-					compiler.initializeReservedRegisters()
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
 
-					err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
 					require.NoError(t, err)
 
 					reg, err := compiler.setupMemoryOffset(offset, targetSizeInByte)
@@ -4702,7 +4920,7 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					// Generate the code under test.
 					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
-					compiler.returnFunction()
+					compiler.exit(jitCallStatusCodeReturned)
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 
@@ -4736,7 +4954,8 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
 			base := compiler.locationStack.pushValueOnStack()
@@ -4744,7 +4963,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationLoad{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := compiler.compileLoad(o)
+			err = compiler.compileLoad(o)
 			require.NoError(t, err)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
@@ -4783,7 +5002,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 			compiler.releaseRegisterToStack(loadedValue)
 
 			// Generate the code under test.
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
@@ -4831,7 +5050,8 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
@@ -4840,7 +5060,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationLoad8{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := compiler.compileLoad8(o)
+			err = compiler.compileLoad8(o)
 			require.NoError(t, err)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
@@ -4859,7 +5079,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 			compiler.releaseRegisterToStack(loadedValue)
 
 			// Generate the code under test.
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
@@ -4890,7 +5110,8 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
@@ -4899,7 +5120,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationLoad16{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := compiler.compileLoad16(o)
+			err = compiler.compileLoad16(o)
 			require.NoError(t, err)
 
 			// At this point, the loaded value must be on top of the stack, and placed on a register.
@@ -4918,7 +5139,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 			compiler.releaseRegisterToStack(loadedValue)
 
 			// Generate the code under test.
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
@@ -4941,7 +5162,8 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 func TestAmd64Compiler_compileLoad32(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
 
 	// Before load operations, we must push the base offset value.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
@@ -4950,7 +5172,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationLoad32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := compiler.compileLoad32(o)
+	err = compiler.compileLoad32(o)
 	require.NoError(t, err)
 
 	// At this point, the loaded value must be on top of the stack, and placed on a register.
@@ -4969,7 +5191,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 	compiler.releaseRegisterToStack(loadedValue)
 
 	// Generate the code under test.
-	compiler.returnFunction()
+	compiler.exit(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
@@ -4998,7 +5220,8 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			// Before store operations, we must push the base offset, and the store target values.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
@@ -5016,7 +5239,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 
 			// Emit the memory load instructions.
 			o := &wazeroir.OperationStore{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-			err := compiler.compileStore(o)
+			err = compiler.compileStore(o)
 			require.NoError(t, err)
 
 			// At this point, two values are popped so the stack pointer must be zero.
@@ -5025,7 +5248,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 			require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 			// Generate the code under test.
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
@@ -5055,7 +5278,8 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 func TestAmd64Compiler_compileStore8(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
@@ -5068,7 +5292,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationStore8{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := compiler.compileStore8(o)
+	err = compiler.compileStore8(o)
 	require.NoError(t, err)
 
 	// At this point, two values are popped so the stack pointer must be zero.
@@ -5077,7 +5301,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Generate the code under test.
-	compiler.returnFunction()
+	compiler.exit(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
@@ -5097,7 +5321,8 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 func TestAmd64Compiler_compileStore16(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
@@ -5110,7 +5335,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationStore16{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := compiler.compileStore16(o)
+	err = compiler.compileStore16(o)
 	require.NoError(t, err)
 
 	// At this point, two values are popped so the stack pointer must be zero.
@@ -5119,7 +5344,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Generate the code under test.
-	compiler.returnFunction()
+	compiler.exit(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
@@ -5139,7 +5364,8 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 func TestAmd64Compiler_compileStore32(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
@@ -5152,7 +5378,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 
 	// Emit the memory load instructions.
 	o := &wazeroir.OperationStore32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
-	err := compiler.compileStore32(o)
+	err = compiler.compileStore32(o)
 	require.NoError(t, err)
 
 	// At this point, two values are popped so the stack pointer must be zero.
@@ -5161,7 +5387,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Generate the code under test.
-	compiler.returnFunction()
+	compiler.exit(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
@@ -5179,45 +5405,92 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
-	compiler := requireNewCompiler(t)
+	for _, currentCallFrameStackPointer := range []uint64{0, 10, 20} {
+		currentCallFrameStackPointer := currentCallFrameStackPointer
+		t.Run(fmt.Sprintf("%d", currentCallFrameStackPointer), func(t *testing.T) {
+			compiler := requireNewCompiler(t)
 
-	compiler.initializeReservedRegisters()
-	// Emit memory.grow instructions.
-	err := compiler.compileMemoryGrow()
-	require.NoError(t, err)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+			// Emit memory.grow instructions.
+			err = compiler.compileMemoryGrow()
+			require.NoError(t, err)
 
-	// Generate the code under test.
-	code, _, _, err := compiler.generate()
-	require.NoError(t, err)
+			// Emit arbitrary code after memory.grow returned.
+			const expValue uint32 = 100
+			err = compiler.emitPreamble()
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+			require.NoError(t, err)
+			err = compiler.releaseAllRegistersToStack()
+			require.NoError(t, err)
+			compiler.exit(jitCallStatusCodeReturned)
 
-	// Run code.
-	env := newJITEnvironment()
-	env.exec(code)
+			// Generate the code under test.
+			code, _, _, err := compiler.generate()
+			require.NoError(t, err)
 
-	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
+			// Run code.
+			env := newJITEnvironment()
+			env.setCallFrameStackPointer(currentCallFrameStackPointer)
+			env.exec(code)
+
+			require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+			require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
+
+			returnAddress := env.callFrameStackPeek().returnAddress
+			require.NotZero(t, returnAddress)
+			jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+
+			require.Equal(t, expValue, env.stackTopAsUint32())
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		})
+	}
 }
 
 func TestAmd64Compiler_compileMemorySize(t *testing.T) {
-	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
-	// Emit memory.size instructions.
-	err := compiler.compileMemorySize()
-	require.NoError(t, err)
-	// At this point, the size of memory should be pushed onto the stack.
-	require.Equal(t, uint64(1), compiler.locationStack.sp)
-	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
+	for _, currentCallFrameStackPointer := range []uint64{0, 10, 20} {
+		currentCallFrameStackPointer := currentCallFrameStackPointer
+		t.Run(fmt.Sprintf("%d", currentCallFrameStackPointer), func(t *testing.T) {
+			compiler := requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+			// Emit memory.size instructions.
+			err = compiler.compileMemorySize()
+			require.NoError(t, err)
+			// At this point, the size of memory should be pushed onto the stack.
+			require.Equal(t, uint64(1), compiler.locationStack.sp)
+			require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
 
-	// Generate the code under test.
-	code, _, _, err := compiler.generate()
-	require.NoError(t, err)
+			// Emit arbitrary code after memory.size returned.
+			const expValue uint32 = 100
+			err = compiler.emitPreamble()
+			require.NoError(t, err)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+			require.NoError(t, err)
+			err = compiler.releaseAllRegistersToStack()
+			require.NoError(t, err)
+			compiler.exit(jitCallStatusCodeReturned)
 
-	// Run code.
-	env := newJITEnvironment()
-	env.exec(code)
+			// Generate the code under test.
+			code, _, _, err := compiler.generate()
+			require.NoError(t, err)
 
-	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, wasm.FunctionAddress(builtinFunctionAddressMemorySize), env.functionCallAddress())
+			// Run code.
+			env := newJITEnvironment()
+			env.exec(code)
+
+			require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+			require.Equal(t, wasm.FunctionAddress(builtinFunctionAddressMemorySize), env.functionCallAddress())
+
+			returnAddress := env.callFrameStackPeek().returnAddress
+			require.NotZero(t, returnAddress)
+			jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+
+			require.Equal(t, expValue, env.stackTopAsUint32())
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		})
+	}
 }
 
 func TestAmd64Compiler_compileDrop(t *testing.T) {
@@ -5324,7 +5597,8 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 		t.Run("real", func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			bottom := compiler.locationStack.pushValueOnRegister(x86.REG_R10)
 			compiler.locationStack.pushValueOnRegister(x86.REG_R9)
@@ -5332,14 +5606,14 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			env.stack()[top.stackPointer] = 5000
 			compiler.movIntConstToRegister(300, bottom.register)
 
-			err := compiler.compileDrop(&wazeroir.OperationDrop{
+			err = compiler.compileDrop(&wazeroir.OperationDrop{
 				Range: &wazeroir.InclusiveRange{Start: 1, End: 1},
 			})
 			require.NoError(t, err)
 
 			err = compiler.releaseAllRegistersToStack()
 			require.NoError(t, err)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -5361,7 +5635,8 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
 
 	x1Reg := int16(x86.REG_AX)
 	x2Reg := int16(x86.REG_R10)
@@ -5376,10 +5651,10 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	// Set the values supposed to be released to stack memory space.
 	compiler.movIntConstToRegister(300, x1Reg)
 	compiler.movIntConstToRegister(51, x2Reg)
-	err := compiler.releaseAllRegistersToStack()
+	err = compiler.releaseAllRegistersToStack()
 	require.NoError(t, err)
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
-	compiler.returnFunction()
+	compiler.exit(jitCallStatusCodeReturned)
 
 	// Generate the code under test.
 	code, _, _, err := compiler.generate()
@@ -5398,30 +5673,72 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	require.Equal(t, uint64(100), stack[sp-4])
 }
 
-func TestAmd64Compiler_assemble(t *testing.T) {
-	compiler := requireNewCompiler(t)
-	compiler.setContinuationOffsetAtNextInstructionAndReturn()
-	prog := compiler.newProg()
-	prog.As = x86.AINCQ
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = x86.REG_R10
-	compiler.addInstruction(prog)
-	code, _, _, err := compiler.generate()
-	require.NoError(t, err)
-	actual := binary.LittleEndian.Uint64(code[2:10])
-	require.Equal(t, uint64(prog.Pc), actual)
+func TestAmd64Compiler_generate(t *testing.T) {
+	t.Run("max pointer", func(t *testing.T) {
+		getCompiler := func(t *testing.T) (compiler *amd64Compiler) {
+			compiler = requireNewCompiler(t)
+			ret := compiler.newProg()
+			ret.As = obj.ARET
+			compiler.addInstruction(ret)
+			return
+		}
+		verify := func(t *testing.T, compiler *amd64Compiler, expectedMaxStackPointer uint64) {
+			var called bool
+			compiler.onMaxStackPointerDeterminedCallBack = func(acutalMaxStackPointerInCallBack uint64) {
+				called = true
+				require.Equal(t, expectedMaxStackPointer, acutalMaxStackPointerInCallBack)
+			}
+
+			_, _, acutalMaxStackPointer, err := compiler.generate()
+			require.NoError(t, err)
+			require.True(t, called)
+			require.Equal(t, expectedMaxStackPointer, acutalMaxStackPointer)
+		}
+		t.Run("current one win", func(t *testing.T) {
+			compiler := getCompiler(t)
+			const expectedMaxStackPointer uint64 = 100
+			compiler.maxStackPointer = expectedMaxStackPointer
+			compiler.locationStack.maxStackPointer = expectedMaxStackPointer - 1
+			verify(t, compiler, expectedMaxStackPointer)
+		})
+		t.Run("previous one win", func(t *testing.T) {
+			compiler := getCompiler(t)
+			const expectedMaxStackPointer uint64 = 100
+			compiler.locationStack.maxStackPointer = expectedMaxStackPointer
+			compiler.maxStackPointer = expectedMaxStackPointer - 1
+			verify(t, compiler, expectedMaxStackPointer)
+		})
+	})
+
+	t.Run("on generate callback", func(t *testing.T) {
+		compiler := requireNewCompiler(t)
+		ret := compiler.newProg()
+		ret.As = obj.ARET
+		compiler.addInstruction(ret)
+
+		var codePassedInCallBack []byte
+		compiler.onGenerateCallbacks = append(compiler.onGenerateCallbacks, func(code []byte) error {
+			codePassedInCallBack = code
+			return nil
+		})
+		code, _, _, err := compiler.generate()
+		require.NoError(t, err)
+		require.NotEmpty(t, code)
+		require.Equal(t, code, codePassedInCallBack)
+	})
 }
 
 func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 	compiler := requireNewCompiler(t)
-	compiler.initializeReservedRegisters()
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
 	x1Reg := int16(x86.REG_AX)
 	x2Reg := int16(x86.REG_R10)
 	compiler.locationStack.pushValueOnRegister(x1Reg)
 	compiler.locationStack.pushValueOnRegister(x2Reg)
 	compiler.movIntConstToRegister(300, x1Reg)
 	compiler.movIntConstToRegister(51, x2Reg)
-	err := compiler.compileUnreachable()
+	err = compiler.compileUnreachable()
 	require.NoError(t, err)
 
 	// Generate the code under test.
@@ -5489,7 +5806,8 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			compiler := requireNewCompiler(t)
 			env := newJITEnvironment()
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			var x1, x2, c *valueLocation
 			if tc.x1OnRegister {
@@ -5537,7 +5855,7 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 			}
 
 			// Now emit code for select.
-			err := compiler.compileSelect()
+			err = compiler.compileSelect()
 			require.NoError(t, err)
 			// The code generation should not affect the x1's placement in any case.
 			require.Equal(t, tc.x1OnRegister, x1.onRegister())
@@ -5548,7 +5866,7 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 			if tc.x1OnRegister {
 				compiler.releaseRegisterToStack(x1)
 			}
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Run code.
 			code, _, _, err := compiler.generate()
@@ -5582,7 +5900,8 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := requireNewCompiler(t)
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 
 			if tc.x2OnRegister {
 				x2 := compiler.locationStack.pushValueOnRegister(x86.REG_R10)
@@ -5613,12 +5932,12 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 			}
 
 			// Swap x1 and x2.
-			err := compiler.compileSwap(&wazeroir.OperationSwap{Depth: 2})
+			err = compiler.compileSwap(&wazeroir.OperationSwap{Depth: 2})
 			require.NoError(t, err)
 			// To verify the behavior, we release all the registers to stack locations.
 			err = compiler.releaseAllRegistersToStack()
 			require.NoError(t, err)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -5633,11 +5952,6 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 			require.Equal(t, uint64(x2Value), env.stack()[2])
 		})
 	}
-}
-
-// TestGlobalInstanceValueOffset ensures the globalInstanceValueOffset doesn't drift when we modify the struct (wasm.GlobalInstance).
-func TestGlobalInstanceValueOffset(t *testing.T) {
-	require.Equal(t, int(unsafe.Offsetof((&wasm.GlobalInstance{}).Val)), globalInstanceValueOffset)
 }
 
 func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
@@ -5657,9 +5971,10 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
 
 			// Emit the code.
-			compiler.initializeReservedRegisters()
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
 			op := &wazeroir.OperationGlobalGet{Index: 1}
-			err := compiler.compileGlobalGet(op)
+			err = compiler.compileGlobalGet(op)
 			require.NoError(t, err)
 
 			// At this point, the top of stack must be the retrieved global on a register.
@@ -5674,7 +5989,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			}
 			err = compiler.releaseAllRegistersToStack()
 			require.NoError(t, err)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -5709,11 +6024,12 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			env.stack()[loc.stackPointer] = valueToSet
 
 			// Now emit the code.
-			compiler.initializeReservedRegisters()
-			op := &wazeroir.OperationGlobalSet{Index: 1}
-			err := compiler.compileGlobalSet(op)
+			err := compiler.emitPreamble()
 			require.NoError(t, err)
-			compiler.returnFunction()
+			op := &wazeroir.OperationGlobalSet{Index: 1}
+			err = compiler.compileGlobalSet(op)
+			require.NoError(t, err)
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
@@ -5730,10 +6046,229 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 	}
 }
 
+func TestAmd64Compiler_callNativeFunction(t *testing.T) {
+	for _, isAddressFromRegister := range []bool{false, true} {
+		isAddressFromRegister := isAddressFromRegister
+		t.Run(fmt.Sprintf("is_address_from_register=%v", isAddressFromRegister), func(t *testing.T) {
+			t.Run("need to grow call frame stack", func(t *testing.T) {
+				t.Skip() // TODO: delete!
+				env := newJITEnvironment()
+				engine := env.engine()
+
+				env.setCallFrameStackPointer(engine.callFrameStackLen - 1)
+				compiler := requireNewCompiler(t)
+
+				require.Empty(t, compiler.locationStack.usedRegisters)
+				var err error
+				if isAddressFromRegister {
+					err = compiler.callNativeFunctionFromRegister(x86.REG_AX, &wasm.FunctionType{})
+				} else {
+					err = compiler.callNativeFunctionFromAddress(0xdeadbeaf, &wasm.FunctionType{})
+				}
+				require.NoError(t, err)
+				require.Empty(t, compiler.locationStack.usedRegisters)
+
+				// Because we must early return from the function this case,
+				// we emit the undefined instruction after the callNativeFunctionFromAddress.
+				compiler.undefined()
+
+				// Generate the code under test.
+				code, _, _, err := compiler.generate()
+				require.NoError(t, err)
+
+				// Run code.
+				env.exec(code)
+
+				// If the call frame stack pointer equals the length of call frame stack length,
+				// we have to call the builtin function to grow the slice.
+				require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+				require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress())
+			})
+			t.Run("stack ok", func(t *testing.T) {
+				env := newJITEnvironment()
+				engine := env.engine()
+
+				// Emit the call target function.
+				const numCalls = 10
+				targetFunctionType := &wasm.FunctionType{
+					Params:  []wasm.ValueType{wasm.ValueTypeI32},
+					Results: []wasm.ValueType{wasm.ValueTypeI32},
+				}
+
+				expectedValue := uint32(0)
+				moduleInstanceToExpectedValueInMemory := map[*wasm.ModuleInstance]uint32{}
+				for i := 0; i < numCalls; i++ {
+					compiler := requireNewCompiler(t)
+
+					compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
+
+					addTargetValue := uint32(100 + i)
+					expectedValue += addTargetValue
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
+					require.NoError(t, err)
+
+					err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+					require.NoError(t, err)
+
+					// Also, we modify the memory to ensure that context siwtch between module instances actually works.
+					const tmpReg = x86.REG_AX
+					moveValueToReg := compiler.newProg()
+					moveValueToReg.As = x86.AMOVL // 32bit!
+					moveValueToReg.From.Type = obj.TYPE_CONST
+					moveValueToReg.From.Offset = int64(addTargetValue)
+					moveValueToReg.To.Type = obj.TYPE_REG
+					moveValueToReg.To.Reg = tmpReg
+					compiler.addInstruction(moveValueToReg)
+
+					writeValueToMemory := compiler.newProg()
+					writeValueToMemory.As = x86.AMOVL // 32bit!
+					writeValueToMemory.From.Type = obj.TYPE_REG
+					writeValueToMemory.From.Reg = tmpReg
+					writeValueToMemory.To.Type = obj.TYPE_MEM
+					writeValueToMemory.To.Reg = reservedRegisterForMemory
+					compiler.addInstruction(writeValueToMemory)
+
+					err = compiler.returnFunction()
+					require.NoError(t, err)
+
+					code, _, _, err := compiler.generate()
+					require.NoError(t, err)
+
+					moduelInstance := &wasm.ModuleInstance{
+						Memory: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+					}
+					moduleInstanceToExpectedValueInMemory[moduelInstance] = addTargetValue
+					compiledFunction := &compiledFunction{
+						codeSegment:           code,
+						codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
+						moduleInstanceAddress: uintptr(unsafe.Pointer(moduelInstance)),
+					}
+					engine.addCompiledFunction(wasm.FunctionAddress(i), compiledFunction)
+				}
+
+				// Now we start building the caller's code.
+				compiler := requireNewCompiler(t)
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
+
+				const initialValue = 100
+				expectedValue += initialValue
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0}) // Dummy value so the base pointer would be non-trivial for callees.
+				require.NoError(t, err)
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: initialValue})
+				require.NoError(t, err)
+
+				for i := 0; i < numCalls; i++ {
+					if isAddressFromRegister {
+						const tmpReg = x86.REG_AX
+						compiler.movIntConstToRegister(int64(i), tmpReg)
+						err = compiler.callNativeFunctionFromRegister(tmpReg, targetFunctionType)
+					} else {
+						err = compiler.callNativeFunctionFromAddress(wasm.FunctionAddress(i), targetFunctionType)
+					}
+					require.NoError(t, err)
+				}
+
+				err = compiler.returnFunction()
+				require.NoError(t, err)
+
+				// Generate the code under test.
+				code, _, _, err := compiler.generate()
+				require.NoError(t, err)
+
+				// Run code.
+				env.exec(code)
+
+				// Check status and returned values.
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, uint64(2), env.stackPointer())
+				require.Equal(t, uint64(0), env.stackBasePointer())
+				require.Equal(t, expectedValue, env.stackTopAsUint32())
+
+				// Also, in the middle of function call, we write the added value into each memory instance.
+				for mod, expValue := range moduleInstanceToExpectedValueInMemory {
+					require.Equal(t, expValue, binary.LittleEndian.Uint32(mod.Memory.Buffer[0:]))
+				}
+			})
+		})
+	}
+}
+
+func TestAmd64Compiler_compileCall(t *testing.T) {
+	env := newJITEnvironment()
+	engine := env.engine()
+
+	const targetFunctionAddress wasm.FunctionAddress = 5 // arbitrary value for testing
+	targetFunctionType := &wasm.FunctionType{
+		Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32},
+		Results: []wasm.ValueType{wasm.ValueTypeI32},
+	}
+
+	{
+		compiler := requireNewCompiler(t)
+		compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+		for i := 0; i < 2; i++ {
+			err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+			require.NoError(t, err)
+		}
+		err = compiler.returnFunction()
+		require.NoError(t, err)
+
+		code, _, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		engine.addCompiledFunction(targetFunctionAddress, &compiledFunction{
+			codeSegment:        code,
+			codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+		})
+
+	}
+
+	compiler := requireNewCompiler(t)
+	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
+		Functions: []*wasm.FunctionInstance{
+			{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: targetFunctionAddress},
+		},
+	}}
+
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
+
+	var expectedValue uint32
+	for i := 0; i < len(targetFunctionType.Params); i++ {
+		param := uint32(1 << (i + 1))
+		expectedValue += param
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: param})
+		require.NoError(t, err)
+	}
+
+	err = compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: 0})
+	require.NoError(t, err)
+
+	err = compiler.returnFunction()
+	require.NoError(t, err)
+
+	// Generate the code under test.
+	code, _, _, err := compiler.generate()
+	require.NoError(t, err)
+
+	// Run code.
+	env.exec(code)
+
+	// Check the status and returned value.
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, uint64(1), env.stackPointer())
+	require.Equal(t, expectedValue, env.stackTopAsUint32())
+}
+
 func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	// Ensure that the offset of wasm.TableInstance doesn't drift.
 	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionAddress)), tableElementFunctionAddressOffest)
-	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionTypeID)), tableElementTypeIDOffest)
+	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionTypeID)), tableElementFunctionTypeIDOffest)
 
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
@@ -5749,9 +6284,10 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		env.stack()[loc.stackPointer] = 10
 
 		// Now emit the code.
-		compiler.initializeReservedRegisters()
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -5782,11 +6318,12 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// Now emit the code.
-		compiler.initializeReservedRegisters()
+		err = compiler.emitPreamble()
+		require.NoError(t, err)
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
 		// Generate the code under test.
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
@@ -5814,11 +6351,12 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// Now emit the code.
-		compiler.initializeReservedRegisters()
+		err = compiler.emitPreamble()
+		require.NoError(t, err)
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
 		// Generate the code under test.
-		compiler.returnFunction()
+		compiler.exit(jitCallStatusCodeReturned)
 		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
@@ -5829,56 +6367,82 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	})
 
 	t.Run("ok", func(t *testing.T) {
+		targetType := &wasm.FunctionType{
+			Params:  []wasm.ValueType{},
+			Results: []wasm.ValueType{wasm.ValueTypeI32}}
+		targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
+		operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
+		moduelInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
+		moduelInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
+
 		table := make([]wasm.TableElement, 10)
+		for i := 0; i < len(table); i++ {
+			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
+		}
+
 		for i := 0; i < len(table); i++ {
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				env := newJITEnvironment()
 				env.setTable(table)
+				engine := env.engine()
+
+				// First we creat the call target function with function address = i,
+				// and it returns one value.
+				expectedReturnValue := uint32(i * 1000)
+				{
+					compiler := requireNewCompiler(t)
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+					require.NoError(t, err)
+					err = compiler.returnFunction()
+					require.NoError(t, err)
+
+					code, _, _, err := compiler.generate()
+					require.NoError(t, err)
+
+					engine.addCompiledFunction(table[i].FunctionAddress, &compiledFunction{
+						codeSegment:        code,
+						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+					})
+				}
+
 				compiler := requireNewCompiler(t)
-
-				targetType := &wasm.FunctionType{
-					Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
-					Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32, wasm.ValueTypeF32}}
-				targetOffset := &wazeroir.OperationConstI32{Value: uint32(i)}
-				targetOperation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
-
-				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-				compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
-					Types: []*wasm.TypeInstance{{Type: targetType, TypeID: wasm.FunctionTypeID(i)}}},
-				}
-				// and the typeID  matches the table[targetOffset]'s type ID.
-				table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: wasm.FunctionTypeID(i)}
-
-				// Put the function call params.
-				for i := 0; i < len(targetType.Params); i++ {
-					compiler.locationStack.pushValueOnStack()
-				}
-
-				// Place the offfset value.
-				err := compiler.compileConstI32(targetOffset)
+				err := compiler.emitPreamble()
 				require.NoError(t, err)
 
-				// At this point, we should have three elements (function params + offset value) on the stack
-				require.Equal(t, uint64(3), compiler.locationStack.sp)
+				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduelInstance}
+				// and the typeID  matches the table[targetOffset]'s type ID.
+
+				// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
+				require.NoError(t, err)
+
+				// At this point, we should have one item (offset value) on the stack.
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
 
 				// Now emit the code.
-				compiler.initializeReservedRegisters()
-				require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
-				// At this point, we consumed the function inputs and offset value, but the function result (four float values)
-				// are pushed onto the register.
-				require.Equal(t, uint64(4), compiler.locationStack.sp)
+				require.NoError(t, compiler.compileCallIndirect(operation))
+
+				// At this point, we consumed the offset value, but the function returns one value,
+				// so the stack pointer results in the same.
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+				err = compiler.returnFunction()
+				require.NoError(t, err)
 
 				// Generate the code under test.
-				compiler.returnFunction()
 				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
 
 				// Run code.
 				env.exec(code)
 
-				require.Equal(t, jitCallStatusCodeCallFunction, env.jitStatus())
-				require.Equal(t, wasm.FunctionAddress(i), env.functionCallAddress())
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, uint64(1), env.stackPointer())
+				require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
 			})
 		}
 	})
