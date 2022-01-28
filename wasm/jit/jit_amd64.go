@@ -4699,6 +4699,13 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	//      _  = callFarme's padding (see comment on callFrame._ field.)
 	//
 	// In the following comment, we use the notations in the above example.
+	//
+	// What we have to do in the following is that (order doesn't matter)
+	//   1) Set rb.1 so that we can return back to this function properly.
+	//   2) Set ra.1 so that we can return back to this function properly.
+	//   3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
+	//   4) Set engine.valueStackContext.stackBasePointer for the next function.
+	//   5) Set engine.moduleContext.moduleInstanceAddress for the next function.
 
 	// First, read the address corresponding to tmpRegister+callFrameStackPointerRegister
 	// by LEA instruction which equals the address of call frame stack top.
@@ -4712,6 +4719,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	calcCallFrameStackTopAddress.From.Scale = 1
 	c.addInstruction(calcCallFrameStackTopAddress)
 
+	// Do 1) in the example.
 	{
 		// We must save the current stack base pointer (which lives on engine.valueStackContext.stackPointer)
 		// to the call frame stack. In the example, this is equivalent to writing the value into "rb.1".
@@ -4735,6 +4743,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(saveCurrentStackBasePointerIntoCallFrameFromTmpRegister)
 	}
 
+	// Do 4) in the example.
 	{
 		// At this point, tmpRegister holds the OLD stack base pointer. We could get the new frame's
 		// stack base pointer by "OLD stack base pointer + OLD stack pointer - # of function params"
@@ -4758,64 +4767,74 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(putNextStackBasePointerIntoEngine)
 	}
 
-	// Place the compiledFunction's address(pointer) into the new frame.
-	// First, we need to read the address of engine.compiledFunctions[0] and put it into tmpRegister.
-	readCopmiledFunctionsFirstItemAddress := c.newProg()
-	readCopmiledFunctionsFirstItemAddress.As = x86.AMOVQ
-	readCopmiledFunctionsFirstItemAddress.To.Type = obj.TYPE_REG
-	readCopmiledFunctionsFirstItemAddress.To.Reg = tmpRegister
-	readCopmiledFunctionsFirstItemAddress.From.Type = obj.TYPE_MEM
-	readCopmiledFunctionsFirstItemAddress.From.Reg = reservedRegisterForEngine
-	readCopmiledFunctionsFirstItemAddress.From.Offset = engineGlobalContextCompiledFunctionsFirstItemAddressOffset
-	c.addInstruction(readCopmiledFunctionsFirstItemAddress)
+	// Do 3) in the example.
+	{
+		// We must set the target function's address(pointer) of *compiledFunction into the next callframe stack.
+		// In the example, this is equivalent to writing the value into "rc.next".
+		//
+		// First, we read the addess of the first item of engine.compiledFunctions slice (= &engine.compiledFunctions[0])
+		// into tmpRegister.
+		readCopmiledFunctionsFirstItemAddress := c.newProg()
+		readCopmiledFunctionsFirstItemAddress.As = x86.AMOVQ
+		readCopmiledFunctionsFirstItemAddress.To.Type = obj.TYPE_REG
+		readCopmiledFunctionsFirstItemAddress.To.Reg = tmpRegister
+		readCopmiledFunctionsFirstItemAddress.From.Type = obj.TYPE_MEM
+		readCopmiledFunctionsFirstItemAddress.From.Reg = reservedRegisterForEngine
+		readCopmiledFunctionsFirstItemAddress.From.Offset = engineGlobalContextCompiledFunctionsFirstItemAddressOffset
+		c.addInstruction(readCopmiledFunctionsFirstItemAddress)
 
-	// Now Ready to read the address of engine.compiledFunctions[offset] (type = *compiledFunction).
-	readCompiledFunctionAddressAddress := c.newProg()
-	readCompiledFunctionAddressAddress.As = x86.AMOVQ
-	readCompiledFunctionAddressAddress.To.Type = obj.TYPE_REG
-	readCompiledFunctionAddressAddress.To.Reg = compiledFunctionAddressRegister
-	readCompiledFunctionAddressAddress.From.Type = obj.TYPE_MEM
-	readCompiledFunctionAddressAddress.From.Reg = tmpRegister
-	if !isNilRegister(addrReg) {
-		readCompiledFunctionAddressAddress.From.Index = addrReg
-		readCompiledFunctionAddressAddress.From.Scale = 8 // because the size of *compiledFunction equals 8 bytes.
-	} else {
-		readCompiledFunctionAddressAddress.From.Offset = int64(addr) * 8 // because the size of *compiledFunction equals 8 bytes.
+		// Next, read the address of the target function (= &engine.compiledFunctions[offset])
+		// into compiledFunctionAddressRegister.
+		readCompiledFunctionAddressAddress := c.newProg()
+		readCompiledFunctionAddressAddress.As = x86.AMOVQ
+		readCompiledFunctionAddressAddress.To.Type = obj.TYPE_REG
+		readCompiledFunctionAddressAddress.To.Reg = compiledFunctionAddressRegister
+		readCompiledFunctionAddressAddress.From.Type = obj.TYPE_MEM
+		readCompiledFunctionAddressAddress.From.Reg = tmpRegister
+		if !isNilRegister(addrReg) {
+			readCompiledFunctionAddressAddress.From.Index = addrReg
+			readCompiledFunctionAddressAddress.From.Scale = 8 // because the size of *compiledFunction equals 8 bytes.
+		} else {
+			readCompiledFunctionAddressAddress.From.Offset = int64(addr) * 8 // because the size of *compiledFunction equals 8 bytes.
+		}
+		c.addInstruction(readCompiledFunctionAddressAddress)
+
+		// Finally, we are ready to place the address of the target function's *compiledFunction into the new callframe.
+		// In the example, this is equivalent to set "rc.next".
+		putCompiledFunctionFunctionAddressOnNewCallFrame := c.newProg()
+		putCompiledFunctionFunctionAddressOnNewCallFrame.As = x86.AMOVQ
+		putCompiledFunctionFunctionAddressOnNewCallFrame.To.Type = obj.TYPE_MEM
+		putCompiledFunctionFunctionAddressOnNewCallFrame.To.Reg = callFrameStackTopAddressRegister
+		putCompiledFunctionFunctionAddressOnNewCallFrame.To.Offset = callFrameCompiledFunctionOffset
+		putCompiledFunctionFunctionAddressOnNewCallFrame.From.Type = obj.TYPE_REG
+		putCompiledFunctionFunctionAddressOnNewCallFrame.From.Reg = compiledFunctionAddressRegister
+		c.addInstruction(putCompiledFunctionFunctionAddressOnNewCallFrame)
+	}
+
+	// Do 5) in the example.
+	{
+		// Also, we have to set engine.moduleContext.ModuleInstance as
+		// it is the caller's responsibility to set the field.
+		readTargetFunctionModuleInstanceAddress := c.newProg()
+		readTargetFunctionModuleInstanceAddress.As = x86.AMOVQ
+		readTargetFunctionModuleInstanceAddress.To.Type = obj.TYPE_REG
+		readTargetFunctionModuleInstanceAddress.To.Reg = tmpRegister
+		readTargetFunctionModuleInstanceAddress.From.Type = obj.TYPE_MEM
+		readTargetFunctionModuleInstanceAddress.From.Reg = compiledFunctionAddressRegister
+		readTargetFunctionModuleInstanceAddress.From.Offset = compiledFunctionModuleInstanceAddressOffset
+		c.addInstruction(readTargetFunctionModuleInstanceAddress)
+
+		setEngineModuleInstanceAddress := c.newProg()
+		setEngineModuleInstanceAddress.As = x86.AMOVQ
+		setEngineModuleInstanceAddress.From.Type = obj.TYPE_REG
+		setEngineModuleInstanceAddress.From.Reg = tmpRegister
+		setEngineModuleInstanceAddress.To.Type = obj.TYPE_MEM
+		setEngineModuleInstanceAddress.To.Reg = reservedRegisterForEngine
+		setEngineModuleInstanceAddress.To.Offset = engineModuleContextModuleInstanceAddressOffset
+		c.addInstruction(setEngineModuleInstanceAddress)
 	}
 
 	// We have to see the return address for the current call frame (which is "ra.1" in the example).
-	c.addInstruction(readCompiledFunctionAddressAddress)
-
-	// Place the address of the target compiled function into the new call frame.
-	putCompiledFunctionFunctionAddressOnNewCallFrame := c.newProg()
-	putCompiledFunctionFunctionAddressOnNewCallFrame.As = x86.AMOVQ
-	putCompiledFunctionFunctionAddressOnNewCallFrame.To.Type = obj.TYPE_MEM
-	putCompiledFunctionFunctionAddressOnNewCallFrame.To.Reg = callFrameStackTopAddressRegister
-	putCompiledFunctionFunctionAddressOnNewCallFrame.To.Offset = callFrameCompiledFunctionOffset
-	putCompiledFunctionFunctionAddressOnNewCallFrame.From.Type = obj.TYPE_REG
-	putCompiledFunctionFunctionAddressOnNewCallFrame.From.Reg = compiledFunctionAddressRegister
-	c.addInstruction(putCompiledFunctionFunctionAddressOnNewCallFrame)
-
-	// Also, we have to set engine.moduleContext.ModuleInstance as
-	// it is the caller's responsibility to set the field.
-	readTargetFunctionModuleInstanceAddress := c.newProg()
-	readTargetFunctionModuleInstanceAddress.As = x86.AMOVQ
-	readTargetFunctionModuleInstanceAddress.To.Type = obj.TYPE_REG
-	readTargetFunctionModuleInstanceAddress.To.Reg = tmpRegister
-	readTargetFunctionModuleInstanceAddress.From.Type = obj.TYPE_MEM
-	readTargetFunctionModuleInstanceAddress.From.Reg = compiledFunctionAddressRegister
-	readTargetFunctionModuleInstanceAddress.From.Offset = compiledFunctionModuleInstanceAddressOffset
-	c.addInstruction(readTargetFunctionModuleInstanceAddress)
-
-	setEngineModuleInstanceAddress := c.newProg()
-	setEngineModuleInstanceAddress.As = x86.AMOVQ
-	setEngineModuleInstanceAddress.From.Type = obj.TYPE_REG
-	setEngineModuleInstanceAddress.From.Reg = tmpRegister
-	setEngineModuleInstanceAddress.To.Type = obj.TYPE_MEM
-	setEngineModuleInstanceAddress.To.Reg = reservedRegisterForEngine
-	setEngineModuleInstanceAddress.To.Offset = engineModuleContextModuleInstanceAddressOffset
-	c.addInstruction(setEngineModuleInstanceAddress)
-
 	// Get the return address into the tmpRegister.
 	readInstructionAddressCompletionCallBack := c.readInstructionAddress(tmpRegister)
 
