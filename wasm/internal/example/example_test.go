@@ -10,8 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
+	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/text"
 )
 
@@ -27,14 +29,13 @@ var exampleText []byte
 var exampleBinary []byte
 
 func newExample() *wasm.Module {
-	four := wasm.Index(4)
-	f32, i32 := wasm.ValueTypeF32, wasm.ValueTypeI32
+	two := wasm.Index(2)
+	i32 := wasm.ValueTypeI32
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
 			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 			{},
 			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
-			{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 		},
 		ImportSection: []*wasm.Import{
 			{
@@ -45,37 +46,24 @@ func newExample() *wasm.Module {
 				Module: "wasi_snapshot_preview1", Name: "fd_write",
 				Kind:     wasm.ImportKindFunc,
 				DescFunc: 2,
-			}, {
-				Module: "Math", Name: "Mul",
-				Kind:     wasm.ImportKindFunc,
-				DescFunc: 3,
-			}, {
-				Module: "Math", Name: "Add",
-				Kind:     wasm.ImportKindFunc,
-				DescFunc: 0,
-			}, {
-				Module: "", Name: "hello",
-				Kind:     wasm.ImportKindFunc,
-				DescFunc: 1,
 			},
 		},
-		FunctionSection: []wasm.Index{wasm.Index(0)},
+		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(0)},
 		ExportSection: map[string]*wasm.Export{
-			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(5)},
+			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
 		},
 		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 		},
-		StartSection: &four,
+		StartSection: &two,
 		NameSection: &wasm.NameSection{
 			ModuleName: "example",
 			FunctionNames: wasm.NameMap{
 				{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
 				{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				{Index: wasm.Index(2), Name: "mul"},
-				{Index: wasm.Index(3), Name: "add"},
-				{Index: wasm.Index(4), Name: "hello"},
-				{Index: wasm.Index(5), Name: "addInt"},
+				{Index: wasm.Index(2), Name: "hello"},
+				{Index: wasm.Index(3), Name: "addInt"},
 			},
 			LocalNames: wasm.IndirectNameMap{
 				{Index: wasm.Index(1), NameMap: wasm.NameMap{
@@ -84,15 +72,7 @@ func newExample() *wasm.Module {
 					{Index: wasm.Index(2), Name: "iovs_len"},
 					{Index: wasm.Index(3), Name: "nwritten_ptr"},
 				}},
-				{Index: wasm.Index(2), NameMap: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "x"},
-					{Index: wasm.Index(1), Name: "y"},
-				}},
 				{Index: wasm.Index(3), NameMap: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "l"},
-					{Index: wasm.Index(1), Name: "r"},
-				}},
-				{Index: wasm.Index(5), NameMap: wasm.NameMap{
 					{Index: wasm.Index(0), Name: "value_1"},
 					{Index: wasm.Index(1), Name: "value_2"},
 				}},
@@ -118,6 +98,32 @@ func TestExampleUpToDate(t *testing.T) {
 		m, err := text.DecodeModule(exampleText)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
+	})
+
+	t.Run("Executable", func(t *testing.T) {
+		// Use the interpreter, as this is a unit test and will run on all archs.
+		store := wasm.NewStore(interpreter.NewEngine())
+
+		// Add WASI to satisfy import tests
+		buf := &bytes.Buffer{} // fake stdio
+		wasiEnv := wasi.NewEnvironment(
+			wasi.Stdin(buf),
+			wasi.Stdout(buf),
+			wasi.Stderr(buf),
+		)
+		err := wasiEnv.Register(store)
+		require.NoError(t, err)
+
+		// Decode and instantiate the module
+		m, err := binary.DecodeModule(exampleBinary)
+		require.NoError(t, err)
+		err = store.Instantiate(m, "example")
+		require.NoError(t, err)
+
+		// Call the add function as a smoke test
+		res, _, err := store.CallFunction("example", "AddInt", 1, 2)
+		require.NoError(t, err)
+		require.Equal(t, []uint64{3}, res)
 	})
 }
 

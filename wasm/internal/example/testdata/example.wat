@@ -1,19 +1,21 @@
-;; example has a work-in-progress of supported functionality, used primarily for benchmarking. This includes:
-;; * module and function names
-;; * explicit, and inlined type definitions (including anonymous)
-;; * inlined parameter names with and without a type index
-;; * start function
-(module $example
-	(type $i32i32_i32 (func (param i32 i32) (result i32)))
+;; This example contains currently supported functionality in the text format, used primarily for benchmarking.
+(module $example ;; module name
+	;; explicit type with param IDs which are to be ignored per WebAssembly/spec#1412
+	(type $i32i32_i32 (func (param $i i32) (param $j i32) (result i32)))
+
+    ;; type use by symbolic ID, but no param names
 	(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type $i32i32_i32)))
+	;; type use on an import func which adds param names on anonymous type
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write
-	;; Note: the param IDs here are to be ignored per WebAssembly/spec#1411
 		(param $fd i32) (param $iovs_ptr i32) (param $iovs_len i32) (param $nwritten_ptr i32) (result i32)))
-	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
-	(import "Math" "Add" (func $add (type $i32i32_i32) (param $l i32) (param $r i32) (result i32)))
+
+    ;; type use referencing a type not defined, yet
+    (func $hello (type 1))
 	(type (func))
-	(import "" "hello" (func $hello (type 1)))
+
+    ;; start function referencing a function by symbolic ID
 	(start $hello)
+
 	;; from https://github.com/summerwind/the-art-of-webassembly-go/blob/main/chapter1/addint/addint.wat
     (func $addInt ;; TODO: function exports (export "AddInt")
         (param $value_1 i32) (param $value_2 i32)
@@ -22,5 +24,6 @@
         local.get 1 ;; TODO: instruction variables $value_2
         i32.add
     )
+    ;; export a function given its symbolic ID
     (export "AddInt" (func $addInt))
 )
