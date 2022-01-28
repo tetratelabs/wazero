@@ -4700,12 +4700,12 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	//
 	// In the following comment, we use the notations in the above example.
 	//
-	// What we have to do in the following is that (order doesn't matter)
+	// What we have to do in the following is that
 	//   1) Set rb.1 so that we can return back to this function properly.
-	//   2) Set ra.1 so that we can return back to this function properly.
+	//   2) Set engine.valueStackContext.stackBasePointer for the next function.
 	//   3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
-	//   4) Set engine.valueStackContext.stackBasePointer for the next function.
-	//   5) Set engine.moduleContext.moduleInstanceAddress for the next function.
+	//   4) Set engine.moduleContext.moduleInstanceAddress for the next function.
+	//   5) Set ra.1 so that we can return back to this function properly.
 
 	// First, read the address corresponding to tmpRegister+callFrameStackPointerRegister
 	// by LEA instruction which equals the address of call frame stack top.
@@ -4743,7 +4743,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(saveCurrentStackBasePointerIntoCallFrameFromTmpRegister)
 	}
 
-	// Do 4) in the example.
+	// Do 2) in the example.
 	{
 		// At this point, tmpRegister holds the OLD stack base pointer. We could get the new frame's
 		// stack base pointer by "OLD stack base pointer + OLD stack pointer - # of function params"
@@ -4811,7 +4811,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(putCompiledFunctionFunctionAddressOnNewCallFrame)
 	}
 
-	// Do 5) in the example.
+	// Do 4) in the example.
 	{
 		// Also, we have to set engine.moduleContext.ModuleInstance as
 		// it is the caller's responsibility to set the field.
@@ -4834,8 +4834,10 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(setEngineModuleInstanceAddress)
 	}
 
-	// We have to see the return address for the current call frame (which is "ra.1" in the example).
-	// Get the return address into the tmpRegister.
+	// Now ready to finish 5) in the example:
+	//
+	// We have to set the return address for the current call frame (which is "ra.1" in the example).
+	// First, Get the return address into the tmpRegister.
 	readInstructionAddressCompletionCallBack := c.readInstructionAddress(tmpRegister)
 
 	// Now we are ready to set the return address to the current call frame.
@@ -4843,11 +4845,14 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	setReturnAddress.As = x86.AMOVQ
 	setReturnAddress.To.Type = obj.TYPE_MEM
 	setReturnAddress.To.Reg = callFrameStackTopAddressRegister
+	// "ra.1" is BELOW the top address. See the above example for detail.
 	setReturnAddress.To.Offset = -(callFrameDataSize - callFrameReturnAddressOffset)
 	setReturnAddress.From.Type = obj.TYPE_REG
 	setReturnAddress.From.Reg = tmpRegister
 	c.addInstruction(setReturnAddress)
 
+	// Every preparetion is done to enter into the target function.
+	// So we increment the call frame stack pointer.
 	incCallFrameStackPointer := c.newProg()
 	incCallFrameStackPointer.As = x86.AINCQ
 	incCallFrameStackPointer.To.Type = obj.TYPE_MEM
@@ -4855,20 +4860,26 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	incCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
 	c.addInstruction(incCallFrameStackPointer)
 
-	jmpToNewFunction := c.newProg()
-	jmpToNewFunction.As = obj.AJMP
-	jmpToNewFunction.To.Type = obj.TYPE_MEM
-	jmpToNewFunction.To.Reg = compiledFunctionAddressRegister
-	jmpToNewFunction.To.Offset = compiledFunctionCodeInitialAddressOffset
-	c.addInstruction(jmpToNewFunction)
+	// And jump into the initial address of the target function.
+	jmpToTargetFunction := c.newProg()
+	jmpToTargetFunction.As = obj.AJMP
+	jmpToTargetFunction.To.Type = obj.TYPE_MEM
+	jmpToTargetFunction.To.Reg = compiledFunctionAddressRegister
+	jmpToTargetFunction.To.Offset = compiledFunctionCodeInitialAddressOffset
+	c.addInstruction(jmpToTargetFunction)
 
+	// In order to finalize the setting return address ("ra.1"), we need to have
+	// the instruction AFTER jmp into the target function. We emit the NOP here
+	// because in anyway this is skipped after assemble.
 	nopAfterJmpToNewFunction := c.newProg()
 	nopAfterJmpToNewFunction.As = obj.ANOP
 	c.addInstruction(nopAfterJmpToNewFunction)
 
-	// Now we are ready to complete the instruction for reading instruciont address of after jmp instruction.
+	// Now we are ready to complete the instruction for reading instruction address of after jmp instruction.
+	// See the comment of readInstructionAddress function for arguments.
 	readInstructionAddressCompletionCallBack(setReturnAddress, nopAfterJmpToNewFunction)
 
+	// All the registers used are temporary so we makr them unused.
 	c.locationStack.markRegisterUnused(
 		tmpRegister, targetAddressRegister, callFrameStackTopAddressRegister,
 		callFrameStackPointerRegister, compiledFunctionAddressRegister, addrReg,
@@ -5131,7 +5142,7 @@ func (c *amd64Compiler) callNonNativeFunction(jitStatus jitCallStatusCode, addr 
 }
 
 // TODO: document!
-func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(afterReadRIPInstruction, ripAcquisitionTargetInstruction *obj.Prog) {
+func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(instructionAfterReadInstructionAddress, addressAcquisitionTargetInstruction *obj.Prog) {
 	readInstructionAddressAfterReturn := c.newProg()
 	readInstructionAddressAfterReturn.As = x86.ALEAQ
 	readInstructionAddressAfterReturn.To.Reg = destinationRegister
@@ -5147,11 +5158,11 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(a
 	readInstructionAddressAfterReturn.From.Reg = x86.REG_BP
 	c.addInstruction(readInstructionAddressAfterReturn)
 
-	return func(afterReadRIPInstruction, ripAcquisitionTargetInstruction *obj.Prog) {
+	return func(instructionAfterReadInstructionAddress, addressAcquisitionTargetInstruction *obj.Prog) {
 		c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
 			// See the comment at readRIP.From.Offset.
 			binary.LittleEndian.PutUint32(code[readInstructionAddressAfterReturn.Pc+3:],
-				uint32(advanceUntilNonNOP(ripAcquisitionTargetInstruction).Pc)-uint32(afterReadRIPInstruction.Pc))
+				uint32(advanceUntilNonNOP(addressAcquisitionTargetInstruction).Pc)-uint32(instructionAfterReadInstructionAddress.Pc))
 			// See the comment at readRIP.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
 			code[readInstructionAddressAfterReturn.Pc+2] = code[readInstructionAddressAfterReturn.Pc+2] & 0b01111111
 			return nil
