@@ -944,9 +944,6 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		return err
 	}
 
-	// On the function return, we have to initialize the state.
-	c.initializationAfterNativeFunctionCall()
-
 	// We consumed the function parameters from the stack after call.
 	for i := 0; i < len(target.FunctionType.Type.Params); i++ {
 		c.locationStack.pop()
@@ -1082,9 +1079,6 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// The offset register should be marked as un-used as we consumed in the function call.
 	c.locationStack.markRegisterUnused(offset.register)
-
-	// On the function return, we have to initialize the state.
-	c.initializationAfterNativeFunctionCall()
 
 	// We consumed the function parameters from the stack after call.
 	for i := 0; i < len(targetFunctionType.Type.Params); i++ {
@@ -4692,14 +4686,14 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	//      |
 	//      [ra.0, rb.0, rc.0, _, ra.1, rb.1, rc.1, _, ra.next, rb.next, rc.next, ...]  <--- call frame stack's data region (somewhere in the memory)
 	//      |                                        |
-	//      ------------------------------------------
+	//      <---------------------------------------->
 	//          callFrameStackPointerRegister (holding the offset from &callFrame[0] in bytes.)
 	//
 	// where:
 	//      ra.* = callFrame.returnAddress
 	//      rb.* = callFrame.returnStackBasePointer
 	//      rc.* = callFrame.compiledFunction
-	//      _  = callFarme's padding (see comment on callFrame._ field.)
+	//      _  = callFrame's padding (see comment on callFrame._ field.)
 	//
 	// In the following comment, we use the notations in the above example.
 	//
@@ -4888,6 +4882,19 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		tmpRegister, targetAddressRegister, callFrameStackTopAddressRegister,
 		callFrameStackPointerRegister, compiledFunctionAddressRegister, addrReg,
 	)
+
+	// On the function return, we have to initialize the state.
+	// This could be reached after returnFunction(), so engine.valueStackContext.stackBasePointer
+	// and engine.moduleContext.moduleInstanceAddress are changed (See comments in returnFunction()).
+	// Therefore we have to initialize the state according to these changes.
+	//
+	// Due to the change to engine.valueStackContext.stackBasePointer.
+	c.initializeReservedStackBasePointer()
+	// Due to the change to engine.moduleContext.moduleInstanceAddress.
+	c.initializeModuleContext()
+	// Due to the change to engine.moduleContext.moduleInstanceAddress as that might result in
+	// the memory instance manipulation.
+	c.initializeReservedMemoryPointer()
 	return nil
 }
 
@@ -4896,7 +4903,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 // Otherwise, we jump into the callers' return address stored in callFrame.returnAddress while setting
 // up all the necessary change on the engine's state.
 //
-// Note: this is the counter part for enginecallFunction, and see the comments there as well
+// Note: this is the counter part for callFunction, and see the comments there as well
 // to understand how the function calls are achieved.
 func (c *amd64Compiler) returnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
@@ -4996,14 +5003,14 @@ func (c *amd64Compiler) returnFunction() error {
 	//      |                                           |
 	//      [......., ra.caller, rb.caller, rc.caller, _, ra.current, rb.current, rc.current, _, ...]  <--- call frame stack's data region (somewhere in the memory)
 	//      |                                           |
-	//      ---------------------------------------------
+	//      <------------------------------------------->
 	//           decrementedCallFrameStackPointerRegister (holding the offset from &callFrame[0] in bytes.)
 	//
 	// where:
 	//      ra.* = callFrame.returnAddress
 	//      rb.* = callFrame.returnStackBasePointer
 	//      rc.* = callFrame.compiledFunction
-	//      _  = callFarme's padding (see comment on callFrame._ field.)
+	//      _  = callFrame's padding (see comment on callFrame._ field.)
 	//
 	// What we have to do in the following is that
 	//   1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller"
@@ -5298,18 +5305,6 @@ func (c *amd64Compiler) emitPreamble() (err error) {
 	// Finally, we initialize the reserved memory register based on the module context.
 	c.initializeReservedMemoryPointer()
 	return
-}
-
-func (c *amd64Compiler) initializationAfterNativeFunctionCall() {
-	// After the function call, we have to initialize the stack base pointer.
-	c.initializeReservedStackBasePointer()
-
-	// At this point, the module context is the caller's one, so we must initialize it
-	// with the current callee function's module instance.
-	c.initializeModuleContext()
-
-	// Finally, we initialize the reserved memory register based on the module context.
-	c.initializeReservedMemoryPointer()
 }
 
 func (c *amd64Compiler) initializationAfterNonNativeFunctionCall() {
