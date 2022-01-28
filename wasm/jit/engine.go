@@ -443,7 +443,6 @@ func (e *engine) valueStackTopIndex() uint64 {
 
 const (
 	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
-	builtinFunctionAddressMemorySize
 	builtinFunctionAddressGrowValueStack
 	builtinFunctionAddressGrowCallFrameStack
 	// builtinFunctionAddressBreakPoint is internal (only for wazero developers). Disabled by default.
@@ -546,10 +545,6 @@ jitentry:
 			case builtinFunctionAddressMemoryGrow:
 				callerCompiledFunction := e.callFrameTop().compiledFunction
 				e.builtinFunctionMemoryGrow(callerCompiledFunction.source.ModuleInstance.Memory)
-			case builtinFunctionAddressMemorySize:
-				callerCompiledFunction := e.callFrameTop().compiledFunction
-				// TODO: this could be implemented in assembly -- it's just reading engine.memorySliceLen.
-				e.builtinFunctionMemorySize(callerCompiledFunction.source.ModuleInstance.Memory)
 			case builtinFunctionAddressGrowValueStack:
 				callerCompiledFunction := e.callFrameTop().compiledFunction
 				e.builtinFunctionGrowValueStack(callerCompiledFunction.maxStackPointer)
