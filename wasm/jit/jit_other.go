@@ -8,10 +8,10 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
-func jitcall(codeSegment, engine, memory uintptr) {
+func jitcall(codeSegment, engine uintptr) {
 	panic("unsupported GOARCH")
 }
 
-func newCompiler(eng *engine, f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	panic("unsupported GOARCH")
 }

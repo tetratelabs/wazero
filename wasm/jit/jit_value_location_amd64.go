@@ -16,11 +16,14 @@ import (
 const (
 	// reservedRegisterForEngine R13: pointer to engine instance (i.e. *engine as uintptr)
 	reservedRegisterForEngine = x86.REG_R13
-	// reservedRegisterForStackBasePointer R14: stack base pointer (engine.stackBasePointer) in the current function call.
-	reservedRegisterForStackBasePointer = x86.REG_R14
-	// reservedRegisterForMemory R15: pointer to memory space (i.e. *[]byte as uintptr).
+	// reservedRegisterForStackBasePointerAddress R14: stack base pointer's address (engine.stackBasePointer) in the current function call.
+	reservedRegisterForStackBasePointerAddress = x86.REG_R14
+	// reservedRegisterForMemory R15: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
 	reservedRegisterForMemory = x86.REG_R15
 )
+
+// nilRegister is used to indicate a register argument a variable is invalid and not an actual register.
+const nilRegister int16 = -1
 
 var (
 	generalPurposeFloatRegisters = []int16{
@@ -49,6 +52,10 @@ func isFloatRegister(r int16) bool {
 	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
 }
 
+func isNilRegister(r int16) bool {
+	return r == nilRegister
+}
+
 type conditionalRegisterState byte
 
 const (
@@ -72,12 +79,12 @@ const (
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
 	regType generalPurposeRegisterType
-	// Set to -1 if the value is stored in the memory stack.
+	// Set to nilRegister if the value is stored in the memory stack.
 	register int16
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
 	conditionalRegister conditionalRegisterState
 	// This is the location of this value in the (virtual) stack,
-	// even though if .register != -1, the value is not written into memory yet.
+	// even though if .register != nilRegister, the value is not written into memory yet.
 	stackPointer uint64
 }
 
@@ -95,11 +102,11 @@ func (v *valueLocation) setRegister(reg int16) {
 }
 
 func (v *valueLocation) onRegister() bool {
-	return v.register != -1 && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register != nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onStack() bool {
-	return v.register == -1 && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register == nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onConditionalRegister() bool {
@@ -189,13 +196,13 @@ func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation)
 }
 
 func (s *valueLocationStack) pushValueOnStack() (loc *valueLocation) {
-	loc = &valueLocation{register: -1, conditionalRegister: conditionalRegisterStateUnset}
+	loc = &valueLocation{register: nilRegister, conditionalRegister: conditionalRegisterStateUnset}
 	s.push(loc)
 	return
 }
 
 func (s *valueLocationStack) pushValueOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
-	loc = &valueLocation{register: -1, conditionalRegister: state}
+	loc = &valueLocation{register: nilRegister, conditionalRegister: state}
 	s.push(loc)
 	return
 }
@@ -228,16 +235,20 @@ func (s *valueLocationStack) peek() (loc *valueLocation) {
 
 func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	s.markRegisterUnused(loc.register)
-	loc.register = -1
+	loc.register = nilRegister
 	loc.conditionalRegister = conditionalRegisterStateUnset
 }
 
-func (s *valueLocationStack) markRegisterUnused(reg int16) {
-	delete(s.usedRegisters, reg)
+func (s *valueLocationStack) markRegisterUnused(regs ...int16) {
+	for _, reg := range regs {
+		delete(s.usedRegisters, reg)
+	}
 }
 
-func (s *valueLocationStack) markRegisterUsed(reg int16) {
-	s.usedRegisters[reg] = struct{}{}
+func (s *valueLocationStack) markRegisterUsed(regs ...int16) {
+	for _, reg := range regs {
+		s.usedRegisters[reg] = struct{}{}
+	}
 }
 
 type generalPurposeRegisterType byte
@@ -273,6 +284,29 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 		return candidate, true
 	}
 	return 0, false
+}
+
+func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []int16, found bool) {
+	var targetRegs []int16
+	switch tp {
+	case generalPurposeRegisterTypeFloat:
+		targetRegs = generalPurposeFloatRegisters
+	case generalPurposeRegisterTypeInt:
+		targetRegs = unreservedGeneralPurposeIntRegisters
+	}
+
+	regs = make([]int16, 0, num)
+	for _, candidate := range targetRegs {
+		if _, ok := s.usedRegisters[candidate]; ok {
+			continue
+		}
+		regs = append(regs, candidate)
+		if len(regs) == num {
+			found = true
+			break
+		}
+	}
+	return
 }
 
 // Search through the stack, and steal the register from the last used

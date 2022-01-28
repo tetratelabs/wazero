@@ -7,10 +7,12 @@ import (
 	"strings"
 )
 
+const EntrypointLabel = ".entrypoint"
+
 func Format(ops []Operation) string {
 	buf := bytes.NewBuffer(nil)
 
-	_, _ = buf.WriteString(".entrypoint:\n")
+	_, _ = buf.WriteString(EntrypointLabel + "\n")
 	for _, op := range ops {
 		formatOperation(buf, op)
 	}
