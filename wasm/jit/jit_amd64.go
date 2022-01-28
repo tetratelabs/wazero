@@ -4719,7 +4719,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	calcCallFrameStackTopAddress.From.Scale = 1
 	c.addInstruction(calcCallFrameStackTopAddress)
 
-	// Do 1) in the example.
+	// Complete 1).
 	{
 		// We must save the current stack base pointer (which lives on engine.valueStackContext.stackPointer)
 		// to the call frame stack. In the example, this is equivalent to writing the value into "rb.1".
@@ -4743,7 +4743,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(saveCurrentStackBasePointerIntoCallFrameFromTmpRegister)
 	}
 
-	// Do 2) in the example.
+	// Complete 2).
 	{
 		// At this point, tmpRegister holds the OLD stack base pointer. We could get the new frame's
 		// stack base pointer by "OLD stack base pointer + OLD stack pointer - # of function params"
@@ -4767,7 +4767,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(putNextStackBasePointerIntoEngine)
 	}
 
-	// Do 3) in the example.
+	// Complete 3).
 	{
 		// We must set the target function's address(pointer) of *compiledFunction into the next callframe stack.
 		// In the example, this is equivalent to writing the value into "rc.next".
@@ -4811,7 +4811,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(putCompiledFunctionFunctionAddressOnNewCallFrame)
 	}
 
-	// Do 4) in the example.
+	// Complete 4).
 	{
 		// Also, we have to set engine.moduleContext.ModuleInstance as
 		// it is the caller's responsibility to set the field.
@@ -4834,13 +4834,14 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		c.addInstruction(setEngineModuleInstanceAddress)
 	}
 
-	// Now ready to finish 5) in the example:
+	// Now ready to complete 5).
 	//
 	// We have to set the return address for the current call frame (which is "ra.1" in the example).
 	// First, Get the return address into the tmpRegister.
 	readInstructionAddressCompletionCallBack := c.readInstructionAddress(tmpRegister)
 
 	// Now we are ready to set the return address to the current call frame.
+	// This is equivalent to set "ra.1" in the example.
 	setReturnAddress := c.newProg()
 	setReturnAddress.As = x86.AMOVQ
 	setReturnAddress.To.Type = obj.TYPE_MEM
