@@ -178,6 +178,22 @@ func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 		return err
 	}
 
+	// We consumed the function parameters from the stack after call.
+	for i := 0; i < len(c.f.FunctionType.Type.Params); i++ {
+		c.locationStack.pop()
+	}
+
+	// Also, the function results were pushed by the call.
+	for _, t := range c.f.FunctionType.Type.Results {
+		loc := c.locationStack.pushValueOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
+
 	return c.returnFunction()
 }
 
@@ -216,19 +232,13 @@ func (c *amd64Compiler) generate() (code []byte, staticData compiledFunctionStat
 		}
 	}
 
-	if buildoptions.IsDebugMode || true {
-		var p bool
+	if buildoptions.IsDebugMode {
 		for key, l := range c.labels {
 			if len(l.labelBeginningCallbacks) > 0 {
 				// Meaning that some instruction is trying to jump to this label,
 				// but initialStack is not set. There must be a bug at the callsite of br or br_if.
-				fmt.Printf("labelBeginningCallbacks must be called for label %s\n", key)
-				p = true
+				panic(fmt.Sprintf("labelBeginningCallbacks must be called for label %s\n", key))
 			}
-
-		}
-		if p {
-			panic("no")
 		}
 	}
 
@@ -895,12 +905,9 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 // Returns true if the label doesn't have any caller, and it is ok to skip the
 // entire operations in the given label.
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
-	// panic("not reached")
-	// if buildoptions.IsDebugMode {
-	if c.currentLabel != "" {
+	if buildoptions.IsDebugMode {
 		fmt.Printf("[label %s ends]\n\n", c.currentLabel)
 	}
-	// }
 
 	labelKey := o.Label.String()
 	labelInfo := c.label(labelKey)
@@ -934,9 +941,9 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	// Clear for debuggin purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
 	labelInfo.labelBeginningCallbacks = nil
 
-	// if buildoptions.IsDebugMode {
-	fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
-	// }
+	if buildoptions.IsDebugMode {
+		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
+	}
 	c.currentLabel = labelKey
 	return
 }
@@ -4263,8 +4270,11 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 		return err
 	}
 
-	// On the function return, we have to initialize the state.
-	c.initializationAfterNonNativeFunctionCall()
+	// After the function call, we have to initialize the stack base pointer.
+	c.initializeReservedStackBasePointer()
+
+	// Finally, we initialize the reserved memory register based on the module context.
+	c.initializeReservedMemoryPointer()
 	return nil
 }
 
@@ -4277,11 +4287,16 @@ func (c *amd64Compiler) compileMemorySize() error {
 	if err := c.callGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemorySize); err != nil {
 		return err
 	}
+
+	// After the function call, we have to initialize the stack base pointer.
+	c.initializeReservedStackBasePointer()
+
+	// Finally, we initialize the reserved memory register based on the module context.
+	c.initializeReservedMemoryPointer()
+
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
-	// On the function return, we have to initialize the state.
-	c.initializationAfterNonNativeFunctionCall()
 	return nil
 }
 
@@ -4650,8 +4665,11 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		return err
 	}
 
-	// On the function return, we have to initialize the state.
-	c.initializationAfterNonNativeFunctionCall()
+	// After the function call, we have to initialize the stack base pointer.
+	c.initializeReservedStackBasePointer()
+
+	// Finally, we initialize the reserved memory register based on the module context.
+	c.initializeReservedMemoryPointer()
 
 	// For call_indirect, we need to push the value back to the register.
 	if !isNilRegister(addrReg) {
@@ -5317,14 +5335,6 @@ func (c *amd64Compiler) emitPreamble() (err error) {
 	// Finally, we initialize the reserved memory register based on the module context.
 	c.initializeReservedMemoryPointer()
 	return
-}
-
-func (c *amd64Compiler) initializationAfterNonNativeFunctionCall() {
-	// After the function call, we have to initialize the stack base pointer.
-	c.initializeReservedStackBasePointer()
-
-	// Finally, we initialize the reserved memory register based on the module context.
-	c.initializeReservedMemoryPointer()
 }
 
 func (c *amd64Compiler) initializeReservedStackBasePointer() {
