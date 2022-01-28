@@ -5218,31 +5218,31 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 
 // readInstructionAddress adds the instruction to read the target instruction's absolute address into the destinationRegister.
 // At the callsite, the returned callback must be called with two arguments:
-// instructionAfterReadInstructionAddress ... is the instruction added *right after* calling this readInstructionAddress function.
-// addressAcquisitionTargetInstruction ... is the instruction we want to get the absolute address.
-func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(instructionAfterReadInstructionAddress, addressAcquisitionTargetInstruction *obj.Prog) {
-	readInstructionAddressAfterReturn := c.newProg()
-	readInstructionAddressAfterReturn.As = x86.ALEAQ
-	readInstructionAddressAfterReturn.To.Reg = destinationRegister
-	readInstructionAddressAfterReturn.To.Type = obj.TYPE_REG
-	readInstructionAddressAfterReturn.From.Type = obj.TYPE_MEM
+// instructionAfterReadInstruction is the instruction added *right after* calling this readInstructionAddress function.
+// addressAcquisitionTargetInstruction  is the instruction we want to get the absolute address.
+func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(instructionAfterReadInstruction, addressAcquisitionTargetInstruction *obj.Prog) {
+	readInstructionAddress := c.newProg()
+	readInstructionAddress.As = x86.ALEAQ
+	readInstructionAddress.To.Reg = destinationRegister
+	readInstructionAddress.To.Type = obj.TYPE_REG
+	readInstructionAddress.From.Type = obj.TYPE_MEM
 	// We use place holder here as we don't yet know at this point the offset of the first instruction
 	// after return instruction.
-	readInstructionAddressAfterReturn.From.Offset = 0xffff
+	readInstructionAddress.From.Offset = 0xffff
 	// Since the assembler cannot directly emit "LEA foo [rip + bar]", we use the some hack here:
 	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
 	// exactly the same as "LEA foo [rip + bar]" except the most significant bit of the third byte.
 	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
-	readInstructionAddressAfterReturn.From.Reg = x86.REG_BP
-	c.addInstruction(readInstructionAddressAfterReturn)
+	readInstructionAddress.From.Reg = x86.REG_BP
+	c.addInstruction(readInstructionAddress)
 
-	return func(instructionAfterReadInstructionAddress, addressAcquisitionTargetInstruction *obj.Prog) {
+	return func(instructionAfterReadInstruction, addressAcquisitionTargetInstruction *obj.Prog) {
 		c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-			// See the comment at readInstructionAddressAfterReturn.From.Offset.
-			binary.LittleEndian.PutUint32(code[readInstructionAddressAfterReturn.Pc+3:],
-				uint32(advanceUntilNonNOP(addressAcquisitionTargetInstruction).Pc)-uint32(instructionAfterReadInstructionAddress.Pc))
-			// See the comment at readInstructionAddressAfterReturn.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
-			code[readInstructionAddressAfterReturn.Pc+2] = code[readInstructionAddressAfterReturn.Pc+2] & 0b01111111
+			// See the comment at readInstructionAddress.From.Offset.
+			binary.LittleEndian.PutUint32(code[readInstructionAddress.Pc+3:],
+				uint32(advanceUntilNonNOP(addressAcquisitionTargetInstruction).Pc)-uint32(instructionAfterReadInstruction.Pc))
+			// See the comment at readInstructionAddress.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
+			code[readInstructionAddress.Pc+2] = code[readInstructionAddress.Pc+2] & 0b01111111
 			return nil
 		})
 	}
