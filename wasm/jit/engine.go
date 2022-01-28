@@ -33,7 +33,7 @@ type (
 		valueStack []uint64
 
 		// callFrameStack is initially callFrameStack[callFrameStackPointer].
-		// The currently executed function call frame lives at callFrameStack[callFrameStackPoitner-1]
+		// The currently executed function call frame lives at callFrameStack[callFrameStackPointer-1]
 		// and that is equivalent to  engine.callFrameTop().
 		callFrameStack []callFrame
 
@@ -98,30 +98,28 @@ type (
 
 	// valueStackContext stores the data to access engine.valueStack.
 	valueStackContext struct {
-		// Stack pointer on .valueStack field which is accessed by [stackBasePointer] + [stackPointer].
-		// This is only used in the Go world and set when jit exiting as native code know
-		// exactly where the variables live on the stack at compilation phase.
+		// stackPointer on .valueStack field which is accessed by [stackBasePointer] + [stackPointer].
 		//
-		// Note that stackPointer is only used in Go world since the native code knows exact position of
+		// Note: stackPointer is not used in assembly since the native code knows exact position of
 		// each variable in the value stack from the info from compilation.
-		// Therefore, only updated when native code exit from the JIT world and go back to Go world.
+		// Therefore, only updated when native code exit from the JIT world and go back to the Go function.
 		stackPointer uint64
 
 		// stackBasePointer is updated whenever we make function calls.
-		// Background: Functions might be compiled as if they use the stack from the bottom,
-		// however in reality, they have to use it from the middle of the stack depending on
+		// Background: Functions might be compiled as if they use the stack from the bottom.
+		// However in reality, they have to use it from the middle of the stack depending on
 		// when these function calls are made. So instead of accessing stack via stackPointer alone,
 		// functions are compiled so they access the stack via [stackBasePointer](fixed for entire function) + [stackPointer].
 		// More precisely, stackBasePointer is set to [callee's stack pointer] + [callee's stack base pointer] - [caller's params].
 		// This way, compiled functions can be independent of the timing of functions calls made against them.
 		//
-		// note: This is SAVED on callFrameTop().returnStackBasePointer whenever making function call.
-		// Also, This is CHANGED whenever we make function call OR return from functions where we execute jump instruction.
+		// Note: This is saved on callFrameTop().returnStackBasePointer whenever making function call.
+		// Also, this is changed whenever we make function call or return from functions where we execute jump instruction.
 		// In either case, the caller of "jmp" instruction must set this field properly.
 		stackBasePointer uint64
 	}
 
-	// exitContext will be manipulated whenever JITed native code returns into the Go world.
+	// exitContext will be manipulated whenever JITed native code returns into the Go function.
 	exitContext struct {
 		// Where we store the status code of JIT execution.
 		statusCode jitCallStatusCode
@@ -137,11 +135,11 @@ type (
 	// That is, callFrameTop().returnAddress or returnStackBasePointer are not set
 	// until it makes a function call.
 	callFrame struct {
-		// Set when making function call FROM this function frame, or for initial function to call from Go world.
+		// Set when making function call from this function frame, or for the initial function frame to call from engine.execFunction.
 		returnAddress uintptr
-		// Set when making function call FROM this function frame.
+		// Set when making function call from this function frame.
 		returnStackBasePointer uint64
-		// Set when making function call TO this function frame.
+		// Set when making function call to this function frame.
 		compiledFunction *compiledFunction
 		// _ is a necessary padding to make the size of callFrame struct a power of 2.
 		_ [8]byte
@@ -181,7 +179,7 @@ type (
 )
 
 // Native code reads/writes Go's structs with the following constants.
-// See TestVeifyOffsetValue for how to derive these values.
+// See TestVerifyOffsetValue for how to derive these values.
 const (
 	// Offsets for engine.globalContext.
 	engineGlobalContextValueStackElement0AddressOffset        = 0

@@ -83,7 +83,7 @@ func init() {
 func jitcall(codeSegment, engine uintptr)
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
-// note: ir param can be nil for host functions.
+// Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
@@ -200,7 +200,7 @@ func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 func (c *amd64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
 	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack(s)
 	// used for all labels (via replaceLocationStack), excluding the current one.
-	// Hense, we check here if the final block's max one exceeds the current c.maxStackPointer.
+	// Hence, we check here if the final block's max one exceeds the current c.maxStackPointer.
 	maxStackPointer = c.maxStackPointer
 	if maxStackPointer < c.locationStack.maxStackPointer {
 		maxStackPointer = c.locationStack.maxStackPointer
@@ -4689,7 +4689,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 
 	// Since call frame stack pointer is the index for engine.callFrameStack slice,
 	// here we get the actual offset in bytes via shifting callFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
-	// That is valid because the size of callFrame struct is a power of 2 (see TestVeifyOffsetValue), which means
+	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
 	// multiplying withe the size of struct equals shifting by its most significant bit.
 	shiftCallFrameStackPointer := c.newProg()
 	shiftCallFrameStackPointer.As = x86.ASHLQ
@@ -4765,7 +4765,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	{
 		// At this point, tmpRegister holds the OLD stack base pointer. We could get the new frame's
 		// stack base pointer by "OLD stack base pointer + OLD stack pointer - # of function params"
-		// See the comments in engine.pushCallFrame which does exactly the same calculation in the Go world.
+		// See the comments in engine.pushCallFrame which does exactly the same calculation in Go.
 		calculateNextStackBasePointer := c.newProg()
 		calculateNextStackBasePointer.As = x86.AADDQ
 		calculateNextStackBasePointer.To.Type = obj.TYPE_REG
@@ -4790,7 +4790,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		// We must set the target function's address(pointer) of *compiledFunction into the next callframe stack.
 		// In the example, this is equivalent to writing the value into "rc.next".
 		//
-		// First, we read the addess of the first item of engine.compiledFunctions slice (= &engine.compiledFunctions[0])
+		// First, we read the address of the first item of engine.compiledFunctions slice (= &engine.compiledFunctions[0])
 		// into tmpRegister.
 		readCopmiledFunctionsElement0Address := c.newProg()
 		readCopmiledFunctionsElement0Address.As = x86.AMOVQ
@@ -4898,7 +4898,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	// See the comment of readInstructionAddress function for arguments.
 	readInstructionAddressCompletionCallBack(setReturnAddress, nopAfterJmpToNewFunction)
 
-	// All the registers used are temporary so we makr them unused.
+	// All the registers used are temporary so we mark them unused.
 	c.locationStack.markRegisterUnused(
 		tmpRegister, targetAddressRegister, callFrameStackTopAddressRegister,
 		callFrameStackPointerRegister, compiledFunctionAddressRegister, addrReg,
@@ -4922,7 +4922,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 }
 
 // returnFunction adds instructions to return from the current callframe back to the caller's frame.
-// If this is the current one is the origin, we return back to the Go world with the Returned status.
+// If this is the current one is the origin, we return back to the engine.execFunction with the Returned status.
 // Otherwise, we jump into the callers' return address stored in callFrame.returnAddress while setting
 // up all the necessary change on the engine's state.
 //
@@ -4987,7 +4987,7 @@ func (c *amd64Compiler) returnFunction() error {
 	//
 	// Since call frame stack pointer is the index for engine.callFrameStack slice,
 	// here we get the actual offset in bytes via shifting decrementedCallFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
-	// That is valid because the size of callFrame struct is a power of 2 (see TestVeifyOffsetValue), which means
+	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
 	// multiplying withe the size of struct equals shifting by its most significant bit.
 	shiftStackPointer := c.newProg()
 	jmpIfNotPreviousCallStackPointer.To.SetTarget(shiftStackPointer)

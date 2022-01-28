@@ -16,7 +16,7 @@ import (
 )
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.
-func TestVeifyOffsetValue(t *testing.T) {
+func TestVerifyOffsetValue(t *testing.T) {
 	var eng engine
 	// Offsets for engine.globalContext.
 	require.Equal(t, int(unsafe.Offsetof(eng.valueStackElement0Address)), engineGlobalContextValueStackElement0AddressOffset)
