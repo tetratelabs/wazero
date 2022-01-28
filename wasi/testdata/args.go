@@ -13,6 +13,7 @@ func args_get(uint32, uint32) uint16
 //go:wasm-module wasi_snapshot_preview1
 //export args_sizes_get
 func args_sizes_get(uint32, uint32) uint16
+
 func main() {
 	testGetWASIArgs()
 	testInvalidArguments()

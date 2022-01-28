@@ -1,4 +1,4 @@
-package examples
+package wasi
 
 import (
 	"os"
@@ -6,14 +6,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
-func Test_WASI_args(t *testing.T) {
-	buf, err := os.ReadFile("testdata/wasi_args.wasm")
+func TestArgs(t *testing.T) {
+	buf, err := os.ReadFile("testdata/args.wasm")
 	require.NoError(t, err)
 
 	mod, err := binary.DecodeModule(buf)
@@ -22,9 +21,9 @@ func Test_WASI_args(t *testing.T) {
 	store := wasm.NewStore(interpreter.NewEngine())
 	require.NoError(t, err)
 
-	args, err := wasi.Args([]string{"foo", "bar", "foobar", "", "baz"})
+	args, err := Args([]string{"foo", "bar", "foobar", "", "baz"})
 	require.NoError(t, err)
-	wasiEnv := wasi.NewEnvironment(args, wasi.Stdout(os.Stderr))
+	wasiEnv := NewEnvironment(args)
 
 	err = wasiEnv.Register(store)
 	require.NoError(t, err)
