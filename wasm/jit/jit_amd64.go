@@ -4888,13 +4888,28 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	return nil
 }
 
+// returnFunction adds instructions to return from the current callframe back to the caller's frame.
+// If this is the current one is the origin, we return back to the Go world with the Returned status.
+// Otherwise, we jump into the callers' return address stored in callFrame.returnAddress while setting
+// up all the necessary change on the engine's state.
 func (c *amd64Compiler) returnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
 	}
 
-	// First, we return from the function, so we need to decement the callframe stack pointer.
+	// Obtain the temporary registers to be used in the followings.
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
+	if !found {
+		// This in theory never happen as all the registers must be free except addrReg.
+		return fmt.Errorf("could not find enough free registers")
+	}
+	c.locationStack.markRegisterUsed(regs...)
+
+	// Alias these free tmp registers for readability.
+	callFrameStackPointerRegister, tmpRegister := regs[0], regs[1]
+
+	// Since we return from the function, we need to decement the callframe stack pointer.
 	decCallFrameStackPointer := c.newProg()
 	decCallFrameStackPointer.As = x86.ADECQ
 	decCallFrameStackPointer.To.Type = obj.TYPE_MEM
@@ -4903,11 +4918,6 @@ func (c *amd64Compiler) returnFunction() error {
 	c.addInstruction(decCallFrameStackPointer)
 
 	// Next, get the acutal address of the callframe stack pointer.
-	callFrameStackPointerRegister, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(callFrameStackPointerRegister)
-	tmpRegister, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(tmpRegister)
-
 	getCallFrameStackPointer := c.newProg()
 	getCallFrameStackPointer.As = x86.AMOVQ
 	getCallFrameStackPointer.To.Type = obj.TYPE_REG
