@@ -6040,7 +6040,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_callNativeFunction(t *testing.T) {
+func TestAmd64Compiler_callFunction(t *testing.T) {
 	for _, isAddressFromRegister := range []bool{false, true} {
 		isAddressFromRegister := isAddressFromRegister
 		t.Run(fmt.Sprintf("is_address_from_register=%v", isAddressFromRegister), func(t *testing.T) {
@@ -6055,15 +6055,15 @@ func TestAmd64Compiler_callNativeFunction(t *testing.T) {
 				require.Empty(t, compiler.locationStack.usedRegisters)
 				var err error
 				if isAddressFromRegister {
-					err = compiler.callNativeFunctionFromRegister(x86.REG_AX, &wasm.FunctionType{})
+					err = compiler.callFunctionFromRegister(x86.REG_AX, &wasm.FunctionType{})
 				} else {
-					err = compiler.callNativeFunctionFromAddress(0xdeadbeaf, &wasm.FunctionType{})
+					err = compiler.callFunctionFromAddress(0xdeadbeaf, &wasm.FunctionType{})
 				}
 				require.NoError(t, err)
 				require.Empty(t, compiler.locationStack.usedRegisters)
 
 				// Because we must early return from the function this case,
-				// we emit the undefined instruction after the callNativeFunctionFromAddress.
+				// we emit the undefined instruction after the callFunctionFromAddress.
 				compiler.undefined()
 
 				// Generate the code under test.
@@ -6158,9 +6158,9 @@ func TestAmd64Compiler_callNativeFunction(t *testing.T) {
 					if isAddressFromRegister {
 						const tmpReg = x86.REG_AX
 						compiler.movIntConstToRegister(int64(i), tmpReg)
-						err = compiler.callNativeFunctionFromRegister(tmpReg, targetFunctionType)
+						err = compiler.callFunctionFromRegister(tmpReg, targetFunctionType)
 					} else {
-						err = compiler.callNativeFunctionFromAddress(wasm.FunctionAddress(i), targetFunctionType)
+						err = compiler.callFunctionFromAddress(wasm.FunctionAddress(i), targetFunctionType)
 					}
 					require.NoError(t, err)
 				}

@@ -65,7 +65,8 @@ type (
 		callFrameStackPointer uint64
 		// previousCallFrameStackPointer is to support re-entrant execution.
 		// This is updated whenever exntering engine.execFunction.
-		// See the comment around the usage in engine.execFunction below.
+		// If this is the initial call into Wasm, the value equals zero,
+		// but if this is the recursive function call from the host function, the value becomes non-zero.
 		previousCallFrameStackPointer uint64
 
 		// &engine.compiledFunctions[0] as uintptr.
@@ -499,7 +500,8 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 }
 
 func (e *engine) execFunction(f *compiledFunction) {
-	// TODO: comment!
+	// We continuously execute functions until we reach the previous top frame
+	// to support recursive Wasm function executions.
 	e.globalContext.previousCallFrameStackPointer = e.globalContext.callFrameStackPointer
 
 	e.pushCallFrame(f)
