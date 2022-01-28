@@ -98,7 +98,7 @@ type (
 
 	// valueStackContext stores the data to access engine.valueStack.
 	valueStackContext struct {
-		// Stack pointer on .value field which is accessed by [stackBasePointer] + [stackPointer].
+		// Stack pointer on .valueStack field which is accessed by [stackBasePointer] + [stackPointer].
 		// This is only used in the Go world and set when jit exiting as native code know
 		// exactly where the variables live on the stack at compilation phase.
 		//
@@ -430,16 +430,16 @@ func newEngine() *engine {
 
 func (e *engine) popValue() (ret uint64) {
 	e.valueStackContext.stackPointer--
-	ret = e.valueStack[e.currentStackTop()]
+	ret = e.valueStack[e.valueStackTopIndex()]
 	return
 }
 
 func (e *engine) pushValue(v uint64) {
-	e.valueStack[e.currentStackTop()] = v
+	e.valueStack[e.valueStackTopIndex()] = v
 	e.valueStackContext.stackPointer++
 }
 
-func (e *engine) currentStackTop() uint64 {
+func (e *engine) valueStackTopIndex() uint64 {
 	return e.valueStackContext.stackBasePointer + e.valueStackContext.stackPointer
 }
 
