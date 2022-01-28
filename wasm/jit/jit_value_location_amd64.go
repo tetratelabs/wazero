@@ -285,6 +285,29 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 	return 0, false
 }
 
+func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []int16, found bool) {
+	var targetRegs []int16
+	switch tp {
+	case generalPurposeRegisterTypeFloat:
+		targetRegs = generalPurposeFloatRegisters
+	case generalPurposeRegisterTypeInt:
+		targetRegs = unreservedGeneralPurposeIntRegisters
+	}
+
+	regs = make([]int16, 0, num)
+	for _, candidate := range targetRegs {
+		if _, ok := s.usedRegisters[candidate]; ok {
+			continue
+		}
+		regs = append(regs, candidate)
+		if len(regs) == num {
+			found = true
+			break
+		}
+	}
+	return
+}
+
 // Search through the stack, and steal the register from the last used
 // variable on the stack.
 func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRegisterType) (*valueLocation, bool) {

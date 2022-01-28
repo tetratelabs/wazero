@@ -4595,17 +4595,22 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 		return err
 	}
 
-	c.locationStack.markRegisterUsed(addrReg)
-	callFrameStackPointerRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(callFrameStackPointerRegister)
-	tmpRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(tmpRegister)
-	targetAddressRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(targetAddressRegister)
-	callFrameStackTopAddressRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(callFrameStackTopAddressRegister)
-	compiledFunctionAddressRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(compiledFunctionAddressRegister)
+	// First, we have to make sure that
+	if !isNilRegister(addrReg) {
+		c.locationStack.markRegisterUsed(addrReg)
+	}
+
+	// Obtain the temporary registers to be used in the followings.
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 5)
+	if !found {
+		// This in theory never happen as all the registers must be free except addrReg.
+		return fmt.Errorf("could not find enough free registers")
+	}
+	c.locationStack.markRegisterUsed(regs...)
+
+	// Alias these free tmp registers for readability.
+	callFrameStackPointerRegister, tmpRegister, targetAddressRegister,
+		callFrameStackTopAddressRegister, compiledFunctionAddressRegister := regs[0], regs[1], regs[2], regs[3], regs[4]
 
 	// First, we read the current call frame stack pointer.
 	c.getCallFrameStackPointer(callFrameStackPointerRegister)
@@ -4620,15 +4625,16 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	cmpWithCallFrameStackLen.From.Offset = engineGlobalContextCallFrameStackLenOffset
 	c.addInstruction(cmpWithCallFrameStackLen)
 
-	// If they equal, then we have to grow the call stack.
+	// If they do not equal, then we don't have to grow the call frame stack.
 	jmpIfNotCallFrameStackNeedsGrow := c.newProg()
 	jmpIfNotCallFrameStackNeedsGrow.As = x86.AJNE
 	jmpIfNotCallFrameStackNeedsGrow.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfNotCallFrameStackNeedsGrow)
 
-	// Otherwise, we have to make the builtin function call to grow the call stack.
-	if isNilRegister(addrReg) {
-		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack.
+	// Otherwise, we have to make the builtin function call to grow the call frame stack.
+	if !isNilRegister(addrReg) {
+		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack,
+		// as the register is not saved across function calls.
 		savedOffsetLocation := c.locationStack.pushValueOnRegister(addrReg)
 		c.releaseRegisterToStack(savedOffsetLocation)
 	}
@@ -4642,7 +4648,7 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	c.initializationAfterNonNativeFunctionCall()
 
 	// For call_indirect, we need to push the value back to the register.
-	if isNilRegister(addrReg) {
+	if !isNilRegister(addrReg) {
 		savedOffsetLocation := c.locationStack.pop()
 		savedOffsetLocation.setRegister(addrReg)
 		c.moveStackToRegister(savedOffsetLocation)
@@ -4653,16 +4659,20 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 
 	// Now that callframe stack is enough length, we are ready to create a new call frame
 	// for the function call we are about to make.
-	getCallFrameStacFirstItemkAddress := c.newProg()
-	jmpIfNotCallFrameStackNeedsGrow.To.SetTarget(getCallFrameStacFirstItemkAddress)
-	getCallFrameStacFirstItemkAddress.As = x86.AMOVQ
-	getCallFrameStacFirstItemkAddress.To.Type = obj.TYPE_REG
-	getCallFrameStacFirstItemkAddress.To.Reg = tmpRegister
-	getCallFrameStacFirstItemkAddress.From.Type = obj.TYPE_MEM
-	getCallFrameStacFirstItemkAddress.From.Reg = reservedRegisterForEngine
-	getCallFrameStacFirstItemkAddress.From.Offset = engineGlobalContextCallFrameStackFirstItemAddressOffset
-	c.addInstruction(getCallFrameStacFirstItemkAddress)
+	getCallFrameStackFirstItemAddress := c.newProg()
+	jmpIfNotCallFrameStackNeedsGrow.To.SetTarget(getCallFrameStackFirstItemAddress)
+	getCallFrameStackFirstItemAddress.As = x86.AMOVQ
+	getCallFrameStackFirstItemAddress.To.Type = obj.TYPE_REG
+	getCallFrameStackFirstItemAddress.To.Reg = tmpRegister
+	getCallFrameStackFirstItemAddress.From.Type = obj.TYPE_MEM
+	getCallFrameStackFirstItemAddress.From.Reg = reservedRegisterForEngine
+	getCallFrameStackFirstItemAddress.From.Offset = engineGlobalContextCallFrameStackFirstItemAddressOffset
+	c.addInstruction(getCallFrameStackFirstItemAddress)
 
+	// Since call frame stack pointer is the index for engine.callFrameStack slice,
+	// here we get the actual offset in bytes via shifting the value by callFrameDataSizeMostSignificantSetBit.
+	// That is valid because the size of callFrame struct is a power of 2 (see TestVeifyOffsetValue), which means
+	// multiplying withe the size of struct equals shifting by its most significant bit.
 	shiftCallFrameStackPointer := c.newProg()
 	shiftCallFrameStackPointer.As = x86.ASHLQ
 	shiftCallFrameStackPointer.To.Type = obj.TYPE_REG
@@ -4671,52 +4681,82 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	shiftCallFrameStackPointer.From.Offset = int64(callFrameDataSizeMostSignificantSetBit)
 	c.addInstruction(shiftCallFrameStackPointer)
 
-	readCurrentCallFrameReturnAddress := c.newProg()
-	readCurrentCallFrameReturnAddress.As = x86.ALEAQ
-	readCurrentCallFrameReturnAddress.To.Type = obj.TYPE_REG
-	readCurrentCallFrameReturnAddress.To.Reg = callFrameStackTopAddressRegister
-	readCurrentCallFrameReturnAddress.From.Type = obj.TYPE_MEM
-	readCurrentCallFrameReturnAddress.From.Reg = tmpRegister
-	readCurrentCallFrameReturnAddress.From.Index = callFrameStackPointerRegister
-	readCurrentCallFrameReturnAddress.From.Scale = 1
-	c.addInstruction(readCurrentCallFrameReturnAddress)
+	// At this point, callFrameStackPointerRegister holds the offset in call frame slice in bytes,
+	// and tmpRegister holds the absolute address of the first item of call frame slice.
+	// To illustrate the situation:
+	//
+	//  tmpRegister (holding the absolute address of &callFrame[0])
+	//      |
+	//      [ra.0, rb.0, rc.0, _, ra.1, rb.1, rc.1, _, ra.next, rb.next, rc.next, ...]  <--- call frame stack's data region (somewhere in the memory)
+	//      |                                        |
+	//      ------------------------------------------
+	//             callFrameStackPointerRegister (holding the offset from &callFrame[0] in bytes.)
+	//
+	// where:
+	//      ra.* = callFrame.returnAddress
+	//      rb.* = callFrame.returnStackBasePointer
+	//      rc.* = callFrame.compiledFunction
+	//      _  = callFarme's padding (see comment on callFrame._ field.)
+	//
+	// In the following comment, we use the notations in the above example.
 
-	movCurrentStackBasePointerIntoTmpRegister := c.newProg()
-	movCurrentStackBasePointerIntoTmpRegister.As = x86.AMOVQ
-	movCurrentStackBasePointerIntoTmpRegister.To.Type = obj.TYPE_REG
-	movCurrentStackBasePointerIntoTmpRegister.To.Reg = tmpRegister
-	movCurrentStackBasePointerIntoTmpRegister.From.Type = obj.TYPE_MEM
-	movCurrentStackBasePointerIntoTmpRegister.From.Reg = reservedRegisterForEngine
-	movCurrentStackBasePointerIntoTmpRegister.From.Offset = engineValueStackContextStackBasePointerOffset
-	c.addInstruction(movCurrentStackBasePointerIntoTmpRegister)
+	// First, read the address corresponding to tmpRegister+callFrameStackPointerRegister
+	// by LEA instruction which equals the address of call frame stack top.
+	calcCallFrameStackTopAddress := c.newProg()
+	calcCallFrameStackTopAddress.As = x86.ALEAQ
+	calcCallFrameStackTopAddress.To.Type = obj.TYPE_REG
+	calcCallFrameStackTopAddress.To.Reg = callFrameStackTopAddressRegister
+	calcCallFrameStackTopAddress.From.Type = obj.TYPE_MEM
+	calcCallFrameStackTopAddress.From.Reg = tmpRegister
+	calcCallFrameStackTopAddress.From.Index = callFrameStackPointerRegister
+	calcCallFrameStackTopAddress.From.Scale = 1
+	c.addInstruction(calcCallFrameStackTopAddress)
 
-	saveCurrentStackBasePointerIntoCallFrameFromTmpRegister := c.newProg()
-	saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.As = x86.AMOVQ
-	saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.To.Type = obj.TYPE_MEM
-	saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.To.Reg = callFrameStackTopAddressRegister
-	saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.To.Offset = -(callFrameDataSize - callFrameReturnStackBasePointerOffset)
-	saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.From.Type = obj.TYPE_REG
-	saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.From.Reg = tmpRegister
-	c.addInstruction(saveCurrentStackBasePointerIntoCallFrameFromTmpRegister)
+	{
+		// We must save the current stack base pointer (which lives on engine.valueStackContext.stackPointer)
+		// to the call frame stack. In the example, this is equivalent to writing the value into "rb.1".
+		movCurrentStackBasePointerIntoTmpRegister := c.newProg()
+		movCurrentStackBasePointerIntoTmpRegister.As = x86.AMOVQ
+		movCurrentStackBasePointerIntoTmpRegister.To.Type = obj.TYPE_REG
+		movCurrentStackBasePointerIntoTmpRegister.To.Reg = tmpRegister
+		movCurrentStackBasePointerIntoTmpRegister.From.Type = obj.TYPE_MEM
+		movCurrentStackBasePointerIntoTmpRegister.From.Reg = reservedRegisterForEngine
+		movCurrentStackBasePointerIntoTmpRegister.From.Offset = engineValueStackContextStackBasePointerOffset
+		c.addInstruction(movCurrentStackBasePointerIntoTmpRegister)
 
-	// Calculate the next stack base pointer on the reserved register.
-	calculateNextStackBasePointer := c.newProg()
-	calculateNextStackBasePointer.As = x86.AADDQ
-	calculateNextStackBasePointer.To.Type = obj.TYPE_REG
-	calculateNextStackBasePointer.To.Reg = tmpRegister
-	calculateNextStackBasePointer.From.Type = obj.TYPE_CONST
-	calculateNextStackBasePointer.From.Offset = (int64(c.locationStack.sp) - int64(len(functype.Params)))
-	c.addInstruction(calculateNextStackBasePointer)
+		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister := c.newProg()
+		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.As = x86.AMOVQ
+		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.To.Type = obj.TYPE_MEM
+		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.To.Reg = callFrameStackTopAddressRegister
+		// "rb.1" is BELOW the top address. See the above example for detail.
+		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.To.Offset = -(callFrameDataSize - callFrameReturnStackBasePointerOffset)
+		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.From.Type = obj.TYPE_REG
+		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister.From.Reg = tmpRegister
+		c.addInstruction(saveCurrentStackBasePointerIntoCallFrameFromTmpRegister)
+	}
 
-	// Write the value to engine.
-	putNextStackBasePointerIntoEngine := c.newProg()
-	putNextStackBasePointerIntoEngine.As = x86.AMOVQ
-	putNextStackBasePointerIntoEngine.To.Type = obj.TYPE_MEM
-	putNextStackBasePointerIntoEngine.To.Reg = reservedRegisterForEngine
-	putNextStackBasePointerIntoEngine.To.Offset = engineValueStackContextStackBasePointerOffset
-	putNextStackBasePointerIntoEngine.From.Type = obj.TYPE_REG
-	putNextStackBasePointerIntoEngine.From.Reg = tmpRegister
-	c.addInstruction(putNextStackBasePointerIntoEngine)
+	{
+		// At this point, tmpRegister holds the OLD stack base pointer. We could get the new frame's
+		// stack base pointer by "OLD stack base pointer + OLD stack pointer - # of function params"
+		// See the comments in engine.pushCallFrame which does exactly the same calculation in the Go world.
+		calculateNextStackBasePointer := c.newProg()
+		calculateNextStackBasePointer.As = x86.AADDQ
+		calculateNextStackBasePointer.To.Type = obj.TYPE_REG
+		calculateNextStackBasePointer.To.Reg = tmpRegister
+		calculateNextStackBasePointer.From.Type = obj.TYPE_CONST
+		calculateNextStackBasePointer.From.Offset = (int64(c.locationStack.sp) - int64(len(functype.Params)))
+		c.addInstruction(calculateNextStackBasePointer)
+
+		// Write the calculated value to engine.valueStackContext.stackBasePointer.
+		putNextStackBasePointerIntoEngine := c.newProg()
+		putNextStackBasePointerIntoEngine.As = x86.AMOVQ
+		putNextStackBasePointerIntoEngine.To.Type = obj.TYPE_MEM
+		putNextStackBasePointerIntoEngine.To.Reg = reservedRegisterForEngine
+		putNextStackBasePointerIntoEngine.To.Offset = engineValueStackContextStackBasePointerOffset
+		putNextStackBasePointerIntoEngine.From.Type = obj.TYPE_REG
+		putNextStackBasePointerIntoEngine.From.Reg = tmpRegister
+		c.addInstruction(putNextStackBasePointerIntoEngine)
+	}
 
 	// Place the compiledFunction's address(pointer) into the new frame.
 	// First, we need to read the address of engine.compiledFunctions[0] and put it into tmpRegister.
@@ -4736,13 +4776,14 @@ func (c *amd64Compiler) callNativeFunction(addr wasm.FunctionAddress, addrReg in
 	readCompiledFunctionAddressAddress.To.Reg = compiledFunctionAddressRegister
 	readCompiledFunctionAddressAddress.From.Type = obj.TYPE_MEM
 	readCompiledFunctionAddressAddress.From.Reg = tmpRegister
-	if isNilRegister(addrReg) {
+	if !isNilRegister(addrReg) {
 		readCompiledFunctionAddressAddress.From.Index = addrReg
 		readCompiledFunctionAddressAddress.From.Scale = 8 // because the size of *compiledFunction equals 8 bytes.
 	} else {
 		readCompiledFunctionAddressAddress.From.Offset = int64(addr) * 8 // because the size of *compiledFunction equals 8 bytes.
 	}
 
+	// We have to see the return address for the current call frame (which is "ra.1" in the example).
 	c.addInstruction(readCompiledFunctionAddressAddress)
 
 	// Place the address of the target compiled function into the new call frame.
@@ -5043,7 +5084,7 @@ func (c *amd64Compiler) callNonNativeFunction(jitStatus jitCallStatusCode, addr 
 	readCurrentCallFrameReturnAddress.From.Offset = -(callFrameDataSize - callFrameReturnAddressOffset)
 	c.addInstruction(readCurrentCallFrameReturnAddress)
 
-	readRIPCompletionCallBack := c.addReadRIPIntoRegisterInstruction(ripRegister)
+	readInstructionAddressCompletionCallback := c.readInstructionAddress(ripRegister)
 
 	// We are ready to store the return address (in ripRegister) to engine.callFrameStack[engine.callStackFramePointer-1].
 	moveRIP := c.newProg()
@@ -5062,7 +5103,7 @@ func (c *amd64Compiler) callNonNativeFunction(jitStatus jitCallStatusCode, addr 
 	nopAfterReturnInst.As = obj.ANOP
 	c.addInstruction(nopAfterReturnInst)
 
-	readRIPCompletionCallBack(moveRIP, nopAfterReturnInst)
+	readInstructionAddressCompletionCallback(moveRIP, nopAfterReturnInst)
 
 	// They were temporarily used, so we mark them unused.
 	c.locationStack.markRegisterUnused(ripRegister)
@@ -5107,6 +5148,8 @@ func advanceUntilNonNOP(in *obj.Prog) (out *obj.Prog) {
 	return
 }
 
+// releaseAllRegistersToStack add the instructions to release all the LIVE value
+// in the value location stack at this point into the stack memory location.
 func (c *amd64Compiler) releaseAllRegistersToStack() error {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
