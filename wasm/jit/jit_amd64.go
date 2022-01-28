@@ -5116,12 +5116,16 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 		return err
 	}
 
-	// setCurrentCallFrameReturnAddressAtNextInstruction is called after releasing
-	// all the registers, so at this point we always have free registers.
-	ripRegister, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(ripRegister)
-	currentCallFrameAddressRegister, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(currentCallFrameAddressRegister)
+	// Obtain the temporary registers to be used in the followings.
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
+	if !found {
+		// This in theory never happen as all the registers must be free except addrReg.
+		return fmt.Errorf("could not find enough free registers")
+	}
+	c.locationStack.markRegisterUsed(regs...)
+
+	// Alias these free tmp registers for readability.
+	ripRegister, currentCallFrameAddressRegister := regs[0], regs[1]
 
 	// We need to store the address of the current callFrame's return address.
 	getCallFrameStackPointer := c.newProg()
@@ -5185,8 +5189,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	readInstructionAddressCompletionCallback(moveRIP, nopAfterReturnInst)
 
 	// They were temporarily used, so we mark them unused.
-	c.locationStack.markRegisterUnused(ripRegister)
-	c.locationStack.markRegisterUnused(currentCallFrameAddressRegister)
+	c.locationStack.markRegisterUnused(regs...)
 	return nil
 }
 

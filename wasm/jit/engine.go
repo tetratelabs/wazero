@@ -154,7 +154,7 @@ type (
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
-		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowStack.
+		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
 		maxStackPointer uint64
 		// Pre-calculated unintptr(unsafe.Pointer(source.ModuleInstance)).
 		// This is used to update engine.moduleContext when start executing this function frame.
@@ -582,7 +582,7 @@ func (e *engine) pushCallFrame(f *compiledFunction) {
 	//
 	// and the target function requires 2 params, we need to pass D and E as arguments.
 	//
-	// Therefore, the target function start executing the following state:
+	// Therefore, the target function start executing under the following state:
 	//                base   sp
 	//                 |     |
 	// [...., A, B, C, D, E, _, _ ]

@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -199,7 +198,6 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 			valueStackLen := uint64(len(env.stack()))
 			maxStackPointer := uint64(5)
 			stackBasePointer := valueStackLen - baseOffset // Base + Max <= valueStackLen = no need to grow!
-			fmt.Println(stackBasePointer)
 			compiler.onMaxStackPointerDeterminedCallBack(maxStackPointer)
 			compiler.onMaxStackPointerDeterminedCallBack = nil
 			env.setValueStackBasePointer(stackBasePointer)
@@ -209,8 +207,6 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 			// Generate the code under test.
 			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
-
-			fmt.Println(hex.EncodeToString(code))
 
 			// Run codes
 			env.exec(code)
@@ -239,8 +235,6 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
-
-		fmt.Println(hex.EncodeToString(code))
 
 		// Run codes
 		env.exec(code)
