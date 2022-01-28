@@ -4707,7 +4707,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	//      |
 	//      [ra.0, rb.0, rc.0, _, ra.1, rb.1, rc.1, _, ra.next, rb.next, rc.next, ...]  <--- call frame stack's data region (somewhere in the memory)
 	//      |                                        |
-	//      <---------------------------------------->
+	//      |---------------------------------------->
 	//          callFrameStackPointerRegister (holding the offset from &callFrame[0] in bytes.)
 	//
 	// where:
@@ -5026,7 +5026,7 @@ func (c *amd64Compiler) returnFunction() error {
 	//      |                                           |
 	//      [......., ra.caller, rb.caller, rc.caller, _, ra.current, rb.current, rc.current, _, ...]  <--- call frame stack's data region (somewhere in the memory)
 	//      |                                           |
-	//      <------------------------------------------->
+	//      |------------------------------------------->
 	//           decrementedCallFrameStackPointerRegister (holding the offset from &callFrame[0] in bytes.)
 	//
 	// where:
