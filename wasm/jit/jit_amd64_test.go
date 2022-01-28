@@ -211,6 +211,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 			// Run codes
 			env.exec(code)
 
+			// The status code must be "Returned", not "BuiltinFunctionCall".
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 		}
 	})
@@ -221,15 +222,14 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		compiler.initializeReservedStackBasePointer()
 		err := compiler.maybeGrowValueStack()
 		require.NoError(t, err)
-		require.NotNil(t, compiler.onMaxStackPointerDeterminedCallBack)
 
+		// On the return from grow value stack, we just exit with "Returned" status.
 		compiler.exit(jitCallStatusCodeReturned)
 
-		valueStackLen := uint64(len(env.stack()))
 		maxStackPointer := uint64(6)
+		compiler.maxStackPointer = maxStackPointer
+		valueStackLen := uint64(len(env.stack()))
 		stackBasePointer := valueStackLen - 5 // Base + Max > valueStackLen = need to grow!
-		compiler.onMaxStackPointerDeterminedCallBack(maxStackPointer)
-		compiler.onMaxStackPointerDeterminedCallBack = nil
 		env.setValueStackBasePointer(stackBasePointer)
 
 		// Generate the code under test.
@@ -247,7 +247,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		require.NotZero(t, returnAddress)
 		jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
 
-		// Check teh result.
+		// Check the result. This should be "Returned".
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
 }
@@ -263,15 +263,19 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedValue})
 		require.NoError(t, err)
 
+		// Before returnFunction, we have the one const on the stack.
 		require.Len(t, compiler.locationStack.usedRegisters, 1)
 		err = compiler.returnFunction()
 		require.NoError(t, err)
+
+		// After returnFunction, all the registers must be released.
 		require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
 		require.NoError(t, err)
 
+		// See the previous call frame stack poitner to verify the correctness of exit decision.
 		const previousCallFrameStackPointer uint64 = 50
 		env.setCallFrameStackPointer(previousCallFrameStackPointer)
 		env.setPreviousCallFrameStackPointer(previousCallFrameStackPointer)
@@ -279,61 +283,75 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		// Run codes
 		env.exec(code)
 
-		// Check the exit status.
+		// Check the exit status and returned value.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 		require.Equal(t, previousCallFrameStackPointer, env.callFrameStackPointer())
-
 		require.Equal(t, expectedValue, env.stackTopAsUint32())
 	})
 	t.Run("deep call stack", func(t *testing.T) {
 		env := newJITEnvironment()
 		engine := env.engine()
 
-		// Push the callFrames.
+		// Push the call frames.
 		const callFrameNums = 10
-		var code []byte
+		stackPointerToExpectedValue := map[uint64]uint32{}
 		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
+			//	Each function pushes its funcaddr and soon returns.
 			compiler := requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(funcaddr)})
+			// Push its funcaddr.
+			expValue := uint32(funcaddr)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
 			require.NoError(t, err)
 
+			// And then return.
 			err = compiler.returnFunction()
 			require.NoError(t, err)
 
-			code, _, _, err = compiler.generate()
+			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
 
+			// Compiles and adds to the engine.
 			codeInitialAddress := uintptr(unsafe.Pointer(&code[0]))
 			compiledFunction := &compiledFunction{codeSegment: code, codeInitialAddress: codeInitialAddress}
 			engine.addCompiledFunction(funcaddr, compiledFunction)
-			engine.callFrameStack[engine.globalContext.callFrameStackPointer] = callFrame{
-				returnAddress:          codeInitialAddress,
+
+			// Pushes the frame whose return address equals the beginning of the function just compiled ^.
+			frame := callFrame{
+				returnAddress: codeInitialAddress,
+				// Note that return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
 				returnStackBasePointer: uint64(funcaddr) * 10,
 				compiledFunction:       compiledFunction,
 			}
+			engine.callFrameStack[engine.globalContext.callFrameStackPointer] = frame
 			engine.globalContext.callFrameStackPointer++
+
+			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
 		}
 
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
 
+		// To ensure that returnFunction() properly sets the moduleInstanceAddress to the
+		// return target's compiledFunction.moduleInstanceAddress, we modify the bottom frame's
+		// compiledFunction here.
 		lastModuleInstance := &wasm.ModuleInstance{}
 		expPtr := uintptr(unsafe.Pointer(lastModuleInstance))
 		engine.callFrameStack[0].compiledFunction.moduleInstanceAddress = expPtr
 
-		// Run codes
-		env.exec(code)
+		// Run codes.
+		env.exec(engine.callFrameTop().compiledFunction.codeSegment)
 
+		// Check the moduleInstanceAddress is properly changed.
 		require.Equal(t, expPtr, engine.moduleContext.moduleInstanceAddress)
 
 		// Check the exit status.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-		require.Equal(t, uint64(0), env.callFrameStackPointer())
 
-		for i := 0; i < callFrameNums; i++ {
-			require.Equal(t, uint64(i), env.stack()[i*10])
+		// Check the stack values.
+		for pos, exp := range stackPointerToExpectedValue {
+			require.Equal(t, exp, uint32(env.stack()[pos]))
 		}
 	})
 }
