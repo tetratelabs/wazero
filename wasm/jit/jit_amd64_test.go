@@ -5,7 +5,6 @@ package jit
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -224,14 +223,14 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, compiler.onMaxStackPointerDeterminedCallBack)
 
+		compiler.exit(jitCallStatusCodeReturned)
+
 		valueStackLen := uint64(len(env.stack()))
 		maxStackPointer := uint64(6)
 		stackBasePointer := valueStackLen - 5 // Base + Max > valueStackLen = need to grow!
 		compiler.onMaxStackPointerDeterminedCallBack(maxStackPointer)
 		compiler.onMaxStackPointerDeterminedCallBack = nil
 		env.setValueStackBasePointer(stackBasePointer)
-
-		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
@@ -240,7 +239,16 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		// Run codes
 		env.exec(code)
 
+		// Check if the call exits with builtin function call status.
 		require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+
+		// Reenter from the return address.
+		returnAddress := env.callFrameStackPeek().returnAddress
+		require.NotZero(t, returnAddress)
+		jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+
+		// Check teh result.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
 }
 
@@ -466,8 +474,6 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		// Generate the code under test.
 		code, _, _, err := c.generate()
 		require.NoError(t, err)
-
-		fmt.Println(hex.EncodeToString(code))
 
 		// Run codes
 		env := newJITEnvironment()

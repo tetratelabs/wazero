@@ -5328,8 +5328,8 @@ func (c *amd64Compiler) emitPreamble() (err error) {
 		return err
 	}
 
-	// Once reserved registers are initialized and the size of stack is ok,
-	// we are ready to execute the wasm instructions. To do so, we have to
+	// Once the stack base pointer is initialized and the size of stack is ok,
+	// initialize the module context next.
 	c.initializeModuleContext()
 
 	// Finally, we initialize the reserved memory register based on the module context.
