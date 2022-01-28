@@ -478,7 +478,6 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
-	// t.Skip()
 	requireRunAndExpectedValueReturned := func(t *testing.T, c *amd64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 10; returnValue++ {
@@ -524,18 +523,18 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 					o             *wazeroir.OperationBrTable
 					expectedValue uint32
 				}{
-					// {
-					// 	name:          "only default with index 0",
-					// 	o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
-					// 	index:         0,
-					// 	expectedValue: 6,
-					// },
-					// {
-					// 	name:          "only default with index 100",
-					// 	o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
-					// 	index:         100,
-					// 	expectedValue: 6,
-					// },
+					{
+						name:          "only default with index 0",
+						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+						index:         0,
+						expectedValue: 6,
+					},
+					{
+						name:          "only default with index 100",
+						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+						index:         100,
+						expectedValue: 6,
+					},
 					{
 						name: "select default with targets and good index",
 						o: &wazeroir.OperationBrTable{
@@ -6116,8 +6115,9 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				expectedValue := uint32(0)
 				moduleInstanceToExpectedValueInMemory := map[*wasm.ModuleInstance]uint32{}
 				for i := 0; i < numCalls; i++ {
-					compiler := requireNewCompiler(t)
+					// Each function takes one arguments, adds the value with 100 + i and returns the result.
 
+					compiler := requireNewCompiler(t)
 					compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
@@ -6178,6 +6178,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: initialValue})
 				require.NoError(t, err)
 
+				// Call all the built functions.
 				for i := 0; i < numCalls; i++ {
 					if isAddressFromRegister {
 						const tmpReg = x86.REG_AX
@@ -6201,7 +6202,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 
 				// Check status and returned values.
 				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-				require.Equal(t, uint64(2), env.stackPointer())
+				require.Equal(t, uint64(2), env.stackPointer()) // Must be 2 (dummy value + the calculation results)
 				require.Equal(t, uint64(0), env.stackBasePointer())
 				require.Equal(t, expectedValue, env.stackTopAsUint32())
 
@@ -6225,6 +6226,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	}
 
 	{
+		// Call target function takes three i32 arguments and does ADD 2 times.
 		compiler := requireNewCompiler(t)
 		compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
 		err := compiler.emitPreamble()
@@ -6243,9 +6245,9 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 			codeSegment:        code,
 			codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 		})
-
 	}
 
+	// Now we start building the caller's code.
 	compiler := requireNewCompiler(t)
 	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
 		Functions: []*wasm.FunctionInstance{
@@ -6257,6 +6259,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	require.NoError(t, err)
 
 	var expectedValue uint32
+	// Emit the const expressions for function arguments.
 	for i := 0; i < len(targetFunctionType.Params); i++ {
 		param := uint32(1 << (i + 1))
 		expectedValue += param
