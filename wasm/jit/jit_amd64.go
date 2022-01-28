@@ -4737,7 +4737,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	calcCallFrameStackTopAddress.From.Scale = 1
 	c.addInstruction(calcCallFrameStackTopAddress)
 
-	// Complete 1).
+	// 1) Set rb.1 so that we can return back to this function properly.
 	{
 		// We must save the current stack base pointer (which lives on engine.valueStackContext.stackPointer)
 		// to the call frame stack. In the example, this is equivalent to writing the value into "rb.1".
@@ -4761,7 +4761,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		c.addInstruction(saveCurrentStackBasePointerIntoCallFrameFromTmpRegister)
 	}
 
-	// Complete 2).
+	// 2) Set engine.valueStackContext.stackBasePointer for the next function.
 	{
 		// At this point, tmpRegister holds the OLD stack base pointer. We could get the new frame's
 		// stack base pointer by "OLD stack base pointer + OLD stack pointer - # of function params"
@@ -4785,7 +4785,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		c.addInstruction(putNextStackBasePointerIntoEngine)
 	}
 
-	// Complete 3).
+	// 3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
 	{
 		// We must set the target function's address(pointer) of *compiledFunction into the next callframe stack.
 		// In the example, this is equivalent to writing the value into "rc.next".
@@ -4829,7 +4829,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		c.addInstruction(putCompiledFunctionFunctionAddressOnNewCallFrame)
 	}
 
-	// Complete 4).
+	// 4) Set engine.moduleContext.moduleInstanceAddress for the next function.
 	{
 		// Also, we have to set engine.moduleContext.ModuleInstance as
 		// it is the caller's responsibility to set the field.
@@ -4852,7 +4852,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		c.addInstruction(setEngineModuleInstanceAddress)
 	}
 
-	// Now ready to complete 5).
+	// 5) Set ra.1 so that we can return back to this function properly.
 	//
 	// We have to set the return address for the current call frame (which is "ra.1" in the example).
 	// First, Get the return address into the tmpRegister.
@@ -4870,7 +4870,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	setReturnAddress.From.Reg = tmpRegister
 	c.addInstruction(setReturnAddress)
 
-	// Every preparetion is done to enter into the target function.
+	// Every preparetion (1 to 5 in the description above) is done to enter into the target function.
 	// So we increment the call frame stack pointer.
 	incCallFrameStackPointer := c.newProg()
 	incCallFrameStackPointer.As = x86.AINCQ
@@ -5036,11 +5036,11 @@ func (c *amd64Compiler) returnFunction() error {
 	//      _  = callFrame's padding (see comment on callFrame._ field.)
 	//
 	// What we have to do in the following is that
-	//   1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller"
+	//   1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller".
 	//   2) Set engine.moduleContext.moduleInstanceAddress to the one stored in "rc.caller".
-	//   3) Jump into the address of "ra.caller"
+	//   3) Jump into the address of "ra.caller".
 
-	// Complete 1).
+	// 1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller"
 	{
 		readReturnStackBasePointer := c.newProg()
 		readReturnStackBasePointer.As = x86.AMOVQ
@@ -5062,7 +5062,7 @@ func (c *amd64Compiler) returnFunction() error {
 		c.addInstruction(putReturnStackBasePointer)
 	}
 
-	// Complete 2).
+	// 2) Set engine.moduleContext.moduleInstanceAddress to the one stored in "rc.caller".
 	{
 		readCompiledFunctionAddress := c.newProg()
 		readCompiledFunctionAddress.As = x86.AMOVQ
@@ -5096,7 +5096,7 @@ func (c *amd64Compiler) returnFunction() error {
 		c.addInstruction(putModuleInstanceAddressToEngine)
 	}
 
-	// Complete 3).
+	// 3) Jump into the address of "ra.caller".
 	{
 		readReturnAddress := c.newProg()
 		readReturnAddress.As = x86.AMOVQ
