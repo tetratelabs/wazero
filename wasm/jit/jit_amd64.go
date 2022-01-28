@@ -4270,10 +4270,8 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 		return err
 	}
 
-	// After the function call, we have to initialize the stack base pointer.
+	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
 	c.initializeReservedStackBasePointer()
-
-	// Finally, we initialize the reserved memory register based on the module context.
 	c.initializeReservedMemoryPointer()
 	return nil
 }
@@ -4288,10 +4286,8 @@ func (c *amd64Compiler) compileMemorySize() error {
 		return err
 	}
 
-	// After the function call, we have to initialize the stack base pointer.
+	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
 	c.initializeReservedStackBasePointer()
-
-	// Finally, we initialize the reserved memory register based on the module context.
 	c.initializeReservedMemoryPointer()
 
 	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
@@ -4665,10 +4661,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		return err
 	}
 
-	// After the function call, we have to initialize the stack base pointer.
+	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
 	c.initializeReservedStackBasePointer()
-
-	// Finally, we initialize the reserved memory register based on the module context.
 	c.initializeReservedMemoryPointer()
 
 	// For call_indirect, we need to push the value back to the register.
@@ -4918,7 +4912,9 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	// Due to the change to engine.valueStackContext.stackBasePointer.
 	c.initializeReservedStackBasePointer()
 	// Due to the change to engine.moduleContext.moduleInstanceAddress.
-	c.initializeModuleContext()
+	if err := c.initializeModuleContext(); err != nil {
+		return err
+	}
 	// Due to the change to engine.moduleContext.moduleInstanceAddress as that might result in
 	// the memory instance manipulation.
 	c.initializeReservedMemoryPointer()
@@ -5220,7 +5216,10 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	return nil
 }
 
-// TODO: document!
+// readInstructionAddress adds the instruction to read the target instruction's absolute address into the destinationRegister.
+// At the callsite, the returned callback must be called with two arguments:
+// instructionAfterReadInstructionAddress ... is the instruction added *right after* calling this readInstructionAddress function.
+// addressAcquisitionTargetInstruction ... is the instruction we want to get the absolute address.
 func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(instructionAfterReadInstructionAddress, addressAcquisitionTargetInstruction *obj.Prog) {
 	readInstructionAddressAfterReturn := c.newProg()
 	readInstructionAddressAfterReturn.As = x86.ALEAQ
@@ -5239,10 +5238,10 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(i
 
 	return func(instructionAfterReadInstructionAddress, addressAcquisitionTargetInstruction *obj.Prog) {
 		c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-			// See the comment at readRIP.From.Offset.
+			// See the comment at readInstructionAddressAfterReturn.From.Offset.
 			binary.LittleEndian.PutUint32(code[readInstructionAddressAfterReturn.Pc+3:],
 				uint32(advanceUntilNonNOP(addressAcquisitionTargetInstruction).Pc)-uint32(instructionAfterReadInstructionAddress.Pc))
-			// See the comment at readRIP.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
+			// See the comment at readInstructionAddressAfterReturn.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
 			code[readInstructionAddressAfterReturn.Pc+2] = code[readInstructionAddressAfterReturn.Pc+2] & 0b01111111
 			return nil
 		})
@@ -5330,7 +5329,9 @@ func (c *amd64Compiler) emitPreamble() (err error) {
 
 	// Once the stack base pointer is initialized and the size of stack is ok,
 	// initialize the module context next.
-	c.initializeModuleContext()
+	if err := c.initializeModuleContext(); err != nil {
+		return err
+	}
 
 	// Finally, we initialize the reserved memory register based on the module context.
 	c.initializeReservedMemoryPointer()
@@ -5392,7 +5393,9 @@ func (c *amd64Compiler) initializeReservedMemoryPointer() {
 	c.addInstruction(setupMemoryRegister)
 }
 
-// TODO: document!
+// maybeGrowValueStack adds instructions to check the necessity to grow the value stack,
+// and if so, make the builtin function call to do so. These instructions are called in the function's
+// preamble.
 func (c *amd64Compiler) maybeGrowValueStack() error {
 	tmpRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
 
@@ -5414,6 +5417,7 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	subStackBasePointer.From.Offset = engineValueStackContextStackBasePointerOffset
 	c.addInstruction(subStackBasePointer)
 
+	// If stack base pointer + max stack poitner > valueStackLen, we need to grow the stack.
 	cmpWithMaxStackPointer := c.newProg()
 	cmpWithMaxStackPointer.As = x86.ACMPQ
 	cmpWithMaxStackPointer.From.Type = obj.TYPE_REG
@@ -5424,6 +5428,7 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	c.onMaxStackPointerDeterminedCallBack = func(maxStackPointer uint64) { cmpWithMaxStackPointer.To.Offset = int64(maxStackPointer) }
 	c.addInstruction(cmpWithMaxStackPointer)
 
+	// Jump if we have no need to grow.
 	jmpIfNoNeedToGrowStack := c.newProg()
 	jmpIfNoNeedToGrowStack.As = x86.AJCC
 	jmpIfNoNeedToGrowStack.To.Type = obj.TYPE_BRANCH
@@ -5440,21 +5445,25 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	return nil
 }
 
-// TODO: document!
-func (c *amd64Compiler) initializeModuleContext() {
+// initializeModuleContext adds instruction to initialize engine.ModuleContext's fields based on
+// engine.ModuleContext.ModuleInstanceAddress.
+// This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
+func (c *amd64Compiler) initializeModuleContext() error {
 	// TODO: we maybe better have flag to indicate if the module context has changed,
 	// and if the flag is not set, we could skip the entire instructions in below!
 
-	// We need to obtain the address of *wasm.MouleInstance for this function as prepration for
-	// setting moduleContext's global, memory, etc in updateModuleContext.
-	moduleInstanceAddressRegister, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(moduleInstanceAddressRegister)
-	tmpRegister, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(tmpRegister)
-	tmpRegister2, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.locationStack.markRegisterUsed(tmpRegister2)
+	// Obtain the temporary registers to be used in the followings.
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	if !found {
+		// This in theory never happen as all the registers must be free except addrReg.
+		return fmt.Errorf("could not find enough free registers")
+	}
+	c.locationStack.markRegisterUsed(regs...)
 
-	// Read the funcaddr from the callframe.
+	// Alias these free tmp registers for readability.
+	moduleInstanceAddressRegister, tmpRegister, tmpRegister2 := regs[0], regs[1], regs[2]
+
+	// Read the module instance's address.
 	readModuleInstanceAddress := c.newProg()
 	readModuleInstanceAddress.As = x86.AMOVQ
 	readModuleInstanceAddress.To.Type = obj.TYPE_REG
@@ -5703,8 +5712,9 @@ func (c *amd64Compiler) initializeModuleContext() {
 		c.addSetJmpOrigins(jmpDoneForNonNil)
 	}
 
-	c.locationStack.markRegisterUnused(moduleInstanceAddressRegister, tmpRegister, tmpRegister2)
+	c.locationStack.markRegisterUnused(regs...)
 	c.addSetJmpOrigins(jmpIfNilPointer)
+	return nil
 }
 
 // ensureOnGeneralPurposeRegister ensures that the given value is located on a

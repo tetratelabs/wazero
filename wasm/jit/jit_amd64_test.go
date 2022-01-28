@@ -419,7 +419,9 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			compiler.initializeReservedStackBasePointer()
 
 			require.Empty(t, compiler.locationStack.usedRegisters)
-			compiler.initializeModuleContext()
+			err := compiler.initializeModuleContext()
+			require.NoError(t, err)
+
 			require.Empty(t, compiler.locationStack.usedRegisters)
 
 			const expectedStatus = jitCallStatusCodeReturned
