@@ -17,6 +17,7 @@ type compiler interface {
 	// maxStackPointer is the max stack pointer that the target function would reach.
 	generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error)
 	// Emit the trampoline code from which native code can jump into the host function.
+	// TODO: maybe we wouldn't need to have trampoline for host functions.
 	compileHostFunction(address wasm.FunctionAddress) error
 	// Return true if the compiler decided to skip the entire label.
 	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)

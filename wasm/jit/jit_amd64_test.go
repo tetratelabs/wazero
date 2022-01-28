@@ -75,23 +75,23 @@ func (j *jitEnv) stack() []uint64 {
 }
 
 func (j *jitEnv) jitStatus() jitCallStatusCode {
-	return j.eng.statusCode
+	return j.eng.exitContext.statusCode
 }
 
 func (j *jitEnv) functionCallAddress() wasm.FunctionAddress {
-	return j.eng.functionCallAddress
+	return j.eng.exitContext.functionCallAddress
 }
 
 func (j *jitEnv) stackPointer() uint64 {
-	return j.eng.stackPointer
+	return j.eng.valueStackContext.stackPointer
 }
 
 func (j *jitEnv) stackBasePointer() uint64 {
-	return j.eng.stackBasePointer
+	return j.eng.valueStackContext.stackBasePointer
 }
 
 func (j *jitEnv) setStackPointer(sp uint64) {
-	j.eng.stackPointer = sp
+	j.eng.valueStackContext.stackPointer = sp
 }
 
 func (j *jitEnv) addGlobals(g ...*wasm.GlobalInstance) {
@@ -107,7 +107,7 @@ func (j *jitEnv) setTable(table []wasm.TableElement) {
 }
 
 func (j *jitEnv) callFrameStackPeek() *callFrame {
-	return &j.eng.callFrameStack[j.eng.callFrameStackPointer-1]
+	return &j.eng.callFrameStack[j.eng.globalContext.callFrameStackPointer-1]
 }
 
 func (j *jitEnv) callFrameStackPointer() uint64 {
@@ -148,7 +148,7 @@ func (j *jitEnv) execWithModule(code []byte, module *wasm.ModuleInstance) {
 			FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
 		},
 	}
-	j.eng.pushInitialFrame(compiledFunction)
+	j.eng.pushCallFrame(compiledFunction)
 
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
@@ -6055,7 +6055,7 @@ func TestAmd64Compiler_callNativeFunction(t *testing.T) {
 				env := newJITEnvironment()
 				engine := env.engine()
 
-				env.setCallFrameStackPointer(engine.callFrameStackLen - 1)
+				env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
 				compiler := requireNewCompiler(t)
 
 				require.Empty(t, compiler.locationStack.usedRegisters)
