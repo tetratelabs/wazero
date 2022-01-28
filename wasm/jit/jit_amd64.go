@@ -5124,7 +5124,7 @@ func (c *amd64Compiler) returnFunction() error {
 // jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
 // jitCallStatusCodeCallHostFunction.
 func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
-	// Set the functionAddress to the engine.exitContext.functionCallAddress.
+	// Set the functionAddress to the engine.exitContext functionCallAddress.
 	setFunctionCallAddress := c.newProg()
 	setFunctionCallAddress.As = x86.AMOVQ
 	setFunctionCallAddress.From.Type = obj.TYPE_CONST

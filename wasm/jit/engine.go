@@ -17,9 +17,10 @@ import (
 
 type (
 	engine struct {
-		// There contexts are read and written by JITed code.
+		// These contexts are read and written by JITed code.
 		// Note that we embed these structs so we can reduce the costs to access fields inside of them.
 		// Also, that eases the calculation of offsets to each field.
+
 		globalContext
 		moduleContext
 		valueStackContext
@@ -27,27 +28,27 @@ type (
 
 		// The following fields are NOT acceessed by JITed code directly.
 
-		// The actual Go-allocated stack for holding Wasm values.
-		// Note that we NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
+		// valueStack is the go-allocated stack for holding Wasm values.
+		// Note: We NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
 		valueStack []uint64
 
-		// Function call frames. The new one is set at callFrameStack[callFrameStackPoitner].
+		// callFrameStack is initially callFrameStack[callFrameStackPointer].
 		// The currently executed function call frame lives at callFrameStack[callFrameStackPoitner-1]
 		// and that is equivalent to  engine.callFrameTop().
 		callFrameStack []callFrame
 
-		// Store the compiled functions.
+		// compiledFunctions are the currently compiled functions.
 		// The index means wasm.FunctionAddress, but we intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by
 		// using compiledFunctionsFirstItemAddress.
 		compiledFunctions []*compiledFunction
 	}
 
-	// globalContext holds the data which stays same across multiple function calls.
+	// globalContext holds the data which is constant across multiple function calls.
 	globalContext struct {
 		// &engine.valueStack[0] as uintptr.
 		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
-		valueStackFirstItemAddress uintptr
+		valueStackElement0Address uintptr
 		// len(engine.valueStack[0]).
 		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
 		valueStackLen uint64

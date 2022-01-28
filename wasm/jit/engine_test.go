@@ -19,7 +19,6 @@ import (
 func TestVeifyOffsetValue(t *testing.T) {
 	var eng engine
 	// Offsets for engine.globalContext.
-	// var gc globalContext
 	require.Equal(t, int(unsafe.Offsetof(eng.valueStackFirstItemAddress)), engineGlobalContextValueStackFirstItemAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.valueStackLen)), engineGlobalContextValueStackLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackFirstItemAddress)), engineGlobalContextCallFrameStackFirstItemAddressOffset)
