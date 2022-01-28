@@ -216,6 +216,22 @@ func (c *amd64Compiler) generate() (code []byte, staticData compiledFunctionStat
 		}
 	}
 
+	if buildoptions.IsDebugMode || true {
+		var p bool
+		for key, l := range c.labels {
+			if len(l.labelBeginningCallbacks) > 0 {
+				// Meaning that some instruction is trying to jump to this label,
+				// but initialStack is not set. There must be a bug at the callsite of br or br_if.
+				fmt.Printf("labelBeginningCallbacks must be called for label %s\n", key)
+				p = true
+			}
+
+		}
+		if p {
+			panic("no")
+		}
+	}
+
 	staticData = c.staticData
 	return
 }
@@ -816,7 +832,6 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			// as this is the last code in this block.
 			locationStack = saved
 		}
-
 		c.replaceLocationStack(locationStack)
 		if err := c.emitDropRange(target.ToDrop); err != nil {
 			return err
@@ -880,11 +895,12 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 // Returns true if the label doesn't have any caller, and it is ok to skip the
 // entire operations in the given label.
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
-	if buildoptions.IsDebugMode {
-		if c.currentLabel != "" {
-			fmt.Printf("[label %s ends]\n\n", c.currentLabel)
-		}
+	// panic("not reached")
+	// if buildoptions.IsDebugMode {
+	if c.currentLabel != "" {
+		fmt.Printf("[label %s ends]\n\n", c.currentLabel)
 	}
+	// }
 
 	labelKey := o.Label.String()
 	labelInfo := c.label(labelKey)
@@ -893,13 +909,6 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	if labelInfo.initialStack == nil {
 		skipLabel = true
 		c.currentLabel = ""
-		if buildoptions.IsDebugMode {
-			if len(labelInfo.labelBeginningCallbacks) > 0 {
-				// Meaning that some instruction is trying to jump to this label,
-				// but initialStack is not set. There must be a bug at the callsite of br or br_if.
-				panic("labelBeginningCallbacks must be empty")
-			}
-		}
 		return
 	}
 
@@ -925,9 +934,9 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	// Clear for debuggin purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
 	labelInfo.labelBeginningCallbacks = nil
 
-	if buildoptions.IsDebugMode {
-		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
-	}
+	// if buildoptions.IsDebugMode {
+	fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
+	// }
 	c.currentLabel = labelKey
 	return
 }
@@ -4641,7 +4650,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		return err
 	}
 
-	// On return from the function call, we have to inialize the reserved registers.
+	// On the function return, we have to initialize the state.
 	c.initializationAfterNonNativeFunctionCall()
 
 	// For call_indirect, we need to push the value back to the register.

@@ -5,6 +5,7 @@ package jit
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -449,6 +450,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
+	// t.Skip()
 	requireRunAndExpectedValueReturned := func(t *testing.T, c *amd64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 10; returnValue++ {
@@ -464,6 +466,8 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		// Generate the code under test.
 		code, _, _, err := c.generate()
 		require.NoError(t, err)
+
+		fmt.Println(hex.EncodeToString(code))
 
 		// Run codes
 		env := newJITEnvironment()
@@ -494,18 +498,18 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 					o             *wazeroir.OperationBrTable
 					expectedValue uint32
 				}{
-					{
-						name:          "only default with index 0",
-						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
-						index:         0,
-						expectedValue: 6,
-					},
-					{
-						name:          "only default with index 100",
-						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
-						index:         100,
-						expectedValue: 6,
-					},
+					// {
+					// 	name:          "only default with index 0",
+					// 	o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+					// 	index:         0,
+					// 	expectedValue: 6,
+					// },
+					// {
+					// 	name:          "only default with index 100",
+					// 	o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+					// 	index:         100,
+					// 	expectedValue: 6,
+					// },
 					{
 						name: "select default with targets and good index",
 						o: &wazeroir.OperationBrTable{
