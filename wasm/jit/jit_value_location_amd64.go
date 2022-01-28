@@ -22,6 +22,7 @@ const (
 	reservedRegisterForMemory = x86.REG_R15
 )
 
+// nilRegister is used to indicate a register argument a variable is invalid and not an actual register.
 const nilRegister int16 = -1
 
 var (
