@@ -2485,14 +2485,14 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 				// Setup values.
-				if tc.x1Reg != -1 {
+				if tc.x1Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
 					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
 				} else {
 					loc := compiler.locationStack.pushValueOnStack()
 					env.stack()[loc.stackPointer] = uint64(x1Value)
 				}
-				if tc.x2Reg != -1 {
+				if tc.x2Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
 					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
 				} else {
@@ -2535,8 +2535,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 	})
 	t.Run("int64", func(t *testing.T) {
 		for _, tc := range []struct {
-			name string
-			// Interpret -1 as stack.
+			name         string
 			x1Reg, x2Reg int16
 		}{
 			{
@@ -2547,7 +2546,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			{
 				name:  "x1:ax,x2:stack",
 				x1Reg: x86.REG_AX,
-				x2Reg: -1,
+				x2Reg: nilRegister,
 			},
 			{
 				name:  "x1:random_reg,x2:ax",
@@ -2556,7 +2555,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			},
 			{
 				name:  "x1:stack,x2:ax",
-				x1Reg: -1,
+				x1Reg: nilRegister,
 				x2Reg: x86.REG_AX,
 			},
 			{
@@ -2566,18 +2565,18 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			},
 			{
 				name:  "x1:stack,x2:random_reg",
-				x1Reg: -1,
+				x1Reg: nilRegister,
 				x2Reg: x86.REG_R9,
 			},
 			{
 				name:  "x1:random_reg,x2:stack",
 				x1Reg: x86.REG_R9,
-				x2Reg: -1,
+				x2Reg: nilRegister,
 			},
 			{
 				name:  "x1:stack,x2:stack",
-				x1Reg: -1,
-				x2Reg: -1,
+				x1Reg: nilRegister,
+				x2Reg: nilRegister,
 			},
 		} {
 			tc := tc
@@ -2598,14 +2597,14 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 				// Setup values.
-				if tc.x1Reg != -1 {
+				if tc.x1Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
 					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
 				} else {
 					loc := compiler.locationStack.pushValueOnStack()
 					env.stack()[loc.stackPointer] = uint64(x1Value)
 				}
-				if tc.x2Reg != -1 {
+				if tc.x2Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
 					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
 				} else {
@@ -3065,8 +3064,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			for _, locations := range []struct {
-				name string
-				// Interpret -1 as stack.
+				name         string
 				x1Reg, x2Reg int16
 			}{
 				{
@@ -3077,7 +3075,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 				{
 					name:  "x1:cx,x2:stack",
 					x1Reg: x86.REG_CX,
-					x2Reg: -1,
+					x2Reg: nilRegister,
 				},
 				{
 					name:  "x1:random_reg,x2:cx",
@@ -3086,7 +3084,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 				},
 				{
 					name:  "x1:staack,x2:cx",
-					x1Reg: -1,
+					x1Reg: nilRegister,
 					x2Reg: x86.REG_CX,
 				},
 				{
@@ -3096,18 +3094,18 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 				},
 				{
 					name:  "x1:stack,x2:random_reg",
-					x1Reg: -1,
+					x1Reg: nilRegister,
 					x2Reg: x86.REG_R9,
 				},
 				{
 					name:  "x1:random_reg,x2:stack",
 					x1Reg: x86.REG_R9,
-					x2Reg: -1,
+					x2Reg: nilRegister,
 				},
 				{
 					name:  "x1:stack,x2:stack",
-					x1Reg: -1,
-					x2Reg: -1,
+					x1Reg: nilRegister,
+					x2Reg: nilRegister,
 				},
 			} {
 				locations := locations
@@ -3223,14 +3221,14 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 							env := newJITEnvironment()
 
 							// Setup the target values.
-							if locations.x1Reg != -1 {
+							if locations.x1Reg != nilRegister {
 								compiler.movIntConstToRegister(int64(vs.x1), locations.x1Reg)
 								compiler.locationStack.pushValueOnRegister(locations.x1Reg)
 							} else {
 								loc := compiler.locationStack.pushValueOnStack()
 								env.stack()[loc.stackPointer] = uint64(vs.x1)
 							}
-							if locations.x2Reg != -1 {
+							if locations.x2Reg != nilRegister {
 								compiler.movIntConstToRegister(int64(vs.x2), locations.x2Reg)
 								compiler.locationStack.pushValueOnRegister(locations.x2Reg)
 							} else {
@@ -3246,7 +3244,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 							case wazeroir.OperationKindShl, wazeroir.OperationKindShr,
 								wazeroir.OperationKindRotl, wazeroir.OperationKindRotr:
 								require.NotContains(t, compiler.locationStack.usedRegisters, x86.REG_CX)
-								if locations.x1Reg == x86.REG_CX || locations.x1Reg == -1 {
+								if locations.x1Reg == x86.REG_CX || locations.x1Reg == nilRegister {
 									require.True(t, compiler.locationStack.peek().onStack())
 									require.Len(t, compiler.locationStack.usedRegisters, 0)
 								} else {
@@ -3290,8 +3288,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			signed := signed
 			t.Run(signed.name, func(t *testing.T) {
 				for _, tc := range []struct {
-					name string
-					// Interpret -1 as stack.
+					name         string
 					x1Reg, x2Reg int16
 				}{
 					{
@@ -3302,7 +3299,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					{
 						name:  "x1:ax,x2:stack",
 						x1Reg: x86.REG_AX,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
@@ -3311,7 +3308,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					},
 					{
 						name:  "x1:staack,x2:ax",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
 					{
@@ -3321,18 +3318,18 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
 						x1Reg: x86.REG_R9,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: -1,
-						x2Reg: -1,
+						x1Reg: nilRegister,
+						x2Reg: nilRegister,
 					},
 				} {
 					tc := tc
@@ -3366,14 +3363,14 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 								// Setup values.
-								if tc.x1Reg != -1 {
+								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
 								} else {
 									loc := compiler.locationStack.pushValueOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
-								if tc.x2Reg != -1 {
+								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
 								} else {
@@ -3448,8 +3445,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			signed := signed
 			t.Run(signed.name, func(t *testing.T) {
 				for _, tc := range []struct {
-					name string
-					// Interpret -1 as stack.
+					name         string
 					x1Reg, x2Reg int16
 				}{
 					{
@@ -3460,7 +3456,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					{
 						name:  "x1:ax,x2:stack",
 						x1Reg: x86.REG_AX,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
@@ -3469,7 +3465,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					},
 					{
 						name:  "x1:staack,x2:ax",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
 					{
@@ -3479,18 +3475,18 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
 						x1Reg: x86.REG_R9,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: -1,
-						x2Reg: -1,
+						x1Reg: nilRegister,
+						x2Reg: nilRegister,
 					},
 				} {
 					tc := tc
@@ -3524,14 +3520,14 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 								// Setup values.
-								if tc.x1Reg != -1 {
+								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
 								} else {
 									loc := compiler.locationStack.pushValueOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
-								if tc.x2Reg != -1 {
+								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
 								} else {
@@ -3751,8 +3747,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 			signed := signed
 			t.Run(signed.name, func(t *testing.T) {
 				for _, tc := range []struct {
-					name string
-					// Interpret -1 as stack.
+					name         string
 					x1Reg, x2Reg int16
 				}{
 					{
@@ -3763,7 +3758,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 					{
 						name:  "x1:ax,x2:stack",
 						x1Reg: x86.REG_AX,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
@@ -3772,7 +3767,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 					},
 					{
 						name:  "x1:staack,x2:ax",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
 					{
@@ -3782,18 +3777,18 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
 						x1Reg: x86.REG_R9,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: -1,
-						x2Reg: -1,
+						x1Reg: nilRegister,
+						x2Reg: nilRegister,
 					},
 				} {
 					tc := tc
@@ -3828,14 +3823,14 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 								// Setup values.
-								if tc.x1Reg != -1 {
+								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
 								} else {
 									loc := compiler.locationStack.pushValueOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
-								if tc.x2Reg != -1 {
+								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
 								} else {
@@ -3907,8 +3902,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 			signed := signed
 			t.Run(signed.name, func(t *testing.T) {
 				for _, tc := range []struct {
-					name string
-					// Interpret -1 as stack.
+					name         string
 					x1Reg, x2Reg int16
 				}{
 					{
@@ -3919,7 +3913,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 					{
 						name:  "x1:ax,x2:stack",
 						x1Reg: x86.REG_AX,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
@@ -3928,7 +3922,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 					},
 					{
 						name:  "x1:staack,x2:ax",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
 					{
@@ -3938,18 +3932,18 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
 						x1Reg: x86.REG_R9,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: -1,
-						x2Reg: -1,
+						x1Reg: nilRegister,
+						x2Reg: nilRegister,
 					},
 				} {
 					tc := tc
@@ -3985,14 +3979,14 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
 
 								// Setup values.
-								if tc.x1Reg != -1 {
+								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
 								} else {
 									loc := compiler.locationStack.pushValueOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
-								if tc.x2Reg != -1 {
+								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
 									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
 								} else {

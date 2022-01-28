@@ -22,6 +22,8 @@ const (
 	reservedRegisterForMemory = x86.REG_R15
 )
 
+const nilRegister int16 = -1
+
 var (
 	generalPurposeFloatRegisters = []int16{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
@@ -49,6 +51,10 @@ func isFloatRegister(r int16) bool {
 	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
 }
 
+func isNilRegister(r int16) bool {
+	return r == nilRegister
+}
+
 type conditionalRegisterState byte
 
 const (
@@ -72,12 +78,12 @@ const (
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
 	regType generalPurposeRegisterType
-	// Set to -1 if the value is stored in the memory stack.
+	// Set to nilRegister if the value is stored in the memory stack.
 	register int16
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
 	conditionalRegister conditionalRegisterState
 	// This is the location of this value in the (virtual) stack,
-	// even though if .register != -1, the value is not written into memory yet.
+	// even though if .register != nilRegister, the value is not written into memory yet.
 	stackPointer uint64
 }
 
@@ -95,11 +101,11 @@ func (v *valueLocation) setRegister(reg int16) {
 }
 
 func (v *valueLocation) onRegister() bool {
-	return v.register != -1 && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register != nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onStack() bool {
-	return v.register == -1 && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register == nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onConditionalRegister() bool {
@@ -189,13 +195,13 @@ func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation)
 }
 
 func (s *valueLocationStack) pushValueOnStack() (loc *valueLocation) {
-	loc = &valueLocation{register: -1, conditionalRegister: conditionalRegisterStateUnset}
+	loc = &valueLocation{register: nilRegister, conditionalRegister: conditionalRegisterStateUnset}
 	s.push(loc)
 	return
 }
 
 func (s *valueLocationStack) pushValueOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
-	loc = &valueLocation{register: -1, conditionalRegister: state}
+	loc = &valueLocation{register: nilRegister, conditionalRegister: state}
 	s.push(loc)
 	return
 }
@@ -228,7 +234,7 @@ func (s *valueLocationStack) peek() (loc *valueLocation) {
 
 func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	s.markRegisterUnused(loc.register)
-	loc.register = -1
+	loc.register = nilRegister
 	loc.conditionalRegister = conditionalRegisterStateUnset
 }
 

@@ -585,7 +585,7 @@ func (e *engine) pushCallFrame(f *compiledFunction) {
 	//                 |     |
 	// [...., A, B, C, D, E, _, _ ]
 	//
-	// That maens the next stack base poitner is calculated as follows:
+	// That maens the next stack base poitner is calculated as follows (note stack pointer is relative to base):
 	e.valueStackContext.stackBasePointer =
 		e.valueStackContext.stackBasePointer + e.valueStackContext.stackPointer - uint64(len(f.source.FunctionType.Type.Params))
 }
