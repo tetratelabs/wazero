@@ -460,18 +460,18 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			engine := env.engine()
 
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
-			require.Equal(t, bufSliceHeader.Data, engine.moduleContext.globalFirstItemAddress)
+			require.Equal(t, bufSliceHeader.Data, engine.moduleContext.globalElement0Address)
 
 			if tc.moduleInstance.Memory != nil {
 				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
 				require.Equal(t, uint64(bufSliceHeader.Len), engine.moduleContext.memorySliceLen)
-				require.Equal(t, bufSliceHeader.Data, engine.moduleContext.memoryFirstItemAddress)
+				require.Equal(t, bufSliceHeader.Data, engine.moduleContext.memoryElement0Address)
 			}
 
 			if len(tc.moduleInstance.Tables) > 0 {
 				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
 				require.Equal(t, uint64(tableHeader.Len), engine.moduleContext.tableSliceLen)
-				require.Equal(t, tableHeader.Data, engine.moduleContext.tableFirstItemAddress)
+				require.Equal(t, tableHeader.Data, engine.moduleContext.tableElement0Address)
 			}
 		})
 	}

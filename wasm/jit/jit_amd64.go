@@ -393,7 +393,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
 	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
-	moveGlobalSlicePointer.From.Offset = engineModuleContextGlobalFirstItemAddressOffset
+	moveGlobalSlicePointer.From.Offset = engineModuleContextGlobalElement0AddressOffset
 	c.addInstruction(moveGlobalSlicePointer)
 
 	// Then, get the memory location of the target global instance's pointer.
@@ -466,7 +466,7 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
 	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
-	moveGlobalSlicePointer.From.Offset = engineModuleContextGlobalFirstItemAddressOffset
+	moveGlobalSlicePointer.From.Offset = engineModuleContextGlobalElement0AddressOffset
 	c.addInstruction(moveGlobalSlicePointer)
 
 	// Then, get the memory location of the target global instance's pointer.
@@ -1034,7 +1034,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.To.Reg = offset.register
 	movTableSliceAddress.From.Type = obj.TYPE_MEM
 	movTableSliceAddress.From.Reg = reservedRegisterForEngine
-	movTableSliceAddress.From.Offset = engineModuleContextTableFirstItemAddressOffset
+	movTableSliceAddress.From.Offset = engineModuleContextTableElement0AddressOffset
 	c.addInstruction(movTableSliceAddress)
 
 	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset]
@@ -4677,15 +4677,15 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 
 	// Now that callframe stack is enough length, we are ready to create a new call frame
 	// for the function call we are about to make.
-	getCallFrameStackFirstItemAddress := c.newProg()
-	jmpIfNotCallFrameStackNeedsGrow.To.SetTarget(getCallFrameStackFirstItemAddress)
-	getCallFrameStackFirstItemAddress.As = x86.AMOVQ
-	getCallFrameStackFirstItemAddress.To.Type = obj.TYPE_REG
-	getCallFrameStackFirstItemAddress.To.Reg = tmpRegister
-	getCallFrameStackFirstItemAddress.From.Type = obj.TYPE_MEM
-	getCallFrameStackFirstItemAddress.From.Reg = reservedRegisterForEngine
-	getCallFrameStackFirstItemAddress.From.Offset = engineGlobalContextCallFrameStackFirstItemAddressOffset
-	c.addInstruction(getCallFrameStackFirstItemAddress)
+	getCallFrameStackElement0Address := c.newProg()
+	jmpIfNotCallFrameStackNeedsGrow.To.SetTarget(getCallFrameStackElement0Address)
+	getCallFrameStackElement0Address.As = x86.AMOVQ
+	getCallFrameStackElement0Address.To.Type = obj.TYPE_REG
+	getCallFrameStackElement0Address.To.Reg = tmpRegister
+	getCallFrameStackElement0Address.From.Type = obj.TYPE_MEM
+	getCallFrameStackElement0Address.From.Reg = reservedRegisterForEngine
+	getCallFrameStackElement0Address.From.Offset = engineGlobalContextCallFrameStackElement0AddressOffset
+	c.addInstruction(getCallFrameStackElement0Address)
 
 	// Since call frame stack pointer is the index for engine.callFrameStack slice,
 	// here we get the actual offset in bytes via shifting callFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
@@ -4792,14 +4792,14 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		//
 		// First, we read the addess of the first item of engine.compiledFunctions slice (= &engine.compiledFunctions[0])
 		// into tmpRegister.
-		readCopmiledFunctionsFirstItemAddress := c.newProg()
-		readCopmiledFunctionsFirstItemAddress.As = x86.AMOVQ
-		readCopmiledFunctionsFirstItemAddress.To.Type = obj.TYPE_REG
-		readCopmiledFunctionsFirstItemAddress.To.Reg = tmpRegister
-		readCopmiledFunctionsFirstItemAddress.From.Type = obj.TYPE_MEM
-		readCopmiledFunctionsFirstItemAddress.From.Reg = reservedRegisterForEngine
-		readCopmiledFunctionsFirstItemAddress.From.Offset = engineGlobalContextCompiledFunctionsFirstItemAddressOffset
-		c.addInstruction(readCopmiledFunctionsFirstItemAddress)
+		readCopmiledFunctionsElement0Address := c.newProg()
+		readCopmiledFunctionsElement0Address.As = x86.AMOVQ
+		readCopmiledFunctionsElement0Address.To.Type = obj.TYPE_REG
+		readCopmiledFunctionsElement0Address.To.Reg = tmpRegister
+		readCopmiledFunctionsElement0Address.From.Type = obj.TYPE_MEM
+		readCopmiledFunctionsElement0Address.From.Reg = reservedRegisterForEngine
+		readCopmiledFunctionsElement0Address.From.Offset = engineGlobalContextCompiledFunctionsElement0AddressOffset
+		c.addInstruction(readCopmiledFunctionsElement0Address)
 
 		// Next, read the address of the target function (= &engine.compiledFunctions[offset])
 		// into compiledFunctionAddressRegister.
@@ -4998,14 +4998,14 @@ func (c *amd64Compiler) returnFunction() error {
 	shiftStackPointer.From.Offset = int64(callFrameDataSizeMostSignificantSetBit)
 	c.addInstruction(shiftStackPointer)
 
-	getCallFrameStackFirstItemAddress := c.newProg()
-	getCallFrameStackFirstItemAddress.As = x86.AMOVQ
-	getCallFrameStackFirstItemAddress.To.Type = obj.TYPE_REG
-	getCallFrameStackFirstItemAddress.To.Reg = tmpRegister
-	getCallFrameStackFirstItemAddress.From.Type = obj.TYPE_MEM
-	getCallFrameStackFirstItemAddress.From.Reg = reservedRegisterForEngine
-	getCallFrameStackFirstItemAddress.From.Offset = engineGlobalContextCallFrameStackFirstItemAddressOffset
-	c.addInstruction(getCallFrameStackFirstItemAddress)
+	getCallFrameStackElement0Address := c.newProg()
+	getCallFrameStackElement0Address.As = x86.AMOVQ
+	getCallFrameStackElement0Address.To.Type = obj.TYPE_REG
+	getCallFrameStackElement0Address.To.Reg = tmpRegister
+	getCallFrameStackElement0Address.From.Type = obj.TYPE_MEM
+	getCallFrameStackElement0Address.From.Reg = reservedRegisterForEngine
+	getCallFrameStackElement0Address.From.Offset = engineGlobalContextCallFrameStackElement0AddressOffset
+	c.addInstruction(getCallFrameStackElement0Address)
 
 	calcCallFrameTopAddress := c.newProg()
 	calcCallFrameTopAddress.As = x86.ALEAQ
@@ -5175,7 +5175,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	getCallFrameStackAddress.To.Reg = ripRegister // We temporarily use ripRegister register.
 	getCallFrameStackAddress.From.Type = obj.TYPE_MEM
 	getCallFrameStackAddress.From.Reg = reservedRegisterForEngine
-	getCallFrameStackAddress.From.Offset = engineGlobalContextCallFrameStackFirstItemAddressOffset
+	getCallFrameStackAddress.From.Offset = engineGlobalContextCallFrameStackElement0AddressOffset
 	c.addInstruction(getCallFrameStackAddress)
 
 	// Now we can get the current call frame's address, which is equivalent to get &engine.callFrameStack[engine.callStackFramePointer-1].returnAddress.
@@ -5344,7 +5344,7 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 	getValueStackAddress.As = x86.AMOVQ
 	getValueStackAddress.From.Type = obj.TYPE_MEM
 	getValueStackAddress.From.Reg = reservedRegisterForEngine
-	getValueStackAddress.From.Offset = engineGlobalContextValueStackFirstItemAddressOffset
+	getValueStackAddress.From.Offset = engineGlobalContextValueStackElement0AddressOffset
 	getValueStackAddress.To.Type = obj.TYPE_REG
 	getValueStackAddress.To.Reg = reservedRegisterForStackBasePointerAddress
 	c.addInstruction(getValueStackAddress)
@@ -5389,7 +5389,7 @@ func (c *amd64Compiler) initializeReservedMemoryPointer() {
 	setupMemoryRegister.To.Reg = reservedRegisterForMemory
 	setupMemoryRegister.From.Type = obj.TYPE_MEM
 	setupMemoryRegister.From.Reg = reservedRegisterForEngine
-	setupMemoryRegister.From.Offset = engineModuleContextMemoryFirstItemAddressOffset
+	setupMemoryRegister.From.Offset = engineModuleContextMemoryElement0AddressOffset
 	c.addInstruction(setupMemoryRegister)
 }
 
@@ -5489,37 +5489,37 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	c.addInstruction(jmpIfNilPointer)
 
 	// Otherwise, we have to update the following fields:
-	// * engine.moduleContext.globalFirstItemAddress
-	// * engine.moduleContext.tableFirstItemAddress
+	// * engine.moduleContext.globalElement0Address
+	// * engine.moduleContext.tableElement0Address
 	// * engine.moduleContext.tableSliceLen
-	// * engine.moduleContext.memoryFirstItemAddress
+	// * engine.moduleContext.memoryElement0Address
 	// * engine.moduleContext.memorySliceLen
 
-	// Update globalFirstItemAddress.
+	// Update globalElement0Address.
 	{
 		// Since ModuleInstance.Globals is []*globalInstance, internally
 		// the address of the first item in the underlying array lies exactly on the globals offset.
 		// See https://go.dev/blog/slices-intro if unfamiliar.
-		readGlobalFirstItemAddress := c.newProg()
-		readGlobalFirstItemAddress.As = x86.AMOVQ
-		readGlobalFirstItemAddress.To.Type = obj.TYPE_REG
-		readGlobalFirstItemAddress.To.Reg = tmpRegister
-		readGlobalFirstItemAddress.From.Type = obj.TYPE_MEM
-		readGlobalFirstItemAddress.From.Reg = moduleInstanceAddressRegister
-		readGlobalFirstItemAddress.From.Offset = moduleInstanceGlobalsOffset
-		c.addInstruction(readGlobalFirstItemAddress)
+		readGlobalElement0Address := c.newProg()
+		readGlobalElement0Address.As = x86.AMOVQ
+		readGlobalElement0Address.To.Type = obj.TYPE_REG
+		readGlobalElement0Address.To.Reg = tmpRegister
+		readGlobalElement0Address.From.Type = obj.TYPE_MEM
+		readGlobalElement0Address.From.Reg = moduleInstanceAddressRegister
+		readGlobalElement0Address.From.Offset = moduleInstanceGlobalsOffset
+		c.addInstruction(readGlobalElement0Address)
 
-		putGlobalFirstItemAddress := c.newProg()
-		putGlobalFirstItemAddress.As = x86.AMOVQ
-		putGlobalFirstItemAddress.To.Type = obj.TYPE_MEM
-		putGlobalFirstItemAddress.To.Reg = reservedRegisterForEngine
-		putGlobalFirstItemAddress.To.Offset = engineModuleContextGlobalFirstItemAddressOffset
-		putGlobalFirstItemAddress.From.Type = obj.TYPE_REG
-		putGlobalFirstItemAddress.From.Reg = tmpRegister
-		c.addInstruction(putGlobalFirstItemAddress)
+		putGlobalElement0Address := c.newProg()
+		putGlobalElement0Address.As = x86.AMOVQ
+		putGlobalElement0Address.To.Type = obj.TYPE_MEM
+		putGlobalElement0Address.To.Reg = reservedRegisterForEngine
+		putGlobalElement0Address.To.Offset = engineModuleContextGlobalElement0AddressOffset
+		putGlobalElement0Address.From.Type = obj.TYPE_REG
+		putGlobalElement0Address.From.Reg = tmpRegister
+		c.addInstruction(putGlobalElement0Address)
 	}
 
-	// Update tableFirstItemAddress and tableSliceLen.
+	// Update tableElement0Address and tableSliceLen.
 	{
 		getTablesCount := c.newProg()
 		getTablesCount.As = x86.AMOVQ
@@ -5541,14 +5541,14 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		c.addInstruction(checkIfTableExist)
 
 		// Skip the updates on table related fields if the length of ModuleInstance.Tables equals 0.
-		// TODO: better zeros tableFirstItemAddress and tableSliceLen in the non-exist case as
+		// TODO: better zeros tableElement0Address and tableSliceLen in the non-exist case as
 		// they might be security holes.
 		jmpIfTableNotExist := c.newProg()
 		jmpIfTableNotExist.As = x86.AJEQ
 		jmpIfTableNotExist.To.Type = obj.TYPE_BRANCH
 		c.addInstruction(jmpIfTableNotExist)
 
-		// Otherwise, we update tableFirstItemAddress and tableSliceLen.
+		// Otherwise, we update tableElement0Address and tableSliceLen.
 		// First, we need to read the *wasm.TableInstance.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
@@ -5570,23 +5570,23 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		// At this point, tmpRegister holds the address of ModuleIntance.Tables[0].
 		// So we are ready to read and put the first item's address stored in Tables[0].Table.
 		// Here we read the value into tmpRegister2.
-		readTableFirstItemAddress := c.newProg()
-		readTableFirstItemAddress.As = x86.AMOVQ // Note this is LEA instruction.
-		readTableFirstItemAddress.To.Type = obj.TYPE_REG
-		readTableFirstItemAddress.To.Reg = tmpRegister2
-		readTableFirstItemAddress.From.Type = obj.TYPE_MEM
-		readTableFirstItemAddress.From.Reg = tmpRegister
-		readTableFirstItemAddress.From.Offset = tableInstanceTableOffset
-		c.addInstruction(readTableFirstItemAddress)
+		readTableElement0Address := c.newProg()
+		readTableElement0Address.As = x86.AMOVQ // Note this is LEA instruction.
+		readTableElement0Address.To.Type = obj.TYPE_REG
+		readTableElement0Address.To.Reg = tmpRegister2
+		readTableElement0Address.From.Type = obj.TYPE_MEM
+		readTableElement0Address.From.Reg = tmpRegister
+		readTableElement0Address.From.Offset = tableInstanceTableOffset
+		c.addInstruction(readTableElement0Address)
 
-		putTableFirstItemAddress := c.newProg()
-		putTableFirstItemAddress.As = x86.AMOVQ
-		putTableFirstItemAddress.To.Type = obj.TYPE_MEM
-		putTableFirstItemAddress.To.Reg = reservedRegisterForEngine
-		putTableFirstItemAddress.To.Offset = engineModuleContextTableFirstItemAddressOffset
-		putTableFirstItemAddress.From.Type = obj.TYPE_REG
-		putTableFirstItemAddress.From.Reg = tmpRegister2
-		c.addInstruction(putTableFirstItemAddress)
+		putTableElement0Address := c.newProg()
+		putTableElement0Address.As = x86.AMOVQ
+		putTableElement0Address.To.Type = obj.TYPE_MEM
+		putTableElement0Address.To.Reg = reservedRegisterForEngine
+		putTableElement0Address.To.Offset = engineModuleContextTableElement0AddressOffset
+		putTableElement0Address.From.Type = obj.TYPE_REG
+		putTableElement0Address.From.Reg = tmpRegister2
+		c.addInstruction(putTableElement0Address)
 
 		// Finally, read the length of table and update tableSliceLen accordingly.
 		readTableLength := c.newProg()
@@ -5613,7 +5613,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		c.addSetJmpOrigins(jmpIfTableNotExist)
 	}
 
-	// Update memoryFirstItemAddress and memorySliceLen.
+	// Update memoryElement0Address and memorySliceLen.
 	{
 		getMemoryInstanceAddress := c.newProg()
 		getMemoryInstanceAddress.As = x86.AMOVQ
@@ -5659,23 +5659,23 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putMemoryLength.From.Reg = tmpRegister2
 		c.addInstruction(putMemoryLength)
 
-		readMemoryFirstItemAddress := c.newProg()
-		readMemoryFirstItemAddress.As = x86.AMOVQ
-		readMemoryFirstItemAddress.To.Type = obj.TYPE_REG
-		readMemoryFirstItemAddress.To.Reg = tmpRegister2
-		readMemoryFirstItemAddress.From.Type = obj.TYPE_MEM
-		readMemoryFirstItemAddress.From.Reg = tmpRegister
-		readMemoryFirstItemAddress.From.Offset = memoryInstanceBufferOffset
-		c.addInstruction(readMemoryFirstItemAddress)
+		readMemoryElement0Address := c.newProg()
+		readMemoryElement0Address.As = x86.AMOVQ
+		readMemoryElement0Address.To.Type = obj.TYPE_REG
+		readMemoryElement0Address.To.Reg = tmpRegister2
+		readMemoryElement0Address.From.Type = obj.TYPE_MEM
+		readMemoryElement0Address.From.Reg = tmpRegister
+		readMemoryElement0Address.From.Offset = memoryInstanceBufferOffset
+		c.addInstruction(readMemoryElement0Address)
 
-		putMemoryFirstItemAddress := c.newProg()
-		putMemoryFirstItemAddress.As = x86.AMOVQ
-		putMemoryFirstItemAddress.To.Type = obj.TYPE_MEM
-		putMemoryFirstItemAddress.To.Reg = reservedRegisterForEngine
-		putMemoryFirstItemAddress.To.Offset = engineModuleContextMemoryFirstItemAddressOffset
-		putMemoryFirstItemAddress.From.Type = obj.TYPE_REG
-		putMemoryFirstItemAddress.From.Reg = tmpRegister2
-		c.addInstruction(putMemoryFirstItemAddress)
+		putMemoryElement0Address := c.newProg()
+		putMemoryElement0Address.As = x86.AMOVQ
+		putMemoryElement0Address.To.Type = obj.TYPE_MEM
+		putMemoryElement0Address.To.Reg = reservedRegisterForEngine
+		putMemoryElement0Address.To.Offset = engineModuleContextMemoryElement0AddressOffset
+		putMemoryElement0Address.From.Type = obj.TYPE_REG
+		putMemoryElement0Address.From.Reg = tmpRegister2
+		c.addInstruction(putMemoryElement0Address)
 
 		jmpDoneForNonNil := c.newProg()
 		jmpDoneForNonNil.As = obj.AJMP
@@ -5691,14 +5691,14 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		zerosTmpRegister.From.Reg = tmpRegister2
 		c.addInstruction(zerosTmpRegister)
 
-		putZeroIntoFirstItemAddress := c.newProg()
-		putZeroIntoFirstItemAddress.As = x86.AMOVQ
-		putZeroIntoFirstItemAddress.To.Type = obj.TYPE_MEM
-		putZeroIntoFirstItemAddress.To.Reg = reservedRegisterForEngine
-		putZeroIntoFirstItemAddress.To.Offset = engineModuleContextMemoryFirstItemAddressOffset
-		putZeroIntoFirstItemAddress.From.Type = obj.TYPE_REG
-		putZeroIntoFirstItemAddress.From.Reg = tmpRegister2
-		c.addInstruction(putZeroIntoFirstItemAddress)
+		putZeroIntoElement0Address := c.newProg()
+		putZeroIntoElement0Address.As = x86.AMOVQ
+		putZeroIntoElement0Address.To.Type = obj.TYPE_MEM
+		putZeroIntoElement0Address.To.Reg = reservedRegisterForEngine
+		putZeroIntoElement0Address.To.Offset = engineModuleContextMemoryElement0AddressOffset
+		putZeroIntoElement0Address.From.Type = obj.TYPE_REG
+		putZeroIntoElement0Address.From.Reg = tmpRegister2
+		c.addInstruction(putZeroIntoElement0Address)
 
 		putZeroIntoMemoryLen := c.newProg()
 		putZeroIntoMemoryLen.As = x86.AMOVQ

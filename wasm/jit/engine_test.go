@@ -19,20 +19,20 @@ import (
 func TestVeifyOffsetValue(t *testing.T) {
 	var eng engine
 	// Offsets for engine.globalContext.
-	require.Equal(t, int(unsafe.Offsetof(eng.valueStackFirstItemAddress)), engineGlobalContextValueStackFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.valueStackElement0Address)), engineGlobalContextValueStackElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.valueStackLen)), engineGlobalContextValueStackLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackFirstItemAddress)), engineGlobalContextCallFrameStackFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackElementZeroAddress)), engineGlobalContextCallFrameStackElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackLen)), engineGlobalContextCallFrameStackLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackPointer)), engineGlobalContextCallFrameStackPointerOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.previousCallFrameStackPointer)), engineGlobalContextPreviouscallFrameStackPointer)
-	require.Equal(t, int(unsafe.Offsetof(eng.compiledFunctionsFirstItemAddress)), engineGlobalContextCompiledFunctionsFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.compiledFunctionsElement0Address)), engineGlobalContextCompiledFunctionsElement0AddressOffset)
 
 	// Offsets for engine.moduleContext.
 	require.Equal(t, int(unsafe.Offsetof(eng.moduleInstanceAddress)), engineModuleContextModuleInstanceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.globalFirstItemAddress)), engineModuleContextGlobalFirstItemAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.memoryFirstItemAddress)), engineModuleContextMemoryFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.globalElement0Address)), engineModuleContextGlobalElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.memoryElement0Address)), engineModuleContextMemoryElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.memorySliceLen)), engineModuleContextMemorySliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.tableFirstItemAddress)), engineModuleContextTableFirstItemAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.tableElement0Address)), engineModuleContextTableElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.tableSliceLen)), engineModuleContextTableSliceLenOffset)
 
 	// Offsets for engine.valueStackContext

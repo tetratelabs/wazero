@@ -40,7 +40,7 @@ type (
 		// compiledFunctions are the currently compiled functions.
 		// The index means wasm.FunctionAddress, but we intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by
-		// using compiledFunctionsFirstItemAddress.
+		// using compiledFunctionsElement0Address.
 		compiledFunctions []*compiledFunction
 	}
 
@@ -55,7 +55,7 @@ type (
 
 		// &engine.callFrameStack[0] as uintptr.
 		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
-		callFrameStackFirstItemAddress uintptr
+		callFrameStackElementZeroAddress uintptr
 		// len(engine.callFrameStack).
 		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
 		callFrameStackLen uint64
@@ -72,7 +72,7 @@ type (
 
 		// &engine.compiledFunctions[0] as uintptr.
 		// Note: this is updated when growing the slice in addCompileFunction.
-		compiledFunctionsFirstItemAddress uintptr
+		compiledFunctionsElement0Address uintptr
 	}
 
 	// moduleContext holds the per-function call specific module information.
@@ -85,13 +85,13 @@ type (
 		moduleInstanceAddress uintptr
 
 		// The address of the first item in the globa slice, i.e. &ModuleInstance.Globals[0] as uintptr.
-		globalFirstItemAddress uintptr
+		globalElement0Address uintptr
 		// The address of the first item in the globa slice, i.e. &ModuleInstance.Memory.Buffer[0] as uintptr.
-		memoryFirstItemAddress uintptr
+		memoryElement0Address uintptr
 		// The length of the memory buffer, i.e. len(ModuleInstance.Memory.Buffer).
 		memorySliceLen uint64
 		// The address of the first item in the globa slice, i.e. &ModuleInstance.Tables[0].Table[0] as uintptr.
-		tableFirstItemAddress uintptr
+		tableElement0Address uintptr
 		// The length of the memory buffer, i.e. len(ModuleInstance.Tables[0].Table).
 		tableSliceLen uint64
 	}
@@ -184,21 +184,21 @@ type (
 // See TestVeifyOffsetValue for how to derive these values.
 const (
 	// Offsets for engine.globalContext.
-	engineGlobalContextValueStackFirstItemAddressOffset        = 0
-	engineGlobalContextValueStackLenOffset                     = 8
-	engineGlobalContextCallFrameStackFirstItemAddressOffset    = 16
-	engineGlobalContextCallFrameStackLenOffset                 = 24
-	engineGlobalContextCallFrameStackPointerOffset             = 32
-	engineGlobalContextPreviouscallFrameStackPointer           = 40
-	engineGlobalContextCompiledFunctionsFirstItemAddressOffset = 48
+	engineGlobalContextValueStackElement0AddressOffset        = 0
+	engineGlobalContextValueStackLenOffset                    = 8
+	engineGlobalContextCallFrameStackElement0AddressOffset    = 16
+	engineGlobalContextCallFrameStackLenOffset                = 24
+	engineGlobalContextCallFrameStackPointerOffset            = 32
+	engineGlobalContextPreviouscallFrameStackPointer          = 40
+	engineGlobalContextCompiledFunctionsElement0AddressOffset = 48
 
 	// Offsets for engine.moduleContext.
-	engineModuleContextModuleInstanceAddressOffset  = 56
-	engineModuleContextGlobalFirstItemAddressOffset = 64
-	engineModuleContextMemoryFirstItemAddressOffset = 72
-	engineModuleContextMemorySliceLenOffset         = 80
-	engineModuleContextTableFirstItemAddressOffset  = 88
-	engineModuleContextTableSliceLenOffset          = 96
+	engineModuleContextModuleInstanceAddressOffset = 56
+	engineModuleContextGlobalElement0AddressOffset = 64
+	engineModuleContextMemoryElement0AddressOffset = 72
+	engineModuleContextMemorySliceLenOffset        = 80
+	engineModuleContextTableElement0AddressOffset  = 88
+	engineModuleContextTableSliceLenOffset         = 96
 
 	// Offsets for engine.valueStackContext.
 	engineValueStackContextStackPointerOffset     = 104
@@ -321,12 +321,12 @@ func (e *engine) initializeGlobalContext() {
 	callFrameStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.callFrameStack))
 	compiledFunctionsHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.compiledFunctions))
 	e.globalContext = globalContext{
-		valueStackFirstItemAddress:        valueStackHeader.Data,
-		valueStackLen:                     uint64(valueStackHeader.Len),
-		callFrameStackFirstItemAddress:    callFrameStackHeader.Data,
-		callFrameStackLen:                 uint64(callFrameStackHeader.Len),
-		callFrameStackPointer:             0,
-		compiledFunctionsFirstItemAddress: compiledFunctionsHeader.Data,
+		valueStackElement0Address:        valueStackHeader.Data,
+		valueStackLen:                    uint64(valueStackHeader.Len),
+		callFrameStackElementZeroAddress: callFrameStackHeader.Data,
+		callFrameStackLen:                uint64(callFrameStackHeader.Len),
+		callFrameStackPointer:            0,
+		compiledFunctionsElement0Address: compiledFunctionsHeader.Data,
 	}
 }
 
@@ -429,14 +429,18 @@ func newEngine() *engine {
 }
 
 func (e *engine) popValue() (ret uint64) {
-	ret = e.valueStack[e.valueStackContext.stackBasePointer+e.valueStackContext.stackPointer-1]
 	e.valueStackContext.stackPointer--
+	ret = e.valueStack[e.currentStackTop()]
 	return
 }
 
 func (e *engine) pushValue(v uint64) {
-	e.valueStack[e.valueStackContext.stackBasePointer+e.valueStackContext.stackPointer] = v
+	e.valueStack[e.currentStackTop()] = v
 	e.valueStackContext.stackPointer++
+}
+
+func (e *engine) currentStackTop() uint64 {
+	return e.valueStackContext.stackBasePointer + e.valueStackContext.stackPointer
 }
 
 const (
@@ -603,7 +607,7 @@ func (e *engine) builtinFunctionGrowValueStack(maxStackPointer uint64) {
 
 	// Update the globalContext's fields as they become stale after the update ^^.
 	stackSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&newStack))
-	e.globalContext.valueStackFirstItemAddress = stackSliceHeader.Data
+	e.globalContext.valueStackElement0Address = stackSliceHeader.Data
 	e.globalContext.valueStackLen = uint64(stackSliceHeader.Len)
 }
 
@@ -623,7 +627,7 @@ func (e *engine) builtinFunctionGrowCallFrameStack() {
 	// Update the globalContext's fields as they become stale after the update ^^.
 	stackSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&newStack))
 	e.globalContext.callFrameStackLen = uint64(stackSliceHeader.Len)
-	e.globalContext.callFrameStackFirstItemAddress = stackSliceHeader.Data
+	e.globalContext.callFrameStackElementZeroAddress = stackSliceHeader.Data
 }
 
 func (e *engine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
@@ -643,7 +647,7 @@ func (e *engine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 		// Update the moduleContext's fields as they become stale after the update ^^.
 		bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
 		e.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
-		e.moduleContext.memoryFirstItemAddress = bufSliceHeader.Data
+		e.moduleContext.memoryElement0Address = bufSliceHeader.Data
 	}
 }
 
@@ -671,7 +675,7 @@ func (e *engine) addCompiledFunction(addr wasm.FunctionAddress, compiled *compil
 		// Double the size of compiled functions.
 		e.compiledFunctions = append(e.compiledFunctions, make([]*compiledFunction, len(e.compiledFunctions))...)
 		compiledFunctionsHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.compiledFunctions))
-		e.globalContext.compiledFunctionsFirstItemAddress = compiledFunctionsHeader.Data
+		e.globalContext.compiledFunctionsElement0Address = compiledFunctionsHeader.Data
 	}
 	e.compiledFunctions[addr] = compiled
 }
