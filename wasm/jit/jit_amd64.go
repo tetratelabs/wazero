@@ -5018,6 +5018,7 @@ func (c *amd64Compiler) returnFunction() error {
 		readReturnStackBasePointer.To.Reg = tmpRegister
 		readReturnStackBasePointer.From.Type = obj.TYPE_MEM
 		readReturnStackBasePointer.From.Reg = callFrameStackTopAddressRegister
+		// "rb.caller" is BELOW the top address. See the above example for detail.
 		readReturnStackBasePointer.From.Offset = -(callFrameDataSize - callFrameReturnStackBasePointerOffset)
 		c.addInstruction(readReturnStackBasePointer)
 
@@ -5033,24 +5034,25 @@ func (c *amd64Compiler) returnFunction() error {
 
 	// Complete 2).
 	{
-		// Read the funcaddr from the callframe.
-		readFunctionAddress := c.newProg()
-		readFunctionAddress.As = x86.AMOVQ
-		readFunctionAddress.To.Type = obj.TYPE_REG
-		readFunctionAddress.To.Reg = moduleInstanceAddressRegister
-		readFunctionAddress.From.Type = obj.TYPE_MEM
-		readFunctionAddress.From.Reg = callFrameStackTopAddressRegister
-		readFunctionAddress.From.Offset = -(callFrameDataSize - callFrameCompiledFunctionOffset)
-		c.addInstruction(readFunctionAddress)
+		readCompiledFunctionAddress := c.newProg()
+		readCompiledFunctionAddress.As = x86.AMOVQ
+		readCompiledFunctionAddress.To.Type = obj.TYPE_REG
+		readCompiledFunctionAddress.To.Reg = tmpRegister
+		readCompiledFunctionAddress.From.Type = obj.TYPE_MEM
+		readCompiledFunctionAddress.From.Reg = callFrameStackTopAddressRegister
+		// "rc.caller" is BELOW the top address. See the above example for detail.
+		readCompiledFunctionAddress.From.Offset = -(callFrameDataSize - callFrameCompiledFunctionOffset)
+		c.addInstruction(readCompiledFunctionAddress)
 
-		// Now Ready to read the address of engine.compiledFunctions[offset].ModuleInstanceAddress.
-		// which equals *wasm.ModuleInstance for this target function.
+		// At this point, tmpRegister holds the caller's *compiledFunction,
+		// so we are ready to read the address of the caller's module instance
+		// stored at compiledFunction.ModuleInstanceAddress.
 		readModuleInstanceAddress := c.newProg()
 		readModuleInstanceAddress.As = x86.AMOVQ
 		readModuleInstanceAddress.To.Type = obj.TYPE_REG
 		readModuleInstanceAddress.To.Reg = moduleInstanceAddressRegister
 		readModuleInstanceAddress.From.Type = obj.TYPE_MEM
-		readModuleInstanceAddress.From.Reg = moduleInstanceAddressRegister
+		readModuleInstanceAddress.From.Reg = tmpRegister
 		readModuleInstanceAddress.From.Offset = compiledFunctionModuleInstanceAddressOffset
 		c.addInstruction(readModuleInstanceAddress)
 
@@ -5072,6 +5074,7 @@ func (c *amd64Compiler) returnFunction() error {
 		readReturnAddress.To.Reg = tmpRegister
 		readReturnAddress.From.Type = obj.TYPE_MEM
 		readReturnAddress.From.Reg = callFrameStackTopAddressRegister
+		// "ra.caller" is BELOW the top address. See the above example for detail.
 		readReturnAddress.From.Offset = -(callFrameDataSize - callFrameReturnAddressOffset)
 		c.addInstruction(readReturnAddress)
 
