@@ -155,10 +155,12 @@ func (j *jitEnv) execWithModule(code []byte, module *wasm.ModuleInstance) {
 	)
 }
 
+const defaultMemoryPageNumInTest = 2
+
 func newJITEnvironment() *jitEnv {
 	return &jitEnv{
 		eng:   newEngine(),
-		mem:   &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+		mem:   &wasm.MemoryInstance{Buffer: make([]byte, wasm.PageSize*defaultMemoryPageNumInTest)},
 		table: &wasm.TableInstance{},
 	}
 }
@@ -5466,48 +5468,30 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileMemorySize(t *testing.T) {
-	for _, currentCallFrameStackPointer := range []uint64{0, 10, 20} {
-		currentCallFrameStackPointer := currentCallFrameStackPointer
-		t.Run(fmt.Sprintf("%d", currentCallFrameStackPointer), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
-			err := compiler.emitPreamble()
-			require.NoError(t, err)
-			// Emit memory.size instructions.
-			err = compiler.compileMemorySize()
-			require.NoError(t, err)
-			// At this point, the size of memory should be pushed onto the stack.
-			require.Equal(t, uint64(1), compiler.locationStack.sp)
-			require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
+	compiler := requireNewCompiler(t)
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
+	// Emit memory.size instructions.
+	err = compiler.compileMemorySize()
+	require.NoError(t, err)
+	// At this point, the size of memory should be pushed onto the stack.
+	require.Equal(t, uint64(1), compiler.locationStack.sp)
+	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
 
-			// Emit arbitrary code after memory.size returned.
-			const expValue uint32 = 100
-			err = compiler.emitPreamble()
-			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
-			require.NoError(t, err)
-			err = compiler.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+	err = compiler.releaseAllRegistersToStack()
+	require.NoError(t, err)
+	compiler.exit(jitCallStatusCodeReturned)
 
-			// Generate the code under test.
-			code, _, _, err := compiler.generate()
-			require.NoError(t, err)
+	// Generate the code under test.
+	code, _, _, err := compiler.generate()
+	require.NoError(t, err)
 
-			// Run code.
-			env := newJITEnvironment()
-			env.exec(code)
+	// Run code.
+	env := newJITEnvironment()
+	env.exec(code)
 
-			require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-			require.Equal(t, wasm.FunctionAddress(builtinFunctionAddressMemorySize), env.functionCallAddress())
-
-			returnAddress := env.callFrameStackPeek().returnAddress
-			require.NotZero(t, returnAddress)
-			jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
-
-			require.Equal(t, expValue, env.stackTopAsUint32())
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-		})
-	}
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
 }
 
 func TestAmd64Compiler_compileDrop(t *testing.T) {

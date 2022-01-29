@@ -4282,17 +4282,32 @@ func (c *amd64Compiler) compileMemorySize() error {
 	if err := c.maybeMoveTopConditionalToFreeGeneralPurposeRegister(); err != nil {
 		return err
 	}
-	if err := c.callGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemorySize); err != nil {
+
+	reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
 		return err
 	}
+	loc := c.locationStack.pushValueOnRegister(reg)
 
-	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
-	c.initializeReservedStackBasePointer()
-	c.initializeReservedMemoryPointer()
+	getMemorySizeInBytes := c.newProg()
+	getMemorySizeInBytes.As = x86.AMOVQ
+	getMemorySizeInBytes.To.Type = obj.TYPE_REG
+	getMemorySizeInBytes.To.Reg = loc.register
+	getMemorySizeInBytes.From.Type = obj.TYPE_MEM
+	getMemorySizeInBytes.From.Reg = reservedRegisterForEngine
+	getMemorySizeInBytes.From.Offset = engineModuleContextMemorySliceLenOffset
+	c.addInstruction(getMemorySizeInBytes)
 
-	loc := c.locationStack.pushValueOnStack() // The size is pushed on the top.
-	loc.setRegisterType(generalPurposeRegisterTypeInt)
-
+	// WebAssembly's memory.size returns the page size (65536) of memory region.
+	// That is equivalent to divide the len of memory slice by 65536 and
+	// that can be calculated as SHR by 16 bits as 65536 = 2^16.
+	getMemorySizeInPageUnit := c.newProg()
+	getMemorySizeInPageUnit.As = x86.ASHRQ
+	getMemorySizeInPageUnit.To.Type = obj.TYPE_REG
+	getMemorySizeInPageUnit.To.Reg = loc.register
+	getMemorySizeInPageUnit.From.Type = obj.TYPE_CONST
+	getMemorySizeInPageUnit.From.Offset = 16
+	c.addInstruction(getMemorySizeInPageUnit)
 	return nil
 }
 

@@ -443,7 +443,6 @@ func (e *engine) valueStackTopIndex() uint64 {
 
 const (
 	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
-	builtinFunctionAddressMemorySize
 	builtinFunctionAddressGrowValueStack
 	builtinFunctionAddressGrowCallFrameStack
 	// builtinFunctionAddressBreakPoint is internal (only for wazero developers). Disabled by default.
@@ -546,10 +545,6 @@ jitentry:
 			case builtinFunctionAddressMemoryGrow:
 				callerCompiledFunction := e.callFrameTop().compiledFunction
 				e.builtinFunctionMemoryGrow(callerCompiledFunction.source.ModuleInstance.Memory)
-			case builtinFunctionAddressMemorySize:
-				callerCompiledFunction := e.callFrameTop().compiledFunction
-				// TODO: this could be implemented in assembly -- it's just reading engine.memorySliceLen.
-				e.builtinFunctionMemorySize(callerCompiledFunction.source.ModuleInstance.Memory)
 			case builtinFunctionAddressGrowValueStack:
 				callerCompiledFunction := e.callFrameTop().compiledFunction
 				e.builtinFunctionGrowValueStack(callerCompiledFunction.maxStackPointer)
@@ -634,12 +629,14 @@ func (e *engine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	if mem.Max != nil {
 		max = uint64(*mem.Max) * wasm.PageSize
 	}
+
+	currentLen := uint64(len(mem.Buffer))
 	// If exceeds the max of memory size, we push -1 according to the spec.
-	if uint64(newPages*wasm.PageSize+uint64(len(mem.Buffer))) > max {
+	if uint64(newPages*wasm.PageSize+currentLen) > max {
 		v := int32(-1)
 		e.pushValue(uint64(v))
 	} else {
-		e.builtinFunctionMemorySize(mem) // Grow returns the prior memory size on change.
+		e.pushValue(currentLen / wasm.PageSize) // Grow returns the prior memory size on change.
 		mem.Buffer = append(mem.Buffer, make([]byte, newPages*wasm.PageSize)...)
 
 		// Update the moduleContext's fields as they become stale after the update ^^.
@@ -647,10 +644,6 @@ func (e *engine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 		e.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
 		e.moduleContext.memoryElement0Address = bufSliceHeader.Data
 	}
-}
-
-func (e *engine) builtinFunctionMemorySize(mem *wasm.MemoryInstance) {
-	e.pushValue(uint64(len(mem.Buffer)) / wasm.PageSize)
 }
 
 func (e *engine) Compile(f *wasm.FunctionInstance) (err error) {
