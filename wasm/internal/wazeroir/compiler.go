@@ -1532,5 +1532,5 @@ func (c *compiler) readMemoryImmediate(tag string) (*MemoryImmediate, error) {
 		return nil, fmt.Errorf("reading offset for %s: %w", tag, err)
 	}
 	c.pc += num
-	return &MemoryImmediate{Offest: offset, Alignment: alignment}, nil
+	return &MemoryImmediate{Offset: offset, Alignment: alignment}, nil
 }

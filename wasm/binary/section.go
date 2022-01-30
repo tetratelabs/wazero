@@ -151,18 +151,18 @@ func decodeExportSection(r *bytes.Reader) (map[string]*wasm.Export, error) {
 		return nil, fmt.Errorf("get size of vector: %v", sizeErr)
 	}
 
-	result := make(map[string]*wasm.Export, vs)
-	for i := uint32(0); i < vs; i++ {
+	exportSection := make(map[string]*wasm.Export, vs)
+	for i := wasm.Index(0); i < vs; i++ {
 		export, err := decodeExport(r)
 		if err != nil {
 			return nil, fmt.Errorf("read export: %w", err)
 		}
-		if _, ok := result[export.Name]; ok {
-			return nil, fmt.Errorf("duplicate export name: %s", export.Name)
+		if _, ok := exportSection[export.Name]; ok {
+			return nil, fmt.Errorf("export[%d] duplicates name %q", i, export.Name)
 		}
-		result[export.Name] = export
+		exportSection[export.Name] = export
 	}
-	return result, nil
+	return exportSection, nil
 }
 
 func decodeStartSection(r *bytes.Reader) (*uint32, error) {
@@ -223,12 +223,12 @@ func decodeDataSection(r *bytes.Reader) ([]*wasm.DataSegment, error) {
 func encodeCustomSection(name string, data []byte) []byte {
 	// The contents of a custom section is the non-empty name followed by potentially empty opaque data
 	contents := append(encodeSizePrefixed([]byte(name)), data...)
-	return encodeSection(SectionIDCustom, contents)
+	return encodeSection(wasm.SectionIDCustom, contents)
 }
 
 // encodeSection encodes the sectionID, the size of its contents in bytes, followed by the contents.
 // See https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
-func encodeSection(sectionID SectionID, contents []byte) []byte {
+func encodeSection(sectionID wasm.SectionID, contents []byte) []byte {
 	return append([]byte{sectionID}, encodeSizePrefixed(contents)...)
 }
 
@@ -241,7 +241,7 @@ func encodeTypeSection(types []*wasm.FunctionType) []byte {
 	for _, t := range types {
 		contents = append(contents, encodeFunctionType(t)...)
 	}
-	return encodeSection(SectionIDType, contents)
+	return encodeSection(wasm.SectionIDType, contents)
 }
 
 // encodeImportSection encodes a SectionIDImport for the given imports in WebAssembly 1.0 (MVP) Binary Format.
@@ -253,7 +253,7 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 	for _, i := range imports {
 		contents = append(contents, encodeImport(i)...)
 	}
-	return encodeSection(SectionIDImport, contents)
+	return encodeSection(wasm.SectionIDImport, contents)
 }
 
 // encodeFunctionSection encodes a SectionIDFunction for the type indices associated with module-defined functions in
@@ -265,19 +265,19 @@ func encodeFunctionSection(functions []wasm.Index) []byte {
 	for _, typeIndex := range functions {
 		contents = append(contents, leb128.EncodeUint32(typeIndex)...)
 	}
-	return encodeSection(SectionIDFunction, contents)
+	return encodeSection(wasm.SectionIDFunction, contents)
 }
 
 // encodeCodeSection encodes a SectionIDCode for the module-defined function in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See encodeCode
 // See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
-func encodeCodeSection(codes []*wasm.Code) []byte {
-	contents := leb128.EncodeUint32(uint32(len(codes)))
-	for _, i := range codes {
+func encodeCodeSection(code []*wasm.Code) []byte {
+	contents := leb128.EncodeUint32(uint32(len(code)))
+	for _, i := range code {
 		contents = append(contents, encodeCode(i)...)
 	}
-	return encodeSection(SectionIDCode, contents)
+	return encodeSection(wasm.SectionIDCode, contents)
 }
 
 // encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (MVP) Binary Format.
@@ -289,12 +289,12 @@ func encodeExportSection(exports map[string]*wasm.Export) []byte {
 	for _, e := range exports {
 		contents = append(contents, encodeExport(e)...)
 	}
-	return encodeSection(SectionIDExport, contents)
+	return encodeSection(wasm.SectionIDExport, contents)
 }
 
 // encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
 func encodeStartSection(funcidx uint32) []byte {
-	return encodeSection(SectionIDStart, leb128.EncodeUint32(funcidx))
+	return encodeSection(wasm.SectionIDStart, leb128.EncodeUint32(funcidx))
 }

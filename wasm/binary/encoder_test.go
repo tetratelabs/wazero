@@ -26,7 +26,7 @@ func TestModule_Encode(t *testing.T) {
 			name:  "only name section",
 			input: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "simple"}},
 			expected: append(append(magic, version...),
-				SectionIDCustom, 0x0e, // 14 bytes in this section
+				wasm.SectionIDCustom, 0x0e, // 14 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x07, // 7 bytes in this subsection
 				0x06, // the Module name simple is 6 bytes long
@@ -38,7 +38,7 @@ func TestModule_Encode(t *testing.T) {
 				"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
 			}},
 			expected: append(append(magic, version...),
-				SectionIDCustom, 0xf, // 15 bytes in this section
+				wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 				0x04, 'm', 'e', 'm', 'e',
 				1, 2, 3, 4, 5, 6, 7, 8, 9, 0),
 		},
@@ -51,10 +51,10 @@ func TestModule_Encode(t *testing.T) {
 				},
 			},
 			expected: append(append(magic, version...),
-				SectionIDCustom, 0xf, // 15 bytes in this section
+				wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 				0x04, 'm', 'e', 'm', 'e',
 				1, 2, 3, 4, 5, 6, 7, 8, 9, 0,
-				SectionIDCustom, 0x0e, // 14 bytes in this section
+				wasm.SectionIDCustom, 0x0e, // 14 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x07, // 7 bytes in this subsection
 				0x06, // the Module name simple is 6 bytes long
@@ -70,7 +70,7 @@ func TestModule_Encode(t *testing.T) {
 				},
 			},
 			expected: append(append(magic, version...),
-				SectionIDType, 0x12, // 18 bytes in this section
+				wasm.SectionIDType, 0x12, // 18 bytes in this section
 				0x03,             // 3 types
 				0x60, 0x00, 0x00, // func=0x60 no param no result
 				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
@@ -97,11 +97,11 @@ func TestModule_Encode(t *testing.T) {
 				},
 			},
 			expected: append(append(magic, version...),
-				SectionIDType, 0x0d, // 13 bytes in this section
+				wasm.SectionIDType, 0x0d, // 13 bytes in this section
 				0x02,                            // 2 types
 				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
 				0x60, 0x02, f32, f32, 0x01, f32, // func=0x60 2 params and 1 result
-				SectionIDImport, 0x17, // 23 bytes in this section
+				wasm.SectionIDImport, 0x17, // 23 bytes in this section
 				0x02, // 2 imports
 				0x04, 'M', 'a', 't', 'h', 0x03, 'M', 'u', 'l', wasm.ImportKindFunc,
 				0x01, // type index
@@ -121,14 +121,14 @@ func TestModule_Encode(t *testing.T) {
 				StartSection: &zero,
 			},
 			expected: append(append(magic, version...),
-				SectionIDType, 0x04, // 4 bytes in this section
+				wasm.SectionIDType, 0x04, // 4 bytes in this section
 				0x01,           // 1 type
 				0x60, 0x0, 0x0, // func=0x60 0 params and 0 result
-				SectionIDImport, 0x0a, // 10 bytes in this section
+				wasm.SectionIDImport, 0x0a, // 10 bytes in this section
 				0x01, // 1 import
 				0x00, 0x05, 'h', 'e', 'l', 'l', 'o', wasm.ImportKindFunc,
 				0x00, // type index
-				SectionIDStart, 0x01,
+				wasm.SectionIDStart, 0x01,
 				0x00, // start function index
 			),
 		},
@@ -156,25 +156,25 @@ func TestModule_Encode(t *testing.T) {
 				},
 			},
 			expected: append(append(magic, version...),
-				SectionIDType, 0x07, // 7 bytes in this section
+				wasm.SectionIDType, 0x07, // 7 bytes in this section
 				0x01,                            // 1 type
 				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
-				SectionIDFunction, 0x02, // 2 bytes in this section
-				0x01,                  // 1 function
-				0x00,                  // func[0] type index 0
-				SectionIDExport, 0x0a, // 10 bytes in this section
+				wasm.SectionIDFunction, 0x02, // 2 bytes in this section
+				0x01,                       // 1 function
+				0x00,                       // func[0] type index 0
+				wasm.SectionIDExport, 0x0a, // 10 bytes in this section
 				0x01,                               // 1 export
 				0x06, 'A', 'd', 'd', 'I', 'n', 't', // size of "AddInt", "AddInt"
 				wasm.ExportKindFunc, 0x00, // func[0]
-				SectionIDCode, 0x09, // 9 bytes in this section
+				wasm.SectionIDCode, 0x09, // 9 bytes in this section
 				01,                     // one code section
 				07,                     // length of the body + locals
 				00,                     // count of local blocks
 				wasm.OpcodeLocalGet, 0, // local.get 0
 				wasm.OpcodeLocalGet, 1, // local.get 1
-				wasm.OpcodeI32Add,     // i32.add
-				wasm.OpcodeEnd,        // end of instructions/code
-				SectionIDCustom, 0x27, // 39 bytes in this section
+				wasm.OpcodeI32Add,          // i32.add
+				wasm.OpcodeEnd,             // end of instructions/code
+				wasm.SectionIDCustom, 0x27, // 39 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDFunctionNames, 0x09, // 9 bytes
 				0x01,                                     // two function names

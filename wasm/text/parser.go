@@ -616,6 +616,17 @@ func (p *moduleParser) parseExportName(tok tokenType, tokenBytes []byte, _, _ ui
 	case tokenString: // Ex. "" or "PI"
 		p.currentValue0 = tokenBytes[1 : len(tokenBytes)-1] // unquote
 		p.tokenParser = p.parseExport
+
+		// verify the name is unique. Note: this logic will be undone on next PR
+		if p.module.exportFuncs == nil {
+			return nil
+		}
+		name := string(p.currentValue0)
+		for _, e := range p.module.exportFuncs {
+			if e.name == name {
+				return fmt.Errorf("duplicate name %q", name)
+			}
+		}
 		return nil
 	case tokenLParen, tokenRParen:
 		return errors.New("missing name")

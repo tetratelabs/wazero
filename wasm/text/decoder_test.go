@@ -291,6 +291,25 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name: "export empty and non-empty name",
+			input: `(module
+    (func)
+    (func)
+    (func)
+    (export "" (func 2))
+    (export "a" (func 1))
+)`,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{{}},
+				FunctionSection: []wasm.Index{0, 0, 0},
+				CodeSection:     []*wasm.Code{{Body: end}, {Body: end}, {Body: end}},
+				ExportSection: map[string]*wasm.Export{
+					"":  {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(2)},
+					"a": {Name: "a", Kind: wasm.ExportKindFunc, Index: wasm.Index(1)},
+				},
+			},
+		},
+		{
 			name: "start function by name",
 			input: `(module
 	(func $hello)
@@ -336,6 +355,26 @@ func TestDecodeModule_Errors(t *testing.T) {
 			name:        "invalid",
 			input:       "module",
 			expectedErr: "1:1: expected '(', but found keyword: module",
+		},
+		{
+			name: "export duplicates empty name",
+			input: `(module
+    (func)
+	(func)
+    (export "" (func 0))
+    (export "" (func 1))
+)`,
+			expectedErr: "5:13: duplicate name \"\" in module.export[1]",
+		},
+		{
+			name: "export duplicates name",
+			input: `(module
+    (func)
+	(func)
+    (export "a" (func 0))
+    (export "a" (func 1))
+)`,
+			expectedErr: "5:13: duplicate name \"a\" in module.export[1]",
 		},
 	}
 

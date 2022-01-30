@@ -9,9 +9,7 @@ import (
 func TestGetModuleInstance(t *testing.T) {
 	name := "test"
 
-	// 'jit' and 'wazeroir' package cannot be used because of circular import.
-	// Here we will use 'nil' instead. Should we have an Engine for testing?
-	s := NewStore(nil)
+	s := NewStore(nopEngineInstance)
 
 	m1 := s.getModuleInstance(name)
 	require.Equal(t, m1, s.ModuleInstances[name])
@@ -23,7 +21,8 @@ func TestGetModuleInstance(t *testing.T) {
 
 func TestBuildFunctionInstances_FunctionNames(t *testing.T) {
 	name := "test"
-	s := NewStore(nil)
+
+	s := NewStore(nopEngineInstance)
 	mi := s.getModuleInstance(name)
 
 	zero := Index(0)
@@ -51,4 +50,17 @@ func TestBuildFunctionInstances_FunctionNames(t *testing.T) {
 
 	// We expect unknown for any functions missing data in the NameSection
 	require.Equal(t, []string{"unknown", "two", "unknown", "four", "five"}, names)
+}
+
+var nopEngineInstance Engine = &nopEngine{}
+
+type nopEngine struct {
+}
+
+func (e *nopEngine) Call(_ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+	return nil, nil
+}
+
+func (e *nopEngine) Compile(_ *FunctionInstance) error {
+	return nil
 }

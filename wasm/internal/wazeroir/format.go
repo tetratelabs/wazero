@@ -56,11 +56,11 @@ func formatOperation(w io.StringWriter, b Operation) {
 	case *OperationGlobalSet:
 		str = fmt.Sprintf("global.set %d", o.Index)
 	case *OperationLoad:
-		str = fmt.Sprintf("%s.load (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("%s.load (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationLoad8:
-		str = fmt.Sprintf("%s.load8 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("%s.load8 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationLoad16:
-		str = fmt.Sprintf("%s.load16 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("%s.load16 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationLoad32:
 		var t string
 		if o.Signed {
@@ -68,15 +68,15 @@ func formatOperation(w io.StringWriter, b Operation) {
 		} else {
 			t = "u64"
 		}
-		str = fmt.Sprintf("%s.load32 (align=%d, offset=%d)", t, o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("%s.load32 (align=%d, offset=%d)", t, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationStore:
-		str = fmt.Sprintf("%s.store (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("%s.store (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationStore8:
-		str = fmt.Sprintf("%s.store8 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("%s.store8 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationStore16:
-		str = fmt.Sprintf("%s.store16 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("%s.store16 (align=%d, offset=%d)", o.Type, o.Arg.Alignment, o.Arg.Offset)
 	case *OperationStore32:
-		str = fmt.Sprintf("i64.store32 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offest)
+		str = fmt.Sprintf("i64.store32 (align=%d, offset=%d)", o.Arg.Alignment, o.Arg.Offset)
 	case *OperationMemorySize:
 		str = "memory.size"
 	case *OperationMemoryGrow:

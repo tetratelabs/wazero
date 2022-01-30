@@ -503,7 +503,7 @@ func (o *OperationGlobalSet) Kind() OperationKind {
 }
 
 type MemoryImmediate struct {
-	Alignment, Offest uint32
+	Alignment, Offset uint32
 }
 
 type OperationLoad struct {

@@ -1038,15 +1038,15 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.addInstruction(movTableSliceAddress)
 
 	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset]
-	// So the target type ID lives at offset+tableElementTypeIDOffest, and we compare it
-	// with wasm.UninitializedTableElelemtTypeID to check if the element is initialized.
+	// So the target type ID lives at offset+tableElementTypeIDOffset, and we compare it
+	// with wasm.UninitializedTableElementTypeID to check if the element is initialized.
 	checkIfInitialized := c.newProg()
 	checkIfInitialized.As = x86.ACMPQ
 	checkIfInitialized.From.Type = obj.TYPE_MEM
 	checkIfInitialized.From.Reg = offset.register
-	checkIfInitialized.From.Offset = tableElementFunctionTypeIDOffest
+	checkIfInitialized.From.Offset = tableElementFunctionTypeIDOffset
 	checkIfInitialized.To.Type = obj.TYPE_CONST
-	checkIfInitialized.To.Offset = int64(wasm.UninitializedTableElelemtTypeID)
+	checkIfInitialized.To.Offset = int64(wasm.UninitializedTableElementTypeID)
 	c.addInstruction(checkIfInitialized)
 
 	// Jump if the target is initialized element.
@@ -1064,7 +1064,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	checkIfTypeMatch.As = x86.ACMPQ
 	checkIfTypeMatch.From.Type = obj.TYPE_MEM
 	checkIfTypeMatch.From.Reg = offset.register
-	checkIfTypeMatch.From.Offset = tableElementFunctionTypeIDOffest
+	checkIfTypeMatch.From.Offset = tableElementFunctionTypeIDOffset
 	checkIfTypeMatch.To.Type = obj.TYPE_CONST
 	checkIfTypeMatch.To.Offset = int64(targetFunctionType.TypeID)
 	c.addInstruction(checkIfTypeMatch)
@@ -1084,7 +1084,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	readValue.As = x86.AMOVQ
 	readValue.To.Type = obj.TYPE_REG
 	readValue.To.Reg = offset.register
-	readValue.From.Offset = tableElementFunctionAddressOffest
+	readValue.From.Offset = tableElementFunctionAddressOffset
 	readValue.From.Type = obj.TYPE_MEM
 	readValue.From.Reg = offset.register
 	c.addInstruction(readValue)
@@ -3992,7 +3992,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		targetSizeInByte = 64 / 8
 	}
 
-	reg, err := c.setupMemoryOffset(o.Arg.Offest, targetSizeInByte)
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInByte)
 	if err != nil {
 		return err
 	}
@@ -4035,7 +4035,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 }
 
 func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offest, 1)
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, 1)
 	if err != nil {
 		return err
 	}
@@ -4068,7 +4068,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 }
 
 func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offest, 16/8)
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, 16/8)
 	if err != nil {
 		return err
 	}
@@ -4101,7 +4101,7 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 }
 
 func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offest, 32/8)
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, 32/8)
 	if err != nil {
 		return err
 	}
@@ -4217,19 +4217,19 @@ func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
 		movInst = x86.AMOVQ
 		targetSizeInByte = 64 / 8
 	}
-	return c.moveToMemory(o.Arg.Offest, movInst, targetSizeInByte)
+	return c.moveToMemory(o.Arg.Offset, movInst, targetSizeInByte)
 }
 
 func (c *amd64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
-	return c.moveToMemory(o.Arg.Offest, x86.AMOVB, 1)
+	return c.moveToMemory(o.Arg.Offset, x86.AMOVB, 1)
 }
 
 func (c *amd64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
-	return c.moveToMemory(o.Arg.Offest, x86.AMOVW, 16/8)
+	return c.moveToMemory(o.Arg.Offset, x86.AMOVW, 16/8)
 }
 
 func (c *amd64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
-	return c.moveToMemory(o.Arg.Offest, x86.AMOVL, 32/8)
+	return c.moveToMemory(o.Arg.Offset, x86.AMOVL, 32/8)
 }
 
 func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As, targetSizeInByte int64) error {

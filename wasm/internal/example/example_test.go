@@ -49,12 +49,13 @@ func newExample() *wasm.Module {
 			},
 		},
 		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(0)},
-		ExportSection: map[string]*wasm.Export{
-			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
-		},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
+		},
+		ExportSection: map[string]*wasm.Export{
+			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
+			"":       {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
 		},
 		StartSection: &two,
 		NameSection: &wasm.NameSection{

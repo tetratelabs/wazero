@@ -271,43 +271,43 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 			op.b1 = byte(o.Type)
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationLoad8:
 			op.b1 = byte(o.Type)
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationLoad16:
 			op.b1 = byte(o.Type)
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationLoad32:
 			if o.Signed {
 				op.b1 = 1
 			}
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationStore:
 			op.b1 = byte(o.Type)
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationStore8:
 			op.b1 = byte(o.Type)
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationStore16:
 			op.b1 = byte(o.Type)
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationStore32:
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.Arg.Alignment)
-			op.us[1] = uint64(o.Arg.Offest)
+			op.us[1] = uint64(o.Arg.Offset)
 		case *wazeroir.OperationMemorySize:
 		case *wazeroir.OperationMemoryGrow:
 		case *wazeroir.OperationConstI32:
@@ -585,7 +585,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				tableElement := table.Table[offset]
 				// Type check.
 				if uint64(tableElement.FunctionTypeID) != op.us[1] {
-					if tableElement.FunctionTypeID == wasm.UninitializedTableElelemtTypeID {
+					if tableElement.FunctionTypeID == wasm.UninitializedTableElementTypeID {
 						panic(wasm.ErrRuntimeInvalidTableAcces)
 					}
 					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
