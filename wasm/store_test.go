@@ -1,12 +1,13 @@
 package wasm
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetModuleInstance(t *testing.T) {
+func TestStore_GetModuleInstance(t *testing.T) {
 	name := "test"
 
 	s := NewStore(nopEngineInstance)
@@ -19,7 +20,37 @@ func TestGetModuleInstance(t *testing.T) {
 	require.Equal(t, m1, m2)
 }
 
-func TestBuildFunctionInstances_FunctionNames(t *testing.T) {
+func TestStore_AddHostFunction(t *testing.T) {
+	s := NewStore(nopEngineInstance)
+	hostFunction := func(_ *HostFunctionCallContext) {
+	}
+
+	err := s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction))
+	require.NoError(t, err)
+
+	// The function was added to the store, prefixed by the owning module name
+	require.Equal(t, 1, len(s.Functions))
+	fn := s.Functions[0]
+	require.Equal(t, "test.fn", fn.Name)
+
+	// The function was exported in the module
+	m := s.getModuleInstance("test")
+	require.Equal(t, 1, len(m.Exports))
+	exp, ok := m.Exports["fn"]
+	require.True(t, ok)
+
+	// Trying to add it again should fail
+	hostFunction2 := func(_ *HostFunctionCallContext) {
+	}
+	err = s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction2))
+	require.EqualError(t, err, `"fn" is already exported in module "test"`)
+
+	// Any side effects should be reverted
+	require.Equal(t, []*FunctionInstance{fn}, s.Functions)
+	require.Equal(t, map[string]*ExportInstance{"fn": exp}, m.Exports)
+}
+
+func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 	name := "test"
 
 	s := NewStore(nopEngineInstance)

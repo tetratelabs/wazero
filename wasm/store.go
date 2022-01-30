@@ -1764,12 +1764,15 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		ModuleInstance: m,
 	}
 
-	if err := s.engine.Compile(f); err != nil {
+	if err = s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
 	s.addFunctionInstance(f)
-
-	return m.addExport(funcName, &ExportInstance{Kind: ExportKindFunc, Function: f})
+	if err = m.addExport(funcName, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
+		s.Functions = s.Functions[:len(s.Functions)-1] // revert the add on conflict
+		return err
+	}
+	return nil
 }
 
 func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType ValueType, mutable bool) error {
