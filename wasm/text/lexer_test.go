@@ -1,7 +1,6 @@
 package text
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -550,43 +549,28 @@ func TestLex_Errors(t *testing.T) {
 			expectedErr:  "found an invalid byte in string token: 0x80",
 		},
 		{
-			name:  "parser error: lParen",
-			input: []byte(" (module)"),
-			parser: func(tok tokenType, tokenBytes []byte, _, _ uint32) error {
-				if tok != tokenLParen {
-					return nil
-				}
-				return errors.New("error on " + string(tokenBytes))
-			},
+			name:         "parser error: lParen",
+			input:        []byte(" (module)"),
+			parser:       (&errorOnTokenParser{tokenLParen}).parse,
 			expectedLine: 1,
 			expectedCol:  2,
-			expectedErr:  "error on (",
+			expectedErr:  "unexpected '('",
 		},
 		{
-			name:  "parser error: keyword",
-			input: []byte(" (module)"),
-			parser: func(tok tokenType, tokenBytes []byte, _, _ uint32) error {
-				if tok != tokenKeyword {
-					return nil
-				}
-				return errors.New("error on " + string(tokenBytes))
-			},
+			name:         "parser error: keyword",
+			input:        []byte(" (module)"),
+			parser:       (&errorOnTokenParser{tokenKeyword}).parse,
 			expectedLine: 1,
 			expectedCol:  3,
-			expectedErr:  "error on module",
+			expectedErr:  "unexpected keyword: module",
 		},
 		{
-			name:  "parser error: rParen",
-			input: []byte(" (module)"),
-			parser: func(tok tokenType, tokenBytes []byte, _, _ uint32) error {
-				if tok != tokenRParen {
-					return nil
-				}
-				return errors.New("error on " + string(tokenBytes))
-			},
+			name:         "parser error: rParen",
+			input:        []byte(" (module)"),
+			parser:       (&errorOnTokenParser{tokenRParen}).parse,
 			expectedLine: 1,
 			expectedCol:  9,
-			expectedErr:  "error on )",
+			expectedErr:  "unexpected ')'",
 		},
 	}
 
@@ -595,7 +579,7 @@ func TestLex_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			parser := tc.parser
 			if parser == nil {
-				parser = noopTokenParser
+				parser = parseNoop
 			}
 			line, col, err := lex(parser, tc.input)
 			require.Equal(t, tc.expectedLine, line)
@@ -606,17 +590,69 @@ func TestLex_Errors(t *testing.T) {
 }
 
 func lexTokens(t *testing.T, input string) []*token {
-	var tokens []*token
-	line, col, err := lex(func(tok tokenType, tokenUTF8 []byte, line, col uint32) error {
-		tokens = append(tokens, &token{tok, line, col, string(tokenUTF8)})
-		return nil
-	}, []byte(input))
+	p := &collectTokenParser{}
+	line, col, err := lex(p.parse, []byte(input))
 	require.NoError(t, err, "%d:%d: %s", line, col, err)
-	return tokens
+	return p.tokens
 }
 
-var noopTokenParser tokenParser = func(_ tokenType, _ []byte, _, _ uint32) error {
-	return nil
+type errorOnTokenParser struct{ tok tokenType }
+
+func (e *errorOnTokenParser) parse(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok != e.tok {
+		return e.parse, nil
+	}
+	return parseErr(tok, tokenBytes, line, col)
+}
+
+type collectTokenParser struct{ tokens []*token }
+
+func (c *collectTokenParser) parse(tok tokenType, tokenUTF8 []byte, line, col uint32) (tokenParser, error) {
+	c.tokens = append(c.tokens, &token{tokenType: tok, line: line, col: col, token: string(tokenUTF8)})
+	return c.parse, nil
+}
+
+type collectTokenTypeParser struct{ tokenTypes []tokenType }
+
+func (c *collectTokenTypeParser) parse(tok tokenType, _ []byte, _, _ uint32) (tokenParser, error) {
+	c.tokenTypes = append(c.tokenTypes, tok)
+	return c.parse, nil
+}
+
+type noopTokenParser struct{}
+
+func (n *noopTokenParser) parse(_ tokenType, _ []byte, _, _ uint32) (tokenParser, error) {
+	return n.parse, nil
+}
+
+var parseNoop = (&noopTokenParser{}).parse
+
+type errTokenParser struct{}
+
+func (n *errTokenParser) parse(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
+	return nil, unexpectedToken(tok, tokenBytes)
+}
+
+var parseErr = (&errTokenParser{}).parse
+
+type skipTokenParser struct {
+	count uint32
+	next  tokenParser
+}
+
+func (s *skipTokenParser) parse(_ tokenType, _ []byte, _, _ uint32) (tokenParser, error) {
+	s.count--
+	if s.count == 0 {
+		return s.next, nil
+	}
+	return s.parse, nil
+}
+
+// skipTokens is a hack because lex tracks parens, so they may need to be skipped. Also, some parsers need to skip past
+// a field name.
+func skipTokens(count uint32, next tokenParser) tokenParser {
+	out := &skipTokenParser{count: count, next: next}
+	return out.parse
 }
 
 type token struct {
