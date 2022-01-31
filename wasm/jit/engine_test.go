@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"reflect"
@@ -22,7 +23,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(eng.valueStackElement0Address)), engineGlobalContextValueStackElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.valueStackLen)), engineGlobalContextValueStackLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackElementZeroAddress)), engineGlobalContextCallFrameStackElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackLen)), engineGlobalContextCallFrameStackLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackNeedsGrowHeight)), engineGlobalContextCallFrameStackNeedsGrowHeightOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackPointer)), engineGlobalContextCallFrameStackPointerOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.previousCallFrameStackPointer)), engineGlobalContextPreviouscallFrameStackPointer)
 	require.Equal(t, int(unsafe.Offsetof(eng.compiledFunctionsElement0Address)), engineGlobalContextCompiledFunctionsElement0AddressOffset)
@@ -237,6 +238,7 @@ func TestEngine_RecursiveEntry(t *testing.T) {
 	store := wasm.NewStore(eng)
 
 	hostfunc := func(ctx *wasm.HostFunctionCallContext) {
+		fmt.Println("calling called_by_host_func..")
 		_, _, err := store.CallFunction("test", "called_by_host_func")
 		require.NoError(t, err)
 	}

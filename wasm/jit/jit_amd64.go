@@ -930,6 +930,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		}
 		// After the host function call, we have to initialize the stack base pointer and memory reserved registers.
 		c.initializeReservedStackBasePointer()
+		c.initializeModuleContext()
 		c.initializeReservedMemoryPointer()
 	} else {
 		if err := c.callFunctionFromAddress(target.Address, target.FunctionType.Type); err != nil {
@@ -4687,7 +4688,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	cmpWithCallFrameStackLen.To.Reg = callFrameStackPointerRegister
 	cmpWithCallFrameStackLen.From.Type = obj.TYPE_MEM
 	cmpWithCallFrameStackLen.From.Reg = reservedRegisterForEngine
-	cmpWithCallFrameStackLen.From.Offset = engineGlobalContextCallFrameStackLenOffset
+	cmpWithCallFrameStackLen.From.Offset = engineGlobalContextCallFrameStackNeedsGrowHeightOffset
 	c.addInstruction(cmpWithCallFrameStackLen)
 
 	// If they do not equal, then we don't have to grow the call frame stack.

@@ -57,9 +57,9 @@ type (
 		// &engine.callFrameStack[0] as uintptr.
 		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
 		callFrameStackElementZeroAddress uintptr
-		// len(engine.callFrameStack).
+		// len(engine.callFrameStack) - 1.
 		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
-		callFrameStackLen uint64
+		callFrameStackNeedsGrowHeight uint64
 		// Points at the next empty slot on the call frame stack. For example, for the next function call,
 		// we push the new callFrame onto callFrameStack[callFrameStackPointer].
 		// This value is incremented/decremented in assembly when making function calls,
@@ -189,7 +189,7 @@ const (
 	engineGlobalContextValueStackElement0AddressOffset        = 0
 	engineGlobalContextValueStackLenOffset                    = 8
 	engineGlobalContextCallFrameStackElement0AddressOffset    = 16
-	engineGlobalContextCallFrameStackLenOffset                = 24
+	engineGlobalContextCallFrameStackNeedsGrowHeightOffset    = 24
 	engineGlobalContextCallFrameStackPointerOffset            = 32
 	engineGlobalContextPreviouscallFrameStackPointer          = 40
 	engineGlobalContextCompiledFunctionsElement0AddressOffset = 48
@@ -324,7 +324,7 @@ func (e *engine) initializeGlobalContext() {
 		valueStackElement0Address:        valueStackHeader.Data,
 		valueStackLen:                    uint64(valueStackHeader.Len),
 		callFrameStackElementZeroAddress: callFrameStackHeader.Data,
-		callFrameStackLen:                uint64(callFrameStackHeader.Len),
+		callFrameStackNeedsGrowHeight:    uint64(callFrameStackHeader.Len) - 1,
 		callFrameStackPointer:            0,
 		compiledFunctionsElement0Address: compiledFunctionsHeader.Data,
 		hostFunctionFlagsElement0Address: hostFunctionFlagsHeader.Data,
@@ -356,9 +356,10 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	defer func() {
 		if shouldRecover {
 			if v := recover(); v != nil {
-				if buildoptions.IsDebugMode {
-					debug.PrintStack()
-				}
+				// if buildoptions.IsDebugMode {
+				debug.PrintStack()
+				// }
+				// runtime.Breakpoint()
 
 				var frames []string
 				for i := uint64(0); i < e.globalContext.callFrameStackPointer; i++ {
@@ -506,6 +507,10 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 }
 
 func (e *engine) execFunction(f *compiledFunction) {
+	fmt.Println("execFunction....")
+	defer func() {
+		fmt.Println("exitting.. execFunction....")
+	}()
 	// We continuously execute functions until we reach the previous top frame
 	// to support recursive Wasm function executions.
 	e.globalContext.previousCallFrameStackPointer = e.globalContext.callFrameStackPointer
@@ -515,10 +520,10 @@ func (e *engine) execFunction(f *compiledFunction) {
 jitentry:
 	{
 		frame := e.callFrameTop()
-		if buildoptions.IsDebugMode {
-			fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d\n",
-				frame.String(), e.valueStackContext.stackBasePointer, e.valueStackContext.stackPointer)
-		}
+		// if buildoptions.IsDebugMode {
+		fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d\n",
+			frame.String(), e.valueStackContext.stackBasePointer, e.valueStackContext.stackPointer)
+		// }
 
 		// Call into the JIT code.
 		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(e)))
@@ -533,18 +538,22 @@ jitentry:
 		case jitCallStatusCodeCallHostFunction:
 			callerCompiledFunction := e.callFrameTop().compiledFunction
 			fn := e.compiledFunctions[e.exitContext.functionCallAddress]
-			if buildoptions.IsDebugMode {
-				if !fn.source.IsHostFunction() {
-					panic("jitCallStatusCodeCallHostFunction is only for host functions")
-				}
+			// if buildoptions.IsDebugMode {
+			if !fn.source.IsHostFunction() {
+				panic("jitCallStatusCodeCallHostFunction is only for host functions")
 			}
+			// }
 			// If the host function re-call the Wasm function, previousCallFrameStackPointer is overridden,
 			// so we havet save the value and restore after execHostFunction.
-			saved := e.globalContext.previousCallFrameStackPointer
+			e.callFrameStack[e.callFrameStackPointer].compiledFunction = fn
 			e.callFrameStackPointer++
+			saved := e.globalContext.previousCallFrameStackPointer
+			savedModuleInstanceAddress := e.moduleContext.moduleInstanceAddress
+			fmt.Println(e.stackBasePointer, e.stackPointer)
 			e.execHostFunction(fn.source.HostFunction, &wasm.HostFunctionCallContext{Memory: callerCompiledFunction.source.ModuleInstance.Memory})
 			e.callFrameStackPointer--
 			e.globalContext.previousCallFrameStackPointer = saved
+			e.moduleContext.moduleInstanceAddress = savedModuleInstanceAddress
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.exitContext.functionCallAddress {
@@ -618,14 +627,14 @@ func (e *engine) builtinFunctionGrowCallFrameStack() {
 	}
 
 	// Double the callstack slice length.
-	newLen := uint64(e.globalContext.callFrameStackLen) * 2
+	newLen := uint64(len(e.callFrameStack)) * 2
 	newStack := make([]callFrame, newLen)
 	copy(newStack, e.callFrameStack)
 	e.callFrameStack = newStack
 
 	// Update the globalContext's fields as they become stale after the update ^^.
 	stackSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&newStack))
-	e.globalContext.callFrameStackLen = uint64(stackSliceHeader.Len)
+	e.globalContext.callFrameStackNeedsGrowHeight = uint64(stackSliceHeader.Len) - 1
 	e.globalContext.callFrameStackElementZeroAddress = stackSliceHeader.Data
 }
 
@@ -878,6 +887,8 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
+
+	fmt.Println(f.Name, hex.EncodeToString(code))
 
 	if buildoptions.IsDebugMode {
 		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))

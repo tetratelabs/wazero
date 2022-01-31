@@ -6056,7 +6056,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				env := newJITEnvironment()
 				engine := env.engine()
 
-				env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
+				env.setCallFrameStackPointer(engine.globalContext.callFrameStackNeedsGrowHeight - 1)
 				compiler := requireNewCompiler(t)
 
 				require.Empty(t, compiler.locationStack.usedRegisters)
