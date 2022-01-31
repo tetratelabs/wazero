@@ -507,10 +507,6 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 }
 
 func (e *engine) execFunction(f *compiledFunction) {
-	fmt.Println("execFunction....")
-	defer func() {
-		fmt.Println("exitting.. execFunction....")
-	}()
 	// We continuously execute functions until we reach the previous top frame
 	// to support recursive Wasm function executions.
 	e.globalContext.previousCallFrameStackPointer = e.globalContext.callFrameStackPointer
@@ -520,10 +516,10 @@ func (e *engine) execFunction(f *compiledFunction) {
 jitentry:
 	{
 		frame := e.callFrameTop()
-		// if buildoptions.IsDebugMode {
-		fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d\n",
-			frame.String(), e.valueStackContext.stackBasePointer, e.valueStackContext.stackPointer)
-		// }
+		if buildoptions.IsDebugMode {
+			fmt.Printf("callframe=%s, stackBasePointer: %d, stackPointer: %d\n",
+				frame.String(), e.valueStackContext.stackBasePointer, e.valueStackContext.stackPointer)
+		}
 
 		// Call into the JIT code.
 		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(e)))
@@ -532,28 +528,32 @@ jitentry:
 		switch status := e.exitContext.statusCode; status {
 		case jitCallStatusCodeReturned:
 			// Meaning that all the function frames above the previous call frame stack pointer are executed.
-			if e.globalContext.previousCallFrameStackPointer != e.globalContext.callFrameStackPointer {
-				panic("bug in JIT compiler")
+			if buildoptions.IsDebugMode {
+				if e.globalContext.previousCallFrameStackPointer != e.globalContext.callFrameStackPointer {
+					panic("bug in JIT compiler")
+				}
 			}
 		case jitCallStatusCodeCallHostFunction:
 			callerCompiledFunction := e.callFrameTop().compiledFunction
 			fn := e.compiledFunctions[e.exitContext.functionCallAddress]
-			// if buildoptions.IsDebugMode {
-			if !fn.source.IsHostFunction() {
-				panic("jitCallStatusCodeCallHostFunction is only for host functions")
+			if buildoptions.IsDebugMode {
+				if !fn.source.IsHostFunction() {
+					panic("jitCallStatusCodeCallHostFunction is only for host functions")
+				}
 			}
-			// }
 			// If the host function re-call the Wasm function, previousCallFrameStackPointer is overridden,
 			// so we havet save the value and restore after execHostFunction.
 			e.callFrameStack[e.callFrameStackPointer].compiledFunction = fn
 			e.callFrameStackPointer++
 			saved := e.globalContext.previousCallFrameStackPointer
 			savedModuleInstanceAddress := e.moduleContext.moduleInstanceAddress
-			fmt.Println(e.stackBasePointer, e.stackPointer)
+			savedStackBasePointer := e.valueStackContext.stackBasePointer
+			e.stackBasePointer = e.valueStackContext.stackBasePointer + e.valueStackContext.stackPointer - uint64(len(fn.source.FunctionType.Type.Params))
 			e.execHostFunction(fn.source.HostFunction, &wasm.HostFunctionCallContext{Memory: callerCompiledFunction.source.ModuleInstance.Memory})
 			e.callFrameStackPointer--
 			e.globalContext.previousCallFrameStackPointer = saved
 			e.moduleContext.moduleInstanceAddress = savedModuleInstanceAddress
+			e.valueStackContext.stackBasePointer = savedStackBasePointer
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch e.exitContext.functionCallAddress {
@@ -887,8 +887,6 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
-
-	fmt.Println(f.Name, hex.EncodeToString(code))
 
 	if buildoptions.IsDebugMode {
 		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))

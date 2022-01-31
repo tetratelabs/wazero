@@ -1,7 +1,6 @@
 package jit
 
 import (
-	"fmt"
 	"math"
 	"os"
 	"reflect"
@@ -238,7 +237,6 @@ func TestEngine_RecursiveEntry(t *testing.T) {
 	store := wasm.NewStore(eng)
 
 	hostfunc := func(ctx *wasm.HostFunctionCallContext) {
-		fmt.Println("calling called_by_host_func..")
 		_, _, err := store.CallFunction("test", "called_by_host_func")
 		require.NoError(t, err)
 	}

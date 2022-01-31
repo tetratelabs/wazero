@@ -928,10 +928,6 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		if err := c.callGoFunctionFromAddress(jitCallStatusCodeCallHostFunction, target.Address); err != nil {
 			return err
 		}
-		// After the host function call, we have to initialize the stack base pointer and memory reserved registers.
-		c.initializeReservedStackBasePointer()
-		c.initializeModuleContext()
-		c.initializeReservedMemoryPointer()
 	} else {
 		if err := c.callFunctionFromAddress(target.Address, target.FunctionType.Type); err != nil {
 			return err
@@ -1107,10 +1103,6 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	if err := c.callGoFunctionFromRegister(jitCallStatusCodeCallHostFunction, functionAddressRegister); err != nil {
 		return err
 	}
-
-	// After the host function call, we have to initialize the stack base pointer and memory reserved registers.
-	c.initializeReservedStackBasePointer()
-	c.initializeReservedMemoryPointer()
 
 	exitJumpFromHostFunctionCall := c.newProg()
 	exitJumpFromHostFunctionCall.As = obj.AJMP
@@ -5216,7 +5208,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	c.locationStack.markRegisterUsed(regs...)
 
 	// Alias these free tmp registers for readability.
-	ripRegister, currentCallFrameAddressRegister := regs[0], regs[1]
+	tmpRegister, currentCallFrameAddressRegister := regs[0], regs[1]
 
 	// We need to store the address of the current callFrame's return address.
 	getCallFrameStackPointer := c.newProg()
@@ -5240,7 +5232,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	getCallFrameStackAddress := c.newProg()
 	getCallFrameStackAddress.As = x86.AMOVQ
 	getCallFrameStackAddress.To.Type = obj.TYPE_REG
-	getCallFrameStackAddress.To.Reg = ripRegister // We temporarily use ripRegister register.
+	getCallFrameStackAddress.To.Reg = tmpRegister
 	getCallFrameStackAddress.From.Type = obj.TYPE_MEM
 	getCallFrameStackAddress.From.Reg = reservedRegisterForEngine
 	getCallFrameStackAddress.From.Offset = engineGlobalContextCallFrameStackElement0AddressOffset
@@ -5252,22 +5244,22 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	readCurrentCallFrameReturnAddress.To.Type = obj.TYPE_REG
 	readCurrentCallFrameReturnAddress.To.Reg = currentCallFrameAddressRegister
 	readCurrentCallFrameReturnAddress.From.Type = obj.TYPE_MEM
-	readCurrentCallFrameReturnAddress.From.Reg = ripRegister
+	readCurrentCallFrameReturnAddress.From.Reg = tmpRegister
 	readCurrentCallFrameReturnAddress.From.Index = currentCallFrameAddressRegister
 	readCurrentCallFrameReturnAddress.From.Scale = 1
 	readCurrentCallFrameReturnAddress.From.Offset = -(callFrameDataSize - callFrameReturnAddressOffset)
 	c.addInstruction(readCurrentCallFrameReturnAddress)
 
-	readInstructionAddressCompletionCallback := c.readInstructionAddress(ripRegister)
+	readInstructionAddressCompletionCallback := c.readInstructionAddress(tmpRegister)
 
-	// We are ready to store the return address (in ripRegister) to engine.callFrameStack[engine.callStackFramePointer-1].
+	// We are ready to store the return address (in tmpRegister) to engine.callFrameStack[engine.callStackFramePointer-1].
 	moveRIP := c.newProg()
 	moveRIP.As = x86.AMOVQ
 	moveRIP.To.Type = obj.TYPE_MEM
 	moveRIP.To.Reg = currentCallFrameAddressRegister
 	moveRIP.To.Offset = callFrameReturnAddressOffset
 	moveRIP.From.Type = obj.TYPE_REG
-	moveRIP.From.Reg = ripRegister
+	moveRIP.From.Reg = tmpRegister
 	c.addInstruction(moveRIP)
 
 	// Emit the return instruction.
@@ -5281,6 +5273,16 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 
 	// They were temporarily used, so we mark them unused.
 	c.locationStack.markRegisterUnused(regs...)
+
+	if jitStatus == jitCallStatusCodeCallHostFunction {
+		// After the host function call, we have to initialize the reserved registers and module context,
+		// because potentially they could be manipulated.
+		c.initializeReservedStackBasePointer()
+		if err := c.initializeModuleContext(); err != nil {
+			return err
+		}
+		c.initializeReservedMemoryPointer()
+	}
 	return nil
 }
 
