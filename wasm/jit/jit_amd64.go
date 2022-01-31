@@ -83,7 +83,6 @@ func init() {
 func jitcall(codeSegment, engine uintptr)
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
-// Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
@@ -99,11 +98,9 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		currentLabel:  wazeroir.EntrypointLabel,
 	}
 
-	if ir != nil {
-		compiler.labels = make(map[string]*labelInfo, len(ir.LabelCallers))
-		for key, callers := range ir.LabelCallers {
-			compiler.labels[key] = &labelInfo{callers: callers}
-		}
+	compiler.labels = make(map[string]*labelInfo, len(ir.LabelCallers))
+	for key, callers := range ir.LabelCallers {
+		compiler.labels[key] = &labelInfo{callers: callers}
 	}
 	return compiler, nil
 }
@@ -166,35 +163,6 @@ func (c *amd64Compiler) label(labelKey string) *labelInfo {
 	}
 	c.labels[labelKey] = &labelInfo{}
 	return c.labels[labelKey]
-}
-
-// compileHostFunction constructs the entire code to enter the host function implementation,
-// and return back to the caller.
-func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
-	// First we must update the location stack to reflect the number of host function inputs.
-	c.pushFunctionParams()
-
-	if err := c.callGoFunction(jitCallStatusCodeCallHostFunction, address); err != nil {
-		return err
-	}
-
-	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(c.f.FunctionType.Type.Params); i++ {
-		c.locationStack.pop()
-	}
-
-	// Also, the function results were pushed by the call.
-	for _, t := range c.f.FunctionType.Type.Results {
-		loc := c.locationStack.pushValueOnStack()
-		switch t {
-		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
-		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
-		}
-	}
-
-	return c.returnFunction()
 }
 
 func (c *amd64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
@@ -956,8 +924,17 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	}
 
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	if err := c.callFunctionFromAddress(target.Address, target.FunctionType.Type); err != nil {
-		return err
+	if target.IsHostFunction() {
+		if err := c.callGoFunctionFromAddress(jitCallStatusCodeCallHostFunction, target.Address); err != nil {
+			return err
+		}
+		// After the host function call, we have to initialize the stack base pointer and memory reserved registers.
+		c.initializeReservedStackBasePointer()
+		c.initializeReservedMemoryPointer()
+	} else {
+		if err := c.callFunctionFromAddress(target.Address, target.FunctionType.Type); err != nil {
+			return err
+		}
 	}
 
 	// We consumed the function parameters from the stack after call.
@@ -1079,22 +1056,75 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.exit(jitCallStatusCodeTypeMismatchOnIndirectCall)
 
 	// Now all checks passeed, so we start making function call.
-	readValue := c.newProg()
-	jumpIfTypeMatch.To.SetTarget(readValue)
-	readValue.As = x86.AMOVQ
-	readValue.To.Type = obj.TYPE_REG
-	readValue.To.Reg = offset.register
-	readValue.From.Offset = tableElementFunctionAddressOffset
-	readValue.From.Type = obj.TYPE_MEM
-	readValue.From.Reg = offset.register
-	c.addInstruction(readValue)
+	readFunctionAddress := c.newProg()
+	jumpIfTypeMatch.To.SetTarget(readFunctionAddress)
+	readFunctionAddress.As = x86.AMOVQ
+	readFunctionAddress.To.Type = obj.TYPE_REG
+	readFunctionAddress.To.Reg = offset.register
+	readFunctionAddress.From.Offset = tableElementFunctionAddressOffset
+	readFunctionAddress.From.Type = obj.TYPE_MEM
+	readFunctionAddress.From.Reg = offset.register
+	c.addInstruction(readFunctionAddress)
 
+	// At this point, offset.register holds the funcaddr of target function.
+	// So alias it for readability.
+	functionAddressRegister := offset.register
+
+	hostFunctionFlagsElement0AddressRegister, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	readHostFunctionFlagsElement0Address := c.newProg()
+	readHostFunctionFlagsElement0Address.As = x86.AMOVQ
+	readHostFunctionFlagsElement0Address.To.Type = obj.TYPE_REG
+	readHostFunctionFlagsElement0Address.To.Reg = hostFunctionFlagsElement0AddressRegister
+	readHostFunctionFlagsElement0Address.From.Type = obj.TYPE_MEM
+	readHostFunctionFlagsElement0Address.From.Reg = reservedRegisterForEngine
+	readHostFunctionFlagsElement0Address.From.Offset = engineGlobalContextHostFunctionFlagsElement0AddressOffset
+	c.addInstruction(readHostFunctionFlagsElement0Address)
+
+	// Check whether engine.hostFunctionFlags[functionAddress] equals true,
+	// and if so, set CF flag via Bit Set instruction.
+	checkHostFuncFlag := c.newProg()
+	checkHostFuncFlag.As = x86.ABTQ
+	checkHostFuncFlag.To.Type = obj.TYPE_MEM
+	checkHostFuncFlag.To.Reg = hostFunctionFlagsElement0AddressRegister
+	checkHostFuncFlag.To.Scale = 1
+	checkHostFuncFlag.To.Index = functionAddressRegister
+	checkHostFuncFlag.From.Type = obj.TYPE_CONST
+	c.addInstruction(checkHostFuncFlag)
+
+	// Jump if the carry flag is not set (meaning the target is not host function).
+	jmpIfNotHostFunction := c.newProg()
+	jmpIfNotHostFunction.As = x86.AJCC
+	jmpIfNotHostFunction.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNotHostFunction)
+
+	// Otherwise, we call the host function.
+	saved := c.locationStack.clone()
+	if err := c.callGoFunctionFromRegister(jitCallStatusCodeCallHostFunction, functionAddressRegister); err != nil {
+		return err
+	}
+
+	// After the host function call, we have to initialize the stack base pointer and memory reserved registers.
+	c.initializeReservedStackBasePointer()
+	c.initializeReservedMemoryPointer()
+
+	exitJumpFromHostFunctionCall := c.newProg()
+	exitJumpFromHostFunctionCall.As = obj.AJMP
+	exitJumpFromHostFunctionCall.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(exitJumpFromHostFunctionCall)
+
+	// Initiate the non-host function case.
+	c.replaceLocationStack(saved)
+	c.addSetJmpOrigins(jmpIfNotHostFunction)
 	if err := c.callFunctionFromRegister(offset.register, targetFunctionType.Type); err != nil {
 		return nil
 	}
 
-	// The offset register should be marked as un-used as we consumed in the function call.
-	c.locationStack.markRegisterUnused(offset.register)
+	// These registers should be marked as unused after function call.
+	c.locationStack.markRegisterUnused(offset.register, hostFunctionFlagsElement0AddressRegister)
 
 	// We consumed the function parameters from the stack after call.
 	for i := 0; i < len(targetFunctionType.Type.Params); i++ {
@@ -1111,6 +1141,9 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 			loc.setRegisterType(generalPurposeRegisterTypeFloat)
 		}
 	}
+
+	// Set the jump target from the host function branch to the next instruction.
+	c.addSetJmpOrigins(exitJumpFromHostFunctionCall)
 	return nil
 }
 
@@ -4266,7 +4299,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 		return err
 	}
 
-	if err := c.callGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemoryGrow); err != nil {
+	if err := c.callGoFunctionFromAddress(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemoryGrow); err != nil {
 		return err
 	}
 
@@ -4672,7 +4705,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	}
 
 	// Grow the stack.
-	if err := c.callGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
+	if err := c.callGoFunctionFromAddress(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
 		return err
 	}
 
@@ -5135,15 +5168,34 @@ func (c *amd64Compiler) returnFunction() error {
 	return nil
 }
 
-// callGoFunction adds instructions to call a Go function whose address equals the addr parameter.
+// callGoFunction adds instructions to call a Go function whose address equals the value on "reg".
 // jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
 // jitCallStatusCodeCallHostFunction.
-func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
+func (c *amd64Compiler) callGoFunctionFromRegister(jitStatus jitCallStatusCode, reg int16) error {
+	return c.callGoFunction(jitStatus, 0, reg)
+}
+
+// callGoFunction adds instructions to call a Go function whose address equals the "addr".
+// jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
+// jitCallStatusCodeCallHostFunction.
+func (c *amd64Compiler) callGoFunctionFromAddress(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
+	return c.callGoFunction(jitStatus, addr, nilRegister)
+}
+
+// callGoFunction adds instructions to call a Go function whose address equals the "addr" or the value on "reg".
+// jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
+// jitCallStatusCodeCallHostFunction.
+func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress, reg int16) error {
 	// Set the functionAddress to the engine.exitContext functionCallAddress.
 	setFunctionCallAddress := c.newProg()
 	setFunctionCallAddress.As = x86.AMOVQ
-	setFunctionCallAddress.From.Type = obj.TYPE_CONST
-	setFunctionCallAddress.From.Offset = int64(addr)
+	if isNilRegister(reg) {
+		setFunctionCallAddress.From.Type = obj.TYPE_CONST
+		setFunctionCallAddress.From.Offset = int64(addr)
+	} else {
+		setFunctionCallAddress.From.Type = obj.TYPE_REG
+		setFunctionCallAddress.From.Reg = reg
+	}
 	setFunctionCallAddress.To.Type = obj.TYPE_MEM
 	setFunctionCallAddress.To.Reg = reservedRegisterForEngine
 	setFunctionCallAddress.To.Offset = engineExitContextFunctionCallAddressOffset
@@ -5450,7 +5502,7 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	c.addInstruction(jmpIfNoNeedToGrowStack)
 
 	// Otherwise, we have to make the builtin function call to grow the call stack.
-	if err := c.callGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
+	if err := c.callGoFunctionFromAddress(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
 		return err
 	}
 	// After grow the stack, we have to inialize the stack base pointer again.

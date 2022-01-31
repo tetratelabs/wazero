@@ -26,6 +26,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackPointer)), engineGlobalContextCallFrameStackPointerOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.previousCallFrameStackPointer)), engineGlobalContextPreviouscallFrameStackPointer)
 	require.Equal(t, int(unsafe.Offsetof(eng.compiledFunctionsElement0Address)), engineGlobalContextCompiledFunctionsElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.hostFunctionFlagsElement0Address)), engineGlobalContextHostFunctionFlagsElement0AddressOffset)
 
 	// Offsets for engine.moduleContext.
 	require.Equal(t, int(unsafe.Offsetof(eng.moduleInstanceAddress)), engineModuleContextModuleInstanceAddressOffset)

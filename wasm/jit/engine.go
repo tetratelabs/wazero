@@ -42,6 +42,7 @@ type (
 		// as the underlying memory region is accessed by assembly directly by
 		// using compiledFunctionsElement0Address.
 		compiledFunctions []*compiledFunction
+		hostFunctionFlags []bool
 	}
 
 	// globalContext holds the data which is constant across multiple function calls.
@@ -73,6 +74,9 @@ type (
 		// &engine.compiledFunctions[0] as uintptr.
 		// Note: this is updated when growing the slice in addCompileFunction.
 		compiledFunctionsElement0Address uintptr
+
+		// TODO:
+		hostFunctionFlagsElement0Address uintptr
 	}
 
 	// moduleContext holds the per-function call specific module information.
@@ -189,22 +193,23 @@ const (
 	engineGlobalContextCallFrameStackPointerOffset            = 32
 	engineGlobalContextPreviouscallFrameStackPointer          = 40
 	engineGlobalContextCompiledFunctionsElement0AddressOffset = 48
+	engineGlobalContextHostFunctionFlagsElement0AddressOffset = 56
 
 	// Offsets for engine.moduleContext.
-	engineModuleContextModuleInstanceAddressOffset = 56
-	engineModuleContextGlobalElement0AddressOffset = 64
-	engineModuleContextMemoryElement0AddressOffset = 72
-	engineModuleContextMemorySliceLenOffset        = 80
-	engineModuleContextTableElement0AddressOffset  = 88
-	engineModuleContextTableSliceLenOffset         = 96
+	engineModuleContextModuleInstanceAddressOffset = 64
+	engineModuleContextGlobalElement0AddressOffset = 72
+	engineModuleContextMemoryElement0AddressOffset = 80
+	engineModuleContextMemorySliceLenOffset        = 88
+	engineModuleContextTableElement0AddressOffset  = 96
+	engineModuleContextTableSliceLenOffset         = 104
 
 	// Offsets for engine.valueStackContext.
-	engineValueStackContextStackPointerOffset     = 104
-	engineValueStackContextStackBasePointerOffset = 112
+	engineValueStackContextStackPointerOffset     = 112
+	engineValueStackContextStackBasePointerOffset = 120
 
 	// Offsets for engine.exitContext.
-	engineExitContextJITCallStatusCodeOffset   = 120
-	engineExitContextFunctionCallAddressOffset = 128
+	engineExitContextJITCallStatusCodeOffset   = 128
+	engineExitContextFunctionCallAddressOffset = 136
 
 	// Offsets for callFrame.
 	callFrameDataSize                      = 32
@@ -303,10 +308,6 @@ func (e *engine) callFrameTop() *callFrame {
 	return &e.callFrameStack[e.globalContext.callFrameStackPointer-1]
 }
 
-func (e *engine) callFrameAt(depth uint64) *callFrame {
-	return &e.callFrameStack[e.globalContext.callFrameStackPointer-1-depth]
-}
-
 // resetState resets the engine state so this engine can be reused.
 func (e *engine) resetState() {
 	e.initializeGlobalContext()
@@ -318,6 +319,7 @@ func (e *engine) initializeGlobalContext() {
 	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.valueStack))
 	callFrameStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.callFrameStack))
 	compiledFunctionsHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.compiledFunctions))
+	hostFunctionFlagsHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.hostFunctionFlags))
 	e.globalContext = globalContext{
 		valueStackElement0Address:        valueStackHeader.Data,
 		valueStackLen:                    uint64(valueStackHeader.Len),
@@ -325,6 +327,7 @@ func (e *engine) initializeGlobalContext() {
 		callFrameStackLen:                uint64(callFrameStackHeader.Len),
 		callFrameStackPointer:            0,
 		compiledFunctionsElement0Address: compiledFunctionsHeader.Data,
+		hostFunctionFlagsElement0Address: hostFunctionFlagsHeader.Data,
 	}
 }
 
@@ -421,6 +424,7 @@ func newEngine() *engine {
 		valueStack:        make([]uint64, initialValueStackSize),
 		callFrameStack:    make([]callFrame, initialCallStackSize),
 		compiledFunctions: make([]*compiledFunction, initialCompiledFunctionsSliceSize),
+		hostFunctionFlags: make([]bool, initialCompiledFunctionsSliceSize),
 	}
 	e.initializeGlobalContext()
 	return e
@@ -527,17 +531,19 @@ jitentry:
 				panic("bug in JIT compiler")
 			}
 		case jitCallStatusCodeCallHostFunction:
-			// Not "callFrameTop" but take the below of peek with "callFrameAt(1)" as the top frame is for host function,
-			// but when making host function calls, we need to pass the memory instance of host function caller.
+			callerCompiledFunction := e.callFrameTop().compiledFunction
 			fn := e.compiledFunctions[e.exitContext.functionCallAddress]
-			callerCompiledFunction := e.callFrameAt(1).compiledFunction
 			if buildoptions.IsDebugMode {
 				if !fn.source.IsHostFunction() {
 					panic("jitCallStatusCodeCallHostFunction is only for host functions")
 				}
 			}
+			// If the host function re-call the Wasm function, previousCallFrameStackPointer is overridden,
+			// so we havet save the value and restore after execHostFunction.
 			saved := e.globalContext.previousCallFrameStackPointer
+			e.callFrameStackPointer++
 			e.execHostFunction(fn.source.HostFunction, &wasm.HostFunctionCallContext{Memory: callerCompiledFunction.source.ModuleInstance.Memory})
+			e.callFrameStackPointer--
 			e.globalContext.previousCallFrameStackPointer = saved
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:
@@ -668,24 +674,16 @@ func (e *engine) addCompiledFunction(addr wasm.FunctionAddress, compiled *compil
 		compiledFunctionsHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.compiledFunctions))
 		e.globalContext.compiledFunctionsElement0Address = compiledFunctionsHeader.Data
 	}
+	if len(e.hostFunctionFlags) <= int(addr) {
+		e.hostFunctionFlags = append(e.hostFunctionFlags, make([]bool, len(e.hostFunctionFlags))...)
+		hostFunctionFlagsHeader := (*reflect.SliceHeader)(unsafe.Pointer(&e.hostFunctionFlags))
+		e.globalContext.hostFunctionFlagsElement0Address = hostFunctionFlagsHeader.Data
+	}
 	e.compiledFunctions[addr] = compiled
+	e.hostFunctionFlags[addr] = compiled.source.IsHostFunction()
 }
 
 func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	compiler, err := newCompiler(f, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = compiler.compileHostFunction(f.Address); err != nil {
-		return nil, err
-	}
-
-	code, _, _, err := compiler.generate()
-	if err != nil {
-		return nil, err
-	}
-
 	maxStackPointer := uint64(len(f.FunctionType.Type.Params))
 	if res := uint64(len(f.FunctionType.Type.Results)); maxStackPointer < res {
 		maxStackPointer = res
@@ -693,8 +691,6 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 
 	return &compiledFunction{
 		source:                f,
-		codeSegment:           code,
-		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
 		moduleInstanceAddress: 0, // Explicitly set zero to indicate this is host function.
 		maxStackPointer:       maxStackPointer,
 	}, nil
