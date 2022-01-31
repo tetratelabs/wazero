@@ -294,10 +294,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							}
 							inst, ok := store.ModuleInstances[moduleName]
 							require.True(t, ok, msg)
-							addr := inst.Exports[c.Action.Field]
-							if addr.Kind != wasm.ExportKindGlobal {
-								t.Fatal()
-							}
+							addr, err := inst.GetExport(c.Action.Field, wasm.ExportKindGlobal)
+							require.NoError(t, err)
 							actual := addr.Global
 							var expType wasm.ValueType
 							switch c.Exps[0].ValType {

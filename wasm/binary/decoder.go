@@ -41,7 +41,7 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 
 		sectionContentStart := r.Len()
 		switch sectionID[0] {
-		case SectionIDCustom:
+		case wasm.SectionIDCustom:
 			// First, validate the section and determine if the section for this name has already been set
 			name, nameSize, decodeErr := decodeUTF8(r, "custom section name")
 			if decodeErr != nil {
@@ -72,27 +72,27 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 					m.CustomSections[name] = data
 				}
 			}
-		case SectionIDType:
+		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(r)
-		case SectionIDImport:
+		case wasm.SectionIDImport:
 			m.ImportSection, err = decodeImportSection(r)
-		case SectionIDFunction:
+		case wasm.SectionIDFunction:
 			m.FunctionSection, err = decodeFunctionSection(r)
-		case SectionIDTable:
+		case wasm.SectionIDTable:
 			m.TableSection, err = decodeTableSection(r)
-		case SectionIDMemory:
+		case wasm.SectionIDMemory:
 			m.MemorySection, err = decodeMemorySection(r)
-		case SectionIDGlobal:
+		case wasm.SectionIDGlobal:
 			m.GlobalSection, err = decodeGlobalSection(r)
-		case SectionIDExport:
+		case wasm.SectionIDExport:
 			m.ExportSection, err = decodeExportSection(r)
-		case SectionIDStart:
+		case wasm.SectionIDStart:
 			m.StartSection, err = decodeStartSection(r)
-		case SectionIDElement:
+		case wasm.SectionIDElement:
 			m.ElementSection, err = decodeElementSection(r)
-		case SectionIDCode:
+		case wasm.SectionIDCode:
 			m.CodeSection, err = decodeCodeSection(r)
-		case SectionIDData:
+		case wasm.SectionIDData:
 			m.DataSection, err = decodeDataSection(r)
 		default:
 			err = ErrInvalidSectionID

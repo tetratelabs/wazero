@@ -4981,7 +4981,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 			env.stack()[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
-			o := &wazeroir.OperationLoad{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+			o := &wazeroir.OperationLoad{Type: tp, Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 			err = compiler.compileLoad(o)
 			require.NoError(t, err)
 
@@ -5026,7 +5026,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 			require.NoError(t, err)
 
 			// Place the load target value to the memory.
-			targetRegion := env.memory()[baseOffset+o.Arg.Offest:]
+			targetRegion := env.memory()[baseOffset+o.Arg.Offset:]
 			var expValue uint64
 			switch tp {
 			case wazeroir.UnsignedTypeI32:
@@ -5078,7 +5078,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 			env.stack()[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
-			o := &wazeroir.OperationLoad8{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+			o := &wazeroir.OperationLoad8{Type: tp, Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 			err = compiler.compileLoad8(o)
 			require.NoError(t, err)
 
@@ -5104,7 +5104,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 
 			// For testing, arbitrary byte is be fine.
 			original := byte(0x10)
-			env.memory()[baseOffset+o.Arg.Offest] = byte(original)
+			env.memory()[baseOffset+o.Arg.Offset] = byte(original)
 
 			// Run code.
 			env.exec(code)
@@ -5138,7 +5138,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 			env.stack()[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
-			o := &wazeroir.OperationLoad16{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+			o := &wazeroir.OperationLoad16{Type: tp, Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 			err = compiler.compileLoad16(o)
 			require.NoError(t, err)
 
@@ -5164,7 +5164,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 			// For testing, arbitrary uint16 is be fine.
 			original := uint16(0xff_fe)
-			binary.LittleEndian.PutUint16(env.memory()[baseOffset+o.Arg.Offest:], original)
+			binary.LittleEndian.PutUint16(env.memory()[baseOffset+o.Arg.Offset:], original)
 
 			// Run code.
 			env.exec(code)
@@ -5190,7 +5190,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 	env.stack()[base.stackPointer] = baseOffset
 
 	// Emit the memory load instructions.
-	o := &wazeroir.OperationLoad32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	o := &wazeroir.OperationLoad32{Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 	err = compiler.compileLoad32(o)
 	require.NoError(t, err)
 
@@ -5216,7 +5216,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 
 	// For testing, arbitrary uint32 is be fine.
 	original := uint32(0xff_ff_fe)
-	binary.LittleEndian.PutUint32(env.memory()[baseOffset+o.Arg.Offest:], original)
+	binary.LittleEndian.PutUint32(env.memory()[baseOffset+o.Arg.Offset:], original)
 
 	// Run code.
 	env.exec(code)
@@ -5257,7 +5257,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 			}
 
 			// Emit the memory load instructions.
-			o := &wazeroir.OperationStore{Type: tp, Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+			o := &wazeroir.OperationStore{Type: tp, Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 			err = compiler.compileStore(o)
 			require.NoError(t, err)
 
@@ -5277,7 +5277,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 			// All the values are popped, so the stack pointer must be zero.
 			require.Equal(t, uint64(0), env.stackPointer())
 			// Check the stored value.
-			offset := o.Arg.Offest + baseOffset
+			offset := o.Arg.Offset + baseOffset
 			mem := env.memory()
 			switch o.Type {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
@@ -5310,7 +5310,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
 	// Emit the memory load instructions.
-	o := &wazeroir.OperationStore8{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	o := &wazeroir.OperationStore8{Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 	err = compiler.compileStore8(o)
 	require.NoError(t, err)
 
@@ -5331,7 +5331,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 	require.Equal(t, uint64(0), env.stackPointer())
 	// Check the stored value.
 	mem := env.memory()
-	offset := o.Arg.Offest + baseOffset
+	offset := o.Arg.Offset + baseOffset
 	require.Equal(t, byte(storeTargetValue), mem[offset])
 	// The trailing bytes must be intact since this is only moving one byte.
 	require.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0}, mem[offset+1:offset+8])
@@ -5353,7 +5353,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
 	// Emit the memory load instructions.
-	o := &wazeroir.OperationStore16{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	o := &wazeroir.OperationStore16{Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 	err = compiler.compileStore16(o)
 	require.NoError(t, err)
 
@@ -5374,7 +5374,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 	require.Equal(t, uint64(0), env.stackPointer())
 	// Check the stored value.
 	mem := env.memory()
-	offset := o.Arg.Offest + baseOffset
+	offset := o.Arg.Offset + baseOffset
 	require.Equal(t, uint16(storeTargetValue), binary.LittleEndian.Uint16(mem[offset:]))
 	// The trailing bytes must be intact since this is only moving 2 byte.
 	require.Equal(t, []byte{0, 0, 0, 0, 0, 0}, mem[offset+2:offset+8])
@@ -5396,7 +5396,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
 	// Emit the memory load instructions.
-	o := &wazeroir.OperationStore32{Arg: &wazeroir.MemoryImmediate{Offest: 361}}
+	o := &wazeroir.OperationStore32{Arg: &wazeroir.MemoryImmediate{Offset: 361}}
 	err = compiler.compileStore32(o)
 	require.NoError(t, err)
 
@@ -5417,7 +5417,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 	require.Equal(t, uint64(0), env.stackPointer())
 	// Check the stored value.
 	mem := env.memory()
-	offset := o.Arg.Offest + baseOffset
+	offset := o.Arg.Offset + baseOffset
 	require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem[offset:]))
 	// The trailing bytes must be intact since this is only moving 4 byte.
 	require.Equal(t, []byte{0, 0, 0, 0}, mem[offset+4:offset+8])
@@ -6138,14 +6138,14 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 
-					moduelInstance := &wasm.ModuleInstance{
+					moduleInstance := &wasm.ModuleInstance{
 						Memory: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
 					}
-					moduleInstanceToExpectedValueInMemory[moduelInstance] = addTargetValue
+					moduleInstanceToExpectedValueInMemory[moduleInstance] = addTargetValue
 					compiledFunction := &compiledFunction{
 						codeSegment:           code,
 						codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
-						moduleInstanceAddress: uintptr(unsafe.Pointer(moduelInstance)),
+						moduleInstanceAddress: uintptr(unsafe.Pointer(moduleInstance)),
 					}
 					engine.addCompiledFunction(wasm.FunctionAddress(i), compiledFunction)
 				}
@@ -6272,8 +6272,8 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	// Ensure that the offset of wasm.TableInstance doesn't drift.
-	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionAddress)), tableElementFunctionAddressOffest)
-	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionTypeID)), tableElementFunctionTypeIDOffest)
+	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionAddress)), tableElementFunctionAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionTypeID)), tableElementFunctionTypeIDOffset)
 
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
@@ -6316,7 +6316,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{
 			Type: &wasm.FunctionType{}, TypeID: 1000}}}}
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
-		table[0] = wasm.TableElement{FunctionTypeID: wasm.UninitializedTableElelemtTypeID}
+		table[0] = wasm.TableElement{FunctionTypeID: wasm.UninitializedTableElementTypeID}
 
 		// Place the offfset value.
 		err := compiler.compileConstI32(targetOffset)
@@ -6377,8 +6377,8 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 			Results: []wasm.ValueType{wasm.ValueTypeI32}}
 		targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
 		operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
-		moduelInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
-		moduelInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
+		moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
+		moduleInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
 
 		table := make([]wasm.TableElement, 10)
 		for i := 0; i < len(table); i++ {
@@ -6417,7 +6417,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				require.NoError(t, err)
 
 				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduelInstance}
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance}
 				// and the typeID  matches the table[targetOffset]'s type ID.
 
 				// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.

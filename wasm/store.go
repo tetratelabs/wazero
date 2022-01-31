@@ -61,6 +61,7 @@ type (
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#syntax-moduleinst
 	ModuleInstance struct {
+		Name      string
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
@@ -75,7 +76,7 @@ type (
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#syntax-exportinst
 	ExportInstance struct {
-		Kind     byte
+		Kind     ExportKind
 		Function *FunctionInstance
 		Global   *GlobalInstance
 		Memory   *MemoryInstance
@@ -177,6 +178,27 @@ type (
 	FunctionTypeID uint64
 )
 
+// addExport adds and indexes the given export or errs if the name is already exported.
+func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
+	if _, ok := m.Exports[name]; ok {
+		return fmt.Errorf("%q is already exported in module %q", name, m.Name)
+	}
+	m.Exports[name] = e
+	return nil
+}
+
+// GetExport returns an export of the given name and kind or errs if not exported or the wrong kind.
+func (m *ModuleInstance) GetExport(name string, kind ExportKind) (*ExportInstance, error) {
+	exp, ok := m.Exports[name]
+	if !ok {
+		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
+	}
+	if exp.Kind != kind {
+		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, exportKindName(exp.Kind), exportKindName(kind))
+	}
+	return exp, nil
+}
+
 func (f *FunctionInstance) IsHostFunction() bool {
 	return f.HostFunction != nil
 }
@@ -186,7 +208,7 @@ func NewStore(engine Engine) *Store {
 }
 
 func (s *Store) Instantiate(module *Module, name string) error {
-	instance := &ModuleInstance{}
+	instance := &ModuleInstance{Name: name}
 	for _, t := range module.TypeSection {
 		instance.Types = append(instance.Types, s.getTypeInstance(t))
 	}
@@ -263,27 +285,29 @@ func (s *Store) Instantiate(module *Module, name string) error {
 }
 
 func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
-	m, ok := s.ModuleInstances[moduleName]
-	if !ok {
-		return nil, nil, fmt.Errorf("module '%s' not instantiated", moduleName)
-	}
-
-	exp, ok := m.Exports[funcName]
-	if !ok {
-		return nil, nil, fmt.Errorf("exported function '%s' not found in '%s'", funcName, moduleName)
-	}
-
-	if exp.Kind != ExportKindFunc {
-		return nil, nil, fmt.Errorf("'%s' is not functype", funcName)
+	var exp *ExportInstance
+	if exp, err = s.getExport(moduleName, funcName, ExportKindFunc); err != nil {
+		return
 	}
 
 	f := exp.Function
 	if len(f.FunctionType.Type.Params) != len(params) {
-		return nil, nil, fmt.Errorf("invalid number of parameters")
+		err = fmt.Errorf("invalid number of parameters")
+		return
 	}
 
-	ret, err := s.engine.Call(f, params...)
-	return ret, f.FunctionType.Type.Results, err
+	results, err = s.engine.Call(f, params...)
+	resultTypes = f.FunctionType.Type.Results
+	return
+}
+
+func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp *ExportInstance, err error) {
+	if m, ok := s.ModuleInstances[moduleName]; !ok {
+		return nil, fmt.Errorf("module %s not instantiated", moduleName)
+	} else if exp, err = m.GetExport(name, kind); err != nil {
+		return
+	}
+	return
 }
 
 func (s *Store) addFunctionInstance(f *FunctionInstance) {
@@ -301,34 +325,26 @@ func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
 }
 
 func (s *Store) resolveImport(target *ModuleInstance, is *Import) error {
-	em, ok := s.ModuleInstances[is.Module]
-	if !ok {
-		return fmt.Errorf("failed to resolve import of module name %s", is.Module)
+	exp, err := s.getExport(is.Module, is.Name, is.Kind)
+	if err != nil {
+		return err
 	}
 
-	e, ok := em.Exports[is.Name]
-	if !ok {
-		return fmt.Errorf("not exported in module %s", is.Module)
-	}
-
-	if is.Kind != e.Kind {
-		return fmt.Errorf("type mismatch on export: got %#x but want %#x", e.Kind, is.Kind)
-	}
 	switch is.Kind {
 	case ImportKindFunc:
-		if err := s.applyFunctionImport(target, is.DescFunc, e); err != nil {
+		if err = s.applyFunctionImport(target, is.DescFunc, exp); err != nil {
 			return fmt.Errorf("applyFunctionImport: %w", err)
 		}
 	case ImportKindTable:
-		if err := s.applyTableImport(target, is.DescTable, e); err != nil {
+		if err = s.applyTableImport(target, is.DescTable, exp); err != nil {
 			return fmt.Errorf("applyTableImport: %w", err)
 		}
 	case ImportKindMemory:
-		if err := s.applyMemoryImport(target, is.DescMem, e); err != nil {
+		if err = s.applyMemoryImport(target, is.DescMem, exp); err != nil {
 			return fmt.Errorf("applyMemoryImport: %w", err)
 		}
 	case ImportKindGlobal:
-		if err := s.applyGlobalImport(target, is.DescGlobal, e); err != nil {
+		if err = s.applyGlobalImport(target, is.DescGlobal, exp); err != nil {
 			return fmt.Errorf("applyGlobalImport: %w", err)
 		}
 	default:
@@ -717,42 +733,33 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	target.Exports = make(map[string]*ExportInstance, len(module.ExportSection))
 	for name, exp := range module.ExportSection {
-		index := int(exp.Index)
+		index := exp.Index
+		var ei *ExportInstance
 		switch exp.Kind {
 		case ExportKindFunc:
-			if index >= len(target.Functions) {
-				return nil, fmt.Errorf("unknown function for export")
+			if index >= uint32(len(target.Functions)) {
+				return nil, fmt.Errorf("unknown function for export[%s]", name)
 			}
-			target.Exports[name] = &ExportInstance{
-				Kind:     exp.Kind,
-				Function: target.Functions[index],
-			}
+			ei = &ExportInstance{Kind: exp.Kind, Function: target.Functions[index]}
 		case ExportKindGlobal:
-			if index >= len(target.Globals) {
-				return nil, fmt.Errorf("unknown global for export")
+			if index >= uint32(len(target.Globals)) {
+				return nil, fmt.Errorf("unknown global for export[%s]", name)
 			}
-			target.Exports[name] = &ExportInstance{
-				Kind:   exp.Kind,
-				Global: target.Globals[index],
-			}
+			ei = &ExportInstance{Kind: exp.Kind, Global: target.Globals[index]}
 		case ExportKindMemory:
 			if index != 0 || target.Memory == nil {
-				return nil, fmt.Errorf("unknown memory for export")
+				return nil, fmt.Errorf("unknown memory for export[%s]", name)
 			}
-			target.Exports[name] = &ExportInstance{
-				Kind:   exp.Kind,
-				Memory: target.Memory,
-			}
+			ei = &ExportInstance{Kind: exp.Kind, Memory: target.Memory}
 		case ExportKindTable:
-			if index >= len(target.Tables) {
-				return nil, fmt.Errorf("unknown memory for export")
+			if index >= uint32(len(target.Tables)) {
+				return nil, fmt.Errorf("unknown table for export[%s]", name)
 			}
-			target.Exports[name] = &ExportInstance{
-				Kind:  exp.Kind,
-				Table: target.Tables[index],
-			}
+			ei = &ExportInstance{Kind: exp.Kind, Table: target.Tables[index]}
 		}
-
+		if err = target.addExport(exp.Name, ei); err != nil {
+			return nil, err
+		}
 	}
 	return
 }
@@ -1745,11 +1752,6 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 
 	m := s.getModuleInstance(moduleName)
 
-	_, ok := m.Exports[funcName]
-	if ok {
-		return fmt.Errorf("name %s already exists in module %s", funcName, moduleName)
-	}
-
 	sig, err := getType(fn.Type())
 	if err != nil {
 		return fmt.Errorf("invalid signature: %w", err)
@@ -1762,60 +1764,45 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		ModuleInstance: m,
 	}
 
-	if err := s.engine.Compile(f); err != nil {
+	if err = s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
-	m.Exports[funcName] = &ExportInstance{Kind: ExportKindFunc, Function: f}
 	s.addFunctionInstance(f)
+	if err = m.addExport(funcName, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
+		s.Functions = s.Functions[:len(s.Functions)-1] // revert the add on conflict
+		return err
+	}
 	return nil
 }
 
 func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType ValueType, mutable bool) error {
-	m := s.getModuleInstance(moduleName)
-
-	_, ok := m.Exports[name]
-	if ok {
-		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
-	}
 	g := &GlobalInstance{
 		Val:  value,
 		Type: &GlobalType{Mutable: mutable, ValType: valueType},
 	}
-	m.Exports[name] = &ExportInstance{Kind: ExportKindGlobal, Global: g}
 	s.Globals = append(s.Globals, g)
-	return nil
+
+	m := s.getModuleInstance(moduleName)
+	return m.addExport(name, &ExportInstance{Kind: ExportKindGlobal, Global: g})
 }
 
 func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint32) error {
+	t := newTableInstance(min, max)
+	s.Tables = append(s.Tables, t)
+
 	m := s.getModuleInstance(moduleName)
-
-	_, ok := m.Exports[name]
-	if ok {
-		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
-	}
-
-	instance := newTableInstance(min, max)
-	m.Exports[name] = &ExportInstance{Kind: ExportKindTable, Table: instance}
-	s.Tables = append(s.Tables, instance)
-	return nil
+	return m.addExport(name, &ExportInstance{Kind: ExportKindTable, Table: t})
 }
 
 func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint32) error {
-	m := s.getModuleInstance(moduleName)
-
-	_, ok := m.Exports[name]
-	if ok {
-		return fmt.Errorf("name %s already exists in module %s", name, moduleName)
-	}
-
 	memory := &MemoryInstance{
 		Buffer: make([]byte, uint64(min)*PageSize),
 		Min:    min,
 		Max:    max,
 	}
-	m.Exports[name] = &ExportInstance{Kind: ExportKindMemory, Memory: memory}
 	s.Memories = append(s.Memories, memory)
-	return nil
+	m := s.getModuleInstance(moduleName)
+	return m.addExport(name, &ExportInstance{Kind: ExportKindMemory, Memory: memory})
 }
 
 func (s *Store) getTypeInstance(t *FunctionType) *TypeInstance {
@@ -1832,7 +1819,7 @@ func (s *Store) getTypeInstance(t *FunctionType) *TypeInstance {
 func (s *Store) getModuleInstance(name string) *ModuleInstance {
 	m, ok := s.ModuleInstances[name]
 	if !ok {
-		m = &ModuleInstance{Exports: map[string]*ExportInstance{}}
+		m = &ModuleInstance{Name: name, Exports: map[string]*ExportInstance{}}
 		s.ModuleInstances[name] = m
 	}
 	return m
@@ -1847,11 +1834,11 @@ func newTableInstance(min uint32, max *uint32) *TableInstance {
 	}
 	for i := range tableInst.Table {
 		tableInst.Table[i] = TableElement{
-			FunctionTypeID: UninitializedTableElelemtTypeID,
+			FunctionTypeID: UninitializedTableElementTypeID,
 		}
 	}
 	return tableInst
 }
 
-// We use math.MaxUint64 to represent the uninitialized elements.
-var UninitializedTableElelemtTypeID FunctionTypeID = math.MaxUint64
+// UninitializedTableElementTypeID math.MaxUint64 to represent the uninitialized elements.
+var UninitializedTableElementTypeID FunctionTypeID = math.MaxUint64

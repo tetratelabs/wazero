@@ -16,6 +16,11 @@
     ;; start function referencing a function by symbolic ID
 	(start $hello)
 
+    ;; export a function before it was defined, given its symbolic ID
+    (export "AddInt" (func $addInt))
+    ;; export a function before it was defined, with an empty name
+    (export "" (func 3))
+
 	;; from https://github.com/summerwind/the-art-of-webassembly-go/blob/main/chapter1/addint/addint.wat
     (func $addInt ;; TODO: function exports (export "AddInt")
         (param $value_1 i32) (param $value_2 i32)
@@ -24,6 +29,4 @@
         local.get 1 ;; TODO: instruction variables $value_2
         i32.add
     )
-    ;; export a function given its symbolic ID
-    (export "AddInt" (func $addInt))
 )

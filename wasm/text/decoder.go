@@ -51,7 +51,7 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 				Kind:  wasm.ExportKindFunc,
 				Index: f.funcIndex.numeric,
 			}
-			result.ExportSection[e.Name] = e
+			result.ExportSection[f.name] = e
 		}
 	}
 

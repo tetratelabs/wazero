@@ -51,7 +51,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
 	if m.NameSection != nil {
 		nameSection := append(sizePrefixedName, encodeNameSectionData(m.NameSection)...)
-		bytes = append(bytes, encodeSection(SectionIDCustom, nameSection)...)
+		bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
 	}
 	return
 }

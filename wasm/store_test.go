@@ -1,17 +1,16 @@
 package wasm
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetModuleInstance(t *testing.T) {
+func TestStore_GetModuleInstance(t *testing.T) {
 	name := "test"
 
-	// 'jit' and 'wazeroir' package cannot be used because of circular import.
-	// Here we will use 'nil' instead. Should we have an Engine for testing?
-	s := NewStore(nil)
+	s := NewStore(nopEngineInstance)
 
 	m1 := s.getModuleInstance(name)
 	require.Equal(t, m1, s.ModuleInstances[name])
@@ -21,9 +20,40 @@ func TestGetModuleInstance(t *testing.T) {
 	require.Equal(t, m1, m2)
 }
 
-func TestBuildFunctionInstances_FunctionNames(t *testing.T) {
+func TestStore_AddHostFunction(t *testing.T) {
+	s := NewStore(nopEngineInstance)
+	hostFunction := func(_ *HostFunctionCallContext) {
+	}
+
+	err := s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction))
+	require.NoError(t, err)
+
+	// The function was added to the store, prefixed by the owning module name
+	require.Equal(t, 1, len(s.Functions))
+	fn := s.Functions[0]
+	require.Equal(t, "test.fn", fn.Name)
+
+	// The function was exported in the module
+	m := s.getModuleInstance("test")
+	require.Equal(t, 1, len(m.Exports))
+	exp, ok := m.Exports["fn"]
+	require.True(t, ok)
+
+	// Trying to add it again should fail
+	hostFunction2 := func(_ *HostFunctionCallContext) {
+	}
+	err = s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction2))
+	require.EqualError(t, err, `"fn" is already exported in module "test"`)
+
+	// Any side effects should be reverted
+	require.Equal(t, []*FunctionInstance{fn}, s.Functions)
+	require.Equal(t, map[string]*ExportInstance{"fn": exp}, m.Exports)
+}
+
+func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 	name := "test"
-	s := NewStore(nil)
+
+	s := NewStore(nopEngineInstance)
 	mi := s.getModuleInstance(name)
 
 	zero := Index(0)
@@ -51,4 +81,17 @@ func TestBuildFunctionInstances_FunctionNames(t *testing.T) {
 
 	// We expect unknown for any functions missing data in the NameSection
 	require.Equal(t, []string{"unknown", "two", "unknown", "four", "five"}, names)
+}
+
+var nopEngineInstance Engine = &nopEngine{}
+
+type nopEngine struct {
+}
+
+func (e *nopEngine) Call(_ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+	return nil, nil
+}
+
+func (e *nopEngine) Compile(_ *FunctionInstance) error {
+	return nil
 }

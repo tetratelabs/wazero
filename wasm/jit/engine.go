@@ -219,13 +219,13 @@ const (
 	compiledFunctionModuleInstanceAddressOffset = 16
 
 	// Offsets for wasm.TableElement
-	tableElementFunctionAddressOffest = 0
-	tableElementFunctionTypeIDOffest  = 8
+	tableElementFunctionAddressOffset = 0
+	tableElementFunctionTypeIDOffset  = 8
 
 	// Offsets for wasm.ModuleInstance
-	moduleInstanceGlobalsOffset = 32
-	moduleInstanceMemoryOffset  = 56
-	moduleInstanceTablesOffset  = 64
+	moduleInstanceGlobalsOffset = 48
+	moduleInstanceMemoryOffset  = 72
+	moduleInstanceTablesOffset  = 80
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset = 0
