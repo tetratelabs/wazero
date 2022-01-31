@@ -351,15 +351,15 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	//
 	// For example, given the call stack:
 	//	 "original host function" --(engine.Call)--> Wasm func A --> Host func --(engine.Call)--> Wasm function B,
-	// if the top Wasm function panics, we go back to the "original host function".
+	// if the top Wasm function B panics, we go back to the "original host function".
 	shouldRecover := e.globalContext.callFrameStackPointer == 0
 	defer func() {
 		if shouldRecover {
 			if v := recover(); v != nil {
-				// if buildoptions.IsDebugMode {
+				if buildoptions.IsDebugMode {
 				debug.PrintStack()
 				// }
-				// runtime.Breakpoint()
+				runtime.Breakpoint()
 
 				var frames []string
 				for i := uint64(0); i < e.globalContext.callFrameStackPointer; i++ {
