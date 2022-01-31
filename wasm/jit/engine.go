@@ -357,8 +357,8 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 		if shouldRecover {
 			if v := recover(); v != nil {
 				if buildoptions.IsDebugMode {
-				debug.PrintStack()
-				// }
+					debug.PrintStack()
+				}
 				runtime.Breakpoint()
 
 				var frames []string
