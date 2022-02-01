@@ -6526,7 +6526,8 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
 		require.NoError(t, err)
 
-		compiler.returnFunction()
+		err = compiler.returnFunction()
+		require.NoError(t, err)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.generate()
