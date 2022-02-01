@@ -5180,7 +5180,7 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16, before
 
 		// Find the address aquisition target instruction.
 		target := base
-		for {
+		for target != nil {
 			// Advance until we have the target.As has the given instruction kind.
 			target = target.Link
 			if target.As == beforeAcquisitionTargetInstruction {
@@ -5189,6 +5189,10 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16, before
 				target = target.Link
 				break
 			}
+		}
+
+		if target == nil {
+			return fmt.Errorf("target instruction not found for read instruction address")
 		}
 
 		// Now we can calculate the "offset" in the LEA instruction.

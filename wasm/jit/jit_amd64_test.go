@@ -6477,3 +6477,66 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		}
 	})
 }
+
+func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
+	t.Run("invalid", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after JMP.
+		compiler.readInstructionAddress(x86.REG_AX, obj.AJMP)
+
+		// If generate the code without JMP after readInstructionAddress,
+		// the call back added must return error.
+		_, _, _, err = compiler.generate()
+		require.Error(t, err)
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		const destinationRegister = x86.REG_AX
+		// Set the acquisition target instruction to the one after RET,
+		// and read the absolute address into destinationRegister.
+		compiler.readInstructionAddress(destinationRegister, obj.ARET)
+
+		// Jump to the instruction after RET below via the absolute
+		// address stored in destinationRegister.
+		jmpToAfterRet := compiler.newProg()
+		jmpToAfterRet.As = obj.AJMP
+		jmpToAfterRet.To.Type = obj.TYPE_REG
+		jmpToAfterRet.To.Reg = destinationRegister
+		compiler.addInstruction(jmpToAfterRet)
+
+		ret := compiler.newProg()
+		ret.As = obj.ARET
+		compiler.addInstruction(ret)
+
+		// This could be the read instruction target as this is the
+		// right after RET. Thefore, the jmp instruction above
+		// must target here.
+		const expectedReturnValue uint32 = 10000
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+		require.NoError(t, err)
+
+		compiler.returnFunction()
+
+		// Generate the code under test.
+		code, _, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
+	})
+}
