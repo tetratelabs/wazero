@@ -1263,8 +1263,6 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = reg
 		c.addInstruction(prog)
-	} else if pickTarget.onConditionalRegister() {
-		panic("TODO: compilePick for targets on a conditonal register")
 	}
 	// Now we already placed the picked value on the register,
 	// so push the location onto the stack.
@@ -5202,7 +5200,7 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16, before
 		binary.LittleEndian.PutUint32(code[readInstructionAddress.Pc+3:], offset)
 
 		// See the comment at readInstructionAddress.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
-		code[readInstructionAddress.Pc+2] = code[readInstructionAddress.Pc+2] & 0b01111111
+		code[readInstructionAddress.Pc+2] &= 0b01111111
 		return nil
 	})
 }

@@ -147,7 +147,7 @@ func newJITEnvironment() *jitEnv {
 	return &jitEnv{
 		eng: newEngine(),
 		moduleInstance: &wasm.ModuleInstance{
-			Memory:  &wasm.MemoryInstance{Buffer: make([]byte, wasm.PageSize*defaultMemoryPageNumInTest)},
+			Memory:  &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
 			Tables:  []*wasm.TableInstance{{}},
 			Globals: []*wasm.GlobalInstance{},
 		},

@@ -640,7 +640,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 			return rollbackFuncs, fmt.Errorf("multiple memories not supported")
 		}
 		target.Memory = &MemoryInstance{
-			Buffer: make([]byte, uint64(memSec.Min)*PageSize),
+			Buffer: make([]byte, memoryPagesToBytesNum(memSec.Min)),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
 		}
@@ -670,11 +670,11 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 		}
 
 		size := uint64(offset) + uint64(len(d.Init))
-		max := uint64(math.MaxUint32)
+		maxPage := uint32(memoryMaxPages)
 		if int(d.MemoryIndex) < len(module.MemorySection) && module.MemorySection[d.MemoryIndex].Max != nil {
-			max = uint64(*module.MemorySection[d.MemoryIndex].Max)
+			maxPage = *module.MemorySection[d.MemoryIndex].Max
 		}
-		if size > max*PageSize {
+		if size > memoryPagesToBytesNum(maxPage) {
 			return rollbackFuncs, fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
 		}
 
@@ -1834,7 +1834,7 @@ func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint3
 
 func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
-		Buffer: make([]byte, uint64(min)*PageSize),
+		Buffer: make([]byte, memoryPagesToBytesNum(min)),
 		Min:    min,
 		Max:    max,
 	}
