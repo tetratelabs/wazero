@@ -323,6 +323,12 @@ func (w *WASIEnvironment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32)
 	return ESUCCESS
 }
 
+// args_sizes_get is a WASI API that returns the number of the command-line arguments and the total buffer size that
+// args_get API will require to store the value of the command-line arguments.
+// * argsCountPtr: a pointer to an address of uint32 type. The number of the command-line arguments is written there.
+// * argsBufSizePtr: a pointer to an address of uint32 type. The number of the command-line arguments is written there.
+//
+// Link to the actual spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
 func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, argsCountPtr uint32, argsBufSizePtr uint32) Errno {
 	if !ctx.Memory.PutUint32(argsCountPtr, uint32(len(w.args.strings))) {
 		return EINVAL
@@ -334,6 +340,17 @@ func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, args
 	return ESUCCESS
 }
 
+// args_get is a WASI API to read the command-line argument data.
+// * argsPtr:
+//     A pointer to a buffer. args_get writes multiple *C.char pointers in sequence there. In other words, this is an array of *char in C.
+//     Each *C.char of them points to a command-line argument that is a null-terminated string.
+//     The number of this *C.char matches the value that args_sizes_get returns in argsCountPtr.
+// * argsBufPtr:
+//     A pointer to a buffer. args_get writes the command line arguments as null-terminated strings in the given buffer.
+//     The total number of bytes written there is the value that args_sizes_get returns in argsBufSizePtr. The caller must ensure that
+//     the buffer has the enough size.
+//     Each *C.char pointer that can be obtained from argsPtr points to the beginning of each of these null-terminated strings.
+// Link to the actual spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
 func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
 	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.strings))*SIZE_UINT32) || !ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
 		return EINVAL

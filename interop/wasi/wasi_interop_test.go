@@ -1,4 +1,7 @@
 // package wasi_interop tests wazero's WASI wasi_snapshot_preview1 is compatible with at least one runtime.
+// Links:
+//    - Spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
+//    - Witx: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/witx/wasi_snapshot_preview1.witx
 //
 // We use tinygo, to perform these tests as the maintainers are familiar with it.
 //
@@ -21,9 +24,9 @@ import (
 )
 
 // Test args_sizes_get and args_get. args_sizes_get must be used to know the length and the
-// size of the result of args_get, so both of them are used at the same time to retreive the
-// WASI's arguments.
-func Test_ArgsAPI(t *testing.T) {
+// size of the result of args_get, so TinyGo calls the both of them together to retrieve the
+// WASI's arguments. Any other language runtime would do the same things.
+func Test_ArgsSizesGet_ArgsGet(t *testing.T) {
 	tests := []struct {
 		name         string
 		args         []string
@@ -68,11 +71,11 @@ func Test_ArgsAPI(t *testing.T) {
 			// XXX Strictly speaking, this test code violates the WASI specification.
 			// The WASI specification does not guarantee that a function exported from a WASI command
 			// can be called outside the context of `_start`.
-			//   > Command instances may assume that none of their exports are accessed outside the duraction of that call.
-			// Link: https://github.com/WebAssembly/WASI/blob/db4e3a12dadbe3e7e41dddd04888db3bf1cf7a96/design/application-abi.md
+			// > Command instances may assume that none of their exports are accessed outside the duraction of that call.
+			// Link: https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md
 			// In fact, calling a WASI function from a normal exported function without calling `_start` first in TinyGo crashes.
 			//
-			// However, once `_start` is called, it appears that WASI functions can be called from exported functions.
+			// However, once `_start` is called, it appears that WASI functions can be called from exported functions in TinyGo.
 			// We believe it's unlikely TinyGo wil break this behavior in the future.
 			// So, we call the test helper functions directly after calling `_start` once for more concise testing.
 
