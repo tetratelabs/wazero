@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -94,4 +95,65 @@ func (e *nopEngine) Call(_ *FunctionInstance, _ ...uint64) (results []uint64, er
 
 func (e *nopEngine) Compile(_ *FunctionInstance) error {
 	return nil
+}
+
+func TestStore_addFunctionInstance(t *testing.T) {
+	t.Run("too many functions", func(t *testing.T) {
+		s := NewStore(nopEngineInstance)
+		const max = 10
+		s.maximumFunctionAddress = max
+		s.Functions = make([]*FunctionInstance, max)
+		err := s.addFunctionInstance(nil)
+		require.Error(t, err)
+	})
+	t.Run("ok", func(t *testing.T) {
+		s := NewStore(nopEngineInstance)
+		for i := 0; i < 10; i++ {
+			f := &FunctionInstance{}
+			require.Len(t, s.Functions, i)
+
+			err := s.addFunctionInstance(f)
+			require.NoError(t, err)
+
+			// After the addition, one instance is added.
+			require.Len(t, s.Functions, i+1)
+
+			// The added function instance must have i for its funcaddr.
+			require.Equal(t, FunctionAddress(i), f.Address)
+		}
+	})
+}
+
+func TestStore_getTypeInstance(t *testing.T) {
+	t.Run("too many functions", func(t *testing.T) {
+		s := NewStore(nopEngineInstance)
+		const max = 10
+		s.maximumFunctionTypes = max
+		s.TypeIDs = make(map[string]FunctionTypeID)
+		for i := 0; i < max; i++ {
+			s.TypeIDs[strconv.Itoa(i)] = 0
+		}
+		_, err := s.getTypeInstance(&FunctionType{})
+		require.Error(t, err)
+	})
+	t.Run("ok", func(t *testing.T) {
+		for _, tc := range []*FunctionType{
+			{Params: []ValueType{}},
+			{Params: []ValueType{ValueTypeF32}},
+			{Results: []ValueType{ValueTypeF64}},
+			{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI64}},
+		} {
+			tc := tc
+			t.Run(tc.String(), func(t *testing.T) {
+				s := NewStore(nopEngineInstance)
+				actual, err := s.getTypeInstance(tc)
+				require.NoError(t, err)
+
+				expectedTypeID, ok := s.TypeIDs[tc.String()]
+				require.True(t, ok)
+				require.Equal(t, expectedTypeID, actual.TypeID)
+				require.Equal(t, tc, actual.Type)
+			})
+		}
+	})
 }
