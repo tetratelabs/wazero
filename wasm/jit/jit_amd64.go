@@ -5039,7 +5039,7 @@ func (c *amd64Compiler) returnFunction() error {
 		c.addInstruction(putReturnStackBasePointer)
 	}
 
-	// 3) Jump into the address of "ra.caller".
+	// 2) Jump into the address of "ra.caller".
 	{
 		readReturnAddress := c.newProg()
 		readReturnAddress.As = x86.AMOVQ
@@ -5198,7 +5198,7 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16, before
 		// Now we can calculate the "offset" in the LEA instruction.
 		offset := uint32(target.Pc) - uint32(base.Pc)
 
-		// Replace the place holder bytes by the actual offset.
+		// Replace the placeholder bytes by the actual offset.
 		binary.LittleEndian.PutUint32(code[readInstructionAddress.Pc+3:], offset)
 
 		// See the comment at readInstructionAddress.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
@@ -5423,7 +5423,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	c.addInstruction(readModuleInstanceAddress)
 
 	// If the module instance address stays the same, we could skip the entire code below.
-	// The rationale/idea for this is that, in almost all use cases, users inistantiate single
+	// The rationale/idea for this is that, in almost all use cases, users instantiate a single
 	// Wasm binary and run the functions from it, rather than doing import/export on multiple
 	// binaries. As a result, this cmp and jmp instruction sequence below must be easy for
 	// x64 CPU to do branch prediction since almost 100% jump happens across function calls.
