@@ -35,8 +35,8 @@ type (
 		// do type-checks on indirect function calls.
 		TypeIDs map[string]FunctionTypeID
 
-		// maxmimuFunctionAddress and maxmimuFunctionTypes represent the limit on the number of each instance type in a store.
-		maxmimuFunctionAddress, maxmimuFunctionTypes int
+		// maximumFunctionAddress and maximumFunctionTypes represent the limit on the number of each instance type in a store.
+		maximumFunctionAddress, maximumFunctionTypes int
 
 		// The followings fields match the definition of Store in the specification.
 
@@ -182,8 +182,8 @@ type (
 )
 
 const (
-	maxmimuFunctionAddress = math.MaxUint32
-	maxmimuFunctionTypes   = maxmimuFunctionAddress
+	maximumFunctionAddress = math.MaxUint32
+	maximumFunctionTypes   = maximumFunctionAddress
 )
 
 // addExport adds and indexes the given export or errs if the name is already exported.
@@ -216,8 +216,8 @@ func NewStore(engine Engine) *Store {
 		ModuleInstances:        map[string]*ModuleInstance{},
 		TypeIDs:                map[string]FunctionTypeID{},
 		engine:                 engine,
-		maxmimuFunctionAddress: maxmimuFunctionAddress,
-		maxmimuFunctionTypes:   maxmimuFunctionTypes,
+		maximumFunctionAddress: maximumFunctionAddress,
+		maximumFunctionTypes:   maximumFunctionTypes,
 	}
 }
 
@@ -330,7 +330,7 @@ func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp 
 
 func (s *Store) addFunctionInstance(f *FunctionInstance) error {
 	l := len(s.Functions)
-	if l >= s.maxmimuFunctionAddress {
+	if l >= s.maximumFunctionAddress {
 		return fmt.Errorf("too many functions in a store")
 	}
 	f.Address = FunctionAddress(len(s.Functions))
@@ -1848,7 +1848,7 @@ func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
 	id, ok := s.TypeIDs[key]
 	if !ok {
 		l := len(s.TypeIDs)
-		if l >= s.maxmimuFunctionTypes {
+		if l >= s.maximumFunctionTypes {
 			return nil, fmt.Errorf("too many function types in a store")
 		}
 		id = FunctionTypeID(len(s.TypeIDs))

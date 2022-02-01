@@ -101,7 +101,7 @@ func TestStore_addFunctionInstance(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
 		s := NewStore(nopEngineInstance)
 		const max = 10
-		s.maxmimuFunctionAddress = max
+		s.maximumFunctionAddress = max
 		s.Functions = make([]*FunctionInstance, max)
 		err := s.addFunctionInstance(nil)
 		require.Error(t, err)
@@ -128,7 +128,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
 		s := NewStore(nopEngineInstance)
 		const max = 10
-		s.maxmimuFunctionTypes = max
+		s.maximumFunctionTypes = max
 		s.TypeIDs = make(map[string]FunctionTypeID)
 		for i := 0; i < max; i++ {
 			s.TypeIDs[strconv.Itoa(i)] = 0
