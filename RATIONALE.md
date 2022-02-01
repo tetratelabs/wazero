@@ -19,7 +19,7 @@ https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/m
 The possible number of function instances in [a store](https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0) is not specified in the WebAssembly specifications since [`funcaddr`](https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) corresponding to a function instance can be arbitrary number. 
 In wazero, we choose to use `uint32` to represent `funcaddr`. Therefore the maximum number of function instances a store can instantiate is limited to 2^32. 
 
-That is because not only we _believe_ that all cases are fine with the limitation, but also we have not way to test wazero runtimes under these unusual circum stantaces.
+That is because not only we _believe_ that all use cases are fine with the limitation, but also we have no way to test wazero runtimes under these unusual circum stantaces.
 
 #### Number of function types
 
