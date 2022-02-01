@@ -77,7 +77,7 @@ func runBase64Benches(b *testing.B, store *wasm.Store) {
 }
 
 func runFibBenches(b *testing.B, store *wasm.Store) {
-	for _, num := range []int{5, 10, 20} {
+	for _, num := range []int{5, 10, 20, 30} {
 		num := num
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("fib_for_%d", num), func(b *testing.B) {
