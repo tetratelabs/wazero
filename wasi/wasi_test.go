@@ -46,9 +46,9 @@ func TestWasiStringArray(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expectedBufSize, wasiStringsArray.totalBufSize)
-			require.Equal(t, len(wasiStringsArray.strings), len(tc.args))
+			require.Equal(t, len(wasiStringsArray.nullTerminatedValues), len(tc.args))
 			for i, arg := range tc.args {
-				wasiString := wasiStringsArray.strings[i]
+				wasiString := wasiStringsArray.nullTerminatedValues[i]
 				require.Equal(t, wasiString[0:len(wasiString)-1], []byte(arg))
 				require.Equal(t, wasiString[len(wasiString)-1], byte(0))
 			}
@@ -234,7 +234,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 		},
 		{
 			name:       "barely out-of-bound argsPtr",
-			argsPtr:    memorySize - SIZE_UINT32*uint32(len(argsArray.strings)) + 1,
+			argsPtr:    memorySize - SIZE_UINT32*uint32(len(argsArray.nullTerminatedValues)) + 1,
 			argsBufPtr: inMemory,
 		},
 		{
