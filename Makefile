@@ -23,9 +23,9 @@ build.bench:
 build.examples:
 	@$(MAKE) WASI_TARGET_DIR=./examples/testdata build.wasi
 
-.PHONY: build.wasi-testdata
-build.wasi-testdata:
-	@$(MAKE) WASI_TARGET_DIR=./wasi/testdata build.wasi
+.PHONY: build.interop
+build.interop:
+	@$(MAKE) WASI_TARGET_DIR=./interop/wasi/testdata build.wasi
 
 .PHONY: build.wasi
 build.wasi: $(WASI_TARGET_DIR)
