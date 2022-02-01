@@ -264,9 +264,9 @@ func (w *WASIEnvironment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32,
 
 	var nwritten uint32
 	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
+		iovPtr := iovsPtr + i*SIZE_UINT32*2
 		offset := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr:])
-		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+4:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+SIZE_UINT32:])
 		n, err := writer.Write(ctx.Memory.Buffer[offset : offset+l])
 		if err != nil {
 			panic(err)
@@ -293,9 +293,9 @@ func (w *WASIEnvironment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, 
 
 	var nread uint32
 	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
+		iovPtr := iovsPtr + i*SIZE_UINT32*2
 		offset := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr:])
-		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+4:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+SIZE_UINT32:])
 		n, err := reader.Read(ctx.Memory.Buffer[offset : offset+l])
 		nread += uint32(n)
 		if errors.Is(err, io.EOF) {
@@ -335,12 +335,12 @@ func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, args
 }
 
 func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
-	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.strings))*4) || !ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
+	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.strings))*SIZE_UINT32) || !ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
 		return EINVAL
 	}
 	for _, arg := range w.args.strings {
 		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argsPtr:], argsBufPtr)
-		argsPtr += 4
+		argsPtr += SIZE_UINT32
 		argsBufPtr += uint32(copy(ctx.Memory.Buffer[argsBufPtr:], arg))
 	}
 
