@@ -1,7 +1,5 @@
 package wasm
 
-const PageSize uint64 = 65536
-
 // Engine is the interface implemented by interpreters.
 type Engine interface {
 	// Call invokes a function instance f with given parameters.

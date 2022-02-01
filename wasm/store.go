@@ -609,7 +609,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 			return rollbackFuncs, fmt.Errorf("multiple memories not supported")
 		}
 		target.Memory = &MemoryInstance{
-			Buffer: make([]byte, uint64(memSec.Min)*PageSize),
+			Buffer: make([]byte, memoryPagesToBytesNum(memSec.Min)),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
 		}
@@ -639,11 +639,11 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 		}
 
 		size := uint64(offset) + uint64(len(d.Init))
-		max := uint64(math.MaxUint32)
+		maxPage := uint32(memoryMaxPages)
 		if int(d.MemoryIndex) < len(module.MemorySection) && module.MemorySection[d.MemoryIndex].Max != nil {
-			max = uint64(*module.MemorySection[d.MemoryIndex].Max)
+			maxPage = *module.MemorySection[d.MemoryIndex].Max
 		}
-		if size > max*PageSize {
+		if size > memoryPagesToBytesNum(maxPage) {
 			return rollbackFuncs, fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
 		}
 
@@ -1796,7 +1796,7 @@ func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint3
 
 func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
-		Buffer: make([]byte, uint64(min)*PageSize),
+		Buffer: make([]byte, memoryPagesToBytesNum(min)),
 		Min:    min,
 		Max:    max,
 	}
@@ -1842,3 +1842,26 @@ func newTableInstance(min uint32, max *uint32) *TableInstance {
 
 // UninitializedTableElementTypeID math.MaxUint64 to represent the uninitialized elements.
 var UninitializedTableElementTypeID FunctionTypeID = math.MaxUint64
+
+func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
+	currentBytesNum := uint64(len(m.Buffer))
+	currentPageNum := memoryBytesNumToPages(currentBytesNum)
+
+	maxPages := uint32(MemoryPageSize)
+	if m.Max != nil {
+		maxPages = *m.Max
+	}
+
+	// If exceeds the max of memory size, we push -1 according to the spec.
+	if currentPageNum+newPages > maxPages {
+		v := int32(-1)
+		return uint32(v)
+	} else {
+		m.Buffer = append(m.Buffer, make([]byte, memoryPagesToBytesNum(newPages))...)
+		return currentPageNum
+	}
+}
+
+func (m *MemoryInstance) PageSize() (result uint32) {
+	return memoryBytesNumToPages(uint64(len(m.Buffer)))
+}

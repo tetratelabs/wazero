@@ -617,25 +617,14 @@ func (e *engine) builtinFunctionGrowCallFrameStack() {
 
 func (e *engine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	newPages := e.popValue()
-	max := uint64(math.MaxUint32)
-	if mem.Max != nil {
-		max = uint64(*mem.Max) * wasm.PageSize
-	}
 
-	currentLen := uint64(len(mem.Buffer))
-	// If exceeds the max of memory size, we push -1 according to the spec.
-	if uint64(newPages*wasm.PageSize+currentLen) > max {
-		v := int32(-1)
-		e.pushValue(uint64(v))
-	} else {
-		e.pushValue(currentLen / wasm.PageSize) // Grow returns the prior memory size on change.
-		mem.Buffer = append(mem.Buffer, make([]byte, newPages*wasm.PageSize)...)
+	res := mem.Grow(uint32(newPages))
+	e.pushValue(uint64(res))
 
-		// Update the moduleContext's fields as they become stale after the update ^^.
-		bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
-		e.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
-		e.moduleContext.memoryElement0Address = bufSliceHeader.Data
-	}
+	// Update the moduleContext's fields as they become stale after the update ^^.
+	bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
+	e.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
+	e.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
 func (e *engine) Compile(f *wasm.FunctionInstance) (err error) {

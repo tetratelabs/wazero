@@ -745,24 +745,14 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 			}
 		case wazeroir.OperationKindMemorySize:
 			{
-				v := uint64(len(memoryInst.Buffer)) / wasm.PageSize
-				it.push(v)
+				it.push(uint64(memoryInst.PageSize()))
 				frame.pc++
 			}
 		case wazeroir.OperationKindMemoryGrow:
 			{
 				n := it.pop()
-				max := uint64(math.MaxUint32)
-				if memoryInst.Max != nil {
-					max = uint64(*memoryInst.Max) * wasm.PageSize
-				}
-				if uint64(n*wasm.PageSize+uint64(len(memoryInst.Buffer))) > max {
-					v := int32(-1)
-					it.push(uint64(v))
-				} else {
-					it.push(uint64(len(memoryInst.Buffer)) / wasm.PageSize)
-					memoryInst.Buffer = append(memoryInst.Buffer, make([]byte, n*wasm.PageSize)...)
-				}
+				res := memoryInst.Grow(uint32(n))
+				it.push(uint64(res))
 				frame.pc++
 			}
 		case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstI64,

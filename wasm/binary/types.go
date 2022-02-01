@@ -64,13 +64,13 @@ func decodeMemoryType(r io.Reader) (*wasm.MemoryType, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ret.Min > uint32(wasm.PageSize) {
+	if ret.Min > uint32(wasm.MemoryPageSize) {
 		return nil, fmt.Errorf("memory min must be at most 65536 pages (4GiB)")
 	}
 	if ret.Max != nil {
 		if *ret.Max < ret.Min {
 			return nil, fmt.Errorf("memory size minimum must not be greater than maximum")
-		} else if *ret.Max > uint32(wasm.PageSize) {
+		} else if *ret.Max > uint32(wasm.MemoryPageSize) {
 			return nil, fmt.Errorf("memory max must be at most 65536 pages (4GiB)")
 		}
 	}
