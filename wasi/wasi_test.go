@@ -165,7 +165,8 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	wasiEnv := NewEnvironment(argsOpt)
 	hostFunctionCallContext := buildMockHostFunctionCallContext()
 
-	outOfBounds := uint32(len(hostFunctionCallContext.Memory.Buffer))
+	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
+	inMemory := uint32(0)
 
 	tests := []struct {
 		name           string
@@ -174,23 +175,23 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	}{
 		{
 			name:           "out-of-bound argsCountPtr",
-			argsCountPtr:   outOfBounds,
-			argsBufSizePtr: 0,
+			argsCountPtr:   memorySize,
+			argsBufSizePtr: inMemory,
 		},
 		{
 			name:           "out-of-bound argsBufSizePtr",
-			argsCountPtr:   0,
-			argsBufSizePtr: outOfBounds,
+			argsCountPtr:   inMemory,
+			argsBufSizePtr: memorySize,
 		},
 		{
-			name:           "out-of-bound boundary argsCountPtr",
-			argsCountPtr:   outOfBounds - SIZE_UINT32 + 1,
-			argsBufSizePtr: 0,
+			name:           "barely out-of-bound argsCountPtr",
+			argsCountPtr:   memorySize - SIZE_UINT32 + 1,
+			argsBufSizePtr: inMemory,
 		},
 		{
-			name:           "out-of-bound boundary argsBufSizePtr",
-			argsCountPtr:   0,
-			argsBufSizePtr: outOfBounds - SIZE_UINT32 + 1,
+			name:           "barely out-of-bound argsBufSizePtr",
+			argsCountPtr:   inMemory,
+			argsBufSizePtr: memorySize - SIZE_UINT32 + 1,
 		},
 	}
 
@@ -211,7 +212,8 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	wasiEnv := NewEnvironment(argsOpt)
 	hostFunctionCallContext := buildMockHostFunctionCallContext()
 
-	outOfBounds := uint32(len(hostFunctionCallContext.Memory.Buffer))
+	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
+	inMemory := uint32(0)
 	argsArray, err := newWASIStringArray(dummyArgs)
 	require.NoError(t, err)
 
@@ -222,23 +224,23 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	}{
 		{
 			name:       "out-of-bound argsPtr",
-			argsPtr:    outOfBounds,
-			argsBufPtr: 0,
+			argsPtr:    memorySize,
+			argsBufPtr: inMemory,
 		},
 		{
 			name:       "out-of-bound argsBufPtr",
-			argsPtr:    0,
-			argsBufPtr: outOfBounds,
+			argsPtr:    inMemory,
+			argsBufPtr: memorySize,
 		},
 		{
-			name:       "out-of-bound boundary argsPtr",
-			argsPtr:    outOfBounds - SIZE_UINT32*uint32(len(argsArray.strings)) + 1,
-			argsBufPtr: 0,
+			name:       "barely out-of-bound argsPtr",
+			argsPtr:    memorySize - SIZE_UINT32*uint32(len(argsArray.strings)) + 1,
+			argsBufPtr: inMemory,
 		},
 		{
-			name:       "out-of-bound boundary argsBufPtr",
-			argsPtr:    0,
-			argsBufPtr: outOfBounds - argsArray.totalBufSize + 1,
+			name:       "barely out-of-bound argsBufPtr",
+			argsPtr:    inMemory,
+			argsBufPtr: memorySize - argsArray.totalBufSize + 1,
 		},
 	}
 
