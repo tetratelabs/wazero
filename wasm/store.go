@@ -35,6 +35,9 @@ type (
 		// do type-checks on indirect function calls.
 		TypeIDs map[string]FunctionTypeID
 
+		// maxmimuFunctionAddress and maxmimuFunctionTypes represent the limit on the number of each instance type in a store.
+		maxmimuFunctionAddress, maxmimuFunctionTypes int
+
 		// The followings fields match the definition of Store in the specification.
 
 		// Functions holds function instances (https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0),
@@ -138,7 +141,7 @@ type (
 		// Note: we intentionally use "[]TableElement", not "[]*TableElement",
 		// because the JIT engine accesses this slice directly from assembly.
 		// If pointer type is used, the access becomes two level indirection (two hops of pointer jumps)
-		// which is a bit costly. TableElement is 128 bit (two 64bit fields) so the cost of using value type
+		// which is a bit costly. TableElement is 96 bit (32 and 64 bit fields) so the cost of using value type
 		// would be ignorable.
 		Table []TableElement
 		Min   uint32
@@ -175,7 +178,12 @@ type (
 	// FunctionTypeID is an uniquely assigned integer for a function type.
 	// This is wazero specific runtime object and specific to a store,
 	// and used at runtime to do type-checks on indirect function calls.
-	FunctionTypeID uint64
+	FunctionTypeID uint32
+)
+
+const (
+	maxmimuFunctionAddress = math.MaxUint32
+	maxmimuFunctionTypes   = maxmimuFunctionAddress
 )
 
 // addExport adds and indexes the given export or errs if the name is already exported.
@@ -204,13 +212,23 @@ func (f *FunctionInstance) IsHostFunction() bool {
 }
 
 func NewStore(engine Engine) *Store {
-	return &Store{ModuleInstances: map[string]*ModuleInstance{}, TypeIDs: map[string]FunctionTypeID{}, engine: engine}
+	return &Store{
+		ModuleInstances:        map[string]*ModuleInstance{},
+		TypeIDs:                map[string]FunctionTypeID{},
+		engine:                 engine,
+		maxmimuFunctionAddress: maxmimuFunctionAddress,
+		maxmimuFunctionTypes:   maxmimuFunctionTypes,
+	}
 }
 
 func (s *Store) Instantiate(module *Module, name string) error {
 	instance := &ModuleInstance{Name: name}
 	for _, t := range module.TypeSection {
-		instance.Types = append(instance.Types, s.getTypeInstance(t))
+		typeInstance, err := s.getTypeInstance(t)
+		if err != nil {
+			return err
+		}
+		instance.Types = append(instance.Types, typeInstance)
 	}
 
 	s.ModuleInstances[name] = instance
@@ -310,9 +328,14 @@ func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp 
 	return
 }
 
-func (s *Store) addFunctionInstance(f *FunctionInstance) {
+func (s *Store) addFunctionInstance(f *FunctionInstance) error {
+	l := len(s.Functions)
+	if l >= s.maxmimuFunctionAddress {
+		return fmt.Errorf("too many functions in a store")
+	}
 	f.Address = FunctionAddress(len(s.Functions))
 	s.Functions = append(s.Functions, f)
+	return nil
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
@@ -576,9 +599,14 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			}
 		}
 
+		typeInstace, err := s.getTypeInstance(module.TypeSection[typeIndex])
+		if err != nil {
+			return rollbackFuncs, err
+		}
+
 		f := &FunctionInstance{
 			Name:           name,
-			FunctionType:   s.getTypeInstance(module.TypeSection[typeIndex]),
+			FunctionType:   typeInstace,
 			Body:           module.CodeSection[codeIndex].Body,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
 			ModuleInstance: target,
@@ -1757,10 +1785,15 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		return fmt.Errorf("invalid signature: %w", err)
 	}
 
+	typeInstace, err := s.getTypeInstance(sig)
+	if err != nil {
+		return err
+	}
+
 	f := &FunctionInstance{
 		Name:           fmt.Sprintf("%s.%s", moduleName, funcName),
 		HostFunction:   &fn,
-		FunctionType:   s.getTypeInstance(sig),
+		FunctionType:   typeInstace,
 		ModuleInstance: m,
 	}
 
@@ -1805,14 +1838,18 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 	return m.addExport(name, &ExportInstance{Kind: ExportKindMemory, Memory: memory})
 }
 
-func (s *Store) getTypeInstance(t *FunctionType) *TypeInstance {
+func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
 	key := t.String()
 	id, ok := s.TypeIDs[key]
 	if !ok {
+		l := len(s.TypeIDs)
+		if l >= s.maxmimuFunctionTypes {
+			return nil, fmt.Errorf("too many function types in a store")
+		}
 		id = FunctionTypeID(len(s.TypeIDs))
 		s.TypeIDs[key] = id
 	}
-	return &TypeInstance{Type: t, TypeID: id}
+	return &TypeInstance{Type: t, TypeID: id}, nil
 }
 
 // getModuleInstance returns an existing ModuleInstance if exists, or assigns a new one.
@@ -1841,4 +1878,4 @@ func newTableInstance(min uint32, max *uint32) *TableInstance {
 }
 
 // UninitializedTableElementTypeID math.MaxUint64 to represent the uninitialized elements.
-var UninitializedTableElementTypeID FunctionTypeID = math.MaxUint64
+var UninitializedTableElementTypeID FunctionTypeID = math.MaxUint32

@@ -1039,7 +1039,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// So the target type ID lives at offset+tableElementTypeIDOffset, and we compare it
 	// with wasm.UninitializedTableElementTypeID to check if the element is initialized.
 	checkIfInitialized := c.newProg()
-	checkIfInitialized.As = x86.ACMPQ
+	checkIfInitialized.As = x86.ACMPL // 32-bit as FunctionTypeID is in 32-bit unsigned integer.
 	checkIfInitialized.From.Type = obj.TYPE_MEM
 	checkIfInitialized.From.Reg = offset.register
 	checkIfInitialized.From.Offset = tableElementFunctionTypeIDOffset
@@ -1059,7 +1059,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
 	checkIfTypeMatch := c.newProg()
 	jumpIfInitialized.To.SetTarget(checkIfTypeMatch)
-	checkIfTypeMatch.As = x86.ACMPQ
+	checkIfTypeMatch.As = x86.ACMPL // 32-bit as FunctionTypeID is in 32-bit unsigned integer.
 	checkIfTypeMatch.From.Type = obj.TYPE_MEM
 	checkIfTypeMatch.From.Reg = offset.register
 	checkIfTypeMatch.From.Offset = tableElementFunctionTypeIDOffset
