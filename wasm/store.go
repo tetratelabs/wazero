@@ -623,7 +623,10 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		target.Functions = append(target.Functions, f)
-		s.addFunctionInstance(f)
+		err = s.addFunctionInstance(f)
+		if err != nil {
+			return rollbackFuncs, err
+		}
 	}
 	return rollbackFuncs, nil
 }
@@ -1800,7 +1803,9 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	if err = s.engine.Compile(f); err != nil {
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
-	s.addFunctionInstance(f)
+	if err = s.addFunctionInstance(f); err != nil {
+		return err
+	}
 	if err = m.addExport(funcName, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
 		s.Functions = s.Functions[:len(s.Functions)-1] // revert the add on conflict
 		return err
