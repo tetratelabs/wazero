@@ -796,7 +796,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 
 	// Now we read the address of the beginning of the jump table.
 	// In the above example, this corresponds to reading the address of 0x123001.
-	readInstructionAddressCompletionCallBack := c.readInstructionAddress(tmp)
+	c.readInstructionAddress(tmp, obj.AJMP)
 
 	// Now we have the address of L0 in tmp register, and the offset to the target label in the index.register.
 	// So we could achieve the br_table jump by adding them and jump into the resulting address.
@@ -850,8 +850,6 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			return err
 		}
 	}
-
-	readInstructionAddressCompletionCallBack(calcAbsoluteAddressOfSelectedLabel, labelInitialInstructions[0])
 
 	// Set up the callbacks to do tasks which cannot be done at the compilation phase.
 	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
@@ -4737,8 +4735,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	//   1) Set rb.1 so that we can return back to this function properly.
 	//   2) Set engine.valueStackContext.stackBasePointer for the next function.
 	//   3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
-	//   4) Set engine.moduleContext.moduleInstanceAddress for the next function.
-	//   5) Set ra.1 so that we can return back to this function properly.
+	//   4) Set ra.1 so that we can return back to this function properly.
 
 	// First, read the address corresponding to tmpRegister+callFrameStackPointerRegister
 	// by LEA instruction which equals the address of call frame stack top.
@@ -4828,6 +4825,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 			readCompiledFunctionAddressAddress.From.Index = addrReg
 			readCompiledFunctionAddressAddress.From.Scale = 8 // because the size of *compiledFunction equals 8 bytes.
 		} else {
+			// TODO: rethink on this since if addr*8 >= math.MaxUint32, then this instruction is invalid.
 			readCompiledFunctionAddressAddress.From.Offset = int64(addr) * 8 // because the size of *compiledFunction equals 8 bytes.
 		}
 		c.addInstruction(readCompiledFunctionAddressAddress)
@@ -4844,34 +4842,11 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		c.addInstruction(putCompiledFunctionFunctionAddressOnNewCallFrame)
 	}
 
-	// 4) Set engine.moduleContext.moduleInstanceAddress for the next function.
-	{
-		// Also, we have to set engine.moduleContext.ModuleInstance as
-		// it is the caller's responsibility to set the field.
-		readTargetFunctionModuleInstanceAddress := c.newProg()
-		readTargetFunctionModuleInstanceAddress.As = x86.AMOVQ
-		readTargetFunctionModuleInstanceAddress.To.Type = obj.TYPE_REG
-		readTargetFunctionModuleInstanceAddress.To.Reg = tmpRegister
-		readTargetFunctionModuleInstanceAddress.From.Type = obj.TYPE_MEM
-		readTargetFunctionModuleInstanceAddress.From.Reg = compiledFunctionAddressRegister
-		readTargetFunctionModuleInstanceAddress.From.Offset = compiledFunctionModuleInstanceAddressOffset
-		c.addInstruction(readTargetFunctionModuleInstanceAddress)
-
-		setEngineModuleInstanceAddress := c.newProg()
-		setEngineModuleInstanceAddress.As = x86.AMOVQ
-		setEngineModuleInstanceAddress.From.Type = obj.TYPE_REG
-		setEngineModuleInstanceAddress.From.Reg = tmpRegister
-		setEngineModuleInstanceAddress.To.Type = obj.TYPE_MEM
-		setEngineModuleInstanceAddress.To.Reg = reservedRegisterForEngine
-		setEngineModuleInstanceAddress.To.Offset = engineModuleContextModuleInstanceAddressOffset
-		c.addInstruction(setEngineModuleInstanceAddress)
-	}
-
-	// 5) Set ra.1 so that we can return back to this function properly.
+	// 4) Set ra.1 so that we can return back to this function properly.
 	//
 	// We have to set the return address for the current call frame (which is "ra.1" in the example).
 	// First, Get the return address into the tmpRegister.
-	readInstructionAddressCompletionCallBack := c.readInstructionAddress(tmpRegister)
+	c.readInstructionAddress(tmpRegister, obj.AJMP)
 
 	// Now we are ready to set the return address to the current call frame.
 	// This is equivalent to set "ra.1" in the example.
@@ -4901,17 +4876,6 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	jmpToTargetFunction.To.Reg = compiledFunctionAddressRegister
 	jmpToTargetFunction.To.Offset = compiledFunctionCodeInitialAddressOffset
 	c.addInstruction(jmpToTargetFunction)
-
-	// In order to finalize the setting return address ("ra.1"), we need to have
-	// the instruction AFTER jmp into the target function. We emit the NOP here
-	// because in anyway this is skipped after assemble.
-	nopAfterJmpToNewFunction := c.newProg()
-	nopAfterJmpToNewFunction.As = obj.ANOP
-	c.addInstruction(nopAfterJmpToNewFunction)
-
-	// Now we are ready to complete the instruction for reading instruction address of after jmp instruction.
-	// See the comment of readInstructionAddress function for arguments.
-	readInstructionAddressCompletionCallBack(setReturnAddress, nopAfterJmpToNewFunction)
 
 	// All the registers used are temporary so we mark them unused.
 	c.locationStack.markRegisterUnused(
@@ -4950,7 +4914,7 @@ func (c *amd64Compiler) returnFunction() error {
 	}
 
 	// Obtain the temporary registers to be used in the followings.
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 4)
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
 		// This in theory never happen as all the registers must be free except addrReg.
 		return fmt.Errorf("could not find enough free registers")
@@ -4958,8 +4922,7 @@ func (c *amd64Compiler) returnFunction() error {
 	c.locationStack.markRegisterUsed(regs...)
 
 	// Alias these free tmp registers for readability.
-	decrementedCallFrameStackPointerRegister, callFrameStackTopAddressRegister,
-		moduleInstanceAddressRegister, tmpRegister := regs[0], regs[1], regs[2], regs[3]
+	decrementedCallFrameStackPointerRegister, callFrameStackTopAddressRegister, tmpRegister := regs[0], regs[1], regs[2]
 
 	// Since we return from the function, we need to decement the callframe stack pointer.
 	decCallFrameStackPointer := c.newProg()
@@ -5052,8 +5015,7 @@ func (c *amd64Compiler) returnFunction() error {
 	//
 	// What we have to do in the following is that
 	//   1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller".
-	//   2) Set engine.moduleContext.moduleInstanceAddress to the one stored in "rc.caller".
-	//   3) Jump into the address of "ra.caller".
+	//   2) Jump into the address of "ra.caller".
 
 	// 1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller"
 	{
@@ -5077,41 +5039,7 @@ func (c *amd64Compiler) returnFunction() error {
 		c.addInstruction(putReturnStackBasePointer)
 	}
 
-	// 2) Set engine.moduleContext.moduleInstanceAddress to the one stored in "rc.caller".
-	{
-		readCompiledFunctionAddress := c.newProg()
-		readCompiledFunctionAddress.As = x86.AMOVQ
-		readCompiledFunctionAddress.To.Type = obj.TYPE_REG
-		readCompiledFunctionAddress.To.Reg = tmpRegister
-		readCompiledFunctionAddress.From.Type = obj.TYPE_MEM
-		readCompiledFunctionAddress.From.Reg = callFrameStackTopAddressRegister
-		// "rc.caller" is BELOW the top address. See the above example for detail.
-		readCompiledFunctionAddress.From.Offset = -(callFrameDataSize - callFrameCompiledFunctionOffset)
-		c.addInstruction(readCompiledFunctionAddress)
-
-		// At this point, tmpRegister holds the caller's *compiledFunction,
-		// so we are ready to read the address of the caller's module instance
-		// stored at compiledFunction.ModuleInstanceAddress.
-		readModuleInstanceAddress := c.newProg()
-		readModuleInstanceAddress.As = x86.AMOVQ
-		readModuleInstanceAddress.To.Type = obj.TYPE_REG
-		readModuleInstanceAddress.To.Reg = moduleInstanceAddressRegister
-		readModuleInstanceAddress.From.Type = obj.TYPE_MEM
-		readModuleInstanceAddress.From.Reg = tmpRegister
-		readModuleInstanceAddress.From.Offset = compiledFunctionModuleInstanceAddressOffset
-		c.addInstruction(readModuleInstanceAddress)
-
-		putModuleInstanceAddressToEngine := c.newProg()
-		putModuleInstanceAddressToEngine.As = x86.AMOVQ
-		putModuleInstanceAddressToEngine.To.Type = obj.TYPE_MEM
-		putModuleInstanceAddressToEngine.To.Reg = reservedRegisterForEngine
-		putModuleInstanceAddressToEngine.To.Offset = engineModuleContextModuleInstanceAddressOffset
-		putModuleInstanceAddressToEngine.From.Type = obj.TYPE_REG
-		putModuleInstanceAddressToEngine.From.Reg = moduleInstanceAddressRegister
-		c.addInstruction(putModuleInstanceAddressToEngine)
-	}
-
-	// 3) Jump into the address of "ra.caller".
+	// 2) Jump into the address of "ra.caller".
 	{
 		readReturnAddress := c.newProg()
 		readReturnAddress.As = x86.AMOVQ
@@ -5205,7 +5133,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	readCurrentCallFrameReturnAddress.From.Offset = -(callFrameDataSize - callFrameReturnAddressOffset)
 	c.addInstruction(readCurrentCallFrameReturnAddress)
 
-	readInstructionAddressCompletionCallback := c.readInstructionAddress(ripRegister)
+	c.readInstructionAddress(ripRegister, obj.ARET)
 
 	// We are ready to store the return address (in ripRegister) to engine.callFrameStack[engine.callStackFramePointer-1].
 	moveRIP := c.newProg()
@@ -5220,22 +5148,16 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	// Emit the return instruction.
 	c.exit(jitStatus)
 
-	nopAfterReturnInst := c.newProg()
-	nopAfterReturnInst.As = obj.ANOP
-	c.addInstruction(nopAfterReturnInst)
-
-	readInstructionAddressCompletionCallback(moveRIP, nopAfterReturnInst)
-
 	// They were temporarily used, so we mark them unused.
 	c.locationStack.markRegisterUnused(regs...)
 	return nil
 }
 
-// readInstructionAddress adds the instruction to read the target instruction's absolute address into the destinationRegister.
-// At the callsite, the returned callback must be called with two arguments:
-// instructionAfterReadInstruction is the instruction added *right after* calling this readInstructionAddress function.
-// addressAcquisitionTargetInstruction  is the instruction we want to get the absolute address.
-func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(instructionAfterReadInstruction, addressAcquisitionTargetInstruction *obj.Prog) {
+// readInstructionAddress add a LEA instruction to read the target instruction's absolute address into the destinationRegister.
+// beforeAcquisitionTargetInstruction is the instruction kind (e.g. RET, JMP, etc.) right before the instruction
+// of which the callsite wants to aquire the absolute address.
+func (c *amd64Compiler) readInstructionAddress(destinationRegister int16, beforeAcquisitionTargetInstruction obj.As) {
+	// Emit the instruction in the form of "LEA destination [RIP + offset]".
 	readInstructionAddress := c.newProg()
 	readInstructionAddress.As = x86.ALEAQ
 	readInstructionAddress.To.Reg = destinationRegister
@@ -5244,31 +5166,45 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16) func(i
 	// We use place holder here as we don't yet know at this point the offset of the first instruction
 	// after return instruction.
 	readInstructionAddress.From.Offset = 0xffff
-	// Since the assembler cannot directly emit "LEA foo [rip + bar]", we use the some hack here:
+	// Since the assembler cannot directly emit "LEA destination [RIP + offset]", we use the some hack here:
 	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
-	// exactly the same as "LEA foo [rip + bar]" except the most significant bit of the third byte.
+	// exactly the same as "LEA destination [RIP + offset]" except the most significant bit of the third byte.
 	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
 	readInstructionAddress.From.Reg = x86.REG_BP
 	c.addInstruction(readInstructionAddress)
 
-	return func(instructionAfterReadInstruction, addressAcquisitionTargetInstruction *obj.Prog) {
-		c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-			// See the comment at readInstructionAddress.From.Offset.
-			binary.LittleEndian.PutUint32(code[readInstructionAddress.Pc+3:],
-				uint32(advanceUntilNonNOP(addressAcquisitionTargetInstruction).Pc)-uint32(instructionAfterReadInstruction.Pc))
-			// See the comment at readInstructionAddress.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
-			code[readInstructionAddress.Pc+2] = code[readInstructionAddress.Pc+2] & 0b01111111
-			return nil
-		})
-	}
-}
+	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
+		// Advance readInstructionAddress to the next one (.Link) in order to get the instruction
+		// right after LEA because RIP points to that next instruction in LEA instruction.
+		base := readInstructionAddress.Link
 
-func advanceUntilNonNOP(in *obj.Prog) (out *obj.Prog) {
-	out = in
-	for out.As == obj.ANOP {
-		out = out.Link
-	}
-	return
+		// Find the address aquisition target instruction.
+		target := base
+		for target != nil {
+			// Advance until we have the target.As has the given instruction kind.
+			target = target.Link
+			if target.As == beforeAcquisitionTargetInstruction {
+				// At this point, target is the instruction right before the target instruction.
+				// Thus, advance one more time to make target the target instruction.
+				target = target.Link
+				break
+			}
+		}
+
+		if target == nil {
+			return fmt.Errorf("target instruction not found for read instruction address")
+		}
+
+		// Now we can calculate the "offset" in the LEA instruction.
+		offset := uint32(target.Pc) - uint32(base.Pc)
+
+		// Replace the placeholder bytes by the actual offset.
+		binary.LittleEndian.PutUint32(code[readInstructionAddress.Pc+3:], offset)
+
+		// See the comment at readInstructionAddress.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
+		code[readInstructionAddress.Pc+2] = code[readInstructionAddress.Pc+2] & 0b01111111
+		return nil
+	})
 }
 
 // releaseAllRegistersToStack add the instructions to release all the LIVE value
@@ -5398,14 +5334,16 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 }
 
 func (c *amd64Compiler) initializeReservedMemoryPointer() {
-	setupMemoryRegister := c.newProg()
-	setupMemoryRegister.As = x86.AMOVQ
-	setupMemoryRegister.To.Type = obj.TYPE_REG
-	setupMemoryRegister.To.Reg = reservedRegisterForMemory
-	setupMemoryRegister.From.Type = obj.TYPE_MEM
-	setupMemoryRegister.From.Reg = reservedRegisterForEngine
-	setupMemoryRegister.From.Offset = engineModuleContextMemoryElement0AddressOffset
-	c.addInstruction(setupMemoryRegister)
+	if c.f.ModuleInstance.Memory != nil {
+		setupMemoryRegister := c.newProg()
+		setupMemoryRegister.As = x86.AMOVQ
+		setupMemoryRegister.To.Type = obj.TYPE_REG
+		setupMemoryRegister.To.Reg = reservedRegisterForMemory
+		setupMemoryRegister.From.Type = obj.TYPE_MEM
+		setupMemoryRegister.From.Reg = reservedRegisterForEngine
+		setupMemoryRegister.From.Offset = engineModuleContextMemoryElement0AddressOffset
+		c.addInstruction(setupMemoryRegister)
+	}
 }
 
 // maybeGrowValueStack adds instructions to check the necessity to grow the value stack,
@@ -5464,8 +5402,6 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 // engine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *amd64Compiler) initializeModuleContext() error {
-	// TODO: we maybe better have flag to indicate if the module context has changed,
-	// and if the flag is not set, we could skip the entire instructions in below!
 
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
@@ -5478,30 +5414,43 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Alias these free tmp registers for readability.
 	moduleInstanceAddressRegister, tmpRegister, tmpRegister2 := regs[0], regs[1], regs[2]
 
-	// Read the module instance's address.
 	readModuleInstanceAddress := c.newProg()
 	readModuleInstanceAddress.As = x86.AMOVQ
 	readModuleInstanceAddress.To.Type = obj.TYPE_REG
 	readModuleInstanceAddress.To.Reg = moduleInstanceAddressRegister
-	readModuleInstanceAddress.From.Type = obj.TYPE_MEM
-	readModuleInstanceAddress.From.Reg = reservedRegisterForEngine
-	readModuleInstanceAddress.From.Offset = engineModuleContextModuleInstanceAddressOffset
+	readModuleInstanceAddress.From.Type = obj.TYPE_CONST
+	readModuleInstanceAddress.From.Offset = int64(uintptr(unsafe.Pointer(c.f.ModuleInstance)))
 	c.addInstruction(readModuleInstanceAddress)
 
-	// First we have to check if the module instance address is nil, which means the target is host function.
-	checkIfNilPointer := c.newProg()
-	checkIfNilPointer.As = x86.ACMPQ
-	checkIfNilPointer.From.Type = obj.TYPE_REG
-	checkIfNilPointer.From.Reg = moduleInstanceAddressRegister
-	checkIfNilPointer.To.Type = obj.TYPE_CONST
-	checkIfNilPointer.To.Offset = 0
-	c.addInstruction(checkIfNilPointer)
+	// If the module instance address stays the same, we could skip the entire code below.
+	// The rationale/idea for this is that, in almost all use cases, users instantiate a single
+	// Wasm binary and run the functions from it, rather than doing import/export on multiple
+	// binaries. As a result, this cmp and jmp instruction sequence below must be easy for
+	// x64 CPU to do branch prediction since almost 100% jump happens across function calls.
+	checkIfModuleChanged := c.newProg()
+	checkIfModuleChanged.As = x86.ACMPQ
+	checkIfModuleChanged.To.Type = obj.TYPE_REG
+	checkIfModuleChanged.To.Reg = moduleInstanceAddressRegister
+	checkIfModuleChanged.From.Type = obj.TYPE_MEM
+	checkIfModuleChanged.From.Reg = reservedRegisterForEngine
+	checkIfModuleChanged.From.Offset = engineModuleContextModuleInstanceAddressOffset
+	c.addInstruction(checkIfModuleChanged)
 
-	// Skip the moduleContext updates if the poitner is nil.
-	jmpIfNilPointer := c.newProg()
-	jmpIfNilPointer.As = x86.AJEQ
-	jmpIfNilPointer.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNilPointer)
+	jmpIfEqual := c.newProg()
+	jmpIfEqual.As = x86.AJEQ
+	jmpIfEqual.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfEqual)
+
+	// Otherwise, we need to update fields.
+	// First, save the read module instance address to engine.moduleInstanceAddress
+	saveModuleInstanceAddress := c.newProg()
+	saveModuleInstanceAddress.As = x86.AMOVQ
+	saveModuleInstanceAddress.From.Type = obj.TYPE_REG
+	saveModuleInstanceAddress.From.Reg = moduleInstanceAddressRegister
+	saveModuleInstanceAddress.To.Type = obj.TYPE_MEM
+	saveModuleInstanceAddress.To.Reg = reservedRegisterForEngine
+	saveModuleInstanceAddress.To.Offset = engineModuleContextModuleInstanceAddressOffset
+	c.addInstruction(saveModuleInstanceAddress)
 
 	// Otherwise, we have to update the following fields:
 	// * engine.moduleContext.globalElement0Address
@@ -5511,7 +5460,11 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// * engine.moduleContext.memorySliceLen
 
 	// Update globalElement0Address.
-	{
+	//
+	// Note: if there's global.get or set instruction in the function, the existence of the globals
+	// is ensured by function validation at module instantiation phase, and that's why it is ok to
+	// skip the initialization if the module's globals slice is empty.
+	if len(c.f.ModuleInstance.Globals) > 0 {
 		// Since ModuleInstance.Globals is []*globalInstance, internally
 		// the address of the first item in the underlying array lies exactly on the globals offset.
 		// See https://go.dev/blog/slices-intro if unfamiliar.
@@ -5535,7 +5488,11 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	}
 
 	// Update tableElement0Address and tableSliceLen.
-	{
+	//
+	// Note: if there's table instruction in the function, the existence of the table
+	// is ensured by function validation at module instantiation phase, and that's
+	// why it is ok to skip the initialization if the module's table doesn't exist.
+	if len(c.f.ModuleInstance.Tables) > 0 {
 		getTablesCount := c.newProg()
 		getTablesCount.As = x86.AMOVQ
 		getTablesCount.To.Type = obj.TYPE_REG
@@ -5547,23 +5504,6 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		getTablesCount.From.Offset = moduleInstanceTablesOffset + 8
 		c.addInstruction(getTablesCount)
 
-		checkIfTableExist := c.newProg()
-		checkIfTableExist.As = x86.ACMPQ
-		checkIfTableExist.From.Type = obj.TYPE_REG
-		checkIfTableExist.From.Reg = tmpRegister
-		checkIfTableExist.To.Type = obj.TYPE_CONST
-		checkIfTableExist.To.Offset = 0
-		c.addInstruction(checkIfTableExist)
-
-		// Skip the updates on table related fields if the length of ModuleInstance.Tables equals 0.
-		// TODO: better zeros tableElement0Address and tableSliceLen in the non-exist case as
-		// they might be security holes.
-		jmpIfTableNotExist := c.newProg()
-		jmpIfTableNotExist.As = x86.AJEQ
-		jmpIfTableNotExist.To.Type = obj.TYPE_BRANCH
-		c.addInstruction(jmpIfTableNotExist)
-
-		// Otherwise, we update tableElement0Address and tableSliceLen.
 		// First, we need to read the *wasm.TableInstance.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
@@ -5624,12 +5564,14 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putTableLength.From.Type = obj.TYPE_REG
 		putTableLength.From.Reg = tmpRegister2
 		c.addInstruction(putTableLength)
-
-		c.addSetJmpOrigins(jmpIfTableNotExist)
 	}
 
 	// Update memoryElement0Address and memorySliceLen.
-	{
+	//
+	// Note: if there's memory instruction in the function, memory instance must be non-nil.
+	// That is ensured by function validation at module instantiation phase, and that's
+	// why it is ok to skip the initialization if the module's memory instance is nil.
+	if c.f.ModuleInstance.Memory != nil {
 		getMemoryInstanceAddress := c.newProg()
 		getMemoryInstanceAddress.As = x86.AMOVQ
 		getMemoryInstanceAddress.To.Type = obj.TYPE_REG
@@ -5639,21 +5581,6 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		getMemoryInstanceAddress.From.Offset = moduleInstanceMemoryOffset
 		c.addInstruction(getMemoryInstanceAddress)
 
-		checkIfMemoryNil := c.newProg()
-		checkIfMemoryNil.As = x86.ACMPQ
-		checkIfMemoryNil.From.Type = obj.TYPE_REG
-		checkIfMemoryNil.From.Reg = tmpRegister
-		checkIfMemoryNil.To.Type = obj.TYPE_CONST
-		checkIfMemoryNil.To.Offset = 0
-		c.addInstruction(checkIfMemoryNil)
-
-		// Skip the updates on table related fields if the ModuleInstance.Memory == nil.
-		jmpIfMemoryNil := c.newProg()
-		jmpIfMemoryNil.As = x86.AJEQ
-		jmpIfMemoryNil.To.Type = obj.TYPE_BRANCH
-		c.addInstruction(jmpIfMemoryNil)
-
-		// Otherwise, we do updates.
 		readMemoryLength := c.newProg()
 		readMemoryLength.As = x86.AMOVQ
 		readMemoryLength.To.Type = obj.TYPE_REG
@@ -5691,44 +5618,12 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putMemoryElement0Address.From.Type = obj.TYPE_REG
 		putMemoryElement0Address.From.Reg = tmpRegister2
 		c.addInstruction(putMemoryElement0Address)
-
-		jmpDoneForNonNil := c.newProg()
-		jmpDoneForNonNil.As = obj.AJMP
-		jmpDoneForNonNil.To.Type = obj.TYPE_BRANCH
-		c.addInstruction(jmpDoneForNonNil)
-
-		zerosTmpRegister := c.newProg()
-		jmpIfMemoryNil.To.SetTarget(zerosTmpRegister)
-		zerosTmpRegister.As = x86.AXORQ
-		zerosTmpRegister.To.Type = obj.TYPE_REG
-		zerosTmpRegister.To.Reg = tmpRegister2
-		zerosTmpRegister.From.Type = obj.TYPE_REG
-		zerosTmpRegister.From.Reg = tmpRegister2
-		c.addInstruction(zerosTmpRegister)
-
-		putZeroIntoElement0Address := c.newProg()
-		putZeroIntoElement0Address.As = x86.AMOVQ
-		putZeroIntoElement0Address.To.Type = obj.TYPE_MEM
-		putZeroIntoElement0Address.To.Reg = reservedRegisterForEngine
-		putZeroIntoElement0Address.To.Offset = engineModuleContextMemoryElement0AddressOffset
-		putZeroIntoElement0Address.From.Type = obj.TYPE_REG
-		putZeroIntoElement0Address.From.Reg = tmpRegister2
-		c.addInstruction(putZeroIntoElement0Address)
-
-		putZeroIntoMemoryLen := c.newProg()
-		putZeroIntoMemoryLen.As = x86.AMOVQ
-		putZeroIntoMemoryLen.To.Type = obj.TYPE_MEM
-		putZeroIntoMemoryLen.To.Reg = reservedRegisterForEngine
-		putZeroIntoMemoryLen.To.Offset = engineModuleContextMemorySliceLenOffset
-		putZeroIntoMemoryLen.From.Type = obj.TYPE_REG
-		putZeroIntoMemoryLen.From.Reg = tmpRegister2
-		c.addInstruction(putZeroIntoMemoryLen)
-
-		c.addSetJmpOrigins(jmpDoneForNonNil)
 	}
 
 	c.locationStack.markRegisterUnused(regs...)
-	c.addSetJmpOrigins(jmpIfNilPointer)
+
+	// Set the jump target towards the next instruction for the case where module instance address hasn't changed.
+	c.addSetJmpOrigins(jmpIfEqual)
 	return nil
 }
 

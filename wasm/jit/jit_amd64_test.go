@@ -26,11 +26,7 @@ import (
 // TODO: have some utility functions to reduce loc here: https://github.com/tetratelabs/wazero/issues/100
 
 type jitEnv struct {
-	eng     *engine
-	mem     *wasm.MemoryInstance
-	globals []*wasm.GlobalInstance
-	table   *wasm.TableInstance
-
+	eng            *engine
 	moduleInstance *wasm.ModuleInstance
 }
 
@@ -66,7 +62,7 @@ func (j *jitEnv) stackTopAsFloat64() float64 {
 }
 
 func (j *jitEnv) memory() []byte {
-	return j.mem.Buffer
+	return j.moduleInstance.Memory.Buffer
 }
 
 func (j *jitEnv) stack() []uint64 {
@@ -94,15 +90,15 @@ func (j *jitEnv) setStackPointer(sp uint64) {
 }
 
 func (j *jitEnv) addGlobals(g ...*wasm.GlobalInstance) {
-	j.globals = append(j.globals, g...)
+	j.moduleInstance.Globals = append(j.moduleInstance.Globals, g...)
 }
 
 func (j *jitEnv) getGlobal(index uint32) uint64 {
-	return j.globals[index].Val
+	return j.moduleInstance.Globals[index].Val
 }
 
 func (j *jitEnv) setTable(table []wasm.TableElement) {
-	j.table.Table = table
+	j.moduleInstance.Tables[0] = &wasm.TableInstance{Table: table}
 }
 
 func (j *jitEnv) callFrameStackPeek() *callFrame {
@@ -130,19 +126,9 @@ func (j *jitEnv) engine() *engine {
 }
 
 func (j *jitEnv) exec(code []byte) {
-	j.moduleInstance = &wasm.ModuleInstance{
-		Globals: j.globals,
-		Memory:  j.mem,
-		Tables:  []*wasm.TableInstance{j.table},
-	}
-	j.execWithModule(code, j.moduleInstance)
-}
-
-func (j *jitEnv) execWithModule(code []byte, module *wasm.ModuleInstance) {
 	compiledFunction := &compiledFunction{
-		codeSegment:           code,
-		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
-		moduleInstanceAddress: uintptr(unsafe.Pointer(module)),
+		codeSegment:        code,
+		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 		source: &wasm.FunctionInstance{
 			FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
 		},
@@ -159,18 +145,22 @@ const defaultMemoryPageNumInTest = 2
 
 func newJITEnvironment() *jitEnv {
 	return &jitEnv{
-		eng:   newEngine(),
-		mem:   &wasm.MemoryInstance{Buffer: make([]byte, wasm.PageSize*defaultMemoryPageNumInTest)},
-		table: &wasm.TableInstance{},
+		eng: newEngine(),
+		moduleInstance: &wasm.ModuleInstance{
+			Memory:  &wasm.MemoryInstance{Buffer: make([]byte, wasm.PageSize*defaultMemoryPageNumInTest)},
+			Tables:  []*wasm.TableInstance{{}},
+			Globals: []*wasm.GlobalInstance{},
+		},
 	}
 }
 
-func requireNewCompiler(t *testing.T) *amd64Compiler {
+func (j *jitEnv) requireNewCompiler(t *testing.T) *amd64Compiler {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
 	return &amd64Compiler{builder: b,
 		locationStack: newValueLocationStack(),
 		labels:        map[string]*labelInfo{},
+		f:             &wasm.FunctionInstance{ModuleInstance: j.moduleInstance},
 	}
 }
 
@@ -190,7 +180,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		for _, baseOffset := range []uint64{5, 10, 20} {
 
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
 
 			compiler.initializeReservedStackBasePointer()
 			err := compiler.maybeGrowValueStack()
@@ -219,7 +209,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 	})
 	t.Run("grow", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t)
 
 		compiler.initializeReservedStackBasePointer()
 		err := compiler.maybeGrowValueStack()
@@ -257,7 +247,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 func TestAmd64Compiler_returnFunction(t *testing.T) {
 	t.Run("last return", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 
@@ -299,7 +289,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		stackPointerToExpectedValue := map[uint64]uint32{}
 		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
 			//	Each function pushes its funcaddr and soon returns.
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -335,18 +325,8 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
 
-		// To ensure that returnFunction() properly sets the moduleInstanceAddress to the
-		// return target's compiledFunction.moduleInstanceAddress, we modify the bottom frame's
-		// compiledFunction here.
-		lastModuleInstance := &wasm.ModuleInstance{}
-		expPtr := uintptr(unsafe.Pointer(lastModuleInstance))
-		engine.callFrameStack[0].compiledFunction.moduleInstanceAddress = expPtr
-
 		// Run codes.
 		env.exec(engine.callFrameTop().compiledFunction.codeSegment)
-
-		// Check the moduleInstanceAddress is properly changed.
-		require.Equal(t, expPtr, engine.moduleContext.moduleInstanceAddress)
 
 		// Check the exit status.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -420,14 +400,6 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
-				Globals: []*wasm.GlobalInstance{},
-			},
-		},
-		{
-			name: "globals nil part2",
-			moduleInstance: &wasm.ModuleInstance{
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables: []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
 			},
@@ -435,8 +407,10 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			compiler.initializeReservedStackBasePointer()
+			compiler.f.ModuleInstance = tc.moduleInstance
 
 			require.Empty(t, compiler.locationStack.usedRegisters)
 			err := compiler.initializeModuleContext()
@@ -452,8 +426,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run codes
-			env := newJITEnvironment()
-			env.execWithModule(code, tc.moduleInstance)
+			env.exec(code)
 
 			// Check the exit status.
 			require.Equal(t, expectedStatus, env.jitStatus())
@@ -633,7 +606,8 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 				} {
 					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -681,9 +655,10 @@ func Test_setJITStatus(t *testing.T) {
 		jitCallStatusCodeUnreachable,
 	} {
 		t.Run(s.String(), func(t *testing.T) {
+			env := newJITEnvironment()
 
 			// Build codes.
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 			compiler.exit(s)
@@ -693,7 +668,6 @@ func Test_setJITStatus(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run codes
-			env := newJITEnvironment()
 			env.exec(code)
 
 			// JIT status on engine must be updated.
@@ -703,7 +677,8 @@ func Test_setJITStatus(t *testing.T) {
 }
 
 func TestAmd64Compiler_initializeReservedRegisters(t *testing.T) {
-	compiler := requireNewCompiler(t)
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
 	compiler.exit(jitCallStatusCodeReturned)
@@ -717,7 +692,8 @@ func TestAmd64Compiler_initializeReservedRegisters(t *testing.T) {
 
 func TestAmd64Compiler_allocateRegister(t *testing.T) {
 	t.Run("free", func(t *testing.T) {
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		reg, err := compiler.allocateRegister(generalPurposeRegisterTypeInt)
 		require.NoError(t, err)
 		require.True(t, isIntRegister(reg))
@@ -727,7 +703,8 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 	})
 	t.Run("steal", func(t *testing.T) {
 		const stealTarget = x86.REG_AX
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 		// Use up all the Int regs.
@@ -756,7 +733,6 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run code.
-		env := newJITEnvironment()
 		env.exec(code)
 
 		// Check the sp and value.
@@ -766,7 +742,8 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileLabel(t *testing.T) {
-	compiler := requireNewCompiler(t)
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
 	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
@@ -794,7 +771,8 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 
 	// The case when the original value is already in register.
 	t.Run("on reg", func(t *testing.T) {
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 
@@ -827,7 +805,6 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run code.
-		env := newJITEnvironment()
 		env.exec(code)
 
 		// Check the stack.
@@ -839,10 +816,10 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 
 	// The case when the original value is in stack.
 	t.Run("on stack", func(t *testing.T) {
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
-		env := newJITEnvironment()
 
 		// Setup the original value.
 		compiler.locationStack.pushValueOnStack() // Dummy value!
@@ -883,7 +860,8 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 func TestAmd64Compiler_compileConstI32(t *testing.T) {
 	for _, v := range []uint32{1, 1 << 5, 1 << 31} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -909,7 +887,6 @@ func TestAmd64Compiler_compileConstI32(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env := newJITEnvironment()
 			env.exec(code)
 
 			// As we push the constant to the stack, the stack pointer must be incremented.
@@ -923,7 +900,8 @@ func TestAmd64Compiler_compileConstI32(t *testing.T) {
 func TestAmd64Compiler_compileConstI64(t *testing.T) {
 	for _, v := range []uint64{1, 1 << 5, 1 << 35, 1 << 63} {
 		t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -949,7 +927,6 @@ func TestAmd64Compiler_compileConstI64(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env := newJITEnvironment()
 			env.exec(code)
 
 			// As we push the constant to the stack, the stack pointer must be incremented.
@@ -963,7 +940,8 @@ func TestAmd64Compiler_compileConstI64(t *testing.T) {
 func TestAmd64Compiler_compileConstF32(t *testing.T) {
 	for _, v := range []float32{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -991,7 +969,6 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env := newJITEnvironment()
 			env.exec(code)
 
 			// As we push the constant to the stack, the stack pointer must be incremented.
@@ -1005,7 +982,8 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 func TestAmd64Compiler_compileConstF64(t *testing.T) {
 	for _, v := range []float64{1, -3.23, 100.123} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -1033,7 +1011,6 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env := newJITEnvironment()
 			env.exec(code)
 
 			// As we push the constant to the stack, the stack pointer must be incremented.
@@ -1048,7 +1025,9 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		const x1Value uint32 = 113
 		const x2Value uint32 = 41
-		compiler := requireNewCompiler(t)
+
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
@@ -1073,7 +1052,6 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run code.
-		env := newJITEnvironment()
 		env.exec(code)
 
 		// Check the stack.
@@ -1083,7 +1061,9 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
 		const x1Value uint64 = 1 << 35
 		const x2Value uint64 = 41
-		compiler := requireNewCompiler(t)
+
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
@@ -1108,7 +1088,6 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run code.
-		env := newJITEnvironment()
 		env.exec(code)
 
 		// Check the stack.
@@ -1128,7 +1107,8 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
@@ -1153,7 +1133,6 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -1175,9 +1154,11 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
@@ -1200,7 +1181,6 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -1233,7 +1213,8 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: 200, x2: 100},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -1272,7 +1253,6 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1298,7 +1278,8 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: 0, x2: 100},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -1337,7 +1318,6 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1387,7 +1367,8 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
 				} {
 					t.Run(fmt.Sprintf("x1=%f,x2=%f", tc.x1, tc.x2), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 						useUpIntRegistersFunc(compiler)
@@ -1425,7 +1406,6 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1465,7 +1445,8 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 					{x1: math.Inf(-1), x2: math.Inf(-1)},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 						useUpIntRegistersFunc(compiler)
@@ -1504,7 +1485,6 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1529,7 +1509,8 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 		} {
 			v := v
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 
@@ -1560,7 +1541,6 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -1575,7 +1555,8 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 		} {
 			v := v
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 
@@ -1606,7 +1587,6 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -1640,7 +1620,8 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					{x1: 200, x2: 100, signed: true},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -1686,7 +1667,6 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1720,7 +1700,8 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					{x1: math.MinInt64, x2: 100, signed: true},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -1766,7 +1747,6 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1808,9 +1788,11 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
 				} {
 					t.Run(fmt.Sprintf("x1=%f,x2=%f", tc.x1, tc.x2), func(t *testing.T) {
-						// Prepare operands.
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
+
+						// Prepare operands.
 						require.NoError(t, err)
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 						require.NoError(t, err)
@@ -1848,7 +1830,6 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1887,10 +1868,12 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 					{x1: math.Inf(-1), x2: math.Inf(-1)},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						// Prepare operands.
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
+
+						// Prepare operands.
 						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
@@ -1927,7 +1910,6 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -1967,7 +1949,8 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 					{x1: 200, x2: 100, signed: true},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -2014,7 +1997,6 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -2049,7 +2031,8 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 				} {
 
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -2096,7 +2079,6 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -2138,10 +2120,12 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 					{x1: float32(math.Inf(-1)), x2: float32(math.Inf(-1))},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						// Prepare operands.
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
+
+						// Prepare operands.
 						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
@@ -2179,7 +2163,6 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -2218,10 +2201,12 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 					{x1: math.Inf(-1), x2: math.Inf(-1)},
 				} {
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						// Prepare operands.
-						compiler := requireNewCompiler(t)
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
+
+						// Prepare operands.
 						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 						require.NoError(t, err)
 						x1 := compiler.locationStack.peek()
@@ -2259,7 +2244,6 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NoError(t, err)
 
 						// Run code.
-						env := newJITEnvironment()
 						env.exec(code)
 
 						// Check the stack.
@@ -2280,7 +2264,8 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		const x1Value uint32 = 1 << 31
 		const x2Value uint32 = 51
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1Value})
@@ -2305,7 +2290,6 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run code.
-		env := newJITEnvironment()
 		env.exec(code)
 
 		// Check the stack.
@@ -2315,9 +2299,12 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
 		const x1Value uint64 = 1 << 35
 		const x2Value uint64 = 51
-		compiler := requireNewCompiler(t)
+
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
+
 		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x1Value})
 		require.NoError(t, err)
 		x1 := compiler.locationStack.peek()
@@ -2340,7 +2327,6 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run code.
-		env := newJITEnvironment()
 		env.exec(code)
 
 		// Check the stack.
@@ -2360,9 +2346,11 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.v1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
@@ -2385,7 +2373,6 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2407,9 +2394,11 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.v1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
@@ -2432,7 +2421,6 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2499,7 +2487,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				const x2Value uint32 = 51
 				const dxValue uint64 = 111111
 
-				compiler := requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 
@@ -2611,7 +2599,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				const dxValue uint64 = 111111
 
 				env := newJITEnvironment()
-				compiler := requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 
@@ -2686,9 +2674,11 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
@@ -2711,7 +2701,6 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2737,9 +2726,11 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
@@ -2762,7 +2753,6 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2783,7 +2773,8 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 				// Setup the target value.
@@ -2811,7 +2802,6 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2831,9 +2821,11 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%064b", tc.expectedLeadingZeros), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				// Setup the target value.
 				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.input})
 				require.NoError(t, err)
@@ -2859,7 +2851,6 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2880,9 +2871,11 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				// Setup the target value.
 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: tc.input})
 				require.NoError(t, err)
@@ -2908,7 +2901,6 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2928,7 +2920,8 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%064b", tc.input), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 				// Setup the target value.
@@ -2956,7 +2949,6 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -2979,7 +2971,8 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%032b", tc.input), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 				// Setup the target value.
@@ -3004,7 +2997,6 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -3028,9 +3020,11 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%064b", tc.in), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				// Setup the target value.
 				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: tc.in})
 				require.NoError(t, err)
@@ -3053,7 +3047,6 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				// Generate and run the code under test.
 				code, _, _, err := compiler.generate()
 				require.NoError(t, err)
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the stack.
@@ -3151,7 +3144,8 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 					} {
 						vs := vs
 						t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-							compiler := requireNewCompiler(t)
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
 							err := compiler.emitPreamble()
 							require.NoError(t, err)
 
@@ -3242,8 +3236,6 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 									expectedValue = uint64(bits.RotateLeft64(vs.x1, -int(vs.x2)))
 								}
 							}
-
-							env := newJITEnvironment()
 
 							// Setup the target values.
 							if locations.x1Reg != nilRegister {
@@ -3377,7 +3369,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							t.Run(fmt.Sprintf("%d/%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
-								compiler := requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t)
 								err := compiler.emitPreamble()
 								require.NoError(t, err)
 
@@ -3534,7 +3526,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							t.Run(fmt.Sprintf("%d/%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
-								compiler := requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t)
 								err := compiler.emitPreamble()
 								require.NoError(t, err)
 
@@ -3644,7 +3636,8 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
@@ -3669,7 +3662,6 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the result.
@@ -3718,9 +3710,11 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				compiler := requireNewCompiler(t)
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
+
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
 				x1 := compiler.locationStack.peek()
@@ -3743,7 +3737,6 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				require.NoError(t, err)
 
 				// Run code.
-				env := newJITEnvironment()
 				env.exec(code)
 
 				// Check the result.
@@ -3837,7 +3830,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 							t.Run(fmt.Sprintf("x1=%d,x2=%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
-								compiler := requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t)
 								err := compiler.emitPreamble()
 								require.NoError(t, err)
 
@@ -3993,7 +3986,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 							vs := vs
 							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 								env := newJITEnvironment()
-								compiler := requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t)
 								err := compiler.emitPreamble()
 								require.NoError(t, err)
 
@@ -4085,7 +4078,8 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 		math.Inf(1), math.Inf(-1), math.NaN(),
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -4107,7 +4101,6 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env := newJITEnvironment()
 			env.exec(code)
 
 			// Check the result.
@@ -4132,7 +4125,8 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 		float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN()),
 	} {
 		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -4152,7 +4146,6 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 			// Generate and run the code under test.
 			code, _, _, err := compiler.generate()
 			require.NoError(t, err)
-			env := newJITEnvironment()
 			env.exec(code)
 
 			// Check the result.
@@ -4186,11 +4179,11 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 					} {
 						v := v
 						t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-							compiler := requireNewCompiler(t)
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
 							err := compiler.emitPreamble()
 							require.NoError(t, err)
 
-							env := newJITEnvironment()
 							if originOnStack {
 								loc := compiler.locationStack.pushValueOnStack()
 								env.stack()[loc.stackPointer] = v
@@ -4267,7 +4260,8 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 			} {
 				v := v
 				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
@@ -4287,7 +4281,6 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
-					env := newJITEnvironment()
 					env.exec(code)
 
 					require.Equal(t, uint64(1), env.stackPointer())
@@ -4358,7 +4351,8 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
@@ -4384,7 +4378,6 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
-					env := newJITEnvironment()
 					env.exec(code)
 
 					// Check the result.
@@ -4491,7 +4484,8 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 				math.Float64bits(math.Inf(-1)),
 			} {
 				t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
@@ -4517,7 +4511,6 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
-					env := newJITEnvironment()
 					env.exec(code)
 
 					// Check the result.
@@ -4606,7 +4599,8 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 				math.Float64bits(math.NaN()),
 			} {
 				t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
@@ -4744,7 +4738,6 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
-					env := newJITEnvironment()
 					env.exec(code)
 
 					// Check the result.
@@ -4815,7 +4808,8 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 				{x1: math.NaN(), x2: math.NaN()},
 			} {
 				t.Run(fmt.Sprintf("x1=%f_x2=%f", vs.x1, vs.x2), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
@@ -4884,7 +4878,6 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 					// Generate and run the code under test.
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
-					env := newJITEnvironment()
 					env.exec(code)
 
 					// Check the result.
@@ -4924,7 +4917,10 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 			for _, targetSizeInByte := range targetSizeInBytes {
 				targetSizeInByte := targetSizeInByte
 				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
-					compiler := requireNewCompiler(t)
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
+					compiler.f.ModuleInstance = env.moduleInstance
+
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
@@ -4944,7 +4940,6 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					require.NoError(t, err)
 
 					// Run code.
-					env := newJITEnvironment()
 					env.exec(code)
 
 					// If the memory offset exceeds the length of memory, we must exit the function
@@ -4972,9 +4967,12 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
+
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
+
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
 			base := compiler.locationStack.pushValueOnStack()
@@ -5068,7 +5066,9 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
+
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -5128,7 +5128,9 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
+
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -5180,7 +5182,9 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 func TestAmd64Compiler_compileLoad32(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := requireNewCompiler(t)
+	compiler := env.requireNewCompiler(t)
+	compiler.f.ModuleInstance = env.moduleInstance
+
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
 
@@ -5238,7 +5242,9 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
+
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -5296,7 +5302,9 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 
 func TestAmd64Compiler_compileStore8(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := requireNewCompiler(t)
+	compiler := env.requireNewCompiler(t)
+	compiler.f.ModuleInstance = env.moduleInstance
+
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
 
@@ -5339,7 +5347,9 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 
 func TestAmd64Compiler_compileStore16(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := requireNewCompiler(t)
+	compiler := env.requireNewCompiler(t)
+	compiler.f.ModuleInstance = env.moduleInstance
+
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
 
@@ -5382,7 +5392,9 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 
 func TestAmd64Compiler_compileStore32(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := requireNewCompiler(t)
+	compiler := env.requireNewCompiler(t)
+	compiler.f.ModuleInstance = env.moduleInstance
+
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
 
@@ -5427,7 +5439,8 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 	for _, currentCallFrameStackPointer := range []uint64{0, 10, 20} {
 		currentCallFrameStackPointer := currentCallFrameStackPointer
 		t.Run(fmt.Sprintf("%d", currentCallFrameStackPointer), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
@@ -5450,7 +5463,6 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 			require.NoError(t, err)
 
 			// Run code.
-			env := newJITEnvironment()
 			env.setCallFrameStackPointer(currentCallFrameStackPointer)
 			env.exec(code)
 
@@ -5468,9 +5480,13 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileMemorySize(t *testing.T) {
-	compiler := requireNewCompiler(t)
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
+	compiler.f.ModuleInstance = env.moduleInstance
+
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
+
 	// Emit memory.size instructions.
 	err = compiler.compileMemorySize()
 	require.NoError(t, err)
@@ -5487,7 +5503,6 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run code.
-	env := newJITEnvironment()
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -5496,12 +5511,14 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 
 func TestAmd64Compiler_compileDrop(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		err := compiler.compileDrop(&wazeroir.OperationDrop{})
 		require.NoError(t, err)
 	})
 	t.Run("zero start", func(t *testing.T) {
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		shouldPeek := compiler.locationStack.pushValueOnStack()
 		const numReg = 10
 		for i := int16(0); i < numReg; i++ {
@@ -5522,7 +5539,8 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			numLive = 3
 			dropNum = 5
 		)
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		shouldBottom := compiler.locationStack.pushValueOnStack()
 		for i := int16(0); i < dropNum; i++ {
 			compiler.locationStack.pushValueOnRegister(i)
@@ -5556,7 +5574,8 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 				dropNum        = 5
 				liveRegisterID = 10
 			)
-			compiler := requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			bottom := compiler.locationStack.pushValueOnStack()
 			require.Equal(t, uint64(0), compiler.locationStack.stack[0].stackPointer)
 			for i := int16(0); i < dropNum; i++ {
@@ -5597,7 +5616,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 		})
 		t.Run("real", func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -5635,7 +5654,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 
 func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	env := newJITEnvironment()
-	compiler := requireNewCompiler(t)
+	compiler := env.requireNewCompiler(t)
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
 
@@ -5677,7 +5696,8 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 func TestAmd64Compiler_generate(t *testing.T) {
 	t.Run("max pointer", func(t *testing.T) {
 		getCompiler := func(t *testing.T) (compiler *amd64Compiler) {
-			compiler = requireNewCompiler(t)
+			env := newJITEnvironment()
+			compiler = env.requireNewCompiler(t)
 			ret := compiler.newProg()
 			ret.As = obj.ARET
 			compiler.addInstruction(ret)
@@ -5712,7 +5732,8 @@ func TestAmd64Compiler_generate(t *testing.T) {
 	})
 
 	t.Run("on generate callback", func(t *testing.T) {
-		compiler := requireNewCompiler(t)
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
 		ret := compiler.newProg()
 		ret.As = obj.ARET
 		compiler.addInstruction(ret)
@@ -5730,9 +5751,11 @@ func TestAmd64Compiler_generate(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileUnreachable(t *testing.T) {
-	compiler := requireNewCompiler(t)
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
+
 	x1Reg := int16(x86.REG_AX)
 	x2Reg := int16(x86.REG_R10)
 	compiler.locationStack.pushValueOnRegister(x1Reg)
@@ -5747,7 +5770,6 @@ func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run code.
-	env := newJITEnvironment()
 	env.exec(code)
 
 	// Check the jitCallStatus of engine.
@@ -5805,8 +5827,8 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 		{x1OnRegister: false, x2OnRegister: false, selectX1: false, condValueOnCondRegister: true},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			compiler := requireNewCompiler(t)
 			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -5900,7 +5922,7 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
@@ -5963,7 +5985,8 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the globals.
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}, nil}
@@ -6015,7 +6038,8 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
-			compiler := requireNewCompiler(t)
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the globals.
 			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}}, nil)
@@ -6052,15 +6076,15 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 		isAddressFromRegister := isAddressFromRegister
 		t.Run(fmt.Sprintf("is_address_from_register=%v", isAddressFromRegister), func(t *testing.T) {
 			t.Run("need to grow call frame stack", func(t *testing.T) {
-				t.Skip() // TODO: delete!
 				env := newJITEnvironment()
 				engine := env.engine()
 
 				env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
-				compiler := requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t)
+				err := compiler.emitPreamble()
+				require.NoError(t, err)
 
 				require.Empty(t, compiler.locationStack.usedRegisters)
-				var err error
 				if isAddressFromRegister {
 					err = compiler.callFunctionFromRegister(x86.REG_AX, &wasm.FunctionType{})
 				} else {
@@ -6100,13 +6124,18 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				moduleInstanceToExpectedValueInMemory := map[*wasm.ModuleInstance]uint32{}
 				for i := 0; i < numCalls; i++ {
 					// Each function takes one arguments, adds the value with 100 + i and returns the result.
+					addTargetValue := uint32(100 + i)
+					moduleInstance := &wasm.ModuleInstance{
+						Memory: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+					}
+					moduleInstanceToExpectedValueInMemory[moduleInstance] = addTargetValue
 
-					compiler := requireNewCompiler(t)
-					compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+					compiler := env.requireNewCompiler(t)
+					compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, ModuleInstance: moduleInstance}
+
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
-					addTargetValue := uint32(100 + i)
 					expectedValue += addTargetValue
 					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
 					require.NoError(t, err)
@@ -6138,20 +6167,15 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 					code, _, _, err := compiler.generate()
 					require.NoError(t, err)
 
-					moduleInstance := &wasm.ModuleInstance{
-						Memory: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
-					}
-					moduleInstanceToExpectedValueInMemory[moduleInstance] = addTargetValue
 					compiledFunction := &compiledFunction{
-						codeSegment:           code,
-						codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
-						moduleInstanceAddress: uintptr(unsafe.Pointer(moduleInstance)),
+						codeSegment:        code,
+						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 					}
 					engine.addCompiledFunction(wasm.FunctionAddress(i), compiledFunction)
 				}
 
 				// Now we start building the caller's code.
-				compiler := requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 
@@ -6211,8 +6235,8 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 	{
 		// Call target function takes three i32 arguments and does ADD 2 times.
-		compiler := requireNewCompiler(t)
-		compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+		compiler := env.requireNewCompiler(t)
+		compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, ModuleInstance: &wasm.ModuleInstance{}}
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 		for i := 0; i < 2; i++ {
@@ -6232,7 +6256,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	}
 
 	// Now we start building the caller's code.
-	compiler := requireNewCompiler(t)
+	compiler := env.requireNewCompiler(t)
 	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
 		Functions: []*wasm.FunctionInstance{
 			{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: targetFunctionAddress},
@@ -6278,7 +6302,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
 		env.setTable(make([]wasm.TableElement, 10))
-		compiler := requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t)
 
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
@@ -6309,7 +6333,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		table := make([]wasm.TableElement, 10)
 		env.setTable(table)
 
-		compiler := requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t)
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
@@ -6343,21 +6367,22 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		table := make([]wasm.TableElement, 10)
 		env.setTable(table)
 
-		compiler := requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t)
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		env.moduleInstance.Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}}}
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
 		table[0] = wasm.TableElement{FunctionTypeID: 50}
 
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
 		// Place the offfset value.
-		err := compiler.compileConstI32(targetOffset)
+		err = compiler.compileConstI32(targetOffset)
 		require.NoError(t, err)
 
 		// Now emit the code.
-		err = compiler.emitPreamble()
-		require.NoError(t, err)
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
 		// Generate the code under test.
@@ -6395,7 +6420,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				// and it returns one value.
 				expectedReturnValue := uint32(i * 1000)
 				{
-					compiler := requireNewCompiler(t)
+					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
@@ -6412,7 +6437,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 					})
 				}
 
-				compiler := requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t)
 				err := compiler.emitPreamble()
 				require.NoError(t, err)
 
@@ -6450,5 +6475,69 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
 			})
 		}
+	})
+}
+
+func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
+	t.Run("invalid", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after JMP.
+		compiler.readInstructionAddress(x86.REG_AX, obj.AJMP)
+
+		// If generate the code without JMP after readInstructionAddress,
+		// the call back added must return error.
+		_, _, _, err = compiler.generate()
+		require.Error(t, err)
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		const destinationRegister = x86.REG_AX
+		// Set the acquisition target instruction to the one after RET,
+		// and read the absolute address into destinationRegister.
+		compiler.readInstructionAddress(destinationRegister, obj.ARET)
+
+		// Jump to the instruction after RET below via the absolute
+		// address stored in destinationRegister.
+		jmpToAfterRet := compiler.newProg()
+		jmpToAfterRet.As = obj.AJMP
+		jmpToAfterRet.To.Type = obj.TYPE_REG
+		jmpToAfterRet.To.Reg = destinationRegister
+		compiler.addInstruction(jmpToAfterRet)
+
+		ret := compiler.newProg()
+		ret.As = obj.ARET
+		compiler.addInstruction(ret)
+
+		// This could be the read instruction target as this is the
+		// right after RET. Thefore, the jmp instruction above
+		// must target here.
+		const expectedReturnValue uint32 = 10000
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+		require.NoError(t, err)
+
+		err = compiler.returnFunction()
+		require.NoError(t, err)
+
+		// Generate the code under test.
+		code, _, _, err := compiler.generate()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
 	})
 }

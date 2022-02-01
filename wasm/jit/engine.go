@@ -46,23 +46,23 @@ type (
 
 	// globalContext holds the data which is constant across multiple function calls.
 	globalContext struct {
-		// &engine.valueStack[0] as uintptr.
+		// valueStackElement0Address is &engine.valueStack[0] as uintptr.
 		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
 		valueStackElement0Address uintptr
-		// len(engine.valueStack[0]).
+		// valueStackLen is len(engine.valueStack[0]).
 		// Note: this is updated when growing the stack in builtinFunctionGrowValueStack.
 		valueStackLen uint64
 
-		// &engine.callFrameStack[0] as uintptr.
+		// callFrameStackElementZeroAddress is &engine.callFrameStack[0] as uintptr.
 		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
 		callFrameStackElementZeroAddress uintptr
-		// len(engine.callFrameStack).
+		// callFrameStackLen is len(engine.callFrameStack).
 		// Note: this is updated when growing the stack in builtinFunctionGrowCallFrameStack.
 		callFrameStackLen uint64
-		// Points at the next empty slot on the call frame stack. For example, for the next function call,
-		// we push the new callFrame onto callFrameStack[callFrameStackPointer].
-		// This value is incremented/decremented in assembly when making function calls,
-		// or returning from them.
+		// callFrameStackPointer points at the next empty slot on the call frame stack.
+		// For example, for the next function call, we push the new callFrame onto
+		// callFrameStack[callFrameStackPointer]. This value is incremented/decremented in assembly
+		// when making function calls or returning from them.
 		callFrameStackPointer uint64
 		// previousCallFrameStackPointer is to support re-entrant execution.
 		// This is updated whenever exntering engine.execFunction.
@@ -70,7 +70,7 @@ type (
 		// but if this is the recursive function call from the host function, the value becomes non-zero.
 		previousCallFrameStackPointer uint64
 
-		// &engine.compiledFunctions[0] as uintptr.
+		// compiledFunctionsElement0Address is &engine.compiledFunctions[0] as uintptr.
 		// Note: this is updated when growing the slice in addCompileFunction.
 		compiledFunctionsElement0Address uintptr
 	}
@@ -78,21 +78,23 @@ type (
 	// moduleContext holds the per-function call specific module information.
 	// This is subject to be manipulated from JITed native code whenever we make function calls.
 	moduleContext struct {
-		// The address(pointer) of module instance from which we initialize the following fields.
-		// This is set whenever we make function call OR we return where we execute jump instruction.
-		// In either case, the caller of "jmp" instruction must set this field to the destination
-		// function's module instance properly. Therefore, this must always equal callFrameTop().moduleInstanceAddress
-		moduleInstanceAddress uintptr
+		// moduleInstanceAddress is the address of module instance from which we initialize
+		// the following fields. This is set whenever we enter a function or return from function calls.
+		// This is only used by JIT code so mark this as nolint.
+		moduleInstanceAddress uintptr //nolint
 
-		// The address of the first item in the globa slice, i.e. &ModuleInstance.Globals[0] as uintptr.
+		// globalElement0Address is the address of the first element in the globa slice,
+		// i.e. &ModuleInstance.Globals[0] as uintptr.
 		globalElement0Address uintptr
-		// The address of the first item in the globa slice, i.e. &ModuleInstance.Memory.Buffer[0] as uintptr.
+		// memoryElement0Address is the address of the first element in the globa slice,
+		// i.e. &ModuleInstance.Memory.Buffer[0] as uintptr.
 		memoryElement0Address uintptr
-		// The length of the memory buffer, i.e. len(ModuleInstance.Memory.Buffer).
+		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Memory.Buffer).
 		memorySliceLen uint64
-		// The address of the first item in the globa slice, i.e. &ModuleInstance.Tables[0].Table[0] as uintptr.
+		// tableElement0Address is the address of the first item in the globa slice,
+		// i.e. &ModuleInstance.Tables[0].Table[0] as uintptr.
 		tableElement0Address uintptr
-		// The length of the memory buffer, i.e. len(ModuleInstance.Tables[0].Table).
+		// tableSliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Tables[0].Table).
 		tableSliceLen uint64
 	}
 
@@ -155,11 +157,6 @@ type (
 		codeInitialAddress uintptr
 		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
 		maxStackPointer uint64
-		// Pre-calculated unintptr(unsafe.Pointer(source.ModuleInstance)).
-		// This is used to update engine.moduleContext when start executing this function frame.
-		// Set zero which to mean nil pointer for host functions since the moduleContext is derived
-		// from the caller for host function.
-		moduleInstanceAddress uintptr
 
 		// Followings are not accessed by JITed code.
 
@@ -214,9 +211,8 @@ const (
 	callFrameCompiledFunctionOffset        = 16
 
 	// Offsets for compiledFunction.
-	compiledFunctionCodeInitialAddressOffset    = 0
-	compiledFunctionMaxStackPointerOffset       = 8
-	compiledFunctionModuleInstanceAddressOffset = 16
+	compiledFunctionCodeInitialAddressOffset = 0
+	compiledFunctionMaxStackPointerOffset    = 8
 
 	// Offsets for wasm.TableElement
 	tableElementFunctionAddressOffset = 0
@@ -565,10 +561,6 @@ jitentry:
 
 // pushInitialFrame is implemented in assembly as well, but this Go version is used BEFORE jit entry.
 func (e *engine) pushCallFrame(f *compiledFunction) {
-	// Set moduleInstanceAddress for the target function's one, so we can
-	// initialize moduleContext's other fields in the function preamble inside of JITed code.
-	e.moduleContext.moduleInstanceAddress = f.moduleInstanceAddress
-
 	// Push the new frame to the top of stack.
 	e.callFrameStack[e.globalContext.callFrameStackPointer] = callFrame{returnAddress: f.codeInitialAddress, compiledFunction: f}
 	e.globalContext.callFrameStackPointer++
@@ -692,11 +684,10 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	}
 
 	return &compiledFunction{
-		source:                f,
-		codeSegment:           code,
-		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
-		moduleInstanceAddress: 0, // Explicitly set zero to indicate this is host function.
-		maxStackPointer:       maxStackPointer,
+		source:             f,
+		codeSegment:        code,
+		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+		maxStackPointer:    maxStackPointer,
 	}, nil
 }
 
@@ -888,11 +879,10 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	}
 
 	return &compiledFunction{
-		source:                f,
-		codeSegment:           code,
-		codeInitialAddress:    uintptr(unsafe.Pointer(&code[0])),
-		maxStackPointer:       maxStackPointer,
-		moduleInstanceAddress: uintptr(unsafe.Pointer(f.ModuleInstance)),
-		staticData:            staticData,
+		source:             f,
+		codeSegment:        code,
+		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+		maxStackPointer:    maxStackPointer,
+		staticData:         staticData,
 	}, nil
 }
