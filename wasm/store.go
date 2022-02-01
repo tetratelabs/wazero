@@ -1842,26 +1842,3 @@ func newTableInstance(min uint32, max *uint32) *TableInstance {
 
 // UninitializedTableElementTypeID math.MaxUint64 to represent the uninitialized elements.
 var UninitializedTableElementTypeID FunctionTypeID = math.MaxUint64
-
-func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
-	currentBytesNum := uint64(len(m.Buffer))
-	currentPageNum := memoryBytesNumToPages(currentBytesNum)
-
-	maxPages := uint32(MemoryPageSize)
-	if m.Max != nil {
-		maxPages = *m.Max
-	}
-
-	// If exceeds the max of memory size, we push -1 according to the spec.
-	if currentPageNum+newPages > maxPages {
-		v := int32(-1)
-		return uint32(v)
-	} else {
-		m.Buffer = append(m.Buffer, make([]byte, memoryPagesToBytesNum(newPages))...)
-		return currentPageNum
-	}
-}
-
-func (m *MemoryInstance) PageSize() (result uint32) {
-	return memoryBytesNumToPages(uint64(len(m.Buffer)))
-}
