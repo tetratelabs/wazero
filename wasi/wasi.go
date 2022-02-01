@@ -117,7 +117,7 @@ type wasiStringArray struct {
 	totalBufSize uint32
 }
 
-// newWASIStringArray creates a cStringArray from the given string slice. It returns an error
+// newWASIStringArray creates a wasiStringArray from the given string slice. It returns an error
 // if the length or the total buffer size of the result WASIStringArray exceeds the max of uint32
 func newWASIStringArray(args []string) (*wasiStringArray, error) {
 	if args == nil {
