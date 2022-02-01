@@ -9,6 +9,53 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+func TestWasiStringArray(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		expectedBufSize uint32
+	}{
+		{
+			name:            "empty",
+			args:            []string{},
+			expectedBufSize: 0,
+		},
+		{
+			name:            "simple",
+			args:            []string{"foo", "bar", "foobar", "", "baz"},
+			expectedBufSize: 20,
+		},
+		{
+			name: "utf-8 string",
+			// "😨", "🤣", and "️🏃‍♀️" have 4, 4, and 13 bytes respectively
+			args:            []string{"😨🤣🏃\u200d♀️", "foo", "bar"},
+			expectedBufSize: 30,
+		},
+		{
+			name:            "invalid utf-8 string",
+			args:            []string{"\xff\xfe\xfd", "foo", "bar"},
+			expectedBufSize: 12,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			wasiStringsArray, err := newWASIStringArray(tc.args)
+			require.NoError(t, err)
+
+			require.Equal(t, tc.expectedBufSize, wasiStringsArray.totalBufSize)
+			require.Equal(t, len(wasiStringsArray.strings), len(tc.args))
+			for i, arg := range tc.args {
+				wasiString := wasiStringsArray.strings[i]
+				require.Equal(t, wasiString[0:len(wasiString)-1], []byte(arg))
+				require.Equal(t, wasiString[len(wasiString)-1], byte(0))
+			}
+		})
+	}
+}
+
 func TestArgsAPISucceed(t *testing.T) {
 	tests := []struct {
 		name            string
