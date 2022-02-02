@@ -427,34 +427,46 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 // Call implements an interpreted wasm.Engine.
 func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	prevFrameLen := len(it.frames)
+
+	// shouldRecover is true when a panic at the origin of callstack should be recovered
+	//
+	// If this is the recursive call into Wasm (prevFrameLen != 0), we do not recover, and delegate the
+	// recovery to the first interpreter.Call.
+	//
+	// For example, given the call stack:
+	//	 "original host function" --(interpreter.Call)--> Wasm func A --> Host func --(interpreter.Call)--> Wasm function B,
+	// if the top Wasm function panics, we go back to the "original host function".
+	shouldRecover := prevFrameLen == 0
 	defer func() {
-		if v := recover(); v != nil {
-			if buildoptions.IsDebugMode {
-				debug.PrintStack()
-			}
-			traceNum := len(it.frames) - prevFrameLen
-			traces := make([]string, 0, traceNum)
-			for i := 0; i < traceNum; i++ {
-				frame := it.popFrame()
-				name := frame.f.funcInstance.Name
-				// TODO: include the original instruction which corresponds
-				// to frame.f.body[frame.pc].
-				traces = append(traces, fmt.Sprintf("\t%d: %s", i, name))
-			}
-
-			it.frames = it.frames[:prevFrameLen]
-			err2, ok := v.(error)
-			if ok {
-				if err2.Error() == "runtime error: integer divide by zero" {
-					err2 = wasm.ErrRuntimeIntegerDivideByZero
+		if shouldRecover {
+			if v := recover(); v != nil {
+				if buildoptions.IsDebugMode {
+					debug.PrintStack()
 				}
-				err = fmt.Errorf("wasm runtime error: %w", err2)
-			} else {
-				err = fmt.Errorf("wasm runtime error: %v", v)
-			}
+				traceNum := len(it.frames) - prevFrameLen
+				traces := make([]string, 0, traceNum)
+				for i := 0; i < traceNum; i++ {
+					frame := it.popFrame()
+					name := frame.f.funcInstance.Name
+					// TODO: include the original instruction which corresponds
+					// to frame.f.body[frame.pc].
+					traces = append(traces, fmt.Sprintf("\t%d: %s", i, name))
+				}
 
-			if len(traces) > 0 {
-				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
+				it.frames = it.frames[:prevFrameLen]
+				err2, ok := v.(error)
+				if ok {
+					if err2.Error() == "runtime error: integer divide by zero" {
+						err2 = wasm.ErrRuntimeIntegerDivideByZero
+					}
+					err = fmt.Errorf("wasm runtime error: %w", err2)
+				} else {
+					err = fmt.Errorf("wasm runtime error: %v", v)
+				}
+
+				if len(traces) > 0 {
+					err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
+				}
 			}
 		}
 	}()
