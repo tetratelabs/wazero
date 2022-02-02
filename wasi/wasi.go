@@ -143,7 +143,6 @@ func newWASIStringArray(args []string) (*wasiStringArray, error) {
 		totalBufSize += uint32(argLen)
 		strings[i] = make([]byte, argLen)
 		copy(strings[i], arg)
-		strings[i][argLen-1] = byte(0)
 	}
 
 	return &wasiStringArray{nullTerminatedValues: strings, totalBufSize: totalBufSize}, nil
