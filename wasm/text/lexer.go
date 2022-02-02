@@ -19,6 +19,10 @@ import (
 // column are here for storing the source location, such as for use in runtime stack traces.
 type tokenParser func(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error)
 
+// TODO: since S-expressions are common and also multiple nesting levels in fields, ex. (import (func)), think about a
+// special result of popCount which pops one or two RParens. This could inline skipping parens, which have no error
+// possibility unless there are extra tokens.
+
 var (
 	constantLParen = []byte{'('}
 	constantRParen = []byte{')'}

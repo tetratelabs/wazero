@@ -10,17 +10,8 @@ import (
 )
 
 func TestDecodeModule(t *testing.T) {
-	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
-	paramI32 := &wasm.FunctionType{Params: []wasm.ValueType{i32}}
-	paramI32I32ResultI32 := &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
-	paramI32I32I32I32ResultI32 := &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}}
-	paramI32I32I32I32I32I64I32I32ResultI32 := &wasm.FunctionType{
-		Params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
-		Results: []wasm.ValueType{i32},
-	}
 	zero := uint32(0)
 	localGet0End := []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}
-	resultI32 := &wasm.FunctionType{Results: []wasm.ValueType{i32}}
 
 	tests := []struct {
 		name, input string
@@ -39,16 +30,12 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "type funcs same param types",
 			input: `(module
-	(type (func (param f32) (param f32) (result f32)))
+	(type (func (param i32) (param i64) (result i32)))
 	(type (func) (; here to ensure sparse indexes work ;))
-	(type (func (param f32) (param f32) (result f32)))
+	(type (func (param i32) (param i64) (result i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
-					{},
-					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
-				},
+				TypeSection: []*wasm.FunctionType{i32i64_i32, v_v, i32i64_i32},
 			},
 		},
 		{
@@ -59,8 +46,8 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{}, // module types are always before inlined types
-					paramI32I32I32I32ResultI32,
+					v_v, // module types are always before inlined types
+					i32i32i32i32_i32,
 				},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "fd_write",
@@ -76,7 +63,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "import func empty",
 			input: "(module (import \"foo\" \"bar\" (func)))", // ok empty sig
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Kind:     wasm.ImportKindFunc,
@@ -91,7 +78,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "foo" "bar" (func))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Kind:     wasm.ImportKindFunc,
@@ -106,7 +93,7 @@ func TestDecodeModule(t *testing.T) {
 	(type (func))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Kind:     wasm.ImportKindFunc,
@@ -122,7 +109,7 @@ func TestDecodeModule(t *testing.T) {
 	(type (func))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Kind:     wasm.ImportKindFunc,
@@ -141,7 +128,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "foo" "bar" (func))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32I32I32I32ResultI32, {}},
+				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32, {}},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Kind:     wasm.ImportKindFunc,
@@ -153,7 +140,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "import func empty twice",
 			input: "(module (import \"foo\" \"bar\" (func)) (import \"baz\" \"qux\" (func)))", // ok empty sig
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{{
 					Module: "foo", Name: "bar",
 					Kind:     wasm.ImportKindFunc,
@@ -171,7 +158,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32) (param i32) (param i32) (result i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Kind:     wasm.ImportKindFunc,
@@ -188,7 +175,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Kind:     wasm.ImportKindFunc,
@@ -207,7 +194,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32 i32) (param i32) (result i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "fd_write",
 					Kind:     wasm.ImportKindFunc,
@@ -224,7 +211,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "proc_exit" (func $runtime.proc_exit (param i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32},
+				TypeSection: []*wasm.FunctionType{i32_v},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "proc_exit",
 					Kind:     wasm.ImportKindFunc,
@@ -239,7 +226,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "import func inlined type no param",
 			input: `(module (import "" "" (func (result i32))))`,
 			expected: &wasm.Module{
-				TypeSection:   []*wasm.FunctionType{resultI32},
+				TypeSection:   []*wasm.FunctionType{v_i32},
 				ImportSection: []*wasm.Import{{Kind: wasm.ImportKindFunc, DescFunc: 0}},
 			},
 		},
@@ -249,7 +236,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32) (param i32) (param i32) (param i32) (param i32) (param i64) (param i64) (param i32) (param i32) (result i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "path_open",
 					Kind:     wasm.ImportKindFunc,
@@ -266,7 +253,7 @@ func TestDecodeModule(t *testing.T) {
 	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "path_open",
 					Kind:     wasm.ImportKindFunc,
@@ -284,7 +271,7 @@ func TestDecodeModule(t *testing.T) {
 			(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{i32i32_i32, i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
 					Kind:     wasm.ImportKindFunc,
@@ -313,7 +300,7 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{},
+					v_v,
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
@@ -346,7 +333,7 @@ func TestDecodeModule(t *testing.T) {
 			(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (type 2)))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32, i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
@@ -370,14 +357,14 @@ func TestDecodeModule(t *testing.T) {
 			name: "multiple import func same inlined type",
 			input: `(module
 			(type (func) (; ensures no false match on index 0 ;))
-			(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (param i32 i32) (result i32)))
+			(import "wasi_snapshot_preview1" "environ_get" (func $runtime.environ_get (param i32 i32) (result i32)))
 			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (param i32 i32) (result i32)))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: "environ_get",
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
@@ -388,7 +375,7 @@ func TestDecodeModule(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: 0, Name: "runtime.environ_get"},
 						&wasm.NameAssoc{Index: 1, Name: "runtime.args_sizes_get"},
 					},
 				},
@@ -399,14 +386,14 @@ func TestDecodeModule(t *testing.T) {
 			input: `(module
 			(type (func) (; ensures no false match on index 0 ;))
 			(type (func (param i32 i32) (result i32)))
-			(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (type 1)))
+			(import "wasi_snapshot_preview1" "environ_get" (func $runtime.environ_get (type 1)))
 			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type 1)))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: "environ_get",
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
@@ -417,7 +404,7 @@ func TestDecodeModule(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: 0, Name: "runtime.environ_get"},
 						&wasm.NameAssoc{Index: 1, Name: "runtime.args_sizes_get"},
 					},
 				},
@@ -427,15 +414,15 @@ func TestDecodeModule(t *testing.T) {
 			name: "multiple import func same type index - type after import",
 			input: `(module
 			(type (func) (; ensures no false match on index 0 ;))
-			(import "wasi_snapshot_preview1" "args_get" (func $runtime.args_get (type 1)))
+			(import "wasi_snapshot_preview1" "environ_get" (func $runtime.environ_get (type 1)))
 			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type 1)))
 			(type (func (param i32 i32) (result i32)))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: "environ_get",
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
@@ -446,7 +433,7 @@ func TestDecodeModule(t *testing.T) {
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.args_get"},
+						&wasm.NameAssoc{Index: 0, Name: "runtime.environ_get"},
 						&wasm.NameAssoc{Index: 1, Name: "runtime.args_sizes_get"},
 					},
 				},
@@ -454,11 +441,9 @@ func TestDecodeModule(t *testing.T) {
 		},
 		{
 			name:  "import func param IDs",
-			input: "(module (import \"Math\" \"Mul\" (func $mul (param $x f32) (param $y f32) (result f32))))",
+			input: "(module (import \"Math\" \"Mul\" (func $mul (param $x i32) (param $y i64) (result i32))))",
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
-				},
+				TypeSection: []*wasm.FunctionType{i32i64_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "Math", Name: "Mul",
 					Kind:     wasm.ImportKindFunc,
@@ -475,13 +460,11 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "import funcs same param types different names",
 			input: `(module
-			(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
-			(import "Math" "Add" (func $add (param $l f32) (param $r f32) (result f32)))
+			(import "Math" "Mul" (func $mul (param $x i32) (param $y i64) (result i32)))
+			(import "Math" "Add" (func $add (param $l i32) (param $r i64) (result i32)))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
-				},
+				TypeSection: []*wasm.FunctionType{i32i64_i32},
 				ImportSection: []*wasm.Import{{
 					Module: "Math", Name: "Mul",
 					Kind:     wasm.ImportKindFunc,
@@ -524,7 +507,7 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{},
+					v_v,
 					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
@@ -611,7 +594,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "func empty",
 			input: "(module (func))", // ok empty sig
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 			},
@@ -623,7 +606,7 @@ func TestDecodeModule(t *testing.T) {
 			(func)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 			},
@@ -635,7 +618,7 @@ func TestDecodeModule(t *testing.T) {
 			(type (func))
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 			},
@@ -648,7 +631,7 @@ func TestDecodeModule(t *testing.T) {
 			(type (func))
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0, 0},
 				CodeSection:     []*wasm.Code{{Body: end}, {Body: end}},
 			},
@@ -660,7 +643,7 @@ func TestDecodeModule(t *testing.T) {
 			(func)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32I32I32I32ResultI32, {}},
+				TypeSection:     []*wasm.FunctionType{i32i32i32i32_i32, {}},
 				FunctionSection: []wasm.Index{1},
 				CodeSection:     []*wasm.Code{{Body: end}},
 			},
@@ -669,7 +652,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "func empty twice",
 			input: "(module (func) (func))", // ok empty sig
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0, 0},
 				CodeSection:     []*wasm.Code{{Body: end}, {Body: end}},
 			},
@@ -680,7 +663,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.fd_write (param i32) (param i32) (param i32) (param i32) (result i32) local.get 0 )
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				TypeSection:     []*wasm.FunctionType{i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -694,7 +677,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.fd_write (param i32 i32 i32 i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				TypeSection:     []*wasm.FunctionType{i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -710,7 +693,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.fd_write (param i32) (param i32 i32) (param i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32I32I32I32ResultI32},
+				TypeSection:     []*wasm.FunctionType{i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -724,7 +707,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.proc_exit (param i32))
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32},
+				TypeSection:     []*wasm.FunctionType{i32_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 				NameSection: &wasm.NameSection{
@@ -736,7 +719,7 @@ func TestDecodeModule(t *testing.T) {
 			name:  "func inlined type no param",
 			input: `(module (func (result i32) local.get 0))`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{resultI32},
+				TypeSection:     []*wasm.FunctionType{v_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 			},
@@ -747,7 +730,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.path_open (param i32) (param i32) (param i32) (param i32) (param i32) (param i64) (param i64) (param i32) (param i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
+				TypeSection:     []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -761,7 +744,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32I32I32I32I32I64I32I32ResultI32},
+				TypeSection:     []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -776,7 +759,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.fd_write (param i32 i32 i32 i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				TypeSection:     []*wasm.FunctionType{i32i32_i32, i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{0, 1},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -796,7 +779,7 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{},
+					v_v,
 					{Params: []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
@@ -821,7 +804,7 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{},
+					v_v,
 					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
@@ -845,7 +828,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.fd_write (type 2) local.get 0 )
 		)`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}, paramI32I32ResultI32, paramI32I32I32I32ResultI32},
+				TypeSection:     []*wasm.FunctionType{v_v, i32i32_i32, i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{1, 2},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}, {Body: localGet0End}},
 				NameSection: &wasm.NameSection{
@@ -912,7 +895,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.args_sizes_get (param i32 i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "args_get",
@@ -939,7 +922,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.args_sizes_get (type 1) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "args_get",
@@ -966,7 +949,7 @@ func TestDecodeModule(t *testing.T) {
 			(type (func (param i32 i32) (result i32) ))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "args_get",
@@ -993,7 +976,7 @@ func TestDecodeModule(t *testing.T) {
 			(func $runtime.args_sizes_get (type 1) (param i32 i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "args_get",
@@ -1020,7 +1003,7 @@ func TestDecodeModule(t *testing.T) {
 			(type (func (param i32 i32) (result i32) ))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}, paramI32I32ResultI32},
+				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
 						Module: "wasi_snapshot_preview1", Name: "args_get",
@@ -1092,7 +1075,7 @@ func TestDecodeModule(t *testing.T) {
 	(export "bar" (func $bar))
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{
 					{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0},
 				},
@@ -1109,7 +1092,7 @@ func TestDecodeModule(t *testing.T) {
 			(export "bar" (func 0))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{
 					{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0},
 				},
@@ -1126,7 +1109,7 @@ func TestDecodeModule(t *testing.T) {
 			(export "bar" (func $bar))
 		)`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{
 					{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0},
 				},
@@ -1148,7 +1131,7 @@ func TestDecodeModule(t *testing.T) {
 	(export "bar" (func $qux))
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
@@ -1173,7 +1156,7 @@ func TestDecodeModule(t *testing.T) {
 	(func $qux)
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
@@ -1198,7 +1181,7 @@ func TestDecodeModule(t *testing.T) {
 	(export "bar" (func 1))
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
@@ -1217,7 +1200,7 @@ func TestDecodeModule(t *testing.T) {
 	(func)
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				ImportSection:   []*wasm.Import{{Module: "foo", Name: "bar", Kind: wasm.ImportKindFunc, DescFunc: 0}},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
@@ -1272,7 +1255,7 @@ func TestDecodeModule(t *testing.T) {
     (export "a" (func 1))
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0, 0, 0},
 				CodeSection:     []*wasm.Code{{Body: end}, {Body: end}, {Body: end}},
 				ExportSection: map[string]*wasm.Export{
@@ -1288,7 +1271,7 @@ func TestDecodeModule(t *testing.T) {
 	(start $hello)
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{{
 					Module: "", Name: "hello",
 					Kind:     wasm.ImportKindFunc,
@@ -1305,7 +1288,7 @@ func TestDecodeModule(t *testing.T) {
 	(start 0)
 )`,
 			expected: &wasm.Module{
-				TypeSection: []*wasm.FunctionType{{}},
+				TypeSection: []*wasm.FunctionType{v_v},
 				ImportSection: []*wasm.Import{{
 					Module: "", Name: "hello",
 					Kind:     wasm.ImportKindFunc,
@@ -1321,7 +1304,7 @@ func TestDecodeModule(t *testing.T) {
 	(start $hello)
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 				StartSection:    &zero,
@@ -1335,7 +1318,7 @@ func TestDecodeModule(t *testing.T) {
 	(func $hello)
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 				StartSection:    &zero,
@@ -1349,7 +1332,7 @@ func TestDecodeModule(t *testing.T) {
 	(start 0)
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 				StartSection:    &zero,
@@ -1362,7 +1345,7 @@ func TestDecodeModule(t *testing.T) {
 	(func)
 )`,
 			expected: &wasm.Module{
-				TypeSection:     []*wasm.FunctionType{{}},
+				TypeSection:     []*wasm.FunctionType{v_v},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: end}},
 				StartSection:    &zero,

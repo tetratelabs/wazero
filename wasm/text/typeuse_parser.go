@@ -127,12 +127,13 @@ func (p *typeUseParser) begin(section wasm.SectionID, idx wasm.Index, onTypeUse 
 	return onTypeUse(p.emptyTypeIndex(section, idx), nil, pos, tok, tokenBytes, line, col)
 }
 
-var emptyFunctionType = &wasm.FunctionType{}
+// v_v is a nullary function type (void -> void)
+var v_v = &wasm.FunctionType{}
 
 // inlinedTypeIndex searches for any existing empty type to re-use
 func (p *typeUseParser) emptyTypeIndex(section wasm.SectionID, idx wasm.Index) wasm.Index {
 	for i, t := range p.module.TypeSection {
-		if t == emptyFunctionType {
+		if t == v_v {
 			return wasm.Index(i)
 		}
 	}
@@ -140,7 +141,7 @@ func (p *typeUseParser) emptyTypeIndex(section wasm.SectionID, idx wasm.Index) w
 	foundEmpty := false
 	var inlinedIdx wasm.Index
 	for i, t := range p.inlinedTypes {
-		if t == emptyFunctionType {
+		if t == v_v {
 			foundEmpty = true
 			inlinedIdx = wasm.Index(i)
 		}
@@ -148,7 +149,7 @@ func (p *typeUseParser) emptyTypeIndex(section wasm.SectionID, idx wasm.Index) w
 
 	if !foundEmpty {
 		inlinedIdx = wasm.Index(len(p.inlinedTypes))
-		p.inlinedTypes = append(p.inlinedTypes, emptyFunctionType)
+		p.inlinedTypes = append(p.inlinedTypes, v_v)
 	}
 
 	// typePos is not needed on empty as there's nothing to verify
@@ -320,7 +321,7 @@ func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32
 }
 
 // parseResult parses the wasm.ValueType in the "result" field and returns onType to finish the type.
-func (p *typeUseParser) parseResult(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *typeUseParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenKeyword: // Ex. i32
 		if p.currentInlinedType != nil && p.currentInlinedType.Results != nil {
@@ -465,91 +466,6 @@ func requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, index
 		return fmt.Errorf("inlined type doesn't match module.type[%d].func", index)
 	}
 	return nil
-}
-
-// resolveTypeUses adds any missing inlined types, resolving any type indexes in the FunctionSection or ImportSection.
-// This errs if any type index is unresolved, out of range or mismatches an inlined type use signature.
-func (p *typeUseParser) resolveTypeUses(module *wasm.Module) error {
-	inlinedToRealIdx := p.addInlinedTypes()
-	return p.resolveInlined(module, inlinedToRealIdx)
-}
-
-func (p *typeUseParser) resolveInlined(module *wasm.Module, inlinedToRealIdx map[wasm.Index]wasm.Index) error {
-	// Now look for all the uses of the inlined types and apply the mapping above
-	for _, i := range p.inlinedTypeIndices {
-		switch i.section {
-		case wasm.SectionIDImport:
-			if i.typePos == nil {
-				module.ImportSection[i.idx].DescFunc = inlinedToRealIdx[i.inlinedIdx]
-				continue
-			}
-
-			typeIdx := module.ImportSection[i.idx].DescFunc
-			if err := p.requireInlinedMatchesReferencedType(module.TypeSection, typeIdx, i); err != nil {
-				return err
-			}
-		case wasm.SectionIDFunction:
-			if i.typePos == nil {
-				module.FunctionSection[i.idx] = inlinedToRealIdx[i.inlinedIdx]
-				continue
-			}
-
-			typeIdx := module.FunctionSection[i.idx]
-			if err := p.requireInlinedMatchesReferencedType(module.TypeSection, typeIdx, i); err != nil {
-				return err
-			}
-		default:
-			panic(unhandledSection(i.section))
-		}
-	}
-	return nil
-}
-
-func (p *typeUseParser) requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, typeIdx wasm.Index, i *inlinedTypeIndex) error {
-	inlined := p.inlinedTypes[i.inlinedIdx]
-	if err := requireInlinedMatchesReferencedType(typeSection, typeIdx, inlined.Params, inlined.Results); err != nil {
-		var context string
-		switch i.section {
-		case wasm.SectionIDImport:
-			context = fmt.Sprintf("module.import[%d].func", i.idx)
-		case wasm.SectionIDFunction:
-			context = fmt.Sprintf("module.func[%d]", i.idx)
-		default:
-			panic(unhandledSection(i.section))
-		}
-		return &FormatError{Line: i.typePos.line, Col: i.typePos.col, Context: context, cause: err}
-	}
-	return nil
-}
-
-// addInlinedTypes adds any inlined types missing from the module TypeSection and returns an index mapping the inlined
-// index to real index in the TypeSection. This avoids adding or looking up a type twice when it has multiple type uses.
-func (p *typeUseParser) addInlinedTypes() map[wasm.Index]wasm.Index {
-	inlinedTypeCount := len(p.inlinedTypes)
-	if inlinedTypeCount == 0 {
-		return nil
-	}
-
-	inlinedToRealIdx := make(map[wasm.Index]wasm.Index, len(p.inlinedTypes))
-INLINED:
-	for idx, inlined := range p.inlinedTypes {
-		inlinedIdx := wasm.Index(idx)
-
-		// A type can be defined after its type use. Ex. (module (func (param i32)) (type (func (param i32)))
-		// This uses an inner loop to avoid creating a large map for an edge case.
-		for realIdx, t := range p.module.TypeSection {
-			if funcTypeEquals(t, inlined.Params, inlined.Results) {
-				inlinedToRealIdx[inlinedIdx] = wasm.Index(realIdx)
-				continue INLINED
-			}
-		}
-
-		// When we get here, this means the inlined type is not in the TypeSection, yet, so add it.
-		inlinedToRealIdx[inlinedIdx] = p.typeNamespace.count
-		p.module.TypeSection = append(p.module.TypeSection, inlined)
-		p.typeNamespace.count++
-	}
-	return inlinedToRealIdx
 }
 
 func funcTypeEquals(f *wasm.FunctionType, params []wasm.ValueType, results []wasm.ValueType) bool {

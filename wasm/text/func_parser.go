@@ -8,20 +8,20 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
-func newCodeParser(onFunc onFunc) *codeParser {
-	return &codeParser{onFunc: onFunc}
+func newFuncParser(onFunc onFunc) *funcParser {
+	return &funcParser{onFunc: onFunc}
 }
 
 type onFunc func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error)
 
-// codeParser parses any instructions and dispatches to onFunc.
+// funcParser parses any instructions and dispatches to onFunc.
 //
 // Ex.  `(module (func (nop)))`
 //       starts here --^    ^
 //      calls onFunc here --+
 //
-// Note: codeParser is reusable. The caller resets via begin.
-type codeParser struct {
+// Note: funcParser is reusable. The caller resets via begin.
+type funcParser struct {
 	// onFunc is called when complete parsing the body. Unless testing, this should be moduleParser.onFuncEnd
 	onFunc onFunc
 
@@ -50,7 +50,7 @@ var codeEnd = &wasm.Code{Body: end}
 // Ex. Given the source `(module (func nop))`
 //                 begin starts here --^  ^
 //                    calls onFunc here --+
-func (p *codeParser) begin(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *funcParser) begin(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch pos {
 	case onTypeUseEndField:
 		return p.onFunc(typeIdx, codeEnd, paramNames)
@@ -75,7 +75,7 @@ func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) (tok
 	return nil, fmt.Errorf("TODO: s-expressions are not yet supported: %s", tokenBytes)
 }
 
-func (p *codeParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch tok {
 	case tokenLParen:
 		return sExpressionsUnsupported, nil
@@ -88,7 +88,7 @@ func (p *codeParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, l
 }
 
 // beginInstruction parses the token into an opcode and dispatches accordingly. If there are none, this calls onFunc.
-func (p *codeParser) beginInstruction(tokenBytes []byte) (tokenParser, error) {
+func (p *funcParser) beginInstruction(tokenBytes []byte) (tokenParser, error) {
 	switch string(tokenBytes) {
 	case "local.get":
 		p.currentOpcode = wasm.OpcodeLocalGet
@@ -101,7 +101,7 @@ func (p *codeParser) beginInstruction(tokenBytes []byte) (tokenParser, error) {
 }
 
 // end invokes onFunc to continue parsing
-func (p *codeParser) end() (tokenParser, error) {
+func (p *funcParser) end() (tokenParser, error) {
 	var code *wasm.Code
 	if p.currentBody == nil {
 		code = codeEnd
@@ -112,7 +112,7 @@ func (p *codeParser) end() (tokenParser, error) {
 }
 
 // TODO: port this to the indexNamespace
-func (p *codeParser) parseInstructionIndex(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
+func (p *funcParser) parseInstructionIndex(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenUN: // Ex. 1
 		i, overflow := decodeUint32(tokenBytes)
@@ -133,7 +133,7 @@ func (p *codeParser) parseInstructionIndex(tok tokenType, tokenBytes []byte, _, 
 	return nil, unexpectedToken(tok, tokenBytes)
 }
 
-func (p *codeParser) endInstruction() (tokenParser, error) {
+func (p *funcParser) endInstruction() (tokenParser, error) {
 	p.currentBody = append(p.currentBody, p.currentOpcode)
 	p.currentBody = append(p.currentBody, p.currentParameters...)
 	p.currentParameters = nil

@@ -8,13 +8,21 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestTypeParser(t *testing.T) {
-	f32, i32, i64 := wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
-	i32_v := &wasm.FunctionType{Params: []wasm.ValueType{i32}}
-	v_i32 := &wasm.FunctionType{Results: []wasm.ValueType{i32}}
-	i32_i64_v := &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}}
-	i32_i64_i32 := &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}}
+var (
+	f32, i32, i64                   = wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
+	i32_v                           = &wasm.FunctionType{Params: []wasm.ValueType{i32}}
+	v_i32                           = &wasm.FunctionType{Results: []wasm.ValueType{i32}}
+	i32i64_v                        = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}}
+	i32i32_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
+	i32i64_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}}
+	i32i32i32i32_i32                = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}}
+	i32i32i32i32i32i64i64i32i32_i32 = &wasm.FunctionType{
+		Params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+		Results: []wasm.ValueType{i32},
+	}
+)
 
+func TestTypeParser(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -57,29 +65,29 @@ func TestTypeParser(t *testing.T) {
 		{
 			name:     "mixed param no result",
 			input:    "(type (func (param i32) (param i64)))",
-			expected: i32_i64_v,
+			expected: i32i64_v,
 		},
 		{
 			name:        "mixed param no result - ID",
-			input:       "(type $i32_i64_v (func (param i32) (param i64)))",
-			expected:    i32_i64_v,
-			expectedErr: "i32_i64_v",
+			input:       "(type $i32i64_v (func (param i32) (param i64)))",
+			expected:    i32i64_v,
+			expectedErr: "i32i64_v",
 		},
 		{
 			name:     "mixed param result",
 			input:    "(type (func (param i32) (param i64) (result i32)))",
-			expected: i32_i64_i32,
+			expected: i32i64_i32,
 		},
 		{
 			name:        "mixed param result - ID",
-			input:       "(type $i32_i64_i32 (func (param i32) (param i64) (result i32)))",
-			expected:    i32_i64_i32,
-			expectedErr: "i32_i64_i32",
+			input:       "(type $i32i64_i32 (func (param i32) (param i64) (result i32)))",
+			expected:    i32i64_i32,
+			expectedErr: "i32i64_i32",
 		},
 		{
 			name:     "abbreviated param result",
 			input:    "(type (func (param i32 i64) (result i32)))",
-			expected: i32_i64_i32,
+			expected: i32i64_i32,
 		},
 		{
 			name:     "mixed param abbreviation", // Verifies we can handle less param fields than param types

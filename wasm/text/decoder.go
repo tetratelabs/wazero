@@ -57,8 +57,8 @@ type moduleParser struct {
 	// resolved here (without the '$' prefix).
 	funcNamespace *indexNamespace
 
-	// codeParser parses the CodeSection for a given module-defined function.
-	codeParser *codeParser
+	// funcParser parses the CodeSection for a given module-defined function.
+	funcParser *funcParser
 
 	// unresolvedExports holds any exports whose type index wasn't resolvable when parsed.
 	unresolvedExports map[wasm.Index]*wasm.Export
@@ -80,7 +80,7 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	}
 	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
 	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
-	p.codeParser = newCodeParser(p.endFunc)
+	p.funcParser = newFuncParser(p.endFunc)
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
 	// reason, we cannot enforce source[0] == '(', and instead need to start the lexer to check the first token.
@@ -89,11 +89,10 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 		return nil, &FormatError{line, col, p.errorContext(), err}
 	}
 
-	if err = p.typeUseParser.resolveTypeUses(module); err != nil {
+	// All identifier contexts are now bound, so resolveTypeUses any uses of symbolic identifiers into concrete indices.
+	if err = p.resolveTypeUses(module); err != nil {
 		return nil, err
 	}
-
-	// All identifier contexts are now bound, so resolveTypeUses any uses of symbolic identifiers into concrete indices.
 	if err = p.resolveTypeIndices(module); err != nil {
 		return nil, err
 	}
@@ -389,7 +388,7 @@ func (p *moduleParser) setFuncID(idToken []byte) error {
 	return nil
 }
 
-// parseFunc passes control to the typeUseParser until any signature is read, then codeParser until and locals or body
+// parseFunc passes control to the typeUseParser until any signature is read, then funcParser until and locals or body
 // are read. Finally, this finishes via endFunc.
 //
 // Ex. `(module (func $math.pi (result f32))`
@@ -398,7 +397,7 @@ func (p *moduleParser) setFuncID(idToken []byte) error {
 //
 // Ex.    `(module (func $math.pi (result f32) (local i32) )`
 //                  starts here --^            ^           ^
-//             codeParser.begin resumes here --+           |
+//             funcParser.begin resumes here --+           |
 //                                  endFunc resumes here --+
 //
 // Ex. If there is no signature `(func)`
@@ -409,7 +408,7 @@ func (p *moduleParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uin
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
 	}
 
-	return p.typeUseParser.begin(wasm.SectionIDFunction, idx, p.codeParser.begin, tok, tokenBytes, line, col)
+	return p.typeUseParser.begin(wasm.SectionIDFunction, idx, p.funcParser.begin, tok, tokenBytes, line, col)
 }
 
 // endFunc adds the type index, code and local names for the current function, and increments funcNamespace as it is
@@ -596,6 +595,91 @@ func (p *moduleParser) resolveFunctionIndices(module *wasm.Module) error {
 		}
 	}
 	return nil
+}
+
+// resolveTypeUses adds any missing inlined types, resolving any type indexes in the FunctionSection or ImportSection.
+// This errs if any type index is unresolved, out of range or mismatches an inlined type use signature.
+func (p *moduleParser) resolveTypeUses(module *wasm.Module) error {
+	inlinedToRealIdx := p.addInlinedTypes()
+	return p.resolveInlined(module, inlinedToRealIdx)
+}
+
+func (p *moduleParser) resolveInlined(module *wasm.Module, inlinedToRealIdx map[wasm.Index]wasm.Index) error {
+	// Now look for all the uses of the inlined types and apply the mapping above
+	for _, i := range p.typeUseParser.inlinedTypeIndices {
+		switch i.section {
+		case wasm.SectionIDImport:
+			if i.typePos == nil {
+				module.ImportSection[i.idx].DescFunc = inlinedToRealIdx[i.inlinedIdx]
+				continue
+			}
+
+			typeIdx := module.ImportSection[i.idx].DescFunc
+			if err := p.requireInlinedMatchesReferencedType(module.TypeSection, typeIdx, i); err != nil {
+				return err
+			}
+		case wasm.SectionIDFunction:
+			if i.typePos == nil {
+				module.FunctionSection[i.idx] = inlinedToRealIdx[i.inlinedIdx]
+				continue
+			}
+
+			typeIdx := module.FunctionSection[i.idx]
+			if err := p.requireInlinedMatchesReferencedType(module.TypeSection, typeIdx, i); err != nil {
+				return err
+			}
+		default:
+			panic(unhandledSection(i.section))
+		}
+	}
+	return nil
+}
+
+func (p *moduleParser) requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, typeIdx wasm.Index, i *inlinedTypeIndex) error {
+	inlined := p.typeUseParser.inlinedTypes[i.inlinedIdx]
+	if err := requireInlinedMatchesReferencedType(typeSection, typeIdx, inlined.Params, inlined.Results); err != nil {
+		var context string
+		switch i.section {
+		case wasm.SectionIDImport:
+			context = fmt.Sprintf("module.import[%d].func", i.idx)
+		case wasm.SectionIDFunction:
+			context = fmt.Sprintf("module.func[%d]", i.idx)
+		default:
+			panic(unhandledSection(i.section))
+		}
+		return &FormatError{Line: i.typePos.line, Col: i.typePos.col, Context: context, cause: err}
+	}
+	return nil
+}
+
+// addInlinedTypes adds any inlined types missing from the module TypeSection and returns an index mapping the inlined
+// index to real index in the TypeSection. This avoids adding or looking up a type twice when it has multiple type uses.
+func (p *moduleParser) addInlinedTypes() map[wasm.Index]wasm.Index {
+	inlinedTypeCount := len(p.typeUseParser.inlinedTypes)
+	if inlinedTypeCount == 0 {
+		return nil
+	}
+
+	inlinedToRealIdx := make(map[wasm.Index]wasm.Index, inlinedTypeCount)
+INLINED:
+	for idx, inlined := range p.typeUseParser.inlinedTypes {
+		inlinedIdx := wasm.Index(idx)
+
+		// A type can be defined after its type use. Ex. (module (func (param i32)) (type (func (param i32)))
+		// This uses an inner loop to avoid creating a large map for an edge case.
+		for realIdx, t := range p.module.TypeSection {
+			if funcTypeEquals(t, inlined.Params, inlined.Results) {
+				inlinedToRealIdx[inlinedIdx] = wasm.Index(realIdx)
+				continue INLINED
+			}
+		}
+
+		// When we get here, this means the inlined type is not in the TypeSection, yet, so add it.
+		inlinedToRealIdx[inlinedIdx] = p.typeNamespace.count
+		p.module.TypeSection = append(p.module.TypeSection, inlined)
+		p.typeNamespace.count++
+	}
+	return inlinedToRealIdx
 }
 
 func (p *moduleParser) errorContext() string {
