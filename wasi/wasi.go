@@ -271,9 +271,9 @@ func (w *WASIEnvironment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32,
 
 	var nwritten uint32
 	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*SIZE_UINT32*2
+		iovPtr := iovsPtr + i*8
 		offset := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr:])
-		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+SIZE_UINT32:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+4:])
 		n, err := writer.Write(ctx.Memory.Buffer[offset : offset+l])
 		if err != nil {
 			panic(err)
@@ -300,9 +300,9 @@ func (w *WASIEnvironment) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, 
 
 	var nread uint32
 	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*SIZE_UINT32*2
+		iovPtr := iovsPtr + i*8
 		offset := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr:])
-		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+SIZE_UINT32:])
+		l := binary.LittleEndian.Uint32(ctx.Memory.Buffer[iovPtr+4:])
 		n, err := reader.Read(ctx.Memory.Buffer[offset : offset+l])
 		nread += uint32(n)
 		if errors.Is(err, io.EOF) {
@@ -360,12 +360,13 @@ func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, args
 // Link to the actual spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
 // Reference: https://en.wikipedia.org/wiki/Null-terminated_string
 func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
-	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.nullTerminatedValues))*SIZE_UINT32) || !ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
+	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
+		!ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
 		return EINVAL
 	}
 	for _, arg := range w.args.nullTerminatedValues {
 		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argsPtr:], argsBufPtr)
-		argsPtr += SIZE_UINT32
+		argsPtr += 4 // size of uint32
 		argsBufPtr += uint32(copy(ctx.Memory.Buffer[argsBufPtr:], arg))
 	}
 

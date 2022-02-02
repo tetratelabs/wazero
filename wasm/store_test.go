@@ -160,7 +160,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 	})
 }
 
-func TestValidateAddrRange(t *testing.T) {
+func TestMemoryInstance_ValidateAddrRange(t *testing.T) {
 	name := "test"
 	s := NewStore(nil)
 	mi := s.getModuleInstance(name)
@@ -179,7 +179,7 @@ func TestValidateAddrRange(t *testing.T) {
 	require.False(t, mi.Memory.ValidateAddrRange(uint32(100*MemoryPageSize), uint64(0)))
 }
 
-func TestPutUint32(t *testing.T) {
+func TestMemoryInstance_PutUint32(t *testing.T) {
 	name := "test"
 	s := NewStore(nil)
 	mi := s.getModuleInstance(name)

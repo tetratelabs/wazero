@@ -9,7 +9,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestWasiStringArray(t *testing.T) {
+func TestNewWasiStringArray(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            []string
@@ -124,11 +124,11 @@ func TestArgsAPISucceed(t *testing.T) {
 			hostFunctionCallContext := buildMockHostFunctionCallContext()
 
 			// Serialize the expected result of args_size_get
-			argCountPtr := uint32(0) // arbitrary valid address
-			expectedArgCount := make([]byte, SIZE_UINT32)
+			argCountPtr := uint32(0)            // arbitrary valid address
+			expectedArgCount := make([]byte, 4) // size of uint32
 			binary.LittleEndian.PutUint32(expectedArgCount, uint32(len(tc.args)))
-			bufSizePtr := uint32(0x100) // arbitrary valid address that doesn't overwrap with argCountPtr
-			expectedBufSize := make([]byte, SIZE_UINT32)
+			bufSizePtr := uint32(0x100)        // arbitrary valid address that doesn't overwrap with argCountPtr
+			expectedBufSize := make([]byte, 4) // size of uint32
 			binary.LittleEndian.PutUint32(expectedBufSize, tc.expectedBufSize)
 
 			// Compare them
@@ -138,13 +138,13 @@ func TestArgsAPISucceed(t *testing.T) {
 			require.Equal(t, expectedBufSize, hostFunctionCallContext.Memory.Buffer[bufSizePtr:bufSizePtr+4])
 
 			// Serialize the expected result of args_get
-			expectedArgs := make([]byte, SIZE_UINT32*len(tc.args))
-			argsPtr := uint32(0) // arbitrary valid address
+			expectedArgs := make([]byte, 4*len(tc.args)) // expected size of the pointers to the args. 4 is the size of uint32
+			argsPtr := uint32(0)                         // arbitrary valid address
 			expectedArgv := make([]byte, tc.expectedBufSize)
 			argvPtr := uint32(0x100) // arbitrary valid address that doesn't overwrap with argsPtr
 			argvWritten := uint32(0)
 			for i, arg := range tc.expectedArgs {
-				binary.LittleEndian.PutUint32(expectedArgs[argsPtr+uint32(i*SIZE_UINT32):], argvPtr+argvWritten)
+				binary.LittleEndian.PutUint32(expectedArgs[argsPtr+uint32(i*4):], argvPtr+argvWritten) // 4 is the size of uint32
 				copy(expectedArgv[argvWritten:], arg)
 				argvWritten += uint32(len(arg))
 			}
@@ -166,7 +166,7 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	hostFunctionCallContext := buildMockHostFunctionCallContext()
 
 	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
-	inMemory := uint32(0)
+	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {
 		name           string
@@ -176,22 +176,22 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 		{
 			name:           "out-of-bound argsCountPtr",
 			argsCountPtr:   memorySize,
-			argsBufSizePtr: inMemory,
+			argsBufSizePtr: validAddress,
 		},
 		{
 			name:           "out-of-bound argsBufSizePtr",
-			argsCountPtr:   inMemory,
+			argsCountPtr:   validAddress,
 			argsBufSizePtr: memorySize,
 		},
 		{
 			name:           "barely out-of-bound argsCountPtr",
-			argsCountPtr:   memorySize - SIZE_UINT32 + 1,
-			argsBufSizePtr: inMemory,
+			argsCountPtr:   memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
+			argsBufSizePtr: validAddress,
 		},
 		{
 			name:           "barely out-of-bound argsBufSizePtr",
-			argsCountPtr:   inMemory,
-			argsBufSizePtr: memorySize - SIZE_UINT32 + 1,
+			argsCountPtr:   validAddress,
+			argsBufSizePtr: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
 		},
 	}
 
@@ -213,7 +213,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	hostFunctionCallContext := buildMockHostFunctionCallContext()
 
 	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
-	inMemory := uint32(0)
+	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
 	argsArray, err := newWASIStringArray(dummyArgs)
 	require.NoError(t, err)
 
@@ -225,21 +225,22 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 		{
 			name:       "out-of-bound argsPtr",
 			argsPtr:    memorySize,
-			argsBufPtr: inMemory,
+			argsBufPtr: validAddress,
 		},
 		{
 			name:       "out-of-bound argsBufPtr",
-			argsPtr:    inMemory,
+			argsPtr:    validAddress,
 			argsBufPtr: memorySize,
 		},
 		{
-			name:       "barely out-of-bound argsPtr",
-			argsPtr:    memorySize - SIZE_UINT32*uint32(len(argsArray.nullTerminatedValues)) + 1,
-			argsBufPtr: inMemory,
+			name: "barely out-of-bound argsPtr",
+			// 4*uint32(len(argsArray.nullTerminatedValues)) is the size of the result of the pointers to args, 4 is the size of uint32
+			argsPtr:    memorySize - 4*uint32(len(argsArray.nullTerminatedValues)) + 1,
+			argsBufPtr: validAddress,
 		},
 		{
 			name:       "barely out-of-bound argsBufPtr",
-			argsPtr:    inMemory,
+			argsPtr:    validAddress,
 			argsBufPtr: memorySize - argsArray.totalBufSize + 1,
 		},
 	}
@@ -256,6 +257,6 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 
 func buildMockHostFunctionCallContext() *wasm.HostFunctionCallContext {
 	return &wasm.HostFunctionCallContext{
-		Memory: &wasm.MemoryInstance{Buffer: make([]byte, wasm.PageSize), Min: 1},
+		Memory: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1},
 	}
 }
