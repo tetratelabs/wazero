@@ -2,11 +2,14 @@ package wasi
 
 import (
 	"encoding/binary"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	wbinary "github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
 func TestNewWasiStringArray(t *testing.T) {
@@ -126,7 +129,8 @@ func TestArgsAPISucceed(t *testing.T) {
 				opts = append(opts, argsOpt)
 			}
 			wasiEnv := NewEnvironment(opts...)
-			hostFunctionCallContext := buildHostFunctionCallContext()
+			store, err := instantiateWasmStore("testdata/args.wasm", wasiEnv)
+			require.NoError(t, err)
 
 			// Serialize the expected result of args_size_get
 			argCountPtr := uint32(0)            // arbitrary valid address
@@ -137,10 +141,11 @@ func TestArgsAPISucceed(t *testing.T) {
 			binary.LittleEndian.PutUint32(expectedBufSize, tc.expectedBufSize)
 
 			// Compare them
-			errno := wasiEnv.args_sizes_get(hostFunctionCallContext, argCountPtr, bufSizePtr)
-			require.Equal(t, ESUCCESS, errno)
-			require.Equal(t, expectedArgCount, hostFunctionCallContext.Memory.Buffer[argCountPtr:argCountPtr+4])
-			require.Equal(t, expectedBufSize, hostFunctionCallContext.Memory.Buffer[bufSizePtr:bufSizePtr+4])
+			ret, _, err := store.CallFunction("test", "args_sizes_get", uint64(argCountPtr), uint64(bufSizePtr))
+			require.NoError(t, err)
+			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is errno
+			require.Equal(t, expectedArgCount, store.Memories[0].Buffer[argCountPtr:argCountPtr+4])
+			require.Equal(t, expectedBufSize, store.Memories[0].Buffer[bufSizePtr:bufSizePtr+4])
 
 			// Serialize the expected result of args_get
 			expectedArgs := make([]byte, 4*len(tc.args)) // expected size of the pointers to the args. 4 is the size of uint32
@@ -155,10 +160,11 @@ func TestArgsAPISucceed(t *testing.T) {
 			}
 
 			// Compare them
-			errno = wasiEnv.args_get(hostFunctionCallContext, argsPtr, argvPtr)
-			require.Equal(t, ESUCCESS, errno)
-			require.Equal(t, expectedArgs, hostFunctionCallContext.Memory.Buffer[argsPtr:argsPtr+uint32(len(expectedArgs))])
-			require.Equal(t, expectedArgv, hostFunctionCallContext.Memory.Buffer[argvPtr:argvPtr+uint32(len(expectedArgv))])
+			ret, _, err = store.CallFunction("test", "args_get", uint64(argsPtr), uint64(argvPtr))
+			require.NoError(t, err)
+			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is the returned errno
+			require.Equal(t, expectedArgs, store.Memories[0].Buffer[argsPtr:argsPtr+uint32(len(expectedArgs))])
+			require.Equal(t, expectedArgv, store.Memories[0].Buffer[argvPtr:argvPtr+uint32(len(expectedArgv))])
 		})
 	}
 }
@@ -168,9 +174,10 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	hostFunctionCallContext := buildHostFunctionCallContext()
+	store, err := instantiateWasmStore("testdata/args.wasm", wasiEnv)
+	require.NoError(t, err)
 
-	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
+	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {
@@ -204,8 +211,9 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			errno := wasiEnv.args_sizes_get(hostFunctionCallContext, tc.argsCountPtr, tc.argsBufSizePtr)
-			require.Equal(t, EINVAL, errno)
+			ret, _, err := store.CallFunction("test", "args_sizes_get", uint64(tc.argsCountPtr), uint64(tc.argsBufSizePtr))
+			require.NoError(t, err)
+			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
@@ -215,9 +223,10 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	hostFunctionCallContext := buildHostFunctionCallContext()
+	store, err := instantiateWasmStore("testdata/args.wasm", wasiEnv)
+	require.NoError(t, err)
 
-	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
+	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
 	argsArray, err := newWASIStringArray(dummyArgs)
 	require.NoError(t, err)
@@ -254,14 +263,30 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			errno := wasiEnv.args_get(hostFunctionCallContext, tc.argsPtr, tc.argsBufPtr)
-			require.Equal(t, EINVAL, errno)
+			ret, _, err := store.CallFunction("test", "args_get", uint64(tc.argsPtr), uint64(tc.argsBufPtr))
+			require.NoError(t, err)
+			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
 
-func buildHostFunctionCallContext() *wasm.HostFunctionCallContext {
-	return &wasm.HostFunctionCallContext{
-		Memory: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1},
+func instantiateWasmStore(wasmFile string, wasiEnv *WASIEnvironment) (*wasm.Store, error) {
+	buf, err := os.ReadFile(wasmFile)
+	if err != nil {
+		return nil, err
 	}
+	mod, err := wbinary.DecodeModule(buf)
+	if err != nil {
+		return nil, err
+	}
+	store := wasm.NewStore(interpreter.NewEngine())
+	err = wasiEnv.Register(store)
+	if err != nil {
+		return nil, err
+	}
+	err = store.Instantiate(mod, "test")
+	if err != nil {
+		return nil, err
+	}
+	return store, nil
 }
