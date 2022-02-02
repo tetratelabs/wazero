@@ -8,114 +8,116 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
-// funcParser parses any instructions and dispatches to onBodyEnd.
+func newFuncParser(onFunc onFunc) *funcParser {
+	return &funcParser{onFunc: onFunc}
+}
+
+type onFunc func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error)
+
+// funcParser parses any instructions and dispatches to onFunc.
 //
 // Ex.  `(module (func (nop)))`
 //       starts here --^    ^
-// onBodyEnd resumes here --+
+//      calls onFunc here --+
 //
-// Note: funcParser is reusable. The caller resets when reaching the appropriate tokenRParen via beginBody.
+// Note: funcParser is reusable. The caller resets via begin.
 type funcParser struct {
-	// m is used as a function pointer to moduleParser.tokenParser. This updates based on state changes.
-	m *moduleParser
+	// onFunc is called when complete parsing the body. Unless testing, this should be moduleParser.onFuncEnd
+	onFunc onFunc
 
-	// onBodyEnd is called when complete parsing the body. Unless testing, this should be moduleParser.parseFuncEnd
-	onBodyEnd tokenParser
+	currentTypeIdx    wasm.Index
+	currentParamNames wasm.NameMap
 
-	currentInstruction wasm.Opcode
-	// currentParameters are the current parameters to currentInstruction in WebAssembly 1.0 (MVP) binary format
+	// currentOpcode is the opcode parsed from an instruction. Ex wasm.OpcodeLocalGet if "local.get 3"
+	currentOpcode wasm.Opcode
+
+	// currentParameters are the parameters to the currentOpcode in WebAssembly 1.0 (MVP) binary format
 	currentParameters []byte
 
-	// currentCode is the current function body encoded in WebAssembly 1.0 (MVP) binary format
-	currentCode []byte
+	// currentBody is the current function body encoded in WebAssembly 1.0 (MVP) binary format
+	currentBody []byte
 }
 
 // end indicates the end of instructions in this function body
 // See https://www.w3.org/TR/wasm-core-1/#expressions%E2%91%A0
 var end = []byte{wasm.OpcodeEnd}
+var codeEnd = &wasm.Code{Body: end}
 
-func (p *funcParser) getBody() []byte {
-	if p.currentCode == nil {
-		return end
-	}
-	return append(p.currentCode, wasm.OpcodeEnd)
-}
-
-// beginLocalsOrBody returns a parser that consumes a function body
+// begin is a tokenParser that starts after a type use.
 //
-// The onBodyEnd field is invoked once any instructions are written into currentCode.
+// The onFunc field is invoked once any instructions are written into currentBody.
 //
 // Ex. Given the source `(module (func nop))`
-//             beginBody starts here --^  ^
-//               onBodyEnd resumes here --+
-//
-//
-// NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (func))`
-func (p *funcParser) beginBody() tokenParser {
-	p.currentCode = nil
-	p.m.tokenParser = p.parseBody
-	return p.m.parse
+//                 begin starts here --^  ^
+//                    calls onFunc here --+
+func (p *funcParser) begin(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	switch pos {
+	case onTypeUseEndField:
+		return p.onFunc(typeIdx, codeEnd, paramNames)
+	case onTypeUseUnhandledField:
+		return sExpressionsUnsupported(tok, tokenBytes, line, col)
+	}
+
+	p.currentBody = nil
+	p.currentTypeIdx = typeIdx
+	p.currentParamNames = paramNames
+	return p.beginFieldOrInstruction(tok, tokenBytes, line, col)
 }
 
-// beginBodyField returns a parser that starts inside the first field of a function that isn't a type use.
-//
-// The onBodyEnd field is invoked once any instructions are written into currentCode.
-//
-// Ex. Given the source `(module (func $main (param i32) (nop)))`
-//                          beginBodyField starts here --^    ^
-//                                   onBodyEnd resumes here --+
-//
-//
-// NOTE: An empty function is valid and will not reach a tokenLParen! Ex. `(module (func))`
-func (p *funcParser) beginBodyField() tokenParser {
-	p.currentCode = nil
-	p.m.tokenParser = p.parseBody
-	return p.m.parse
-}
-
-func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) error {
+func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	if tok != tokenKeyword {
-		return unexpectedToken(tok, tokenBytes)
+		return nil, unexpectedToken(tok, tokenBytes)
 	}
-	fieldName := string(tokenBytes)
-	switch fieldName {
+	switch string(tokenBytes) {
 	case "result", "param": // TODO: local
-		return fmt.Errorf("%s declared out of order", fieldName)
+		return nil, fmt.Errorf("%s declared out of order", tokenBytes)
 	}
-	return fmt.Errorf("TODO: s-expressions are not yet supported: %s", fieldName)
+	return nil, fmt.Errorf("TODO: s-expressions are not yet supported: %s", tokenBytes)
 }
 
-func (p *funcParser) parseBody(tok tokenType, tokenBytes []byte, line, col uint32) error {
-	if tok == tokenLParen {
-		p.m.tokenParser = sExpressionsUnsupported
-		return nil
+func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	switch tok {
+	case tokenLParen:
+		return sExpressionsUnsupported, nil
+	case tokenRParen:
+		return p.end()
+	case tokenKeyword:
+		return p.beginInstruction(tokenBytes)
 	}
-	return p.beginInstruction(tok, tokenBytes, line, col)
+	return nil, unexpectedToken(tok, tokenBytes)
 }
 
-// beginInstruction is a tokenParser called after a tokenLParen and accepts an instruction field.
-func (p *funcParser) beginInstruction(tok tokenType, tokenBytes []byte, line, col uint32) error {
-	if tok == tokenKeyword {
-		switch string(tokenBytes) {
-		case "local.get":
-			p.currentInstruction = wasm.OpcodeLocalGet
-			p.m.tokenParser = p.parseIndex
-			return nil
-		case "i32.add":
-			p.currentInstruction = wasm.OpcodeI32Add
-			return p.endInstruction()
-		}
-		return fmt.Errorf("unsupported instruction: %s", tokenBytes)
+// beginInstruction parses the token into an opcode and dispatches accordingly. If there are none, this calls onFunc.
+func (p *funcParser) beginInstruction(tokenBytes []byte) (tokenParser, error) {
+	switch string(tokenBytes) {
+	case "local.get":
+		p.currentOpcode = wasm.OpcodeLocalGet
+		return p.parseInstructionIndex, nil
+	case "i32.add":
+		p.currentOpcode = wasm.OpcodeI32Add
+		return p.endInstruction()
 	}
-	return p.onBodyEnd(tok, tokenBytes, line, col)
+	return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
 }
 
-func (p *funcParser) parseIndex(tok tokenType, tokenBytes []byte, _, _ uint32) error {
+// end invokes onFunc to continue parsing
+func (p *funcParser) end() (tokenParser, error) {
+	var code *wasm.Code
+	if p.currentBody == nil {
+		code = codeEnd
+	} else {
+		code = &wasm.Code{Body: append(p.currentBody, wasm.OpcodeEnd)}
+	}
+	return p.onFunc(p.currentTypeIdx, code, p.currentParamNames)
+}
+
+// TODO: port this to the indexNamespace
+func (p *funcParser) parseInstructionIndex(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenUN: // Ex. 1
-		i, err := decodeUint32(tokenBytes)
-		if err != nil {
-			return fmt.Errorf("malformed i32 %s: %w", tokenBytes, errors.Unwrap(err))
+		i, overflow := decodeUint32(tokenBytes)
+		if overflow {
+			return nil, fmt.Errorf("index outside range of uint32: %s", tokenBytes)
 		}
 		p.currentParameters = leb128.EncodeUint32(i)
 		// TODO: it is possible this is out of range in the index. Local out-of-range is caught in Store.Initialize, but
@@ -126,19 +128,14 @@ func (p *funcParser) parseIndex(tok tokenType, tokenBytes []byte, _, _ uint32) e
 		// should probably save off the instruction count or at least the current opcode to help with the error message.
 		return p.endInstruction()
 	case tokenID: // Ex $y
-		return errors.New("TODO: index variables are not yet supported")
+		return nil, errors.New("TODO: index variables are not yet supported")
 	}
-	return unexpectedToken(tok, tokenBytes)
+	return nil, unexpectedToken(tok, tokenBytes)
 }
 
-func (p *funcParser) endInstruction() error {
-	p.currentCode = append(p.currentCode, p.currentInstruction)
-	p.currentCode = append(p.currentCode, p.currentParameters...)
+func (p *funcParser) endInstruction() (tokenParser, error) {
+	p.currentBody = append(p.currentBody, p.currentOpcode)
+	p.currentBody = append(p.currentBody, p.currentParameters...)
 	p.currentParameters = nil
-	p.m.tokenParser = p.parseBody
-	return nil
-}
-
-func (p *funcParser) errorContext() string {
-	return "" // TODO: add locals etc
+	return p.beginFieldOrInstruction, nil
 }

@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// tokenParser is what the lexer calls for each token in the input.
+// tokenParser parses the current token and returns a parser for the next.
 //
 // * tokenType is the token type
 // * tokenBytes are the UTF-8 bytes representing the token. Do not modify this.
@@ -17,7 +17,11 @@ import (
 //
 // Note: Do not include the line and column number in a parsing error as that will be attached automatically. Line and
 // column are here for storing the source location, such as for use in runtime stack traces.
-type tokenParser func(tok tokenType, tokenBytes []byte, line, col uint32) error
+type tokenParser func(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error)
+
+// TODO: since S-expressions are common and also multiple nesting levels in fields, ex. (import (func)), think about a
+// special result of popCount which pops one or two RParens. This could inline skipping parens, which have no error
+// possibility unless there are extra tokens.
 
 var (
 	constantLParen = []byte{'('}
@@ -76,8 +80,8 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 				blockCommentDepth++
 				continue
 			} else if blockCommentDepth == 0 { // Fast path left paren token at the expense of code duplication.
-				if e := parser(tokenLParen, constantLParen, line, col); e != nil {
-					return line, col, e
+				if parser, err = parser(tokenLParen, constantLParen, line, col); err != nil {
+					return line, col, err
 				}
 				parenDepth++
 				continue
@@ -87,8 +91,8 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 				if parenDepth == 0 {
 					return line, col, errors.New("found ')' before '('")
 				}
-				if e := parser(tokenRParen, constantRParen, line, col); e != nil {
-					return line, col, e
+				if parser, err = parser(tokenRParen, constantRParen, line, col); err != nil {
+					return line, col, err
 				}
 				parenDepth--
 				continue
@@ -228,8 +232,8 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 		//
 		// TODO: Ex. inf nan nan:0xfffffffffffff or nan:0x400000
 
-		if e := parser(tok, source[b:peek], line, c); e != nil {
-			return line, c, e
+		if parser, err = parser(tok, source[b:peek], line, c); err != nil {
+			return line, c, err
 		}
 	}
 

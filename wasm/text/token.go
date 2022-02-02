@@ -99,7 +99,7 @@ var tokenNames = [...]string{
 	"sN",
 	"fN",
 	"string",
-	"id",
+	"ID",
 	"(",
 	")",
 	"reserved",

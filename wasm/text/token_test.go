@@ -16,7 +16,7 @@ func TestTokenType_String(t *testing.T) {
 		{tokenSN, "sN"},
 		{tokenFN, "fN"},
 		{tokenString, "string"},
-		{tokenID, "id"},
+		{tokenID, "ID"},
 		{tokenLParen, "("},
 		{tokenRParen, ")"},
 		{tokenReserved, "reserved"},
@@ -28,4 +28,8 @@ func TestTokenType_String(t *testing.T) {
 			require.Equal(t, tc.expected, tc.input.String())
 		})
 	}
+}
+
+func TestStripDollar(t *testing.T) {
+	require.Equal(t, []byte{'1'}, stripDollar([]byte{'$', '1'}))
 }

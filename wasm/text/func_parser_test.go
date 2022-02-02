@@ -1,6 +1,7 @@
 package text
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -8,35 +9,35 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestBeginBody(t *testing.T) {
-	localGet0End := []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}
-
+func TestFuncParser(t *testing.T) {
 	tests := []struct {
-		name, input  string
-		expectedCode []byte
+		name, source string
+		expected     *wasm.Code
 	}{
 		{
-			name: "empty",
+			name:     "empty",
+			source:   "(func)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeEnd}},
 		},
 		{
-			name:         "local.get",
-			input:        "local.get 0",
-			expectedCode: localGet0End,
+			name:     "local.get",
+			source:   "(func local.get 0)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}},
 		},
 		{
-			name:         "local.get twice",
-			input:        "local.get 0 local.get 1",
-			expectedCode: []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeLocalGet, 0x01, wasm.OpcodeEnd},
+			name:     "local.get twice",
+			source:   "(func local.get 0 local.get 1)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeLocalGet, 0x01, wasm.OpcodeEnd}},
 		},
 		{
-			name:  "local.get twice and add",
-			input: "local.get 0 local.get 1 i32.add",
-			expectedCode: []byte{
+			name:   "local.get twice and add",
+			source: "(func local.get 0 local.get 1 i32.add)",
+			expected: &wasm.Code{Body: []byte{
 				wasm.OpcodeLocalGet, 0x00,
 				wasm.OpcodeLocalGet, 0x01,
 				wasm.OpcodeI32Add,
 				wasm.OpcodeEnd,
-			},
+			}},
 		},
 	}
 
@@ -44,68 +45,61 @@ func TestBeginBody(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			lp := &funcParser{m: &moduleParser{}, onBodyEnd: noopTokenParser}
-			_, _, err := lex(lp.beginBody(), []byte(tc.input))
-			require.NoError(t, err)
-			if tc.expectedCode == nil {
-				require.Equal(t, end, lp.getBody())
-			} else {
-				require.Equal(t, tc.expectedCode, lp.getBody())
+			var parsedCode *wasm.Code
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+				parsedCode = code
+				return parseErr, nil
 			}
+
+			require.NoError(t, parseFunc(newFuncParser(setFunc), tc.source))
+			require.Equal(t, tc.expected, parsedCode)
 		})
 	}
 }
 
-func TestBeginBodyField_Errors(t *testing.T) {
+func TestFuncParser_Errors(t *testing.T) {
 	tests := []struct {
-		name, input, expectedErr string
+		name, source, expectedErr string
 	}{
 		{
-			name:        "fields not yet supported",
-			input:       "(f32.const 1.1)",
-			expectedErr: "TODO: s-expressions are not yet supported: f32.const",
+			name:        "not field",
+			source:      "(func ($local.get 1))",
+			expectedErr: "1:8: unexpected ID: $local.get",
 		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			lp := &funcParser{m: &moduleParser{}, onBodyEnd: noopTokenParser}
-			_, _, err := lex(lp.beginBodyField(), []byte(tc.input))
-			require.EqualError(t, err, tc.expectedErr)
-		})
-	}
-}
-
-func TestBeginBody_Errors(t *testing.T) {
-	tests := []struct {
-		name, input, expectedErr string
-	}{
 		{
 			name:        "local.get wrong value",
-			input:       "local.get a",
-			expectedErr: "unexpected keyword: a",
+			source:      "(func local.get a)",
+			expectedErr: "1:17: unexpected keyword: a",
 		},
 		{
 			name:        "local.get symbolic ID",
-			input:       "local.get $y",
-			expectedErr: "TODO: index variables are not yet supported",
+			source:      "(func local.get $y)",
+			expectedErr: "1:17: TODO: index variables are not yet supported",
 		},
 		{
 			name:        "local.get overflow",
-			input:       "local.get 4294967296",
-			expectedErr: "malformed i32 4294967296: value out of range",
+			source:      "(func local.get 4294967296)",
+			expectedErr: "1:17: index outside range of uint32: 4294967296",
 		},
 		{
 			name:        "instruction not yet supported",
-			input:       "f32.const 1.1",
-			expectedErr: "unsupported instruction: f32.const",
+			source:      "(func f32.const 1.1)",
+			expectedErr: "1:7: unsupported instruction: f32.const",
 		},
 		{
-			name:        "fields not yet supported",
-			input:       "(f32.const 1.1)",
-			expectedErr: "TODO: s-expressions are not yet supported: f32.const",
+			name:        "s-expressions not yet supported",
+			source:      "(func (f32.const 1.1))",
+			expectedErr: "1:8: TODO: s-expressions are not yet supported: f32.const",
+		},
+		{
+			name:        "param out of order", // because this parser is after the type use, so it must be wrong
+			source:      "(func (param i32))",
+			expectedErr: "1:8: param declared out of order",
+		},
+		{
+			name:        "result out of order", // because this parser is after the type use, so it must be wrong
+			source:      "(func (result i32))",
+			expectedErr: "1:8: result declared out of order",
 		},
 	}
 
@@ -113,9 +107,25 @@ func TestBeginBody_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			lp := &funcParser{m: &moduleParser{}, onBodyEnd: noopTokenParser}
-			_, _, err := lex(lp.beginBody(), []byte(tc.input))
-			require.EqualError(t, err, tc.expectedErr)
+			fp := newFuncParser(failOnFunc)
+			require.EqualError(t, parseFunc(fp, tc.source), tc.expectedErr)
 		})
 	}
+}
+
+var failOnFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+	return nil, errors.New("unexpected to call onFunc on error")
+}
+
+func parseFunc(fp *funcParser, source string) error {
+	// TODO: all func hooks into func_parser.go, so that we don't have to fake the onTypeUse position
+	var parser tokenParser = func(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+		return fp.begin(0, nil, onTypeUseUnhandledToken, tok, tokenBytes, line, col)
+	}
+
+	line, col, err := lex(skipTokens(2, parser), []byte(source)) // skip the leading (func
+	if err != nil {
+		err = &FormatError{Line: line, Col: col, cause: err}
+	}
+	return err
 }
