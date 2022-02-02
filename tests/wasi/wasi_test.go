@@ -68,26 +68,8 @@ func Test_ArgsSizesGet_ArgsGet(t *testing.T) {
 			err = store.Instantiate(mod, "test")
 			require.NoError(t, err)
 
-			// XXX Strictly speaking, this test code violates the WASI specification.
-			// The WASI specification does not guarantee that a function exported from a WASI command
-			// can be called outside the context of `_start`.
-			// > Command instances may assume that none of their exports are accessed outside the duraction of that call.
-			// Link: https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md
-			// In fact, calling a WASI function from a normal exported function without calling `_start` first in TinyGo crashes.
-			//
-			// However, once `_start` is called, it appears that WASI functions can be called from exported functions in TinyGo.
-			// We think it's unlikely TinyGo wil break this behavior in the future.
-			// So, we call the test helper functions directly after calling `_start` once for more concise testing.
-			//
-			// Note that this specification affects only WASI Command and Reactor, the WASM module side. It does not affect wazero, the environment.
-			// wazero's WASI API implementations don't care if they are called from the `_start` context, and it's not easy to know that in the first place.
-
-			// Let TinyGo runtime initialize the WASI environment by calling _start
+			// Calling `_start` to call WASI APIs because it's the only stable way to call WASI APIs on TinyGo.
 			_, _, err = store.CallFunction("test", "_start")
-			require.NoError(t, err)
-
-			// Call a test function directly
-			_, _, err = store.CallFunction("test", "PrintArgs")
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expectedArgs, strings.TrimSpace(stdoutBuf.String()))
