@@ -3,7 +3,7 @@ golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 
 .PHONY: bench
 bench:
-	@go test -benchmem -bench=. ./bench/...
+	@go test -run=NONE -benchmem -bench=. ./tests/...
 
 .PHONY: build.lib
 build.lib:
@@ -15,21 +15,25 @@ build.lib:
 	@GOOS=windows GOARCH=arm64 go build ./...
 	@GOOS=windows GOARCH=amd64 go build ./...
 
+bench_testdata_dir := tests/bench/testdata
+
 .PHONY: build.bench
 build.bench:
-	tinygo build -o bench/testdata/case.wasm -scheduler=none -target=wasi bench/testdata/case.go
+	tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none -target=wasi $(bench_testdata_dir)/case.go
+
+wasi_testdata_dir := ./examples/testdata ./tests/wasi/testdata
 
 .PHONY: build.examples
 build.examples:
-	@$(MAKE) WASI_TARGET_DIR=./examples/testdata build.tinygo-wasi
+	@$(MAKE) wasi_testdata_dir=./examples/testdata build.wasi
 
 .PHONY: build.tests-wasi
 build.tests-wasi:
-	@$(MAKE) WASI_TARGET_DIR=./tests/wasi/testdata build.tinygo-wasi
+	@$(MAKE) wasi_testdata_dir=./tests/wasi/testdata build.wasi
 
-.PHONY: build.tinygo-wasi
-build.tinygo-wasi: $(WASI_TARGET_DIR)
-	@find $(WASI_TARGET_DIR) -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
+.PHONY: build.wasi
+build.wasi:
+	@find $(wasi_testdata_dir) -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
 
 spectest_testdata_dir := tests/spectest/testdata
 spec_version := wg-1.0
