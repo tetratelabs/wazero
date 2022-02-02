@@ -16,6 +16,11 @@ func TestNewWasiStringArray(t *testing.T) {
 		expectedBufSize uint32
 	}{
 		{
+			name:            "nil args",
+			args:            nil,
+			expectedBufSize: 0,
+		},
+		{
 			name:            "empty",
 			args:            []string{},
 			expectedBufSize: 0,
