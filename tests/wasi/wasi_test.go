@@ -1,13 +1,13 @@
-// package wasi_interop tests wazero's WASI wasi_snapshot_preview1 is compatible with at least one language runtime.
+// package wasi tests wazero's WASI wasi_snapshot_preview1 is compatible with at least one language runtime.
 // Links:
 //    - Spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 //    - Witx: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/witx/wasi_snapshot_preview1.witx
 //
 // We use tinygo, to perform these tests as the maintainers are familiar with it.
 //
-// Note: Use `make build.interop` to compile `testdata/*.wasm` from `testdata/*.go`
+// Note: Use `make build.tests-wasi` to compile `testdata/*.wasm` from `testdata/*.go`
 // Note: This also substitutes for WASI spec tests until we have another option
-package wasi_interop
+package wasi
 
 import (
 	"bytes"
