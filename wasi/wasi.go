@@ -358,8 +358,8 @@ func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, args
 //     The total number of bytes written there is the value that args_sizes_get returns in argsBufSizePtr. The caller must ensure that
 //     the buffer has the enough size.
 //     Each *C.char pointer that can be obtained from argsPtr points to the beginning of each of these null-terminated strings.
-// Link to the actual spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
-// Reference: https://en.wikipedia.org/wiki/Null-terminated_string
+// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
+// See: https://en.wikipedia.org/wiki/Null-terminated_string
 func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
 	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
 		!ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
