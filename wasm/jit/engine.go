@@ -387,7 +387,11 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	}
 
 	if compiled.source.IsHostFunction() {
-		e.execHostFunction(compiled.source.HostFunction, &wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
+		e.execHostFunction(compiled.source.HostFunction, &wasm.HostFunctionCallContext{
+			Name:   f.ModuleInstance.Name,
+			Memory: f.ModuleInstance.Memory,
+			Data:   f.ModuleInstance.Data,
+		})
 	} else {
 		e.execFunction(compiled)
 	}
@@ -533,7 +537,11 @@ jitentry:
 				}
 			}
 			saved := e.globalContext.previousCallFrameStackPointer
-			e.execHostFunction(fn.source.HostFunction, &wasm.HostFunctionCallContext{Memory: callerCompiledFunction.source.ModuleInstance.Memory})
+			e.execHostFunction(fn.source.HostFunction, &wasm.HostFunctionCallContext{
+				Name:   callerCompiledFunction.source.ModuleInstance.Name,
+				Memory: callerCompiledFunction.source.ModuleInstance.Memory,
+				Data:   callerCompiledFunction.source.ModuleInstance.Data,
+			})
 			e.globalContext.previousCallFrameStackPointer = saved
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:

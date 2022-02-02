@@ -78,6 +78,7 @@ type (
 		Memory    *MemoryInstance
 		Tables    []*TableInstance
 		Types     []*TypeInstance
+		Data      interface{}
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -310,6 +311,15 @@ func (s *Store) Instantiate(module *Module, name string) error {
 			return fmt.Errorf("calling start function failed: %v", err)
 		}
 	}
+	return nil
+}
+
+func (s *Store) SetInstanceData(moduleName string, data interface{}) error {
+	m, ok := s.ModuleInstances[moduleName]
+	if !ok {
+		return fmt.Errorf("module %s not instantiated", moduleName)
+	}
+	m.Data = data
 	return nil
 }
 
@@ -844,8 +854,13 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 
 // HostFunctionCallContext is the first argument of all host functions.
 type HostFunctionCallContext struct {
+	// Name is the name of the module instance so that host calls can be correlated with the instance
+	// that called them.
+	Name string
 	// Memory is the currently used memory instance at the time when the host function call is made.
 	Memory *MemoryInstance
+	// Data is custom module instance data set by the host application and passed back in host calls.
+	Data interface{}
 	// TODO: Add others if necessary.
 }
 

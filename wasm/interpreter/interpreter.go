@@ -511,11 +511,15 @@ func (it *interpreter) callHostFunc(f *interpreterFunction) {
 	}
 
 	val := reflect.New(tp.In(0)).Elem()
-	var memory *wasm.MemoryInstance
+	module := f.funcInstance.ModuleInstance
 	if len(it.frames) > 0 {
-		memory = it.frames[len(it.frames)-1].f.funcInstance.ModuleInstance.Memory
+		module = it.frames[len(it.frames)-1].f.funcInstance.ModuleInstance
 	}
-	val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{Memory: memory}))
+	val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{
+		Name:   module.Name,
+		Memory: module.Memory,
+		Data:   module.Data,
+	}))
 	in[0] = val
 
 	frame := &interpreterFrame{f: f}
