@@ -25,14 +25,14 @@ wasi_testdata_dir := ./examples/testdata ./tests/wasi/testdata
 
 .PHONY: build.examples
 build.examples:
-	@$(MAKE) wasi_testdata_dir=./examples/testdata build.wasi
+	@$(MAKE) wasi_testdata_dir=./examples/testdata build.tinygo-wasi
 
 .PHONY: build.tests-wasi
 build.tests-wasi:
-	@$(MAKE) wasi_testdata_dir=./tests/wasi/testdata build.wasi
+	@$(MAKE) wasi_testdata_dir=./tests/wasi/testdata build.tinygo-wasi
 
-.PHONY: build.wasi
-build.wasi:
+.PHONY: build.tinygo-wasi
+build.tinygo-wasi:
 	@find $(wasi_testdata_dir) -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
 
 spectest_testdata_dir := tests/spectest/testdata
