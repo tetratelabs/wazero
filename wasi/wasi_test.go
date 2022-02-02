@@ -126,7 +126,7 @@ func TestArgsAPISucceed(t *testing.T) {
 				opts = append(opts, argsOpt)
 			}
 			wasiEnv := NewEnvironment(opts...)
-			hostFunctionCallContext := buildMockHostFunctionCallContext()
+			hostFunctionCallContext := buildHostFunctionCallContext()
 
 			// Serialize the expected result of args_size_get
 			argCountPtr := uint32(0)            // arbitrary valid address
@@ -168,7 +168,7 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	hostFunctionCallContext := buildMockHostFunctionCallContext()
+	hostFunctionCallContext := buildHostFunctionCallContext()
 
 	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -215,7 +215,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	hostFunctionCallContext := buildMockHostFunctionCallContext()
+	hostFunctionCallContext := buildHostFunctionCallContext()
 
 	memorySize := uint32(len(hostFunctionCallContext.Memory.Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -260,7 +260,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	}
 }
 
-func buildMockHostFunctionCallContext() *wasm.HostFunctionCallContext {
+func buildHostFunctionCallContext() *wasm.HostFunctionCallContext {
 	return &wasm.HostFunctionCallContext{
 		Memory: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize), Min: 1},
 	}
