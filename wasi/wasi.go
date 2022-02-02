@@ -149,6 +149,8 @@ func newWASIStringArray(args []string) (*wasiStringArray, error) {
 	return &wasiStringArray{nullTerminatedValues: strings, totalBufSize: totalBufSize}, nil
 }
 
+// Args returns an option to give a command-line arguments to the WASIEnvironment.
+// Args returns an error if the length or the total size of the given string slice exceeds the max of uint32.
 func Args(args []string) (Option, error) {
 	wasiStrings, err := newWASIStringArray(args)
 	if err != nil {
