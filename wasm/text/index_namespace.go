@@ -143,11 +143,28 @@ func (i *indexNamespace) resolve(unresolved *unresolvedIndex) (wasm.Index, error
 		}
 		return unresolved.targetIdx, nil
 	}
-	numeric, err := unresolved.requireIndex(i.idToIdx)
+	numeric, err := i.requireIndex(unresolved.targetID)
 	if err != nil {
 		return 0, unresolved.formatErr(err)
 	}
 	return numeric, nil
+}
+
+func (i *indexNamespace) requireIndex(id string) (wasm.Index, error) {
+	if numeric, ok := i.idToIdx[id]; ok {
+		return numeric, nil
+	}
+	return 0, fmt.Errorf("unknown ID $%s", id) // re-attach '$' as that was in the text format!
+}
+
+func requireIndexInRange(index wasm.Index, count uint32) error {
+	if index >= count {
+		if count == 0 {
+			return fmt.Errorf("index %d is not in range due to empty namespace", index)
+		}
+		return fmt.Errorf("index %d is out of range [0..%d]", index, count-1)
+	}
+	return nil
 }
 
 func (d *unresolvedIndex) formatErr(err error) error {
@@ -160,18 +177,4 @@ func (d *unresolvedIndex) formatErr(err error) error {
 		context = fmt.Sprintf("module.exports[%d].func", d.idx)
 	}
 	return &FormatError{d.line, d.col, context, err}
-}
-
-func (d *unresolvedIndex) requireIndex(idToIdx map[string]wasm.Index) (wasm.Index, error) {
-	if numeric, ok := idToIdx[d.targetID]; ok {
-		return numeric, nil
-	}
-	return 0, fmt.Errorf("unknown ID $%s", d.targetID) // re-attach '$' as that was in the text format!
-}
-
-func requireIndexInRange(index wasm.Index, count uint32) error {
-	if index >= count {
-		return fmt.Errorf("index %d is out of range [0..%d]", index, count-1)
-	}
-	return nil
 }
