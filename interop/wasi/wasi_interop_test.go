@@ -1,4 +1,4 @@
-// package wasi_interop tests wazero's WASI wasi_snapshot_preview1 is compatible with at least one runtime.
+// package wasi_interop tests wazero's WASI wasi_snapshot_preview1 is compatible with at least one language runtime.
 // Links:
 //    - Spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 //    - Witx: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/witx/wasi_snapshot_preview1.witx
