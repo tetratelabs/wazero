@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -213,6 +214,9 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 }
 
 func TestJIT(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip()
+	}
 	runTest(t, jit.NewEngine)
 }
 

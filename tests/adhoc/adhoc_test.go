@@ -3,6 +3,7 @@ package adhoc
 import (
 	"os"
 	"reflect"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -15,6 +16,9 @@ import (
 )
 
 func TestJIT(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip()
+	}
 	runTests(t, jit.NewEngine)
 }
 
