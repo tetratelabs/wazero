@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"encoding/binary"
-	"math"
 	"reflect"
 	"strconv"
 	"testing"
@@ -161,43 +160,106 @@ func TestStore_getTypeInstance(t *testing.T) {
 }
 
 func TestMemoryInstance_ValidateAddrRange(t *testing.T) {
-	name := "test"
-	s := NewStore(nil)
-	mi := s.getModuleInstance(name)
-
-	m := &Module{
-		MemorySection: []*LimitsType{{Min: 100}},
+	memory := &MemoryInstance{
+		Buffer: make([]byte, 100),
 	}
 
-	_, err := s.buildMemoryInstances(m, mi)
-	require.NoError(t, err)
+	tests := []struct {
+		name      string
+		addr      uint32
+		rangeSize uint64
+		expected  bool
+	}{
+		{
+			name:      "simple valid arguments",
+			addr:      0,   // arbitrary valid address
+			rangeSize: 100, // arbitrary valid size
+			expected:  true,
+		},
+		{
+			name:      "maximum valid rangeSize",
+			addr:      0, // arbitrary valid address
+			rangeSize: uint64(len(memory.Buffer)),
+			expected:  true,
+		},
+		{
+			name:      "rangeSize exceeds the valid size by 1",
+			addr:      100, // arbitrary valid address
+			rangeSize: uint64(len(memory.Buffer)) - 99,
+			expected:  false,
+		},
+		{
+			name:      "rangeSize exceeds the valid size and the memory size by 1",
+			addr:      0, // arbitrary valid address
+			rangeSize: uint64(len(memory.Buffer)) + 1,
+			expected:  false,
+		},
+		{
+			name:      "addr exceeds the memory size",
+			addr:      uint32(len(memory.Buffer)),
+			rangeSize: 0, // arbitrary size
+			expected:  false,
+		},
+	}
 
-	require.True(t, mi.Memory.ValidateAddrRange(uint32(0), uint64(0)))
-	require.True(t, mi.Memory.ValidateAddrRange(uint32(0), uint64(100*MemoryPageSize)))
-	require.False(t, mi.Memory.ValidateAddrRange(uint32(0), uint64(100*MemoryPageSize+1)))
-	require.False(t, mi.Memory.ValidateAddrRange(uint32(1), uint64(100*MemoryPageSize)))
-	require.False(t, mi.Memory.ValidateAddrRange(uint32(100*MemoryPageSize), uint64(0)))
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, memory.ValidateAddrRange(tc.addr, tc.rangeSize))
+		})
+	}
 }
 
 func TestMemoryInstance_PutUint32(t *testing.T) {
-	name := "test"
-	s := NewStore(nil)
-	mi := s.getModuleInstance(name)
-
-	m := &Module{
-		MemorySection: []*LimitsType{{Min: 100}},
+	memory := &MemoryInstance{
+		Buffer: make([]byte, 100),
 	}
 
-	_, err := s.buildMemoryInstances(m, mi)
-	require.NoError(t, err)
+	tests := []struct {
+		name               string
+		addr               uint32
+		val                uint32
+		shouldSuceed       bool
+		expectedWrittenVal uint32
+	}{
+		{
+			name:               "valid addr with an endian-insensitive val",
+			addr:               0, // arbitrary valid address.
+			val:                0xffffffff,
+			shouldSuceed:       true,
+			expectedWrittenVal: 0xffffffff,
+		},
+		{
+			name:               "valid addr with an endian-sensitive val",
+			addr:               0, // arbitrary valid address.
+			val:                0xfffffffe,
+			shouldSuceed:       true,
+			expectedWrittenVal: 0xfffffffe,
+		},
+		{
+			name:               "maximum boundary valid addr",
+			addr:               uint32(len(memory.Buffer)) - 4, // 4 is the size of uint32
+			val:                1,                              // arbitrary valid val
+			shouldSuceed:       true,
+			expectedWrittenVal: 1,
+		},
+		{
+			name:         "addr exceeds the maximum valid addr by 1",
+			addr:         uint32(len(memory.Buffer)) - 4 + 1, // 4 is the size of uint32
+			val:          1,                                  // arbitrary valid val
+			shouldSuceed: false,
+		},
+	}
 
-	maxUint32 := uint32(math.MaxUint32)
-	asymmetryBitsVal := uint32(0xfffffffe)
-	require.True(t, mi.Memory.PutUint32(uint32(0), asymmetryBitsVal))
-	require.Equal(t, asymmetryBitsVal, binary.LittleEndian.Uint32(mi.Memory.Buffer[0:4]))
-	require.True(t, mi.Memory.PutUint32(uint32(0), maxUint32))
-	require.Equal(t, maxUint32, binary.LittleEndian.Uint32(mi.Memory.Buffer[0:4]))
-	require.True(t, mi.Memory.PutUint32(uint32(100*MemoryPageSize-4), asymmetryBitsVal))
-	require.Equal(t, asymmetryBitsVal, binary.LittleEndian.Uint32(mi.Memory.Buffer[100*MemoryPageSize-4:100*MemoryPageSize]))
-	require.False(t, mi.Memory.PutUint32(uint32(100*MemoryPageSize-3), asymmetryBitsVal))
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.shouldSuceed, memory.PutUint32(tc.addr, tc.val))
+			if tc.shouldSuceed {
+				require.Equal(t, tc.expectedWrittenVal, binary.LittleEndian.Uint32(memory.Buffer[tc.addr:tc.addr+4])) // 4 is the size of uint32
+			}
+		})
+	}
 }

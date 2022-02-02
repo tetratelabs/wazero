@@ -174,22 +174,22 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 		argsBufSizePtr uint32
 	}{
 		{
-			name:           "out-of-bound argsCountPtr",
+			name:           "out-of-memory argsCountPtr",
 			argsCountPtr:   memorySize,
 			argsBufSizePtr: validAddress,
 		},
 		{
-			name:           "out-of-bound argsBufSizePtr",
+			name:           "out-of-memory argsBufSizePtr",
 			argsCountPtr:   validAddress,
 			argsBufSizePtr: memorySize,
 		},
 		{
-			name:           "barely out-of-bound argsCountPtr",
+			name:           "argsCountPtr exceeds the maximum valid address by 1",
 			argsCountPtr:   memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 			argsBufSizePtr: validAddress,
 		},
 		{
-			name:           "barely out-of-bound argsBufSizePtr",
+			name:           "argsBufSizePtr exceeds the maximum valid size by 1",
 			argsCountPtr:   validAddress,
 			argsBufSizePtr: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
 		},
@@ -223,23 +223,23 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 		argsBufPtr uint32
 	}{
 		{
-			name:       "out-of-bound argsPtr",
+			name:       "out-of-memory argsPtr",
 			argsPtr:    memorySize,
 			argsBufPtr: validAddress,
 		},
 		{
-			name:       "out-of-bound argsBufPtr",
+			name:       "out-of-memory argsBufPtr",
 			argsPtr:    validAddress,
 			argsBufPtr: memorySize,
 		},
 		{
-			name: "barely out-of-bound argsPtr",
+			name: "argsPtr exceeds the maximum valid address by 1",
 			// 4*uint32(len(argsArray.nullTerminatedValues)) is the size of the result of the pointers to args, 4 is the size of uint32
 			argsPtr:    memorySize - 4*uint32(len(argsArray.nullTerminatedValues)) + 1,
 			argsBufPtr: validAddress,
 		},
 		{
-			name:       "barely out-of-bound argsBufPtr",
+			name:       "argsBufPtr exceeds the maximum valid addres by 1",
 			argsPtr:    validAddress,
 			argsBufPtr: memorySize - argsArray.totalBufSize + 1,
 		},
