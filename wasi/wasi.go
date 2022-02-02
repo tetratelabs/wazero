@@ -20,7 +20,7 @@ const (
 )
 
 type WASIEnvironment struct {
-	args  wasiStringArray
+	args  *wasiStringArray
 	stdin io.Reader
 	stdout,
 	stderr io.Writer
@@ -155,7 +155,7 @@ func Args(args []string) (Option, error) {
 		return nil, err
 	}
 	return func(w *WASIEnvironment) {
-		w.args = *wasiStrings
+		w.args = wasiStrings
 	}, nil
 }
 
@@ -170,7 +170,7 @@ func Preopen(dir string, fileSys FS) Option {
 
 func NewEnvironment(opts ...Option) *WASIEnvironment {
 	ret := &WASIEnvironment{
-		args:   wasiStringArray{},
+		args:   &wasiStringArray{},
 		stdin:  os.Stdin,
 		stdout: os.Stdout,
 		stderr: os.Stderr,
