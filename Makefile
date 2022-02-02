@@ -3,7 +3,7 @@ golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 
 .PHONY: bench
 bench:
-	@go test -run=NONE -benchmem -bench=. ./...
+	@go test -run=NONE -benchmem -bench=. ./tests/...
 
 .PHONY: build.lib
 build.lib:
