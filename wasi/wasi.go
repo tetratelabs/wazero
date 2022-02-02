@@ -334,7 +334,7 @@ func (w *WASIEnvironment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32)
 // args_sizes_get is a WASI API that returns the number of the command-line arguments and the total buffer size that
 // args_get API will require to store the value of the command-line arguments.
 // * argsCountPtr: a pointer to an address of uint32 type. The number of the command-line arguments is written there.
-// * argsBufSizePtr: a pointer to an address of uint32 type. The number of the command-line arguments is written there.
+// * argsBufSizePtr: a pointer to an address of uint32 type. The total size of the buffer that the command-line argument data requires is written there.
 //
 // Link to the actual spec: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
 func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, argsCountPtr uint32, argsBufSizePtr uint32) Errno {
