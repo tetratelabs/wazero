@@ -3,8 +3,10 @@ package wasi
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"math/rand"
 	"os"
 	"reflect"
@@ -18,6 +20,7 @@ const (
 )
 
 type WASIEnvironment struct {
+	args  *wasiStringArray
 	stdin io.Reader
 	stdout,
 	stderr io.Writer
@@ -69,11 +72,11 @@ func (w *WASIEnvironment) Register(store *wasm.Store) (err error) {
 		if err != nil {
 			return err
 		}
-		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(args_get))
+		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(w.args_get))
 		if err != nil {
 			return err
 		}
-		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(args_sizes_get))
+		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(w.args_sizes_get))
 		if err != nil {
 			return err
 		}
@@ -107,6 +110,56 @@ func Stderr(writer io.Writer) Option {
 	}
 }
 
+// wasiStringArray holds null-terminated strings. It ensures that
+// its length and total buffer size don't exceed the max of uint32.
+// Each string can have arbitrary byte values, not only utf-8 encoded text.
+// wasiStringArray are convenience struct for args_get and environ_get. (environ_get is not implemented yet)
+//
+// A Null-terminated string is a byte string with a NULL suffix ("\x00").
+// See: https://en.wikipedia.org/wiki/Null-terminated_string
+type wasiStringArray struct {
+	// nullTerminatedValues are null-terminated values with a NULL suffix.
+	// Each string can have arbitrary byte values, not only utf-8 encoded text.
+	nullTerminatedValues [][]byte
+	totalBufSize         uint32
+}
+
+// newWASIStringArray creates a wasiStringArray from the given string slice. It returns an error
+// if the length or the total buffer size of the result WASIStringArray exceeds the max of uint32
+func newWASIStringArray(args []string) (*wasiStringArray, error) {
+	if args == nil {
+		return &wasiStringArray{nullTerminatedValues: [][]byte{}}, nil
+	}
+	if len(args) > math.MaxUint32 {
+		return nil, fmt.Errorf("the length of the args exceeds the max of uint32: %v", len(args))
+	}
+	strings := make([][]byte, len(args))
+	totalBufSize := uint32(0)
+	for i, arg := range args {
+		argLen := uint64(len(arg)) + 1 // + 1 for "\x00"
+		if argLen > uint64(math.MaxUint32-totalBufSize) {
+			return nil, fmt.Errorf("the required buffer size for the args exceeds the max of uint32: %v", uint64(totalBufSize)+argLen)
+		}
+		totalBufSize += uint32(argLen)
+		strings[i] = make([]byte, argLen)
+		copy(strings[i], arg)
+	}
+
+	return &wasiStringArray{nullTerminatedValues: strings, totalBufSize: totalBufSize}, nil
+}
+
+// Args returns an option to give a command-line arguments to the WASIEnvironment.
+// Args returns an error if the length or the total size of the given string slice exceeds the max of uint32.
+func Args(args []string) (Option, error) {
+	wasiStrings, err := newWASIStringArray(args)
+	if err != nil {
+		return nil, err
+	}
+	return func(w *WASIEnvironment) {
+		w.args = wasiStrings
+	}, nil
+}
+
 func Preopen(dir string, fileSys FS) Option {
 	return func(w *WASIEnvironment) {
 		w.opened[uint32(len(w.opened))+3] = fileEntry{
@@ -118,6 +171,7 @@ func Preopen(dir string, fileSys FS) Option {
 
 func NewEnvironment(opts ...Option) *WASIEnvironment {
 	ret := &WASIEnvironment{
+		args:   &wasiStringArray{},
 		stdin:  os.Stdin,
 		stdout: os.Stdout,
 		stderr: os.Stderr,
@@ -277,16 +331,47 @@ func (w *WASIEnvironment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32)
 	return ESUCCESS
 }
 
-func args_sizes_get(ctx *wasm.HostFunctionCallContext, argcPtr uint32, argvPtr uint32) (err Errno) {
-	// not implemented yet
-	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argcPtr:], 0)
-	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argvPtr:], 0)
-	return 0
+// args_sizes_get is a WASI API that returns the number of the command-line arguments and the total buffer size that
+// args_get API will require to store the value of the command-line arguments.
+// * argsCountPtr: a pointer to an address of uint32 type. The number of the command-line arguments is written there.
+// * argsBufSizePtr: a pointer to an address of uint32 type. The total size of the buffer that the command-line argument data requires is written there.
+//
+// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
+func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, argsCountPtr uint32, argsBufSizePtr uint32) Errno {
+	if !ctx.Memory.PutUint32(argsCountPtr, uint32(len(w.args.nullTerminatedValues))) {
+		return EINVAL
+	}
+	if !ctx.Memory.PutUint32(argsBufSizePtr, w.args.totalBufSize) {
+		return EINVAL
+	}
+
+	return ESUCCESS
 }
 
-func args_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	// not implemented yet
-	return
+// args_get is a WASI API to read the command-line argument data.
+// * argsPtr:
+//     A pointer to a buffer. args_get writes multiple *C.char pointers in sequence there. In other words, this is an array of *char in C.
+//     Each *C.char of them points to a command-line argument that is a null-terminated string.
+//     The number of this *C.char matches the value that args_sizes_get returns in argsCountPtr.
+// * argsBufPtr:
+//     A pointer to a buffer. args_get writes the command line arguments as null-terminated strings in the given buffer.
+//     The total number of bytes written there is the value that args_sizes_get returns in argsBufSizePtr. The caller must ensure that
+//     the buffer has the enough size.
+//     Each *C.char pointer that can be obtained from argsPtr points to the beginning of each of these null-terminated strings.
+// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
+// See: https://en.wikipedia.org/wiki/Null-terminated_string
+func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
+	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
+		!ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
+		return EINVAL
+	}
+	for _, arg := range w.args.nullTerminatedValues {
+		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argsPtr:], argsBufPtr)
+		argsPtr += 4 // size of uint32
+		argsBufPtr += uint32(copy(ctx.Memory.Buffer[argsBufPtr:], arg))
+	}
+
+	return ESUCCESS
 }
 
 func proc_exit(*wasm.HostFunctionCallContext, uint32) {
