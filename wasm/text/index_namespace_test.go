@@ -2,10 +2,11 @@ package text
 
 import (
 	"errors"
-	"github.com/tetratelabs/wazero/wasm"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestIndexNamespace_SetId(t *testing.T) {
