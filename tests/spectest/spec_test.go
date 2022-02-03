@@ -20,7 +20,8 @@ import (
 	"github.com/tetratelabs/wazero/wasm/jit"
 )
 
-//go:embed testdata/*
+//go:embed testdata/*.wasm
+//go:embed testdata/*.json
 var testcases embed.FS
 
 type (
