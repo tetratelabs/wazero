@@ -2,8 +2,8 @@ package examples
 
 import (
 	"bytes"
+	_ "embed"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,6 +13,9 @@ import (
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
+
+//go:embed testdata/file_system.wasm
+var filesystemWasm []byte
 
 func writeFile(fs wasi.FS, path string, data []byte) error {
 	f, err := fs.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
@@ -43,10 +46,7 @@ func readFile(fs wasi.FS, path string) ([]byte, error) {
 }
 
 func Test_file_system(t *testing.T) {
-	buf, err := os.ReadFile("testdata/file_system.wasm")
-	require.NoError(t, err)
-
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(filesystemWasm)
 	require.NoError(t, err)
 
 	memFS := wasi.MemFS()

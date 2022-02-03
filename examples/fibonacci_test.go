@@ -1,7 +1,7 @@
 package examples
 
 import (
-	"os"
+	_ "embed"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,11 +12,11 @@ import (
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
-func Test_fibonacci(t *testing.T) {
-	buf, err := os.ReadFile("testdata/fibonacci.wasm")
-	require.NoError(t, err)
+//go:embed testdata/fibonacci.wasm
+var fibWasm []byte
 
-	mod, err := binary.DecodeModule(buf)
+func Test_fibonacci(t *testing.T) {
+	mod, err := binary.DecodeModule(fibWasm)
 	require.NoError(t, err)
 
 	store := wasm.NewStore(interpreter.NewEngine())

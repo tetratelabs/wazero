@@ -2,7 +2,7 @@ package examples
 
 import (
 	"bytes"
-	"os"
+	_ "embed"
 	"strings"
 	"testing"
 
@@ -14,10 +14,11 @@ import (
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
+//go:embed testdata/stdio.wasm
+var stdioWasm []byte
+
 func Test_stdio(t *testing.T) {
-	buf, err := os.ReadFile("testdata/stdio.wasm")
-	require.NoError(t, err)
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(stdioWasm)
 	require.NoError(t, err)
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
 	stdoutBuf := bytes.NewBuffer(nil)

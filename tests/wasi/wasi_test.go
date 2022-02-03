@@ -11,7 +11,7 @@ package wasi
 
 import (
 	"bytes"
-	"os"
+	_ "embed"
 	"strings"
 	"testing"
 
@@ -22,6 +22,9 @@ import (
 	wbinary "github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
+
+//go:embed testdata/args.wasm
+var argsWasm []byte
 
 // Test args_sizes_get and args_get. args_sizes_get must be used to know the length and the
 // size of the result of args_get, so TinyGo calls the both of them together to retrieve the
@@ -44,10 +47,7 @@ func Test_ArgsSizesGet_ArgsGet(t *testing.T) {
 		},
 	}
 
-	buf, err := os.ReadFile("testdata/args.wasm")
-	require.NoError(t, err)
-
-	mod, err := wbinary.DecodeModule(buf)
+	mod, err := wbinary.DecodeModule(argsWasm)
 	require.NoError(t, err)
 
 	for _, tt := range tests {
