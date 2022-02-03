@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	_ "embed"
+
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
