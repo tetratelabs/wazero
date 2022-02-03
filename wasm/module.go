@@ -433,3 +433,26 @@ type NameMapAssoc struct {
 	Index   Index
 	NameMap NameMap
 }
+
+func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) {
+	for _, imp := range m.ImportSection {
+		switch imp.Kind {
+		case ImportKindFunc:
+			functions = append(functions, imp.DescFunc)
+		case ImportKindGlobal:
+			globals = append(globals, imp.DescGlobal)
+		case ImportKindMemory:
+			memories = append(memories, imp.DescMem)
+		case ImportKindTable:
+			tables = append(tables, imp.DescTable)
+		}
+	}
+
+	functions = append(functions, m.FunctionSection...)
+	for _, g := range m.GlobalSection {
+		globals = append(globals, g.Type)
+	}
+	memories = append(memories, m.MemorySection...)
+	tables = append(tables, m.TableSection...)
+	return
+}
