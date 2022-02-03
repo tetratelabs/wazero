@@ -463,13 +463,13 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	case OpcodeI32Const:
 		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, 0, fmt.Errorf("read uint32: %w", err)
+			return nil, 0, fmt.Errorf("read i32: %w", err)
 		}
 		return v, ValueTypeI32, nil
 	case OpcodeI64Const:
-		v, _, err = leb128.DecodeInt32(r)
+		v, _, err = leb128.DecodeInt64(r)
 		if err != nil {
-			return nil, 0, fmt.Errorf("read uint64: %w", err)
+			return nil, 0, fmt.Errorf("read i64: %w", err)
 		}
 		return v, ValueTypeI64, nil
 	case OpcodeF32Const:
