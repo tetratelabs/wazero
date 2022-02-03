@@ -194,7 +194,6 @@ const (
 	maximumFunctionTypes   = 1 << 27
 	maximumGlobals         = 1 << 27
 	maximumValuesOnStack   = 1 << 27
-	// TODO: add maximum value stack height
 )
 
 // addExport adds and indexes the given export or errs if the name is already exported.
