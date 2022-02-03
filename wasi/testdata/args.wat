@@ -12,8 +12,8 @@
   (memory 0x200)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   ;; Define wrapper functions instead of just exporting the imported WASI APIS for now
-  ;; because wazero's interpreter has a bug that it crashes when an exported host function is called
-  ;; from the host environment, which will be fixed soon.
+  ;; because wazero's interpreter has a bug that it crashes when an imported-and-exported host function
+  ;; is called from the host environment, which will be fixed soon.
   ;; After it's fixed, these wrapper functions are no longer necessary.
   (func $args_sizes_get (param i32 i32) (result i32)
         local.get 0
