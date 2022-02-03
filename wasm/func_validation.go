@@ -820,10 +820,8 @@ func validateFunctionInstance(
 	if len(controlBloclStack) > 0 {
 		return fmt.Errorf("ill-nested block exists")
 	}
-
 	if valueTypeStack.maximumStackPointer > maxStackValues {
-		return fmt.Errorf("function too large: potentially could have %d values on the stack with the limit %d",
-			valueTypeStack.maximumStackPointer, maxStackValues)
+		return fmt.Errorf("function may have %d stack values, which exceeds limit %d", valueTypeStack.maximumStackPointer, maxStackValues)
 	}
 	return nil
 }

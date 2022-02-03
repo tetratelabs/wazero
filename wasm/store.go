@@ -611,7 +611,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		if err := validateFunctionInstance(f, funcs, globals, mems, tables, module.TypeSection, maximumValuesOnStack); err != nil {
-			return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection)-1, err)
+			return rollbackFuncs, fmt.Errorf("invalid function '%s' (%d/%d): %v", f.Name, codeIndex, len(module.FunctionSection)-1, err)
 		}
 
 		err = s.addFunctionInstance(f)

@@ -32,7 +32,7 @@ func TestValidateFunction_valueStackLimit(t *testing.T) {
 	t.Run("exceed", func(t *testing.T) {
 		err := validateFunctionInstance(f, nil, nil, nil, nil, nil, max)
 		require.Error(t, err)
-		expMsg := fmt.Sprintf("function too large: potentially could have %d values on the stack with the limit %d", valuesNum, max)
+		expMsg := fmt.Sprintf("function may have %d stack values, which exceeds limit %d", valuesNum, max)
 		require.Equal(t, expMsg, err.Error())
 	})
 }
