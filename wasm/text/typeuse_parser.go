@@ -179,7 +179,7 @@ func (p *typeUseParser) beginTypeParamOrResult(tok tokenType, tokenBytes []byte,
 // parseType parses a type index inside the "type" field. If not yet in the TypeSection, the position is recorded for
 // resolution later. Finally, this returns parseTypeEnd to finish the field.
 func (p *typeUseParser) parseType(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	idx, resolved, err := p.typeNamespace.parseIndex(p.section, p.idx, tok, tokenBytes, line, col)
+	idx, resolved, err := p.typeNamespace.parseIndex(p.section, p.idx, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}

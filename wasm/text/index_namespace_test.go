@@ -116,12 +116,13 @@ func TestUnresolvedIndex_FormatError(t *testing.T) {
 		section     wasm.SectionID
 		expectedErr string
 	}{
-		{section: wasm.SectionIDStart, expectedErr: "3:4: bomb in module.start"},
+		{section: wasm.SectionIDCode, expectedErr: "3:4: bomb in module.code[1].body[2]"},
 		{section: wasm.SectionIDExport, expectedErr: "3:4: bomb in module.exports[1].func"},
+		{section: wasm.SectionIDStart, expectedErr: "3:4: bomb in module.start"},
 	} {
 		tc := tt
 		t.Run(wasm.SectionIDName(tc.section), func(t *testing.T) {
-			ui := &unresolvedIndex{section: tc.section, idx: 1, targetID: "X", targetIdx: 2, line: 3, col: 4}
+			ui := &unresolvedIndex{section: tc.section, idx: 1, bodyOffset: 2, targetID: "X", targetIdx: 2, line: 3, col: 4}
 			require.EqualError(t, ui.formatErr(errors.New("bomb")), tc.expectedErr)
 		})
 	}

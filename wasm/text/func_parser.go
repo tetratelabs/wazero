@@ -8,8 +8,8 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
-func newFuncParser(onFunc onFunc) *funcParser {
-	return &funcParser{onFunc: onFunc}
+func newFuncParser(funcNamespace *indexNamespace, onFunc onFunc) *funcParser {
+	return &funcParser{funcNamespace: funcNamespace, onFunc: onFunc}
 }
 
 type onFunc func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error)
@@ -25,14 +25,11 @@ type funcParser struct {
 	// onFunc is called when complete parsing the body. Unless testing, this should be moduleParser.onFuncEnd
 	onFunc onFunc
 
+	// funcNamespace is described by moduleParser.funcNamespace
+	funcNamespace *indexNamespace
+
 	currentTypeIdx    wasm.Index
 	currentParamNames wasm.NameMap
-
-	// currentOpcode is the opcode parsed from an instruction. Ex wasm.OpcodeLocalGet if "local.get 3"
-	currentOpcode wasm.Opcode
-
-	// currentParameters are the parameters to the currentOpcode in WebAssembly 1.0 (MVP) binary format
-	currentParameters []byte
 
 	// currentBody is the current function body encoded in WebAssembly 1.0 (MVP) binary format
 	currentBody []byte
@@ -88,16 +85,23 @@ func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, l
 }
 
 // beginInstruction parses the token into an opcode and dispatches accordingly. If there are none, this calls onFunc.
-func (p *funcParser) beginInstruction(tokenBytes []byte) (tokenParser, error) {
+func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err error) {
+	var opCode wasm.Opcode
 	switch string(tokenBytes) {
-	case "local.get":
-		p.currentOpcode = wasm.OpcodeLocalGet
-		return p.parseInstructionIndex, nil
-	case "i32.add":
-		p.currentOpcode = wasm.OpcodeI32Add
-		return p.endInstruction()
+	case "local.get": // See https://www.w3.org/TR/wasm-core-1/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
+		opCode = wasm.OpcodeLocalGet
+		next = p.parseLocalIndex
+	case "i32.add": // See https://www.w3.org/TR/wasm-core-1/#syntax-instr-numeric
+		opCode = wasm.OpcodeI32Add
+		next = p.beginFieldOrInstruction
+	case "call": // See https://www.w3.org/TR/wasm-core-1/#-hrefsyntax-instr-controlmathsfcallx
+		opCode = wasm.OpcodeCall
+		next = p.parseFuncIndex
+	default:
+		return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
 	}
-	return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
+	p.currentBody = append(p.currentBody, opCode)
+	return next, nil
 }
 
 // end invokes onFunc to continue parsing
@@ -111,31 +115,42 @@ func (p *funcParser) end() (tokenParser, error) {
 	return p.onFunc(p.currentTypeIdx, code, p.currentParamNames)
 }
 
+// parseFuncIndex parses an index in the function namespace and appends it to the currentBody. If it was an ID, a
+// placeholder byte(0) is added instead and will be resolved later.
+func (p *funcParser) parseFuncIndex(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	funcIdx := p.funcNamespace.count // TODO: move all function logic here and use the code index, not including imports
+	bodyOffset := uint32(len(p.currentBody))
+	idx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDCode, funcIdx, bodyOffset, tok, tokenBytes, line, col)
+	if err != nil {
+		return nil, err
+	}
+	if !resolved && tok == tokenID {
+		p.currentBody = append(p.currentBody, 0) // will be replaced later
+	} else {
+		p.currentBody = append(p.currentBody, leb128.EncodeUint32(idx)...)
+	}
+	return p.beginFieldOrInstruction, nil
+}
+
 // TODO: port this to the indexNamespace
-func (p *funcParser) parseInstructionIndex(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
+func (p *funcParser) parseLocalIndex(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenUN: // Ex. 1
 		i, overflow := decodeUint32(tokenBytes)
 		if overflow {
 			return nil, fmt.Errorf("index outside range of uint32: %s", tokenBytes)
 		}
-		p.currentParameters = leb128.EncodeUint32(i)
+		p.currentBody = append(p.currentBody, leb128.EncodeUint32(i)...)
+
 		// TODO: it is possible this is out of range in the index. Local out-of-range is caught in Store.Initialize, but
 		// we can provide a better area since we can access the line and col info. However, since the local index starts
 		// with parameters and they are on the type, and that type may be defined after the function, it can get hairy.
 		// To handle this neatly means doing a quick check to see if the type is already present and immediately
 		// validate. If the type isn't yet present, we can save off the context for late validation, noting that we
 		// should probably save off the instruction count or at least the current opcode to help with the error message.
-		return p.endInstruction()
+		return p.beginFieldOrInstruction, nil
 	case tokenID: // Ex $y
 		return nil, errors.New("TODO: index variables are not yet supported")
 	}
 	return nil, unexpectedToken(tok, tokenBytes)
-}
-
-func (p *funcParser) endInstruction() (tokenParser, error) {
-	p.currentBody = append(p.currentBody, p.currentOpcode)
-	p.currentBody = append(p.currentBody, p.currentParameters...)
-	p.currentParameters = nil
-	return p.beginFieldOrInstruction, nil
 }

@@ -187,6 +187,22 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name: "func call - index - after import",
+			input: `(module
+			(import "" "" (func))
+			(func)
+			(func call 1)
+		)`,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				ImportSection:   []*wasm.Import{{Kind: wasm.ImportKindFunc, DescFunc: 0}},
+				FunctionSection: []wasm.Index{0, 0},
+				CodeSection: []*wasm.Code{
+					{Body: end}, {Body: []byte{wasm.OpcodeCall, 0x01, wasm.OpcodeEnd}},
+				},
+			},
+		},
+		{
 			// Spec says expand abbreviations first. It doesn't explicitly say you can't mix forms.
 			// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A0
 			name: "import func inlined type - mixed abbreviated",
@@ -1069,6 +1085,72 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name: "func call - index",
+			input: `(module
+			(func)
+			(func)
+			(func call 1)
+		)`,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0, 0, 0},
+				CodeSection: []*wasm.Code{
+					{Body: end}, {Body: end}, {Body: []byte{wasm.OpcodeCall, 0x01, wasm.OpcodeEnd}},
+				},
+			},
+		},
+		{
+			name: "func call - index - late",
+			input: `(module
+			(func)
+			(func call 1)
+			(func)
+		)`,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0, 0, 0},
+				CodeSection: []*wasm.Code{
+					{Body: end}, {Body: []byte{wasm.OpcodeCall, 0x01, wasm.OpcodeEnd}}, {Body: end},
+				},
+			},
+		},
+		{
+			name: "func call - ID",
+			input: `(module
+			(func)
+			(func $main)
+			(func call $main)
+		)`,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0, 0, 0},
+				CodeSection: []*wasm.Code{
+					{Body: end}, {Body: end}, {Body: []byte{wasm.OpcodeCall, 0x01, wasm.OpcodeEnd}},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 1, Name: "main"}},
+				},
+			},
+		},
+		{
+			name: "func call - ID - late",
+			input: `(module
+			(func)
+			(func call $main)
+			(func $main)
+		)`,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{v_v},
+				FunctionSection: []wasm.Index{0, 0, 0},
+				CodeSection: []*wasm.Code{
+					{Body: end}, {Body: []byte{wasm.OpcodeCall, 0x02, wasm.OpcodeEnd}}, {Body: end},
+				},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{{Index: 2, Name: "main"}},
+				},
+			},
+		},
+		{
 			name: "export imported func",
 			input: `(module
 	(import "foo" "bar" (func $bar))
@@ -1785,6 +1867,22 @@ func TestParseModule_Errors(t *testing.T) {
 			name:        "func points nowhere",
 			input:       "(module (func (type $v_v)))",
 			expectedErr: "1:21: unknown ID $v_v",
+		},
+		{
+			name: "func call unresolved - index",
+			input: `(module
+			(func)
+			(func call 2)
+		)`,
+			expectedErr: "3:15: index 2 is out of range [0..1] in module.code[1].body[1]",
+		},
+		{
+			name: "func call unresolved - ID",
+			input: `(module
+			(func $main)
+			(func call $mein)
+		)`,
+			expectedErr: "3:15: unknown ID $mein in module.code[1].body[1]",
 		},
 		{
 			name: "export duplicates empty name",

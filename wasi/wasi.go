@@ -116,7 +116,7 @@ func Stderr(writer io.Writer) Option {
 // wasiStringArray are convenience struct for args_get and environ_get. (environ_get is not implemented yet)
 //
 // A Null-terminated string is a byte string with a NULL suffix ("\x00").
-// See: https://en.wikipedia.org/wiki/Null-terminated_string
+// See https://en.wikipedia.org/wiki/Null-terminated_string
 type wasiStringArray struct {
 	// nullTerminatedValues are null-terminated values with a NULL suffix.
 	// Each string can have arbitrary byte values, not only utf-8 encoded text.
@@ -336,7 +336,7 @@ func (w *WASIEnvironment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32)
 // * argsCountPtr: a pointer to an address of uint32 type. The number of the command-line arguments is written there.
 // * argsBufSizePtr: a pointer to an address of uint32 type. The total size of the buffer that the command-line argument data requires is written there.
 //
-// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
 func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, argsCountPtr uint32, argsBufSizePtr uint32) Errno {
 	if !ctx.Memory.PutUint32(argsCountPtr, uint32(len(w.args.nullTerminatedValues))) {
 		return EINVAL
@@ -358,8 +358,8 @@ func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, args
 //     The total number of bytes written there is the value that args_sizes_get returns in argsBufSizePtr. The caller must ensure that
 //     the buffer has the enough size.
 //     Each *C.char pointer that can be obtained from argsPtr points to the beginning of each of these null-terminated strings.
-// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
-// See: https://en.wikipedia.org/wiki/Null-terminated_string
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
+// See https://en.wikipedia.org/wiki/Null-terminated_string
 func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
 	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
 		!ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {

@@ -29,7 +29,7 @@ var exampleText []byte
 var exampleBinary []byte
 
 func newExample() *wasm.Module {
-	two := wasm.Index(2)
+	three := wasm.Index(3)
 	i32 := wasm.ValueTypeI32
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
@@ -48,23 +48,25 @@ func newExample() *wasm.Module {
 				DescFunc: 2,
 			},
 		},
-		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(0)},
+		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(1), wasm.Index(0)},
 		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeCall, 3, wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 		},
 		ExportSection: map[string]*wasm.Export{
-			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
+			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(4)},
 			"":       {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
 		},
-		StartSection: &two,
+		StartSection: &three,
 		NameSection: &wasm.NameSection{
 			ModuleName: "example",
 			FunctionNames: wasm.NameMap{
 				{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
 				{Index: wasm.Index(1), Name: "runtime.fd_write"},
-				{Index: wasm.Index(2), Name: "hello"},
-				{Index: wasm.Index(3), Name: "addInt"},
+				{Index: wasm.Index(2), Name: "call_hello"},
+				{Index: wasm.Index(3), Name: "hello"},
+				{Index: wasm.Index(4), Name: "addInt"},
 			},
 			LocalNames: wasm.IndirectNameMap{
 				{Index: wasm.Index(1), NameMap: wasm.NameMap{
@@ -73,7 +75,7 @@ func newExample() *wasm.Module {
 					{Index: wasm.Index(2), Name: "iovs_len"},
 					{Index: wasm.Index(3), Name: "nwritten_ptr"},
 				}},
-				{Index: wasm.Index(3), NameMap: wasm.NameMap{
+				{Index: wasm.Index(4), NameMap: wasm.NameMap{
 					{Index: wasm.Index(0), Name: "value_1"},
 					{Index: wasm.Index(1), Name: "value_2"},
 				}},

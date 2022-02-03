@@ -51,7 +51,121 @@ func TestFuncParser(t *testing.T) {
 				return parseErr, nil
 			}
 
-			require.NoError(t, parseFunc(newFuncParser(setFunc), tc.source))
+			require.NoError(t, parseFunc(newFuncParser(newIndexNamespace(), setFunc), tc.source))
+			require.Equal(t, tc.expected, parsedCode)
+		})
+	}
+}
+
+func TestFuncParser_Call_Unresolved(t *testing.T) {
+	tests := []struct {
+		name, source            string
+		expectedCode            *wasm.Code
+		expectedUnresolvedIndex *unresolvedIndex
+	}{
+		{
+			name:         "index zero",
+			source:       "(func call 0)",
+			expectedCode: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x00, wasm.OpcodeEnd}},
+			expectedUnresolvedIndex: &unresolvedIndex{
+				section:    wasm.SectionIDCode,
+				bodyOffset: 1, // second byte is the position Code.Body
+				targetIdx:  0, // zero is literally the intended index. because targetID isn't set, this will be read
+				line:       1, col: 12,
+			},
+		},
+		{
+			name:         "index",
+			source:       "(func call 2)",
+			expectedCode: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x02, wasm.OpcodeEnd}},
+			expectedUnresolvedIndex: &unresolvedIndex{
+				section:    wasm.SectionIDCode,
+				bodyOffset: 1, // second byte is the position Code.Body
+				targetIdx:  2,
+				line:       1, col: 12,
+			},
+		},
+		{
+			name:         "ID",
+			source:       "(func call $main)",
+			expectedCode: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x00, wasm.OpcodeEnd}},
+			expectedUnresolvedIndex: &unresolvedIndex{
+				section:    wasm.SectionIDCode,
+				bodyOffset: 1, // second byte is the position Code.Body
+				targetID:   "main",
+				line:       1, col: 12,
+			},
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			var parsedCode *wasm.Code
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+				parsedCode = code
+				return parseErr, nil
+			}
+
+			fp := newFuncParser(newIndexNamespace(), setFunc)
+			require.NoError(t, parseFunc(fp, tc.source))
+			require.Equal(t, tc.expectedCode, parsedCode)
+			require.Equal(t, []*unresolvedIndex{tc.expectedUnresolvedIndex}, fp.funcNamespace.unresolvedIndices)
+		})
+	}
+}
+
+func TestFuncParser_Call_Resolved(t *testing.T) {
+	tests := []struct {
+		name, source string
+		expected     *wasm.Code
+	}{
+		{
+			name:     "index zero",
+			source:   "(func call 0)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x00, wasm.OpcodeEnd}},
+		},
+		{
+			name:     "index",
+			source:   "(func call 2)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x02, wasm.OpcodeEnd}},
+		},
+		{
+			name:     "ID",
+			source:   "(func call $main)",
+			expected: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x02, wasm.OpcodeEnd}},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			funcNamespace := newIndexNamespace()
+			_, err := funcNamespace.setID([]byte("$not_main"))
+			require.NoError(t, err)
+			funcNamespace.count++
+
+			_, err = funcNamespace.setID([]byte("$also_not_main"))
+			require.NoError(t, err)
+			funcNamespace.count++
+
+			_, err = funcNamespace.setID([]byte("$main"))
+			require.NoError(t, err)
+			funcNamespace.count++
+
+			_, err = funcNamespace.setID([]byte("$still_not_main"))
+			require.NoError(t, err)
+			funcNamespace.count++
+
+			var parsedCode *wasm.Code
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+				parsedCode = code
+				return parseErr, nil
+			}
+
+			fp := newFuncParser(funcNamespace, setFunc)
+			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
 	}
@@ -107,7 +221,7 @@ func TestFuncParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			fp := newFuncParser(failOnFunc)
+			fp := newFuncParser(newIndexNamespace(), failOnFunc)
 			require.EqualError(t, parseFunc(fp, tc.source), tc.expectedErr)
 		})
 	}

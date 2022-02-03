@@ -80,7 +80,7 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	}
 	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
 	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
-	p.funcParser = newFuncParser(p.endFunc)
+	p.funcParser = newFuncParser(p.funcNamespace, p.endFunc)
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
 	// reason, we cannot enforce source[0] == '(', and instead need to start the lexer to check the first token.
@@ -483,7 +483,7 @@ func (p *moduleParser) beginExportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 // parseExportFunc records the symbolic or numeric function index the function export
 func (p *moduleParser) parseExportFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	eIdx := wasm.Index(len(p.module.ExportSection))
-	typeIdx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDExport, eIdx, tok, tokenBytes, line, col)
+	typeIdx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDExport, eIdx, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}
@@ -534,7 +534,7 @@ func (p *moduleParser) parseExportEnd(tok tokenType, tokenBytes []byte, _, _ uin
 
 // parseStart returns parseStartEnd after recording the start function index, or errs if it couldn't be read.
 func (p *moduleParser) parseStart(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	idx, _, err := p.funcNamespace.parseIndex(wasm.SectionIDStart, 0, tok, tokenBytes, line, col)
+	idx, _, err := p.funcNamespace.parseIndex(wasm.SectionIDStart, 0, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}
@@ -585,11 +585,17 @@ func (p *moduleParser) resolveFunctionIndices(module *wasm.Module) error {
 		if err != nil {
 			return err
 		}
+		importCount := p.funcNamespace.count - uint32(len(module.CodeSection))
 		switch unresolved.section {
-		case wasm.SectionIDStart:
-			module.StartSection = &target
+		case wasm.SectionIDCode:
+			if target > 255 {
+				return errors.New("TODO: unresolved function indexes that don't fit in a byte")
+			}
+			module.CodeSection[unresolved.idx-importCount].Body[unresolved.bodyOffset] = byte(target)
 		case wasm.SectionIDExport:
 			p.unresolvedExports[unresolved.idx].Index = target
+		case wasm.SectionIDStart:
+			module.StartSection = &target
 		default:
 			panic(unhandledSection(unresolved.section))
 		}

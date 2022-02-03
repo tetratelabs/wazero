@@ -235,12 +235,12 @@ func TestTypeParser_Errors(t *testing.T) {
 	}
 
 	t.Run("duplicate ID", func(t *testing.T) {
-		funcIndexNamespace := newIndexNamespace()
-		_, err := funcIndexNamespace.setID([]byte("$v_v"))
+		typeNamespace := newIndexNamespace()
+		_, err := typeNamespace.setID([]byte("$v_v"))
 		require.NoError(t, err)
-		funcIndexNamespace.count++
+		typeNamespace.count++
 
-		parsed, _, err := parseFunctionType(funcIndexNamespace, "(type $v_v (func))")
+		parsed, _, err := parseFunctionType(typeNamespace, "(type $v_v (func))")
 		require.EqualError(t, err, "duplicate ID $v_v")
 		require.Nil(t, parsed)
 	})
