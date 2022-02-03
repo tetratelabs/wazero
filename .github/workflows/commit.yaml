@@ -40,8 +40,8 @@ jobs:
 
       - run: make check
 
-  test:
-    name: Test (${{ matrix.os }}, go-${{ matrix.go-version }})
+  test_amd64:
+    name: Test (${{ matrix.os }}, Go-${{ matrix.go-version }}) / amd64
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -69,6 +69,51 @@ jobs:
           key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
 
       - run: make test
+
+  test_arm64:
+    name: Test (${{ matrix.os }}, Go-${{ matrix.go-version }}) / arm64
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [
+          "ubuntu-latest",
+        ]
+        go-version: [
+          "1.17",  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+          "1.16",  # temporarily support go 1.16 per #37
+        ]
+
+    steps:
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-arm64
+
+      - name: build test binaries
+        run: go list ./... | xargs -Ipkg go test pkg -c
+        env:
+          GOARCH: arm64
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          image: tonistiigi/binfmt:latest
+          platforms: arm64
+
+      # Reference: https://www.stereolabs.com/docs/docker/building-arm-container-on-x86/
+      - name: Setup the multiarch docker settings
+        run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes # This step will execute the registering scripts
+
+      - name: Run built test binaries inside the qemu
+        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t arm64v8/ubuntu /bin/bash -c 'find . -name "*.test" | xargs -Ibin bash -c "bin test.v"'
 
   bench:
     name: Benchmark
