@@ -9,6 +9,9 @@
 	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write
 		(param $fd i32) (param $iovs_ptr i32) (param $iovs_len i32) (param $nwritten_ptr i32) (result i32)))
 
+    ;; func call referencing a func not defined, yet
+    (func $call_hello call $hello)
+
     ;; type use referencing a type not defined, yet
     (func $hello (type 1))
 	(type (func))
