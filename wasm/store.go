@@ -38,6 +38,8 @@ type (
 
 		// maximumFunctionAddress and maximumFunctionTypes represent the limit on the number of each instance type in a store.
 		maximumFunctionAddress, maximumFunctionTypes int
+		// maximumGlobals is the maximum number of globals that can be declared in a module.
+		maximumGlobals int
 
 		// The followings fields match the definition of Store in the specification.
 
@@ -183,8 +185,10 @@ type (
 )
 
 const (
-	maximumFunctionAddress = math.MaxUint32
-	maximumFunctionTypes   = maximumFunctionAddress
+	maximumFunctionAddress = 1 << 27
+	maximumFunctionTypes   = 1 << 27
+	maximumGlobals         = 1 << 27
+	// TODO: add maximum value stack height
 )
 
 // addExport adds and indexes the given export or errs if the name is already exported.
@@ -219,6 +223,7 @@ func NewStore(engine Engine) *Store {
 		engine:                 engine,
 		maximumFunctionAddress: maximumFunctionAddress,
 		maximumFunctionTypes:   maximumFunctionTypes,
+		maximumGlobals:         maximumGlobals,
 	}
 }
 
@@ -511,6 +516,17 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (ro
 	rollbackFuncs = append(rollbackFuncs, func() {
 		s.Globals = s.Globals[:prevLen]
 	})
+	// We limit the number of globals in a moudle to 2^27.
+	globalDecls := len(module.GlobalSection)
+	for _, imp := range module.ImportSection {
+		if imp.Kind == ImportKindGlobal {
+			globalDecls++
+		}
+	}
+	if globalDecls > s.maximumGlobals {
+		return rollbackFuncs, fmt.Errorf("too many globals in a module")
+	}
+
 	for _, gs := range module.GlobalSection {
 		raw, t, err := s.executeConstExpression(target, gs.Init)
 		if err != nil {

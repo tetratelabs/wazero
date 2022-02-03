@@ -402,6 +402,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	getGlobalInstanceLocation.To.Type = obj.TYPE_REG
 	getGlobalInstanceLocation.To.Reg = intReg
 	getGlobalInstanceLocation.From.Type = obj.TYPE_CONST
+	// Note: globals are limited to 2^27 in a module, so this offset never exceeds 32-bit.
 	getGlobalInstanceLocation.From.Offset = 8 * int64(o.Index)
 	c.addInstruction(getGlobalInstanceLocation)
 
@@ -475,6 +476,7 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	getGlobalInstanceLocation.To.Type = obj.TYPE_REG
 	getGlobalInstanceLocation.To.Reg = intReg
 	getGlobalInstanceLocation.From.Type = obj.TYPE_CONST
+	// Note: globals are limited to 2^27 in a module, so this offset never exceeds 32-bit.
 	getGlobalInstanceLocation.From.Offset = 8 * int64(o.Index)
 	c.addInstruction(getGlobalInstanceLocation)
 
@@ -1259,6 +1261,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		prog.As = x86.AMOVQ
 		prog.From.Type = obj.TYPE_MEM
 		prog.From.Reg = reservedRegisterForStackBasePointerAddress
+		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 		prog.From.Offset = int64(pickTarget.stackPointer) * 8
 		prog.To.Type = obj.TYPE_REG
 		prog.To.Reg = reg
@@ -2200,6 +2203,7 @@ func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
 		// Shift target can be placed on a memory location.
 		inst.To.Type = obj.TYPE_MEM
 		inst.To.Reg = reservedRegisterForStackBasePointerAddress
+		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 		inst.To.Offset = int64(x1.stackPointer) * 8
 	}
 	c.addInstruction(inst)
@@ -4466,6 +4470,7 @@ func (c *amd64Compiler) moveStackToRegister(loc *valueLocation) {
 	prog.As = x86.AMOVQ
 	prog.From.Type = obj.TYPE_MEM
 	prog.From.Reg = reservedRegisterForStackBasePointerAddress
+	// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 	prog.From.Offset = int64(loc.stackPointer) * 8
 	prog.To.Type = obj.TYPE_REG
 	prog.To.Reg = loc.register
@@ -4823,7 +4828,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 			readCompiledFunctionAddressAddress.From.Index = addrReg
 			readCompiledFunctionAddressAddress.From.Scale = 8 // because the size of *compiledFunction equals 8 bytes.
 		} else {
-			// TODO: rethink on this since if addr*8 >= math.MaxUint32, then this instruction is invalid.
+			// Note: Funcaddr is limited up to 2^27 so this offset never exceeds 32-bit integer.
 			readCompiledFunctionAddressAddress.From.Offset = int64(addr) * 8 // because the size of *compiledFunction equals 8 bytes.
 		}
 		c.addInstruction(readCompiledFunctionAddressAddress)
@@ -5236,6 +5241,7 @@ func (c *amd64Compiler) releaseRegisterToStack(loc *valueLocation) {
 	prog.As = x86.AMOVQ
 	prog.To.Type = obj.TYPE_MEM
 	prog.To.Reg = reservedRegisterForStackBasePointerAddress
+	// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 	prog.To.Offset = int64(loc.stackPointer) * 8
 	prog.From.Type = obj.TYPE_REG
 	prog.From.Reg = loc.register

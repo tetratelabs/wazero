@@ -263,3 +263,15 @@ func TestMemoryInstance_PutUint32(t *testing.T) {
 		})
 	}
 }
+
+func TestStore_buildGlobalInstances(t *testing.T) {
+	t.Run("too many globals", func(t *testing.T) {
+		// Setup a store to have the reasonably low max on globals for testing.
+		s := NewStore(nopEngineInstance)
+		const max = 10
+		s.maximumGlobals = max
+
+		_, err := s.buildGlobalInstances(&Module{GlobalSection: make([]*Global, max+1)}, nil)
+		require.Error(t, err)
+	})
+}
