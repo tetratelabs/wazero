@@ -1353,7 +1353,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						res := int64(v)
 						if math.IsNaN(v) {
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
-						} else if v < math.MinInt64 || v > 0 && res < 0 {
+						} else if v < math.MinInt64 || v >= math.MaxInt64 {
+							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(res))
@@ -1370,7 +1372,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						res := uint64(v)
 						if math.IsNaN(v) {
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
-						} else if v < 0 || v > float64(res) {
+						} else if v < 0 || v >= math.MaxUint64 {
+							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(res)
@@ -1391,7 +1395,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						res := int64(v)
 						if math.IsNaN(v) {
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
-						} else if v < math.MinInt64 || v > 0 && res < 0 {
+						} else if v < math.MinInt64 || v >= math.MaxInt64 {
+							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(uint64(res))
@@ -1408,7 +1414,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 						res := uint64(v)
 						if math.IsNaN(v) {
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
-						} else if v < 0 || v > float64(res) {
+						} else if v < 0 || v >= math.MaxUint64 {
+							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
+							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
 						it.push(res)
