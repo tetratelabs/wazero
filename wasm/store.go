@@ -36,8 +36,15 @@ type (
 		// do type-checks on indirect function calls.
 		TypeIDs map[string]FunctionTypeID
 
-		// maximumFunctionAddress and maximumFunctionTypes represent the limit on the number of each instance type in a store.
-		maximumFunctionAddress, maximumFunctionTypes int
+		// maximumFunctionAddress represents the limit on the number of function addresses (= function instances) in a store.
+		// Note: this is fixed to 2^27 but have this a field for testability.
+		maximumFunctionAddress int
+		//  maximumFunctionTypes represents the limit on the number of function types in a store.
+		// Note: this is fixed to 2^27 but have this a field for testability.
+		maximumFunctionTypes int
+		// maximumGlobals is the maximum number of globals that can be declared in a module.
+		// Note: this is fixed to 2^27 but have this a field for testability.
+		maximumGlobals int
 
 		// The followings fields match the definition of Store in the specification.
 
@@ -182,9 +189,12 @@ type (
 	FunctionTypeID uint32
 )
 
+// The wazero specific limitations described at RATIONALE.md.
 const (
-	maximumFunctionAddress = math.MaxUint32
-	maximumFunctionTypes   = maximumFunctionAddress
+	maximumFunctionAddress = 1 << 27
+	maximumFunctionTypes   = 1 << 27
+	maximumGlobals         = 1 << 27
+	// TODO: add maximum value stack height
 )
 
 // addExport adds and indexes the given export or errs if the name is already exported.
@@ -219,6 +229,7 @@ func NewStore(engine Engine) *Store {
 		engine:                 engine,
 		maximumFunctionAddress: maximumFunctionAddress,
 		maximumFunctionTypes:   maximumFunctionTypes,
+		maximumGlobals:         maximumGlobals,
 	}
 }
 
@@ -452,19 +463,19 @@ func (s *Store) applyGlobalImport(target *ModuleInstance, globalTypePtr *GlobalT
 	return nil
 }
 
-func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExpression) (v interface{}, valueType ValueType, err error) {
+func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}, valueType ValueType, err error) {
 	r := bytes.NewBuffer(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		v, _, err = leb128.DecodeInt32(r)
 		if err != nil {
-			return nil, 0, fmt.Errorf("read uint32: %w", err)
+			return nil, 0, fmt.Errorf("read i32: %w", err)
 		}
 		return v, ValueTypeI32, nil
 	case OpcodeI64Const:
-		v, _, err = leb128.DecodeInt32(r)
+		v, _, err = leb128.DecodeInt64(r)
 		if err != nil {
-			return nil, 0, fmt.Errorf("read uint64: %w", err)
+			return nil, 0, fmt.Errorf("read i64: %w", err)
 		}
 		return v, ValueTypeI64, nil
 	case OpcodeF32Const:
@@ -484,10 +495,10 @@ func (s *Store) executeConstExpression(target *ModuleInstance, expr *ConstantExp
 		if err != nil {
 			return nil, 0, fmt.Errorf("read index of global: %w", err)
 		}
-		if uint32(len(target.Globals)) <= id {
+		if uint32(len(globals)) <= id {
 			return nil, 0, fmt.Errorf("global index out of range")
 		}
-		g := target.Globals[id]
+		g := globals[id]
 		switch g.Type.ValType {
 		case ValueTypeI32:
 			v = int32(g.Val)
@@ -511,8 +522,20 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (ro
 	rollbackFuncs = append(rollbackFuncs, func() {
 		s.Globals = s.Globals[:prevLen]
 	})
+
+	// We limit the number of globals in a moudle to 2^27.
+	globalDecls := len(module.GlobalSection)
+	for _, imp := range module.ImportSection {
+		if imp.Kind == ImportKindGlobal {
+			globalDecls++
+		}
+	}
+	if globalDecls > s.maximumGlobals {
+		return rollbackFuncs, fmt.Errorf("too many globals in a module")
+	}
+
 	for _, gs := range module.GlobalSection {
-		raw, t, err := s.executeConstExpression(target, gs.Init)
+		raw, t, err := executeConstExpression(target.Globals, gs.Init)
 		if err != nil {
 			return rollbackFuncs, fmt.Errorf("execution failed: %w", err)
 		}
@@ -656,7 +679,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 			return rollbackFuncs, fmt.Errorf("memory index must be zero")
 		}
 
-		rawOffset, offsetType, err := s.executeConstExpression(target, d.OffsetExpression)
+		rawOffset, offsetType, err := executeConstExpression(target.Globals, d.OffsetExpression)
 		if err != nil {
 			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
 		} else if offsetType != ValueTypeI32 {
@@ -707,7 +730,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 			return rollbackFuncs, fmt.Errorf("index out of range of index space")
 		}
 
-		rawOffset, offsetType, err := s.executeConstExpression(target, elem.OffsetExpr)
+		rawOffset, offsetType, err := executeConstExpression(target.Globals, elem.OffsetExpr)
 		if err != nil {
 			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
 		} else if offsetType != ValueTypeI32 {

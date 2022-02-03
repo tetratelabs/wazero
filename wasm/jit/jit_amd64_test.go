@@ -6088,7 +6088,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				if isAddressFromRegister {
 					err = compiler.callFunctionFromRegister(x86.REG_AX, &wasm.FunctionType{})
 				} else {
-					err = compiler.callFunctionFromAddress(0xdeadbeaf, &wasm.FunctionType{})
+					err = compiler.callFunctionFromAddress(11111 /* can be arbitrary*/, &wasm.FunctionType{})
 				}
 				require.NoError(t, err)
 				require.Empty(t, compiler.locationStack.usedRegisters)
