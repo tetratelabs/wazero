@@ -29,7 +29,7 @@ That is because not only we _believe_ that all use cases are fine with the limit
 ### Number of function types in a store
 
 There's no limitation on the number of function types in [a store](https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0) according to the spec. In wazero implementation, we assign each function type to a unique ID, and choose to use `uint32` to represent the IDs.
-Therefore the maximum number of function types a store can have is limited to 2^27 as that would result in occupying 2^29 = (512 MiB) bytes in memory for function types alone.
+Therefore the maximum number of function types a store can have is limited to 2^27 as even that number would occupy 512MB just to reference the function types.
 
 This is due to the same reason for the limitation on the number of functions above.
 
