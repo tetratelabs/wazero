@@ -32,6 +32,7 @@ func runTests(t *testing.T, newEngine func() wasm.Engine) {
 	unreachable(t, newEngine)
 	memory(t, newEngine)
 	recursiveEntry(t, newEngine)
+	importedAndExportedFunc(t, newEngine)
 }
 
 func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
@@ -169,4 +170,29 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 
 	_, _, err = store.CallFunction("test", "main", uint64(1))
 	require.NoError(t, err)
+}
+
+func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
+	buf, err := os.ReadFile("testdata/imported_and_exported_func.wasm")
+	require.NoError(t, err)
+	mod, err := binary.DecodeModule(buf)
+	require.NoError(t, err)
+
+	store := wasm.NewStore(newEngine())
+
+	// addInt is imported by the wasm module, and the wasm module exports addInt back
+	addInt := func(ctx *wasm.HostFunctionCallContext, x int32, y int32) int32 {
+		return x + y
+	}
+	// Let the wasm module import addInt
+	err = store.AddHostFunction("env", "add_int", reflect.ValueOf(addInt))
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	// We should be able to call the exported add_int and it should add two ints.
+	results, _, err := store.CallFunction("test", "add_int", uint64(12), uint64(30))
+	require.NoError(t, err)
+	require.Equal(t, uint64(42), results[0])
 }

@@ -477,12 +477,12 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		return
 	}
 
+	for _, param := range params {
+		it.push(param)
+	}
 	if g.hostFn != nil {
 		it.callHostFunc(g, params...)
 	} else {
-		for _, param := range params {
-			it.push(param)
-		}
 		it.callNativeFunc(g)
 	}
 	results = make([]uint64, len(f.FunctionType.Type.Results))
