@@ -105,7 +105,6 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
         with:
-          image: tonistiigi/binfmt:latest
           platforms: arm64
 
       - name: Run built test binaries inside the qemu
