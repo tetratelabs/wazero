@@ -38,7 +38,7 @@ This is due to the same reason for the limitation on the number of functions abo
 
 According to the spec, there's no limitation on the number of values we a function can retain in the Wasm values stack. We limit the maximum number to 2^27 = 134,217,728.
 The reason is that we internally represent all the values as 64-bit integes regardless of its types (including f32, f64), and 2^27 values means 
-1 GiB = (2^30). 1 GiB is the reasonable for most applications [as we see a Goroutine has a stack size limit with that number on 64-bit arch](https://github.com/golang/go/blob/f296b7a6f045325a230f77e9bda1470b1270f817/src/runtime/proc.go#L120), considering that WebAssembly is (currently) 32-bit environment.
+1 GiB = (2^30). 1 GiB is the reasonable for most applications [as we see a Goroutine has 250 MB as a limit on the stack for 32-bit arch](https://github.com/golang/go/blob/f296b7a6f045325a230f77e9bda1470b1270f817/src/runtime/proc.go#L120), considering that WebAssembly is (currently) 32-bit environment.
 
 All the functions are statically analyzed at module insntantiation phase, and if a function can potentially reach this limit, an error is returend.
 
