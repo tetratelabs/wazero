@@ -268,6 +268,59 @@ func TestMemoryInstance_PutUint32(t *testing.T) {
 	}
 }
 
+func TestMemoryInstance_PutUint64(t *testing.T) {
+	memory := &MemoryInstance{
+		Buffer: make([]byte, 100),
+	}
+
+	tests := []struct {
+		name               string
+		addr               uint32
+		val                uint64
+		shouldSuceed       bool
+		expectedWrittenVal uint64
+	}{
+		{
+			name:               "valid addr with an endian-insensitive val",
+			addr:               0, // arbitrary valid address.
+			val:                0xffffffffffffffff,
+			shouldSuceed:       true,
+			expectedWrittenVal: 0xffffffffffffffff,
+		},
+		{
+			name:               "valid addr with an endian-sensitive val",
+			addr:               0, // arbitrary valid address.
+			val:                0xfffffffffffffffe,
+			shouldSuceed:       true,
+			expectedWrittenVal: 0xfffffffffffffffe,
+		},
+		{
+			name:               "maximum boundary valid addr",
+			addr:               uint32(len(memory.Buffer)) - 8, // 8 is the size of uint64
+			val:                1,                              // arbitrary valid val
+			shouldSuceed:       true,
+			expectedWrittenVal: 1,
+		},
+		{
+			name:         "addr exceeds the maximum valid addr by 1",
+			addr:         uint32(len(memory.Buffer)) - 8 + 1, // 8 is the size of uint64
+			val:          1,                                  // arbitrary valid val
+			shouldSuceed: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.shouldSuceed, memory.PutUint64(tc.addr, tc.val))
+			if tc.shouldSuceed {
+				require.Equal(t, tc.expectedWrittenVal, binary.LittleEndian.Uint64(memory.Buffer[tc.addr:tc.addr+8])) // 8 is the size of uint64
+			}
+		})
+	}
+}
+
 func TestStore_buildGlobalInstances(t *testing.T) {
 	t.Run("too many globals", func(t *testing.T) {
 		// Setup a store to have the reasonably low max on globals for testing.

@@ -405,8 +405,14 @@ func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	return
 }
 
+// clock_time_get is a WASI API that returns the time value of a clock. Note: This is similar to clock_gettime in POSIX.
+// * id: The clock id for which to return the time.
+// * precision: timestamp The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
+// * timestampPtr: a pointer to an address of uint64 type. The time value of the clock in nanoseconds is written there.
+//
+// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 func (w *WASIEnvironment) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
-	nanos := w.getTimeNanosFn()
-	binary.LittleEndian.PutUint64(ctx.Memory.Buffer[timestampPtr:], nanos)
+	// The clock id and precision are currently ignored.
+	ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn())
 	return ESUCCESS
 }
