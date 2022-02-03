@@ -413,6 +413,8 @@ func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 // See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 func (w *WASIEnvironment) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
 	// The clock id and precision are currently ignored.
-	ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn())
+	if !ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn()) {
+		return EINVAL
+	}
 	return ESUCCESS
 }

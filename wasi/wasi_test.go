@@ -291,10 +291,34 @@ func TestClockGetTime(t *testing.T) {
 	expected := uint64(12345)
 	wasiEnv.getTimeNanosFn = func() uint64 { return expected }
 	store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
 
-	ret, _, err := store.CallFunction("test", "clock_time_get", uint64(0), uint64(0), uint64(0))
-	require.NoError(t, err)
-	require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is returned errno
-	nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
-	assert.Equal(t, expected, nanos) // Allow skew of 10ms.
+	tests := []struct {
+		name         string
+		timestampPtr uint32
+		result       Errno
+	}{
+		{
+			name:         "timestampPtr is valid",
+			timestampPtr: validAddress,
+			result:       ESUCCESS,
+		},
+		{
+			name:         "timestampPtr exceeds the maximum valid address by 1",
+			timestampPtr: memorySize - 8 + 1,
+			result:       EINVAL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction("test", "clock_time_get", uint64(0), uint64(0), uint64(tt.timestampPtr))
+			require.NoError(t, err)
+			if assert.Equal(t, uint64(tt.result), ret[0]) { // ret[0] is returned errno
+				nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
+				assert.Equal(t, expected, nanos)
+			}
+		})
+	}
 }
