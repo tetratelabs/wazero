@@ -1,12 +1,13 @@
 package examples
 
 import (
+	"context"
 	"crypto/rand"
 	_ "embed"
-	"encoding/binary"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasi"
@@ -14,6 +15,8 @@ import (
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
+
+type testKey struct{}
 
 //go:embed testdata/host_func.wasm
 var hostFuncWasm []byte
@@ -26,6 +29,10 @@ func Test_hostFunc(t *testing.T) {
 
 	// Host-side implementation of get_random_string on Wasm import.
 	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
+		// Assert that context values passed in from CallFunctionContext are accessible.
+		contextValue := ctx.Value(testKey{}).(int64)
+		assert.Equal(t, int64(12345), contextValue)
+
 		const bufferSize = 10000 // force memory space grow to ensure eager failures on missing setup
 		// Allocate the in-Wasm memory region so we can store the generated string.
 		// Note that this is recursive call. That means that this is the VM function call during the VM function call.
@@ -37,8 +44,8 @@ func Test_hostFunc(t *testing.T) {
 		bufAddr := ret[0]
 
 		// Store the address info to the memory.
-		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[retBufPtr:], uint32(bufAddr))
-		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[retBufSize:], bufferSize)
+		ctx.Memory.PutUint32(retBufPtr, uint32(bufAddr))
+		ctx.Memory.PutUint32(retBufSize, uint32(bufferSize))
 
 		// Now store the random values in the region.
 		n, err := rand.Read(ctx.Memory.Buffer[bufAddr : bufAddr+bufferSize])
@@ -62,6 +69,10 @@ func Test_hostFunc(t *testing.T) {
 	_, _, err = store.CallFunction("test", "_start")
 	require.NoError(t, err)
 
-	_, _, err = store.CallFunction("test", "base64", 5)
+	// Set a context variable that should be available in HostFunctionCallContext.
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, testKey{}, int64(12345))
+
+	_, _, err = store.CallFunctionContext(ctx, "test", "base64", 5)
 	require.NoError(t, err)
 }

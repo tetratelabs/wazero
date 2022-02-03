@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"math"
 	"reflect"
@@ -95,6 +96,10 @@ type nopEngine struct {
 }
 
 func (e *nopEngine) Call(_ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+	return nil, nil
+}
+
+func (e *nopEngine) CallContext(_ context.Context, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	return nil, nil
 }
 

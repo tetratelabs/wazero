@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -333,6 +334,10 @@ func (c *callFrame) String() string {
 }
 
 func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+	return e.CallContext(context.Background(), f, params...)
+}
+
+func (e *engine) CallContext(ctx context.Context, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside
@@ -388,9 +393,12 @@ func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uin
 	}
 
 	if compiled.source.IsHostFunction() {
-		e.execHostFunction(compiled.source.HostFunction, &wasm.HostFunctionCallContext{Memory: f.ModuleInstance.Memory})
+		e.execHostFunction(compiled.source.HostFunction, &wasm.HostFunctionCallContext{
+			Context: ctx,
+			Memory:  f.ModuleInstance.Memory,
+		})
 	} else {
-		e.execFunction(compiled)
+		e.execFunction(ctx, compiled)
 	}
 
 	// Note the top value is the tail of the results,
@@ -498,7 +506,7 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 	}
 }
 
-func (e *engine) execFunction(f *compiledFunction) {
+func (e *engine) execFunction(ctx context.Context, f *compiledFunction) {
 	// We continuously execute functions until we reach the previous top frame
 	// to support recursive Wasm function executions.
 	e.globalContext.previousCallFrameStackPointer = e.globalContext.callFrameStackPointer
@@ -534,7 +542,10 @@ jitentry:
 				}
 			}
 			saved := e.globalContext.previousCallFrameStackPointer
-			e.execHostFunction(fn.source.HostFunction, &wasm.HostFunctionCallContext{Memory: callerCompiledFunction.source.ModuleInstance.Memory})
+			e.execHostFunction(fn.source.HostFunction, &wasm.HostFunctionCallContext{
+				Context: ctx,
+				Memory:  callerCompiledFunction.source.ModuleInstance.Memory,
+			})
 			e.globalContext.previousCallFrameStackPointer = saved
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:

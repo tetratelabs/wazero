@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -314,6 +315,10 @@ func (s *Store) Instantiate(module *Module, name string) error {
 }
 
 func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
+	return s.CallFunctionContext(context.Background(), moduleName, funcName, params...)
+}
+
+func (s *Store) CallFunctionContext(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
 	var exp *ExportInstance
 	if exp, err = s.getExport(moduleName, funcName, ExportKindFunc); err != nil {
 		return
@@ -325,7 +330,7 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 		return
 	}
 
-	results, err = s.engine.Call(f, params...)
+	results, err = s.engine.CallContext(ctx, f, params...)
 	resultTypes = f.FunctionType.Type.Results
 	return
 }
@@ -844,6 +849,7 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 
 // HostFunctionCallContext is the first argument of all host functions.
 type HostFunctionCallContext struct {
+	context.Context
 	// Memory is the currently used memory instance at the time when the host function call is made.
 	Memory *MemoryInstance
 	// TODO: Add others if necessary.
