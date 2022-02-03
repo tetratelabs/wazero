@@ -58,9 +58,11 @@ func newExample() *wasm.Module {
 			{Body: []byte{wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 		},
+		MemorySection: []*wasm.MemoryType{{Min: 1, Max: &three}},
 		ExportSection: map[string]*wasm.Export{
 			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(4)},
 			"":       {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
+			"mem":    {Name: "mem", Kind: wasm.ExportKindMemory, Index: wasm.Index(0)},
 		},
 		StartSection: &three,
 		NameSection: &wasm.NameSection{

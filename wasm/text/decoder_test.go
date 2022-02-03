@@ -1151,6 +1151,20 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name:  "memory",
+			input: "(module (memory 1))",
+			expected: &wasm.Module{
+				MemorySection: []*wasm.MemoryType{{Min: 1}},
+			},
+		},
+		{
+			name:  "memory ID",
+			input: "(module (memory $mem 1))",
+			expected: &wasm.Module{
+				MemorySection: []*wasm.MemoryType{{Min: 1}},
+			},
+		},
+		{
 			name: "export imported func",
 			input: `(module
 	(import "foo" "bar" (func $bar))
@@ -1328,6 +1342,38 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name: "export different memory - numeric",
+			input: `(module
+	(memory 0)
+	(memory 1)
+	(export "foo" (memory 0))
+	(export "bar" (memory 1))
+)`,
+			expected: &wasm.Module{
+				MemorySection: []*wasm.MemoryType{{Min: 0}, {Min: 1}},
+				ExportSection: map[string]*wasm.Export{
+					"foo": {Name: "foo", Kind: wasm.ExportKindMemory, Index: 0},
+					"bar": {Name: "bar", Kind: wasm.ExportKindMemory, Index: 1},
+				},
+			},
+		},
+		{
+			name: "export different memory - numeric - late",
+			input: `(module
+	(export "foo" (memory 0))
+	(export "bar" (memory 1))
+	(memory 0)
+	(memory 1)
+)`,
+			expected: &wasm.Module{
+				MemorySection: []*wasm.MemoryType{{Min: 0}, {Min: 1}},
+				ExportSection: map[string]*wasm.Export{
+					"foo": {Name: "foo", Kind: wasm.ExportKindMemory, Index: 0},
+					"bar": {Name: "bar", Kind: wasm.ExportKindMemory, Index: 1},
+				},
+			},
+		},
+		{
 			name: "export empty and non-empty name",
 			input: `(module
     (func)
@@ -1343,6 +1389,21 @@ func TestDecodeModule(t *testing.T) {
 				ExportSection: map[string]*wasm.Export{
 					"":  {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(2)},
 					"a": {Name: "a", Kind: wasm.ExportKindFunc, Index: 1},
+				},
+			},
+		},
+		{
+			name: "export memory - ID",
+			input: `(module
+    (memory 1)
+    (memory $mem 2)
+    (memory $mam 3)
+    (export "memory" (memory $mem))
+)`,
+			expected: &wasm.Module{
+				MemorySection: []*wasm.MemoryType{{Min: 1}, {Min: 2}, {Min: 3}},
+				ExportSection: map[string]*wasm.Export{
+					"memory": {Name: "memory", Kind: wasm.ExportKindMemory, Index: 2},
 				},
 			},
 		},
@@ -1890,7 +1951,7 @@ func TestParseModule_Errors(t *testing.T) {
     (func)
 	(func)
     (export "" (func 0))
-    (export "" (func 1))
+    (export "" (memory 1))
 )`,
 			expectedErr: "5:13: duplicate name \"\" in module.export[1]",
 		},
@@ -1900,7 +1961,7 @@ func TestParseModule_Errors(t *testing.T) {
     (func)
 	(func)
     (export "a" (func 0))
-    (export "a" (func 1))
+    (export "a" (memory 1))
 )`,
 			expectedErr: "5:13: duplicate name \"a\" in module.export[1]",
 		},
@@ -2023,6 +2084,34 @@ func TestParseModule_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := DecodeModule([]byte(tc.input))
 			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
+func TestModuleParser_ErrorContext(t *testing.T) {
+	p := newModuleParser(&wasm.Module{})
+	tests := []struct {
+		input    string
+		pos      parserPosition
+		expected string
+	}{
+		{input: "initial", pos: positionInitial, expected: ""},
+		{input: "module", pos: positionModule, expected: "module"},
+		{input: "module import", pos: positionModuleImport, expected: "module.import[0]"},
+		{input: "module import func", pos: positionModuleImportFunc, expected: "module.import[0].func"},
+		{input: "module func", pos: positionModuleFunc, expected: "module.func[0]"},
+		{input: "module memory", pos: positionModuleMemory, expected: "module.memory[0]"},
+		{input: "module export", pos: positionModuleExport, expected: "module.export[0]"},
+		{input: "module export func", pos: positionModuleExportFunc, expected: "module.export[0].func"},
+		{input: "start", pos: positionModuleStart, expected: "module.start"},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.input, func(t *testing.T) {
+			p.pos = tc.pos
+			require.Equal(t, tc.expected, p.errorContext())
 		})
 	}
 }

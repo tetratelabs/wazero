@@ -280,6 +280,18 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 	return encodeSection(wasm.SectionIDCode, contents)
 }
 
+// encodeMemorySection encodes a SectionIDMemory for the module-defined function in WebAssembly 1.0 (MVP) Binary Format.
+//
+// See encodeMemoryType
+// See https://www.w3.org/TR/wasm-core-1/#memory-section%E2%91%A0
+func encodeMemorySection(memories []*wasm.MemoryType) []byte {
+	contents := leb128.EncodeUint32(uint32(len(memories)))
+	for _, i := range memories {
+		contents = append(contents, encodeMemoryType(i)...)
+	}
+	return encodeSection(wasm.SectionIDMemory, contents)
+}
+
 // encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See encodeExport

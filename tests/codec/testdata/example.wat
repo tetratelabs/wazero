@@ -32,4 +32,8 @@
         local.get 1 ;; TODO: instruction variables $value_2
         i32.add
     )
+
+    ;; export a memory before it was defined, given its symbolic ID
+    (export "mem" (memory $mem))
+    (memory $mem 1 3)
 )

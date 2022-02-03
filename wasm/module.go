@@ -290,6 +290,7 @@ type LimitsType struct {
 	Min uint32
 	Max *uint32
 }
+
 type TableType struct {
 	ElemType byte
 	Limit    *LimitsType
