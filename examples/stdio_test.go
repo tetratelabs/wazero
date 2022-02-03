@@ -2,12 +2,11 @@ package examples
 
 import (
 	"bytes"
+	_ "embed"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	_ "embed"
 
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
