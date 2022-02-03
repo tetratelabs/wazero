@@ -1,12 +1,14 @@
 package wasm
 
 import (
+	"bytes"
 	"encoding/binary"
 	"reflect"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
 func TestStore_GetModuleInstance(t *testing.T) {
@@ -271,7 +273,54 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 		const max = 10
 		s.maximumGlobals = max
 
-		_, err := s.buildGlobalInstances(&Module{GlobalSection: make([]*Global, max+1)}, nil)
+		// Module with max+1 globals must fail.
+		_, err := s.buildGlobalInstances(&Module{GlobalSection: make([]*Global, max+1)}, &ModuleInstance{})
 		require.Error(t, err)
 	})
+	t.Run("invalid constant expression", func(t *testing.T) {
+		s := NewStore(nopEngineInstance)
+
+		// Empty constant expression is invalid.
+		m := &Module{GlobalSection: []*Global{{Init: &ConstantExpression{}}}}
+		_, err := s.buildGlobalInstances(m, &ModuleInstance{})
+		require.Error(t, err)
+	})
+
+	t.Run("global type mismatch", func(t *testing.T) {
+		s := NewStore(nopEngineInstance)
+		m := &Module{GlobalSection: []*Global{{
+			// Global with i32.const initial value, but with type specified as f64 must be error.
+			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0}},
+			Type: &GlobalType{ValType: ValueTypeF64},
+		}}}
+		_, err := s.buildGlobalInstances(m, &ModuleInstance{})
+		require.Error(t, err)
+	})
+	t.Run("ok", func(t *testing.T) {
+		global := &Global{
+			Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: []byte{0x11}},
+			Type: &GlobalType{ValType: ValueTypeI64},
+		}
+		expectedValue, _, err := leb128.DecodeUint64(bytes.NewReader(global.Init.Data))
+		require.NoError(t, err)
+
+		m := &Module{GlobalSection: []*Global{global}}
+
+		s := NewStore(nopEngineInstance)
+		target := &ModuleInstance{}
+		_, err = s.buildGlobalInstances(m, target)
+		require.NoError(t, err)
+
+		// A global must be added to both store and module instance.
+		require.Len(t, s.Globals, 1)
+		require.Len(t, target.Globals, 1)
+		// Plus the added one must be same.
+		require.Equal(t, s.Globals[0], target.Globals[0])
+
+		require.Equal(t, expectedValue, s.Globals[0].Val)
+	})
+}
+
+func TestStore_executeConstExpression(t *testing.T) {
+
 }
