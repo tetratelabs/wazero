@@ -9,6 +9,7 @@
 (module
   (import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi_args_sizes_get (param i32 i32) (result i32)))
   (import "wasi_snapshot_preview1" "args_get"       (func $wasi_args_get (param i32 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "clock_time_get" (func $wasi_clock_time_get (param i32 i64 i32) (result i32)))
   (memory 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   ;; Define wrapper functions instead of just exporting the imported WASI APIS for now
@@ -25,6 +26,13 @@
         local.get 1
         call $wasi_args_get
         )
+  (func $clock_time_get (param i32 i64 i32) (result i32)
+        local.get 0
+        local.get 1
+        local.get 2
+        call $wasi_clock_time_get
+        )
   (export "args_sizes_get" (func $args_sizes_get))
   (export "args_get" (func $args_get))
+  (export "clock_time_get" (func $clock_time_get))
   )

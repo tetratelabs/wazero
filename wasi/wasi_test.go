@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -283,4 +284,17 @@ func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, wasiEnv *
 	require.NoError(t, err)
 
 	return store
+}
+
+func TestClockGetTime(t *testing.T) {
+	wasiEnv := NewEnvironment()
+	expected := uint64(12345)
+	wasiEnv.getTimeNanosFn = func() uint64 { return expected }
+	store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
+
+	ret, _, err := store.CallFunction("test", "clock_time_get", uint64(0), uint64(0), uint64(0))
+	require.NoError(t, err)
+	require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is returned errno
+	nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
+	assert.Equal(t, expected, nanos) // Allow skew of 10ms.
 }
