@@ -789,13 +789,19 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 
 // ValidateAddrRange checks if the given address range is a valid address range.
 // It accepts rangeSize as uint64 so that callers can add or multiply two uint32 addresses
-// without overflow. eg.) ValidateAddrRange(uint32Offset, uint64(uint32Size) + 1)
+// without overflow. For example, `ValidateAddrRange(uint32Offset, uint64(uint32Size) + 1)`.
+// ValidateAddrRange works even if `m` is nil so that memory range validation
+// against a module with no memory exported can be done in a consistent way.
 func (m *MemoryInstance) ValidateAddrRange(addr uint32, rangeSize uint64) bool {
+	if m == nil {
+		// Address validation is done for a module with no memory exported.
+		return false
+	}
 	return uint64(addr) < uint64(len(m.Buffer)) && rangeSize <= uint64(len(m.Buffer))-uint64(addr)
 }
 
 // PutUint32 writes a uint32 value to the specified address. If the specified address
-// is not a valid address range, it returns false. Otherwise, it returns true.
+// is not a valid address range or `m` is nil, it returns false. Otherwise, it returns true.
 func (m *MemoryInstance) PutUint32(addr uint32, val uint32) bool {
 	if !m.ValidateAddrRange(addr, uint64(4)) {
 		return false

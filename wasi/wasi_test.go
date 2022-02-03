@@ -271,6 +271,39 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	}
 }
 
+func TestArgsGetAPICaresNoMemoryModule(t *testing.T) {
+	dummyArgs := []string{"foo", "bar", "baz"}
+	argsOpt, err := Args(dummyArgs)
+	require.NoError(t, err)
+	wasiEnv := NewEnvironment(argsOpt)
+
+	mod, err := wbinary.DecodeModule(argsAPIWasmBinary)
+	require.NoError(t, err)
+	// Remove the memory instance.
+	mod.MemorySection = []*wasm.LimitsType{}
+	delete(mod.ExportSection, "memory")
+
+	// Instantiate wasm.Store from it with wasiEnv
+	store := wasm.NewStore(interpreter.NewEngine())
+	err = wasiEnv.Register(store)
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	t.Run("args_get should return error against modules with no memory", func(t *testing.T) {
+		ret, _, err := store.CallFunction("test", "args_get", uint64(0), uint64(0)) // 0 is arbitrary address
+		require.NoError(t, err)
+		require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is the returned errno
+	})
+
+	t.Run("args_sizes_get should return error against modules with no memory", func(t *testing.T) {
+		ret, _, err := store.CallFunction("test", "args_sizes_get", uint64(0), uint64(0)) // 0 is arbitrary address
+		require.NoError(t, err)
+		require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is the returned errno
+	})
+}
+
 func instantiateWasmStore(t *testing.T, wasmBinary []byte, moduleName string, wasiEnv *WASIEnvironment) *wasm.Store {
 	mod, err := wbinary.DecodeModule(wasmBinary)
 	require.NoError(t, err)
