@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/jit"
+	"github.com/tetratelabs/wazero/wasm/text"
 )
 
 func TestJIT(t *testing.T) {
@@ -173,9 +174,9 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
-	buf, err := os.ReadFile("testdata/imported_and_exported_func.wasm")
+	buf, err := os.ReadFile("testdata/imported_and_exported_func.wat")
 	require.NoError(t, err)
-	mod, err := binary.DecodeModule(buf)
+	mod, err := text.DecodeModule(buf)
 	require.NoError(t, err)
 
 	store := wasm.NewStore(newEngine())
