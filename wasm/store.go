@@ -662,7 +662,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 		}
 
 		size := uint64(offset) + uint64(len(d.Init))
-		maxPage := uint32(memoryMaxPages)
+		maxPage := uint32(MemoryMaxPages)
 		if int(d.MemoryIndex) < len(module.MemorySection) && module.MemorySection[d.MemoryIndex].Max != nil {
 			maxPage = *module.MemorySection[d.MemoryIndex].Max
 		}

@@ -5,9 +5,9 @@ const (
 	// and is defined as 2^16 = 65536.
 	// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0
 	MemoryPageSize = uint32(65536)
-	// memoryMaxPages is maximum number of pages defined (2^16).
+	// MemoryMaxPages is maximum number of pages defined (2^16).
 	// See https://www.w3.org/TR/wasm-core-1/#grow-mem
-	memoryMaxPages = MemoryPageSize
+	MemoryMaxPages = MemoryPageSize
 	// memoryPageSizeInBit satisfies the relation: "1 << memoryPageSizeInBit == memoryPageSize".
 	memoryPageSizeInBit = uint32(16)
 )
@@ -30,7 +30,7 @@ func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
 
-	maxPages := uint32(memoryMaxPages)
+	maxPages := uint32(MemoryMaxPages)
 	if m.Max != nil {
 		maxPages = *m.Max
 	}

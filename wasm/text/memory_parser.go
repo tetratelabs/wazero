@@ -81,7 +81,7 @@ func (p *memoryParser) beginMax(tok tokenType, tokenBytes []byte, line, col uint
 	case tokenUN:
 		i, overflow := decodeUint32(tokenBytes)
 		if overflow || i > wasm.MemoryPageSize {
-			return nil, fmt.Errorf("min outside range of %d: %s", wasm.MemoryPageSize, tokenBytes)
+			return nil, fmt.Errorf("min outside range of %d: %s", wasm.MemoryMaxPages, tokenBytes)
 		} else if i < p.currentMin {
 			return nil, fmt.Errorf("max %d < min %d", p.currentMax, p.currentMin)
 		}

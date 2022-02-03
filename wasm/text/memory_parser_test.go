@@ -10,7 +10,7 @@ import (
 
 func TestMemoryParser(t *testing.T) {
 	zero := uint32(0)
-	max := wasm.MemoryPageSize
+	max := wasm.MemoryMaxPages
 	tests := []struct {
 		name       string
 		input      string
