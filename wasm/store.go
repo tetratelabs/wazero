@@ -193,6 +193,7 @@ const (
 	maximumFunctionAddress = 1 << 27
 	maximumFunctionTypes   = 1 << 27
 	maximumGlobals         = 1 << 27
+	maximumValuesOnStack   = 1 << 27
 	// TODO: add maximum value stack height
 )
 
@@ -610,7 +611,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			ModuleInstance: target,
 		}
 
-		if err := validateFunction(f, funcs, globals, mems, tables, module.TypeSection); err != nil {
+		if err := validateFunctionInstance(f, funcs, globals, mems, tables, module.TypeSection, maximumValuesOnStack); err != nil {
 			return rollbackFuncs, fmt.Errorf("invalid function at index %d/%d: %v", codeIndex, len(module.FunctionSection)-1, err)
 		}
 

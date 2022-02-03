@@ -3,145 +3,45 @@ package wasm
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
-type valueTypeStack struct {
-	stack       []ValueType
-	stackLimits []int
-}
-
-const (
-	// Only used in the anlyzeFunction below.
-	valueTypeUnknown = ValueType(0xFF)
-)
-
-func (s *valueTypeStack) pop() (ValueType, error) {
-	limit := 0
-	if len(s.stackLimits) > 0 {
-		limit = s.stackLimits[len(s.stackLimits)-1]
-	}
-	if len(s.stack) <= limit {
-		return 0, fmt.Errorf("invalid operation: trying to pop at %d with limit %d",
-			len(s.stack), limit)
-	} else if len(s.stack) == limit+1 && s.stack[limit] == valueTypeUnknown {
-		return valueTypeUnknown, nil
-	} else {
-		ret := s.stack[len(s.stack)-1]
-		s.stack = s.stack[:len(s.stack)-1]
-		return ret, nil
-	}
-}
-
-func (s *valueTypeStack) popAndVerifyType(expected ValueType) error {
-	actual, err := s.pop()
-	if err != nil {
-		return err
-	}
-	if actual != expected && actual != valueTypeUnknown && expected != valueTypeUnknown {
-		return fmt.Errorf("type mismatch")
-	}
-	return nil
-}
-
-func (s *valueTypeStack) push(v ValueType) {
-	s.stack = append(s.stack, v)
-}
-
-func (s *valueTypeStack) unreachable() {
-	s.resetAtStackLimit()
-	s.stack = append(s.stack, valueTypeUnknown)
-}
-
-func (s *valueTypeStack) resetAtStackLimit() {
-	if len(s.stackLimits) != 0 {
-		s.stack = s.stack[:s.stackLimits[len(s.stackLimits)-1]]
-	} else {
-		s.stack = []ValueType{}
-	}
-}
-
-func (s *valueTypeStack) popStackLimit() {
-	if len(s.stackLimits) != 0 {
-		s.stackLimits = s.stackLimits[:len(s.stackLimits)-1]
-	}
-}
-
-func (s *valueTypeStack) pushStackLimit() {
-	s.stackLimits = append(s.stackLimits, len(s.stack))
-}
-
-func (s *valueTypeStack) popResults(expResults []ValueType, checkAboveLimit bool) error {
-	limit := 0
-	if len(s.stackLimits) > 0 {
-		limit = s.stackLimits[len(s.stackLimits)-1]
-	}
-	for _, exp := range expResults {
-		if err := s.popAndVerifyType(exp); err != nil {
-			return err
-		}
-	}
-	if checkAboveLimit {
-		if !(limit == len(s.stack) || (limit+1 == len(s.stack) && s.stack[limit] == valueTypeUnknown)) {
-			return fmt.Errorf("leftovers found in the stack")
-		}
-	}
-	return nil
-}
-
-func (s *valueTypeStack) String() string {
-	var typeStrs, limits []string
-	for _, v := range s.stack {
-		var str string
-		if v == valueTypeUnknown {
-			str = "unknown"
-		} else if v == ValueTypeI32 {
-			str = "i32"
-		} else if v == ValueTypeI64 {
-			str = "i64"
-		} else if v == ValueTypeF32 {
-			str = "f32"
-		} else if v == ValueTypeF64 {
-			str = "f64"
-		}
-		typeStrs = append(typeStrs, str)
-	}
-	for _, d := range s.stackLimits {
-		limits = append(limits, fmt.Sprintf("%d", d))
-	}
-	return fmt.Sprintf("{stack: [%s], limits: [%s]}",
-		strings.Join(typeStrs, ", "), strings.Join(limits, ","))
-}
-
-// validateFunction validates the instruction sequence of a function instance body
+// validateFunctionInstance validates the instruction sequence of a function instance.
 // following the specification https://www.w3.org/TR/wasm-core-1/#instructions%E2%91%A2.
-func validateFunction(
+//
+// f is the validation target function instance.
+// functions is the list of function indexes which are declared on a module from which the target is instantiated.
+// globals is the list of global types which are declared on a module from which the target is instantiated.
+// memories is the list of memory types which are declared on a module from which the target is instantiated.
+// tables is the list of table types which are declared on a module from which the target is instantiated.
+// types is the list of function types which are declared on a module from which the target is instantiated.
+// maxStackValues is the maximum height of values stack which the target is allowed to reach.
+//
+// Returns an error if the instruction sequence is not valid,
+// or potentially it can exceed the maximum number of values on the stack.
+func validateFunctionInstance(
 	f *FunctionInstance,
 	functions []Index,
 	globals []*GlobalType,
 	memories []*MemoryType,
 	tables []*TableType,
 	types []*FunctionType,
+	maxStackValues int,
 ) error {
-
+	// Note: In WebAssembly 1.0 (MVP), multiple memories are not allowed.
 	hasMemory := len(memories) > 0
+	// Note: In WebAssembly 1.0 (MVP), multiple tables are not allowed.
 	hasTable := len(tables) > 0
 
-	type controlBlock struct {
-		startAt, elseAt, endAt uint64
-		blockType              *FunctionType
-		blockTypeBytes         uint64
-		isLoop                 bool
-		isIf                   bool
-	}
-
-	controlBloclStack := []*controlBlock{
-		{blockType: f.FunctionType.Type, startAt: math.MaxUint64},
-	}
+	// We start with the outermost control block which is for function return if the code branches into it.
+	controlBloclStack := []*controlBlock{{blockType: f.FunctionType.Type}}
+	// Create the valueTypeStack to track the state of Wasm value stacks at anypoint of execution.
 	valueTypeStack := &valueTypeStack{}
+
+	// Now start walking through all the instructions in the body while tracking
+	// control blocks and value types to check the validity of all instructions.
 	for pc := uint64(0); pc < uint64(len(f.Body)); pc++ {
 		op := f.Body[pc]
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
@@ -921,5 +821,128 @@ func validateFunction(
 		return fmt.Errorf("ill-nested block exists")
 	}
 
+	if valueTypeStack.maximumStackPointer > maxStackValues {
+		return fmt.Errorf("function too large: potentially could have %d values on the stack with the limit %d",
+			valueTypeStack.maximumStackPointer, maxStackValues)
+	}
 	return nil
+}
+
+type valueTypeStack struct {
+	stack               []ValueType
+	stackLimits         []int
+	maximumStackPointer int
+}
+
+const (
+	// Only used in the anlyzeFunction below.
+	valueTypeUnknown = ValueType(0xFF)
+)
+
+func (s *valueTypeStack) pop() (ValueType, error) {
+	limit := 0
+	if len(s.stackLimits) > 0 {
+		limit = s.stackLimits[len(s.stackLimits)-1]
+	}
+	if len(s.stack) <= limit {
+		return 0, fmt.Errorf("invalid operation: trying to pop at %d with limit %d",
+			len(s.stack), limit)
+	} else if len(s.stack) == limit+1 && s.stack[limit] == valueTypeUnknown {
+		return valueTypeUnknown, nil
+	} else {
+		ret := s.stack[len(s.stack)-1]
+		s.stack = s.stack[:len(s.stack)-1]
+		return ret, nil
+	}
+}
+
+func (s *valueTypeStack) popAndVerifyType(expected ValueType) error {
+	actual, err := s.pop()
+	if err != nil {
+		return err
+	}
+	if actual != expected && actual != valueTypeUnknown && expected != valueTypeUnknown {
+		return fmt.Errorf("type mismatch")
+	}
+	return nil
+}
+
+func (s *valueTypeStack) push(v ValueType) {
+	s.stack = append(s.stack, v)
+	if sp := len(s.stack); sp > s.maximumStackPointer {
+		s.maximumStackPointer = sp
+	}
+}
+
+func (s *valueTypeStack) unreachable() {
+	s.resetAtStackLimit()
+	s.stack = append(s.stack, valueTypeUnknown)
+}
+
+func (s *valueTypeStack) resetAtStackLimit() {
+	if len(s.stackLimits) != 0 {
+		s.stack = s.stack[:s.stackLimits[len(s.stackLimits)-1]]
+	} else {
+		s.stack = []ValueType{}
+	}
+}
+
+func (s *valueTypeStack) popStackLimit() {
+	if len(s.stackLimits) != 0 {
+		s.stackLimits = s.stackLimits[:len(s.stackLimits)-1]
+	}
+}
+
+func (s *valueTypeStack) pushStackLimit() {
+	s.stackLimits = append(s.stackLimits, len(s.stack))
+}
+
+func (s *valueTypeStack) popResults(expResults []ValueType, checkAboveLimit bool) error {
+	limit := 0
+	if len(s.stackLimits) > 0 {
+		limit = s.stackLimits[len(s.stackLimits)-1]
+	}
+	for _, exp := range expResults {
+		if err := s.popAndVerifyType(exp); err != nil {
+			return err
+		}
+	}
+	if checkAboveLimit {
+		if !(limit == len(s.stack) || (limit+1 == len(s.stack) && s.stack[limit] == valueTypeUnknown)) {
+			return fmt.Errorf("leftovers found in the stack")
+		}
+	}
+	return nil
+}
+
+func (s *valueTypeStack) String() string {
+	var typeStrs, limits []string
+	for _, v := range s.stack {
+		var str string
+		if v == valueTypeUnknown {
+			str = "unknown"
+		} else if v == ValueTypeI32 {
+			str = "i32"
+		} else if v == ValueTypeI64 {
+			str = "i64"
+		} else if v == ValueTypeF32 {
+			str = "f32"
+		} else if v == ValueTypeF64 {
+			str = "f64"
+		}
+		typeStrs = append(typeStrs, str)
+	}
+	for _, d := range s.stackLimits {
+		limits = append(limits, fmt.Sprintf("%d", d))
+	}
+	return fmt.Sprintf("{stack: [%s], limits: [%s]}",
+		strings.Join(typeStrs, ", "), strings.Join(limits, ","))
+}
+
+type controlBlock struct {
+	startAt, elseAt, endAt uint64
+	blockType              *FunctionType
+	blockTypeBytes         uint64
+	isLoop                 bool
+	isIf                   bool
 }

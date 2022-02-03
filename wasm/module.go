@@ -434,6 +434,7 @@ type NameMapAssoc struct {
 	NameMap NameMap
 }
 
+// allDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
 func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) {
 	for _, imp := range m.ImportSection {
 		switch imp.Kind {
