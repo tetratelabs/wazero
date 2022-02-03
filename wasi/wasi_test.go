@@ -1,8 +1,8 @@
 package wasi
 
 import (
+	_ "embed"
 	"encoding/binary"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,6 +63,10 @@ func TestNewWasiStringArray(t *testing.T) {
 		})
 	}
 }
+
+// argsAPIWasmBinary is a wasm module to call args_get and args_sizes_get.
+//go:embed testdata/args.wasm
+var argsAPIWasmBinary []byte
 
 func TestArgsAPISucceed(t *testing.T) {
 	tests := []struct {
@@ -129,8 +133,7 @@ func TestArgsAPISucceed(t *testing.T) {
 				opts = append(opts, argsOpt)
 			}
 			wasiEnv := NewEnvironment(opts...)
-			store, err := instantiateWasmStore("testdata/args.wasm", wasiEnv)
-			require.NoError(t, err)
+			store := instantiateWasmStore(t, argsAPIWasmBinary, "test", wasiEnv)
 
 			// Serialize the expected result of args_size_get
 			argCountPtr := uint32(0)            // arbitrary valid address
@@ -174,8 +177,7 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	store, err := instantiateWasmStore("testdata/args.wasm", wasiEnv)
-	require.NoError(t, err)
+	store := instantiateWasmStore(t, argsAPIWasmBinary, "test", wasiEnv)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -223,8 +225,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	store, err := instantiateWasmStore("testdata/args.wasm", wasiEnv)
-	require.NoError(t, err)
+	store := instantiateWasmStore(t, argsAPIWasmBinary, "test", wasiEnv)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -270,23 +271,16 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	}
 }
 
-func instantiateWasmStore(wasmFile string, wasiEnv *WASIEnvironment) (*wasm.Store, error) {
-	buf, err := os.ReadFile(wasmFile)
-	if err != nil {
-		return nil, err
-	}
-	mod, err := wbinary.DecodeModule(buf)
-	if err != nil {
-		return nil, err
-	}
+func instantiateWasmStore(t *testing.T, wasmBinary []byte, moduleName string, wasiEnv *WASIEnvironment) *wasm.Store {
+	mod, err := wbinary.DecodeModule(wasmBinary)
+	require.NoError(t, err)
+
 	store := wasm.NewStore(interpreter.NewEngine())
 	err = wasiEnv.Register(store)
-	if err != nil {
-		return nil, err
-	}
-	err = store.Instantiate(mod, "test")
-	if err != nil {
-		return nil, err
-	}
-	return store, nil
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, moduleName)
+	require.NoError(t, err)
+
+	return store
 }
