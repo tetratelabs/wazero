@@ -580,12 +580,13 @@ func (p *moduleParser) resolveTypeIndices(module *wasm.Module) error {
 
 // resolveFunctionIndices ensures any indices point are numeric or returns a FormatError if they cannot be bound.
 func (p *moduleParser) resolveFunctionIndices(module *wasm.Module) error {
+	// TODO: remove when funcParser points to the correct index
+	importCount := p.funcNamespace.count - uint32(len(module.CodeSection))
 	for _, unresolved := range p.funcNamespace.unresolvedIndices {
 		target, err := p.funcNamespace.resolve(unresolved)
 		if err != nil {
 			return err
 		}
-		importCount := p.funcNamespace.count - uint32(len(module.CodeSection))
 		switch unresolved.section {
 		case wasm.SectionIDCode:
 			if target > 255 {
