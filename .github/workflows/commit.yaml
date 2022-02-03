@@ -71,7 +71,7 @@ jobs:
       - run: make test
 
   test_arm64:
-    name: Test (${{ matrix.os }}, Go-${{ matrix.go-version }}) / arm64
+    name: Test (ubuntu, Go-${{ matrix.go-version }}) / arm64
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -97,7 +97,7 @@ jobs:
             ~/go/pkg/mod
           key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-arm64
 
-      - name: build test binaries
+      - name: Build test binaries
         run: go list ./... | xargs -Ipkg go test pkg -c
         env:
           GOARCH: arm64
