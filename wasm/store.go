@@ -36,8 +36,10 @@ type (
 		// do type-checks on indirect function calls.
 		TypeIDs map[string]FunctionTypeID
 
-		// maximumFunctionAddress and maximumFunctionTypes represent the limit on the number of each instance type in a store.
-		maximumFunctionAddress, maximumFunctionTypes int
+		// maximumFunctionAddress represents the limit on the number of function addresses (= function instances) in a store.
+		maximumFunctionAddress int
+		//  maximumFunctionTypes represents the limit on the number of function types in a store.
+		maximumFunctionTypes int
 		// maximumGlobals is the maximum number of globals that can be declared in a module.
 		maximumGlobals int
 

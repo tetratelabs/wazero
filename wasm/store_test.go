@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
