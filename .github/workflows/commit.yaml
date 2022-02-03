@@ -108,10 +108,6 @@ jobs:
           image: tonistiigi/binfmt:latest
           platforms: arm64
 
-      # Reference: https://www.stereolabs.com/docs/docker/building-arm-container-on-x86/
-      - name: Setup the multiarch docker settings
-        run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes # This step will execute the registering scripts
-
       - name: Run built test binaries inside the qemu
         run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t arm64v8/ubuntu /bin/bash -c 'find . -name "*.test" | xargs -Ibin bash -c "bin test.v"'
 
