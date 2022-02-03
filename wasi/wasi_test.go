@@ -288,7 +288,7 @@ func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, wasiEnv *
 
 func TestClockGetTime(t *testing.T) {
 	wasiEnv := NewEnvironment()
-	expected := uint64(12345)
+	expected := uint64(0xffffffffffffffff)
 	wasiEnv.getTimeNanosFn = func() uint64 { return expected }
 	store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
 	memorySize := uint32(len(store.Memories[0].Buffer))
@@ -296,16 +296,25 @@ func TestClockGetTime(t *testing.T) {
 
 	tests := []struct {
 		name         string
+		timestampVal uint64
 		timestampPtr uint32
 		result       Errno
 	}{
 		{
-			name:         "timestampPtr is valid",
+			name:         "low uint64 value",
+			timestampVal: 12345,
+			timestampPtr: validAddress,
+			result:       ESUCCESS,
+		},
+		{
+			name:         "high int64 value - no truncation",
+			timestampVal: 0xffffffffffffffff,
 			timestampPtr: validAddress,
 			result:       ESUCCESS,
 		},
 		{
 			name:         "timestampPtr exceeds the maximum valid address by 1",
+			timestampVal: 0xffffffffffffffff,
 			timestampPtr: memorySize - 8 + 1,
 			result:       EINVAL,
 		},
@@ -313,9 +322,12 @@ func TestClockGetTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			expected = tt.timestampVal
 			ret, _, err := store.CallFunction("test", "clock_time_get", uint64(0), uint64(0), uint64(tt.timestampPtr))
 			require.NoError(t, err)
-			if assert.Equal(t, uint64(tt.result), ret[0]) { // ret[0] is returned errno
+			errno := Errno(ret[0])
+			require.Equal(t, tt.result, errno) // ret[0] is returned errno
+			if errno == ESUCCESS {
 				nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
 				assert.Equal(t, expected, nanos)
 			}
