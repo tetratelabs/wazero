@@ -1,3 +1,7 @@
+//go:build amd64
+// +build amd64
+
+// Wasmtime cannot be used non-amd64 platform.
 package example
 
 import (
