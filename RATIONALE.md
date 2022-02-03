@@ -36,14 +36,14 @@ This is due to the same reason for the limitation on the number of functions abo
 ### Number of values on the stack in a function
 
 While the the spec does not clarify a limitation of function stack values, wazero limits this to 2^27 = 134,217,728.
-The reason is that we internally represent all the values as 64-bit integes regardless of its types (including f32, f64), and 2^27 values means 
+The reason is that we internally represent all the values as 64-bit integers regardless of its types (including f32, f64), and 2^27 values means 
 1 GiB = (2^30). 1 GiB is the reasonable for most applications [as we see a Goroutine has 250 MB as a limit on the stack for 32-bit arch](https://github.com/golang/go/blob/f296b7a6f045325a230f77e9bda1470b1270f817/src/runtime/proc.go#L120), considering that WebAssembly is (currently) 32-bit environment.
 
-All the functions are statically analyzed at module insntantiation phase, and if a function can potentially reach this limit, an error is returend.
+All the functions are statically analyzed at module instantiation phase, and if a function can potentially reach this limit, an error is returned.
 
 ### Number of globals in a module
 
-Theoretically, a module can declare globals (inclding imported ones) up to 2^32 times. However, we limit the number of available globals in a module to 2^27 = 134,217,728.
+Theoretically, a module can declare globals (including imports) up to 2^32 times. However, wazero limits this to  2^27(134,217,728) per module.
 That is because internally we store globals in a slice with pointer types (meaning 8 bytes on 64-bit platforms), and thefore 2^27 globals
 means that we have 1 GiB size of slice which seems large enough for most applications.
 
