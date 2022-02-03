@@ -37,10 +37,13 @@ type (
 		TypeIDs map[string]FunctionTypeID
 
 		// maximumFunctionAddress represents the limit on the number of function addresses (= function instances) in a store.
+		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionAddress int
 		//  maximumFunctionTypes represents the limit on the number of function types in a store.
+		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionTypes int
 		// maximumGlobals is the maximum number of globals that can be declared in a module.
+		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumGlobals int
 
 		// The followings fields match the definition of Store in the specification.
@@ -186,6 +189,7 @@ type (
 	FunctionTypeID uint32
 )
 
+// The wazero specific limitations described at RATIONALE.md.
 const (
 	maximumFunctionAddress = 1 << 27
 	maximumFunctionTypes   = 1 << 27
