@@ -1,7 +1,7 @@
 package adhoc
 
 import (
-	"os"
+	_ "embed"
 	"reflect"
 	"runtime"
 	"sync"
@@ -26,6 +26,19 @@ func TestInterpreter(t *testing.T) {
 	runTests(t, interpreter.NewEngine)
 }
 
+var (
+	//go:embed testdata/fib.wasm
+	fibWasm []byte
+	//go:embed testdata/fac.wasm
+	facWasm []byte
+	//go:embed testdata/unreachable.wasm
+	unreachableWasm []byte
+	//go:embed testdata/memory.wasm
+	memoryWasm []byte
+	//go:embed testdata/recursive.wasm
+	recursiveWasm []byte
+)
+
 func runTests(t *testing.T, newEngine func() wasm.Engine) {
 	fibonacci(t, newEngine)
 	fac(t, newEngine)
@@ -35,9 +48,7 @@ func runTests(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
-	buf, err := os.ReadFile("testdata/fib.wasm")
-	require.NoError(t, err)
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(fibWasm)
 	require.NoError(t, err)
 
 	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
@@ -61,9 +72,7 @@ func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func fac(t *testing.T, newEngine func() wasm.Engine) {
-	buf, err := os.ReadFile("testdata/fac.wasm")
-	require.NoError(t, err)
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(facWasm)
 	require.NoError(t, err)
 	store := wasm.NewStore(newEngine())
 	require.NoError(t, err)
@@ -89,9 +98,7 @@ func fac(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func unreachable(t *testing.T, newEngine func() wasm.Engine) {
-	buf, err := os.ReadFile("testdata/unreachable.wasm")
-	require.NoError(t, err)
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(unreachableWasm)
 	require.NoError(t, err)
 	store := wasm.NewStore(newEngine())
 	require.NoError(t, err)
@@ -121,9 +128,7 @@ wasm backtrace:
 }
 
 func memory(t *testing.T, newEngine func() wasm.Engine) {
-	buf, err := os.ReadFile("testdata/memory.wasm")
-	require.NoError(t, err)
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(memoryWasm)
 	require.NoError(t, err)
 	store := wasm.NewStore(newEngine())
 	require.NoError(t, err)
@@ -150,9 +155,7 @@ func memory(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
-	buf, err := os.ReadFile("testdata/recursive.wasm")
-	require.NoError(t, err)
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(recursiveWasm)
 	require.NoError(t, err)
 
 	store := wasm.NewStore(newEngine())

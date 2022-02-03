@@ -2,8 +2,8 @@ package examples
 
 import (
 	"crypto/rand"
+	_ "embed"
 	"encoding/binary"
-	"os"
 	"reflect"
 	"testing"
 
@@ -15,11 +15,11 @@ import (
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
-func Test_hostFunc(t *testing.T) {
-	buf, err := os.ReadFile("testdata/host_func.wasm")
-	require.NoError(t, err)
+//go:embed testdata/host_func.wasm
+var hostFuncWasm []byte
 
-	mod, err := binaryFormat.DecodeModule((buf))
+func Test_hostFunc(t *testing.T) {
+	mod, err := binaryFormat.DecodeModule(hostFuncWasm)
 	require.NoError(t, err)
 
 	store := wasm.NewStore(interpreter.NewEngine())

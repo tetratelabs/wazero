@@ -1,10 +1,10 @@
 package bench
 
 import (
+	_ "embed"
 	"encoding/binary"
 	"fmt"
 	"math/rand"
-	"os"
 	"reflect"
 	"runtime"
 	"testing"
@@ -15,6 +15,9 @@ import (
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/jit"
 )
+
+//go:embed testdata/case.wasm
+var caseWasm []byte
 
 func BenchmarkEngines(b *testing.B) {
 	b.Run("wazeroir", func(b *testing.B) {
@@ -32,11 +35,7 @@ func BenchmarkEngines(b *testing.B) {
 }
 
 func setUpStore(store *wasm.Store) {
-	buf, err := os.ReadFile("testdata/case.wasm")
-	if err != nil {
-		panic(err)
-	}
-	mod, err := binaryFormat.DecodeModule(buf)
+	mod, err := binaryFormat.DecodeModule(caseWasm)
 	if err != nil {
 		panic(err)
 	}
