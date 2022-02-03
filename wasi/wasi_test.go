@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
-	wbinary "github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
+	"github.com/tetratelabs/wazero/wasm/text"
 )
 
 func TestNewWasiStringArray(t *testing.T) {
@@ -64,9 +64,9 @@ func TestNewWasiStringArray(t *testing.T) {
 	}
 }
 
-// argsAPIWasmBinary is a wasm module to call args_get and args_sizes_get.
-//go:embed testdata/args.wasm
-var argsAPIWasmBinary []byte
+// argsWat is a wasm module to call args_get and args_sizes_get.
+//go:embed testdata/args.wat
+var argsWat []byte
 
 func TestArgsAPISucceed(t *testing.T) {
 	tests := []struct {
@@ -133,7 +133,7 @@ func TestArgsAPISucceed(t *testing.T) {
 				opts = append(opts, argsOpt)
 			}
 			wasiEnv := NewEnvironment(opts...)
-			store := instantiateWasmStore(t, argsAPIWasmBinary, "test", wasiEnv)
+			store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
 
 			// Serialize the expected result of args_size_get
 			argCountPtr := uint32(0)            // arbitrary valid address
@@ -177,7 +177,7 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	store := instantiateWasmStore(t, argsAPIWasmBinary, "test", wasiEnv)
+	store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -225,7 +225,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
 	wasiEnv := NewEnvironment(argsOpt)
-	store := instantiateWasmStore(t, argsAPIWasmBinary, "test", wasiEnv)
+	store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -254,7 +254,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 			argsBufPtr: validAddress,
 		},
 		{
-			name:       "argsBufPtr exceeds the maximum valid addres by 1",
+			name:       "argsBufPtr exceeds the maximum valid address by 1",
 			argsPtr:    validAddress,
 			argsBufPtr: memorySize - argsArray.totalBufSize + 1,
 		},
@@ -271,8 +271,8 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	}
 }
 
-func instantiateWasmStore(t *testing.T, wasmBinary []byte, moduleName string, wasiEnv *WASIEnvironment) *wasm.Store {
-	mod, err := wbinary.DecodeModule(wasmBinary)
+func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, wasiEnv *WASIEnvironment) *wasm.Store {
+	mod, err := text.DecodeModule(wat)
 	require.NoError(t, err)
 
 	store := wasm.NewStore(interpreter.NewEngine())

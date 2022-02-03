@@ -5,38 +5,7 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
-
-func decodeLimitsType(r io.Reader) (*wasm.LimitsType, error) {
-	b := make([]byte, 1)
-	_, err := io.ReadFull(r, b)
-	if err != nil {
-		return nil, fmt.Errorf("read leading byte: %v", err)
-	}
-
-	ret := &wasm.LimitsType{}
-	switch b[0] {
-	case 0x00:
-		ret.Min, _, err = leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("read min of limit: %v", err)
-		}
-	case 0x01:
-		ret.Min, _, err = leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("read min of limit: %v", err)
-		}
-		m, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, fmt.Errorf("read min of limit: %v", err)
-		}
-		ret.Max = &m
-	default:
-		return nil, fmt.Errorf("%v for limits: %#x != 0x00 or 0x01", ErrInvalidByte, b[0])
-	}
-	return ret, nil
-}
 
 func decodeTableType(r io.Reader) (*wasm.TableType, error) {
 	b := make([]byte, 1)
@@ -57,24 +26,6 @@ func decodeTableType(r io.Reader) (*wasm.TableType, error) {
 		ElemType: 0x70, // funcref
 		Limit:    lm,
 	}, nil
-}
-
-func decodeMemoryType(r io.Reader) (*wasm.MemoryType, error) {
-	ret, err := decodeLimitsType(r)
-	if err != nil {
-		return nil, err
-	}
-	if ret.Min > uint32(wasm.MemoryPageSize) {
-		return nil, fmt.Errorf("memory min must be at most 65536 pages (4GiB)")
-	}
-	if ret.Max != nil {
-		if *ret.Max < ret.Min {
-			return nil, fmt.Errorf("memory size minimum must not be greater than maximum")
-		} else if *ret.Max > uint32(wasm.MemoryPageSize) {
-			return nil, fmt.Errorf("memory max must be at most 65536 pages (4GiB)")
-		}
-	}
-	return ret, nil
 }
 
 func decodeGlobalType(r io.Reader) (*wasm.GlobalType, error) {

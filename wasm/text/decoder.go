@@ -22,8 +22,10 @@ const (
 	positionModuleImport
 	positionModuleImportFunc
 	positionModuleFunc
+	positionModuleMemory
 	positionModuleExport
 	positionModuleExportFunc
+	positionModuleExportMemory
 	positionModuleStart
 )
 
@@ -40,7 +42,7 @@ type moduleParser struct {
 	// currentModuleField holds the incremental state of a module-scoped field such as an import.
 	currentModuleField interface{}
 
-	// typeNamespace represents the function index namespace, which begins with the TypeSection and ends with any
+	// typeNamespace represents the function type index namespace, which begins with the TypeSection and ends with any
 	// inlined type uses which had neither a type index, nor matched an existing type. Elements in the TypeSection can
 	// can declare symbolic IDs, such as "$v_v", which are resolved here (without the '$' prefix)
 	typeNamespace *indexNamespace
@@ -60,6 +62,14 @@ type moduleParser struct {
 	// funcParser parses the CodeSection for a given module-defined function.
 	funcParser *funcParser
 
+	// memoryNamespace represents the memory index namespace, where any wasm.ImportKindMemory precede the MemorySection.
+	// Non-abbreviated imported and module-defined memories can declare symbolic IDs, such as "$mem", which are resolved
+	// here (without the '$' prefix).
+	memoryNamespace *indexNamespace
+
+	// memoryParser parses the MemorySection for a given module-defined memory.
+	memoryParser *memoryParser
+
 	// unresolvedExports holds any exports whose type index wasn't resolvable when parsed.
 	unresolvedExports map[wasm.Index]*wasm.Export
 }
@@ -74,13 +84,8 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	// * LocalNames: nil when no imported or module-defined function had named (param) fields.
 	names := &wasm.NameSection{}
 	module := &wasm.Module{NameSection: names}
-	p := moduleParser{source: source, module: module,
-		typeNamespace: newIndexNamespace(),
-		funcNamespace: newIndexNamespace(),
-	}
-	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
-	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
-	p.funcParser = newFuncParser(p.funcNamespace, p.endFunc)
+	p := newModuleParser(module)
+	p.source = source
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
 	// reason, we cannot enforce source[0] == '(', and instead need to start the lexer to check the first token.
@@ -106,6 +111,19 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	}
 
 	return module, nil
+}
+
+func newModuleParser(module *wasm.Module) *moduleParser {
+	p := moduleParser{module: module,
+		typeNamespace:   newIndexNamespace(),
+		funcNamespace:   newIndexNamespace(),
+		memoryNamespace: newIndexNamespace(),
+	}
+	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
+	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
+	p.funcParser = newFuncParser(p.funcNamespace, p.endFunc)
+	p.memoryParser = newMemoryParser(p.memoryNamespace, p.endMemory)
+	return &p
 }
 
 // ensureLParen errors unless a '(' is found as the text format must start with a field.
@@ -143,6 +161,9 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 		case "func":
 			p.pos = positionModuleFunc
 			return p.parseFuncID, nil
+		case "memory":
+			p.pos = positionModuleMemory
+			return p.memoryParser.begin, nil
 		case "export":
 			p.pos = positionModuleExport
 			return p.parseExportName, nil
@@ -424,6 +445,17 @@ func (p *moduleParser) endFunc(typeIdx wasm.Index, code *wasm.Code, localNames w
 	return p.parseModule, nil
 }
 
+// endMemory adds the limits for the current memory, and increments memoryNamespace as it is shared across imported and
+// module-defined memories. Finally, this returns parseModule to prepare for the next field.
+func (p *moduleParser) endMemory(min uint32, max *uint32) tokenParser {
+	p.module.MemorySection = append(p.module.MemorySection, &wasm.MemoryType{Min: min, Max: max})
+
+	// Multiple memories are allowed, so advance in case there's a next.
+	p.memoryNamespace.count++
+	p.pos = positionModule
+	return p.parseModule
+}
+
 // parseExportName returns parseExport after recording the export name, or errs if it couldn't be read.
 //
 // Ex. Export name is present `(export "PI" (func 0))`
@@ -472,23 +504,36 @@ func (p *moduleParser) beginExportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 	switch string(tokenBytes) {
 	case "func":
 		p.pos = positionModuleExportFunc
-		return p.parseExportFunc, nil
-	case "table", "memory", "global":
+		return p.parseExportDesc, nil
+	case "memory":
+		p.pos = positionModuleExportMemory
+		return p.parseExportDesc, nil
+	case "table", "global":
 		return nil, fmt.Errorf("TODO: %s", tokenBytes)
 	default:
 		return nil, unexpectedFieldName(tokenBytes)
 	}
 }
 
-// parseExportFunc records the symbolic or numeric function index the function export
-func (p *moduleParser) parseExportFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+// parseExportDesc records the symbolic or numeric function index of the export target
+func (p *moduleParser) parseExportDesc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	var namespace *indexNamespace
+	e := p.currentModuleField.(*wasm.Export)
+	switch p.pos {
+	case positionModuleExportFunc:
+		e.Kind = wasm.ExportKindFunc
+		namespace = p.funcNamespace
+	case positionModuleExportMemory:
+		e.Kind = wasm.ExportKindMemory
+		namespace = p.memoryNamespace
+	default:
+		panic(fmt.Errorf("BUG: unhandled parsing state on parseExportDesc: %v", p.pos))
+	}
 	eIdx := wasm.Index(len(p.module.ExportSection))
-	typeIdx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDExport, eIdx, 0, tok, tokenBytes, line, col)
+	typeIdx, resolved, err := namespace.parseIndex(wasm.SectionIDExport, eIdx, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}
-	e := p.currentModuleField.(*wasm.Export)
-	e.Kind = wasm.ExportKindFunc
 	e.Index = typeIdx
 
 	// All sections in wasm.Module are numeric indices except exports. Hence, we have to special-case here
@@ -499,11 +544,11 @@ func (p *moduleParser) parseExportFunc(tok tokenType, tokenBytes []byte, line, c
 			p.unresolvedExports[eIdx] = e
 		}
 	}
-	return p.parseExportFuncEnd, nil
+	return p.parseExportDescEnd, nil
 }
 
 // parseExportFuncEnd returns parseExportEnd to add the current export.
-func (p *moduleParser) parseExportFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
+func (p *moduleParser) parseExportDescEnd(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenUN, tokenID:
 		return nil, errors.New("redundant index")
@@ -707,6 +752,9 @@ func (p *moduleParser) errorContext() string {
 	case positionModuleFunc:
 		idx := wasm.Index(len(p.module.FunctionSection))
 		return fmt.Sprintf("module.func[%d]%s", idx, p.typeUseParser.errorContext())
+	case positionModuleMemory:
+		idx := wasm.Index(len(p.module.MemorySection))
+		return fmt.Sprintf("module.memory[%d]", idx)
 	case positionModuleExport, positionModuleExportFunc: // TODO: table, memory or global
 		idx := wasm.Index(len(p.module.ExportSection))
 		if p.pos == positionModuleExport {

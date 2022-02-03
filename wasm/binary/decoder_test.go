@@ -72,6 +72,19 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
+			name: "memory and export section",
+			input: &wasm.Module{
+				MemorySection: []*wasm.MemoryType{{Min: 0, Max: &zero}},
+				ExportSection: map[string]*wasm.Export{
+					"mem": {
+						Name:  "mem",
+						Kind:  wasm.ExportKindMemory,
+						Index: 0,
+					},
+				},
+			},
+		},
+		{
 			name: "type function and start section",
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{{}},

@@ -1,29 +1,26 @@
 package wasm
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestMemoryPageConsts(t *testing.T) {
-	a := int32(-1)
-	fmt.Printf("%x", uint32(a))
-	require.Equal(t, MemoryPageSize, 1<<memoryPageSizeInBit)
-	require.Equal(t, MemoryPageSize, memoryMaxPages)
-	require.Equal(t, MemoryPageSize, 1<<16)
+	require.Equal(t, MemoryPageSize, uint32(1)<<memoryPageSizeInBit)
+	require.Equal(t, MemoryPageSize, MemoryMaxPages)
+	require.Equal(t, MemoryPageSize, uint32(1<<16))
 }
 
 func Test_MemoryPagesToBytesNum(t *testing.T) {
 	for _, numPage := range []uint32{0, 1, 5, 10} {
-		require.Equal(t, uint64(numPage)*MemoryPageSize, memoryPagesToBytesNum(numPage))
+		require.Equal(t, uint64(numPage*MemoryPageSize), memoryPagesToBytesNum(numPage))
 	}
 }
 
 func Test_MemoryBytesNumToPages(t *testing.T) {
-	for _, numbytes := range []uint64{0, MemoryPageSize * 1, MemoryPageSize * 10} {
-		require.Equal(t, uint32(numbytes/MemoryPageSize), memoryBytesNumToPages(numbytes))
+	for _, numbytes := range []uint32{0, MemoryPageSize * 1, MemoryPageSize * 10} {
+		require.Equal(t, numbytes/MemoryPageSize, memoryBytesNumToPages(uint64(numbytes)))
 	}
 }
 
@@ -51,8 +48,8 @@ func TestMemryInstance_Grow_Size(t *testing.T) {
 		m := &MemoryInstance{Buffer: make([]byte, 0)}
 		require.Equal(t, uint32(0), m.Grow(1))
 		require.Equal(t, uint32(1), m.PageSize())
-		// Trying to grow above memoryMaxPages, the operation should fail.
-		require.Equal(t, int32(-1), int32(m.Grow(memoryMaxPages)))
+		// Trying to grow above MemoryMaxPages, the operation should fail.
+		require.Equal(t, int32(-1), int32(m.Grow(MemoryMaxPages)))
 		require.Equal(t, uint32(1), m.PageSize())
 	})
 }

@@ -24,10 +24,10 @@ var (
 
 func TestTypeParser(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		expected    *wasm.FunctionType
-		expectedErr string
+		name       string
+		input      string
+		expected   *wasm.FunctionType
+		expectedID string
 	}{
 		{
 			name:     "empty",
@@ -35,10 +35,10 @@ func TestTypeParser(t *testing.T) {
 			expected: &wasm.FunctionType{},
 		},
 		{
-			name:        "empty - ID",
-			input:       "(type $v_v (func))",
-			expected:    &wasm.FunctionType{},
-			expectedErr: "v_v",
+			name:       "empty - ID",
+			input:      "(type $v_v (func))",
+			expected:   &wasm.FunctionType{},
+			expectedID: "v_v",
 		},
 		{
 			name:     "param no result",
@@ -46,10 +46,10 @@ func TestTypeParser(t *testing.T) {
 			expected: i32_v,
 		},
 		{
-			name:        "param no result - ID",
-			input:       "(type $i32_v (func (param i32)))",
-			expected:    i32_v,
-			expectedErr: "i32_v",
+			name:       "param no result - ID",
+			input:      "(type $i32_v (func (param i32)))",
+			expected:   i32_v,
+			expectedID: "i32_v",
 		},
 		{
 			name:     "result no param",
@@ -57,10 +57,10 @@ func TestTypeParser(t *testing.T) {
 			expected: v_i32,
 		},
 		{
-			name:        "result no param - ID",
-			input:       "(type $v_i32 (func (result i32)))",
-			expected:    v_i32,
-			expectedErr: "v_i32",
+			name:       "result no param - ID",
+			input:      "(type $v_i32 (func (result i32)))",
+			expected:   v_i32,
+			expectedID: "v_i32",
 		},
 		{
 			name:     "mixed param no result",
@@ -68,10 +68,10 @@ func TestTypeParser(t *testing.T) {
 			expected: i32i64_v,
 		},
 		{
-			name:        "mixed param no result - ID",
-			input:       "(type $i32i64_v (func (param i32) (param i64)))",
-			expected:    i32i64_v,
-			expectedErr: "i32i64_v",
+			name:       "mixed param no result - ID",
+			input:      "(type $i32i64_v (func (param i32) (param i64)))",
+			expected:   i32i64_v,
+			expectedID: "i32i64_v",
 		},
 		{
 			name:     "mixed param result",
@@ -79,10 +79,10 @@ func TestTypeParser(t *testing.T) {
 			expected: i32i64_i32,
 		},
 		{
-			name:        "mixed param result - ID",
-			input:       "(type $i32i64_i32 (func (param i32) (param i64) (result i32)))",
-			expected:    i32i64_i32,
-			expectedErr: "i32i64_i32",
+			name:       "mixed param result - ID",
+			input:      "(type $i32i64_i32 (func (param i32) (param i64) (result i32)))",
+			expected:   i32i64_i32,
+			expectedID: "i32i64_i32",
 		},
 		{
 			name:     "abbreviated param result",
@@ -105,11 +105,11 @@ func TestTypeParser(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, parsed)
 			require.Equal(t, uint32(1), tp.typeNamespace.count)
-			if tc.expectedErr == "" {
+			if tc.expectedID == "" {
 				require.Empty(t, tp.typeNamespace.idToIdx)
 			} else {
 				// Since the parser was initially empty, the expected index of the parsed type is 0
-				require.Equal(t, map[string]wasm.Index{tc.expectedErr: wasm.Index(0)}, tp.typeNamespace.idToIdx)
+				require.Equal(t, map[string]wasm.Index{tc.expectedID: wasm.Index(0)}, tp.typeNamespace.idToIdx)
 			}
 		})
 	}

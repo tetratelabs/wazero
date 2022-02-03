@@ -9,8 +9,33 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestEncodeStartSection(t *testing.T) {
-	require.Equal(t, []byte{wasm.SectionIDStart, 0x01, 0x05}, encodeStartSection(5))
+func TestMemorySection(t *testing.T) {
+	three := uint32(3)
+	tests := []struct {
+		name     string
+		input    []byte
+		expected []*wasm.MemoryType
+	}{
+		{
+			name: "min and min with max",
+			input: []byte{
+				0x02,    // 2 memories
+				0x00, 1, // (memory 1)
+				0x01, 2, 3, // (memory 2, 3)
+			},
+			expected: []*wasm.MemoryType{{Min: 1}, {Min: 2, Max: &three}},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			memories, err := decodeMemorySection(bytes.NewReader(tc.input))
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, memories)
+		})
+	}
 }
 
 func TestDecodeExportSection(t *testing.T) {
@@ -84,4 +109,8 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
+}
+
+func TestEncodeStartSection(t *testing.T) {
+	require.Equal(t, []byte{wasm.SectionIDStart, 0x01, 0x05}, encodeStartSection(5))
 }

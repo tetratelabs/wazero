@@ -4,12 +4,12 @@ const (
 	// MemoryPageSize is the unit of memory length in WebAssembly,
 	// and is defined as 2^16 = 65536.
 	// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0
-	MemoryPageSize = 65536
-	// memoryMaxPages is maximum number of pages defined (2^16).
+	MemoryPageSize = uint32(65536)
+	// MemoryMaxPages is maximum number of pages defined (2^16).
 	// See https://www.w3.org/TR/wasm-core-1/#grow-mem
-	memoryMaxPages = MemoryPageSize
+	MemoryMaxPages = MemoryPageSize
 	// memoryPageSizeInBit satisfies the relation: "1 << memoryPageSizeInBit == memoryPageSize".
-	memoryPageSizeInBit = 16
+	memoryPageSizeInBit = uint32(16)
 )
 
 // MemoryPagesToBytesNum converts the given pages into the number of bytes contained in these pages.
@@ -17,7 +17,7 @@ func memoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 	return uint64(pages) << memoryPageSizeInBit
 }
 
-// MemoryPagesToBytesNum converts the given nuber of bytes into the number of pages.
+// MemoryPagesToBytesNum converts the given number of bytes into the number of pages.
 func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 	return uint32(bytesNum >> memoryPageSizeInBit)
 }
@@ -30,7 +30,7 @@ func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
 
-	maxPages := uint32(memoryMaxPages)
+	maxPages := uint32(MemoryMaxPages)
 	if m.Max != nil {
 		maxPages = *m.Max
 	}
