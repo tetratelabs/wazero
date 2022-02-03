@@ -23,14 +23,14 @@ The followings are the limitations we explicitly impose and handle as errors dur
 ### Number of functions in a store
 
 The possible number of function instances in [a store](https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0) is not specified in the WebAssembly specifications since [`funcaddr`](https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) corresponding to a function instance can be arbitrary number. 
-In wazero, we choose to use `uint32` to represent `funcaddr`. Therefore the maximum number of function instances a store can instantiate is limited to 2^27. 
+In wazero, we choose to set the maximum number of function instances a store can instantiate is limited to 2^27 as that would result in occupying 2^20 (= 1 GiB) bytes in memory for function pointers alone.
 
 That is because not only we _believe_ that all use cases are fine with the limitation, but also we have no way to test wazero runtimes under these unusual circumstances.
 
 ### Number of function types in a store
 
 There's no limitation on the number of function types in [a store](https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0) according to the spec. In wazero implementation, we assign each function type to a unique ID, and choose to use `uint32` to represent the IDs.
-Therefore the maximum number of function types a store can have is limited to 2^27. 
+Therefore the maximum number of function types a store can have is limited to 2^27 as that would result in occupying 2^29 = (512 MiB) bytes in memory for function types alone.
 
 This is due to the same reason for the limitation on the number of functions above.
 
