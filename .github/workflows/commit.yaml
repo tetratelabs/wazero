@@ -41,7 +41,7 @@ jobs:
       - run: make check
 
   test_amd64:
-    name: Test (${{ matrix.os }}, Go-${{ matrix.go-version }}) / amd64
+    name: (amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -71,7 +71,13 @@ jobs:
       - run: make test
 
   test_arm64:
-    name: Test (ubuntu, Go-${{ matrix.go-version }}) / arm64
+    # Here we cannot use "make test" to test on arm64. We have to run tests inside the emulation, but running all tests in the emulation
+    # comes with costs as we have to install all the build dependency there and build time itself can be a bottleneck.
+    # Therefore, we choose to build arm64 test binaries on usual amd64 environment so we can leverage Go's cross compilation
+    # functionality and reduce the maintenance cost of build dependencies outside of amd64 platform, and just we run the 
+    # built test binaries inside of the emulation. This way, the overhead of emulation becomes ignorable.
+    # Note: this can be generalized to any GOARCH.
+    name: (arm64, ubuntu, Go-${{ matrix.go-version }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
