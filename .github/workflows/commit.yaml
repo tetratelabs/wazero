@@ -71,8 +71,9 @@ jobs:
       - run: make test
 
   test_arm64:
-    # Here we cannot use "make test" to test on arm64. We have to run tests inside the emulation, but running all tests in the emulation
-    # comes with costs as we have to install all the build dependency there and build time itself can be a bottleneck.
+    # Here we cannot use "make test" to test on arm64. We have to run tests inside the emulation, but running all tests 
+    # from scratch including build phase in the emulation comes with costs since we have to install all the build dependency
+    # and build time itself can be a bottleneck.
     # Therefore, we choose to build arm64 test binaries on usual amd64 environment so we can leverage Go's cross compilation
     # functionality and reduce the maintenance cost of build dependencies outside of amd64 platform, and just we run the 
     # built test binaries inside of the emulation. This way, the overhead of emulation becomes ignorable.
