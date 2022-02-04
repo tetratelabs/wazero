@@ -5,7 +5,6 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
-	"github.com/twitchyliquid64/golang-asm/obj/x86"
 )
 
 // TestReservedRegisters ensures that reserved registers are not contained in unreservedGeneralPurposeIntRegisters.
@@ -34,14 +33,16 @@ func TestValueLocationStack_basic(t *testing.T) {
 	require.Equal(t, uint64(1), s.sp)
 	require.Equal(t, uint64(0), loc.stackPointer)
 	// Push the register value.
-	loc = s.pushValueOnRegister(x86.REG_X1)
+	tmpReg := unreservedGeneralPurposeIntRegisters[0]
+	loc = s.pushValueOnRegister(tmpReg)
 	require.Equal(t, uint64(2), s.sp)
 	require.Equal(t, uint64(1), loc.stackPointer)
-	require.Equal(t, int16(x86.REG_X1), loc.register)
+	require.Equal(t, tmpReg, loc.register)
 	require.Contains(t, s.usedRegisters, loc.register)
 	// markRegisterUsed.
-	s.markRegisterUsed(x86.REG_X2)
-	require.Contains(t, s.usedRegisters, int16(x86.REG_X2))
+	tmpReg2 := unreservedGeneralPurposeIntRegisters[1]
+	s.markRegisterUsed(tmpReg2)
+	require.Contains(t, s.usedRegisters, int16(tmpReg2))
 	// releaseRegister.
 	s.releaseRegister(loc)
 	require.NotContains(t, s.usedRegisters, loc.register)
@@ -93,9 +94,9 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 
 func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s := newValueLocationStack()
-	intReg := int16(x86.REG_R10)
+	intReg := unreservedGeneralPurposeIntRegisters[0]
 	intLocation := &valueLocation{register: intReg}
-	floatReg := int16(x86.REG_X0)
+	floatReg := generalPurposeFloatRegisters[0]
 	floatLocation := &valueLocation{register: floatReg}
 	s.push(intLocation)
 	s.push(floatLocation)
