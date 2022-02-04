@@ -69,12 +69,10 @@ jobs:
       - run: make test
 
   test_non_amd64:
-    # Here we don't use "make test" to test on non-amd64. We have to run tests inside the emulation, but running all tests 
-    # from scratch including build phase in the emulation comes with costs since we have to install all the build dependency
-    # and build time itself can be a bottleneck.
-    # Therefore, we choose to build non-amd64 test binaries on usual amd64 environment so we can leverage Go's cross compilation
-    # functionality and reduce the maintenance cost of build dependencies outside of amd64 platform, and just we run the 
-    # built test binaries inside of the emulation. This way, the overhead of emulation becomes ignorable.
+    # Only amd64 is viable with "make test" because other architectures require emulation: 
+    # the process of installing depedencies and building the project through an emulator is unacceptably slow.
+    # Instead, we build cross-platform test binaries on our amd64 runner, which limits what is emulated to 
+    # only executing the tests. This is why below uses "bash -c 'testbin test.v'" (running test binary) instead of make.
     name: ${{ matrix.target.arch }}, ubuntu, Go-${{ matrix.go-version }}
     runs-on: ubuntu-latest
     strategy:
@@ -113,7 +111,7 @@ jobs:
           platforms: ${{ matrix.target.arch }}
 
       - name: Run built test binaries
-        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t ${{ matrix.target.image }} /bin/bash -c 'find . -name "*.test" | xargs -Ibin bash -c "bin test.v"'
+        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t ${{ matrix.target.image }} /bin/bash -c 'find . -name "*.test" | xargs -Itestbin bash -c "testbin test.v"'
 
   bench:
     name: Benchmark
