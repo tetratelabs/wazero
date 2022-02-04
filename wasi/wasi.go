@@ -410,9 +410,9 @@ func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 // * precision: timestamp The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
 // * timestampPtr: a pointer to an address of uint64 type. The time value of the clock in nanoseconds is written there.
 //
-// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 func (w *WASIEnvironment) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
-	// The clock id and precision are currently ignored.
+	// TODO: The clock id and precision are currently ignored.
 	if !ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn()) {
 		return EINVAL
 	}

@@ -230,16 +230,16 @@ func TestMemoryInstance_PutUint32(t *testing.T) {
 		{
 			name:               "valid addr with an endian-insensitive val",
 			addr:               0, // arbitrary valid address.
-			val:                0xffffffff,
+			val:                math.MaxUint32,
 			shouldSuceed:       true,
-			expectedWrittenVal: 0xffffffff,
+			expectedWrittenVal: math.MaxUint32,
 		},
 		{
 			name:               "valid addr with an endian-sensitive val",
 			addr:               0, // arbitrary valid address.
-			val:                0xfffffffe,
+			val:                math.MaxUint32 - 1,
 			shouldSuceed:       true,
-			expectedWrittenVal: 0xfffffffe,
+			expectedWrittenVal: math.MaxUint32 - 1,
 		},
 		{
 			name:               "maximum boundary valid addr",
@@ -283,16 +283,16 @@ func TestMemoryInstance_PutUint64(t *testing.T) {
 		{
 			name:               "valid addr with an endian-insensitive val",
 			addr:               0, // arbitrary valid address.
-			val:                0xffffffffffffffff,
+			val:                math.MaxUint64,
 			shouldSuceed:       true,
-			expectedWrittenVal: 0xffffffffffffffff,
+			expectedWrittenVal: math.MaxUint64,
 		},
 		{
 			name:               "valid addr with an endian-sensitive val",
 			addr:               0, // arbitrary valid address.
-			val:                0xfffffffffffffffe,
+			val:                math.MaxUint64 - 1,
 			shouldSuceed:       true,
-			expectedWrittenVal: 0xfffffffffffffffe,
+			expectedWrittenVal: math.MaxUint64 - 1,
 		},
 		{
 			name:               "maximum boundary valid addr",
