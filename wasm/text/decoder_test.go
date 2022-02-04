@@ -1830,9 +1830,9 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:34: unknown type: f65 in module.func[0].param[1]",
 		},
 		{
-			name:        "func double result",
+			name:        "func duplicate result",
 			input:       "(module (func (param i32) (result i32) (result i32)))",
-			expectedErr: "1:41: result declared out of order in module.func[0]",
+			expectedErr: "1:41: duplicate result in module.func[0]",
 		},
 		{
 			name:        "func double result type",
@@ -1922,7 +1922,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "func param after result",
 			input:       "(module (func (result i32) (param i32)))",
-			expectedErr: "1:29: param declared out of order in module.func[0]",
+			expectedErr: "1:29: param after result in module.func[0]",
 		},
 		{
 			name:        "func points nowhere",

@@ -206,14 +206,14 @@ func TestFuncParser_Errors(t *testing.T) {
 			expectedErr: "1:8: TODO: s-expressions are not yet supported: f32.const",
 		},
 		{
-			name:        "param out of order", // because this parser is after the type use, so it must be wrong
+			name:        "param after result",
 			source:      "(func (result i32) (param i32))",
-			expectedErr: "1:21: param declared out of order",
+			expectedErr: "1:21: param after result",
 		},
 		{
-			name:        "result out of order", // because this parser is after the type use, so it must be wrong
+			name:        "duplicate result",
 			source:      "(func (result i32) (result i32))",
-			expectedErr: "1:21: result declared out of order",
+			expectedErr: "1:21: duplicate result",
 		},
 	}
 

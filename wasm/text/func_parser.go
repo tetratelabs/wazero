@@ -117,8 +117,12 @@ func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) (tok
 		return nil, unexpectedToken(tok, tokenBytes)
 	}
 	switch string(tokenBytes) {
-	case "result", "param": // TODO: local
-		return nil, fmt.Errorf("%s declared out of order", tokenBytes)
+	case "param":
+		return nil, errors.New("param after result")
+	case "result":
+		return nil, errors.New("duplicate result")
+	case "local":
+		return nil, errors.New("TODO: local")
 	}
 	return nil, fmt.Errorf("TODO: s-expressions are not yet supported: %s", tokenBytes)
 }
