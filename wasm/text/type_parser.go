@@ -50,7 +50,7 @@ type typeParser struct {
 	parsedParamID bool
 }
 
-// begin should be called after reaching the "type" keyword in a type field. Parsing continues until onType or error.
+// begin should be called after reaching the "type" keyword in a module field. Parsing continues until onType or error.
 //
 // This stage records the ID of the current type, if present, and resumes with tryBeginFunc.
 //

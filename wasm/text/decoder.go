@@ -121,7 +121,7 @@ func newModuleParser(module *wasm.Module) *moduleParser {
 	}
 	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
 	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
-	p.funcParser = newFuncParser(p.funcNamespace, p.endFunc)
+	p.funcParser = newFuncParser(p.typeUseParser, p.funcNamespace, p.endFunc)
 	p.memoryParser = newMemoryParser(p.memoryNamespace, p.endMemory)
 	return &p
 }
@@ -160,7 +160,8 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 			return p.parseImportModule, nil
 		case "func":
 			p.pos = positionModuleFunc
-			return p.parseFuncID, nil
+			p.funcParser.currentIdx = wasm.Index(len(p.module.FunctionSection))
+			return p.funcParser.begin, nil
 		case "memory":
 			p.pos = positionModuleMemory
 			return p.memoryParser.begin, nil
@@ -302,12 +303,23 @@ func (p *moduleParser) beginImportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 //                  calls parseImportFunc here --^
 func (p *moduleParser) parseImportFuncID(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	if tok == tokenID { // Ex. $main
-		if err := p.setFuncID(tokenBytes); err != nil {
+		id, err := p.funcNamespace.setID(tokenBytes)
+		if err != nil {
 			return nil, err
 		}
+		p.addFunctionName(id)
 		return p.parseImportFunc, nil
 	}
 	return p.parseImportFunc(tok, tokenBytes, line, col)
+}
+
+// addFunctionName appends the current imported or module-defined function name to the wasm.NameSection
+func (p *moduleParser) addFunctionName(name string) {
+	if name == "" {
+		return // there's no value in an empty name
+	}
+	na := &wasm.NameAssoc{Index: p.funcNamespace.count, Name: name}
+	p.module.NameSection.FunctionNames = append(p.module.NameSection.FunctionNames, na)
 }
 
 // parseImportFunc passes control to the typeUseParser until any signature is read, then returns onImportFunc.
@@ -330,7 +342,7 @@ func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, c
 // onImportFunc records the type index and local names of the current imported function, and increments
 // funcNamespace as it is shared across imported and module-defined functions. Finally, this returns parseImportEnd to
 // the current import into the ImportSection.
-func (p *moduleParser) onImportFunc(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *moduleParser) onImportFunc(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	i := p.currentModuleField.(*wasm.Import)
 	i.Kind = wasm.ImportKindFunc
 	i.DescFunc = typeIdx
@@ -380,61 +392,10 @@ func (p *moduleParser) parseImportEnd(tok tokenType, tokenBytes []byte, _, _ uin
 	return p.parseModule, nil
 }
 
-// parseFuncID records the ID of the current function, if present, and resumes with parseFunc.
-//
-// Ex. A function ID is present `(module (func $math.pi (result f32))`
-//                      records math.pi here --^
-//                             parseFunc resumes here --^
-//
-// Ex. No function ID `(module (func (result f32))`
-//            calls parseFunc here --^
-func (p *moduleParser) parseFuncID(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	if tok == tokenID { // Ex. $main
-		if err := p.setFuncID(tokenBytes); err != nil {
-			return nil, err
-		}
-		return p.parseFunc, nil
-	}
-	return p.parseFunc(tok, tokenBytes, line, col)
-}
-
-// setFuncID adds the normalized ('$' stripped) function ID to the funcNamespace and the wasm.NameSection.
-func (p *moduleParser) setFuncID(idToken []byte) error {
-	id, err := p.funcNamespace.setID(idToken)
-	if err != nil {
-		return err
-	}
-	na := &wasm.NameAssoc{Index: p.funcNamespace.count, Name: id}
-	p.module.NameSection.FunctionNames = append(p.module.NameSection.FunctionNames, na)
-	return nil
-}
-
-// parseFunc passes control to the typeUseParser until any signature is read, then funcParser until and locals or body
-// are read. Finally, this finishes via endFunc.
-//
-// Ex. `(module (func $math.pi (result f32))`
-//               starts here --^           ^
-//                  endFunc resumes here --+
-//
-// Ex.    `(module (func $math.pi (result f32) (local i32) )`
-//                  starts here --^            ^           ^
-//             funcParser.begin resumes here --+           |
-//                                  endFunc resumes here --+
-//
-// Ex. If there is no signature `(func)`
-//              calls endFunc here ---^
-func (p *moduleParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	idx := wasm.Index(len(p.module.FunctionSection))
-	if tok == tokenID { // Ex. (func $main $main)
-		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
-	}
-
-	return p.typeUseParser.begin(wasm.SectionIDFunction, idx, p.funcParser.begin, tok, tokenBytes, line, col)
-}
-
 // endFunc adds the type index, code and local names for the current function, and increments funcNamespace as it is
 // shared across imported and module-defined functions. Finally, this returns parseModule to prepare for the next field.
-func (p *moduleParser) endFunc(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+func (p *moduleParser) endFunc(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
+	p.addFunctionName(name)
 	p.module.FunctionSection = append(p.module.FunctionSection, typeIdx)
 	p.module.CodeSection = append(p.module.CodeSection, code)
 	p.addLocalNames(localNames)
@@ -625,8 +586,6 @@ func (p *moduleParser) resolveTypeIndices(module *wasm.Module) error {
 
 // resolveFunctionIndices ensures any indices point are numeric or returns a FormatError if they cannot be bound.
 func (p *moduleParser) resolveFunctionIndices(module *wasm.Module) error {
-	// TODO: remove when funcParser points to the correct index
-	importCount := p.funcNamespace.count - uint32(len(module.CodeSection))
 	for _, unresolved := range p.funcNamespace.unresolvedIndices {
 		target, err := p.funcNamespace.resolve(unresolved)
 		if err != nil {
@@ -637,7 +596,7 @@ func (p *moduleParser) resolveFunctionIndices(module *wasm.Module) error {
 			if target > 255 {
 				return errors.New("TODO: unresolved function indexes that don't fit in a byte")
 			}
-			module.CodeSection[unresolved.idx-importCount].Body[unresolved.bodyOffset] = byte(target)
+			module.CodeSection[unresolved.idx].Body[unresolved.bodyOffset] = byte(target)
 		case wasm.SectionIDExport:
 			p.unresolvedExports[unresolved.idx].Index = target
 		case wasm.SectionIDStart:

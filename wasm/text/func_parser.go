@@ -8,11 +8,11 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
-func newFuncParser(funcNamespace *indexNamespace, onFunc onFunc) *funcParser {
-	return &funcParser{funcNamespace: funcNamespace, onFunc: onFunc}
+func newFuncParser(typeUseParser *typeUseParser, funcNamespace *indexNamespace, onFunc onFunc) *funcParser {
+	return &funcParser{typeUseParser: typeUseParser, funcNamespace: funcNamespace, onFunc: onFunc}
 }
 
-type onFunc func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error)
+type onFunc func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error)
 
 // funcParser parses any instructions and dispatches to onFunc.
 //
@@ -25,9 +25,14 @@ type funcParser struct {
 	// onFunc is called when complete parsing the body. Unless testing, this should be moduleParser.onFuncEnd
 	onFunc onFunc
 
+	// typeUseParser is described by moduleParser.typeUseParser
+	typeUseParser *typeUseParser
+
 	// funcNamespace is described by moduleParser.funcNamespace
 	funcNamespace *indexNamespace
 
+	currentIdx        wasm.Index
+	currentName       string
 	currentTypeIdx    wasm.Index
 	currentParamNames wasm.NameMap
 
@@ -40,17 +45,63 @@ type funcParser struct {
 var end = []byte{wasm.OpcodeEnd}
 var codeEnd = &wasm.Code{Body: end}
 
-// begin is a tokenParser that starts after a type use.
+// begin should be called after reaching the "func" keyword in a module field. Parsing continues until onFunc or
+// error.
+//
+// This stage records the ID of the current function, if present, and resumes with onFunc.
+//
+// Ex. A func ID is present `(func $main nop)`
+//                  records main --^     ^
+//              parseFunc resumes here --+
+//
+// Ex. No func ID `(func nop)`
+//     calls parseFunc --^
+func (p *funcParser) begin(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok == tokenID { // Ex. $main
+		if id, err := p.funcNamespace.setID(tokenBytes); err != nil {
+			return nil, err
+		} else {
+			p.currentName = id
+		}
+		return p.parseFunc, nil
+	}
+	p.currentName = ""
+	return p.parseFunc(tok, tokenBytes, line, col)
+}
+
+// parseFunc passes control to the typeUseParser until any signature is read, then funcParser until and locals or body
+// are read. Finally, this finishes via endFunc.
+//
+// Ex. `(module (func $math.pi (result f32))`
+//               starts here --^           ^
+//                  endFunc resumes here --+
+//
+// Ex.    `(module (func $math.pi (result f32) (local i32) )`
+//                  starts here --^            ^           ^
+//      funcParser.afterTypeUse resumes here --+           |
+//                                  endFunc resumes here --+
+//
+// Ex. If there is no signature `(func)`
+//              calls endFunc here ---^
+func (p *funcParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+	if tok == tokenID { // Ex. (func $main $main)
+		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
+	}
+
+	return p.typeUseParser.begin(wasm.SectionIDFunction, p.currentIdx, p.afterTypeUse, tok, tokenBytes, line, col)
+}
+
+// afterTypeUse is a tokenParser that starts after a type use.
 //
 // The onFunc field is invoked once any instructions are written into currentBody.
 //
 // Ex. Given the source `(module (func nop))`
 //                 begin starts here --^  ^
 //                    calls onFunc here --+
-func (p *funcParser) begin(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *funcParser) afterTypeUse(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch pos {
 	case onTypeUseEndField:
-		return p.onFunc(typeIdx, codeEnd, paramNames)
+		return p.onFunc(typeIdx, codeEnd, p.currentName, paramNames)
 	case onTypeUseUnhandledField:
 		return sExpressionsUnsupported(tok, tokenBytes, line, col)
 	}
@@ -112,15 +163,14 @@ func (p *funcParser) end() (tokenParser, error) {
 	} else {
 		code = &wasm.Code{Body: append(p.currentBody, wasm.OpcodeEnd)}
 	}
-	return p.onFunc(p.currentTypeIdx, code, p.currentParamNames)
+	return p.onFunc(p.currentTypeIdx, code, p.currentName, p.currentParamNames)
 }
 
 // parseFuncIndex parses an index in the function namespace and appends it to the currentBody. If it was an ID, a
 // placeholder byte(0) is added instead and will be resolved later.
 func (p *funcParser) parseFuncIndex(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	funcIdx := p.funcNamespace.count // TODO: move all function logic here and use the code index, not including imports
 	bodyOffset := uint32(len(p.currentBody))
-	idx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDCode, funcIdx, bodyOffset, tok, tokenBytes, line, col)
+	idx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDCode, p.currentIdx, bodyOffset, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}
