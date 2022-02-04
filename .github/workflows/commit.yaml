@@ -82,8 +82,8 @@ jobs:
     strategy:
       matrix:
         go-version:
-        - "1.17",  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.16",  # temporarily support go 1.16 per #37
+        - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.16"  # temporarily support go 1.16 per #37
         target:
         - arch: arm64
           image: arm64v8/ubuntu
