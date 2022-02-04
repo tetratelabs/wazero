@@ -230,16 +230,16 @@ func TestMemoryInstance_PutUint32(t *testing.T) {
 		{
 			name:               "valid addr with an endian-insensitive val",
 			addr:               0, // arbitrary valid address.
-			val:                0xffffffff,
+			val:                math.MaxUint32,
 			shouldSuceed:       true,
-			expectedWrittenVal: 0xffffffff,
+			expectedWrittenVal: math.MaxUint32,
 		},
 		{
 			name:               "valid addr with an endian-sensitive val",
 			addr:               0, // arbitrary valid address.
-			val:                0xfffffffe,
+			val:                math.MaxUint32 - 1,
 			shouldSuceed:       true,
-			expectedWrittenVal: 0xfffffffe,
+			expectedWrittenVal: math.MaxUint32 - 1,
 		},
 		{
 			name:               "maximum boundary valid addr",
@@ -263,6 +263,59 @@ func TestMemoryInstance_PutUint32(t *testing.T) {
 			require.Equal(t, tc.shouldSuceed, memory.PutUint32(tc.addr, tc.val))
 			if tc.shouldSuceed {
 				require.Equal(t, tc.expectedWrittenVal, binary.LittleEndian.Uint32(memory.Buffer[tc.addr:tc.addr+4])) // 4 is the size of uint32
+			}
+		})
+	}
+}
+
+func TestMemoryInstance_PutUint64(t *testing.T) {
+	memory := &MemoryInstance{
+		Buffer: make([]byte, 100),
+	}
+
+	tests := []struct {
+		name               string
+		addr               uint32
+		val                uint64
+		shouldSuceed       bool
+		expectedWrittenVal uint64
+	}{
+		{
+			name:               "valid addr with an endian-insensitive val",
+			addr:               0, // arbitrary valid address.
+			val:                math.MaxUint64,
+			shouldSuceed:       true,
+			expectedWrittenVal: math.MaxUint64,
+		},
+		{
+			name:               "valid addr with an endian-sensitive val",
+			addr:               0, // arbitrary valid address.
+			val:                math.MaxUint64 - 1,
+			shouldSuceed:       true,
+			expectedWrittenVal: math.MaxUint64 - 1,
+		},
+		{
+			name:               "maximum boundary valid addr",
+			addr:               uint32(len(memory.Buffer)) - 8, // 8 is the size of uint64
+			val:                1,                              // arbitrary valid val
+			shouldSuceed:       true,
+			expectedWrittenVal: 1,
+		},
+		{
+			name:         "addr exceeds the maximum valid addr by 1",
+			addr:         uint32(len(memory.Buffer)) - 8 + 1, // 8 is the size of uint64
+			val:          1,                                  // arbitrary valid val
+			shouldSuceed: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.shouldSuceed, memory.PutUint64(tc.addr, tc.val))
+			if tc.shouldSuceed {
+				require.Equal(t, tc.expectedWrittenVal, binary.LittleEndian.Uint64(memory.Buffer[tc.addr:tc.addr+8])) // 8 is the size of uint64
 			}
 		})
 	}

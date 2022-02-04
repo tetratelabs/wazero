@@ -804,6 +804,16 @@ func (m *MemoryInstance) PutUint32(addr uint32, val uint32) bool {
 	return true
 }
 
+// PutUint64 writes a uint64 value to the specified address. If the specified address
+// is not a valid address range, it returns false. Otherwise, it returns true.
+func (m *MemoryInstance) PutUint64(addr uint32, val uint64) bool {
+	if !m.ValidateAddrRange(addr, uint64(8)) {
+		return false
+	}
+	binary.LittleEndian.PutUint64(m.Buffer[addr:], val)
+	return true
+}
+
 // DecodeBlockType is exported for use in the compiler
 func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)

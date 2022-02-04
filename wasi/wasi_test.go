@@ -3,8 +3,10 @@ package wasi
 import (
 	_ "embed"
 	"encoding/binary"
+	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -67,6 +69,10 @@ func TestNewWasiStringArray(t *testing.T) {
 // argsWat is a wasm module to call args_get and args_sizes_get.
 //go:embed testdata/args.wat
 var argsWat []byte
+
+// clockWat is a wasm module to call clock_time_get.
+//go:embed testdata/clock.wat
+var clockWat []byte
 
 func TestArgsAPISucceed(t *testing.T) {
 	tests := []struct {
@@ -283,4 +289,63 @@ func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, wasiEnv *
 	require.NoError(t, err)
 
 	return store
+}
+
+func TestClockGetTime(t *testing.T) {
+	wasiEnv := NewEnvironment()
+	store := instantiateWasmStore(t, clockWat, "test", wasiEnv)
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
+
+	tests := []struct {
+		name         string
+		timestampVal uint64
+		timestampPtr uint32
+		result       Errno
+	}{
+		{
+			name:         "zero uint64 value",
+			timestampVal: 0,
+			timestampPtr: validAddress,
+			result:       ESUCCESS,
+		},
+		{
+			name:         "low uint64 value",
+			timestampVal: 12345,
+			timestampPtr: validAddress,
+			result:       ESUCCESS,
+		},
+		{
+			name:         "high uint64 value - no truncation",
+			timestampVal: math.MaxUint64,
+			timestampPtr: validAddress,
+			result:       ESUCCESS,
+		},
+		{
+			name:         "with an endian-sensitive uint64 val - no truncation",
+			timestampVal: math.MaxUint64 - 1,
+			timestampPtr: validAddress,
+			result:       ESUCCESS,
+		},
+		{
+			name:         "timestampPtr exceeds the maximum valid address by 1",
+			timestampVal: math.MaxUint64,
+			timestampPtr: memorySize - 8 + 1,
+			result:       EINVAL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wasiEnv.getTimeNanosFn = func() uint64 { return tt.timestampVal }
+			ret, _, err := store.CallFunction("test", "clock_time_get", uint64(0), uint64(0), uint64(tt.timestampPtr))
+			require.NoError(t, err)
+			errno := Errno(ret[0])
+			require.Equal(t, tt.result, errno) // ret[0] is returned errno
+			if errno == ESUCCESS {
+				nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
+				assert.Equal(t, tt.timestampVal, nanos)
+			}
+		})
+	}
 }

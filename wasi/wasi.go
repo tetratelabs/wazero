@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/tetratelabs/wazero/wasm"
 )
@@ -24,7 +25,8 @@ type WASIEnvironment struct {
 	stdin io.Reader
 	stdout,
 	stderr io.Writer
-	opened map[uint32]fileEntry
+	opened         map[uint32]fileEntry
+	getTimeNanosFn func() uint64
 }
 
 func (w *WASIEnvironment) Register(store *wasm.Store) (err error) {
@@ -68,6 +70,10 @@ func (w *WASIEnvironment) Register(store *wasm.Store) (err error) {
 		if err != nil {
 			return err
 		}
+		err = store.AddHostFunction(wasiName, "fd_seek", reflect.ValueOf(w.fd_seek))
+		if err != nil {
+			return err
+		}
 		err = store.AddHostFunction(wasiName, "path_open", reflect.ValueOf(w.path_open))
 		if err != nil {
 			return err
@@ -77,6 +83,10 @@ func (w *WASIEnvironment) Register(store *wasm.Store) (err error) {
 			return err
 		}
 		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(w.args_sizes_get))
+		if err != nil {
+			return err
+		}
+		err = store.AddHostFunction(wasiName, "clock_time_get", reflect.ValueOf(w.clock_time_get))
 		if err != nil {
 			return err
 		}
@@ -176,6 +186,9 @@ func NewEnvironment(opts ...Option) *WASIEnvironment {
 		stdout: os.Stdout,
 		stderr: os.Stderr,
 		opened: map[uint32]fileEntry{},
+		getTimeNanosFn: func() uint64 {
+			return uint64(time.Now().UnixNano())
+		},
 	}
 
 	// apply functional options
@@ -252,6 +265,11 @@ func (w *WASIEnvironment) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFl
 
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[fdPtr:], newFD)
 	return ESUCCESS
+}
+
+func (w *WASIEnvironment) fd_seek(ctx *wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
+	// not implemented yet
+	return ENOSYS
 }
 
 func (w *WASIEnvironment) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
@@ -385,4 +403,18 @@ func environ_sizes_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno
 
 func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	return
+}
+
+// clock_time_get is a WASI API that returns the time value of a clock. Note: This is similar to clock_gettime in POSIX.
+// * id: The clock id for which to return the time.
+// * precision: timestamp The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
+// * timestampPtr: a pointer to an address of uint64 type. The time value of the clock in nanoseconds is written there.
+//
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
+func (w *WASIEnvironment) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
+	// TODO: The clock id and precision are currently ignored.
+	if !ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn()) {
+		return EINVAL
+	}
+	return ESUCCESS
 }
