@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
+	"github.com/twitchyliquid64/golang-asm/obj"
 )
 
 // nilRegister is used to indicate a register argument a variable is invalid and not an actual register.
-const nilRegister int16 = -1
+const nilRegister int16 = obj.REG_NONE
 
 func isNilRegister(r int16) bool {
 	return r == nilRegister
