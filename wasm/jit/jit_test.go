@@ -7,7 +7,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if runtime.GOARCH != "amd64" {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		// JIT is currently implemented only for amd64.
 		os.Exit(0)
 	}
