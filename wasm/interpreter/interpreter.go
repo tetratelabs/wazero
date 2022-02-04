@@ -477,12 +477,12 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		return
 	}
 
+	for _, param := range params {
+		it.push(param)
+	}
 	if g.hostFn != nil {
-		it.callHostFunc(g, params...)
+		it.callHostFunc(g)
 	} else {
-		for _, param := range params {
-			it.push(param)
-		}
 		it.callNativeFunc(g)
 	}
 	results = make([]uint64, len(f.FunctionType.Type.Results))
@@ -492,7 +492,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 	return
 }
 
-func (it *interpreter) callHostFunc(f *interpreterFunction, _ ...uint64) {
+func (it *interpreter) callHostFunc(f *interpreterFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 	for i := len(in) - 1; i >= 1; i-- {
@@ -582,7 +582,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case wazeroir.OperationKindCall:
 			{
 				if op.f.hostFn != nil {
-					it.callHostFunc(op.f, it.stack[len(it.stack)-len(op.f.funcInstance.FunctionType.Type.Params):]...)
+					it.callHostFunc(op.f)
 				} else {
 					it.callNativeFunc(op.f)
 				}
@@ -605,7 +605,7 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				target := it.functions[table.Table[offset].FunctionAddress]
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target, it.stack[len(it.stack)-len(target.funcInstance.FunctionType.Type.Params):]...)
+					it.callHostFunc(target)
 				} else {
 					it.callNativeFunc(target)
 				}

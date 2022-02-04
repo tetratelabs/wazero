@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/jit"
+	"github.com/tetratelabs/wazero/wasm/text"
 )
 
 func TestJIT(t *testing.T) {
@@ -40,11 +41,24 @@ var (
 )
 
 func runTests(t *testing.T, newEngine func() wasm.Engine) {
-	fibonacci(t, newEngine)
-	fac(t, newEngine)
-	unreachable(t, newEngine)
-	memory(t, newEngine)
-	recursiveEntry(t, newEngine)
+	t.Run("fibonacci", func(t *testing.T) {
+		fibonacci(t, newEngine)
+	})
+	t.Run("fac", func(t *testing.T) {
+		fac(t, newEngine)
+	})
+	t.Run("unreachable", func(t *testing.T) {
+		unreachable(t, newEngine)
+	})
+	t.Run("memory", func(t *testing.T) {
+		memory(t, newEngine)
+	})
+	t.Run("recursive entry", func(t *testing.T) {
+		recursiveEntry(t, newEngine)
+	})
+	t.Run("imported-and-exported func", func(t *testing.T) {
+		importedAndExportedFunc(t, newEngine)
+	})
 }
 
 func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
@@ -172,4 +186,31 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 
 	_, _, err = store.CallFunction("test", "main", uint64(1))
 	require.NoError(t, err)
+}
+
+func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
+	// Test that the engine can call "imported-and-then-exported-back" function correctly
+	mod, err := text.DecodeModule([]byte(`(module
+		;; arbitrary function with params
+		(import "env" "add_int" (func $add_int (param i32 i32) (result i32)))
+		;; add_int is imported from the environment, but it's also exported back to the environment
+		(export "add_int" (func $add_int))
+		)`))
+	require.NoError(t, err)
+
+	store := wasm.NewStore(newEngine())
+
+	addInt := func(ctx *wasm.HostFunctionCallContext, x int32, y int32) int32 {
+		return x + y
+	}
+	err = store.AddHostFunction("env", "add_int", reflect.ValueOf(addInt))
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	// We should be able to call the exported add_int and it should add two ints.
+	results, _, err := store.CallFunction("test", "add_int", uint64(12), uint64(30))
+	require.NoError(t, err)
+	require.Equal(t, uint64(42), results[0])
 }
