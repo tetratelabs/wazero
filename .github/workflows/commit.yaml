@@ -70,30 +70,27 @@ jobs:
 
       - run: make test
 
-  test_arm64:
-    # Here we cannot use "make test" to test on arm64. We have to run tests inside the emulation, but running all tests 
+  test_non_amd64:
+    # Here we don't use "make test" to test on non-amd64. We have to run tests inside the emulation, but running all tests 
     # from scratch including build phase in the emulation comes with costs since we have to install all the build dependency
     # and build time itself can be a bottleneck.
-    # Therefore, we choose to build arm64 test binaries on usual amd64 environment so we can leverage Go's cross compilation
+    # Therefore, we choose to build non-amd64 test binaries on usual amd64 environment so we can leverage Go's cross compilation
     # functionality and reduce the maintenance cost of build dependencies outside of amd64 platform, and just we run the 
     # built test binaries inside of the emulation. This way, the overhead of emulation becomes ignorable.
-    # Note: this can be generalized to any GOARCH.
-    name: (arm64, ubuntu, Go-${{ matrix.go-version }})
-    runs-on: ${{ matrix.os }}
+    name: (${{ matrix.arch }}, ubuntu, Go-${{ env.GO_VERSION }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [
-          "ubuntu-latest",
-        ]
-        go-version: [
-          "1.17",  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-          "1.16",  # temporarily support go 1.16 per #37
-        ]
+        include:
+        - arch: arm64
+          image: arm64v8/ubuntu
+        - arch: riscv64
+          image: riscv64/ubuntu
 
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
 
       - uses: actions/checkout@v2
 
@@ -102,20 +99,20 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-arm64
+          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}
 
       - name: Build test binaries
         run: go list ./... | xargs -Ipkg go test pkg -c
         env:
-          GOARCH: arm64
+          GOARCH: ${{ matrix.arch }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
         with:
-          platforms: arm64
+          platforms: ${{ matrix.arch }}
 
-      - name: Run built test binaries inside the qemu
-        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t arm64v8/ubuntu /bin/bash -c 'find . -name "*.test" | xargs -Ibin bash -c "bin test.v"'
+      - name: Run built test binaries
+        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t ${{ matrix.image }} /bin/bash -c 'find . -name "*.test" | xargs -Ibin bash -c "bin test.v"'
 
   bench:
     name: Benchmark
