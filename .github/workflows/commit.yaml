@@ -45,14 +45,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [
-          "ubuntu-latest",
-          "macos-latest",
-        ]
-        go-version: [
-          "1.17",  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-          "1.16",  # temporarily support go 1.16 per #37
-        ]
+        os: 
+        - "ubuntu-latest"
+        - "macos-latest"
+        go-version:
+        - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.16" # temporarily support go 1.16 per #37
 
     steps:
       - uses: actions/setup-go@v2
