@@ -88,19 +88,46 @@ func (c *arm64Compiler) saveReturnAddress() {
 }
 
 func (c *arm64Compiler) returnFunction() error {
+
+	// TODO: we don't support function calls yet.
+	// For now the following code just simply returns to Go code.
+
 	// Since we return from the function, we need to decement the callframe stack pointer.
 	decCallFrameStackPointer := c.newInstruction()
-	decCallFrameStackPointer.As = arm64.AADC
+	decCallFrameStackPointer.As = arm64.ASUBS
 	decCallFrameStackPointer.To.Type = obj.TYPE_MEM
 	decCallFrameStackPointer.To.Reg = reservedRegisterForEngine
 	decCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
+	decCallFrameStackPointer.From.Offset = 1
 	c.addInstruction(decCallFrameStackPointer)
+
 	c.exit(jitCallStatusCodeReturned)
 	return nil
 }
 
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
+	setJitStatus := c.newInstruction()
+	setJitStatus.As = arm64.AMOVD
+	setJitStatus.From.Type = obj.TYPE_CONST
+	setJitStatus.From.Offset = int64(status)
+	setJitStatus.To.Type = obj.TYPE_MEM
+	setJitStatus.To.Reg = reservedRegisterForEngine
+	setJitStatus.To.Offset = engineExitContextJITCallStatusCodeOffset
+	c.addInstruction(setJitStatus)
 
+	// Move back the return address to x30.
+	writeBackReturnAddress := c.newInstruction()
+	writeBackReturnAddress.As = arm64.AMOVD
+	writeBackReturnAddress.From.Type = obj.TYPE_MEM
+	writeBackReturnAddress.From.Offset = int64(uintptr(unsafe.Pointer(&c.staticData[0][0])))
+	writeBackReturnAddress.To.Type = obj.TYPE_REG
+	// X30 register is holding the return address right after entering JIT.
+	writeBackReturnAddress.To.Reg = arm64.REG_R30
+	c.addInstruction(writeBackReturnAddress)
+
+	ret := c.newInstruction()
+	ret.As = obj.ARET
+	c.addInstruction(ret)
 }
 
 func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
