@@ -46,12 +46,12 @@ func TestFuncParser(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var parsedCode *wasm.Code
-			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
 				parsedCode = code
 				return parseErr, nil
 			}
 
-			require.NoError(t, parseFunc(newFuncParser(newIndexNamespace(), setFunc), tc.source))
+			require.NoError(t, parseFunc(newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), setFunc), tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
 	}
@@ -102,12 +102,12 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var parsedCode *wasm.Code
-			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
 				parsedCode = code
 				return parseErr, nil
 			}
 
-			fp := newFuncParser(newIndexNamespace(), setFunc)
+			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expectedCode, parsedCode)
 			require.Equal(t, []*unresolvedIndex{tc.expectedUnresolvedIndex}, fp.funcNamespace.unresolvedIndices)
@@ -159,12 +159,12 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 			funcNamespace.count++
 
 			var parsedCode *wasm.Code
-			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
 				parsedCode = code
 				return parseErr, nil
 			}
 
-			fp := newFuncParser(funcNamespace, setFunc)
+			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, funcNamespace, setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
@@ -206,14 +206,14 @@ func TestFuncParser_Errors(t *testing.T) {
 			expectedErr: "1:8: TODO: s-expressions are not yet supported: f32.const",
 		},
 		{
-			name:        "param out of order", // because this parser is after the type use, so it must be wrong
-			source:      "(func (param i32))",
-			expectedErr: "1:8: param declared out of order",
+			name:        "param after result",
+			source:      "(func (result i32) (param i32))",
+			expectedErr: "1:21: param after result",
 		},
 		{
-			name:        "result out of order", // because this parser is after the type use, so it must be wrong
-			source:      "(func (result i32))",
-			expectedErr: "1:8: result declared out of order",
+			name:        "duplicate result",
+			source:      "(func (result i32) (result i32))",
+			expectedErr: "1:21: duplicate result",
 		},
 	}
 
@@ -221,23 +221,18 @@ func TestFuncParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			fp := newFuncParser(newIndexNamespace(), failOnFunc)
+			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), failOnFunc)
 			require.EqualError(t, parseFunc(fp, tc.source), tc.expectedErr)
 		})
 	}
 }
 
-var failOnFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
+var failOnFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
 	return nil, errors.New("unexpected to call onFunc on error")
 }
 
 func parseFunc(fp *funcParser, source string) error {
-	// TODO: all func hooks into func_parser.go, so that we don't have to fake the onTypeUse position
-	var parser tokenParser = func(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-		return fp.begin(0, nil, onTypeUseUnhandledToken, tok, tokenBytes, line, col)
-	}
-
-	line, col, err := lex(skipTokens(2, parser), []byte(source)) // skip the leading (func
+	line, col, err := lex(skipTokens(2, fp.begin), []byte(source)) // skip the leading (func
 	if err != nil {
 		err = &FormatError{Line: line, Col: col, cause: err}
 	}

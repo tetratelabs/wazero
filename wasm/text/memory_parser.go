@@ -33,7 +33,7 @@ type memoryParser struct {
 	currentMax *uint32
 }
 
-// begin should be called after reaching the "memory" keyword in a memory field. Parsing continues until onMemory or
+// begin should be called after reaching the "memory" keyword in a module field. Parsing continues until onMemory or
 // error.
 //
 // This stage records the ID of the current memory, if present, and resumes with beginMin.
