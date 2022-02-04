@@ -10,19 +10,26 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
+// jitcall is implemented in jit_arm64.s as a Go Assembler function.
+// This is used by engine.exec and the entrypoint to enter the JITed native code.
+// codeSegment is the pointer to the initial instruction of the compiled native code.
+// engine is the pointer to the "*engine" as uintptr.
 func jitcall(codeSegment, engine uintptr)
 
+// newCompiler returns a new compiler interface which can be used to compile the given function instance.
+// Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	return &arm64Copmiler{}, nil
 }
 
 type arm64Copmiler struct{}
 
-func (c *arm64Copmiler) String() string { return "TODO" }
+func (c *arm64Copmiler) String() (ret string) { return }
 
 func (c *arm64Copmiler) emitPreamble() error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
+
 func (c *arm64Copmiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
 	return nil, nil, 0, fmt.Errorf("TODO: unsupported on arm64")
 }
