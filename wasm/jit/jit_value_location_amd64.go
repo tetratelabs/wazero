@@ -45,16 +45,16 @@ func isFloatRegister(r int16) bool {
 }
 
 const (
-	conditionalRegisterStateE  = conditionalRegisterStateUnset + iota // ZF equal to zero
-	conditionalRegisterStateNE                                        //˜ZF not equal to zero
-	conditionalRegisterStateS                                         // SF negative
-	conditionalRegisterStateNS                                        // ˜SF non-negative
-	conditionalRegisterStateG                                         // ˜(SF xor OF) & ˜ ZF greater (signed >)
-	conditionalRegisterStateGE                                        // ˜(SF xor OF) greater or equal (signed >=)
-	conditionalRegisterStateL                                         // SF xor OF less (signed <)
-	conditionalRegisterStateLE                                        // (SF xor OF) | ZF less or equal (signed <=)
-	conditionalRegisterStateA                                         // ˜CF & ˜ZF above (unsigned >)
-	conditionalRegisterStateAE                                        // ˜CF above or equal (unsigned >=)
-	conditionalRegisterStateB                                         // CF below (unsigned <)
-	conditionalRegisterStateBE                                        // CF | ZF below or equal (unsigned <=)
+	conditionalRegisterStateE  = conditionalRegisterStateUnset + 1 + iota // ZF equal to zero
+	conditionalRegisterStateNE                                            //˜ZF not equal to zero
+	conditionalRegisterStateS                                             // SF negative
+	conditionalRegisterStateNS                                            // ˜SF non-negative
+	conditionalRegisterStateG                                             // ˜(SF xor OF) & ˜ ZF greater (signed >)
+	conditionalRegisterStateGE                                            // ˜(SF xor OF) greater or equal (signed >=)
+	conditionalRegisterStateL                                             // SF xor OF less (signed <)
+	conditionalRegisterStateLE                                            // (SF xor OF) | ZF less or equal (signed <=)
+	conditionalRegisterStateA                                             // ˜CF & ˜ZF above (unsigned >)
+	conditionalRegisterStateAE                                            // ˜CF above or equal (unsigned >=)
+	conditionalRegisterStateB                                             // CF below (unsigned <)
+	conditionalRegisterStateBE                                            // CF | ZF below or equal (unsigned <=)
 )
