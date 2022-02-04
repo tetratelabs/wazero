@@ -28,12 +28,24 @@ func TestInterpreter(t *testing.T) {
 }
 
 func runTests(t *testing.T, newEngine func() wasm.Engine) {
-	fibonacci(t, newEngine)
-	fac(t, newEngine)
-	unreachable(t, newEngine)
-	memory(t, newEngine)
-	recursiveEntry(t, newEngine)
-	importedAndExportedFunc(t, newEngine)
+	t.Run("fibonacci", func(t *testing.T) {
+		fibonacci(t, newEngine)
+	})
+	t.Run("fac", func(t *testing.T) {
+		fac(t, newEngine)
+	})
+	t.Run("unreachable", func(t *testing.T) {
+		unreachable(t, newEngine)
+	})
+	t.Run("memory", func(t *testing.T) {
+		memory(t, newEngine)
+	})
+	t.Run("recursive entry", func(t *testing.T) {
+		recursiveEntry(t, newEngine)
+	})
+	t.Run("imported-and-exported func", func(t *testing.T) {
+		importedAndExportedFunc(t, newEngine)
+	})
 }
 
 func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
@@ -174,18 +186,20 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
-	buf, err := os.ReadFile("testdata/imported_and_exported_func.wat")
-	require.NoError(t, err)
-	mod, err := text.DecodeModule(buf)
+	// Test that the engine can call "imported-and-then-exported-back" function correctly
+	mod, err := text.DecodeModule([]byte(`(module
+		;; arbitrary function with params
+		(import "env" "add_int" (func $add_int (param i32 i32) (result i32)))
+		;; add_int is imported from the environment, but it's also exported back to the environment
+		(export "add_int" (func $add_int))
+		)`))
 	require.NoError(t, err)
 
 	store := wasm.NewStore(newEngine())
 
-	// addInt is imported by the wasm module, and the wasm module exports addInt back
 	addInt := func(ctx *wasm.HostFunctionCallContext, x int32, y int32) int32 {
 		return x + y
 	}
-	// Let the wasm module import addInt
 	err = store.AddHostFunction("env", "add_int", reflect.ValueOf(addInt))
 	require.NoError(t, err)
 
