@@ -5,6 +5,11 @@ package jit
 
 import (
 	"fmt"
+	"unsafe"
+
+	asm "github.com/twitchyliquid64/golang-asm"
+	"github.com/twitchyliquid64/golang-asm/obj"
+	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
@@ -19,19 +24,83 @@ func jitcall(codeSegment, engine uintptr)
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	return &arm64Compiler{}, nil
+	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
+	// TODO: optimize the number.
+	b, err := asm.NewBuilder("amd64", 1024)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
+	}
+
+	compiler := &arm64Compiler{
+		f:             f,
+		builder:       b,
+		locationStack: newValueLocationStack(),
+	}
+
+	// Reserve the static data for return address.
+	compiler.staticData = append(compiler.staticData, make([]byte, 8))
+	return compiler, nil
 }
 
-type arm64Compiler struct{}
+type arm64Compiler struct {
+	builder *asm.Builder
+	f       *wasm.FunctionInstance
+	// locationStack holds the state of wazeroir virtual stack.
+	// and each item is either placed in register or the actual memory stack.
+	locationStack *valueLocationStack
+	staticData    compiledFunctionStaticData
+}
+
+func (c *arm64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
+	code, err = mmapCodeSegment(c.builder.Assemble())
+	if err != nil {
+		return
+	}
+	staticData = c.staticData
+	return
+}
+
+func (c *arm64Compiler) newInstruction() (inst *obj.Prog) {
+	inst = c.builder.NewProg()
+	return
+}
+
+func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
+	c.builder.AddInstruction(inst)
+}
 
 func (c *arm64Compiler) String() (ret string) { return }
 
 func (c *arm64Compiler) emitPreamble() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	c.saveReturnAddress()
+	return nil
 }
 
-func (c *arm64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
-	return nil, nil, 0, fmt.Errorf("TODO: unsupported on arm64")
+func (c *arm64Compiler) saveReturnAddress() {
+	saveReturnAddress := c.newInstruction()
+	saveReturnAddress.As = arm64.AMOVD
+	saveReturnAddress.To.Type = obj.TYPE_MEM
+	saveReturnAddress.To.Offset = int64(uintptr(unsafe.Pointer(&c.staticData[0][0])))
+	saveReturnAddress.From.Type = obj.TYPE_REG
+	// X30 register is holding the return address right after entering JIT.
+	saveReturnAddress.From.Reg = arm64.REG_R30
+	c.addInstruction(saveReturnAddress)
+}
+
+func (c *arm64Compiler) returnFunction() error {
+	// Since we return from the function, we need to decement the callframe stack pointer.
+	decCallFrameStackPointer := c.newInstruction()
+	decCallFrameStackPointer.As = arm64.AADC
+	decCallFrameStackPointer.To.Type = obj.TYPE_MEM
+	decCallFrameStackPointer.To.Reg = reservedRegisterForEngine
+	decCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
+	c.addInstruction(decCallFrameStackPointer)
+	c.exit(jitCallStatusCodeReturned)
+	return nil
+}
+
+func (c *arm64Compiler) exit(status jitCallStatusCode) {
+
 }
 
 func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
@@ -59,7 +128,11 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 }
 
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Target.IsReturnTarget() {
+		return c.returnFunction()
+	} else {
+		return fmt.Errorf("TODO: only return target is available on arm64")
+	}
 }
 
 func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
