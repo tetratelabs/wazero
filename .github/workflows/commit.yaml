@@ -41,18 +41,16 @@ jobs:
       - run: make check
 
   test_amd64:
-    name: (amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }})
+    name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [
-          "ubuntu-latest",
-          "macos-latest",
-        ]
-        go-version: [
-          "1.17",  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-          "1.16",  # temporarily support go 1.16 per #37
-        ]
+        os: 
+        - "ubuntu-latest"
+        - "macos-latest"
+        go-version:
+        - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.16" # temporarily support go 1.16 per #37
 
     steps:
       - uses: actions/setup-go@v2
@@ -70,25 +68,23 @@ jobs:
 
       - run: make test
 
-  test_arm64:
-    # Here we cannot use "make test" to test on arm64. We have to run tests inside the emulation, but running all tests 
-    # from scratch including build phase in the emulation comes with costs since we have to install all the build dependency
-    # and build time itself can be a bottleneck.
-    # Therefore, we choose to build arm64 test binaries on usual amd64 environment so we can leverage Go's cross compilation
-    # functionality and reduce the maintenance cost of build dependencies outside of amd64 platform, and just we run the 
-    # built test binaries inside of the emulation. This way, the overhead of emulation becomes ignorable.
-    # Note: this can be generalized to any GOARCH.
-    name: (arm64, ubuntu, Go-${{ matrix.go-version }})
-    runs-on: ${{ matrix.os }}
+  test_non_amd64:
+    # Only amd64 is viable with "make test" because other architectures require emulation: 
+    # the process of installing depedencies and building the project through an emulator is unacceptably slow.
+    # Instead, we build cross-platform test binaries on our amd64 runner, which limits what is emulated to 
+    # only executing the tests. This is why below uses "bash -c 'testbin test.v'" (running test binary) instead of make.
+    name: ${{ matrix.target.arch }}, ubuntu, Go-${{ matrix.go-version }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [
-          "ubuntu-latest",
-        ]
-        go-version: [
-          "1.17",  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-          "1.16",  # temporarily support go 1.16 per #37
-        ]
+        go-version:
+        - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.16"  # temporarily support go 1.16 per #37
+        target:
+        - arch: arm64
+          image: arm64v8/ubuntu
+        - arch: riscv64
+          image: riscv64/ubuntu
 
     steps:
       - uses: actions/setup-go@v2
@@ -102,20 +98,20 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-arm64
+          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.target.arch }}
 
       - name: Build test binaries
         run: go list ./... | xargs -Ipkg go test pkg -c
         env:
-          GOARCH: arm64
+          GOARCH: ${{ matrix.target.arch }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
         with:
-          platforms: arm64
+          platforms: ${{ matrix.target.arch }}
 
-      - name: Run built test binaries inside the qemu
-        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t arm64v8/ubuntu /bin/bash -c 'find . -name "*.test" | xargs -Ibin bash -c "bin test.v"'
+      - name: Run built test binaries
+        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t ${{ matrix.target.image }} /bin/bash -c 'find . -name "*.test" | xargs -Itestbin bash -c "testbin test.v"'
 
   bench:
     name: Benchmark
