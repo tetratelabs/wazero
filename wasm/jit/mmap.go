@@ -26,6 +26,6 @@ func mmapCodeSegment(code []byte) ([]byte, error) {
 	copy(mmapFunc, code)
 
 	// Then we're done with writing code, change the permission to RX.
-	syscall.Mprotect(mmapFunc, syscall.PROT_READ|syscall.PROT_EXEC)
-	return mmapFunc, nil
+	err = syscall.Mprotect(mmapFunc, syscall.PROT_READ|syscall.PROT_EXEC)
+	return mmapFunc, err
 }

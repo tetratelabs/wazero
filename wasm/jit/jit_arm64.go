@@ -26,7 +26,7 @@ func jitcall(codeSegment, engine uintptr)
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
-	b, err := asm.NewBuilder("amd64", 1024)
+	b, err := asm.NewBuilder("arm64", 1024)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
@@ -76,7 +76,7 @@ func (c *arm64Compiler) emitPreamble() error {
 	return nil
 }
 
-func (c *arm64Compiler) saveReturnAddress() {
+func (c *arm64Compiler) saveReturnAddress() error {
 	saveReturnAddress := c.newInstruction()
 	saveReturnAddress.As = arm64.AMOVD
 	saveReturnAddress.To.Type = obj.TYPE_MEM
@@ -85,6 +85,8 @@ func (c *arm64Compiler) saveReturnAddress() {
 	// X30 register is holding the return address right after entering JIT.
 	saveReturnAddress.From.Reg = arm64.REG_R30
 	c.addInstruction(saveReturnAddress)
+
+	return nil
 }
 
 func (c *arm64Compiler) returnFunction() error {
@@ -98,6 +100,7 @@ func (c *arm64Compiler) returnFunction() error {
 	decCallFrameStackPointer.To.Type = obj.TYPE_MEM
 	decCallFrameStackPointer.To.Reg = reservedRegisterForEngine
 	decCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
+	decCallFrameStackPointer.From.Type = obj.TYPE_CONST
 	decCallFrameStackPointer.From.Offset = 1
 	c.addInstruction(decCallFrameStackPointer)
 
@@ -127,6 +130,8 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 
 	ret := c.newInstruction()
 	ret.As = obj.ARET
+	ret.To.Type = obj.TYPE_REG
+	ret.To.Reg = arm64.REG_R30
 	c.addInstruction(ret)
 }
 
