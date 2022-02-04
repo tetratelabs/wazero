@@ -96,7 +96,7 @@ func (p *funcParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 // The onFunc field is invoked once any instructions are written into currentBody.
 //
 // Ex. Given the source `(module (func nop))`
-//                 begin starts here --^  ^
+//          afterTypeUse starts here --^  ^
 //                    calls onFunc here --+
 func (p *funcParser) afterTypeUse(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch pos {
