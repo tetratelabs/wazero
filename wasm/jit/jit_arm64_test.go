@@ -23,7 +23,29 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(eng.returnAddress)), engineArchContextReturnAddressOffset)
 }
 
-func Test_exit(t *testing.T) {
+func TestArm64Compiler_returnFunction(t *testing.T) {
+
+	env := newJITEnvironment()
+
+	// Build codes.
+	compiler := env.requireNewCompiler(t)
+	err := compiler.emitPreamble()
+	require.NoError(t, err)
+	compiler.returnFunction()
+
+	// Generate the code under test.
+	code, _, _, err := compiler.generate()
+	require.NoError(t, err)
+
+	// Run codes
+	env.exec(code)
+
+	// JIT status on engine must be returned.
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, uint64(0), env.callFrameStackPointer())
+}
+
+func TestArm64Compiler_exit(t *testing.T) {
 	for _, s := range []jitCallStatusCode{
 		jitCallStatusCodeReturned,
 		jitCallStatusCodeCallHostFunction,

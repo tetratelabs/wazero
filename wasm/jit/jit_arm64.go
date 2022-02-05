@@ -1,6 +1,15 @@
 //go:build arm64
 // +build arm64
 
+// This file implements the compiler for arm64 target.
+// Please refer tohttps://developer.arm.com/documentation/102374/latest/
+// if unfamiliar with arm64 instructions and semantics.
+//
+// Note: we use arm64 pkg as the assembler which has different notation
+// from the original arm64 assembly. For example,
+// 64-bit variant ldr, str, stur are all corresponding to arm64.AMOVD.
+// Please refer to https://pkg.go.dev/cmd/internal/obj/arm64.
+
 package jit
 
 import (
@@ -15,6 +24,7 @@ import (
 )
 
 type archContext struct {
+	//nolint
 	returnAddress uint64
 }
 
@@ -90,24 +100,36 @@ func (c *arm64Compiler) returnFunction() error {
 	// For now the following code just simply returns to Go code.
 
 	// Since we return from the function, we need to decement the callframe stack pointer.
-	// decCallFrameStackPointer := c.newInstruction()
-	// decCallFrameStackPointer.As = arm64.ASUBS
-	// decCallFrameStackPointer.To.Type = obj.TYPE_ADDR
-	// decCallFrameStackPointer.To.Reg = reservedRegisterForEngine
-	// decCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
-	// decCallFrameStackPointer.From.Type = obj.TYPE_CONST
-	// decCallFrameStackPointer.From.Offset = 1
-	// c.addInstruction(decCallFrameStackPointer)
+	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	loadCurrentCallFramPointer := c.newInstruction()
+	loadCurrentCallFramPointer.As = arm64.AMOVD
+	loadCurrentCallFramPointer.To.Type = obj.TYPE_REG
+	loadCurrentCallFramPointer.To.Reg = callFramePointerReg
+	loadCurrentCallFramPointer.From.Type = obj.TYPE_MEM
+	loadCurrentCallFramPointer.From.Reg = reservedRegisterForEngine
+	loadCurrentCallFramPointer.From.Offset = engineGlobalContextCallFrameStackPointerOffset
+	c.addInstruction(loadCurrentCallFramPointer)
 
-	c.exit(jitCallStatusCodeCallHostFunction)
+	decCallFrameStackPointer := c.newInstruction()
+	decCallFrameStackPointer.As = arm64.ASUBS
+	decCallFrameStackPointer.To.Type = obj.TYPE_REG
+	decCallFrameStackPointer.To.Reg = callFramePointerReg
+	decCallFrameStackPointer.From.Type = obj.TYPE_CONST
+	decCallFrameStackPointer.From.Offset = 1
+	c.addInstruction(decCallFrameStackPointer)
+
+	writeDecrementedCallFrameStackPoitner := c.newInstruction()
+	writeDecrementedCallFrameStackPoitner.As = arm64.AMOVD
+	writeDecrementedCallFrameStackPoitner.To = loadCurrentCallFramPointer.From
+	writeDecrementedCallFrameStackPoitner.From = loadCurrentCallFramPointer.To
+	c.addInstruction(writeDecrementedCallFrameStackPoitner)
+
+	c.exit(jitCallStatusCodeReturned)
 	return nil
 }
 
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
-	tmp, ok := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	if !ok {
-		panic("")
-	}
+	tmp, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
 	if status != 0 {
 		loadStatusConst := c.newInstruction()
