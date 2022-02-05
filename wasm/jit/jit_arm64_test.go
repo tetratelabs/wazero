@@ -4,9 +4,8 @@
 package jit
 
 import (
-	"encoding/hex"
-	"fmt"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero/wasm"
@@ -18,24 +17,38 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	return cmp.(*arm64Compiler)
 }
 
-func Test_return(t *testing.T) {
-	env := newJITEnvironment()
+func TestArchContextOffsetInEngine(t *testing.T) {
+	var eng engine
+	// If this fails, we have to fix jit_arm64.s as well.
+	require.Equal(t, int(unsafe.Offsetof(eng.returnAddress)), engineArchContextReturnAddressOffset)
+}
 
-	// Build codes.
-	compiler := env.requireNewCompiler(t)
-	err := compiler.emitPreamble()
-	require.NoError(t, err)
-	compiler.exit(jitCallStatusCodeReturned)
+func Test_exit(t *testing.T) {
+	for _, s := range []jitCallStatusCode{
+		jitCallStatusCodeReturned,
+		jitCallStatusCodeCallHostFunction,
+		jitCallStatusCodeCallBuiltInFunction,
+		jitCallStatusCodeUnreachable,
+	} {
+		t.Run(s.String(), func(t *testing.T) {
 
-	// Generate the code under test.
-	code, _, _, err := compiler.generate()
-	require.NoError(t, err)
+			env := newJITEnvironment()
 
-	fmt.Println(hex.EncodeToString(code))
+			// Build codes.
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+			compiler.exit(s)
 
-	// Run codes
-	env.exec(code)
+			// Generate the code under test.
+			code, _, _, err := compiler.generate()
+			require.NoError(t, err)
 
-	// JIT status on engine must be updated.
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			// Run codes
+			env.exec(code)
+
+			// JIT status on engine must be updated.
+			require.Equal(t, s, env.jitStatus())
+		})
+	}
 }

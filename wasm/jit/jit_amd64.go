@@ -82,6 +82,8 @@ func init() {
 // engine is the pointer to the "*engine" as uintptr.
 func jitcall(codeSegment, engine uintptr)
 
+type archContext struct{}
+
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {

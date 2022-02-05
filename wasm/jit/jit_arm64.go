@@ -5,7 +5,6 @@ package jit
 
 import (
 	"fmt"
-	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
@@ -14,6 +13,12 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
+
+type archContext struct {
+	returnAddress uint64
+}
+
+const engineArchContextReturnAddressOffset = 136
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
 // This is used by engine.exec and the entrypoint to enter the JITed native code.
@@ -72,20 +77,10 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 func (c *arm64Compiler) String() (ret string) { return }
 
 func (c *arm64Compiler) emitPreamble() error {
-	c.saveReturnAddress()
-	return nil
-}
-
-func (c *arm64Compiler) saveReturnAddress() error {
-	saveReturnAddress := c.newInstruction()
-	saveReturnAddress.As = arm64.AMOVD
-	saveReturnAddress.To.Type = obj.TYPE_MEM
-	saveReturnAddress.To.Offset = int64(uintptr(unsafe.Pointer(&c.staticData[0][0])))
-	saveReturnAddress.From.Type = obj.TYPE_REG
-	// X30 register is holding the return address right after entering JIT.
-	saveReturnAddress.From.Reg = arm64.REG_R30
-	c.addInstruction(saveReturnAddress)
-
+	// The assembler skips the first instruction so we intetionally add NOP here.
+	nop := c.newInstruction()
+	nop.As = obj.ANOP
+	c.addInstruction(nop)
 	return nil
 }
 
@@ -95,43 +90,67 @@ func (c *arm64Compiler) returnFunction() error {
 	// For now the following code just simply returns to Go code.
 
 	// Since we return from the function, we need to decement the callframe stack pointer.
-	decCallFrameStackPointer := c.newInstruction()
-	decCallFrameStackPointer.As = arm64.ASUBS
-	decCallFrameStackPointer.To.Type = obj.TYPE_MEM
-	decCallFrameStackPointer.To.Reg = reservedRegisterForEngine
-	decCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
-	decCallFrameStackPointer.From.Type = obj.TYPE_CONST
-	decCallFrameStackPointer.From.Offset = 1
-	c.addInstruction(decCallFrameStackPointer)
+	// decCallFrameStackPointer := c.newInstruction()
+	// decCallFrameStackPointer.As = arm64.ASUBS
+	// decCallFrameStackPointer.To.Type = obj.TYPE_ADDR
+	// decCallFrameStackPointer.To.Reg = reservedRegisterForEngine
+	// decCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
+	// decCallFrameStackPointer.From.Type = obj.TYPE_CONST
+	// decCallFrameStackPointer.From.Offset = 1
+	// c.addInstruction(decCallFrameStackPointer)
 
-	c.exit(jitCallStatusCodeReturned)
+	c.exit(jitCallStatusCodeCallHostFunction)
 	return nil
 }
 
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
-	setJitStatus := c.newInstruction()
-	setJitStatus.As = arm64.AMOVD
-	setJitStatus.From.Type = obj.TYPE_CONST
-	setJitStatus.From.Offset = int64(status)
-	setJitStatus.To.Type = obj.TYPE_MEM
-	setJitStatus.To.Reg = reservedRegisterForEngine
-	setJitStatus.To.Offset = engineExitContextJITCallStatusCodeOffset
-	c.addInstruction(setJitStatus)
+	tmp, ok := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	if !ok {
+		panic("")
+	}
 
-	// Move back the return address to x30.
-	writeBackReturnAddress := c.newInstruction()
-	writeBackReturnAddress.As = arm64.AMOVD
-	writeBackReturnAddress.From.Type = obj.TYPE_MEM
-	writeBackReturnAddress.From.Offset = int64(uintptr(unsafe.Pointer(&c.staticData[0][0])))
-	writeBackReturnAddress.To.Type = obj.TYPE_REG
-	// X30 register is holding the return address right after entering JIT.
-	writeBackReturnAddress.To.Reg = arm64.REG_R30
-	c.addInstruction(writeBackReturnAddress)
+	if status != 0 {
+		loadStatusConst := c.newInstruction()
+		loadStatusConst.As = arm64.AMOVW
+		loadStatusConst.To.Type = obj.TYPE_REG
+		loadStatusConst.To.Reg = tmp
+		loadStatusConst.From.Type = obj.TYPE_CONST
+		loadStatusConst.From.Offset = int64(status)
+		c.addInstruction(loadStatusConst)
+
+		setJitStatus := c.newInstruction()
+		setJitStatus.As = arm64.AMOVWU
+		setJitStatus.From.Type = obj.TYPE_REG
+		setJitStatus.From.Reg = tmp
+		setJitStatus.To.Type = obj.TYPE_MEM
+		setJitStatus.To.Reg = reservedRegisterForEngine
+		setJitStatus.To.Offset = engineExitContextJITCallStatusCodeOffset
+		c.addInstruction(setJitStatus)
+	} else {
+		// If the status == 0, we simply use zero register to store zero.
+		setJitStatus := c.newInstruction()
+		setJitStatus.As = arm64.AMOVWU
+		setJitStatus.From.Type = obj.TYPE_REG
+		setJitStatus.From.Reg = arm64.REGZERO
+		setJitStatus.To.Type = obj.TYPE_MEM
+		setJitStatus.To.Reg = reservedRegisterForEngine
+		setJitStatus.To.Offset = engineExitContextJITCallStatusCodeOffset
+		c.addInstruction(setJitStatus)
+	}
+
+	loadReturnAddress := c.newInstruction()
+	loadReturnAddress.As = arm64.AMOVD
+	loadReturnAddress.To.Type = obj.TYPE_REG
+	loadReturnAddress.To.Reg = tmp
+	loadReturnAddress.From.Type = obj.TYPE_MEM
+	loadReturnAddress.From.Reg = reservedRegisterForEngine
+	loadReturnAddress.From.Offset = engineArchContextReturnAddressOffset
+	c.addInstruction(loadReturnAddress)
 
 	ret := c.newInstruction()
 	ret.As = obj.ARET
 	ret.To.Type = obj.TYPE_REG
-	ret.To.Reg = arm64.REG_R30
+	ret.To.Reg = tmp
 	c.addInstruction(ret)
 }
 

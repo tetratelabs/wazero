@@ -25,6 +25,7 @@ type (
 		moduleContext
 		valueStackContext
 		exitContext
+		archContext
 
 		// The following fields are NOT acceessed by JITed code directly.
 
@@ -235,7 +236,7 @@ const (
 
 // jitCallStatusCode represents the result of `jitcall`.
 // This is set by the jitted native code.
-type jitCallStatusCode byte
+type jitCallStatusCode uint32
 
 const (
 	// jitStatusReturned means the jitcall reaches the end of function, and returns successfully.
