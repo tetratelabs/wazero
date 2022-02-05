@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
-type archContext {}
+type archContext struct{}
 
 func jitcall(codeSegment, engine uintptr) {
 	panic("unsupported GOARCH")

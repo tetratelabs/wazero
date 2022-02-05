@@ -43,6 +43,7 @@ jobs:
   test_amd64:
     name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
     runs-on: ${{ matrix.os }}
+    fail-fast: false
     strategy:
       matrix:
         os: 
@@ -75,6 +76,7 @@ jobs:
     # only executing the tests. This is why below uses "bash -c 'testbin test.v'" (running test binary) instead of make.
     name: ${{ matrix.target.arch }}, ubuntu, Go-${{ matrix.go-version }}
     runs-on: ubuntu-latest
+    fail-fast: false
     strategy:
       matrix:
         go-version:
