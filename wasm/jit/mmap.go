@@ -23,7 +23,7 @@ func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 		-1,
 		0,
 		len(code),
-		// The region must be RW: RW for writing native codes.
+		// The region must be RWX: RW for writing native codes, X for executing the region.
 		syscall.PROT_READ|syscall.PROT_WRITE|syscall.PROT_EXEC,
 		// Anonymous as this is not an actual file, but a memory,
 		// Private as this is in-process memory region.
