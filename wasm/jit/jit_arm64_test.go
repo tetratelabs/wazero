@@ -15,7 +15,9 @@ import (
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	cmp, err := newCompiler(&wasm.FunctionInstance{ModuleInstance: j.moduleInstance}, nil)
 	require.NoError(t, err)
-	return cmp.(*arm64Compiler)
+	ret, ok := cmp.(*arm64Compiler)
+	require.True(t, ok)
+	return ret
 }
 
 func TestArm64CompilerEndToEnd(t *testing.T) {
