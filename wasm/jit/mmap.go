@@ -33,7 +33,7 @@ func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 		return nil, err
 	}
 	copy(mmapFunc, code)
-	return mmapFunc, err
+	return mmapFunc, nil
 }
 
 func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
