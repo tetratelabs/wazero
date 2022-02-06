@@ -35,7 +35,7 @@ func TestArm64CompilerEndToEnd(t *testing.T) {
 func TestArchContextOffsetInEngine(t *testing.T) {
 	var eng engine
 	// If this fails, we have to fix jit_arm64.s as well.
-	require.Equal(t, int(unsafe.Offsetof(eng.returnAddress)), engineArchContextReturnAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.jitCallReturnAddress)), engineArchContextJITCallReturnAddressOffset)
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {

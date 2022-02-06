@@ -23,12 +23,16 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
+// archContext is embedded in Engine in order to store artchitecture-specific data.
 type archContext struct {
-	//nolint
-	returnAddress uint64
+	// jitCallReturnAddress holds the absolute return address for jitcall.
+	// The value is set whenever jitcall is executed and done in jit_arm64.s
+	// Native code can return back to the engine.exec's main loop back by
+	// executing "ret" instruction with this value. See arm64Compiler.exit.
+	jitCallReturnAddress uint64
 }
 
-const engineArchContextReturnAddressOffset = 136
+const engineArchContextJITCallReturnAddressOffset = 136
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
 // This is used by engine.exec and the entrypoint to enter the JITed native code.
@@ -166,7 +170,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 	loadReturnAddress.To.Reg = tmp
 	loadReturnAddress.From.Type = obj.TYPE_MEM
 	loadReturnAddress.From.Reg = reservedRegisterForEngine
-	loadReturnAddress.From.Offset = engineArchContextReturnAddressOffset
+	loadReturnAddress.From.Offset = engineArchContextJITCallReturnAddressOffset
 	c.addInstruction(loadReturnAddress)
 
 	ret := c.newInstruction()

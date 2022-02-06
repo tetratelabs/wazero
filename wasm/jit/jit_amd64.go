@@ -82,6 +82,8 @@ func init() {
 // engine is the pointer to the "*engine" as uintptr.
 func jitcall(codeSegment, engine uintptr)
 
+// archContext is embedded in Engine in order to store artchitecture-specific data.
+// For amd64, this is empty.
 type archContext struct{}
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
