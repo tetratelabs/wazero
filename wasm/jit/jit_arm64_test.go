@@ -19,17 +19,26 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 }
 
 func TestArm64CompilerEndToEnd(t *testing.T) {
-	engine := newEngine()
-	// TODO: currently arm64 compiler only suppots empty function which only uses
-	// "br .return" instruction.
-	f := &wasm.FunctionInstance{
-		FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
-		Body:         []byte{wasm.OpcodeEnd},
+	for _, tc := range []struct {
+		name string
+		body []byte
+	}{
+		{name: "empty", body: []byte{wasm.OpcodeEnd}},
+		{name: "br .return", body: []byte{wasm.OpcodeBr, 0, wasm.OpcodeEnd}},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			engine := newEngine()
+			f := &wasm.FunctionInstance{
+				FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
+				Body:         tc.body,
+			}
+			err := engine.Compile(f)
+			require.NoError(t, err)
+			_, err = engine.Call(f)
+			require.NoError(t, err)
+		})
 	}
-	err := engine.Compile(f)
-	require.NoError(t, err)
-	_, err = engine.Call(f)
-	require.NoError(t, err)
 }
 
 func TestArchContextOffsetInEngine(t *testing.T) {
