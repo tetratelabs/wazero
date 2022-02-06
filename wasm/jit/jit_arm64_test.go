@@ -18,7 +18,7 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	return cmp.(*arm64Compiler)
 }
 
-func TestEndToEnd(t *testing.T) {
+func TestArm64CompilerEndToEnd(t *testing.T) {
 	engine := newEngine()
 	// TODO: currently arm64 compiler only suppots empty function which only uses
 	// "br .return" instruction.

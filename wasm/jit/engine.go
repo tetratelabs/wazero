@@ -236,7 +236,7 @@ const (
 
 // jitCallStatusCode represents the result of `jitcall`.
 // This is set by the jitted native code.
-type jitCallStatusCode uint32
+type jitCallStatusCode byte
 
 const (
 	// jitStatusReturned means the jitcall reaches the end of function, and returns successfully.
