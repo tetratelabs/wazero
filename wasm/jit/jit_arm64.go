@@ -56,8 +56,6 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		locationStack: newValueLocationStack(),
 	}
 
-	// Reserve the static data for return address.
-	compiler.staticData = append(compiler.staticData, make([]byte, 8))
 	return compiler, nil
 }
 
@@ -67,7 +65,6 @@ type arm64Compiler struct {
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
-	staticData    compiledFunctionStaticData
 }
 
 func (c *arm64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
@@ -75,7 +72,6 @@ func (c *arm64Compiler) generate() (code []byte, staticData compiledFunctionStat
 	if err != nil {
 		return
 	}
-	staticData = c.staticData
 	return
 }
 
@@ -98,7 +94,7 @@ func (c *arm64Compiler) emitPreamble() error {
 	return nil
 }
 
-func (c *arm64Compiler) returnFunction() error {
+func (c *arm64Compiler) returnFunction() {
 
 	// TODO: we don't support function calls yet.
 	// For now the following code just simply returns to Go code.
@@ -129,7 +125,7 @@ func (c *arm64Compiler) returnFunction() error {
 	c.addInstruction(writeDecrementedCallFrameStackPoitner)
 
 	c.exit(jitCallStatusCodeReturned)
-	return nil
+	return
 }
 
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
@@ -164,6 +160,9 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 		c.addInstruction(setJitStatus)
 	}
 
+	// The return address to the Go code is stored in archContext.jitReturnAddress which
+	// is embedded in engine. We load the value to the tmpRegister, and then
+	// invoke RET with that register.
 	loadReturnAddress := c.newInstruction()
 	loadReturnAddress.As = arm64.AMOVD
 	loadReturnAddress.To.Type = obj.TYPE_REG

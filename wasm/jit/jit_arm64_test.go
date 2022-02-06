@@ -50,7 +50,6 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {
-
 	env := newJITEnvironment()
 
 	// Build codes.
@@ -63,11 +62,12 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 	code, _, _, err := compiler.generate()
 	require.NoError(t, err)
 
-	// Run codes
+	// Run native code.
 	env.exec(code)
 
 	// JIT status on engine must be returned.
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	// Plus, the call frame stack pointer must be zero after return.
 	require.Equal(t, uint64(0), env.callFrameStackPointer())
 }
 
