@@ -1,6 +1,7 @@
 package adhoc
 
 import (
+	"context"
 	_ "embed"
 	"reflect"
 	"runtime"
@@ -62,6 +63,7 @@ func runTests(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(fibWasm)
 	require.NoError(t, err)
 
@@ -77,7 +79,7 @@ func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
 			require.NoError(t, err)
 			err = store.Instantiate(mod, "test")
 			require.NoError(t, err)
-			out, _, err := store.CallFunction("test", "fib", 20)
+			out, _, err := store.CallFunction(ctx, "test", "fib", 20)
 			require.NoError(t, err)
 			require.Equal(t, uint64(10946), out[0])
 		}()
@@ -86,6 +88,7 @@ func fibonacci(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func fac(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(facWasm)
 	require.NoError(t, err)
 	store := wasm.NewStore(newEngine())
@@ -101,17 +104,18 @@ func fac(t *testing.T, newEngine func() wasm.Engine) {
 	} {
 		name := name
 		t.Run(name, func(t *testing.T) {
-			out, _, err := store.CallFunction("test", name, 25)
+			out, _, err := store.CallFunction(ctx, "test", name, 25)
 			require.NoError(t, err)
 			require.Equal(t, uint64(7034535277573963776), out[0])
 		})
 	}
 
-	_, _, err = store.CallFunction("test", "fac-rec", 1073741824)
+	_, _, err = store.CallFunction(ctx, "test", "fac-rec", 1073741824)
 	require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow)
 }
 
 func unreachable(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(unreachableWasm)
 	require.NoError(t, err)
 	store := wasm.NewStore(newEngine())
@@ -120,7 +124,7 @@ func unreachable(t *testing.T, newEngine func() wasm.Engine) {
 	const moduleName = "test"
 
 	callUnreachable := func(ctx *wasm.HostFunctionCallContext) {
-		_, _, err := store.CallFunction(moduleName, "unreachable_func")
+		_, _, err := store.CallFunction(ctx, moduleName, "unreachable_func")
 		require.NoError(t, err)
 	}
 	err = store.AddHostFunction("host", "cause_unreachable", reflect.ValueOf(callUnreachable))
@@ -129,7 +133,7 @@ func unreachable(t *testing.T, newEngine func() wasm.Engine) {
 	err = store.Instantiate(mod, moduleName)
 	require.NoError(t, err)
 
-	_, _, err = store.CallFunction(moduleName, "main")
+	_, _, err = store.CallFunction(ctx, moduleName, "main")
 	exp := `wasm runtime error: unreachable
 wasm backtrace:
 	0: unreachable_func
@@ -142,6 +146,7 @@ wasm backtrace:
 }
 
 func memory(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(memoryWasm)
 	require.NoError(t, err)
 	store := wasm.NewStore(newEngine())
@@ -149,33 +154,34 @@ func memory(t *testing.T, newEngine func() wasm.Engine) {
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 	// First, we have zero-length memory instance.
-	out, _, err := store.CallFunction("test", "size")
+	out, _, err := store.CallFunction(ctx, "test", "size")
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), out[0])
 	// Then grow the memory.
 	const newPages uint64 = 10
-	out, _, err = store.CallFunction("test", "grow", newPages)
+	out, _, err = store.CallFunction(ctx, "test", "grow", newPages)
 	require.NoError(t, err)
 	// Grow returns the previous number of memory pages, namely zero.
 	require.Equal(t, uint64(0), out[0])
 	// Now size should return the new pages -- 10.
-	out, _, err = store.CallFunction("test", "size")
+	out, _, err = store.CallFunction(ctx, "test", "size")
 	require.NoError(t, err)
 	require.Equal(t, newPages, out[0])
 	// Growing memory with zero pages is valid but should be noop.
-	out, _, err = store.CallFunction("test", "grow", 0)
+	out, _, err = store.CallFunction(ctx, "test", "grow", 0)
 	require.NoError(t, err)
 	require.Equal(t, newPages, out[0])
 }
 
 func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(recursiveWasm)
 	require.NoError(t, err)
 
 	store := wasm.NewStore(newEngine())
 
 	hostfunc := func(ctx *wasm.HostFunctionCallContext) {
-		_, _, err := store.CallFunction("test", "called_by_host_func")
+		_, _, err := store.CallFunction(ctx, "test", "called_by_host_func")
 		require.NoError(t, err)
 	}
 	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(hostfunc))
@@ -184,11 +190,12 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	_, _, err = store.CallFunction("test", "main", uint64(1))
+	_, _, err = store.CallFunction(ctx, "test", "main", uint64(1))
 	require.NoError(t, err)
 }
 
 func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
 	// Test that the engine can call "imported-and-then-exported-back" function correctly
 	mod, err := text.DecodeModule([]byte(`(module
 		;; arbitrary function with params
@@ -210,7 +217,7 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	require.NoError(t, err)
 
 	// We should be able to call the exported add_int and it should add two ints.
-	results, _, err := store.CallFunction("test", "add_int", uint64(12), uint64(30))
+	results, _, err := store.CallFunction(ctx, "test", "add_int", uint64(12), uint64(30))
 	require.NoError(t, err)
 	require.Equal(t, uint64(42), results[0])
 }

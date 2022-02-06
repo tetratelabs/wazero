@@ -1,6 +1,7 @@
 package spectests
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -229,6 +230,7 @@ func TestInterpreter(t *testing.T) {
 }
 
 func runTest(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
 	files, err := testcases.ReadDir(".")
 	require.NoError(t, err)
 
@@ -286,7 +288,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							vals, types, err := store.CallFunction(moduleName, c.Action.Field, args...)
+							vals, types, err := store.CallFunction(ctx, moduleName, c.Action.Field, args...)
 							require.NoError(t, err, msg)
 							require.Equal(t, len(exps), len(vals), msg)
 							require.Equal(t, len(exps), len(types), msg)
@@ -346,7 +348,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
+							_, _, err := store.CallFunction(ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, c.expectedError(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -375,7 +377,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := store.CallFunction(moduleName, c.Action.Field, args...)
+							_, _, err := store.CallFunction(ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)

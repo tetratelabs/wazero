@@ -426,12 +426,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 }
 
 // Call implements an interpreted wasm.Engine.
-func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	return it.CallContext(context.Background(), f, params...)
-}
-
-// Call implements an interpreted wasm.Engine.
-func (it *interpreter) CallContext(ctx context.Context, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (it *interpreter) Call(ctx context.Context, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	prevFrameLen := len(it.frames)
 
 	// shouldRecover is true when a panic at the origin of callstack should be recovered

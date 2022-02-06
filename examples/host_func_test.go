@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasi"
@@ -31,14 +30,14 @@ func Test_hostFunc(t *testing.T) {
 	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
 		// Assert that context values passed in from CallFunctionContext are accessible.
 		contextValue := ctx.Value(testKey{}).(int64)
-		assert.Equal(t, int64(12345), contextValue)
+		require.Equal(t, int64(12345), contextValue)
 
 		const bufferSize = 10000 // force memory space grow to ensure eager failures on missing setup
 		// Allocate the in-Wasm memory region so we can store the generated string.
 		// Note that this is recursive call. That means that this is the VM function call during the VM function call.
 		// More precisely, we call test.base64 (in Wasm), and the function in turn calls this get_random_string function,
 		// and we call test.allocate_buffer (in Wasm) here: host->vm->host->vm.
-		ret, _, err := store.CallFunction("test", "allocate_buffer", bufferSize)
+		ret, _, err := store.CallFunction(ctx, "test", "allocate_buffer", bufferSize)
 		require.NoError(t, err)
 		require.Len(t, ret, 1)
 		bufAddr := ret[0]
@@ -62,17 +61,18 @@ func Test_hostFunc(t *testing.T) {
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
+	ctx := context.Background()
+
 	// We assume that TinyGo binary expose "_start" symbol
 	// to initialize the memory state.
 	// Meaning that TinyGo binary is "WASI command":
 	// https://github.com/WebAssembly/WASI/blob/main/design/application-abi.md
-	_, _, err = store.CallFunction("test", "_start")
+	_, _, err = store.CallFunction(ctx, "test", "_start")
 	require.NoError(t, err)
 
 	// Set a context variable that should be available in HostFunctionCallContext.
-	ctx := context.Background()
 	ctx = context.WithValue(ctx, testKey{}, int64(12345))
 
-	_, _, err = store.CallFunctionContext(ctx, "test", "base64", 5)
+	_, _, err = store.CallFunction(ctx, "test", "base64", 5)
 	require.NoError(t, err)
 }

@@ -305,20 +305,18 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	rollbackFuncs = nil
 
 	// Execute the start function.
+	ctx := context.Background()
 	if startIndex := module.StartSection; startIndex != nil {
 		f := instance.Functions[*startIndex]
-		if _, err := s.engine.Call(f); err != nil {
+		if _, err := s.engine.Call(ctx, f); err != nil {
 			return fmt.Errorf("calling start function failed: %v", err)
 		}
 	}
 	return nil
 }
 
-func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
-	return s.CallFunctionContext(context.Background(), moduleName, funcName, params...)
-}
-
-func (s *Store) CallFunctionContext(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
+// Note: this API is unstable. See tetratelabs/wazero#170
+func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
 	var exp *ExportInstance
 	if exp, err = s.getExport(moduleName, funcName, ExportKindFunc); err != nil {
 		return
@@ -330,7 +328,7 @@ func (s *Store) CallFunctionContext(ctx context.Context, moduleName, funcName st
 		return
 	}
 
-	results, err = s.engine.CallContext(ctx, f, params...)
+	results, err = s.engine.Call(ctx, f, params...)
 	resultTypes = f.FunctionType.Type.Results
 	return
 }

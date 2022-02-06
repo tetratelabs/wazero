@@ -6,6 +6,7 @@ package example
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"os"
 	"testing"
@@ -91,6 +92,7 @@ func newExample() *wasm.Module {
 }
 
 func TestExampleUpToDate(t *testing.T) {
+	ctx := context.Background()
 	encoded := binary.EncodeModule(example)
 	// This means we changed something. Overwrite the example wasm file rather than force maintainers to use hex editor!
 	if !bytes.Equal(encoded, exampleBinary) {
@@ -130,7 +132,7 @@ func TestExampleUpToDate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		res, _, err := store.CallFunction("example", "AddInt", 1, 2)
+		res, _, err := store.CallFunction(ctx, "example", "AddInt", 1, 2)
 		require.NoError(t, err)
 		require.Equal(t, []uint64{3}, res)
 	})

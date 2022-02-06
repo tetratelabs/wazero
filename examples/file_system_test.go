@@ -2,6 +2,7 @@ package examples
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"io"
 	"testing"
@@ -46,6 +47,7 @@ func readFile(fs wasi.FS, path string) ([]byte, error) {
 }
 
 func Test_file_system(t *testing.T) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(filesystemWasm)
 	require.NoError(t, err)
 
@@ -63,7 +65,7 @@ func Test_file_system(t *testing.T) {
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	_, _, err = store.CallFunction("test", "_start")
+	_, _, err = store.CallFunction(ctx, "test", "_start")
 	require.NoError(t, err)
 
 	out, err := readFile(memFS, "output.txt")

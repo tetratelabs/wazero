@@ -11,6 +11,7 @@ package wasi
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"strings"
 	"testing"
@@ -30,6 +31,7 @@ var argsWasm []byte
 // size of the result of args_get, so TinyGo calls the both of them together to retrieve the
 // WASI's arguments. Any other language runtime would do the same things.
 func Test_ArgsSizesGet_ArgsGet(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name         string
 		args         []string
@@ -69,7 +71,7 @@ func Test_ArgsSizesGet_ArgsGet(t *testing.T) {
 			require.NoError(t, err)
 
 			// Calling `_start` to call WASI APIs because it's the only stable way to call WASI APIs on TinyGo.
-			_, _, err = store.CallFunction("test", "_start")
+			_, _, err = store.CallFunction(ctx, "test", "_start")
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expectedArgs, strings.TrimSpace(stdoutBuf.String()))

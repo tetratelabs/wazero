@@ -1,6 +1,7 @@
 package examples
 
 import (
+	"context"
 	_ "embed"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 var fibWasm []byte
 
 func Test_fibonacci(t *testing.T) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(fibWasm)
 	require.NoError(t, err)
 
@@ -35,7 +37,7 @@ func Test_fibonacci(t *testing.T) {
 		{in: 10, exp: 55},
 		{in: 5, exp: 5},
 	} {
-		ret, retTypes, err := store.CallFunction("test", "fibonacci", uint64(c.in))
+		ret, retTypes, err := store.CallFunction(ctx, "test", "fibonacci", uint64(c.in))
 		require.NoError(t, err)
 		require.Len(t, ret, len(retTypes))
 		require.Equal(t, wasm.ValueTypeI32, retTypes[0])

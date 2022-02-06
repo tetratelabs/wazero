@@ -333,11 +333,7 @@ func (c *callFrame) String() string {
 	)
 }
 
-func (e *engine) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	return e.CallContext(context.Background(), f, params...)
-}
-
-func (e *engine) CallContext(ctx context.Context, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (e *engine) Call(ctx context.Context, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside
