@@ -205,7 +205,8 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	if o.Target.IsReturnTarget() {
-		return c.returnFunction()
+		c.returnFunction()
+		return nil
 	} else {
 		return fmt.Errorf("TODO: only return target is available on arm64")
 	}
