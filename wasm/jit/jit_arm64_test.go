@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -15,6 +16,20 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	cmp, err := newCompiler(&wasm.FunctionInstance{ModuleInstance: j.moduleInstance}, nil)
 	require.NoError(t, err)
 	return cmp.(*arm64Compiler)
+}
+
+func TestEndToEnd(t *testing.T) {
+	engine := newEngine()
+	// TODO: currently arm64 compiler only suppots empty function which only uses
+	// "br .return" instruction.
+	f := &wasm.FunctionInstance{
+		FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
+		Body:         []byte{wasm.OpcodeEnd},
+	}
+	err := engine.Compile(f)
+	require.NoError(t, err)
+	_, err = engine.Call(f)
+	require.NoError(t, err)
 }
 
 func TestArchContextOffsetInEngine(t *testing.T) {
