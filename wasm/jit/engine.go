@@ -687,9 +687,9 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
-	// if buildoptions.IsDebugMode {
-	fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
-	// }
+	if buildoptions.IsDebugMode {
+		fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
+	}
 
 	compiler, err := newCompiler(f, ir)
 	if err != nil {
