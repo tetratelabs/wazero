@@ -3485,10 +3485,12 @@ func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	return nil
 }
 
+// compileEq implements compiler.compileEq for the amd64 architecture.
 func (c *amd64Compiler) compileEq(o *wazeroir.OperationEq) error {
 	return c.emitEqOrNe(o.Type, true)
 }
 
+// compileNe implements compiler.compileNe for the amd64 architecture.
 func (c *amd64Compiler) compileNe(o *wazeroir.OperationNe) error {
 	return c.emitEqOrNe(o.Type, false)
 }
@@ -3622,6 +3624,7 @@ func (c *amd64Compiler) emitEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction o
 	return nil
 }
 
+// compileEqz implements compiler.compileEqz for the amd64 architecture.
 func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	v := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(v); err != nil {
@@ -3666,6 +3669,7 @@ func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	return nil
 }
 
+// compileLt implements compiler.compileLt for the amd64 architecture.
 func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
@@ -3726,6 +3730,7 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	return nil
 }
 
+// compileGt implements compiler.compileGt for the amd64 architecture.
 func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
@@ -3786,6 +3791,7 @@ func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	return nil
 }
 
+// compileLe implements compiler.compileLe for the amd64 architecture.
 func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
@@ -3846,6 +3852,7 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	return nil
 }
 
+// compileGe implements compiler.compileGe for the amd64 architecture.
 func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	x2 := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
@@ -3906,6 +3913,7 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	return nil
 }
 
+// compileLoad implements compiler.compileLoad for the amd64 architecture.
 func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	var (
 		isIntType        bool
@@ -3973,6 +3981,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	return nil
 }
 
+// compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	reg, err := c.setupMemoryOffset(o.Arg.Offset, 1)
 	if err != nil {
@@ -4006,6 +4015,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	return nil
 }
 
+// compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	reg, err := c.setupMemoryOffset(o.Arg.Offset, 16/8)
 	if err != nil {
@@ -4039,6 +4049,7 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	return nil
 }
 
+// compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	reg, err := c.setupMemoryOffset(o.Arg.Offset, 32/8)
 	if err != nil {
@@ -4145,6 +4156,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	return base.register, nil
 }
 
+// compileStore implements compiler.compileStore for the amd64 architecture.
 func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
 	var movInst obj.As
 	var targetSizeInByte int64
@@ -4159,14 +4171,17 @@ func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
 	return c.moveToMemory(o.Arg.Offset, movInst, targetSizeInByte)
 }
 
+// compileStore8 implements compiler.compileStore8 for the amd64 architecture.
 func (c *amd64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
 	return c.moveToMemory(o.Arg.Offset, x86.AMOVB, 1)
 }
 
+// compileStore32 implements compiler.compileStore32 for the amd64 architecture.
 func (c *amd64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
 	return c.moveToMemory(o.Arg.Offset, x86.AMOVW, 16/8)
 }
 
+// compileStore32 implements compiler.compileStore32 for the amd64 architecture.
 func (c *amd64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
 	return c.moveToMemory(o.Arg.Offset, x86.AMOVL, 32/8)
 }
@@ -4198,6 +4213,7 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 	return nil
 }
 
+// compileMemoryGrow implements compiler.compileMemoryGrow for the amd64 architecture.
 func (c *amd64Compiler) compileMemoryGrow() error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -4215,6 +4231,7 @@ func (c *amd64Compiler) compileMemoryGrow() error {
 	return nil
 }
 
+// compileMemorySize implements compiler.compileMemorySize for the amd64 architecture.
 func (c *amd64Compiler) compileMemorySize() error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -4250,6 +4267,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 	return nil
 }
 
+// compileConstI32 implements compiler.compileConstI32 for the amd64 architecture.
 func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -4278,6 +4296,7 @@ func (c *amd64Compiler) emitConstI32(val uint32, register int16) {
 	c.addInstruction(prog)
 }
 
+// compileConstI64 implements compiler.compileConstI64 for the amd64 architecture.
 func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -4306,6 +4325,7 @@ func (c *amd64Compiler) emitConstI64(val uint64, register int16) {
 	c.addInstruction(prog)
 }
 
+// compileConstF32 implements compiler.compileConstF32 for the amd64 architecture.
 func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -4346,6 +4366,7 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 	return nil
 }
 
+// compileConstF64 implements compiler.compileConstF64 for the amd64 architecture.
 func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.

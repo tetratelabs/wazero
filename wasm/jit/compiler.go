@@ -196,25 +196,46 @@ type compiler interface {
 	// underlying bit pattern as 64-bit integer. For signed case, this is sign-extension which preserves the
 	// original integer's sign.
 	compileExtend(o *wazeroir.OperationExtend) error
+	// TODO:
 	compileEq(o *wazeroir.OperationEq) error
+	// TODO:
 	compileNe(o *wazeroir.OperationNe) error
+	// TODO:
 	compileEqz(o *wazeroir.OperationEqz) error
+	// TODO:
 	compileLt(o *wazeroir.OperationLt) error
+	// TODO:
 	compileGt(o *wazeroir.OperationGt) error
+	// TODO:
 	compileLe(o *wazeroir.OperationLe) error
+	// TODO:
 	compileGe(o *wazeroir.OperationGe) error
+	// TODO:
 	compileLoad(o *wazeroir.OperationLoad) error
+	// TODO:
 	compileLoad8(o *wazeroir.OperationLoad8) error
+	// TODO:
 	compileLoad16(o *wazeroir.OperationLoad16) error
+	// TODO:
 	compileLoad32(o *wazeroir.OperationLoad32) error
+	// TODO:
 	compileStore(o *wazeroir.OperationStore) error
+	// TODO:
 	compileStore8(o *wazeroir.OperationStore8) error
+	// TODO:
 	compileStore16(o *wazeroir.OperationStore16) error
+	// TODO:
 	compileStore32(o *wazeroir.OperationStore32) error
+	// TODO:
 	compileMemoryGrow() error
+	// TODO:
 	compileMemorySize() error
+	// TODO:
 	compileConstI32(o *wazeroir.OperationConstI32) error
+	// TODO:
 	compileConstI64(o *wazeroir.OperationConstI64) error
+	// TODO:
 	compileConstF32(o *wazeroir.OperationConstF32) error
+	// TODO:
 	compileConstF64(o *wazeroir.OperationConstF64) error
 }
