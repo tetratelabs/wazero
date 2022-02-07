@@ -509,7 +509,7 @@ func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
 		loadConst.From.Type = obj.TYPE_CONST
 		// Note: in raw arm64 assembly, immediates larger than 16-bits
 		// are not supported, but the assembler takes care of this and
-		// emits corresponding 4-instructions to load such large constants.
+		// emits corresponding (at most) 4-instructions to load such large constants.
 		loadConst.From.Offset = int64(value)
 		loadConst.To.Type = obj.TYPE_REG
 		loadConst.To.Reg = reg
@@ -560,7 +560,7 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 		loadConst.From.Type = obj.TYPE_CONST
 		// Note: in raw arm64 assembly, immediates larger than 16-bits
 		// are not supported, but the assembler takes care of this and
-		// emits corresponding 4-instructions to load such large constants.
+		// emits corresponding (at most) 4-instructions to load such large constants.
 		loadConst.From.Offset = int64(value)
 		loadConst.To.Type = obj.TYPE_REG
 		loadConst.To.Reg = tmpReg
@@ -629,7 +629,7 @@ func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) {
 	store.To.Reg = reservedRegisterForStackBasePointerAddress
 	// Note: in raw arm64 assembly, immediates larger than 16-bits
 	// are not supported, but the assembler takes care of this and
-	// emits corresponding 4-instructions to load such large constants.
+	// emits corresponding (at most) 4-instructions to load such large constants.
 	store.To.Offset = int64(loc.stackPointer) * 8
 	store.From.Type = obj.TYPE_REG
 	store.From.Reg = loc.register
