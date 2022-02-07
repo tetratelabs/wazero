@@ -25,6 +25,7 @@ type (
 		moduleContext
 		valueStackContext
 		exitContext
+		archContext
 
 		// The following fields are NOT acceessed by JITed code directly.
 
