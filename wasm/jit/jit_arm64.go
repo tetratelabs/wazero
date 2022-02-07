@@ -69,6 +69,7 @@ type arm64Compiler struct {
 	locationStack *valueLocationStack
 }
 
+// generate implements compiler.generate for the arm64 architecture.
 func (c *arm64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
 	code, err = mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
@@ -127,7 +128,6 @@ func (c *arm64Compiler) returnFunction() {
 	c.addInstruction(writeDecrementedCallFrameStackPoitner)
 
 	c.exit(jitCallStatusCodeReturned)
-	return
 }
 
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
@@ -205,6 +205,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	if o.Target.IsReturnTarget() {
 		c.returnFunction()

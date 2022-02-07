@@ -201,6 +201,7 @@ func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 	return c.returnFunction()
 }
 
+// generate implements compiler.generate for the amd64 architecture.
 func (c *amd64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
 	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack(s)
 	// used for all labels (via replaceLocationStack), excluding the current one.

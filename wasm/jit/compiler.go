@@ -8,15 +8,16 @@ import (
 // compiler is the interface of architecture-specific native code compiler,
 // and this is responsible for compiling native code for all wazeroir operations.
 type compiler interface {
-	// For debugging purpose.
+	// String is for debugging purpose.
 	String() string
 	// emitPreamble is called before compiling any wazeroir operation.
 	// This is used, for example, to initilize the reserved registers, etc.
 	emitPreamble() error
-	// Generates the byte slice of native codes.
+	// generate generates the byte slice of native code.
 	// maxStackPointer is the max stack pointer that the target function would reach.
+	// staticData is compiledFunctionStaticData for the resutling native code.
 	generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error)
-	// Emit the trampoline code from which native code can jump into the host function.
+	// compileHostFunction emits the trampoline code from which native code can jump into the host function.
 	// TODO: maybe we wouldn't need to have trampoline for host functions.
 	compileHostFunction(address wasm.FunctionAddress) error
 	// compileLabel notify compilers of the beginning of a label.
@@ -196,46 +197,62 @@ type compiler interface {
 	// underlying bit pattern as 64-bit integer. For signed case, this is sign-extension which preserves the
 	// original integer's sign.
 	compileExtend(o *wazeroir.OperationExtend) error
-	// TODO:
+	// compileEq adds instructions to pop two values from the stack and push 1 if they equal otherwise 0.
 	compileEq(o *wazeroir.OperationEq) error
-	// TODO:
+	// compileEq adds instructions to pop two values from the stack and push 0 if they equal otherwise 1.
 	compileNe(o *wazeroir.OperationNe) error
-	// TODO:
+	// compileEq adds instructions to pop a value from the stack and push 1 if it equals zero, 0.
 	compileEqz(o *wazeroir.OperationEqz) error
-	// TODO:
+	// compileLt adds instructions to pop two values from the stack and push 1 if the second is less than the top one. Otherwise 0.
 	compileLt(o *wazeroir.OperationLt) error
-	// TODO:
+	// compileGt adds instructions to pop two values from the stack and push 1 if the second is greater than the top one. Otherwise 0.
 	compileGt(o *wazeroir.OperationGt) error
-	// TODO:
+	// compileLe adds instructions to pop two values from the stack and push 1 if the second is less than or equals the top one. Otherwise 0.
 	compileLe(o *wazeroir.OperationLe) error
-	// TODO:
+	// compileLe adds instructions to pop two values from the stack and push 1 if the second is greater than or equals the top one. Otherwise 0.
 	compileGe(o *wazeroir.OperationGe) error
-	// TODO:
+	// compileLoad adds instructions to perform load instruction in WebAssembly.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfloadhrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfloadnmathsf_hrefsyntax-sxmathitsxhrefsyntax-memargmathitmemarg.
 	compileLoad(o *wazeroir.OperationLoad) error
-	// TODO:
+	// compileLoad8 adds instructions to perform load8 instruction in WebAssembly.
+	// The resulting code checks the memory boundary at runtime, and exit the function with jitCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfloadhrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfloadnmathsf_hrefsyntax-sxmathitsxhrefsyntax-memargmathitmemarg.
 	compileLoad8(o *wazeroir.OperationLoad8) error
-	// TODO:
+	// compileLoad16 adds instructions to perform load16 instruction in WebAssembly.
+	// The resulting code checks the memory boundary at runtime, and exit the function with jitCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfloadhrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfloadnmathsf_hrefsyntax-sxmathitsxhrefsyntax-memargmathitmemarg.
 	compileLoad16(o *wazeroir.OperationLoad16) error
-	// TODO:
+	// compileLoad32 adds instructions to perform load32 instruction in WebAssembly.
+	// The resulting code checks the memory boundary at runtime, and exit the function with jitCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfloadhrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfloadnmathsf_hrefsyntax-sxmathitsxhrefsyntax-memargmathitmemarg.
 	compileLoad32(o *wazeroir.OperationLoad32) error
-	// TODO:
+	// compileStore adds instructions to perform store instruction in WebAssembly.
+	// The resulting code checks the memory boundary at runtime, and exit the function with jitCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfstorehrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfstorenhrefsyntax-memargmathitmemarg
 	compileStore(o *wazeroir.OperationStore) error
-	// TODO:
+	// compileStore8 adds instructions to perform store8 instruction in WebAssembly.
+	// The resulting code checks the memory boundary at runtime, and exit the function with jitCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfstorehrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfstorenhrefsyntax-memargmathitmemarg
 	compileStore8(o *wazeroir.OperationStore8) error
-	// TODO:
+	// compileStore16 adds instructions to perform store16 instruction in WebAssembly.
+	// The resulting code checks the memory boundary at runtime, and exit the function with jitCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfstorehrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfstorenhrefsyntax-memargmathitmemarg
 	compileStore16(o *wazeroir.OperationStore16) error
-	// TODO:
+	// compileStore32 adds instructions to perform store32 instruction in WebAssembly.
+	// The resulting code checks the memory boundary at runtime, and exit the function with jitCallStatusCodeMemoryOutOfBounds if out-of-bounds access happens.
+	// See https://www.w3.org/TR/wasm-core-1/#-tmathsfhrefsyntax-instr-memorymathsfstorehrefsyntax-memargmathitmemarg-and--tmathsfhrefsyntax-instr-memorymathsfstorenhrefsyntax-memargmathitmemarg
 	compileStore32(o *wazeroir.OperationStore32) error
-	// TODO:
+	// compileMemorySize adds instruction to pop a value from the stack, grow the memory buffer according to the value,
+	// and push the previous page size onto the stack.
 	compileMemoryGrow() error
-	// TODO:
+	// compileMemorySize adds instruction to read the current page size of memory instance and push it onto the stack.
 	compileMemorySize() error
-	// TODO:
+	// compileConstI32 adds instruction to push the given constant i32 value onto the stack.
 	compileConstI32(o *wazeroir.OperationConstI32) error
-	// TODO:
+	// compileConstI32 adds instruction to push the given constant i64 value onto the stack.
 	compileConstI64(o *wazeroir.OperationConstI64) error
-	// TODO:
+	// compileConstI32 adds instruction to push the given constant f32 value onto the stack.
 	compileConstF32(o *wazeroir.OperationConstF32) error
-	// TODO:
+	// compileConstI32 adds instruction to push the given constant f64 value onto the stack.
 	compileConstF64(o *wazeroir.OperationConstF64) error
 }
