@@ -24,7 +24,7 @@ type compiler interface {
 	// Return true if the compiler decided to skip the entire label.
 	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)
 	// compileUnreachable adds instructions to return to engine with jitCallStatusCodeUnreachable status.
-	// See wasm.OpcodeUnreachable.
+	// See wasm.OpcodeUnreachable
 	compileUnreachable() error
 	// compileSwap adds instruction to swap the stack top value with the target in the Wasm value stack.
 	// The values are might be on registers or memory-stack at runtime, so compiler implementations
@@ -32,15 +32,15 @@ type compiler interface {
 	compileSwap(o *wazeroir.OperationSwap) error
 	// compileGlobalGet adds instructions to read the value of the given index in the ModuleInstance.Globals
 	// and push the value onto the stack.
-	// See wasm.OpcodeGlobalGet.
+	// See wasm.OpcodeGlobalGet
 	compileGlobalGet(o *wazeroir.OperationGlobalGet) error
 	// compileGlobalSet adds instructions to set the top value on the stack to the given index in the ModuleInstance.Globals.
-	// See wasm.OpcodeGlobalSet.
+	// See wasm.OpcodeGlobalSet
 	compileGlobalSet(o *wazeroir.OperationGlobalSet) error
-	// compileBr adds instrctions to branch into the given label.
-	// See wasm.OpcodeBr.
+	// compileBr adds instructions to branch into the given label.
+	// See wasm.OpcodeBr
 	compileBr(o *wazeroir.OperationBr) error
-	// compileBrIf adds instrctions to pops a value and branch into ".then" lable if the value equals 1.
+	// compileBrIf adds instructions to pops a value and branch into ".then" lable if the value equals 1.
 	// Otherwise, the code branches into ".else" label.
 	compileBrIf(o *wazeroir.OperationBrIf) error
 	// compileBrTable adds instructions to do br_table operation.
@@ -51,10 +51,10 @@ type compiler interface {
 	// For example, assume we have operations like {default: L_DEFAULT, targets: [L0, L1, L2]}.
 	// If "index" >= len(defaults), then branch into the L_DEFAULT label.
 	// Othewise, we enter label of targets[index].
-	// See wasm.OpcodeBrTable.
+	// See wasm.OpcodeBrTable
 	compileBrTable(o *wazeroir.OperationBrTable) error
 	// compileCall adds instructions to call into a funcion of the given index.
-	// See wasm.OpcodeCall.
+	// See wasm.OpcodeCall
 	compileCall(o *wazeroir.OperationCall) error
 	// compileCallIndirect adds instructions to perform call_indirect operation.
 	// This consumes the one value from the top of stack (called "offset"),
@@ -68,7 +68,7 @@ type compiler interface {
 	// Otherwise, we successfully enter the target function.
 	//
 	// Note: WebAssembly 1.0 (MVP) supports at most one table, so this doesn't support multiple tables.
-	// See wasm.CallIndirect.
+	// See wasm.CallIndirect
 	compileCallIndirect(o *wazeroir.OperationCallIndirect) error
 	// compileDrop adds instructions to drop values within the given inclusive range from the value stack.
 	compileDrop(o *wazeroir.OperationDrop) error
@@ -212,11 +212,11 @@ type compiler interface {
 	compileFConvertFromI(o *wazeroir.OperationFConvertFromI) error
 	// compileF32DemoteFromF64 adds instructions to replace the 64-bit float on top of the stack
 	// with the corresponding 32-bit float. This is equivalent to float32(float64(v)) in Go.
-	// See wasm.OpcodeF32DemoteF64.
+	// See wasm.OpcodeF32DemoteF64
 	compileF32DemoteFromF64() error
 	// compileF64PromoteFromF32 adds instructions to replace the 32-bit float on top of the stack
 	// with the corresponding 64-bit float. This is equivalent to float64(float32(v)) in Go.
-	// See wasm.OpcodeF64PromoteF32.
+	// See wasm.OpcodeF64PromoteF32
 	compileF64PromoteFromF32() error
 	// compileI32ReinterpretFromF32 adds instructions to reinterpret the 32-bit float on top of the stack
 	// as a 32-bit integer by preserving the bit representation. If the value is on the stack,
@@ -300,21 +300,21 @@ type compiler interface {
 	compileStore32(o *wazeroir.OperationStore32) error
 	// compileMemorySize adds instruction to pop a value from the stack, grow the memory buffer according to the value,
 	// and push the previous page size onto the stack.
-	// See wasm.OpcodeMemoryGrow.
+	// See wasm.OpcodeMemoryGrow
 	compileMemoryGrow() error
 	// compileMemorySize adds instruction to read the current page size of memory instance and push it onto the stack.
-	// See wasm.OpcodeMemorySize.
+	// See wasm.OpcodeMemorySize
 	compileMemorySize() error
 	// compileConstI32 adds instruction to push the given constant i32 value onto the stack.
-	// See wasm.OpcodeI32Const.
+	// See wasm.OpcodeI32Const
 	compileConstI32(o *wazeroir.OperationConstI32) error
 	// compileConstI32 adds instruction to push the given constant i64 value onto the stack.
-	// See wasm.OpcodeI64Const.
+	// See wasm.OpcodeI64Const
 	compileConstI64(o *wazeroir.OperationConstI64) error
 	// compileConstI32 adds instruction to push the given constant f32 value onto the stack.
-	// See wasm.OpcodeF32Const.
+	// See wasm.OpcodeF32Const
 	compileConstF32(o *wazeroir.OperationConstF32) error
 	// compileConstI32 adds instruction to push the given constant f64 value onto the stack.
-	// See wasm.OpcodeF64Const.
+	// See wasm.OpcodeF64Const
 	compileConstF64(o *wazeroir.OperationConstF64) error
 }
