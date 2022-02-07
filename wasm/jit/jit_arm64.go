@@ -473,36 +473,19 @@ func (c *arm64Compiler) compileMemorySize() error {
 }
 
 func (c *arm64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
-	if o.Value == 0 {
-		c.pushZeroValue()
-	} else {
-		// Take a register to load the value.
-		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-		if err != nil {
-			return err
-		}
-
-		// Then, load the const.
-		loadConst := c.newProg()
-		loadConst.As = arm64.AMOVW // 32-bit!
-		loadConst.From.Type = obj.TYPE_CONST
-		// Note: in raw arm64 assembly, immediates larger than 16-bits
-		// are not supported, but the assembler takes care of this and
-		// emits corresponding 4-instructions to load such large constants.
-		loadConst.From.Offset = int64(o.Value)
-		loadConst.To.Type = obj.TYPE_REG
-		loadConst.To.Reg = reg
-		c.addInstruction(loadConst)
-
-		loc := c.locationStack.pushValueOnRegister(reg)
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
-	}
-	return nil
+	return c.emitIntConstant(true, uint64(o.Value))
 }
 
 // compileConstI64 implements compiler.compileConstI64 for the arm64 architecture.
 func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
-	if o.Value == 0 {
+	return c.emitIntConstant(false, o.Value)
+}
+
+// emitIntConstant adds instruction to load an integer constant.
+// is32bit is true if the target value is originally 32-bit const, false otherwise.
+// value holds the (zero-extended for 32-bit case) load target constant.
+func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
+	if value == 0 {
 		c.pushZeroValue()
 	} else {
 		// Take a register to load the value.
@@ -513,12 +496,16 @@ func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 
 		// Then, load the const.
 		loadConst := c.newProg()
-		loadConst.As = arm64.AMOVD
+		if is32bit {
+			loadConst.As = arm64.AMOVW
+		} else {
+			loadConst.As = arm64.AMOVD
+		}
 		loadConst.From.Type = obj.TYPE_CONST
 		// Note: in raw arm64 assembly, immediates larger than 16-bits
 		// are not supported, but the assembler takes care of this and
 		// emits corresponding 4-instructions to load such large constants.
-		loadConst.From.Offset = int64(o.Value)
+		loadConst.From.Offset = int64(value)
 		loadConst.To.Type = obj.TYPE_REG
 		loadConst.To.Reg = reg
 		c.addInstruction(loadConst)
@@ -529,48 +516,20 @@ func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	return nil
 }
 
-// https://stackoverflow.com/questions/64608307/how-do-i-move-a-floating-point-constant-into-an-fp-register
+// compileConstF32 implements compiler.compileConstF32 for the arm64 architecture.
 func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
-	// Take a register to load the value.
-	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
-	if err != nil {
-		return err
-	}
-
-	tmpReg := zeroRegister
-	if o.Value != 0 {
-		tmpReg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
-		if err != nil {
-			return err
-		}
-
-		// Load the const.
-		loadConst := c.newProg()
-		loadConst.As = arm64.AMOVW
-		loadConst.From.Type = obj.TYPE_CONST
-		// Note: in raw arm64 assembly, immediates larger than 16-bits
-		// are not supported, but the assembler takes care of this and
-		// emits corresponding 4-instructions to load such large constants.
-		loadConst.From.Offset = int64(uint64(math.Float32bits(o.Value)))
-		loadConst.To.Type = obj.TYPE_REG
-		loadConst.To.Reg = tmpReg
-		c.addInstruction(loadConst)
-	}
-
-	mov := c.newProg()
-	mov.As = arm64.AFMOVS
-	mov.From.Type = obj.TYPE_REG
-	mov.From.Reg = tmpReg
-	mov.To.Type = obj.TYPE_REG
-	mov.To.Reg = reg
-	c.addInstruction(mov)
-
-	loc := c.locationStack.pushValueOnRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeFloat)
-	return nil
+	return c.emitFloatConstant(true, uint64(math.Float32bits(o.Value)))
 }
 
+// compileConstF64 implements compiler.compileConstF64 for the arm64 architecture.
 func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
+	return c.emitFloatConstant(false, math.Float64bits(o.Value))
+}
+
+// emitFloatConstant adds instruction to load a flaot constant.
+// is32bit is true if the target value is originally 32-bit const, false otherwise.
+// value holds the (zero-extended for 32-bit case) bit representation of load target float constant.
+func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 	// Take a register to load the value.
 	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
@@ -578,27 +537,38 @@ func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	}
 
 	tmpReg := zeroRegister
-	if o.Value != 0 {
+	if value != 0 {
+		// If the target value is not zero, we have to load the constant
+		// temporarily into the integer register since we cannot directly
+		// move the const into float register.
 		tmpReg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
 		}
 
-		// Load the const.
 		loadConst := c.newProg()
-		loadConst.As = arm64.AMOVD
+		if is32bit {
+			loadConst.As = arm64.AMOVW
+		} else {
+			loadConst.As = arm64.AMOVD
+		}
 		loadConst.From.Type = obj.TYPE_CONST
 		// Note: in raw arm64 assembly, immediates larger than 16-bits
 		// are not supported, but the assembler takes care of this and
 		// emits corresponding 4-instructions to load such large constants.
-		loadConst.From.Offset = int64(math.Float64bits(o.Value))
+		loadConst.From.Offset = int64(value)
 		loadConst.To.Type = obj.TYPE_REG
 		loadConst.To.Reg = tmpReg
 		c.addInstruction(loadConst)
 	}
 
+	// Use FMOV instruction to move the value on integer register into the float one.
 	mov := c.newProg()
-	mov.As = arm64.AFMOVD
+	if is32bit {
+		mov.As = arm64.AFMOVS
+	} else {
+		mov.As = arm64.AFMOVD
+	}
 	mov.From.Type = obj.TYPE_REG
 	mov.From.Reg = tmpReg
 	mov.To.Type = obj.TYPE_REG
