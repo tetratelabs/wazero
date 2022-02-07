@@ -89,16 +89,16 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 }
 
 func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, constValue int64, destinationRegister int16) {
-	loadConst := c.newProg()
-	loadConst.As = insturction
-	loadConst.From.Type = obj.TYPE_CONST
+	applyConst := c.newProg()
+	applyConst.As = insturction
+	applyConst.From.Type = obj.TYPE_CONST
 	// Note: in raw arm64 assembly, immediates larger than 16-bits
 	// are not supported, but the assembler takes care of this and
 	// emits corresponding (at most) 4-instructions to load such large constants.
-	loadConst.From.Offset = constValue
-	loadConst.To.Type = obj.TYPE_REG
-	loadConst.To.Reg = destinationRegister
-	c.addInstruction(loadConst)
+	applyConst.From.Offset = constValue
+	applyConst.To.Type = obj.TYPE_REG
+	applyConst.To.Reg = destinationRegister
+	c.addInstruction(applyConst)
 }
 
 func (c *arm64Compiler) addLoadToRegisterInstruction(insturction obj.As, baseRegister int16, offset int64, destinationRegister int16) {
@@ -116,17 +116,17 @@ func (c *arm64Compiler) addLoadToRegisterInstruction(insturction obj.As, baseReg
 }
 
 func (c *arm64Compiler) addStoreToMemoryInstruction(insturction obj.As, baseRegister int16, offset int64, source int16) {
-	load := c.newProg()
-	load.As = insturction
-	load.To.Type = obj.TYPE_MEM
-	load.To.Reg = baseRegister
+	store := c.newProg()
+	store.As = insturction
+	store.To.Type = obj.TYPE_MEM
+	store.To.Reg = baseRegister
 	// Note: in raw arm64 assembly, immediates larger than 16-bits
 	// are not supported, but the assembler takes care of this and
 	// emits corresponding (at most) 4-instructions to load such large constants.
-	load.To.Offset = offset
-	load.From.Type = obj.TYPE_REG
-	load.From.Reg = source
-	c.addInstruction(load)
+	store.To.Offset = offset
+	store.From.Type = obj.TYPE_REG
+	store.From.Reg = source
+	c.addInstruction(store)
 }
 
 func (c *arm64Compiler) String() (ret string) { return }
