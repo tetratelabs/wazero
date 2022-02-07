@@ -63,8 +63,8 @@ type compiler interface {
 	// Note: This is called indirect function call in the sense that the target function is indirectly
 	// determined by the current state (top value) of the stack.
 	// Therefore, two checks are performed at runtime before entering the target function:
-	// 1) If "offset" exceeds the length of table, "out of bounds table access" states (jitCallStatusCodeTableOutOfBounds) is returned.
-	// 2) If the type of the function table[offset] doesn't match the specified function type, "type mismatch" status (jitCallStatusCodeTypeMismatchOnIndirectCall) is returned.
+	// 1) If "offset" exceeds the length of table, the function exits with jitCallStatusCodeInvalidTableAccess.
+	// 2) If the type of the function table[offset] doesn't match the specified function type, the function exits with jitCallStatusCodeTypeMismatchOnIndirectCall.
 	// Otherwise, we successfully enter the target function.
 	//
 	// Note: WebAssembly 1.0 (MVP) supports at most one table, so this doesn't support multiple tables.
