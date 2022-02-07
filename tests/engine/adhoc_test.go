@@ -230,37 +230,37 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 func hostFuncWithFloat32Param(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
 	mod, err := text.DecodeModule([]byte(`(module
-		;; 'test_f32param' is a host function which accepts a f32 param
-		;; and tests if it is an expected value.
-		(import "test" "f32param" (func $test.f32param (param f32)))
+		;; 'identity_f32' is a host function which accepts a float32 param.
+		;; It should just return the given value without breaking it.
+		(import "test" "identity_f32" (func $identity_f32 (param f32) (result f32)))
 
-		;; 'call_test_f32' is an exported guest function to call
-		;; the host function, 'test_f32param', from the guest.
-		;; call->test.f32param proxies test.f32param via call in order to test floats aren't corrupted.
-		(func $call->test.f32param (param f32)
+		;; 'call_identity_f32' proxies test.identity_f32 via call in order to test floats aren't corrupted
+		(func $call_identity_f32 (param f32) (result f32)
 			local.get 0
-			call $test_f32param
+			call $identity_f32
 		)
-		(export "call_test_f32param" (func $call_test_f32param))
+		(export "call_identity_f32" (func $call_identity_f32))
 		)`))
 	require.NoError(t, err)
 
 	store := wasm.NewStore(newEngine())
 
-	expectedFloat32Val := float32(math.MaxFloat32) // arbitrary float32 value.
-	// testF32Param is called from the guest function, call_test_f32param.
-	// This function expects the guest to pass expectedF32Val.
-	testF32Param := func(ctx *wasm.HostFunctionCallContext, value float32) {
-		require.Equal(t, expectedFloat32Val, value)
+	// identityF32 is a host function that just returns the given float32 parameter to the guest.
+	identityF32 := func(ctx *wasm.HostFunctionCallContext, value float32) float32 {
+		return value
 	}
-	err = store.AddHostFunction("env", "test_f32param", reflect.ValueOf(testF32Param))
+	err = store.AddHostFunction("env", "identity_f32", reflect.ValueOf(identityF32))
 	require.NoError(t, err)
 
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	// `call_test_f32param` calls the host function `testF32Param` with `expectedF32Val` as its parameter,
-	// and `testF32Param` asserts that it gets `expectedFloat32Val` without the value being corrupted.
-	_, _, err = store.CallFunction(ctx, "test", "call_test_f32param", uint64(math.Float32bits(expectedFloat32Val)))
+	expectedF32Val := float32(math.MaxFloat32) // arbitrary f32 value
+	// This call should return the given `expectedF32Val` without corrupting the value.
+	results, resultTypes, err := store.CallFunction(ctx, "test", "call_identity_f32", uint64(math.Float32bits(expectedF32Val)))
 	require.NoError(t, err)
+	require.Len(t, results, len(resultTypes))
+	require.Equal(t, wasm.ValueTypeF32, resultTypes[0])
+	// Note that the f32 result is returned as a float64 bits value in wazero.
+	require.Equal(t, float64(expectedF32Val), math.Float64frombits(results[0]))
 }
