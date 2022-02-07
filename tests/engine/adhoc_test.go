@@ -230,34 +230,35 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 func hostFuncWithFloat32Param(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
 	mod, err := text.DecodeModule([]byte(`(module
-		;; 'identity_f32' is a host function which accepts a float32 param.
-		;; It should just return the given value without breaking it.
+		;; 'identity_f32' just returns the given value as is.
 		(import "test" "identity_f32" (func $identity_f32 (param f32) (result f32)))
 
-		;; 'call_identity_f32' proxies test.identity_f32 via call in order to test floats aren't corrupted
-		(func $call_identity_f32 (param f32) (result f32)
+		;; 'call->identity_f32' proxies test.identity_f32 via call in order to test floats aren't corrupted
+		;; when the float values are routing through OpCodeCall
+		(func $call->test.identity_f32 (param f32) (result f32)
 			local.get 0
 			call $identity_f32
 		)
-		(export "call_identity_f32" (func $call_identity_f32))
+		(export "call->test.identity_f32" (func $call->test.identity_f32))
 		)`))
 	require.NoError(t, err)
 
 	store := wasm.NewStore(newEngine())
 
-	// identityF32 is a host function that just returns the given float32 parameter to the guest.
+	// identityF32 is a host function that just returns the given float32 parameter as is to the module.
 	identityF32 := func(ctx *wasm.HostFunctionCallContext, value float32) float32 {
 		return value
 	}
-	err = store.AddHostFunction("env", "identity_f32", reflect.ValueOf(identityF32))
+	err = store.AddHostFunction("test", "identity_f32", reflect.ValueOf(identityF32))
 	require.NoError(t, err)
 
-	err = store.Instantiate(mod, "test")
+	err = store.Instantiate(mod, "mod")
 	require.NoError(t, err)
 
 	expectedF32Val := float32(math.MaxFloat32) // arbitrary f32 value
-	// This call should return the given `expectedF32Val` without corrupting the value.
-	results, resultTypes, err := store.CallFunction(ctx, "test", "call_identity_f32", uint64(math.Float32bits(expectedF32Val)))
+	// This call should return the given `expectedF32Val` as is.
+	// That ensures that the float values are not corrupted when they are routed through OpCodeCall.
+	results, resultTypes, err := store.CallFunction(ctx, "mod", "call->test.identity_f32", uint64(math.Float32bits(expectedF32Val)))
 	require.NoError(t, err)
 	require.Len(t, results, len(resultTypes))
 	require.Equal(t, wasm.ValueTypeF32, resultTypes[0])
