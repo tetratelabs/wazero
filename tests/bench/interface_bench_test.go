@@ -8,7 +8,7 @@ import (
 func BenchmarkInterfaceVSUnexport(b *testing.B) {
 	const size = 100
 	const val = 55
-	var memInterface MemoryInstanceInteface = &memoryInstance{buffer: make([]byte, size)}
+	var memInterface MemoryInstanceInterface = &memoryInstance{buffer: make([]byte, size)}
 	var memStruct = &memoryInstance{buffer: make([]byte, size)}
 
 	b.Run("interface", func(b *testing.B) {
