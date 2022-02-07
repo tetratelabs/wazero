@@ -30,11 +30,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: check-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+          key: check-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
       - run: make lint
-
-      - run: make build.lib
 
       - run: make build.spectest
 
