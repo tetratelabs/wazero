@@ -90,7 +90,7 @@ func (c *arm64Compiler) String() (ret string) { return }
 
 func (c *arm64Compiler) emitPreamble() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
-	nop := c.newInstruction()
+	nop := c.newProg()
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
 	return nil
@@ -103,7 +103,7 @@ func (c *arm64Compiler) returnFunction() {
 
 	// Since we return from the function, we need to decrement the callframe stack pointer.
 	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	loadCurrentCallFramPointer := c.newInstruction()
+	loadCurrentCallFramPointer := c.newProg()
 	loadCurrentCallFramPointer.As = arm64.AMOVD
 	loadCurrentCallFramPointer.To.Type = obj.TYPE_REG
 	loadCurrentCallFramPointer.To.Reg = callFramePointerReg
@@ -112,7 +112,7 @@ func (c *arm64Compiler) returnFunction() {
 	loadCurrentCallFramPointer.From.Offset = engineGlobalContextCallFrameStackPointerOffset
 	c.addInstruction(loadCurrentCallFramPointer)
 
-	decCallFrameStackPointer := c.newInstruction()
+	decCallFrameStackPointer := c.newProg()
 	decCallFrameStackPointer.As = arm64.ASUBS
 	decCallFrameStackPointer.To.Type = obj.TYPE_REG
 	decCallFrameStackPointer.To.Reg = callFramePointerReg
@@ -120,7 +120,7 @@ func (c *arm64Compiler) returnFunction() {
 	decCallFrameStackPointer.From.Offset = 1
 	c.addInstruction(decCallFrameStackPointer)
 
-	writeDecrementedCallFrameStackPoitner := c.newInstruction()
+	writeDecrementedCallFrameStackPoitner := c.newProg()
 	writeDecrementedCallFrameStackPoitner.As = arm64.AMOVD
 	writeDecrementedCallFrameStackPoitner.To = loadCurrentCallFramPointer.From
 	writeDecrementedCallFrameStackPoitner.From = loadCurrentCallFramPointer.To
@@ -134,7 +134,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 	tmp, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
 	if status != 0 {
-		loadStatusConst := c.newInstruction()
+		loadStatusConst := c.newProg()
 		loadStatusConst.As = arm64.AMOVW
 		loadStatusConst.To.Type = obj.TYPE_REG
 		loadStatusConst.To.Reg = tmp
@@ -142,7 +142,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 		loadStatusConst.From.Offset = int64(status)
 		c.addInstruction(loadStatusConst)
 
-		setJitStatus := c.newInstruction()
+		setJitStatus := c.newProg()
 		setJitStatus.As = arm64.AMOVWU
 		setJitStatus.From.Type = obj.TYPE_REG
 		setJitStatus.From.Reg = tmp
@@ -152,7 +152,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 		c.addInstruction(setJitStatus)
 	} else {
 		// If the status == 0, we simply use zero register to store zero.
-		setJitStatus := c.newInstruction()
+		setJitStatus := c.newProg()
 		setJitStatus.As = arm64.AMOVWU
 		setJitStatus.From.Type = obj.TYPE_REG
 		setJitStatus.From.Reg = arm64.REGZERO
@@ -165,7 +165,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
 	// is embedded in engine. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
-	loadReturnAddress := c.newInstruction()
+	loadReturnAddress := c.newProg()
 	loadReturnAddress.As = arm64.AMOVD
 	loadReturnAddress.To.Type = obj.TYPE_REG
 	loadReturnAddress.To.Reg = tmp
@@ -174,7 +174,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 	loadReturnAddress.From.Offset = engineArchContextJITCallReturnAddressOffset
 	c.addInstruction(loadReturnAddress)
 
-	ret := c.newInstruction()
+	ret := c.newProg()
 	ret.As = obj.ARET
 	ret.To.Type = obj.TYPE_REG
 	ret.To.Reg = tmp
