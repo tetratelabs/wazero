@@ -873,7 +873,7 @@ func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) *Ho
 	}
 }
 
-// Context returns the host call's context. To change the context, use WithContext.
+// Context returns the host call's context.
 //
 // The returned context is always non-nil; it defaults to the background context.
 func (c *HostFunctionCallContext) Context() context.Context {
