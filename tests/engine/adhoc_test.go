@@ -3,6 +3,7 @@ package adhoc
 import (
 	"context"
 	_ "embed"
+	"math"
 	"reflect"
 	"runtime"
 	"sync"
@@ -59,6 +60,9 @@ func runTests(t *testing.T, newEngine func() wasm.Engine) {
 	})
 	t.Run("imported-and-exported func", func(t *testing.T) {
 		importedAndExportedFunc(t, newEngine)
+	})
+	t.Run("host function with float32 type", func(t *testing.T) {
+		hostFuncWithFloat32Param(t, newEngine)
 	})
 }
 
@@ -194,9 +198,9 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 	require.NoError(t, err)
 }
 
+// Test that the engine can call "imported-and-then-exported-back" function correctly
 func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
-	// Test that the engine can call "imported-and-then-exported-back" function correctly
 	mod, err := text.DecodeModule([]byte(`(module
 		;; arbitrary function with params
 		(import "env" "add_int" (func $add_int (param i32 i32) (result i32)))
@@ -220,4 +224,44 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	results, _, err := store.CallFunction(ctx, "test", "add_int", uint64(12), uint64(30))
 	require.NoError(t, err)
 	require.Equal(t, uint64(42), results[0])
+}
+
+// Test that host functions can handle float parameter without corrupting the value
+func hostFuncWithFloat32Param(t *testing.T, newEngine func() wasm.Engine) {
+	ctx := context.Background()
+	mod, err := text.DecodeModule([]byte(`(module
+		;; 'identity_f32' is a host function which accepts a float32 param.
+		;; It should just return the given value without breaking it.
+		(import "env" "identity_f32" (func $identity_f32 (param f32) (result f32)))
+
+		;; 'call_identity_f32' is an exported guest function to call
+		;; the host function, 'identity_f32' from the guest.
+		(func $call_identity_f32 (param f32) (result f32)
+			local.get 0
+			call $identity_f32
+		)
+		(export "call_identity_f32" (func $call_identity_f32))
+		)`))
+	require.NoError(t, err)
+
+	store := wasm.NewStore(newEngine())
+
+	// identityF32 is a host function that just returns the given float32 parameter to the guest.
+	identityF32 := func(ctx *wasm.HostFunctionCallContext, value float32) float32 {
+		return value
+	}
+	err = store.AddHostFunction("env", "identity_f32", reflect.ValueOf(identityF32))
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, "test")
+	require.NoError(t, err)
+
+	expectedF32Val := float32(math.MaxFloat32) // arbitrary f32 value
+	// This call should return the given `expectedF32Val` without corrupting the value.
+	results, resultTypes, err := store.CallFunction(ctx, "test", "call_identity_f32", uint64(math.Float32bits(expectedF32Val)))
+	require.NoError(t, err)
+	require.Len(t, results, len(resultTypes))
+	require.Equal(t, wasm.ValueTypeF32, resultTypes[0])
+	// Note that the f32 result is returned as a float64 bits value in wazero.
+	require.Equal(t, float64(expectedF32Val), math.Float64frombits(results[0]))
 }

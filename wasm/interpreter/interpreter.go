@@ -501,7 +501,9 @@ func (it *interpreter) callHostFunc(ctx context.Context, f *interpreterFunction)
 		raw := it.pop()
 		kind := tp.In(i).Kind()
 		switch kind {
-		case reflect.Float64, reflect.Float32:
+		case reflect.Float32:
+			val.SetFloat(float64(math.Float32frombits(uint32(raw))))
+		case reflect.Float64:
 			val.SetFloat(math.Float64frombits(raw))
 		case reflect.Uint32, reflect.Uint64:
 			val.SetUint(raw)
