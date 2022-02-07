@@ -136,26 +136,27 @@ func (c *arm64Compiler) returnFunction() {
 	c.exit(jitCallStatusCodeReturned)
 }
 
+// exit adds instruction to give th
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
 	tmp, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
-	// Write back the cached SP to the actual eng.stackPointer.
-	loadStackPointer := c.newProg()
-	loadStackPointer.As = arm64.AMOVW
-	loadStackPointer.To.Type = obj.TYPE_REG
-	loadStackPointer.To.Reg = tmp
-	loadStackPointer.From.Type = obj.TYPE_CONST
-	loadStackPointer.From.Offset = int64(c.locationStack.sp)
-	c.addInstruction(loadStackPointer)
+	// Write the current stack pointer to the engine.stackPointer.
+	loadStackPointerConst := c.newProg()
+	loadStackPointerConst.As = arm64.AMOVW
+	loadStackPointerConst.To.Type = obj.TYPE_REG
+	loadStackPointerConst.To.Reg = tmp
+	loadStackPointerConst.From.Type = obj.TYPE_CONST
+	loadStackPointerConst.From.Offset = int64(c.locationStack.sp)
+	c.addInstruction(loadStackPointerConst)
 
-	prog := c.newProg()
-	prog.As = arm64.AMOVW
-	prog.From.Type = obj.TYPE_REG
-	prog.From.Reg = tmp
-	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineValueStackContextStackPointerOffset
-	c.addInstruction(prog)
+	writeStackPointerToEngine := c.newProg()
+	writeStackPointerToEngine.As = arm64.AMOVW
+	writeStackPointerToEngine.From.Type = obj.TYPE_REG
+	writeStackPointerToEngine.From.Reg = tmp
+	writeStackPointerToEngine.To.Type = obj.TYPE_MEM
+	writeStackPointerToEngine.To.Reg = reservedRegisterForEngine
+	writeStackPointerToEngine.To.Offset = engineValueStackContextStackPointerOffset
+	c.addInstruction(writeStackPointerToEngine)
 
 	if status != 0 {
 		loadStatusConst := c.newProg()
@@ -674,16 +675,11 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
 	c.addInstruction(calcStackBasePointerAddress)
 }
 
-// setShiftedRegister modifies the given *obj.Prog so that .From or .To
-// becomes the "shifted register". For example, this is used to emit instruction like
+// setShiftedRegister modifies the given *obj.Prog so that .From (source operand)
+// becomes the "left shifted register". For example, this is used to emit instruction like
 // "add  x1, x2, x3, lsl #3" which means "x1 = x2 + (x3 << 3)".
-// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131.
-func setLeftShiftedRegister(inst *obj.Prog, onFrom bool, register int16, shiftNum int64) {
-	if onFrom {
-		inst.From.Type = obj.TYPE_SHIFT
-		inst.From.Offset = (int64(register)&31)<<16 | 0<<22 | (shiftNum&63)<<10
-	} else {
-		inst.To.Type = obj.TYPE_SHIFT
-		inst.To.Offset = (int64(register)&31)<<16 | 0<<22 | (shiftNum&63)<<10
-	}
+// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131
+func setLeftShiftedRegister(inst *obj.Prog, register int16, shiftNum int64) {
+	inst.From.Type = obj.TYPE_SHIFT
+	inst.From.Offset = (int64(register)&31)<<16 | 0<<22 | (shiftNum&63)<<10
 }
