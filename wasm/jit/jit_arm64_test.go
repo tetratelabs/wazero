@@ -142,6 +142,8 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
+					compiler.locationStack.pushValueOnStack()
+
 					switch op {
 					case wazeroir.OperationKindConstI32:
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(val)})
@@ -154,9 +156,11 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 					}
 					require.NoError(t, err)
 
+					// After compiling const operations, we must see the register allocated value on the top of value.
 					loc := compiler.locationStack.peek()
 					require.True(t, loc.onRegister())
 
+					// Release the register allocated value to the memory stack so that we can see the value after exiting.
 					compiler.releaseRegisterToStack(loc)
 					compiler.returnFunction()
 
