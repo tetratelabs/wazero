@@ -321,6 +321,7 @@ func (s *Store) Instantiate(module *Module, name string) error {
 // signature mismatch.
 //
 // Note: The ctx parameter will be the outer-most ancestor of HostFunctionCallContext.Context.
+// ctx will default to context.Background() is nil is passed.
 // Note: this API is unstable. See tetratelabs/wazero#170
 func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
 	var exp *ExportInstance
