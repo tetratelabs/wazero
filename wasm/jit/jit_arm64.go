@@ -667,7 +667,20 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
 	calcStackBasePointerAddress.As = arm64.AADD
 	calcStackBasePointerAddress.To.Type = obj.TYPE_REG
 	calcStackBasePointerAddress.To.Reg = reservedRegisterForStackBasePointerAddress
-	calcStackBasePointerAddress.From.Type = obj.TYPE_SHIFT
-	calcStackBasePointerAddress.From.Offset = (int64(tmpReg)&31)<<16 | 0<<22 | (3&63)<<10
+	setShiftedRegister(calcStackBasePointerAddress, true, tmpReg, 3)
 	c.addInstruction(calcStackBasePointerAddress)
+}
+
+// setShiftedRegister modifies the given *obj.Prog so that .From or .To
+// becomes the "shifted register". For example, this is used to emit instruction like
+// "add  x1, x2, x3, lsl #3" which means "x1 = x2 + (x3 << 3)".
+// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131.
+func setShiftedRegister(inst *obj.Prog, onFrom bool, register int16, shiftNum int64) {
+	if onFrom {
+		inst.From.Type = obj.TYPE_SHIFT
+		inst.From.Offset = (int64(register)&31)<<16 | 0<<22 | (shiftNum&63)<<10
+	} else {
+		inst.To.Type = obj.TYPE_SHIFT
+		inst.To.Offset = (int64(register)&31)<<16 | 0<<22 | (shiftNum&63)<<10
+	}
 }
