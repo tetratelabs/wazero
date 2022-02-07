@@ -281,6 +281,7 @@ func (c *amd64Compiler) newProg() (prog *obj.Prog) {
 	return
 }
 
+// compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
 func (c *amd64Compiler) compileUnreachable() error {
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -289,6 +290,7 @@ func (c *amd64Compiler) compileUnreachable() error {
 	return nil
 }
 
+// compileUnreachable implements compiler.compileUnreachable for the amd64 architecture.
 func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	index := int(c.locationStack.sp) - 1 - o.Depth
 	// Note that, in theory, the register types and value types
@@ -376,8 +378,7 @@ func (c *amd64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	return nil
 }
 
-// compileGlobalGet adds instructions to read the value of the given index in the ModuleInstance.Globals
-// and push the value onto the stack.
+// compileGlobalGet implements compiler.compileGlobalGet for the amd64 architecture.
 func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -451,6 +452,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	return nil
 }
 
+// compileGlobalSet implements compiler.compileGlobalSet for the amd64 architecture.
 func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	// First, move the value to set into a temporary register.
 	val := c.locationStack.pop()
@@ -508,6 +510,7 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	return nil
 }
 
+// compileBr implements compiler.compileBr for the amd64 architecture.
 func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -551,6 +554,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 	return nil
 }
 
+// compileBrIf implements compiler.compileBrIf for the amd64 architecture.
 func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	cond := c.locationStack.pop()
 	var jmpWithCond *obj.Prog
@@ -689,14 +693,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	return nil
 }
 
-// compileBrTable adds instructions to do br_table operation.
-// A br_table operation has list of targets and default target, and
-// this pops a value from the stack (called "index") and decide which branch we go into next
-// based on the value.
-//
-// For example, assume we have operations like {default: L_DEFAULT, targets: [L0, L1, L2]}.
-// If "index" >= len(defaults), then branch into the L_DEFAULT label.
-// Othewise, we enter label of targets[index].
+// compileBrTable implements compiler.compileBrTable for the amd64 architecture.
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
 
@@ -903,11 +900,7 @@ func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Pr
 	}
 }
 
-// compileLabel initiates the given label's machine code generation, and emit the
-// NOP instruction as a initial one so that branch operations can target it without
-// knowing the following instructions.
-// Returns true if the label doesn't have any caller, and it is ok to skip the
-// entire operations in the given label.
+// compileLabel implements compiler.compileLabel for the amd64 architecture.
 func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool) {
 	if buildoptions.IsDebugMode {
 		fmt.Printf("[label %s ends]\n\n", c.currentLabel)
@@ -952,6 +945,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	return
 }
 
+// compileCall implements compiler.compileCall for the amd64 architecture.
 func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -982,18 +976,7 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	return nil
 }
 
-// compileCallIndirect adds instructions to perform call_indirect operation.
-// This consumes the one value from the top of stack (called "offset"),
-// and make a function call against the function whose function address equals "table[offset]".
-//
-// Note: This is called indirect function call in the sense that the target function is indirectly
-// determined by the current state (top value) of the stack.
-// Therefore, two checks are performed at runtime before entering the target function:
-// 1) If "offset" exceeds the length of table, "out of bounds table access" states (jitCallStatusCodeTableOutOfBounds) is returned.
-// 2) If the type of the function table[offset] doesn't match the specified function type, "type mismatch" status (jitCallStatusCodeTypeMismatchOnIndirectCall) is returned.
-// Otherwise, we successfully enter the target function.
-//
-// Note: WebAssembly 1.0 (MVP) supports at most one table, so this doesn't support multiple tables.
+// compileCallIndirect implements compiler.compileCallIndirect for the amd64 architecture.
 func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
 	offset := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(offset); err != nil {
@@ -1118,6 +1101,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	return nil
 }
 
+// compileDrop implements compiler.compileDrop for the amd64 architecture.
 func (c *amd64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 	return c.emitDropRange(o.Range)
 }
@@ -1164,10 +1148,8 @@ func (c *amd64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	return nil
 }
 
-// compileSelect uses top three values on the stack:
-// Assume we have stack as [..., x1, x2, c], if the value of c
-// equals zero, then the stack results in [..., x1]
-// otherwise, [..., x2].
+// compileSelect implements compiler.compileSelect for the amd64 architecture.
+//
 // The emitted native code depends on whether the values are on
 // the physical registers or memory stack, or maybe conditional register.
 func (c *amd64Compiler) compileSelect() error {
@@ -1235,6 +1217,7 @@ func (c *amd64Compiler) compileSelect() error {
 	return nil
 }
 
+// compilePick implements compiler.compilePick for the amd64 architecture.
 func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	// If the top value is conditional one, we must save it before executing the following instructions
 	// as they clear the conditional flag, meaning that the conditional value might change.
@@ -1278,6 +1261,7 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	return nil
 }
 
+// compileAdd implements compiler.compileAdd for the amd64 architecture.
 func (c *amd64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
@@ -1319,6 +1303,7 @@ func (c *amd64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	return nil
 }
 
+// compileSub implements compiler.compileSub for the amd64 architecture.
 func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
@@ -1360,8 +1345,7 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	return nil
 }
 
-// compileMul adds instructions to multiply two operands which may be on the stack or registers.
-// After execution, the result of multiplication pushed onto the stack.
+// compileMul implements compiler.compileMul for the amd64 architecture.
 func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
@@ -1495,9 +1479,7 @@ func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
 	return nil
 }
 
-// compileClz emits instructions to count up the leading zeros in the
-// current top of the stack, and push the count result.
-// For example, stack of [..., 0x00_ff_ff_ff] results in [..., 8].
+// compileClz implements compiler.compileClz for the amd64 architecture.
 func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	target := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -1594,9 +1576,7 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	return nil
 }
 
-// compileCtz emits instructions to count up the trailing zeros in the
-// current top of the stack, and push the count result.
-// For example, stack of [..., 0xff_ff_ff_00] results in [..., 8].
+// compileCtz implements compiler.compileCtz for the amd64 architecture.
 func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	target := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -1674,9 +1654,7 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	return nil
 }
 
-// compilePopcnt emits instructions to count up the number of set bits in the
-// current top of the stack, and push the count result.
-// For example, stack of [..., 0b00_00_00_11] results in [..., 2].
+// compilePopcnt implements compiler.compilePopcnt for the amd64 architecture.
 func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	target := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -1702,7 +1680,7 @@ func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	return nil
 }
 
-// compileDiv emits the instructions to perform division on the top two values on the stack.
+// compileDiv implements compiler.compileDiv for the amd64 architecture.
 func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
@@ -1724,7 +1702,7 @@ func (c *amd64Compiler) compileDiv(o *wazeroir.OperationDiv) (err error) {
 // compileDivForInts emits the instructions to perform division on the top
 // two values of integer type on the stack and puts the quotient of the result
 // onto the stack. For example, stack [..., 10, 3] results in [..., 3] where
-// the remainder is discarded. See compileRem for how to acquire remainder, not quotient.
+// the remainder is discarded.
 func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	if err := c.performDivisionOnInts(false, is32Bit, signed); err != nil {
 		return err
@@ -1736,10 +1714,7 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	return nil
 }
 
-// compileRem emits the instructions to perform division on the top
-// two values of integer type on the stack and puts the remainder of the result
-// onto the stack. For example, stack [..., 10, 3] results in [..., 1] where
-// the quotient is discarded. See compileDivForInts for how to acquire quotient, not remainder.
+// compileRem implements compiler.compileRem for the amd64 architecture.
 func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
@@ -2030,8 +2005,7 @@ func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 	}
 }
 
-// compileAnd emits instructions to perform an "and" operation on
-// top two values on the stack, and pushes the result.
+// compileAnd implements compiler.compileAnd for the amd64 architecture.
 func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -2042,8 +2016,7 @@ func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 	return
 }
 
-// compileOr emits instructions to perform an "or" operation on
-// top two values on the stack, and pushes the result.
+// compileOr implements compiler.compileOr for the amd64 architecture.
 func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -2054,8 +2027,7 @@ func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 	return
 }
 
-// compileXor emits instructions to perform an xor operation on
-// top two values on the stack, and pushes the result.
+// compileXor implements compiler.compileXor for the amd64 architecture.
 func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -2100,8 +2072,7 @@ func (c *amd64Compiler) emitSimpleBinaryOp(instruction obj.As) error {
 	return nil
 }
 
-// compileShl emits instructions to perform a shift-left operation on
-// top two values on the stack, and pushes the result.
+// compileShl implements compiler.compileShl for the amd64 architecture.
 func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -2112,8 +2083,7 @@ func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	return
 }
 
-// compileShr emits instructions to perform a shift-right operation on
-// top two values on the stack, and pushes the result.
+// compileShr implements compiler.compileShr for the amd64 architecture.
 func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
@@ -2128,8 +2098,7 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	return
 }
 
-// compileRotl emits instructions to perform a rotate-left operation on
-// top two values on the stack, and pushes the result.
+// compileRotl implements compiler.compileRotl for the amd64 architecture.
 func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -2140,8 +2109,7 @@ func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	return
 }
 
-// compileRotr emits instructions to perform a rotate-right operation on
-// top two values on the stack, and pushes the result.
+// compileRotr implements compiler.compileRotr for the amd64 architecture.
 func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
@@ -2218,8 +2186,8 @@ func (c *amd64Compiler) emitShiftOp(instruction obj.As, is32Bit bool) error {
 	return nil
 }
 
-// compileAbs adds instructions to replace the top value of float type on the stack with its absolute value.
-// For example, stack [..., -1.123] results in [..., 1.123].
+// compileAbs implements compiler.compileAbs for the amd64 architecture.
+//
 // See the following discussions for how we could take the abs of floats on x86 assembly.
 // https://stackoverflow.com/questions/32408665/fastest-way-to-compute-absolute-value-using-sse/32422471#32422471
 // https://stackoverflow.com/questions/44630015/how-would-fabsdouble-be-implemented-on-x86-is-it-an-expensive-operation
@@ -2257,8 +2225,7 @@ func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 	return nil
 }
 
-// compileNeg adds instructions to replace the top value of float type on the stack with its negated value.
-// For example, stack [..., -1.123] results in [..., 1.123].
+// compileNeg implements compiler.compileNeg for the amd64 architecture.
 func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -2302,34 +2269,28 @@ func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 	return nil
 }
 
-// compileCeil adds instructions to replace the top value of float type on the stack with its ceiling value.
-// For example, stack [..., 1.123] results in [..., 2.0]. This is equivalent to math.Ceil.
+// compileCeil implements compiler.compileCeil for the amd64 architecture.
 func (c *amd64Compiler) compileCeil(o *wazeroir.OperationCeil) (err error) {
 	// Internally, ceil can be performed via ROUND instruction with 0x02 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/ceilf.S for example.
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x02)
 }
 
-// compileFloor adds instructions to replace the top value of float type on the stack with its floor value.
-// For example, stack [..., 1.123] results in [..., 1.0]. This is equivalent to math.Floor.
+// compileFloor implements compiler.compileFloor for the amd64 architecture.
 func (c *amd64Compiler) compileFloor(o *wazeroir.OperationFloor) (err error) {
 	// Internally, floor can be performed via ROUND instruction with 0x01 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/floorf.S for example.
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x01)
 }
 
-// compileTrunc adds instructions to replace the top value of float type on the stack with its truncated value.
-// For example, stack [..., 1.9] results in [..., 1.0]. This is equivalent to math.Trunc.
+// compileTrunc implements compiler.compileTrunc for the amd64 architecture.
 func (c *amd64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	// Internally, trunc can be performed via ROUND instruction with 0x03 mode.
 	// See https://android.googlesource.com/platform/bionic/+/882b8af/libm/x86_64/truncf.S for example.
 	return c.emitRoundInstruction(o.Type == wazeroir.Float32, 0x03)
 }
 
-// compileNearest adds instructions to replace the top value of float type on the stack with its nearest integer value.
-// For example, stack [..., 1.9] results in [..., 2.0]. This is NOT equivalent to math.Round and instead has the same
-// the semantics of LLVM's rint instrinsic. See https://llvm.org/docs/LangRef.html#llvm-rint-intrinsic.
-// For example, math.Round(-4.5) produces -5 while ROUND with 0x00 mode produces -4.
+// compileNearest implements compiler.compileNearest for the amd64 architecture.
 func (c *amd64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	// Internally, nearest can be performed via ROUND instruction with 0x00 mode.
 	// If we compile the following Wat by "wasmtime wasm2obj",
@@ -2383,9 +2344,7 @@ func (c *amd64Compiler) emitRoundInstruction(is32Bit bool, mode int64) error {
 	return nil
 }
 
-// compileMin adds instructions to pop two values from the stack, and push back the maximum of
-// these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 1.9].
-// For the cases where NaN involves, see the doc of emitMinOrMax below.
+// compileMin implements compiler.compileMin for the amd64 architecture.
 func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
@@ -2395,9 +2354,7 @@ func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	}
 }
 
-// compileMax adds instructions to pop two values from the stack, and push back the maximum of
-// these two values onto the stack. For example, stack [..., 100.1, 1.9] results in [..., 100.1].
-// For the cases where NaN involves, see the doc of emitMinOrMax below.
+// compileMax implements compiler.compileMax for the amd64 architecture.
 func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
@@ -2509,9 +2466,7 @@ func (c *amd64Compiler) emitMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) e
 	return nil
 }
 
-// compileCopysign adds instructions to pop two float values from the stack, and copy the signbit of
-// the first-popped value to the last one.
-// For example, stack [..., 1.213, -5.0] results in [..., -1.213].
+// compileCopysign implements compiler.compileCopysign for the amd64 architecture.
 func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	is32Bit := o.Type == wazeroir.Float32
 
@@ -2602,8 +2557,7 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	return nil
 }
 
-// compileSqrt adds instructions to replace the top value of float type on the stack with its square root.
-// For example, stack [..., 9.0] results in [..., 3.0]. This is equivalent to "math.Sqrt".
+// compileSqrt implements compiler.compileSqrt for the amd64 architecture.
 func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -2624,8 +2578,7 @@ func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	return nil
 }
 
-// compileI32WrapFromI64 adds instructions to replace the 64-bit int on top of the stack
-// with the corresponding 32-bit integer. This is equivalent to uint64(uint32(v)) in Go.
+// compileI32WrapFromI64 implements compiler.compileI32WrapFromI64 for the amd64 architecture.
 func (c *amd64Compiler) compileI32WrapFromI64() error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -2642,23 +2595,15 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 	return nil
 }
 
-// compileITruncFromF adds instructions to replace the top value of float type on the stack with
-// the corresponding int value. This is equivalent to int32(math.Trunc(float32(x))), uint32(math.Trunc(float64(x))), etc in Go.
+// compileITruncFromF implements compiler.compileITruncFromF for the amd64 architecture.
 //
-// Please refer to [1] and [2] for when we encounter undefined behavior in the WebAssembly specification.
-// To summarize, if the source float value is NaN or doesn't fit in the destination range of integers (incl. +=Inf),
-// then the runtime behavior is undefined. In wazero, we exit the function in these undefined cases with
-// jitCallStatusCodeInvalidFloatToIntConversion status code.
-// [1] https://www.w3.org/TR/wasm-core-1/#-hrefop-trunc-umathrmtruncmathsfu_m-n-z for unsigned integers.
-// [2] https://www.w3.org/TR/wasm-core-1/#-hrefop-trunc-smathrmtruncmathsfs_m-n-z for signed integers.
-//
+// Note: in the follwoing implementations, we use CVTSS2SI and CVTSD2SI to convert floats to signed integers.
+// According to the Intel manual ([1],[2]), if the source float value is either +-Inf or NaN, or it exceeds representative ranges
+// of target signed integer, then the instruction returns "masked" response float32SignBitMask (or float64SignBitMask for 64 bit case).
+// [1] Chapter 11.5.2, SIMD Floating-Point Exception Conditions in "Vol 1, Intel® 64 and IA-32 Architectures Manual"
+//     https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
+// [2] https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol1/o_7281d5ea06a5b67a-268.html
 func (c *amd64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) (err error) {
-	// Note: in the follwoing implementations, we use CVTSS2SI and CVTSD2SI to convert floats to signed integers.
-	// According to the Intel manual ([1],[2]), if the source float value is either +-Inf or NaN, or it exceeds representative ranges
-	// of target signed integer, then the instruction returns "masked" response float32SignBitMask (or float64SignBitMask for 64 bit case).
-	// [1] Chapter 11.5.2, SIMD Floating-Point Exception Conditions in "Vol 1, Intel® 64 and IA-32 Architectures Manual"
-	//     https://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-software-developer-vol-1-manual.html
-	// [2] https://xem.github.io/minix86/manual/intel-x86-and-64-manual-vol1/o_7281d5ea06a5b67a-268.html
 	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
 		err = c.emitSignedI32TruncFromFloat(true)
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
@@ -3224,8 +3169,7 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	return nil
 }
 
-// compileFConvertFromI adds instructions to replace the top value of int type on the stack with
-// the corresponding float value. This is equivalent to float32(uint32(x)), float32(int32(x)), etc in Go.
+// compileFConvertFromI implements compiler.compileFConvertFromI for the amd64 architecture.
 func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
 	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
 		err = c.emitSimpleConversion(x86.ACVTSL2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 32bit int
@@ -3446,8 +3390,7 @@ func (c *amd64Compiler) emitSimpleConversion(convInstruction obj.As, destination
 	return nil
 }
 
-// compileF32DemoteFromF64 adds instructions to replace the 64-bit float on top of the stack
-// with the corresponding 32-bit float. This is equivalent to float32(float64(v)) in Go.
+// compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the amd64 architecture.
 func (c *amd64Compiler) compileF32DemoteFromF64() error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -3464,8 +3407,7 @@ func (c *amd64Compiler) compileF32DemoteFromF64() error {
 	return nil
 }
 
-// compileF64PromoteFromF32 adds instructions to replace the 32-bit float on top of the stack
-// with the corresponding 64-bit float. This is equivalent to float64(float32(v)) in Go.
+// compileF64PromoteFromF32 implements compiler.compileF64PromoteFromF32 for the amd64 architecture.
 func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
@@ -3482,54 +3424,47 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 	return nil
 }
 
-// compileI32ReinterpretFromF32 adds instructions to reinterpret the 32-bit float on top of the stack
-// as a 32-bit integer by preserving the bit representation. If the value is on the stack,
-// this is no-op as there is nothing to do for converting type.
+// compileI32ReinterpretFromF32 implements compiler.compileI32ReinterpretFromF32 for the amd64 architecture.
 func (c *amd64Compiler) compileI32ReinterpretFromF32() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
 		peek.setRegisterType(generalPurposeRegisterTypeInt)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeInt)
 }
 
-// compileI64ReinterpretFromF64 adds instructions to reinterpret the 64-bit float on top of the stack
-// as a 64-bit integer by preserving the bit representation. If the value is on the stack,
-// this is no-op as there is nothing to do for converting type.
+// compileI64ReinterpretFromF64 implements compiler.compileI64ReinterpretFromF64 for the amd64 architecture.
 func (c *amd64Compiler) compileI64ReinterpretFromF64() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
 		peek.setRegisterType(generalPurposeRegisterTypeInt)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeInt)
 }
 
-// compileF32ReinterpretFromI32 adds instructions to reinterpret the 32-bit int on top of the stack
-// as a 32-bit float by preserving the bit representation. If the value is on the stack,
-// this is no-op as there is nothing to do for converting type.
+// compileF32ReinterpretFromI32 implements compiler.compileF32ReinterpretFromI32 for the amd64 architecture.
 func (c *amd64Compiler) compileF32ReinterpretFromI32() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
 		peek.setRegisterType(generalPurposeRegisterTypeFloat)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeFloat)
 }
 
-// compileF64ReinterpretFromI64 adds instructions to reinterpret the 64-bit int on top of the stack
-// as a 64-bit float by preserving the bit representation. If the value is on the stack,
-// this is no-op as there is nothing to do for converting type.
+// compileF64ReinterpretFromI64 implements compiler.compileF64ReinterpretFromI64 for the amd64 architecture.
 func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
 		peek.setRegisterType(generalPurposeRegisterTypeFloat)
 		return nil
 	}
 	return c.emitSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeFloat)
 }
 
-// compileExtend adds instructions to extend the 32-bit signed or unsigned int on top of the stack
-// as a 64-bit integer of coressponding signedness. For unsigned case, this is just reinterpreting the
-// underlying bit pattern as 64-bit integer. For signed case, this is sign-extension which preserves the
-// original integer's sign.
+// compileExtend implements compiler.compileExtend for the amd64 architecture.
 func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
