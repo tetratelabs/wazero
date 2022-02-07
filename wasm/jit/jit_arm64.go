@@ -546,12 +546,12 @@ func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 
 		// Load the const.
 		loadConst := c.newProg()
-		loadConst.As = arm64.AMOVD
+		loadConst.As = arm64.AMOVW
 		loadConst.From.Type = obj.TYPE_CONST
-		loadConst.From.Offset = int64(uint64(math.Float32bits(o.Value)))
 		// Note: in raw arm64 assembly, immediates larger than 16-bits
 		// are not supported, but the assembler takes care of this and
 		// emits corresponding 4-instructions to load such large constants.
+		loadConst.From.Offset = int64(uint64(math.Float32bits(o.Value)))
 		loadConst.To.Type = obj.TYPE_REG
 		loadConst.To.Reg = tmpReg
 		c.addInstruction(loadConst)
@@ -571,7 +571,43 @@ func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 }
 
 func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	// Take a register to load the value.
+	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	tmpReg := zeroRegister
+	if o.Value != 0 {
+		tmpReg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+
+		// Load the const.
+		loadConst := c.newProg()
+		loadConst.As = arm64.AMOVD
+		loadConst.From.Type = obj.TYPE_CONST
+		// Note: in raw arm64 assembly, immediates larger than 16-bits
+		// are not supported, but the assembler takes care of this and
+		// emits corresponding 4-instructions to load such large constants.
+		loadConst.From.Offset = int64(math.Float64bits(o.Value))
+		loadConst.To.Type = obj.TYPE_REG
+		loadConst.To.Reg = tmpReg
+		c.addInstruction(loadConst)
+	}
+
+	mov := c.newProg()
+	mov.As = arm64.AFMOVD
+	mov.From.Type = obj.TYPE_REG
+	mov.From.Reg = tmpReg
+	mov.To.Type = obj.TYPE_REG
+	mov.To.Reg = reg
+	c.addInstruction(mov)
+
+	loc := c.locationStack.pushValueOnRegister(reg)
+	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	return nil
 }
 
 func (c *arm64Compiler) pushZeroValue() {

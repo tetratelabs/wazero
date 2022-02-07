@@ -117,12 +117,12 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 		wazeroir.OperationKindConstI32,
 		wazeroir.OperationKindConstI64,
 		wazeroir.OperationKindConstF32,
-		// wazeroir.OperationKindConstF64,
+		wazeroir.OperationKindConstF64,
 	} {
 		op := op
 		t.Run(op.String(), func(t *testing.T) {
 			for _, val := range []uint64{
-				0x1, 0x1111000, 1 << 16, 1 << 21, 1 << 27, 1 << 32, 1<<32 + 1, 1 << 53,
+				0x0, 0x1, 0x1111000, 1 << 16, 1 << 21, 1 << 27, 1 << 32, 1<<32 + 1, 1 << 53,
 				math.Float64bits(math.Inf(1)),
 				math.Float64bits(math.Inf(-1)),
 				math.Float64bits(math.NaN()),
