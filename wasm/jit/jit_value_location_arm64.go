@@ -15,14 +15,18 @@ const (
 	reservedRegisterForMemory = arm64.REG_R2
 )
 
+// zeroRegister is the alias of the arm64-specific zero register for readability.
+const zeroRegister int16 = arm64.REGZERO
+
 var (
 	generalPurposeFloatRegisters = []int16{
-		arm64.REG_V0, arm64.REG_V1, arm64.REG_V2, arm64.REG_V3, arm64.REG_V4, arm64.REG_V5,
-		arm64.REG_V6, arm64.REG_V7, arm64.REG_V8, arm64.REG_V9, arm64.REG_V10, arm64.REG_V11,
-		arm64.REG_V12, arm64.REG_V13, arm64.REG_V14, arm64.REG_V15, arm64.REG_V16, arm64.REG_V17,
-		arm64.REG_V18, arm64.REG_V19, arm64.REG_V20, arm64.REG_V21, arm64.REG_V22, arm64.REG_V23,
-		arm64.REG_V24, arm64.REG_V25, arm64.REG_V26, arm64.REG_V27, arm64.REG_V28, arm64.REG_V29,
-		arm64.REG_V30, arm64.REG_V31,
+		arm64.REG_F0, arm64.REG_F1, arm64.REG_F2, arm64.REG_F3,
+		arm64.REG_F4, arm64.REG_F5, arm64.REG_F6, arm64.REG_F7, arm64.REG_F8,
+		arm64.REG_F9, arm64.REG_F10, arm64.REG_F11, arm64.REG_F12, arm64.REG_F13,
+		arm64.REG_F14, arm64.REG_F15, arm64.REG_F16, arm64.REG_F17, arm64.REG_F18,
+		arm64.REG_F19, arm64.REG_F20, arm64.REG_F21, arm64.REG_F22, arm64.REG_F23,
+		arm64.REG_F24, arm64.REG_F25, arm64.REG_F26, arm64.REG_F27, arm64.REG_F28,
+		arm64.REG_F29, arm64.REG_F30, arm64.REG_F31,
 	}
 	unreservedGeneralPurposeIntRegisters = []int16{
 		arm64.REG_R3, arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,

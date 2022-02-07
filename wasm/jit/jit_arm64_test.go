@@ -5,12 +5,15 @@ package jit
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"testing"
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
@@ -87,6 +90,9 @@ func TestArm64Compiler_exit(t *testing.T) {
 			// Build codes.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
+
+			expStackPointer := uint64(100)
+			compiler.locationStack.sp = expStackPointer
 			require.NoError(t, err)
 			compiler.exit(s)
 
@@ -99,6 +105,82 @@ func TestArm64Compiler_exit(t *testing.T) {
 
 			// JIT status on engine must be updated.
 			require.Equal(t, s, env.jitStatus())
+
+			// Stack pointer must be written on engine.stackPointer on return.
+			require.Equal(t, expStackPointer, env.stackPointer())
+		})
+	}
+}
+
+func TestArm64Compiler_compileConsts(t *testing.T) {
+	for _, op := range []wazeroir.OperationKind{
+		wazeroir.OperationKindConstI32,
+		wazeroir.OperationKindConstI64,
+		wazeroir.OperationKindConstF32,
+		wazeroir.OperationKindConstF64,
+	} {
+		op := op
+		t.Run(op.String(), func(t *testing.T) {
+			for _, val := range []uint64{
+				0x0, 0x1, 0x1111000, 1 << 16, 1 << 21, 1 << 27, 1 << 32, 1<<32 + 1, 1 << 53,
+				math.Float64bits(math.Inf(1)),
+				math.Float64bits(math.Inf(-1)),
+				math.Float64bits(math.NaN()),
+				math.MaxUint32,
+				math.MaxInt32,
+				math.MaxUint64,
+				math.MaxInt64,
+				uint64(math.Float32bits(float32(math.Inf(1)))),
+				uint64(math.Float32bits(float32(math.Inf(-1)))),
+				uint64(math.Float32bits(float32(math.NaN()))),
+			} {
+				t.Run(fmt.Sprintf("0x%x", val), func(t *testing.T) {
+					env := newJITEnvironment()
+
+					// Build codes.
+					compiler := env.requireNewCompiler(t)
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
+
+					switch op {
+					case wazeroir.OperationKindConstI32:
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(val)})
+					case wazeroir.OperationKindConstI64:
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: val})
+					case wazeroir.OperationKindConstF32:
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(val))})
+					case wazeroir.OperationKindConstF64:
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
+					}
+					require.NoError(t, err)
+
+					// After compiling const operations, we must see the register allocated value on the top of value.
+					loc := compiler.locationStack.peek()
+					require.True(t, loc.onRegister())
+
+					// Release the register allocated value to the memory stack so that we can see the value after exiting.
+					compiler.releaseRegisterToStack(loc)
+					compiler.returnFunction()
+
+					// Generate the code under test.
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+
+					// Run native code.
+					env.exec(code)
+
+					// JIT status on engine must be returned.
+					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+					require.Equal(t, uint64(1), env.stackPointer())
+
+					switch op {
+					case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstF32:
+						require.Equal(t, uint32(val), env.stackTopAsUint32())
+					case wazeroir.OperationKindConstI64, wazeroir.OperationKindConstF64:
+						require.Equal(t, val, env.stackTopAsUint64())
+					}
+				})
+			}
 		})
 	}
 }
