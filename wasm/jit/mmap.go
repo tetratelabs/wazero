@@ -18,6 +18,8 @@ func mmapCodeSegment(code []byte) ([]byte, error) {
 	}
 }
 
+// On amd64, we have to give all read-write-exec permission to the mmap region
+// to enter the function. Otherwise, segmentation fault exeception is raied.
 func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	mmapFunc, err := syscall.Mmap(
 		-1,
@@ -36,6 +38,10 @@ func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	return mmapFunc, nil
 }
 
+// On arm64, we cannot give all read-write-exec permission to the mmap region.
+// Otherwise, the mmap systemcall would raise an error. Here we give read-write
+// to the region at first, write the native code and then change the perm to
+// read-exec so we can execute the native code.
 func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
 	mmapFunc, err := syscall.Mmap(
 		-1,
