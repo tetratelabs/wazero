@@ -142,8 +142,6 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
 
-					compiler.locationStack.pushValueOnStack()
-
 					switch op {
 					case wazeroir.OperationKindConstI32:
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(val)})
