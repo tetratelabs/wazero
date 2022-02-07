@@ -27,7 +27,7 @@ func BenchmarkInterfaceVSUnexport(b *testing.B) {
 	})
 }
 
-type MemoryInstanceInteface interface {
+type MemoryInstanceInterface interface {
 	PutUint32(addr uint32, val uint32) bool
 }
 
