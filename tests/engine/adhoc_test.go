@@ -198,7 +198,7 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 	require.NoError(t, err)
 }
 
-// Test that the engine can call "imported-and-then-exported-back" function correctly
+// importedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
 func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
 	mod, err := text.DecodeModule([]byte(`(module
@@ -226,17 +226,18 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	require.Equal(t, uint64(42), results[0])
 }
 
-// Test that host functions can handle float parameter without corrupting the value
+//  hostFuncWithFloat32Param fails if a float parameter corrupts a host function value
 func hostFuncWithFloat32Param(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
 	mod, err := text.DecodeModule([]byte(`(module
 		;; 'test_f32param' is a host function which accepts a f32 param
 		;; and tests if it is an expected value.
-		(import "env" "test_f32param" (func $test_f32param (param f32)))
+		(import "test" "f32param" (func $test.f32param (param f32)))
 
 		;; 'call_test_f32' is an exported guest function to call
 		;; the host function, 'test_f32param', from the guest.
-		(func $call_test_f32param (param f32)
+		;; call->test.f32param proxies test.f32param via call in order to test floats aren't corrupted.
+		(func $call->test.f32param (param f32)
 			local.get 0
 			call $test_f32param
 		)
