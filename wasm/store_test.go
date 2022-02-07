@@ -33,7 +33,7 @@ func TestStore_CallFunction(t *testing.T) {
 	engine := &nopEngine{}
 	s := NewStore(engine)
 	m1 := s.getModuleInstance(name)
-	m1.addExport(fn, &ExportInstance{
+	err := m1.addExport(fn, &ExportInstance{
 		Kind: ExportKindFunc,
 		Function: &FunctionInstance{
 			FunctionType: &TypeInstance{
@@ -44,6 +44,7 @@ func TestStore_CallFunction(t *testing.T) {
 			},
 		},
 	})
+	require.NoError(t, err)
 
 	type testKey struct{}
 	ctxVal := context.WithValue(context.Background(), testKey{}, "test")
@@ -71,7 +72,8 @@ func TestStore_CallFunction(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s.CallFunction(tt.ctx, name, fn)
+			_, _, err := s.CallFunction(tt.ctx, name, fn)
+			require.NoError(t, err)
 			require.Equal(t, tt.actualCtx, engine.ctx)
 		})
 	}
