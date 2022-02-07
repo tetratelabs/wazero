@@ -136,7 +136,7 @@ func (c *arm64Compiler) returnFunction() {
 	c.exit(jitCallStatusCodeReturned)
 }
 
-// exit adds instruction to give th
+// exit adds instruction to give the control back to engine.exec with the given status code.
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
 	tmp, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
