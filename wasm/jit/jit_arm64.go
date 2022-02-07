@@ -476,6 +476,7 @@ func (c *arm64Compiler) compileMemorySize() error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileConstI32 implements compiler.compileConstI32 for the arm64 architecture.
 func (c *arm64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 	return c.emitIntConstant(true, uint64(o.Value))
 }
