@@ -247,66 +247,63 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() wasm.Engine) {
 		)`)
 	require.NoError(t, err)
 
-	t.Run("host function with f32 param", func(t *testing.T) {
-		// Build and instantiate the wat for `f32`
-		var wat bytes.Buffer
-		err = watTemplate.Execute(&wat, "f32")
-		require.NoError(t, err)
+	tests := []struct {
+		testName          string
+		typeName          string        // "f32" or "f64"
+		identityFloatFunc reflect.Value // imported as 'identity_float' to the wasm module
+		floatParam        uint64        // passed to identityFloatFunc as a parameter
+		expectedFloatType byte          // wasm.ValueTypeF32 or wasm.ValueTypeF64
+		expectedFloatVal  float64
+	}{
+		{
+			testName: "host function with f32 param",
+			typeName: "f32",
+			identityFloatFunc: reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext, value float32) float32 {
+				return value
+			}),
+			floatParam:        uint64(math.Float32bits(math.MaxFloat32)), // float bits as a uint32 value, but casted to uint64 to be passed to CallFunction
+			expectedFloatType: wasm.ValueTypeF32,
+			expectedFloatVal:  float64(math.MaxFloat32), // arbitrary f32 value
+		},
+		{
+			testName: "host function with f64 param",
+			typeName: "f64",
+			identityFloatFunc: reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext, value float64) float64 {
+				return value
+			}),
+			floatParam:        math.Float64bits(math.MaxFloat64),
+			expectedFloatType: wasm.ValueTypeF64,
+			expectedFloatVal:  float64(math.MaxFloat64), // arbitrary f64 value that doesn' fit in f32
+		},
+	}
 
-		mod, err := text.DecodeModule(wat.Bytes())
-		require.NoError(t, err)
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.testName, func(t *testing.T) {
+			// Build and instantiate the wat for `f32` or `f64`
+			var wat bytes.Buffer
+			err = watTemplate.Execute(&wat, tc.typeName)
+			require.NoError(t, err)
 
-		store := wasm.NewStore(newEngine())
+			mod, err := text.DecodeModule(wat.Bytes())
+			require.NoError(t, err)
 
-		// identityF32 is a host function that just returns the given float32 parameter as is to the module.
-		identityF32 := func(ctx *wasm.HostFunctionCallContext, value float32) float32 {
-			return value
-		}
-		err = store.AddHostFunction("test", "identity_float", reflect.ValueOf(identityF32))
-		require.NoError(t, err)
+			store := wasm.NewStore(newEngine())
 
-		err = store.Instantiate(mod, "mod")
-		require.NoError(t, err)
+			err = store.AddHostFunction("test", "identity_float", tc.identityFloatFunc)
+			require.NoError(t, err)
 
-		expectedF32Val := float32(math.MaxFloat32) // arbitrary f32 value
-		// This call should return the given `expectedF32Val` as is.
-		// That ensures that the float32 values are not corrupted when they are routed through OpCodeCall.
-		results, resultTypes, err := store.CallFunction(ctx, "mod", "call->test.identity_float", uint64(math.Float32bits(expectedF32Val)))
-		require.NoError(t, err)
-		require.Len(t, results, len(resultTypes))
-		require.Equal(t, wasm.ValueTypeF32, resultTypes[0])
-		// Note that the f32 result is returned as a float64 bits value in wazero.
-		require.Equal(t, float64(expectedF32Val), math.Float64frombits(results[0]))
-	})
+			err = store.Instantiate(mod, "mod")
+			require.NoError(t, err)
 
-	t.Run("host function with f64 param", func(t *testing.T) {
-		// Build and instantiate the wat for `f64`
-		var wat bytes.Buffer
-		err = watTemplate.Execute(&wat, "f64")
-		require.NoError(t, err)
-
-		mod, err := text.DecodeModule(wat.Bytes())
-		require.NoError(t, err)
-
-		store := wasm.NewStore(newEngine())
-
-		// identityF64 is a host function that just returns the given float64 parameter as is to the module.
-		identityF64 := func(ctx *wasm.HostFunctionCallContext, value float64) float64 {
-			return value
-		}
-		err = store.AddHostFunction("test", "identity_float", reflect.ValueOf(identityF64))
-		require.NoError(t, err)
-
-		err = store.Instantiate(mod, "mod")
-		require.NoError(t, err)
-
-		expectedF64Val := float64(math.MaxFloat64) // arbitrary f64 value that doesn' fit in f32
-		// This call should return the given `expectedF64Val` as is.
-		// That ensures that the float64 values are not corrupted when they are routed through OpCodeCall.
-		results, resultTypes, err := store.CallFunction(ctx, "mod", "call->test.identity_float", math.Float64bits(expectedF64Val))
-		require.NoError(t, err)
-		require.Len(t, results, len(resultTypes))
-		require.Equal(t, wasm.ValueTypeF64, resultTypes[0])
-		require.Equal(t, expectedF64Val, math.Float64frombits(results[0]))
-	})
+			// This call should return the `expectedFloatVal`.
+			// That ensures that the float32 values are not corrupted when they are routed through OpCodeCall.
+			results, resultTypes, err := store.CallFunction(ctx, "mod", "call->test.identity_float", tc.floatParam)
+			require.NoError(t, err)
+			require.Len(t, results, len(resultTypes))
+			require.Equal(t, tc.expectedFloatType, resultTypes[0])
+			// Note that the both f32 and f64 result value are expressed as the float64 bits value in wazero.
+			require.Equal(t, tc.expectedFloatVal, math.Float64frombits(results[0]))
+		})
+	}
 }
