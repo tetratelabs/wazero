@@ -15,6 +15,9 @@ const (
 	reservedRegisterForMemory = arm64.REG_R2
 )
 
+// zeroRegister is the alias of the arm64-specific zero register for readability.
+const zeroRegister = arm64.REGZERO
+
 var (
 	generalPurposeFloatRegisters = []int16{
 		arm64.REG_V0, arm64.REG_V1, arm64.REG_V2, arm64.REG_V3, arm64.REG_V4, arm64.REG_V5,

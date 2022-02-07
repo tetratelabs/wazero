@@ -133,6 +133,24 @@ func (c *arm64Compiler) returnFunction() {
 func (c *arm64Compiler) exit(status jitCallStatusCode) {
 	tmp, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
+	// Write back the cached SP to the actual eng.stackPointer.
+	loadStackPointer := c.newProg()
+	loadStackPointer.As = arm64.AMOVW
+	loadStackPointer.To.Type = obj.TYPE_REG
+	loadStackPointer.To.Reg = tmp
+	loadStackPointer.From.Type = obj.TYPE_CONST
+	loadStackPointer.From.Offset = int64(c.locationStack.sp)
+	c.addInstruction(loadStackPointer)
+
+	prog := c.newProg()
+	prog.As = arm64.AMOVW
+	prog.From.Type = obj.TYPE_REG
+	prog.From.Reg = tmp
+	prog.To.Type = obj.TYPE_MEM
+	prog.To.Reg = reservedRegisterForEngine
+	prog.To.Offset = engineValueStackContextStackPointerOffset
+	c.addInstruction(prog)
+
 	if status != 0 {
 		loadStatusConst := c.newProg()
 		loadStatusConst.As = arm64.AMOVW
@@ -155,7 +173,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 		setJitStatus := c.newProg()
 		setJitStatus.As = arm64.AMOVWU
 		setJitStatus.From.Type = obj.TYPE_REG
-		setJitStatus.From.Reg = arm64.REGZERO
+		setJitStatus.From.Reg = zeroRegister
 		setJitStatus.To.Type = obj.TYPE_MEM
 		setJitStatus.To.Reg = reservedRegisterForEngine
 		setJitStatus.To.Offset = engineExitContextJITCallStatusCodeOffset
@@ -455,8 +473,19 @@ func (c *arm64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileConstI64 implements compiler.compileConstI64 for the arm64 architecture.
 func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Value == 0 {
+		c.locationStack.pushValueOnRegister(zeroRegister)
+	} else {
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+
+		c.locationStack.pushValueOnRegister(reg)
+	}
+	return nil
 }
 
 func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
@@ -465,4 +494,47 @@ func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 
 func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
+}
+
+// allocateRegister returns an unused register of the given type. The register will be taken
+// either from the free register pool or by spilling an used register. If we allocate an used register,
+// this adds an instruction to write the value on a register back to memory stack region.
+// Note: resulting registers are NOT marked as used so the call site should mark it used if necessary.
+func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int16, err error) {
+	var ok bool
+	// Try to get the unused register.
+	reg, ok = c.locationStack.takeFreeRegister(t)
+	if ok {
+		return
+	}
+
+	// If not found, we have to steal the register.
+	stealTarget, ok := c.locationStack.takeStealTargetFromUsedRegister(t)
+	if !ok {
+		err = fmt.Errorf("cannot steal register")
+		return
+	}
+
+	// Release the steal target register value onto stack location.
+	reg = stealTarget.register
+	c.releaseRegisterToStack(stealTarget)
+	return
+}
+
+// releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
+func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) {
+	// Push value.
+	store := c.newProg()
+	store.As = arm64.AMOVD
+	store.To.Type = obj.TYPE_MEM
+	store.To.Reg = reservedRegisterForStackBasePointerAddress
+	// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
+	// TODO:
+	store.To.Offset = int64(loc.stackPointer) * 8
+	store.From.Type = obj.TYPE_REG
+	store.From.Reg = loc.register
+	c.addInstruction(store)
+
+	// Mark the register is free.
+	c.locationStack.releaseRegister(loc)
 }

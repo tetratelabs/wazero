@@ -5,12 +5,16 @@ package jit
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
+	"math"
 	"testing"
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
@@ -87,6 +91,9 @@ func TestArm64Compiler_exit(t *testing.T) {
 			// Build codes.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
+
+			expStackPointer := uint64(100)
+			compiler.locationStack.sp = expStackPointer
 			require.NoError(t, err)
 			compiler.exit(s)
 
@@ -99,6 +106,70 @@ func TestArm64Compiler_exit(t *testing.T) {
 
 			// JIT status on engine must be updated.
 			require.Equal(t, s, env.jitStatus())
+
+			// Stack pointer must be written on engine.stackPointer on return.
+			require.Equal(t, expStackPointer, env.stackPointer())
+		})
+	}
+}
+
+func TestArm64Compiler_compileConsts(t *testing.T) {
+	for _, op := range []wazeroir.OperationKind{
+		// wazeroir.OperationKindConstI32,
+		wazeroir.OperationKindConstI64,
+		// wazeroir.OperationKindConstF32,
+		// wazeroir.OperationKindConstF64,
+	} {
+		op := op
+		t.Run(op.String(), func(t *testing.T) {
+			for _, val := range []uint64{
+				0,
+			} {
+				t.Run(fmt.Sprintf("0x%x", val), func(t *testing.T) {
+					env := newJITEnvironment()
+
+					// Build codes.
+					compiler := env.requireNewCompiler(t)
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
+
+					switch op {
+					case wazeroir.OperationKindConstI32:
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(val)})
+					case wazeroir.OperationKindConstI64:
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: val})
+					case wazeroir.OperationKindConstF32:
+						err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(val))})
+					case wazeroir.OperationKindConstF64:
+						err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
+					}
+					require.NoError(t, err)
+
+					loc := compiler.locationStack.peek()
+					require.True(t, loc.onRegister())
+
+					compiler.releaseRegisterToStack(loc)
+					compiler.returnFunction()
+
+					// Generate the code under test.
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+
+					fmt.Println(hex.EncodeToString(code))
+					// Run native code.
+					env.exec(code)
+
+					// JIT status on engine must be returned.
+					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+					switch op {
+					case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstF32:
+						require.Equal(t, uint32(val), env.stackTopAsUint32())
+					case wazeroir.OperationKindConstI64, wazeroir.OperationKindConstF64:
+						require.Equal(t, val, env.stackTopAsUint64())
+					}
+				})
+			}
 		})
 	}
 }
