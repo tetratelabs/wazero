@@ -66,7 +66,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run codes
@@ -94,7 +94,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		env.setValueStackBasePointer(stackBasePointer)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run codes
@@ -133,7 +133,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// See the previous call frame stack poitner to verify the correctness of exit decision.
@@ -171,7 +171,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 			err = compiler.returnFunction()
 			require.NoError(t, err)
 
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Compiles and adds to the engine.
@@ -291,7 +291,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			compiler.exit(expectedStatus)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run codes
@@ -335,7 +335,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		}
 
 		// Generate the code under test.
-		code, _, _, err := c.generate()
+		code, _, _, err := c.compile()
 		require.NoError(t, err)
 
 		// Run codes
@@ -533,7 +533,7 @@ func Test_setJITStatus(t *testing.T) {
 			compiler.exit(s)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run codes
@@ -553,7 +553,7 @@ func TestAmd64Compiler_initializeReservedRegisters(t *testing.T) {
 	compiler.exit(jitCallStatusCodeReturned)
 
 	// Generate the code under test.
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	newJITEnvironment().exec(code)
@@ -598,7 +598,7 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -670,7 +670,7 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -713,7 +713,7 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -752,7 +752,7 @@ func TestAmd64Compiler_compileConstI32(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -792,7 +792,7 @@ func TestAmd64Compiler_compileConstI64(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -834,7 +834,7 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -876,7 +876,7 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -917,7 +917,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -953,7 +953,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -998,7 +998,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -1046,7 +1046,7 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -1118,7 +1118,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1183,7 +1183,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1271,7 +1271,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1350,7 +1350,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1406,7 +1406,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -1452,7 +1452,7 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -1532,7 +1532,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1612,7 +1612,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1695,7 +1695,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1775,7 +1775,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						compiler.exit(jitCallStatusCodeReturned)
 
 						// Generate the code under test.
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1862,7 +1862,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -1944,7 +1944,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -2028,7 +2028,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -2109,7 +2109,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
-						code, _, _, err := compiler.generate()
+						code, _, _, err := compiler.compile()
 						require.NoError(t, err)
 
 						// Run code.
@@ -2155,7 +2155,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -2192,7 +2192,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -2238,7 +2238,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2286,7 +2286,7 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2404,7 +2404,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 				// Run code.
 				env.exec(code)
@@ -2516,7 +2516,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2566,7 +2566,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2618,7 +2618,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -2669,7 +2669,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -2718,7 +2718,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -2768,7 +2768,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -2816,7 +2816,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -2864,7 +2864,7 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -2914,7 +2914,7 @@ func TestAmd64Compiler_compilPopcnt(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 				env.exec(code)
 
@@ -3146,7 +3146,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 							compiler.exit(jitCallStatusCodeReturned)
 
 							// Generate and run the code under test.
-							code, _, _, err := compiler.generate()
+							code, _, _, err := compiler.compile()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -3291,7 +3291,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
-								code, _, _, err := compiler.generate()
+								code, _, _, err := compiler.compile()
 								require.NoError(t, err)
 
 								// Run code.
@@ -3448,7 +3448,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
-								code, _, _, err := compiler.generate()
+								code, _, _, err := compiler.compile()
 								require.NoError(t, err)
 
 								// Run code.
@@ -3527,7 +3527,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -3602,7 +3602,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				compiler.exit(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -3752,7 +3752,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
-								code, _, _, err := compiler.generate()
+								code, _, _, err := compiler.compile()
 								require.NoError(t, err)
 
 								// Run code.
@@ -3908,7 +3908,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								compiler.exit(jitCallStatusCodeReturned)
 
 								// Generate the code under test.
-								code, _, _, err := compiler.generate()
+								code, _, _, err := compiler.compile()
 								require.NoError(t, err)
 
 								// Run code.
@@ -3966,7 +3966,7 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate and run the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -4013,7 +4013,7 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate and run the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -4102,7 +4102,7 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 							compiler.exit(jitCallStatusCodeReturned)
 
 							// Generate and run the code under test.
-							code, _, _, err := compiler.generate()
+							code, _, _, err := compiler.compile()
 							require.NoError(t, err)
 							env.exec(code)
 
@@ -4148,7 +4148,7 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -4245,7 +4245,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -4378,7 +4378,7 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -4605,7 +4605,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -4745,7 +4745,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 					compiler.exit(jitCallStatusCodeReturned)
 
 					// Generate and run the code under test.
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
 
@@ -4805,7 +4805,7 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					err = compiler.releaseAllRegistersToStack()
 					require.NoError(t, err)
 					compiler.exit(jitCallStatusCodeReturned)
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 
 					// Run code.
@@ -4889,7 +4889,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.exit(jitCallStatusCodeReturned)
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Place the load target value to the memory.
@@ -4968,7 +4968,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.exit(jitCallStatusCodeReturned)
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// For testing, arbitrary byte is be fine.
@@ -5030,7 +5030,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.exit(jitCallStatusCodeReturned)
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// For testing, arbitrary uint16 is be fine.
@@ -5084,7 +5084,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.exit(jitCallStatusCodeReturned)
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// For testing, arbitrary uint32 is be fine.
@@ -5143,7 +5143,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 
 			// Generate the code under test.
 			compiler.exit(jitCallStatusCodeReturned)
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5198,7 +5198,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.exit(jitCallStatusCodeReturned)
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5243,7 +5243,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.exit(jitCallStatusCodeReturned)
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5288,7 +5288,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 
 	// Generate the code under test.
 	compiler.exit(jitCallStatusCodeReturned)
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5328,7 +5328,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5368,7 +5368,7 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	compiler.exit(jitCallStatusCodeReturned)
 
 	// Generate the code under test.
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5505,7 +5505,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5546,7 +5546,7 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	compiler.exit(jitCallStatusCodeReturned)
 
 	// Generate the code under test.
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5579,7 +5579,7 @@ func TestAmd64Compiler_generate(t *testing.T) {
 				require.Equal(t, expectedMaxStackPointer, acutalMaxStackPointerInCallBack)
 			}
 
-			_, _, acutalMaxStackPointer, err := compiler.generate()
+			_, _, acutalMaxStackPointer, err := compiler.compile()
 			require.NoError(t, err)
 			require.True(t, called)
 			require.Equal(t, expectedMaxStackPointer, acutalMaxStackPointer)
@@ -5612,7 +5612,7 @@ func TestAmd64Compiler_generate(t *testing.T) {
 			codePassedInCallBack = code
 			return nil
 		})
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 		require.NotEmpty(t, code)
 		require.Equal(t, code, codePassedInCallBack)
@@ -5635,7 +5635,7 @@ func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test.
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -5761,7 +5761,7 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Run code.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 			env.exec(code)
 
@@ -5832,7 +5832,7 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5885,7 +5885,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run the code assembled above.
@@ -5926,7 +5926,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run code.
@@ -5967,7 +5967,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				compiler.undefined()
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -6033,7 +6033,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 					err = compiler.returnFunction()
 					require.NoError(t, err)
 
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 
 					compiledFunction := &compiledFunction{
@@ -6071,7 +6071,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				require.NoError(t, err)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -6115,7 +6115,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		err = compiler.returnFunction()
 		require.NoError(t, err)
 
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		engine.addCompiledFunction(targetFunctionAddress, &compiledFunction{
@@ -6151,7 +6151,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	require.NoError(t, err)
 
 	// Generate the code under test.
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run code.
@@ -6188,7 +6188,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -6222,7 +6222,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		// Generate the code under test.
 		compiler.exit(jitCallStatusCodeReturned)
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -6256,7 +6256,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		// Generate the code under test.
 		compiler.exit(jitCallStatusCodeReturned)
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.
@@ -6297,7 +6297,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 					err = compiler.returnFunction()
 					require.NoError(t, err)
 
-					code, _, _, err := compiler.generate()
+					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 
 					engine.addCompiledFunction(table[i].FunctionAddress, &compiledFunction{
@@ -6333,7 +6333,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				require.NoError(t, err)
 
 				// Generate the code under test.
-				code, _, _, err := compiler.generate()
+				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
 
 				// Run code.
@@ -6360,7 +6360,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 		// If generate the code without JMP after readInstructionAddress,
 		// the call back added must return error.
-		_, _, _, err = compiler.generate()
+		_, _, _, err = compiler.compile()
 		require.Error(t, err)
 	})
 
@@ -6399,7 +6399,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Generate the code under test.
-		code, _, _, err := compiler.generate()
+		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
 		// Run code.

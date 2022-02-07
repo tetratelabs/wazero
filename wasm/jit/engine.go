@@ -668,7 +668,7 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, err
 	}
 
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -864,7 +864,7 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		}
 	}
 
-	code, staticData, maxStackPointer, err := compiler.generate()
+	code, staticData, maxStackPointer, err := compiler.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
