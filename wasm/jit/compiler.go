@@ -13,15 +13,16 @@ type compiler interface {
 	// emitPreamble is called before compiling any wazeroir operation.
 	// This is used, for example, to initilize the reserved registers, etc.
 	emitPreamble() error
-	// generate generates the byte slice of native code.
+	// compile generates the byte slice of native code.
 	// maxStackPointer is the max stack pointer that the target function would reach.
 	// staticData is compiledFunctionStaticData for the resutling native code.
-	generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error)
+	compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error)
 	// compileHostFunction emits the trampoline code from which native code can jump into the host function.
 	// TODO: maybe we wouldn't need to have trampoline for host functions.
 	compileHostFunction(address wasm.FunctionAddress) error
 	// compileLabel notify compilers of the beginning of a label.
 	// Return true if the compiler decided to skip the entire label.
+	// See wazeroir.OperationLabel
 	compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool)
 	// compileUnreachable adds instructions to return to engine with jitCallStatusCodeUnreachable status.
 	// See wasm.OpcodeUnreachable
@@ -29,6 +30,7 @@ type compiler interface {
 	// compileSwap adds instruction to swap the stack top value with the target in the Wasm value stack.
 	// The values are might be on registers or memory-stack at runtime, so compiler implementations
 	// emit instructions to swap values depending these locations.
+	// See wazeroir.OpeationBrIf
 	compileSwap(o *wazeroir.OperationSwap) error
 	// compileGlobalGet adds instructions to read the value of the given index in the ModuleInstance.Globals
 	// and push the value onto the stack.
@@ -42,6 +44,7 @@ type compiler interface {
 	compileBr(o *wazeroir.OperationBr) error
 	// compileBrIf adds instructions to pops a value and branch into ".then" lable if the value equals 1.
 	// Otherwise, the code branches into ".else" label.
+	// See wasm.OpcodeBrIf and wazeroir.OpeationBrIf
 	compileBrIf(o *wazeroir.OperationBrIf) error
 	// compileBrTable adds instructions to do br_table operation.
 	// A br_table operation has list of targets and default target, and
@@ -71,12 +74,15 @@ type compiler interface {
 	// See wasm.CallIndirect
 	compileCallIndirect(o *wazeroir.OperationCallIndirect) error
 	// compileDrop adds instructions to drop values within the given inclusive range from the value stack.
+	// See wazeroir.OperationDrop
 	compileDrop(o *wazeroir.OperationDrop) error
 	// compileSelect uses top three values on the stack. For example, if we have stack as [..., x1, x2, c]
 	// and the value "c" equals zero, then the stack results in [..., x1], otherwise, [..., x2].
+	// See wasm.OpcodeSelect
 	compileSelect() error
 	// compilePick adds instructions to copy a value on the given location in the Wasm value stack,
 	// and push the copied value onto the top of the stack.
+	// See wazeroir.OperationPick
 	compilePick(o *wazeroir.OperationPick) error
 	// compileAdd adds instructions to pop two values from the stack, add these two values, and push
 	// back the result onto the stack.

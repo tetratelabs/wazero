@@ -59,7 +59,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 	compiler.returnFunction()
 
 	// Generate the code under test.
-	code, _, _, err := compiler.generate()
+	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
 	// Run native code.
@@ -89,7 +89,7 @@ func TestArm64Compiler_exit(t *testing.T) {
 			compiler.exit(s)
 
 			// Generate the code under test.
-			code, _, _, err := compiler.generate()
+			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
 			// Run codes

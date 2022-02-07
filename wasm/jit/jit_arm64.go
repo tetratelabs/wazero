@@ -69,8 +69,8 @@ type arm64Compiler struct {
 	locationStack *valueLocationStack
 }
 
-// generate implements compiler.generate for the arm64 architecture.
-func (c *arm64Compiler) generate() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
+// compile implements compiler.compile for the arm64 architecture.
+func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
 	code, err = mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
 		return
