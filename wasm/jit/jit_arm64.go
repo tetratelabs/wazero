@@ -5,14 +5,15 @@
 // Please refer to https://developer.arm.com/documentation/102374/latest/
 // if unfamiliar with arm64 instructions and semantics.
 //
-// Note: we use arm64 pkg as the assembler which has different notation
-// from the original arm64 assembly. For example,
+// Note: we use arm64 pkg as the assembler (github.com/twitchyliquid64/golang-asm/obj/arm64)
+// which has different notation from the original arm64 assembly. For example,
 // 64-bit variant ldr, str, stur are all corresponding to arm64.AMOVD.
 // Please refer to https://pkg.go.dev/cmd/internal/obj/arm64.
 
 package jit
 
 import (
+	"errors"
 	"fmt"
 
 	asm "github.com/twitchyliquid64/golang-asm"
