@@ -21,8 +21,8 @@ func allocateBuffer(size uint32) *byte {
 //export get_random_string
 func getRandomStringRaw(retBufPtr **byte, retBufSize *int)
 
-// Get randm string from the hosts.
-func getRandmString() string {
+// Get random string from the hosts.
+func getRandomString() string {
 	var bufPtr *byte
 	var bufSize int
 	getRandomStringRaw(&bufPtr, &bufSize)
@@ -39,7 +39,7 @@ func base64OnString(num uint32) {
 	// Get random strings from the host and
 	// do base64 encoding them for given times.
 	for i := uint32(0); i < num; i++ {
-		msg := getRandmString()
+		msg := getRandomString()
 		encoded := base64.StdEncoding.EncodeToString([]byte(msg))
 		fmt.Printf("base64 encoded string '%s'\n", encoded[:10])
 	}

@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -304,16 +305,25 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	rollbackFuncs = nil
 
 	// Execute the start function.
+	ctx := context.Background()
 	if startIndex := module.StartSection; startIndex != nil {
 		f := instance.Functions[*startIndex]
-		if _, err := s.engine.Call(f); err != nil {
+		if _, err := s.engine.Call(ctx, f); err != nil {
 			return fmt.Errorf("calling start function failed: %v", err)
 		}
 	}
 	return nil
 }
 
-func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
+// CallFunction looks up an exported function given its module and function name and calls it.
+// Any returned results and resultTypes are index-correlated, noting WebAssembly 1.0 (MVP) allows
+// up to one result. An error is returned for any failure looking up or invoking the function including
+// signature mismatch.
+//
+// Note: The ctx parameter will be the outer-most ancestor of HostFunctionCallContext.Context.
+// ctx will default to context.Background() is nil is passed.
+// Note: this API is unstable. See tetratelabs/wazero#170
+func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
 	var exp *ExportInstance
 	if exp, err = s.getExport(moduleName, funcName, ExportKindFunc); err != nil {
 		return
@@ -325,7 +335,12 @@ func (s *Store) CallFunction(moduleName, funcName string, params ...uint64) (res
 		return
 	}
 
-	results, err = s.engine.Call(f, params...)
+	// Ensure context has a value so that host calls can assume it is non-nil.
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	results, err = s.engine.Call(ctx, f, params...)
 	resultTypes = f.FunctionType.Type.Results
 	return
 }
@@ -844,9 +859,26 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 
 // HostFunctionCallContext is the first argument of all host functions.
 type HostFunctionCallContext struct {
+	ctx context.Context
 	// Memory is the currently used memory instance at the time when the host function call is made.
 	Memory *MemoryInstance
 	// TODO: Add others if necessary.
+}
+
+// NewHostFunctionCallContext creates a new HostFunctionCallContext with a
+// context and memory instance.
+func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) *HostFunctionCallContext {
+	return &HostFunctionCallContext{
+		ctx:    ctx,
+		Memory: memory,
+	}
+}
+
+// Context returns the host call's context.
+//
+// The returned context is always non-nil; it defaults to the background context.
+func (c *HostFunctionCallContext) Context() context.Context {
+	return c.ctx
 }
 
 func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {

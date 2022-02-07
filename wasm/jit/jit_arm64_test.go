@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"context"
 	"testing"
 	"unsafe"
 
@@ -21,6 +22,7 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 }
 
 func TestArm64CompilerEndToEnd(t *testing.T) {
+	ctx := context.Background()
 	for _, tc := range []struct {
 		name string
 		body []byte
@@ -37,7 +39,7 @@ func TestArm64CompilerEndToEnd(t *testing.T) {
 			}
 			err := engine.Compile(f)
 			require.NoError(t, err)
-			_, err = engine.Call(f)
+			_, err = engine.Call(ctx, f)
 			require.NoError(t, err)
 		})
 	}

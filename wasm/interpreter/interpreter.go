@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -425,7 +426,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 }
 
 // Call implements an interpreted wasm.Engine.
-func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (it *interpreter) Call(ctx context.Context, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	prevFrameLen := len(it.frames)
 
 	// shouldRecover is true when a panic at the origin of callstack should be recovered
@@ -481,9 +482,9 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 		it.push(param)
 	}
 	if g.hostFn != nil {
-		it.callHostFunc(g)
+		it.callHostFunc(ctx, g)
 	} else {
-		it.callNativeFunc(g)
+		it.callNativeFunc(ctx, g)
 	}
 	results = make([]uint64, len(f.FunctionType.Type.Results))
 	for i := range results {
@@ -492,7 +493,7 @@ func (it *interpreter) Call(f *wasm.FunctionInstance, params ...uint64) (results
 	return
 }
 
-func (it *interpreter) callHostFunc(f *interpreterFunction) {
+func (it *interpreter) callHostFunc(ctx context.Context, f *interpreterFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 	for i := len(in) - 1; i >= 1; i-- {
@@ -515,7 +516,7 @@ func (it *interpreter) callHostFunc(f *interpreterFunction) {
 	if len(it.frames) > 0 {
 		memory = it.frames[len(it.frames)-1].f.funcInstance.ModuleInstance.Memory
 	}
-	val.Set(reflect.ValueOf(&wasm.HostFunctionCallContext{Memory: memory}))
+	val.Set(reflect.ValueOf(wasm.NewHostFunctionCallContext(ctx, memory)))
 	in[0] = val
 
 	frame := &interpreterFrame{f: f}
@@ -535,7 +536,7 @@ func (it *interpreter) callHostFunc(f *interpreterFunction) {
 	it.popFrame()
 }
 
-func (it *interpreter) callNativeFunc(f *interpreterFunction) {
+func (it *interpreter) callNativeFunc(ctx context.Context, f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.Memory
@@ -582,9 +583,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 		case wazeroir.OperationKindCall:
 			{
 				if op.f.hostFn != nil {
-					it.callHostFunc(op.f)
+					it.callHostFunc(ctx, op.f)
 				} else {
-					it.callNativeFunc(op.f)
+					it.callNativeFunc(ctx, op.f)
 				}
 				frame.pc++
 			}
@@ -605,9 +606,9 @@ func (it *interpreter) callNativeFunc(f *interpreterFunction) {
 				target := it.functions[table.Table[offset].FunctionAddress]
 				// Call in.
 				if target.hostFn != nil {
-					it.callHostFunc(target)
+					it.callHostFunc(ctx, target)
 				} else {
-					it.callNativeFunc(target)
+					it.callNativeFunc(ctx, target)
 				}
 				frame.pc++
 			}

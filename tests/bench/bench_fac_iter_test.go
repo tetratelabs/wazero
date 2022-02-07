@@ -5,6 +5,7 @@
 package bench
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"testing"
@@ -25,6 +26,7 @@ var facWasm []byte
 
 // TestFacIter ensures that the code in BenchmarkFacIter works as expected.
 func TestFacIter(t *testing.T) {
+	ctx := context.Background()
 	const in = 30
 	expValue := uint64(0x865df5dd54000000)
 	t.Run("iter", func(t *testing.T) {
@@ -32,7 +34,7 @@ func TestFacIter(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			res, _, err := store.CallFunction("test", "fac-iter", in)
+			res, _, err := store.CallFunction(ctx, "test", "fac-iter", in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -43,7 +45,7 @@ func TestFacIter(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			res, _, err := store.CallFunction("test", "fac-iter", in)
+			res, _, err := store.CallFunction(ctx, "test", "fac-iter", in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -116,6 +118,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 
 // BenchmarkFacIter_Invoke benchmarks the time spent invoking a factorial calculation.
 func BenchmarkFacIter_Invoke(b *testing.B) {
+	ctx := context.Background()
 	const in = 30
 	b.Run("interpreter", func(b *testing.B) {
 		store, err := newStoreForFacIterBench(interpreter.NewEngine())
@@ -124,7 +127,7 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, _, err = store.CallFunction("test", "fac-iter", in); err != nil {
+			if _, _, err = store.CallFunction(ctx, "test", "fac-iter", in); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -136,7 +139,7 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, _, err = store.CallFunction("test", "fac-iter", in); err != nil {
+			if _, _, err = store.CallFunction(ctx, "test", "fac-iter", in); err != nil {
 				b.Fatal(err)
 			}
 		}

@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"math"
 	"reflect"
@@ -24,6 +25,58 @@ func TestStore_GetModuleInstance(t *testing.T) {
 
 	m2 := s.getModuleInstance(name)
 	require.Equal(t, m1, m2)
+}
+
+func TestStore_CallFunction(t *testing.T) {
+	name := "test"
+	fn := "fn"
+	engine := &nopEngine{}
+	s := NewStore(engine)
+	m1 := s.getModuleInstance(name)
+	err := m1.addExport(fn, &ExportInstance{
+		Kind: ExportKindFunc,
+		Function: &FunctionInstance{
+			FunctionType: &TypeInstance{
+				Type: &FunctionType{
+					Params:  []ValueType{},
+					Results: []ValueType{},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	type testKey struct{}
+	ctxVal := context.WithValue(context.Background(), testKey{}, "test")
+
+	tests := []struct {
+		name      string
+		ctx       context.Context
+		actualCtx context.Context
+	}{
+		{
+			name:      "nil context",
+			ctx:       nil,
+			actualCtx: context.Background(),
+		},
+		{
+			name:      "background context",
+			ctx:       context.Background(),
+			actualCtx: context.Background(),
+		},
+		{
+			name:      "context with value",
+			ctx:       ctxVal,
+			actualCtx: ctxVal,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := s.CallFunction(tt.ctx, name, fn)
+			require.NoError(t, err)
+			require.Equal(t, tt.actualCtx, engine.ctx)
+		})
+	}
 }
 
 func TestStore_AddHostFunction(t *testing.T) {
@@ -92,9 +145,11 @@ func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 var nopEngineInstance Engine = &nopEngine{}
 
 type nopEngine struct {
+	ctx context.Context
 }
 
-func (e *nopEngine) Call(_ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+func (e *nopEngine) Call(ctx context.Context, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+	e.ctx = ctx
 	return nil, nil
 }
 

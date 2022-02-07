@@ -1,6 +1,7 @@
 package wasi
 
 import (
+	"context"
 	_ "embed"
 	"encoding/binary"
 	"math"
@@ -75,6 +76,7 @@ var argsWat []byte
 var clockWat []byte
 
 func TestArgsAPISucceed(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name            string
 		args            []string
@@ -150,7 +152,7 @@ func TestArgsAPISucceed(t *testing.T) {
 			binary.LittleEndian.PutUint32(expectedBufSize, tc.expectedBufSize)
 
 			// Compare them
-			ret, _, err := store.CallFunction("test", "args_sizes_get", uint64(argCountPtr), uint64(bufSizePtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(argCountPtr), uint64(bufSizePtr))
 			require.NoError(t, err)
 			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is errno
 			require.Equal(t, expectedArgCount, store.Memories[0].Buffer[argCountPtr:argCountPtr+4])
@@ -169,7 +171,7 @@ func TestArgsAPISucceed(t *testing.T) {
 			}
 
 			// Compare them
-			ret, _, err = store.CallFunction("test", "args_get", uint64(argsPtr), uint64(argvPtr))
+			ret, _, err = store.CallFunction(ctx, "test", "args_get", uint64(argsPtr), uint64(argvPtr))
 			require.NoError(t, err)
 			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is the returned errno
 			require.Equal(t, expectedArgs, store.Memories[0].Buffer[argsPtr:argsPtr+uint32(len(expectedArgs))])
@@ -179,6 +181,7 @@ func TestArgsAPISucceed(t *testing.T) {
 }
 
 func TestArgsSizesGetReturnError(t *testing.T) {
+	ctx := context.Background()
 	dummyArgs := []string{"foo", "bar", "baz"}
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
@@ -219,7 +222,7 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction("test", "args_sizes_get", uint64(tc.argsCountPtr), uint64(tc.argsBufSizePtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(tc.argsCountPtr), uint64(tc.argsBufSizePtr))
 			require.NoError(t, err)
 			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
@@ -227,6 +230,7 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 }
 
 func TestArgsGetAPIReturnError(t *testing.T) {
+	ctx := context.Background()
 	dummyArgs := []string{"foo", "bar", "baz"}
 	argsOpt, err := Args(dummyArgs)
 	require.NoError(t, err)
@@ -270,7 +274,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction("test", "args_get", uint64(tc.argsPtr), uint64(tc.argsBufPtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(tc.argsPtr), uint64(tc.argsBufPtr))
 			require.NoError(t, err)
 			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
@@ -292,6 +296,7 @@ func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, wasiEnv *
 }
 
 func TestClockGetTime(t *testing.T) {
+	ctx := context.Background()
 	wasiEnv := NewEnvironment()
 	store := instantiateWasmStore(t, clockWat, "test", wasiEnv)
 	memorySize := uint32(len(store.Memories[0].Buffer))
@@ -338,7 +343,7 @@ func TestClockGetTime(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wasiEnv.getTimeNanosFn = func() uint64 { return tt.timestampVal }
-			ret, _, err := store.CallFunction("test", "clock_time_get", uint64(0), uint64(0), uint64(tt.timestampPtr))
+			ret, _, err := store.CallFunction(ctx, "test", "clock_time_get", uint64(0), uint64(0), uint64(tt.timestampPtr))
 			require.NoError(t, err)
 			errno := Errno(ret[0])
 			require.Equal(t, tt.result, errno) // ret[0] is returned errno

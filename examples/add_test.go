@@ -1,6 +1,7 @@
 package examples
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ import (
 // Test_AddInt shows how you can define a function in text format and have it compiled inline.
 // See https://github.com/summerwind/the-art-of-webassembly-go/blob/main/chapter1/addint/addint.wat
 func Test_AddInt(t *testing.T) {
+	ctx := context.Background()
 	mod, err := text.DecodeModule([]byte(`(module
     (func $addInt ;; TODO: function exports (export "AddInt")
         (param $value_1 i32) (param $value_2 i32)
@@ -41,7 +43,7 @@ func Test_AddInt(t *testing.T) {
 		{value1: 1, value2: 2, result: 3},
 		{value1: 5, value2: 5, result: 10},
 	} {
-		ret, retTypes, err := store.CallFunction("test", "AddInt", c.value1, c.value2)
+		ret, retTypes, err := store.CallFunction(ctx, "test", "AddInt", c.value1, c.value2)
 		require.NoError(t, err)
 		require.Len(t, ret, len(retTypes))
 		require.Equal(t, wasm.ValueTypeI32, retTypes[0])

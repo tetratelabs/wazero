@@ -2,6 +2,7 @@ package examples
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 var stdioWasm []byte
 
 func Test_stdio(t *testing.T) {
+	ctx := context.Background()
 	mod, err := binary.DecodeModule(stdioWasm)
 	require.NoError(t, err)
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
@@ -33,7 +35,7 @@ func Test_stdio(t *testing.T) {
 	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
-	_, _, err = store.CallFunction("test", "_start")
+	_, _, err = store.CallFunction(ctx, "test", "_start")
 	require.NoError(t, err)
 	require.Equal(t, "Hello, WASI!", strings.TrimSpace(stdoutBuf.String()))
 	require.Equal(t, "Error Message", strings.TrimSpace(stderrBuf.String()))
