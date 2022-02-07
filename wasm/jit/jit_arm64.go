@@ -537,8 +537,9 @@ func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 		return err
 	}
 
+	tmpReg := zeroRegister
 	if o.Value != 0 {
-		tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		tmpReg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
 		}
@@ -556,13 +557,13 @@ func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 		c.addInstruction(loadConst)
 	}
 
-	// mov := c.newProg()
-	// mov.As = arm64.AFMOVS
-	// mov.From.Type = obj.TYPE_REG
-	// mov.From.Reg = tmpReg
-	// mov.To.Type = obj.TYPE_REG
-	// mov.To.Reg = reg
-	// c.addInstruction(mov)
+	mov := c.newProg()
+	mov.As = arm64.AFMOVS
+	mov.From.Type = obj.TYPE_REG
+	mov.From.Reg = tmpReg
+	mov.To.Type = obj.TYPE_REG
+	mov.To.Reg = reg
+	c.addInstruction(mov)
 
 	loc := c.locationStack.pushValueOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeFloat)
@@ -606,7 +607,13 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) {
 	// Push value.
 	store := c.newProg()
-	store.As = arm64.AMOVD
+	switch loc.regType {
+	case generalPurposeRegisterTypeInt:
+		store.As = arm64.AMOVD
+	case generalPurposeRegisterTypeFloat:
+		store.As = arm64.AFMOVD
+	}
+
 	store.To.Type = obj.TYPE_MEM
 	store.To.Reg = reservedRegisterForStackBasePointerAddress
 	// Note: in raw arm64 assembly, immediates larger than 16-bits
