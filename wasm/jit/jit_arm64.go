@@ -32,6 +32,7 @@ type archContext struct {
 	jitCallReturnAddress uint64
 }
 
+// engineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress
 const engineArchContextJITCallReturnAddressOffset = 136
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
@@ -75,7 +76,7 @@ func (c *arm64Compiler) generate() (code []byte, staticData compiledFunctionStat
 	return
 }
 
-func (c *arm64Compiler) newInstruction() (inst *obj.Prog) {
+func (c *arm64Compiler) newProg() (inst *obj.Prog) {
 	inst = c.builder.NewProg()
 	return
 }
@@ -87,7 +88,7 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 func (c *arm64Compiler) String() (ret string) { return }
 
 func (c *arm64Compiler) emitPreamble() error {
-	// The assembler skips the first instruction so we intetionally add NOP here.
+	// The assembler skips the first instruction so we intentionally add NOP here.
 	nop := c.newInstruction()
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
@@ -99,7 +100,7 @@ func (c *arm64Compiler) returnFunction() {
 	// TODO: we don't support function calls yet.
 	// For now the following code just simply returns to Go code.
 
-	// Since we return from the function, we need to decement the callframe stack pointer.
+	// Since we return from the function, we need to decrement the callframe stack pointer.
 	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	loadCurrentCallFramPointer := c.newInstruction()
 	loadCurrentCallFramPointer.As = arm64.AMOVD
@@ -180,7 +181,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) {
 }
 
 func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return errors.New("TODO: implement compileHostFunction on arm64")
 }
 
 func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool) {

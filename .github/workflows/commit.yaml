@@ -44,7 +44,7 @@ jobs:
     name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         os: 
         - "ubuntu-latest"
@@ -77,7 +77,7 @@ jobs:
     name: ${{ matrix.target.arch }}, ubuntu, Go-${{ matrix.go-version }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
         go-version:
         - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables

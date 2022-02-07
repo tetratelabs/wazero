@@ -82,7 +82,7 @@ func init() {
 // engine is the pointer to the "*engine" as uintptr.
 func jitcall(codeSegment, engine uintptr)
 
-// archContext is embedded in Engine in order to store artchitecture-specific data.
+// archContext is embedded in Engine in order to store architecture-specific data.
 // For amd64, this is empty.
 type archContext struct{}
 
