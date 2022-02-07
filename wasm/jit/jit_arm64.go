@@ -667,12 +667,15 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
 	getStackBasePointer.To.Reg = tmpReg
 	c.addInstruction(getStackBasePointer)
 
-	// Finally we add the reg to cachedStackBasePointerReg.
+	// Finally, we calculate "reservedRegisterForStackBasePointerAddress + tmpReg * 8"
+	// where we multiply tmpReg by 8 because stack pointer is an index in the []uint64
+	// so as an bytes we must multiply the size of uint64 = 8 bytes.
 	calcStackBasePointerAddress := c.newProg()
 	calcStackBasePointerAddress.As = arm64.AADD
 	calcStackBasePointerAddress.To.Type = obj.TYPE_REG
 	calcStackBasePointerAddress.To.Reg = reservedRegisterForStackBasePointerAddress
-	setLeftShiftedRegister(calcStackBasePointerAddress, true, tmpReg, 3)
+	// We calculate "tmpReg * 8" as "tmpReg << 3".
+	setLeftShiftedRegister(calcStackBasePointerAddress, tmpReg, 3)
 	c.addInstruction(calcStackBasePointerAddress)
 }
 
