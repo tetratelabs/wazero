@@ -29,7 +29,7 @@ func Test_hostFunc(t *testing.T) {
 	// Host-side implementation of get_random_string on Wasm import.
 	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
 		// Assert that context values passed in from CallFunctionContext are accessible.
-		contextValue := ctx.Value(testKey{}).(int64)
+		contextValue := ctx.Context().Value(testKey{}).(int64)
 		require.Equal(t, int64(12345), contextValue)
 
 		const bufferSize = 10000 // force memory space grow to ensure eager failures on missing setup
@@ -37,7 +37,7 @@ func Test_hostFunc(t *testing.T) {
 		// Note that this is recursive call. That means that this is the VM function call during the VM function call.
 		// More precisely, we call test.base64 (in Wasm), and the function in turn calls this get_random_string function,
 		// and we call test.allocate_buffer (in Wasm) here: host->vm->host->vm.
-		ret, _, err := store.CallFunction(ctx, "test", "allocate_buffer", bufferSize)
+		ret, _, err := store.CallFunction(ctx.Context(), "test", "allocate_buffer", bufferSize)
 		require.NoError(t, err)
 		require.Len(t, ret, 1)
 		bufAddr := ret[0]

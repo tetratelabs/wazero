@@ -144,7 +144,7 @@ func runRandomMatMul(b *testing.B, store *wasm.Store) {
 func newStore(engine wasm.Engine) *wasm.Store {
 	store := wasm.NewStore(engine)
 	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
-		ret, _, _ := store.CallFunction(ctx, "test", "allocate_buffer", 10)
+		ret, _, _ := store.CallFunction(ctx.Context(), "test", "allocate_buffer", 10)
 		bufAddr := ret[0]
 		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[retBufPtr:], uint32(bufAddr))
 		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[retBufSize:], 10)

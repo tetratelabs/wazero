@@ -124,7 +124,7 @@ func unreachable(t *testing.T, newEngine func() wasm.Engine) {
 	const moduleName = "test"
 
 	callUnreachable := func(ctx *wasm.HostFunctionCallContext) {
-		_, _, err := store.CallFunction(ctx, moduleName, "unreachable_func")
+		_, _, err := store.CallFunction(ctx.Context(), moduleName, "unreachable_func")
 		require.NoError(t, err)
 	}
 	err = store.AddHostFunction("host", "cause_unreachable", reflect.ValueOf(callUnreachable))
@@ -181,7 +181,7 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 	store := wasm.NewStore(newEngine())
 
 	hostfunc := func(ctx *wasm.HostFunctionCallContext) {
-		_, _, err := store.CallFunction(ctx, "test", "called_by_host_func")
+		_, _, err := store.CallFunction(ctx.Context(), "test", "called_by_host_func")
 		require.NoError(t, err)
 	}
 	err = store.AddHostFunction("env", "host_func", reflect.ValueOf(hostfunc))

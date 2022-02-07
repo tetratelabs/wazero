@@ -858,10 +858,26 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 
 // HostFunctionCallContext is the first argument of all host functions.
 type HostFunctionCallContext struct {
-	context.Context
+	ctx context.Context
 	// Memory is the currently used memory instance at the time when the host function call is made.
 	Memory *MemoryInstance
 	// TODO: Add others if necessary.
+}
+
+// NewHostFunctionCallContext creates a new HostFunctionCallContext with a
+// context and memory instance.
+func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) *HostFunctionCallContext {
+	return &HostFunctionCallContext{
+		ctx:    ctx,
+		Memory: memory,
+	}
+}
+
+// Context returns the host call's context. To change the context, use WithContext.
+//
+// The returned context is always non-nil; it defaults to the background context.
+func (c *HostFunctionCallContext) Context() context.Context {
+	return c.ctx
 }
 
 func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
