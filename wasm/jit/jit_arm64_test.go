@@ -5,7 +5,6 @@ package jit
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"testing"
@@ -115,15 +114,25 @@ func TestArm64Compiler_exit(t *testing.T) {
 
 func TestArm64Compiler_compileConsts(t *testing.T) {
 	for _, op := range []wazeroir.OperationKind{
-		// wazeroir.OperationKindConstI32,
+		wazeroir.OperationKindConstI32,
 		wazeroir.OperationKindConstI64,
-		// wazeroir.OperationKindConstF32,
+		wazeroir.OperationKindConstF32,
 		// wazeroir.OperationKindConstF64,
 	} {
 		op := op
 		t.Run(op.String(), func(t *testing.T) {
 			for _, val := range []uint64{
-				0,
+				0x1, 0x1111000, 1 << 16, 1 << 21, 1 << 27, 1 << 32, 1<<32 + 1, 1 << 53,
+				math.Float64bits(math.Inf(1)),
+				math.Float64bits(math.Inf(-1)),
+				math.Float64bits(math.NaN()),
+				math.MaxUint32,
+				math.MaxInt32,
+				math.MaxUint64,
+				math.MaxInt64,
+				uint64(math.Float32bits(float32(math.Inf(1)))),
+				uint64(math.Float32bits(float32(math.Inf(-1)))),
+				uint64(math.Float32bits(float32(math.NaN()))),
 			} {
 				t.Run(fmt.Sprintf("0x%x", val), func(t *testing.T) {
 					env := newJITEnvironment()
@@ -155,12 +164,12 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 
-					fmt.Println(hex.EncodeToString(code))
 					// Run native code.
 					env.exec(code)
 
 					// JIT status on engine must be returned.
 					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+					require.Equal(t, uint64(1), env.stackPointer())
 
 					switch op {
 					case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstF32:

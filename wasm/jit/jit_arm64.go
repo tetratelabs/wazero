@@ -15,6 +15,7 @@ package jit
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
@@ -94,6 +95,8 @@ func (c *arm64Compiler) emitPreamble() error {
 	nop := c.newProg()
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
+
+	c.initializeReservedStackBasePointerRegister()
 	return nil
 }
 
@@ -470,30 +473,108 @@ func (c *arm64Compiler) compileMemorySize() error {
 }
 
 func (c *arm64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
-}
-
-// compileConstI64 implements compiler.compileConstI64 for the arm64 architecture.
-func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	if o.Value == 0 {
-		c.locationStack.pushValueOnRegister(zeroRegister)
+		c.pushZeroValue()
 	} else {
+		// Take a register to load the value.
 		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
 		}
 
-		c.locationStack.pushValueOnRegister(reg)
+		// Then, load the const.
+		loadConst := c.newProg()
+		loadConst.As = arm64.AMOVW // 32-bit!
+		loadConst.From.Type = obj.TYPE_CONST
+		// Note: in raw arm64 assembly, immediates larger than 16-bits
+		// are not supported, but the assembler takes care of this and
+		// emits corresponding 4-instructions to load such large constants.
+		loadConst.From.Offset = int64(o.Value)
+		loadConst.To.Type = obj.TYPE_REG
+		loadConst.To.Reg = reg
+		c.addInstruction(loadConst)
+
+		loc := c.locationStack.pushValueOnRegister(reg)
+		loc.setRegisterType(generalPurposeRegisterTypeInt)
 	}
 	return nil
 }
 
+// compileConstI64 implements compiler.compileConstI64 for the arm64 architecture.
+func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
+	if o.Value == 0 {
+		c.pushZeroValue()
+	} else {
+		// Take a register to load the value.
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+
+		// Then, load the const.
+		loadConst := c.newProg()
+		loadConst.As = arm64.AMOVD
+		loadConst.From.Type = obj.TYPE_CONST
+		// Note: in raw arm64 assembly, immediates larger than 16-bits
+		// are not supported, but the assembler takes care of this and
+		// emits corresponding 4-instructions to load such large constants.
+		loadConst.From.Offset = int64(o.Value)
+		loadConst.To.Type = obj.TYPE_REG
+		loadConst.To.Reg = reg
+		c.addInstruction(loadConst)
+
+		loc := c.locationStack.pushValueOnRegister(reg)
+		loc.setRegisterType(generalPurposeRegisterTypeInt)
+	}
+	return nil
+}
+
+// https://stackoverflow.com/questions/64608307/how-do-i-move-a-floating-point-constant-into-an-fp-register
 func (c *arm64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	// Take a register to load the value.
+	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	if o.Value != 0 {
+		tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+
+		// Load the const.
+		loadConst := c.newProg()
+		loadConst.As = arm64.AMOVD
+		loadConst.From.Type = obj.TYPE_CONST
+		loadConst.From.Offset = int64(uint64(math.Float32bits(o.Value)))
+		// Note: in raw arm64 assembly, immediates larger than 16-bits
+		// are not supported, but the assembler takes care of this and
+		// emits corresponding 4-instructions to load such large constants.
+		loadConst.To.Type = obj.TYPE_REG
+		loadConst.To.Reg = tmpReg
+		c.addInstruction(loadConst)
+	}
+
+	// mov := c.newProg()
+	// mov.As = arm64.AFMOVS
+	// mov.From.Type = obj.TYPE_REG
+	// mov.From.Reg = tmpReg
+	// mov.To.Type = obj.TYPE_REG
+	// mov.To.Reg = reg
+	// c.addInstruction(mov)
+
+	loc := c.locationStack.pushValueOnRegister(reg)
+	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	return nil
 }
 
 func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
+}
+
+func (c *arm64Compiler) pushZeroValue() {
+	c.locationStack.pushValueOnRegister(zeroRegister)
 }
 
 // allocateRegister returns an unused register of the given type. The register will be taken
@@ -528,13 +609,52 @@ func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) {
 	store.As = arm64.AMOVD
 	store.To.Type = obj.TYPE_MEM
 	store.To.Reg = reservedRegisterForStackBasePointerAddress
-	// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
-	// TODO:
+	// Note: in raw arm64 assembly, immediates larger than 16-bits
+	// are not supported, but the assembler takes care of this and
+	// emits corresponding 4-instructions to load such large constants.
 	store.To.Offset = int64(loc.stackPointer) * 8
 	store.From.Type = obj.TYPE_REG
 	store.From.Reg = loc.register
 	c.addInstruction(store)
 
+	nop := c.newProg()
+	nop.As = obj.ANOP
+	c.addInstruction(nop)
+
 	// Mark the register is free.
 	c.locationStack.releaseRegister(loc)
+}
+
+// initializeReservedStackBasePointerRegister adds intructions to initialize reservedRegisterForStackBasePointerAddress
+// so that it points to the absolute address of the stack base for this function.
+func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
+	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+
+	loadElement0Address := c.newProg()
+	loadElement0Address.As = arm64.AMOVD
+	loadElement0Address.From.Type = obj.TYPE_MEM
+	loadElement0Address.From.Reg = reservedRegisterForEngine
+	loadElement0Address.From.Offset = engineGlobalContextValueStackElement0AddressOffset
+	loadElement0Address.To.Type = obj.TYPE_REG
+	loadElement0Address.To.Reg = reservedRegisterForStackBasePointerAddress
+	c.addInstruction(loadElement0Address)
+
+	// Next we move the base pointer (engine.stackBasePointer) to the tmp register.
+	getStackBasePointer := c.newProg()
+	getStackBasePointer.As = arm64.AMOVD
+	getStackBasePointer.From.Type = obj.TYPE_MEM
+	getStackBasePointer.From.Reg = reservedRegisterForEngine
+	getStackBasePointer.From.Offset = engineValueStackContextStackBasePointerOffset
+	getStackBasePointer.To.Type = obj.TYPE_REG
+	getStackBasePointer.To.Reg = tmpReg
+	c.addInstruction(getStackBasePointer)
+
+	// Finally we add the reg to cachedStackBasePointerReg.
+	calcStackBasePointerAddress := c.newProg()
+	calcStackBasePointerAddress.As = arm64.AADD
+	calcStackBasePointerAddress.To.Type = obj.TYPE_REG
+	calcStackBasePointerAddress.To.Reg = reservedRegisterForStackBasePointerAddress
+	calcStackBasePointerAddress.From.Type = obj.TYPE_SHIFT
+	calcStackBasePointerAddress.From.Offset = (int64(tmpReg)&31)<<16 | 0<<22 | (3&63)<<10
+	c.addInstruction(calcStackBasePointerAddress)
 }
