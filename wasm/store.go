@@ -315,6 +315,12 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	return nil
 }
 
+// CallFunction looks up an exported function given its module and function name and calls it.
+// Any returned results and resultTypes are index-correlated, noting WebAssembly 1.0 (MVP) allows
+// up to one result. An error is returned for any failure looking up or invoking the function including
+// signature mismatch.
+//
+// Note: The ctx parameter will be the outer-most ancestor of HostFunctionCallContext.Context.
 // Note: this API is unstable. See tetratelabs/wazero#170
 func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
 	var exp *ExportInstance
@@ -326,6 +332,11 @@ func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, p
 	if len(f.FunctionType.Type.Params) != len(params) {
 		err = fmt.Errorf("invalid number of parameters")
 		return
+	}
+
+	// Ensure context has a value so that host calls can assume it is non-nil.
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
 	results, err = s.engine.Call(ctx, f, params...)
