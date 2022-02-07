@@ -90,12 +90,15 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 
 func (c *arm64Compiler) String() (ret string) { return }
 
+// emitPreamble implements compiler.emitPreamble for the arm64 architecture.
 func (c *arm64Compiler) emitPreamble() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
 	nop := c.newProg()
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
 
+	// Before excuting function body, we must initialize the stack base pointer register
+	// so that we can manipulate the memory stack properly.
 	c.initializeReservedStackBasePointerRegister()
 	return nil
 }
@@ -667,7 +670,7 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
 	calcStackBasePointerAddress.As = arm64.AADD
 	calcStackBasePointerAddress.To.Type = obj.TYPE_REG
 	calcStackBasePointerAddress.To.Reg = reservedRegisterForStackBasePointerAddress
-	setShiftedRegister(calcStackBasePointerAddress, true, tmpReg, 3)
+	setLeftShiftedRegister(calcStackBasePointerAddress, true, tmpReg, 3)
 	c.addInstruction(calcStackBasePointerAddress)
 }
 
@@ -675,7 +678,7 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
 // becomes the "shifted register". For example, this is used to emit instruction like
 // "add  x1, x2, x3, lsl #3" which means "x1 = x2 + (x3 << 3)".
 // See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131.
-func setShiftedRegister(inst *obj.Prog, onFrom bool, register int16, shiftNum int64) {
+func setLeftShiftedRegister(inst *obj.Prog, onFrom bool, register int16, shiftNum int64) {
 	if onFrom {
 		inst.From.Type = obj.TYPE_SHIFT
 		inst.From.Offset = (int64(register)&31)<<16 | 0<<22 | (shiftNum&63)<<10
