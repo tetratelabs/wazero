@@ -486,7 +486,7 @@ func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	return c.emitIntConstant(false, o.Value)
 }
 
-// emitIntConstant adds instruction to load an integer constant.
+// emitIntConstant adds instructions to load an integer constant.
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) load target constant.
 func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
@@ -531,7 +531,7 @@ func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 	return c.emitFloatConstant(false, math.Float64bits(o.Value))
 }
 
-// emitFloatConstant adds instruction to load a flaot constant.
+// emitFloatConstant adds instructions to load a float constant.
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) bit representation of load target float constant.
 func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
