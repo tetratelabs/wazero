@@ -11,6 +11,7 @@ TEXT ·jitcall(SB),NOSPLIT|NOFRAME,$0-16
         // Load the address of engine.
         MOVD engine+8(FP),R0
         // In arm64, return address is stored in R30 after jumping into the code.
+        // We save the return address value into archContext.jitReturnAddress in Engine.
         // Note that the const 136 drifts after editting Engine or archContext struct. See TestArchContextOffsetInEngine.
         MOVD R30,136(R0)          
         // Jump to native code.
