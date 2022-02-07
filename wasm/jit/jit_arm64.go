@@ -23,7 +23,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
-// archContext is embedded in Engine in order to store artchitecture-specific data.
+// archContext is embedded in Engine in order to store architecture-specific data.
 type archContext struct {
 	// jitCallReturnAddress holds the absolute return address for jitcall.
 	// The value is set whenever jitcall is executed and done in jit_arm64.s
