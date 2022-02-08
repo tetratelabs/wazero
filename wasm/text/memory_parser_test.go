@@ -60,11 +60,10 @@ func TestMemoryParser(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			namespace := newIndexNamespace()
-			parsed, tp, err := parseMemoryType(namespace, tc.input)
+			memoryNamespace := newIndexNamespace(wasm.SectionIDMemory)
+			parsed, tp, err := parseMemoryType(memoryNamespace, tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, parsed)
-			require.Equal(t, uint32(1), tp.memoryNamespace.count)
 			if tc.expectedID == "" {
 				require.Empty(t, tp.memoryNamespace.idToIdx)
 			} else {
@@ -133,14 +132,14 @@ func TestMemoryParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			parsed, _, err := parseMemoryType(newIndexNamespace(), tc.input)
+			parsed, _, err := parseMemoryType(newIndexNamespace(wasm.SectionIDMemory), tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 			require.Nil(t, parsed)
 		})
 	}
 
 	t.Run("duplicate ID", func(t *testing.T) {
-		memoryNamespace := newIndexNamespace()
+		memoryNamespace := newIndexNamespace(wasm.SectionIDMemory)
 		_, err := memoryNamespace.setID([]byte("$mem"))
 		require.NoError(t, err)
 		memoryNamespace.count++
@@ -151,13 +150,13 @@ func TestMemoryParser_Errors(t *testing.T) {
 	})
 }
 
-func parseMemoryType(namespace *indexNamespace, input string) (*wasm.MemoryType, *memoryParser, error) {
+func parseMemoryType(memoryNamespace *indexNamespace, input string) (*wasm.MemoryType, *memoryParser, error) {
 	var parsed *wasm.MemoryType
 	var setFunc onMemory = func(min uint32, max *uint32) tokenParser {
 		parsed = &wasm.MemoryType{Min: min, Max: max}
 		return parseErr
 	}
-	tp := newMemoryParser(namespace, setFunc)
+	tp := newMemoryParser(memoryNamespace, setFunc)
 	// memoryParser starts after the '(memory', so we need to eat it first!
 	_, _, err := lex(skipTokens(2, tp.begin), []byte(input))
 	return parsed, tp, err

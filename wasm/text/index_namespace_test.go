@@ -10,7 +10,7 @@ import (
 )
 
 func TestIndexNamespace_SetId(t *testing.T) {
-	in := newIndexNamespace()
+	in := newIndexNamespace(wasm.SectionIDFunction)
 	t.Run("set when empty", func(t *testing.T) {
 		id, err := in.setID([]byte("$x"))
 		require.NoError(t, err)

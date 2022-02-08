@@ -10,6 +10,7 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+// TODO: add abbreviation tests
 func TestDecodeModule(t *testing.T) {
 	zero := uint32(0)
 	localGet0End := []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}
@@ -37,6 +38,45 @@ func TestDecodeModule(t *testing.T) {
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i64_i32, v_v, i32i64_i32},
+			},
+		},
+		{
+			name: "func inlined import, nullary type match",
+			input: `(module
+	(func $main (import "test" "main"))
+	(type (func))
+)`,
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{v_v},
+				ImportSection: []*wasm.Import{{
+					Module: "test", Name: "main",
+					Kind:     wasm.ImportKindFunc,
+					DescFunc: 0,
+				}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "main"}},
+				},
+			},
+		},
+		{
+			name: "func inlined import, inlined type",
+			input: `(module
+	(func $runtime.fd_write (import "wasi_snapshot_preview1" "fd_write") (param i32 i32 i32 i32) (result i32))
+	(type (func))
+)`,
+			expected: &wasm.Module{
+				TypeSection: []*wasm.FunctionType{
+					v_v, // module types are always before inlined types
+					i32i32i32i32_i32,
+				},
+				ImportSection: []*wasm.Import{{
+					Module: "wasi_snapshot_preview1", Name: "fd_write",
+					Kind:     wasm.ImportKindFunc,
+					DescFunc: 1,
+				}},
+				NameSection: &wasm.NameSection{
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+				},
 			},
 		},
 		{
@@ -1343,34 +1383,28 @@ func TestDecodeModule(t *testing.T) {
 			},
 		},
 		{
-			name: "export different memory - numeric",
+			name: "export memory - numeric",
 			input: `(module
 	(memory 0)
-	(memory 1)
 	(export "foo" (memory 0))
-	(export "bar" (memory 1))
 )`,
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 0}, {Min: 1}},
+				MemorySection: []*wasm.MemoryType{{Min: 0}},
 				ExportSection: map[string]*wasm.Export{
 					"foo": {Name: "foo", Kind: wasm.ExportKindMemory, Index: 0},
-					"bar": {Name: "bar", Kind: wasm.ExportKindMemory, Index: 1},
 				},
 			},
 		},
 		{
-			name: "export different memory - numeric - late",
+			name: "export memory - numeric - late",
 			input: `(module
 	(export "foo" (memory 0))
-	(export "bar" (memory 1))
 	(memory 0)
-	(memory 1)
 )`,
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 0}, {Min: 1}},
+				MemorySection: []*wasm.MemoryType{{Min: 0}},
 				ExportSection: map[string]*wasm.Export{
 					"foo": {Name: "foo", Kind: wasm.ExportKindMemory, Index: 0},
-					"bar": {Name: "bar", Kind: wasm.ExportKindMemory, Index: 1},
 				},
 			},
 		},
@@ -1396,15 +1430,13 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "export memory - ID",
 			input: `(module
-    (memory 1)
     (memory $mem 2)
-    (memory $mam 3)
     (export "memory" (memory $mem))
 )`,
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 1}, {Min: 2}, {Min: 3}},
+				MemorySection: []*wasm.MemoryType{{Min: 2}},
 				ExportSection: map[string]*wasm.Export{
-					"memory": {Name: "memory", Kind: wasm.ExportKindMemory, Index: 2},
+					"memory": {Name: "memory", Kind: wasm.ExportKindMemory, Index: 0},
 				},
 			},
 		},
@@ -1781,6 +1813,11 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:41: unknown ID $v_v",
 		},
 		{
+			name:        "import func after func",
+			input:       "(module (func) (import \"\" \"\" (func)))",
+			expectedErr: "1:31: import after module-defined function in module.import[0]",
+		},
+		{
 			name:        "func invalid name",
 			input:       "(module (func baz)))",
 			expectedErr: "1:15: unsupported instruction: baz in module.func[0]",
@@ -1793,7 +1830,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "func double param ID",
 			input:       "(module (func $baz $qux)))",
-			expectedErr: "1:20: redundant ID $qux in module.func[0]",
+			expectedErr: "1:20: redundant ID: $qux in module.func[0]",
 		},
 		{
 			name:        "func param ID clash",
@@ -1886,11 +1923,6 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "1:43: duplicate ID $main in module.func[0]",
 		},
 		{
-			name:        "import func ID clashes with func ID",
-			input:       "(module (func $main) (import \"\" \"\" (func $main)))",
-			expectedErr: "1:42: duplicate ID $main in module.import[0].func",
-		},
-		{
 			name:        "func ID after result",
 			input:       "(module (func (result i32) $main)))",
 			expectedErr: "1:28: unexpected ID: $main in module.func[0]",
@@ -1945,6 +1977,17 @@ func TestParseModule_Errors(t *testing.T) {
 			(func call $mein)
 		)`,
 			expectedErr: "3:15: unknown ID $mein in module.code[1].body[1]",
+		},
+		{
+			name:        "import memory after memory",
+			input:       "(module (memory 1) (import \"\" \"\" (memory)))",
+			expectedErr: "1:35: redundant memory in module.import[0]",
+		},
+		// TODO: memory after import memory
+		{
+			name:        "second memory",
+			input:       "(module (memory 1) (memory 1))",
+			expectedErr: "1:21: redundant memory in module",
 		},
 		{
 			name: "export duplicates empty name",
@@ -2098,13 +2141,13 @@ func TestModuleParser_ErrorContext(t *testing.T) {
 	}{
 		{input: "initial", pos: positionInitial, expected: ""},
 		{input: "module", pos: positionModule, expected: "module"},
-		{input: "module import", pos: positionModuleImport, expected: "module.import[0]"},
-		{input: "module import func", pos: positionModuleImportFunc, expected: "module.import[0].func"},
-		{input: "module func", pos: positionModuleFunc, expected: "module.func[0]"},
-		{input: "module memory", pos: positionModuleMemory, expected: "module.memory[0]"},
-		{input: "module export", pos: positionModuleExport, expected: "module.export[0]"},
-		{input: "module export func", pos: positionModuleExportFunc, expected: "module.export[0].func"},
-		{input: "start", pos: positionModuleStart, expected: "module.start"},
+		{input: "module import", pos: positionImport, expected: "module.import[0]"},
+		{input: "module import func", pos: positionImportFunc, expected: "module.import[0].func"},
+		{input: "module func", pos: positionFunc, expected: "module.func[0]"},
+		{input: "module memory", pos: positionMemory, expected: "module.memory[0]"},
+		{input: "module export", pos: positionExport, expected: "module.export[0]"},
+		{input: "module export func", pos: positionExportFunc, expected: "module.export[0].func"},
+		{input: "start", pos: positionStart, expected: "module.start"},
 	}
 
 	for _, tt := range tests {

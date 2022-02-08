@@ -46,12 +46,12 @@ func TestFuncParser(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var parsedCode *wasm.Code
-			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
 				parsedCode = code
 				return parseErr, nil
 			}
 
-			require.NoError(t, parseFunc(newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), setFunc), tc.source))
+			require.NoError(t, parseFunc(newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(wasm.SectionIDFunction), setFunc), tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
 	}
@@ -102,12 +102,12 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			var parsedCode *wasm.Code
-			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
 				parsedCode = code
 				return parseErr, nil
 			}
 
-			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), setFunc)
+			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(wasm.SectionIDFunction), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expectedCode, parsedCode)
 			require.Equal(t, []*unresolvedIndex{tc.expectedUnresolvedIndex}, fp.funcNamespace.unresolvedIndices)
@@ -141,7 +141,7 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			funcNamespace := newIndexNamespace()
+			funcNamespace := newIndexNamespace(wasm.SectionIDFunction)
 			_, err := funcNamespace.setID([]byte("$not_main"))
 			require.NoError(t, err)
 			funcNamespace.count++
@@ -159,7 +159,7 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 			funcNamespace.count++
 
 			var parsedCode *wasm.Code
-			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
+			var setFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
 				parsedCode = code
 				return parseErr, nil
 			}
@@ -221,13 +221,13 @@ func TestFuncParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), failOnFunc)
+			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(wasm.SectionIDFunction), failOnFunc)
 			require.EqualError(t, parseFunc(fp, tc.source), tc.expectedErr)
 		})
 	}
 }
 
-var failOnFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error) {
+var failOnFunc onFunc = func(typeIdx wasm.Index, code *wasm.Code, localNames wasm.NameMap) (tokenParser, error) {
 	return nil, errors.New("unexpected to call onFunc on error")
 }
 

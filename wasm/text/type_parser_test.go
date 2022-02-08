@@ -100,8 +100,8 @@ func TestTypeParser(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			namespace := newIndexNamespace()
-			parsed, tp, err := parseFunctionType(namespace, tc.input)
+			typeNamespace := newIndexNamespace(wasm.SectionIDType)
+			parsed, tp, err := parseFunctionType(typeNamespace, tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, parsed)
 			require.Equal(t, uint32(1), tp.typeNamespace.count)
@@ -228,14 +228,14 @@ func TestTypeParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			parsed, _, err := parseFunctionType(newIndexNamespace(), tc.input)
+			parsed, _, err := parseFunctionType(newIndexNamespace(wasm.SectionIDType), tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 			require.Nil(t, parsed)
 		})
 	}
 
 	t.Run("duplicate ID", func(t *testing.T) {
-		typeNamespace := newIndexNamespace()
+		typeNamespace := newIndexNamespace(wasm.SectionIDType)
 		_, err := typeNamespace.setID([]byte("$v_v"))
 		require.NoError(t, err)
 		typeNamespace.count++
@@ -246,13 +246,13 @@ func TestTypeParser_Errors(t *testing.T) {
 	})
 }
 
-func parseFunctionType(namespace *indexNamespace, input string) (*wasm.FunctionType, *typeParser, error) {
+func parseFunctionType(typeNamespace *indexNamespace, input string) (*wasm.FunctionType, *typeParser, error) {
 	var parsed *wasm.FunctionType
 	var setFunc onType = func(ft *wasm.FunctionType) tokenParser {
 		parsed = ft
 		return parseErr
 	}
-	tp := newTypeParser(namespace, setFunc)
+	tp := newTypeParser(typeNamespace, setFunc)
 	// typeParser starts after the '(type', so we need to eat it first!
 	_, _, err := lex(skipTokens(2, tp.begin), []byte(input))
 	return parsed, tp, err

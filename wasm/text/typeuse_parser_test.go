@@ -18,7 +18,7 @@ type typeUseParserTest struct {
 	expectedTypeIdx     wasm.Index
 	expectedParamNames  wasm.NameMap
 
-	expectedOnTypeUsePosition onTypeUsePosition
+	expectedOnTypeUsePosition callbackPosition
 	expectedOnTypeUseToken    tokenType
 	expectedTrailingTokens    []tokenType
 }
@@ -81,7 +81,7 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 	}
 
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace(wasm.SectionIDType))
 		return tp, func(t *testing.T) {
 			// We should have inlined the type, and it is the first type use, which means the inlined index is zero
 			require.Zero(t, tp.inlinedTypeIndices[0].inlinedIdx)
@@ -116,7 +116,7 @@ func TestTypeUseParser_UnresolvedType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace(wasm.SectionIDType))
 		return tp, func(t *testing.T) {
 			require.NotNil(t, tp.typeNamespace.unresolvedIndices)
 			if tc.expectedInlinedType == nil {
@@ -207,7 +207,7 @@ func TestTypeUseParser_ReuseExistingType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		typeNamespace := newIndexNamespace()
+		typeNamespace := newIndexNamespace(wasm.SectionIDType)
 
 		// Add types to cover the main ways types uses are declared
 		module := &wasm.Module{TypeSection: []*wasm.FunctionType{v_i32, v_v, i32_v, i32i64_i32}}
@@ -260,7 +260,7 @@ func TestTypeUseParser_ReuseExistingInlinedType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace(wasm.SectionIDType))
 		// inline a type that doesn't match the test
 		require.NoError(t, parseTypeUse(tp, "((param i32 i64))", ignoreTypeUse))
 		// inline the test type
@@ -305,7 +305,7 @@ func TestTypeUseParser_BeginResets(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace(wasm.SectionIDType))
 		// inline a type that uses all fields
 		require.NoError(t, parseTypeUse(tp, "((type $i32i64_i32) (param $x i32) (param $y i64) (result i32))", ignoreTypeUse))
 		require.NoError(t, parseTypeUse(tp, tc.source, ignoreTypeUse))
@@ -325,14 +325,14 @@ type typeUseTestFunc func(*typeUseParserTest) (*typeUseParser, func(t *testing.T
 func runTypeUseParserTests(t *testing.T, tests []*typeUseParserTest, tf typeUseTestFunc) {
 	moreTests := make([]*typeUseParserTest, 0, len(tests)*2)
 	for _, tt := range tests {
-		tt.expectedOnTypeUsePosition = onTypeUseEndField
+		tt.expectedOnTypeUsePosition = callbackPositionEndField
 		tt.expectedOnTypeUseToken = tokenRParen // at the end of the field ')'
 		tt.expectedTrailingTokens = nil
 
 		kt := *tt // copy
 		kt.name = fmt.Sprintf("%s - trailing keyword", tt.name)
 		kt.source = fmt.Sprintf("%s nop)", tt.source[:len(tt.source)-1])
-		kt.expectedOnTypeUsePosition = onTypeUseUnhandledToken
+		kt.expectedOnTypeUsePosition = callbackPositionUnhandledToken
 		kt.expectedOnTypeUseToken = tokenKeyword // at 'nop' and ')' remains
 		kt.expectedTrailingTokens = []tokenType{tokenRParen}
 		moreTests = append(moreTests, &kt)
@@ -342,11 +342,11 @@ func runTypeUseParserTests(t *testing.T, tests []*typeUseParserTest, tf typeUseT
 		ft.source = fmt.Sprintf("%s (nop))", tt.source[:len(tt.source)-1])
 		// Two outcomes, we've reached a field not named "type", "param" or "result" or we completed "result"
 		if strings.Contains(tt.source, "result") {
-			ft.expectedOnTypeUsePosition = onTypeUseUnhandledToken
+			ft.expectedOnTypeUsePosition = callbackPositionUnhandledToken
 			ft.expectedOnTypeUseToken = tokenLParen // at '(' and 'nop))' remain
 			ft.expectedTrailingTokens = []tokenType{tokenKeyword, tokenRParen, tokenRParen}
 		} else {
-			ft.expectedOnTypeUsePosition = onTypeUseUnhandledField
+			ft.expectedOnTypeUsePosition = callbackPositionUnhandledField
 			ft.expectedOnTypeUseToken = tokenKeyword // at 'nop' and '))' remain
 			ft.expectedTrailingTokens = []tokenType{tokenRParen, tokenRParen}
 		}
@@ -360,7 +360,7 @@ func runTypeUseParserTests(t *testing.T, tests []*typeUseParserTest, tf typeUseT
 			var parsedTypeIdx wasm.Index
 			var parsedParamNames wasm.NameMap
 			p := &collectTokenTypeParser{}
-			var setTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+			var setTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 				parsedTypeIdx = typeIdx
 				parsedParamNames = paramNames
 				require.Equal(t, tc.expectedOnTypeUsePosition, pos)
@@ -482,14 +482,14 @@ func TestTypeUseParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := parseTypeUse(newTypeUseParser(&wasm.Module{}, newIndexNamespace()), tc.source, failOnTypeUse)
+			err := parseTypeUse(newTypeUseParser(&wasm.Module{}, newIndexNamespace(wasm.SectionIDType)), tc.source, failOnTypeUse)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }
 
 func TestTypeUseParser_FailsMatch(t *testing.T) {
-	typeNamespace := newIndexNamespace()
+	typeNamespace := newIndexNamespace(wasm.SectionIDType)
 
 	// Add types to cover the main ways types uses are declared
 	module := &wasm.Module{TypeSection: []*wasm.FunctionType{v_v, i32i64_i32}}
@@ -534,11 +534,11 @@ func TestTypeUseParser_FailsMatch(t *testing.T) {
 	}
 }
 
-var ignoreTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+var ignoreTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	return parseNoop, nil
 }
 
-var failOnTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+var failOnTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	return nil, errors.New("unexpected to call onTypeUse on error")
 }
 

@@ -99,6 +99,5 @@ func (p *memoryParser) end(tok tokenType, tokenBytes []byte, _, _ uint32) (token
 	if tok != tokenRParen {
 		return nil, unexpectedToken(tok, tokenBytes)
 	}
-	p.memoryNamespace.count++
 	return p.onMemory(p.currentMin, p.currentMax), nil
 }

@@ -1,5 +1,7 @@
 package text
 
+import "math"
+
 // decodeUint32 decodes an uint32 from a tokenUN or returns false on overflow
 //
 // Note: Bit length interpretation is not defined at the lexing layer, so this may fail on overflow due to invalid
@@ -16,7 +18,7 @@ func decodeUint32(tokenBytes []byte) (uint32, bool) { // TODO: hex
 		if overflow {
 			return 0, overflow
 		}
-		if v > 0xffffffff {
+		if v > math.MaxUint32 {
 			return 0, true
 		}
 		return uint32(v), false
