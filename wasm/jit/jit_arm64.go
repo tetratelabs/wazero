@@ -94,6 +94,7 @@ func (c *arm64Compiler) markRegisterUnused(reg int16) {
 	}
 }
 
+// applyConstToRegisterInstruction adds an instruction where source operand is a constant and destination is a register.
 func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, constValue int64, destinationRegister int16) {
 	applyConst := c.newProg()
 	applyConst.As = insturction
@@ -107,11 +108,12 @@ func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, cons
 	c.addInstruction(applyConst)
 }
 
+// applyMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
+// baseRegister is the base absolute address in the memory, and offset is the offset from the absolute address in baseRegister.
 func (c *arm64Compiler) applyMemoryToRegisterInstruction(insturction obj.As, baseRegister int16, offset int64, destinationRegister int16) (err error) {
 	if offset > math.MaxInt16 {
 		// This is a bug in JIT copmiler: caller must check the offset at compilation time, and avoid such a large offset
-		// by loading the const to the register beforehand and then using applyConstToRegisterInstruction instead.
-		//
+		// by loading the const to the register beforehand and then using applyRegisterOffsetMemoryToRegisterInstruction instead.
 		err = fmt.Errorf("memory offset must be smaller than or equal %d, but got %d", math.MaxInt16, offset)
 		return
 	}
@@ -126,6 +128,8 @@ func (c *arm64Compiler) applyMemoryToRegisterInstruction(insturction obj.As, bas
 	return
 }
 
+// applyRegisterOffsetMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
+// The differece from applyMemoryToRegisterInstruction is that here we specify the offset by a register rather than offset constant.
 func (c *arm64Compiler) applyRegisterOffsetMemoryToRegisterInstruction(insturction obj.As, baseRegister, offsetRegister, destinationRegister int16) (err error) {
 	inst := c.newProg()
 	inst.As = insturction
@@ -139,6 +143,8 @@ func (c *arm64Compiler) applyRegisterOffsetMemoryToRegisterInstruction(insturcti
 	return nil
 }
 
+// applyRegisterToMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
+// This is the opposite of applyMemoryToRegisterInstruction.
 func (c *arm64Compiler) applyRegisterToMemoryInstruction(insturction obj.As, baseRegister int16, offset int64, source int16) (err error) {
 	if offset > math.MaxInt16 {
 		// This is a bug in JIT copmiler: caller must check the offset at compilation time, and avoid such a large offset
@@ -157,6 +163,8 @@ func (c *arm64Compiler) applyRegisterToMemoryInstruction(insturction obj.As, bas
 	return
 }
 
+// applyRegisterToRegisterOffsetMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
+// The differece from applyRegisterToMemoryInstruction is that here we specify the offset by a register rather than offset constant.
 func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(insturction obj.As, baseRegister, offsetRegister, source int16) {
 	inst := c.newProg()
 	inst.As = insturction
@@ -169,6 +177,7 @@ func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(insturcti
 	c.addInstruction(inst)
 }
 
+// applyRegisterToRegisterOffsetMemoryInstruction adds an instruction where both destination and source operands are registers.
 func (c *arm64Compiler) applyRegisterToRegisterInstruction(insturction obj.As, from, to int16) {
 	inst := c.newProg()
 	inst.As = insturction
@@ -179,6 +188,7 @@ func (c *arm64Compiler) applyRegisterToRegisterInstruction(insturction obj.As, f
 	c.addInstruction(inst)
 }
 
+// applyRegisterToRegisterOffsetMemoryInstruction adds an instruction which takes two source operands on registers and one destination register operand.
 func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(insturction obj.As, src1, src2, destination int16) {
 	inst := c.newProg()
 	inst.As = insturction
