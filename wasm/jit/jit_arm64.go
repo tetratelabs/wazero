@@ -763,6 +763,10 @@ func (c *arm64Compiler) loadValueOnStackToRegister(loc *valueLocation) (err erro
 		reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
 	}
 
+	if err != nil {
+		return
+	}
+
 	if offset := int64(loc.stackPointer) * 8; offset > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
 		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
