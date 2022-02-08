@@ -422,7 +422,7 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 								require.NoError(t, err)
 							}
 
-							// At this point, two values exist.
+							// At this point, two values exist for comparison.
 							require.Equal(t, uint64(2), compiler.locationStack.sp)
 
 							// Emit the operation.
@@ -441,10 +441,11 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 							// We consumed two values, but push the result back.
 							require.Equal(t, uint64(1), compiler.locationStack.sp)
 							resultLocation := compiler.locationStack.peek()
-							// Plus the result must be located on a register.
+							// Plus the result must be located on a conditional register.
 							require.True(t, resultLocation.onConditionalRegister())
 
-							compiler.loadConditionalFlagOnGeneralPurposeRegister(resultLocation)
+							// Move the conditional register value to a general purpose register to verify the value.
+							compiler.loadConditionalRegisterToGeneralPurposeRegister(resultLocation)
 							require.True(t, resultLocation.onRegister())
 
 							// Release the value to the memory stack again to verify the operation, and then return.

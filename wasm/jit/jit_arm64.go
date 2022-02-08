@@ -626,6 +626,7 @@ func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileLt implements compiler.compileLt for the arm64 architecture.
 func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
@@ -662,6 +663,7 @@ func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	return nil
 }
 
+// compileGt implements compiler.compileGt for the arm64 architecture.
 func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
@@ -698,6 +700,7 @@ func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	return nil
 }
 
+// compileLe implements compiler.compileLe for the arm64 architecture.
 func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
@@ -734,6 +737,7 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	return nil
 }
 
+// compileGe implements compiler.compileGe for the arm64 architecture.
 func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
@@ -922,7 +926,7 @@ func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err 
 	if loc.onStack() {
 		err = c.loadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
-		c.loadConditionalFlagOnGeneralPurposeRegister(loc)
+		c.loadConditionalRegisterToGeneralPurposeRegister(loc)
 	}
 	return
 }
@@ -935,12 +939,12 @@ func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err 
 func (c *arm64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() {
 	if c.locationStack.sp > 0 {
 		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
-			c.loadConditionalFlagOnGeneralPurposeRegister(loc)
+			c.loadConditionalRegisterToGeneralPurposeRegister(loc)
 		}
 	}
 }
 
-func (c *arm64Compiler) loadConditionalFlagOnGeneralPurposeRegister(loc *valueLocation) {
+func (c *arm64Compiler) loadConditionalRegisterToGeneralPurposeRegister(loc *valueLocation) {
 	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	c.markRegisterUsed(reg)
 

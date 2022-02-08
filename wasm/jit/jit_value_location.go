@@ -17,6 +17,9 @@ func isNilRegister(r int16) bool {
 	return r == nilRegister
 }
 
+// conditionalRegisterState indicates a state of the conditional flag register.
+// In arm64, conditional registers begins with arm64.COND_* registers.
+// In amd64, we define each flag values in value_locations_amd64.go
 type conditionalRegisterState int16
 
 const conditionalRegisterStateUnset conditionalRegisterState = 0
