@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
@@ -24,20 +25,48 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	return ret
 }
 
+// TODO: delete this as this could be a duplication from other tests especially spectests.
+// Use this until we could run spectests on arm64.
 func TestArm64CompilerEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name string
 		body []byte
+		sig  *wasm.FunctionType
 	}{
-		{name: "empty", body: []byte{wasm.OpcodeEnd}},
-		{name: "br .return", body: []byte{wasm.OpcodeBr, 0, wasm.OpcodeEnd}},
+		{name: "empty", body: []byte{wasm.OpcodeEnd}, sig: &wasm.FunctionType{}},
+		{name: "br .return", body: []byte{wasm.OpcodeBr, 0, wasm.OpcodeEnd}, sig: &wasm.FunctionType{}},
+		{
+			name: "consts",
+			body: []byte{
+				wasm.OpcodeI32Const, 1, wasm.OpcodeI64Const, 1,
+				wasm.OpcodeF32Const, 1, 1, 1, 1, wasm.OpcodeF64Const, 1, 2, 3, 4, 5, 6, 7, 8,
+				wasm.OpcodeEnd,
+			},
+			// We push four constants.
+			sig: &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64}},
+		},
+		{
+			name: "add",
+			body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeI32Const, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd},
+			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32}},
+		},
+		{
+			name: "sub",
+			body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeI64Const, 1, wasm.OpcodeI64Sub, wasm.OpcodeEnd},
+			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}},
+		},
+		{
+			name: "mul",
+			body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeI64Const, 1, wasm.OpcodeI64Mul, wasm.OpcodeEnd},
+			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			engine := newEngine()
 			f := &wasm.FunctionInstance{
-				FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
+				FunctionType: &wasm.TypeInstance{Type: tc.sig},
 				Body:         tc.body,
 			}
 			err := engine.Compile(f)
@@ -57,7 +86,7 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 func TestArm64Compiler_returnFunction(t *testing.T) {
 	env := newJITEnvironment()
 
-	// Build codes.
+	// Build code.
 	compiler := env.requireNewCompiler(t)
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
@@ -87,7 +116,7 @@ func TestArm64Compiler_exit(t *testing.T) {
 
 			env := newJITEnvironment()
 
-			// Build codes.
+			// Build code.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 
@@ -100,7 +129,7 @@ func TestArm64Compiler_exit(t *testing.T) {
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
-			// Run codes
+			// Run code
 			env.exec(code)
 
 			// JIT status on engine must be updated.
@@ -137,7 +166,7 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 				t.Run(fmt.Sprintf("0x%x", val), func(t *testing.T) {
 					env := newJITEnvironment()
 
-					// Build codes.
+					// Build code.
 					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
@@ -178,6 +207,312 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 						require.Equal(t, uint32(val), env.stackTopAsUint32())
 					case wazeroir.OperationKindConstI64, wazeroir.OperationKindConstF64:
 						require.Equal(t, val, env.stackTopAsUint64())
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
+	const val = 10000
+	for _, tc := range []struct {
+		name         string
+		stackPointer uint64
+		isFloat      bool
+	}{
+		{name: "int", stackPointer: 10, isFloat: false},
+		{name: "float", stackPointer: 10, isFloat: true},
+		{name: "int-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: false},
+		{name: "float-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: true},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+
+			// Build code.
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			// Setup the location stack so that we push the const on the specified height.
+			compiler.locationStack.sp = tc.stackPointer
+			compiler.locationStack.stack = make([]*valueLocation, tc.stackPointer)
+
+			if tc.isFloat {
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
+			} else {
+				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: val})
+			}
+			require.NoError(t, err)
+
+			// Release the register allocated value to the memory stack so that we can see the value after exiting.
+			compiler.releaseRegisterToStack(compiler.locationStack.peek())
+			compiler.returnFunction()
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run native code after growing the value stack.
+			env.engine().builtinFunctionGrowValueStack(tc.stackPointer)
+			env.exec(code)
+
+			// JIT status on engine must be returned and stack pointer must end up the specified one.
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, tc.stackPointer+1, env.stackPointer())
+
+			if tc.isFloat {
+				require.Equal(t, math.Float64frombits(val), env.stackTopAsFloat64())
+			} else {
+				require.Equal(t, uint64(val), env.stackTopAsUint64())
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
+	const val = 123
+	for _, tc := range []struct {
+		name         string
+		stackPointer uint64
+		isFloat      bool
+	}{
+		{name: "int", stackPointer: 10, isFloat: false},
+		{name: "float", stackPointer: 10, isFloat: true},
+		{name: "int-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: false},
+		{name: "float-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: true},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+
+			// Build code.
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			// Setup the location stack so that we push the const on the specified height.
+			compiler.locationStack.sp = tc.stackPointer
+			compiler.locationStack.stack = make([]*valueLocation, tc.stackPointer)
+
+			// Record that that top value is on top.
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
+			loc := compiler.locationStack.pushValueOnStack()
+			if tc.isFloat {
+				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+			} else {
+				loc.setRegisterType(generalPurposeRegisterTypeInt)
+			}
+			// At this point the value must be recorded as being on stack.
+			require.True(t, loc.onStack())
+
+			// Release the stack-allocated value to register.
+			compiler.loadValueOnStackToRegister(loc)
+			require.Len(t, compiler.locationStack.usedRegisters, 1)
+			require.True(t, loc.onRegister())
+
+			// To verify the behavior, increment the value on the register.
+			if tc.isFloat {
+				// For float, we cannot add consts, so load the constant first.
+				err = compiler.emitFloatConstant(false, math.Float64bits(1))
+				require.NoError(t, err)
+				// Then, do the increment.
+				compiler.applyRegisterToRegisterInstruction(arm64.AFADDD, compiler.locationStack.peek().register, loc.register)
+				// Delete the loaded const.
+				compiler.locationStack.pop()
+			} else {
+				compiler.applyConstToRegisterInstruction(arm64.AADD, 1, loc.register)
+			}
+
+			// Release the value to the memory stack so that we can see the value after exiting.
+			compiler.releaseRegisterToStack(loc)
+			compiler.returnFunction()
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run native code after growing the value stack, and place the original value.
+			env.engine().builtinFunctionGrowValueStack(tc.stackPointer)
+			env.stack()[tc.stackPointer] = val
+			env.exec(code)
+
+			// JIT status on engine must be returned and stack pointer must end up the specified one.
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, tc.stackPointer+1, env.stackPointer())
+
+			if tc.isFloat {
+				require.Equal(t, math.Float64frombits(val)+1, env.stackTopAsFloat64())
+			} else {
+				require.Equal(t, uint64(val)+1, env.stackTopAsUint64())
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindAdd,
+		wazeroir.OperationKindSub,
+		wazeroir.OperationKindMul,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, unsignedType := range []wazeroir.UnsignedType{
+				wazeroir.UnsignedTypeI32,
+				wazeroir.UnsignedTypeI64,
+				wazeroir.UnsignedTypeF32,
+				wazeroir.UnsignedTypeF64,
+			} {
+				unsignedType := unsignedType
+				t.Run(unsignedType.String(), func(t *testing.T) {
+					for _, values := range [][2]uint64{
+						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1}, {math.MaxInt16, math.MaxInt32},
+						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
+						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
+						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{0, math.Float64bits(math.Inf(1))},
+						{0, math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), 1},
+						{math.Float64bits(math.Inf(-1)), 1},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(-1))},
+					} {
+						x1, x2 := values[0], values[1]
+						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.emitPreamble()
+							require.NoError(t, err)
+
+							// Emit consts operands.
+							for _, v := range []uint64{x1, x2} {
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+								case wazeroir.UnsignedTypeI64:
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+								case wazeroir.UnsignedTypeF32:
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+								case wazeroir.UnsignedTypeF64:
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+								}
+								require.NoError(t, err)
+							}
+
+							// At this point, two values exist.
+							require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+							// Emit the operation.
+							switch kind {
+							case wazeroir.OperationKindAdd:
+								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: unsignedType})
+							case wazeroir.OperationKindSub:
+								err = compiler.compileSub(&wazeroir.OperationSub{Type: unsignedType})
+							case wazeroir.OperationKindMul:
+								err = compiler.compileMul(&wazeroir.OperationMul{Type: unsignedType})
+							}
+							require.NoError(t, err)
+
+							// We consumed two values, but push the result back.
+							require.Equal(t, uint64(1), compiler.locationStack.sp)
+							resultLocation := compiler.locationStack.peek()
+							// Plus the result must be located on a register.
+							require.True(t, resultLocation.onRegister())
+							// Also, the result must have an appropriate register type.
+							if unsignedType == wazeroir.UnsignedTypeF32 || unsignedType == wazeroir.UnsignedTypeF64 {
+								require.Equal(t, generalPurposeRegisterTypeFloat, resultLocation.regType)
+							} else {
+								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+							}
+
+							// Release the value to the memory stack again to verify the operation, and then return.
+							compiler.releaseRegisterToStack(resultLocation)
+							compiler.returnFunction()
+
+							// Generate the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+
+							// Run code.
+							env.exec(code)
+
+							// Check the stack.
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindAdd:
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									require.Equal(t, uint32(x1)+uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedTypeI64:
+									require.Equal(t, x1+x2, env.stackTopAsUint64())
+								case wazeroir.UnsignedTypeF32:
+									exp := math.Float32frombits(uint32(x1)) + math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
+								case wazeroir.UnsignedTypeF64:
+									exp := math.Float64frombits(x1) + math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
+								}
+							case wazeroir.OperationKindSub:
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									require.Equal(t, uint32(x1)-uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedTypeI64:
+									require.Equal(t, x1-x2, env.stackTopAsUint64())
+								case wazeroir.UnsignedTypeF32:
+									exp := math.Float32frombits(uint32(x1)) - math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
+								case wazeroir.UnsignedTypeF64:
+									exp := math.Float64frombits(x1) - math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
+								}
+							case wazeroir.OperationKindMul:
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									require.Equal(t, uint32(x1)*uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedTypeI64:
+									require.Equal(t, x1*x2, env.stackTopAsUint64())
+								case wazeroir.UnsignedTypeF32:
+									exp := math.Float32frombits(uint32(x1)) * math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
+								case wazeroir.UnsignedTypeF64:
+									exp := math.Float64frombits(x1) * math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
+								}
+							}
+						})
 					}
 				})
 			}

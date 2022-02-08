@@ -88,9 +88,16 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 	c.builder.AddInstruction(inst)
 }
 
-func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, constValue int64, destinationRegister int16) {
+func (c *arm64Compiler) markRegisterUnused(reg int16) {
+	if !isZeroRegister(reg) {
+		c.locationStack.markRegisterUnused(reg)
+	}
+}
+
+// applyConstToRegisterInstruction adds an instruction where source operand is a constant and destination is a register.
+func (c *arm64Compiler) applyConstToRegisterInstruction(instruction obj.As, constValue int64, destinationRegister int16) {
 	applyConst := c.newProg()
-	applyConst.As = insturction
+	applyConst.As = instruction
 	applyConst.From.Type = obj.TYPE_CONST
 	// Note: in raw arm64 assembly, immediates larger than 16-bits
 	// are not supported, but the assembler takes care of this and
@@ -101,32 +108,96 @@ func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, cons
 	c.addInstruction(applyConst)
 }
 
-func (c *arm64Compiler) addLoadToRegisterInstruction(insturction obj.As, baseRegister int16, offset int64, destinationRegister int16) {
-	load := c.newProg()
-	load.As = insturction
-	load.From.Type = obj.TYPE_MEM
-	load.From.Reg = baseRegister
-	// Note: in raw arm64 assembly, immediates larger than 16-bits
-	// are not supported, but the assembler takes care of this and
-	// emits corresponding (at most) 4-instructions to load such large constants.
-	load.From.Offset = offset
-	load.To.Type = obj.TYPE_REG
-	load.To.Reg = destinationRegister
-	c.addInstruction(load)
+// applyMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
+// baseRegister is the base absolute address in the memory, and offset is the offset from the absolute address in baseRegister.
+func (c *arm64Compiler) applyMemoryToRegisterInstruction(instruction obj.As, baseRegister int16, offset int64, destinationRegister int16) (err error) {
+	if offset > math.MaxInt16 {
+		// This is a bug in JIT copmiler: caller must check the offset at compilation time, and avoid such a large offset
+		// by loading the const to the register beforehand and then using applyRegisterOffsetMemoryToRegisterInstruction instead.
+		err = fmt.Errorf("memory offset must be smaller than or equal %d, but got %d", math.MaxInt16, offset)
+		return
+	}
+	inst := c.newProg()
+	inst.As = instruction
+	inst.From.Type = obj.TYPE_MEM
+	inst.From.Reg = baseRegister
+	inst.From.Offset = offset
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationRegister
+	c.addInstruction(inst)
+	return
 }
 
-func (c *arm64Compiler) addStoreToMemoryInstruction(insturction obj.As, baseRegister int16, offset int64, source int16) {
-	store := c.newProg()
-	store.As = insturction
-	store.To.Type = obj.TYPE_MEM
-	store.To.Reg = baseRegister
-	// Note: in raw arm64 assembly, immediates larger than 16-bits
-	// are not supported, but the assembler takes care of this and
-	// emits corresponding (at most) 4-instructions to load such large constants.
-	store.To.Offset = offset
-	store.From.Type = obj.TYPE_REG
-	store.From.Reg = source
-	c.addInstruction(store)
+// applyRegisterOffsetMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
+// The difference from applyMemoryToRegisterInstruction is that here we specify the offset by a register rather than offset constant.
+func (c *arm64Compiler) applyRegisterOffsetMemoryToRegisterInstruction(instruction obj.As, baseRegister, offsetRegister, destinationRegister int16) (err error) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.From.Type = obj.TYPE_MEM
+	inst.From.Reg = baseRegister
+	inst.From.Index = offsetRegister
+	inst.From.Scale = 1
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationRegister
+	c.addInstruction(inst)
+	return nil
+}
+
+// applyRegisterToMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
+// This is the opposite of applyMemoryToRegisterInstruction.
+func (c *arm64Compiler) applyRegisterToMemoryInstruction(instruction obj.As, baseRegister int16, offset int64, source int16) (err error) {
+	if offset > math.MaxInt16 {
+		// This is a bug in JIT copmiler: caller must check the offset at compilation time, and avoid such a large offset
+		// by loading the const to the register beforehand and then using applyRegisterToRegisterOffsetMemoryInstruction instead.
+		err = fmt.Errorf("memory offset must be smaller than or equal %d, but got %d", math.MaxInt16, offset)
+		return
+	}
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_MEM
+	inst.To.Reg = baseRegister
+	inst.To.Offset = offset
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = source
+	c.addInstruction(inst)
+	return
+}
+
+// applyRegisterToRegisterOffsetMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
+// The difference from applyRegisterToMemoryInstruction is that here we specify the offset by a register rather than offset constant.
+func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(instruction obj.As, baseRegister, offsetRegister, source int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_MEM
+	inst.To.Reg = baseRegister
+	inst.To.Index = offsetRegister
+	inst.To.Scale = 1
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = source
+	c.addInstruction(inst)
+}
+
+// applyRegisterToRegisterOffsetMemoryInstruction adds an instruction where both destination and source operands are registers.
+func (c *arm64Compiler) applyRegisterToRegisterInstruction(instruction obj.As, from, to int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = to
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = from
+	c.addInstruction(inst)
+}
+
+// applyRegisterToRegisterOffsetMemoryInstruction adds an instruction which takes two source operands on registers and one destination register operand.
+func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(instruction obj.As, src1, src2, destination int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destination
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = src1
+	inst.Reg = src2
+	c.addInstruction(inst)
 }
 
 func (c *arm64Compiler) String() (ret string) { return }
@@ -138,51 +209,72 @@ func (c *arm64Compiler) emitPreamble() error {
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
 
+	// TODO: Push function parameter constants.
+
 	// Before excuting function body, we must initialize the stack base pointer register
 	// so that we can manipulate the memory stack properly.
-	c.initializeReservedStackBasePointerRegister()
-	return nil
+	return c.initializeReservedStackBasePointerRegister()
 }
 
-func (c *arm64Compiler) returnFunction() {
+// returnFunction emits instructions to return from the current function frame.
+// If the current frame is the bottom, the code goes back to the Go code with jitCallStatusCodeReturned status.
+// Otherwise, we jump into the caller's return address (TODO).
+func (c *arm64Compiler) returnFunction() error {
 	// TODO: we don't support function calls yet.
 	// For now the following code just simply returns to Go code.
 
 	// Since we return from the function, we need to decrement the callframe stack pointer, and write it back.
 	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	c.addLoadToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg)
+	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
+		engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg); err != nil {
+		return err
+	}
 	c.applyConstToRegisterInstruction(arm64.ASUBS, 1, callFramePointerReg)
-	c.addStoreToMemoryInstruction(arm64.AMOVD, reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg)
+	if err := c.applyRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForEngine,
+		engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg); err != nil {
+		return err
+	}
 
-	c.exit(jitCallStatusCodeReturned)
+	return c.exit(jitCallStatusCodeReturned)
 }
 
 // exit adds instructions to give the control back to engine.exec with the given status code.
-func (c *arm64Compiler) exit(status jitCallStatusCode) {
-	tmp, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-
+func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 	// Write the current stack pointer to the engine.stackPointer.
-	c.applyConstToRegisterInstruction(arm64.AMOVW, int64(c.locationStack.sp), tmp)
-	c.addStoreToMemoryInstruction(arm64.AMOVW, reservedRegisterForEngine, engineValueStackContextStackPointerOffset, tmp)
+	c.applyConstToRegisterInstruction(arm64.AMOVW, int64(c.locationStack.sp), reservedRegisterForTemporary)
+	if err := c.applyRegisterToMemoryInstruction(arm64.AMOVW, reservedRegisterForEngine,
+		engineValueStackContextStackPointerOffset, reservedRegisterForTemporary); err != nil {
+		return err
+	}
 
 	if status != 0 {
-		c.applyConstToRegisterInstruction(arm64.AMOVW, int64(status), tmp)
-		c.addStoreToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset, tmp)
+		c.applyConstToRegisterInstruction(arm64.AMOVW, int64(status), reservedRegisterForTemporary)
+		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine,
+			engineExitContextJITCallStatusCodeOffset, reservedRegisterForTemporary); err != nil {
+			return err
+		}
 	} else {
 		// If the status == 0, we simply use zero register to store zero.
-		c.addStoreToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset, zeroRegister)
+		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine,
+			engineExitContextJITCallStatusCodeOffset, zeroRegister); err != nil {
+			return err
+		}
 	}
 
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
 	// is embedded in engine. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
-	c.addLoadToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineArchContextJITCallReturnAddressOffset, tmp)
+	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
+		engineArchContextJITCallReturnAddressOffset, reservedRegisterForTemporary); err != nil {
+		return err
+	}
 
 	ret := c.newProg()
 	ret.As = obj.ARET
 	ret.To.Type = obj.TYPE_REG
-	ret.To.Reg = tmp
+	ret.To.Reg = reservedRegisterForTemporary
 	c.addInstruction(ret)
+	return nil
 }
 
 func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
@@ -247,16 +339,106 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileAdd implements compiler.compileAdd for the arm64 architecture.
 func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	// Additon can be nop if one of operands is zero.
+	if isZeroRegister(x1.register) {
+		c.locationStack.pushValueOnRegister(x2.register)
+		return nil
+	} else if isZeroRegister(x2.register) {
+		c.locationStack.pushValueOnRegister(x1.register)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		inst = arm64.AADDW
+	case wazeroir.UnsignedTypeI64:
+		inst = arm64.AADD
+	case wazeroir.UnsignedTypeF32:
+		inst = arm64.AFADDS
+	case wazeroir.UnsignedTypeF64:
+		inst = arm64.AFADDD
+	}
+
+	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	// The result is placed on a register for x1, so record it.
+	c.locationStack.pushValueOnRegister(x1.register)
+	return nil
 }
 
+// compileSub implements compiler.compileSub for the arm64 architecture.
 func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	// If both of registers are zeros, this can be nop and simply push the zero register.
+	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
+		c.locationStack.pushValueOnRegister(zeroRegister)
+		return nil
+	}
+
+	// At this point, at least one of x1 or x2 registers is non zero.
+	// Choose the non-zero register as destination.
+	var destinationReg int16 = x1.register
+	if isZeroRegister(x1.register) {
+		destinationReg = x2.register
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		inst = arm64.ASUBW
+	case wazeroir.UnsignedTypeI64:
+		inst = arm64.ASUB
+	case wazeroir.UnsignedTypeF32:
+		inst = arm64.AFSUBS
+	case wazeroir.UnsignedTypeF64:
+		inst = arm64.AFSUBD
+	}
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
+	c.locationStack.pushValueOnRegister(destinationReg)
+	return nil
 }
 
+// compileMul implements compiler.compileMul for the arm64 architecture.
 func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	// Multiplcation can be done by putting a zero register if one of operands is zero.
+	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
+		c.locationStack.pushValueOnRegister(zeroRegister)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		inst = arm64.AMULW
+	case wazeroir.UnsignedTypeI64:
+		inst = arm64.AMUL
+	case wazeroir.UnsignedTypeF32:
+		inst = arm64.AFMULS
+	case wazeroir.UnsignedTypeF64:
+		inst = arm64.AFMULD
+	}
+
+	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	// The result is placed on a register for x1, so record it.
+	c.locationStack.pushValueOnRegister(x1.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
@@ -486,8 +668,7 @@ func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
 		}
 		c.applyConstToRegisterInstruction(inst, int64(value), reg)
 
-		loc := c.locationStack.pushValueOnRegister(reg)
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
+		c.locationStack.pushValueOnRegister(reg)
 	}
 	return nil
 }
@@ -514,14 +695,7 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 
 	tmpReg := zeroRegister
 	if value != 0 {
-		// If the target value is not zero, we have to load the constant
-		// temporarily into the integer register since we cannot directly
-		// move the const into float register.
-		tmpReg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
-		if err != nil {
-			return err
-		}
-
+		tmpReg = reservedRegisterForTemporary
 		var inst obj.As
 		if is32bit {
 			inst = arm64.AMOVW
@@ -532,25 +706,81 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 	}
 
 	// Use FMOV instruction to move the value on integer register into the float one.
-	mov := c.newProg()
+	var inst obj.As
 	if is32bit {
-		mov.As = arm64.AFMOVS
+		inst = arm64.AFMOVS
 	} else {
-		mov.As = arm64.AFMOVD
+		inst = arm64.AFMOVD
 	}
-	mov.From.Type = obj.TYPE_REG
-	mov.From.Reg = tmpReg
-	mov.To.Type = obj.TYPE_REG
-	mov.To.Reg = reg
-	c.addInstruction(mov)
+	c.applyRegisterToRegisterInstruction(inst, tmpReg, reg)
 
-	loc := c.locationStack.pushValueOnRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	c.locationStack.pushValueOnRegister(reg)
 	return nil
 }
 
 func (c *arm64Compiler) pushZeroValue() {
 	c.locationStack.pushValueOnRegister(zeroRegister)
+}
+
+// popTwoValuesOnRegisters pops two values from the location stacks, ensures
+// these two values are located on registers, and mark them unused.
+func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
+	x2 = c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return
+	}
+
+	x1 = c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return
+	}
+
+	c.markRegisterUnused(x1.register)
+	c.markRegisterUnused(x2.register)
+	return
+}
+
+// ensureOnGeneralPurposeRegister emits instructions to ensure that a value is located on a register.
+func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
+	if loc.onStack() {
+		err = c.loadValueOnStackToRegister(loc)
+	} else if loc.onConditionalRegister() {
+		err = fmt.Errorf("TODO: support moving conditional to general purpose register")
+	}
+	return
+}
+
+// loadValueOnStackToRegister emits instructions to load the value located on the stack to a register.
+func (c *arm64Compiler) loadValueOnStackToRegister(loc *valueLocation) (err error) {
+	var inst obj.As
+	var reg int16
+	switch loc.regType {
+	case generalPurposeRegisterTypeInt:
+		inst = arm64.AMOVD
+		reg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+	case generalPurposeRegisterTypeFloat:
+		inst = arm64.AFMOVD
+		reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+	}
+
+	if err != nil {
+		return
+	}
+
+	if offset := int64(loc.stackPointer) * 8; offset > math.MaxInt16 {
+		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
+		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
+		// but instead load the constant manually to "our" temporary register, then emit the load with it.
+		c.applyConstToRegisterInstruction(arm64.AMOVD, offset, reservedRegisterForTemporary)
+		c.applyRegisterOffsetMemoryToRegisterInstruction(inst, reservedRegisterForStackBasePointerAddress, reservedRegisterForTemporary, reg)
+	} else {
+		c.applyMemoryToRegisterInstruction(inst, reservedRegisterForStackBasePointerAddress, offset, reg)
+	}
+
+	// Record that the value holds the register and the register is marked used.
+	loc.setRegister(reg)
+	c.locationStack.markRegisterUsed(reg)
+	return
 }
 
 // allocateRegister returns an unused register of the given type. The register will be taken
@@ -574,40 +804,50 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 
 	// Release the steal target register value onto stack location.
 	reg = stealTarget.register
-	c.releaseRegisterToStack(stealTarget)
+	err = c.releaseRegisterToStack(stealTarget)
 	return
 }
 
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
-func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) {
-	var inst obj.As
-	switch loc.regType {
-	case generalPurposeRegisterTypeInt:
-		inst = arm64.AMOVD
-	case generalPurposeRegisterTypeFloat:
+func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) (err error) {
+	var inst obj.As = arm64.AMOVD
+	if loc.regType == generalPurposeRegisterTypeFloat {
 		inst = arm64.AFMOVD
 	}
 
-	c.addStoreToMemoryInstruction(inst, reservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8, loc.register)
+	if offset := int64(loc.stackPointer) * 8; offset > math.MaxInt16 {
+		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
+		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
+		// but instead load the constant manually to "our" temporary register, then emit the load with it.
+		c.applyConstToRegisterInstruction(arm64.AMOVD, offset, reservedRegisterForTemporary)
+		c.applyRegisterToRegisterOffsetMemoryInstruction(inst, reservedRegisterForStackBasePointerAddress, reservedRegisterForTemporary, loc.register)
+	} else {
+		if err = c.applyRegisterToMemoryInstruction(inst, reservedRegisterForStackBasePointerAddress, offset, loc.register); err != nil {
+			return
+		}
+	}
 
 	// Mark the register is free.
 	c.locationStack.releaseRegister(loc)
+	return
 }
 
 // initializeReservedStackBasePointerRegister adds intructions to initialize reservedRegisterForStackBasePointerAddress
 // so that it points to the absolute address of the stack base for this function.
-func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
-	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-
+func (c *arm64Compiler) initializeReservedStackBasePointerRegister() error {
 	// First, load the address of the first element in the value stack into reservedRegisterForStackBasePointerAddress temporarily.
-	c.addLoadToRegisterInstruction(arm64.AMOVD,
+	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineGlobalContextValueStackElement0AddressOffset,
-		reservedRegisterForStackBasePointerAddress)
+		reservedRegisterForStackBasePointerAddress); err != nil {
+		return err
+	}
 
 	// Next we move the base pointer (engine.stackBasePointer) to the tmp register.
-	c.addLoadToRegisterInstruction(arm64.AMOVD,
+	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset,
-		tmpReg)
+		reservedRegisterForTemporary); err != nil {
+		return err
+	}
 
 	// Finally, we calculate "reservedRegisterForStackBasePointerAddress + tmpReg * 8"
 	// where we multiply tmpReg by 8 because stack pointer is an index in the []uint64
@@ -617,8 +857,9 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() {
 	calcStackBasePointerAddress.To.Type = obj.TYPE_REG
 	calcStackBasePointerAddress.To.Reg = reservedRegisterForStackBasePointerAddress
 	// We calculate "tmpReg * 8" as "tmpReg << 3".
-	setLeftShiftedRegister(calcStackBasePointerAddress, tmpReg, 3)
+	setLeftShiftedRegister(calcStackBasePointerAddress, reservedRegisterForTemporary, 3)
 	c.addInstruction(calcStackBasePointerAddress)
+	return nil
 }
 
 // setShiftedRegister modifies the given *obj.Prog so that .From (source operand)
