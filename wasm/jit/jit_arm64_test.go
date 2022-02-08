@@ -214,7 +214,7 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 	}
 }
 
-func TestAarm64Compiler_releaseRegisterToStack(t *testing.T) {
+func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 	const val = 10000
 	for _, tc := range []struct {
 		name         string
