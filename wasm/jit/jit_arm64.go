@@ -365,6 +365,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
 		c.locationStack.pushValueOnRegister(zeroRegister)
+		return nil
 	}
 
 	// At this point, at least one of x1 or x2 registers is non zero.
@@ -786,11 +787,8 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
 func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) (err error) {
-	var inst obj.As
-	switch loc.regType {
-	case generalPurposeRegisterTypeInt:
-		inst = arm64.AMOVD
-	case generalPurposeRegisterTypeFloat:
+	var inst obj.As = arm64.AMOVD
+	if loc.regType == generalPurposeRegisterTypeFloat {
 		inst = arm64.AFMOVD
 	}
 
