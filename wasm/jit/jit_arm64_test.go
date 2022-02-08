@@ -333,13 +333,14 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
-			// Run native code after growing the value stack.
+			// Run native code after growing the value stack, and place the original value.
 			env.engine().builtinFunctionGrowValueStack(tc.stackPointer)
 			env.stack()[tc.stackPointer] = val
 			env.exec(code)
 
 			// JIT status on engine must be returned and stack pointer must end up the specified one.
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
 			if tc.isFloat {
 				require.Equal(t, math.Float64frombits(val)+1, env.stackTopAsFloat64())
@@ -350,7 +351,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compileSub(t *testing.T) {
+func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindAdd,
 		wazeroir.OperationKindSub,
@@ -425,7 +426,14 @@ func TestArm64Compiler_compileSub(t *testing.T) {
 							resultLocation := compiler.locationStack.peek()
 							// Plus the result must be located on a register.
 							require.True(t, resultLocation.onRegister())
+							// Also, the result must have an appropriate register type.
+							if unsignedType == wazeroir.UnsignedTypeF32 || unsignedType == wazeroir.UnsignedTypeF64 {
+								require.Equal(t, generalPurposeRegisterTypeFloat, resultLocation.regType)
+							} else {
+								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+							}
 
+							// Release the value to the memory stack again to verify the operation, and then return.
 							compiler.releaseRegisterToStack(resultLocation)
 							compiler.returnFunction()
 
