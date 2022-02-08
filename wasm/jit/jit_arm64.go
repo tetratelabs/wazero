@@ -621,7 +621,40 @@ func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
 }
 
 func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalFlag conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalFlag = conditionalRegisterStateLS // Unsigned lower or same.
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalFlag = conditionalRegisterStateLS // Unsigned lower or same.
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalFlag = conditionalRegisterStateLT // Signed less than.
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalFlag = conditionalRegisterStateLT // Signed less than.
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalFlag = conditionalRegisterStateLS
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalFlag = conditionalRegisterStateLS
+	}
+
+	// Execute the cmp operation.
+	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register placed value.
+	c.locationStack.pushValueOnConditionalRegister(conditionalFlag)
+	return nil
 }
 
 func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
