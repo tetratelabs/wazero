@@ -109,45 +109,58 @@ func (c *arm64Compiler) applyMemoryToRegisterInstruction(insturction obj.As, bas
 		err = fmt.Errorf("memory offset must be smaller than or equal %d, but got %d", math.MaxInt16, offset)
 		return
 	}
-	load := c.newProg()
-	load.As = insturction
-	load.From.Type = obj.TYPE_MEM
-	load.From.Reg = baseRegister
-	load.From.Offset = offset
-	load.To.Type = obj.TYPE_REG
-	load.To.Reg = destinationRegister
-	c.addInstruction(load)
+	inst := c.newProg()
+	inst.As = insturction
+	inst.From.Type = obj.TYPE_MEM
+	inst.From.Reg = baseRegister
+	inst.From.Offset = offset
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationRegister
+	c.addInstruction(inst)
 	return
+}
+
+func (c *arm64Compiler) applyRegisterOffsetMemoryToRegisterInstruction(insturction obj.As, baseRegister, offsetRegister, destinationRegister int16) (err error) {
+	inst := c.newProg()
+	inst.As = insturction
+	inst.From.Type = obj.TYPE_MEM
+	inst.From.Reg = baseRegister
+	inst.From.Index = offsetRegister
+	inst.From.Scale = 1
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationRegister
+	c.addInstruction(inst)
+	return nil
 }
 
 func (c *arm64Compiler) applyRegisterToMemoryInstruction(insturction obj.As, baseRegister int16, offset int64, source int16) (err error) {
 	if offset > math.MaxInt16 {
 		// This is a bug in JIT copmiler: caller must check the offset at compilation time, and avoid such a large offset
-		// by loading the const to the register beforehand and then using the register offset, instead of immediate offset.
+		// by loading the const to the register beforehand and then using applyRegisterToRegisterOffsetMemoryInstruction instead.
 		err = fmt.Errorf("memory offset must be smaller than or equal %d, but got %d", math.MaxInt16, offset)
 		return
 	}
-	store := c.newProg()
-	store.As = insturction
-	store.To.Type = obj.TYPE_MEM
-	store.To.Reg = baseRegister
-	store.To.Offset = offset
-	store.From.Type = obj.TYPE_REG
-	store.From.Reg = source
-	c.addInstruction(store)
+	inst := c.newProg()
+	inst.As = insturction
+	inst.To.Type = obj.TYPE_MEM
+	inst.To.Reg = baseRegister
+	inst.To.Offset = offset
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = source
+	c.addInstruction(inst)
 	return
 }
 
 func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(insturction obj.As, baseRegister, offsetRegister, source int16) {
-	store := c.newProg()
-	store.As = insturction
-	store.To.Type = obj.TYPE_MEM
-	store.To.Reg = baseRegister
-	store.To.Index = offsetRegister
-	store.To.Scale = 1
-	store.From.Type = obj.TYPE_REG
-	store.From.Reg = source
-	c.addInstruction(store)
+	inst := c.newProg()
+	inst.As = insturction
+	inst.To.Type = obj.TYPE_MEM
+	inst.To.Reg = baseRegister
+	inst.To.Index = offsetRegister
+	inst.To.Scale = 1
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = source
+	c.addInstruction(inst)
 }
 
 func (c *arm64Compiler) String() (ret string) { return }
@@ -279,6 +292,15 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 }
 
 func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
+	x2 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return err
+	}
+
+	x1 := c.locationStack.pop()
+	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return err
+	}
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
@@ -575,6 +597,43 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 
 func (c *arm64Compiler) pushZeroValue() {
 	c.locationStack.pushValueOnRegister(zeroRegister)
+}
+
+func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
+	if loc.onStack() {
+		err = c.loadValueOnStackToRegister(loc)
+	} else if loc.onConditionalRegister() {
+		err = fmt.Errorf("TODO: support moving conditional to general purpose register")
+	}
+	return
+}
+
+func (c *arm64Compiler) loadValueOnStackToRegister(loc *valueLocation) (err error) {
+	var inst obj.As
+	var reg int16
+	switch loc.regType {
+	case generalPurposeRegisterTypeInt:
+		inst = arm64.AMOVD
+		reg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+	case generalPurposeRegisterTypeFloat:
+		inst = arm64.AFMOVD
+		reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+	}
+
+	if offset := int64(loc.stackPointer) * 8; offset > math.MaxInt16 {
+		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
+		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
+		// but instead load the constant manually to "our" temporary register, then emit the load with it.
+		c.applyConstToRegisterInstruction(arm64.AMOVD, offset, reservedRegisterForTemporary)
+		c.applyRegisterOffsetMemoryToRegisterInstruction(inst, reservedRegisterForStackBasePointerAddress, reservedRegisterForTemporary, reg)
+	} else {
+		c.applyMemoryToRegisterInstruction(inst, reservedRegisterForStackBasePointerAddress, offset, reg)
+	}
+
+	// Record that the value holds the register and the register is marked used.
+	loc.setRegister(reg)
+	c.locationStack.markRegisterUsed(reg)
+	return
 }
 
 // allocateRegister returns an unused register of the given type. The register will be taken

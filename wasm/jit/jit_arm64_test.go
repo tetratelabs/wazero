@@ -241,3 +241,59 @@ func TestAarm64Compiler_releaseRegisterToStack(t *testing.T) {
 		})
 	}
 }
+
+func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
+	const val = 10000
+	for _, tc := range []struct {
+		name         string
+		stackPointer uint64
+		isFloat      bool
+	}{
+		{name: "int", stackPointer: 10, isFloat: false},
+		{name: "float", stackPointer: 10, isFloat: true},
+		{name: "int-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: false},
+		{name: "float-huge-height", stackPointer: math.MaxInt16 + 1, isFloat: true},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+
+			// Build codes.
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			// Setup the location stack so that we push the const on the specified height.
+			compiler.locationStack.sp = tc.stackPointer
+			compiler.locationStack.stack = make([]*valueLocation, tc.stackPointer)
+
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
+			loc := compiler.locationStack.pushValueOnStack()
+			compiler.loadValueOnStackToRegister(loc)
+			require.Len(t, compiler.locationStack.usedRegisters, 1)
+
+			// Release the value to the memory stack so that we can see the value after exiting.
+			compiler.releaseRegisterToStack(loc)
+			compiler.returnFunction()
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run native code after growing the value stack.
+			env.engine().builtinFunctionGrowValueStack(tc.stackPointer)
+			env.stack()[tc.stackPointer] = val
+			env.exec(code)
+
+			// JIT status on engine must be returned and stack pointer must end up the specified one.
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, tc.stackPointer+1, env.stackPointer())
+
+			if tc.isFloat {
+				require.Equal(t, math.Float64frombits(val), env.stackTopAsFloat64())
+			} else {
+				require.Equal(t, uint64(val), env.stackTopAsUint64())
+			}
+		})
+	}
+}
