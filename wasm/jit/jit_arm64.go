@@ -419,8 +419,6 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	// Multiplcation can be done by putting a zero register if one of operands is zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.markRegisterUnused(x1.register)
-		c.markRegisterUnused(x2.register)
 		c.locationStack.pushValueOnRegister(zeroRegister)
 		return nil
 	}
