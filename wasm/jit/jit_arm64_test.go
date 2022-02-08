@@ -811,3 +811,78 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 		})
 	}
 }
+
+func TestArm64Compiler_compieleDrop(t *testing.T) {
+	t.Run("range nil", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Put existing contents on stack.
+		liveNum := 10
+		for i := 0; i < liveNum; i++ {
+			compiler.locationStack.pushValueOnStack()
+		}
+		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
+
+		err = compiler.compileDrop(&wazeroir.OperationDrop{Range: nil})
+		require.NoError(t, err)
+
+		// After the nil range drop, the stack must remain the same.
+		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
+
+		compiler.returnFunction()
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+	t.Run("start top", func(t *testing.T) {
+		r := &wazeroir.InclusiveRange{Start: 0, End: 2}
+		dropTargetNum := r.End - r.Start + 1 // +1 as the range is inclusive!
+		liveNum := 5
+
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Put existing contents on stack.
+		const expectedTopLiveValue = 100
+		for i := 0; i < liveNum+dropTargetNum; i++ {
+			if i == liveNum-1 {
+				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: expectedTopLiveValue})
+				require.NoError(t, err)
+			} else {
+				compiler.locationStack.pushValueOnStack()
+			}
+		}
+		require.Equal(t, uint64(liveNum+dropTargetNum), compiler.locationStack.sp)
+
+		err = compiler.compileDrop(&wazeroir.OperationDrop{Range: r})
+		require.NoError(t, err)
+
+		// After the drop operation, the stack contains only live contents.
+		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
+		// Plus, the top value must stay on a register.
+		top := compiler.locationStack.peek()
+		require.True(t, top.onRegister())
+		// Release the top value after drop so that we can verify the cpu itself is not mainpulated.
+		compiler.releaseRegisterToStack(top)
+
+		compiler.returnFunction()
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(5), env.stackPointer())
+		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
+	})
+}

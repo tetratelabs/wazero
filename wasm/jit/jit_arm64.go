@@ -342,14 +342,53 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileDrop implements compiler.compileDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	r := o.Range
+	if r == nil {
+		return nil
+	} else if r.Start == 0 {
+		for i := 0; i <= r.End; i++ {
+			if loc := c.locationStack.pop(); loc.onRegister() {
+				c.locationStack.releaseRegister(loc)
+			}
+		}
+		return nil
+	}
+
+	var liveValues []*valueLocation
+	for i := 0; i < r.Start; i++ {
+		live := c.locationStack.pop()
+		liveValues = append(liveValues, live)
+	}
+	for i := 0; i < r.End-r.Start+1; i++ {
+		if loc := c.locationStack.pop(); loc.onRegister() {
+			c.locationStack.releaseRegister(loc)
+		}
+	}
+	for i := range liveValues {
+		live := liveValues[len(liveValues)-1-i]
+		if live.onStack() {
+			// Write the value in the old stack location to a register
+			if err := c.loadValueOnStackToRegister(live); err != nil {
+				return err
+			}
+		} else if live.onConditionalRegister() {
+			// If the live is conditional, and it's not target of drop,
+			// we must assign it to the register before we emit any instructions here.
+			c.loadConditionalRegisterToGeneralPurposeRegister(live)
+		}
+		// Modify the location in the stack with new stack pointer.
+		c.locationStack.push(live)
+	}
+	return nil
 }
 
 func (c *arm64Compiler) compileSelect() error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compilePick implements compiler.compilePick for the arm64 architecture.
 func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
 
