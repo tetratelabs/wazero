@@ -30,7 +30,7 @@ func TestNewAPI_Args(t *testing.T) {
 	})
 	t.Run("error constructing args", func(t *testing.T) {
 		_, err := Args("\xff\xfe\xfd", "foo", "bar")
-		require.EqualError(t, err, "arg[0] is not a valid UTF-8 string")
+		require.EqualError(t, err, "value at 0 is not a valid UTF-8 string")
 	})
 }
 
@@ -200,8 +200,210 @@ func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 	}
 }
 
-// TODO TestAPI_EnvironGet TestAPI_EnvironGet_Errors
-// TODO TestAPI_EnvironSizesGet TestAPI_EnvironSizesGet_Errors
+func TestNewAPI_Environ(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		o, err := Environ("a=b", "b=cd")
+		require.NoError(t, err)
+		a := newAPI(o)
+		require.Equal(t, &nullTerminatedStrings{
+			nullTerminatedValues: [][]byte{
+				{'a', '=', 'b', 0},
+				{'b', '=', 'c', 'd', 0},
+			},
+			totalBufSize: 9,
+		}, a.environ)
+	})
+
+	errorTests := []struct {
+		name        string
+		environ     string
+		errorMesage string
+	}{
+		{name: "error invalid utf-8",
+			environ:     "non_utf8=\xff\xfe\xfd",
+			errorMesage: "value at 0 is not a valid UTF-8 string"},
+		{name: "error not '='-joined pair",
+			environ:     "no_equal_pair",
+			errorMesage: "value at 0 is not joined with '='"},
+	}
+	for _, tt := range errorTests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Environ(tc.environ)
+			require.EqualError(t, err, tc.errorMesage)
+		})
+	}
+}
+
+func TestAPI_EnvironGet(t *testing.T) {
+	envOpt, err := Environ("a=b", "b=cd")
+	require.NoError(t, err)
+	resultEnviron := uint32(11)   // arbitrary offset
+	resultEnvironBuf := uint32(1) // arbitrary offset
+	maskLength := 20              // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',              // environBuf is after this
+		'a', '=', 'b', 0, // null terminated "a=b",
+		'b', '=', 'c', 'd', 0, // null terminated "b=cd"
+		'?',        // environ is after this
+		1, 0, 0, 0, // little endian-encoded offset of "a=b"
+		5, 0, 0, 0, // little endian-encoded offset of "b=cd"
+		'?', // stopped after encoding
+	}
+	store, wasiAPI := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
+
+	t.Run("API.EnvironGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		// invoke EnvironGet directly and check the memory side-effects
+		errno := wasiAPI.EnvironGet(hContext, resultEnviron, resultEnvironBuf)
+		require.Equal(t, ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run(FunctionEnvironGet, func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionEnvironGet, uint64(resultEnviron), uint64(resultEnvironBuf))
+		require.NoError(t, err)
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_EnvironGet_Errors(t *testing.T) {
+	envOpt, err := Environ("a=bc", "b=cd")
+	require.NoError(t, err)
+	store, api := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
+
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
+
+	tests := []struct {
+		name       string
+		environ    uint32
+		environBuf uint32
+	}{
+		{
+			name:       "out-of-memory environPtr",
+			environ:    memorySize,
+			environBuf: validAddress,
+		},
+		{
+			name:       "out-of-memory environBufPtr",
+			environ:    validAddress,
+			environBuf: memorySize,
+		},
+		{
+			name: "environPtr exceeds the maximum valid address by 1",
+			// 4*len(environ.nullTerminatedValues) is the expected buffer size for environPtr, 4 is the size of uint32
+			environ:    memorySize - 4*uint32(len(api.(*wasiAPI).environ.nullTerminatedValues)) + 1,
+			environBuf: validAddress,
+		},
+		{
+			name:       "environBufPtr exceeds the maximum valid address by 1",
+			environ:    validAddress,
+			environBuf: memorySize - api.(*wasiAPI).environ.totalBufSize + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionEnvironGet, uint64(tc.environ), uint64(tc.environBuf))
+			require.NoError(t, err)
+			require.Equal(t, uint64(ErrnoFault), ret[0]) // ret[0] is returned errno
+		})
+	}
+}
+
+func TestAPI_EnvironSizesGet(t *testing.T) {
+	envOpt, err := Environ("a=b", "b=cd")
+	require.NoError(t, err)
+	resultEnvironc := uint32(1)       // arbitrary offset
+	resultEnvironBufSize := uint32(6) // arbitrary offset
+	maskLength := 11                  // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                // resultEnvironc is after this
+		0x2, 0x0, 0x0, 0x0, // little endian-encoded environment variable count
+		'?',                // resultEnvironBufSize is after this
+		0x9, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
+		'?', // stopped after encoding
+	}
+	store, wasiAPI := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
+
+	t.Run("API.EnvironSizesGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		// invoke EnvironSizesGet directly and check the memory side effects
+		errno := wasiAPI.EnvironSizesGet(hContext, resultEnvironc, resultEnvironBufSize)
+		require.Equal(t, ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run(FunctionEnvironSizesGet, func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionEnvironSizesGet, uint64(resultEnvironc), uint64(resultEnvironBufSize))
+		require.NoError(t, err)
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_EnvironSizesGet_Errors(t *testing.T) {
+	ctx := context.Background()
+	envOpt, err := Environ("a=b", "b=cd")
+	require.NoError(t, err)
+	store, _ := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
+
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0) // arbitrary valid address as arguments to environ_sizes_get. We chose 0 here.
+
+	tests := []struct {
+		name           string
+		environc       uint32
+		environBufSize uint32
+	}{
+		{
+			name:           "out-of-memory environCountPtr",
+			environc:       memorySize,
+			environBufSize: validAddress,
+		},
+		{
+			name:           "out-of-memory environBufSizePtr",
+			environc:       validAddress,
+			environBufSize: memorySize,
+		},
+		{
+			name:           "environCountPtr exceeds the maximum valid address by 1",
+			environc:       memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of environ
+			environBufSize: validAddress,
+		},
+		{
+			name:           "environBufSizePtr exceeds the maximum valid size by 1",
+			environc:       validAddress,
+			environBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction(ctx, "test", FunctionEnvironSizesGet, uint64(tc.environc), uint64(tc.environBufSize))
+			require.NoError(t, err)
+			require.Equal(t, uint64(ErrnoFault), ret[0]) // ret[0] is returned errno
+		})
+	}
+}
+
 // TODO TestAPI_ClockResGet TestAPI_ClockResGet_Errors
 
 func TestAPI_ClockTimeGet(t *testing.T) {

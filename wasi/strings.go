@@ -18,7 +18,7 @@ type nullTerminatedStrings struct {
 }
 
 // newNullTerminatedStrings creates a nullTerminatedStrings from the given string slice. It returns an error
-// if the length or the total buffer size of the result WASIStringArray exceeds the maxBufSize
+// if the length or the total buffer size of the result nullTerminatedStrings exceeds the maxBufSize
 func newNullTerminatedStrings(maxBufSize uint32, args ...string) (*nullTerminatedStrings, error) {
 	if len(args) == 0 {
 		return &nullTerminatedStrings{nullTerminatedValues: [][]byte{}}, nil
@@ -27,12 +27,12 @@ func newNullTerminatedStrings(maxBufSize uint32, args ...string) (*nullTerminate
 	totalBufSize := uint32(0)
 	for i, arg := range args {
 		if !utf8.ValidString(arg) {
-			return nil, fmt.Errorf("arg[%d] is not a valid UTF-8 string", i)
+			return nil, fmt.Errorf("value at %d is not a valid UTF-8 string", i)
 		}
 		argLen := uint64(len(arg)) + 1 // + 1 for "\x00"; uint64 in case this one arg is huge
 		nextSize := uint64(totalBufSize) + argLen
 		if nextSize > uint64(maxBufSize) {
-			return nil, fmt.Errorf("arg[%d] will exceed max buffer size %d", i, maxBufSize)
+			return nil, fmt.Errorf("value at %d will exceed max buffer size %d", i, maxBufSize)
 		}
 		totalBufSize = uint32(nextSize)
 		strings = append(strings, append([]byte(arg), 0))

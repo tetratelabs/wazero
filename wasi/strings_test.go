@@ -75,14 +75,14 @@ func TestNewNullTerminatedStrings(t *testing.T) {
 func TestNewNullTerminatedStrings_Errors(t *testing.T) {
 	t.Run("invalid utf-8", func(t *testing.T) {
 		_, err := newNullTerminatedStrings(100, "\xff\xfe\xfd", "foo", "bar")
-		require.EqualError(t, err, "arg[0] is not a valid UTF-8 string")
+		require.EqualError(t, err, "value at 0 is not a valid UTF-8 string")
 	})
-	t.Run("arg[0] too large", func(t *testing.T) {
+	t.Run("value at 0 too large", func(t *testing.T) {
 		_, err := newNullTerminatedStrings(1, "a", "bc")
-		require.EqualError(t, err, "arg[0] will exceed max buffer size 1")
+		require.EqualError(t, err, "value at 0 will exceed max buffer size 1")
 	})
 	t.Run("empty arg too large due to null terminator", func(t *testing.T) {
 		_, err := newNullTerminatedStrings(2, "a", "", "bc")
-		require.EqualError(t, err, "arg[1] will exceed max buffer size 2")
+		require.EqualError(t, err, "value at 1 will exceed max buffer size 2")
 	})
 }
