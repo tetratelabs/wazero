@@ -14,7 +14,8 @@ const (
 	// reservedRegisterForStackBasePointerAddress: stack base pointer's address (engine.stackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointerAddress = x86.REG_R14
 	// reservedRegisterForMemory: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
-	reservedRegisterForMemory = x86.REG_R15
+	reservedRegisterForMemory    = x86.REG_R15
+	reservedRegisterForTemporary = nilRegister
 )
 
 var (

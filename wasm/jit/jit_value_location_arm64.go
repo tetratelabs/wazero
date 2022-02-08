@@ -7,12 +7,13 @@ import "github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 // Reserved registers.
 const (
-	// reservedRegisterForEngine: pointer to engine instance (i.e. *engine as uintptr)
+	// reservedRegisterForEngine holds the pointer to engine instance (i.e. *engine as uintptr)
 	reservedRegisterForEngine = arm64.REG_R0
-	// reservedRegisterForStackBasePointerAddress: stack base pointer's address (engine.stackBasePointer) in the current function call.
+	// reservedRegisterForStackBasePointerAddress holds stack base pointer's address (engine.stackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointerAddress = arm64.REG_R1
-	// reservedRegisterForMemory: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
-	reservedRegisterForMemory = arm64.REG_R2
+	// reservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
+	reservedRegisterForMemory    = arm64.REG_R2
+	reservedRegisterForTemporary = arm64.REG_R3
 )
 
 // zeroRegister is the alias of the arm64-specific zero register for readability.
@@ -29,12 +30,12 @@ var (
 		arm64.REG_F29, arm64.REG_F30, arm64.REG_F31,
 	}
 	unreservedGeneralPurposeIntRegisters = []int16{
-		arm64.REG_R3, arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
+		arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
 		arm64.REG_R14, arm64.REG_R15, arm64.REG_R16, arm64.REG_R17, arm64.REG_R18,
 		arm64.REG_R19, arm64.REG_R20, arm64.REG_R21, arm64.REG_R22, arm64.REG_R23,
 		arm64.REG_R24, arm64.REG_R25, arm64.REG_R26, arm64.REG_R27, arm64.REG_R28,
-		arm64.REG_R29, arm64.REG_R30, arm64.REG_R31,
+		arm64.REG_R29, arm64.REG_R30,
 	}
 )
 
