@@ -308,7 +308,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 }
 
 func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
-	x1, x2, err := c.getTwoValuesOnRegisters()
+	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 }
 
 func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
-	x1, x2, err := c.getTwoValuesOnRegisters()
+	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 }
 
 func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
-	x1, x2, err := c.getTwoValuesOnRegisters()
+	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
 	}
@@ -656,7 +656,7 @@ func (c *arm64Compiler) pushZeroValue() {
 	c.locationStack.pushValueOnRegister(zeroRegister)
 }
 
-func (c *arm64Compiler) getTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
+func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
 	x2 = c.locationStack.pop()
 	if err = c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return

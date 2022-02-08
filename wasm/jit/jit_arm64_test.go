@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
@@ -243,7 +244,7 @@ func TestAarm64Compiler_releaseRegisterToStack(t *testing.T) {
 }
 
 func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
-	const val = 10000
+	const val = 123
 	for _, tc := range []struct {
 		name         string
 		stackPointer uint64
@@ -267,10 +268,34 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 			compiler.locationStack.sp = tc.stackPointer
 			compiler.locationStack.stack = make([]*valueLocation, tc.stackPointer)
 
+			// Record that that top value is on top.
 			require.Len(t, compiler.locationStack.usedRegisters, 0)
 			loc := compiler.locationStack.pushValueOnStack()
+			if tc.isFloat {
+				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+			} else {
+				loc.setRegisterType(generalPurposeRegisterTypeInt)
+			}
+			// At this point the value must be recorded as being on stack.
+			require.True(t, loc.onStack())
+
+			// Release the stack-allocated value to register.
 			compiler.loadValueOnStackToRegister(loc)
 			require.Len(t, compiler.locationStack.usedRegisters, 1)
+			require.True(t, loc.onRegister())
+
+			// To verify the behavior, increment the value on the register.
+			if tc.isFloat {
+				// For float, we cannot add consts, so load the constant first.
+				err = compiler.emitFloatConstant(false, math.Float64bits(1))
+				require.NoError(t, err)
+				// Then, do the increment.
+				compiler.applyRegisterToRegisterInstruction(arm64.AFADDD, compiler.locationStack.peek().register, loc.register)
+				// Delete the loaded const.
+				compiler.locationStack.pop()
+			} else {
+				compiler.applyConstToRegisterInstruction(arm64.AADD, 1, loc.register)
+			}
 
 			// Release the value to the memory stack so that we can see the value after exiting.
 			compiler.releaseRegisterToStack(loc)
@@ -287,12 +312,11 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 
 			// JIT status on engine must be returned and stack pointer must end up the specified one.
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
 			if tc.isFloat {
-				require.Equal(t, math.Float64frombits(val), env.stackTopAsFloat64())
+				require.Equal(t, math.Float64frombits(val)+1, env.stackTopAsFloat64())
 			} else {
-				require.Equal(t, uint64(val), env.stackTopAsUint64())
+				require.Equal(t, uint64(val)+1, env.stackTopAsUint64())
 			}
 		})
 	}
