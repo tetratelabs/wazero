@@ -17,7 +17,7 @@ func isNilRegister(r int16) bool {
 	return r == nilRegister
 }
 
-type conditionalRegisterState byte
+type conditionalRegisterState int16
 
 const conditionalRegisterStateUnset conditionalRegisterState = 0
 

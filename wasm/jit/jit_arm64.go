@@ -88,6 +88,10 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 	c.builder.AddInstruction(inst)
 }
 
+func (c *arm64Compiler) markRegisterUsed(reg int16) {
+	c.locationStack.markRegisterUsed(reg)
+}
+
 func (c *arm64Compiler) markRegisterUnused(reg int16) {
 	if !isZeroRegister(reg) {
 		c.locationStack.markRegisterUnused(reg)
@@ -627,33 +631,33 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	}
 
 	var inst obj.As
-	var conditionalFlag conditionalRegisterState
+	var conditionalRegister conditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
-		inst = arm64.ACMPW
-		conditionalFlag = conditionalRegisterStateLS // Unsigned lower or same.
+		inst = arm64.ASUBW
+		conditionalRegister = arm64.COND_LS // Unsigned lower or same.
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.ACMP
-		conditionalFlag = conditionalRegisterStateLS // Unsigned lower or same.
+		conditionalRegister = arm64.COND_LS // Unsigned lower or same.
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.ACMPW
-		conditionalFlag = conditionalRegisterStateLT // Signed less than.
+		conditionalRegister = arm64.COND_LT // Signed less than.
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.ACMP
-		conditionalFlag = conditionalRegisterStateLT // Signed less than.
+		conditionalRegister = arm64.COND_LT // Signed less than.
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.AFCMPS
-		conditionalFlag = conditionalRegisterStateLS
+		conditionalRegister = arm64.COND_LS
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.AFCMPD
-		conditionalFlag = conditionalRegisterStateLS
+		conditionalRegister = arm64.COND_LS
 	}
 
 	// Execute the cmp operation.
 	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register placed value.
-	c.locationStack.pushValueOnConditionalRegister(conditionalFlag)
+	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
 	return nil
 }
 
@@ -809,9 +813,23 @@ func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err 
 	if loc.onStack() {
 		err = c.loadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
-		err = fmt.Errorf("TODO: support moving conditional to general purpose register")
+		c.loadConditionalFlagOnGeneralPurposeRegister(loc)
 	}
 	return
+}
+
+func (c *arm64Compiler) loadConditionalFlagOnGeneralPurposeRegister(loc *valueLocation) {
+	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	c.markRegisterUsed(reg)
+
+	add := c.newProg()
+	add.As = arm64.ACSET
+	add.To.Reg = reg
+	add.To.Type = obj.TYPE_REG
+	add.From.Type = obj.TYPE_REG
+	add.From.Reg = int16(loc.conditionalRegister)
+	c.addInstruction(add)
+	loc.setRegister(reg)
 }
 
 // loadValueOnStackToRegister emits instructions to load the value located on the stack to a register.

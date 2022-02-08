@@ -50,20 +50,3 @@ func isFloatRegister(r int16) bool {
 func isZeroRegister(r int16) bool {
 	return r == zeroRegister
 }
-
-// We call each "conditional code" in arm64 ref as "condtional register state" in wazero in line with amd64.
-// See the following link to check the list of conditional codes.
-// https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/condition-codes-1-condition-flags-and-codes
-// For the meaning with FCMP, see https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/condition-codes-4-floating-point-comparisons-using-vfp
-const (
-	conditionalRegisterStateEQ = conditionalRegisterStateUnset + 1 + iota // Equal.
-	conditionalRegisterStateNE                                            // Not Equal.
-	conditionalRegisterStateHS                                            // Unsigned higher or same (or carry set).
-	conditionalRegisterStateLO                                            // Unsigned lower (or carry clear).
-	conditionalRegisterStateHI                                            // Unsigned higher.
-	conditionalRegisterStateLS                                            // Unsigned lower or same.
-	conditionalRegisterStateGE                                            // Signed greater than or equal.
-	conditionalRegisterStateLT                                            // Signed less than.
-	conditionalRegisterStateGT                                            // Signed greater than.
-	conditionalRegisterStateLE                                            // Signed less than or equal.
-)

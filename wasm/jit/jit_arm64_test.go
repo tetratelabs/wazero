@@ -351,6 +351,111 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 	}
 }
 
+func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindLe,
+		// TODO:
+		// wazeroir.OperationKindLt,
+		// wazeroir.OperationKindGe,
+		// wazeroir.OperationKindGt,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, signedType := range []wazeroir.SignedType{
+				wazeroir.SignedTypeUint32,
+				// wazeroir.SignedTypeUint64,
+				// wazeroir.SignedTypeInt32,
+				// wazeroir.SignedTypeInt64,
+				// wazeroir.SignedTypeFloat32,
+				// wazeroir.SignedTypeFloat64,
+			} {
+				signedType := signedType
+				t.Run(signedType.String(), func(t *testing.T) {
+					for _, values := range [][2]uint64{
+						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1}, {math.MaxInt16, math.MaxInt32},
+						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
+						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
+						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{0, math.Float64bits(math.Inf(1))},
+						{0, math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), 1},
+						{math.Float64bits(math.Inf(-1)), 1},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(-1))},
+					} {
+						x1, x2 := values[0], values[1]
+						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.emitPreamble()
+							require.NoError(t, err)
+
+							// Emit consts operands.
+							for _, v := range []uint64{x1, x2} {
+								switch signedType {
+								case wazeroir.SignedTypeInt32, wazeroir.SignedTypeUint32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+								case wazeroir.SignedTypeFloat32:
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+								case wazeroir.SignedTypeFloat64:
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+								}
+								require.NoError(t, err)
+							}
+
+							// At this point, two values exist.
+							require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+							// Emit the operation.
+							switch kind {
+							case wazeroir.OperationKindLe:
+								err = compiler.compileLe(&wazeroir.OperationLe{Type: signedType})
+							case wazeroir.OperationKindLt:
+								err = compiler.compileLt(&wazeroir.OperationLt{Type: signedType})
+							case wazeroir.OperationKindGe:
+								err = compiler.compileGe(&wazeroir.OperationGe{Type: signedType})
+							case wazeroir.OperationKindGt:
+								err = compiler.compileGt(&wazeroir.OperationGt{Type: signedType})
+							}
+							require.NoError(t, err)
+
+							// We consumed two values, but push the result back.
+							require.Equal(t, uint64(1), compiler.locationStack.sp)
+							resultLocation := compiler.locationStack.peek()
+							// Plus the result must be located on a register.
+							require.True(t, resultLocation.onConditionalRegister())
+
+							compiler.loadConditionalFlagOnGeneralPurposeRegister(resultLocation)
+
+							// Release the value to the memory stack again to verify the operation, and then return.
+							compiler.releaseRegisterToStack(resultLocation)
+							compiler.returnFunction()
+
+							// Generate the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+
+							// Run code.
+							env.exec(code)
+
+							// Check the stack.
+							require.Equal(t, uint64(1), env.stackPointer())
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindAdd,
