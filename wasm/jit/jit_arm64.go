@@ -209,6 +209,8 @@ func (c *arm64Compiler) emitPreamble() error {
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
 
+	// TODO: Push function parameter constants.
+
 	// Before excuting function body, we must initialize the stack base pointer register
 	// so that we can manipulate the memory stack properly.
 	return c.initializeReservedStackBasePointerRegister()
