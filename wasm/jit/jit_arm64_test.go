@@ -364,7 +364,7 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 				wazeroir.SignedTypeUint32,
 				wazeroir.SignedTypeUint64,
 				wazeroir.SignedTypeInt32,
-				// wazeroir.SignedTypeInt64,
+				wazeroir.SignedTypeInt64,
 				wazeroir.SignedTypeFloat32,
 				wazeroir.SignedTypeFloat64,
 			} {
@@ -375,6 +375,8 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
 						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
 						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{1, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 1},
+						{0xffff_ffff_ffff_ffff, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 0xffff_ffff_ffff_ffff},
 						{math.Float64bits(math.MaxFloat32), 1},
 						{math.Float64bits(math.SmallestNonzeroFloat32), 1},
 						{math.Float64bits(math.MaxFloat64), 1},

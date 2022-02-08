@@ -652,10 +652,10 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 		conditionalRegister = arm64.COND_LS // Unsigned lower or same.
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.ACMPW
-		conditionalRegister = arm64.COND_LE // Signed less than.
+		conditionalRegister = arm64.COND_LE // Signed less than or equal.
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.ACMP
-		conditionalRegister = arm64.COND_LE // Signed less than.
+		conditionalRegister = arm64.COND_LE // Signed less than or equal.
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.AFCMPS
 		conditionalRegister = arm64.COND_LS
