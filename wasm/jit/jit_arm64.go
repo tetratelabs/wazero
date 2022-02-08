@@ -369,7 +369,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	}
 
 	// At this point, at least one of x1 or x2 registers is non zero.
-	// Choose the non-zero destination register here.
+	// Choose the non-zero register as destination.
 	var destinationReg int16 = x1.register
 	if isZeroRegister(x1.register) {
 		destinationReg = x2.register

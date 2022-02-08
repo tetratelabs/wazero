@@ -339,7 +339,22 @@ func TestArm64Compiler_compileSub(t *testing.T) {
 				unsignedType := unsignedType
 				t.Run(unsignedType.String(), func(t *testing.T) {
 					for _, values := range [][2]uint64{
-						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1},
+						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1}, {math.MaxInt16, math.MaxInt32},
+						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
+						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
+						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{0, math.Float64bits(math.Inf(1))},
+						{0, math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), 1},
+						{math.Float64bits(math.Inf(-1)), 1},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(-1))},
 					} {
 						x1, x2 := values[0], values[1]
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
@@ -404,9 +419,19 @@ func TestArm64Compiler_compileSub(t *testing.T) {
 								case wazeroir.UnsignedTypeI64:
 									require.Equal(t, x1+x2, env.stackTopAsUint64())
 								case wazeroir.UnsignedTypeF32:
-									require.Equal(t, math.Float32frombits(uint32(x1))+math.Float32frombits(uint32(x2)), env.stackTopAsFloat32())
+									exp := math.Float32frombits(uint32(x1)) + math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
 								case wazeroir.UnsignedTypeF64:
-									require.Equal(t, math.Float64frombits(x1)+math.Float64frombits(x2), env.stackTopAsFloat64())
+									exp := math.Float64frombits(x1) + math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
 								}
 							case wazeroir.OperationKindSub:
 								switch unsignedType {
@@ -415,9 +440,19 @@ func TestArm64Compiler_compileSub(t *testing.T) {
 								case wazeroir.UnsignedTypeI64:
 									require.Equal(t, x1-x2, env.stackTopAsUint64())
 								case wazeroir.UnsignedTypeF32:
-									require.Equal(t, math.Float32frombits(uint32(x1))-math.Float32frombits(uint32(x2)), env.stackTopAsFloat32())
+									exp := math.Float32frombits(uint32(x1)) - math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
 								case wazeroir.UnsignedTypeF64:
-									require.Equal(t, math.Float64frombits(x1)-math.Float64frombits(x2), env.stackTopAsFloat64())
+									exp := math.Float64frombits(x1) - math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
 								}
 							case wazeroir.OperationKindMul:
 								switch unsignedType {
@@ -426,9 +461,19 @@ func TestArm64Compiler_compileSub(t *testing.T) {
 								case wazeroir.UnsignedTypeI64:
 									require.Equal(t, x1*x2, env.stackTopAsUint64())
 								case wazeroir.UnsignedTypeF32:
-									require.Equal(t, math.Float32frombits(uint32(x1))*math.Float32frombits(uint32(x2)), env.stackTopAsFloat32())
+									exp := math.Float32frombits(uint32(x1)) * math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
 								case wazeroir.UnsignedTypeF64:
-									require.Equal(t, math.Float64frombits(x1)*math.Float64frombits(x2), env.stackTopAsFloat64())
+									exp := math.Float64frombits(x1) * math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
 								}
 							}
 						})
