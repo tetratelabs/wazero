@@ -226,7 +226,10 @@ const (
 	ValueTypeF64 ValueType = 0x7c
 )
 
-func valueTypeName(t ValueType) string {
+// ValuTypeName returns the type name of the given ValueType as a string.
+// These type names match the names used in the WebAssembly text format.
+// Note that ValueTypeName returns "unknown", if an undefined ValueType value is passed.
+func ValueTypeName(t ValueType) string {
 	switch t {
 	case ValueTypeI32:
 		return "i32"
@@ -242,14 +245,14 @@ func valueTypeName(t ValueType) string {
 
 func (t *FunctionType) String() (ret string) {
 	for _, b := range t.Params {
-		ret += valueTypeName(b)
+		ret += ValueTypeName(b)
 	}
 	if len(t.Params) == 0 {
 		ret += "null"
 	}
 	ret += "_"
 	for _, b := range t.Results {
-		ret += valueTypeName(b)
+		ret += ValueTypeName(b)
 	}
 	if len(t.Results) == 0 {
 		ret += "null"

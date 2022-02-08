@@ -249,31 +249,28 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() wasm.Engine) {
 
 	tests := []struct {
 		testName          string
-		typeName          string        // "f32" or "f64"
+		floatType         byte          // wasm.ValueTypeF32 or wasm.ValueTypeF64
 		identityFloatFunc reflect.Value // imported as 'identity_float' to the wasm module
 		floatParam        uint64        // passed to identityFloatFunc as a parameter
-		expectedFloatType byte          // wasm.ValueTypeF32 or wasm.ValueTypeF64
 		expectedFloatVal  float64
 	}{
 		{
-			testName: "host function with f32 param",
-			typeName: "f32",
+			testName:  "host function with f32 param",
+			floatType: wasm.ValueTypeF32,
 			identityFloatFunc: reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext, value float32) float32 {
 				return value
 			}),
-			floatParam:        uint64(math.Float32bits(math.MaxFloat32)), // float bits as a uint32 value, but casted to uint64 to be passed to CallFunction
-			expectedFloatType: wasm.ValueTypeF32,
-			expectedFloatVal:  float64(math.MaxFloat32), // arbitrary f32 value
+			floatParam:       uint64(math.Float32bits(math.MaxFloat32)), // float bits as a uint32 value, but casted to uint64 to be passed to CallFunction
+			expectedFloatVal: float64(math.MaxFloat32),                  // arbitrary f32 value
 		},
 		{
-			testName: "host function with f64 param",
-			typeName: "f64",
+			testName:  "host function with f64 param",
+			floatType: wasm.ValueTypeF64,
 			identityFloatFunc: reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext, value float64) float64 {
 				return value
 			}),
-			floatParam:        math.Float64bits(math.MaxFloat64),
-			expectedFloatType: wasm.ValueTypeF64,
-			expectedFloatVal:  float64(math.MaxFloat64), // arbitrary f64 value that doesn' fit in f32
+			floatParam:       math.Float64bits(math.MaxFloat64),
+			expectedFloatVal: float64(math.MaxFloat64), // arbitrary f64 value that doesn' fit in f32
 		},
 	}
 
@@ -282,7 +279,7 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() wasm.Engine) {
 		t.Run(tc.testName, func(t *testing.T) {
 			// Build and instantiate the wat for `f32` or `f64`
 			var wat bytes.Buffer
-			err = watTemplate.Execute(&wat, tc.typeName)
+			err = watTemplate.Execute(&wat, wasm.ValueTypeName(tc.floatType))
 			require.NoError(t, err)
 
 			mod, err := text.DecodeModule(wat.Bytes())
@@ -301,7 +298,7 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() wasm.Engine) {
 			results, resultTypes, err := store.CallFunction(ctx, "mod", "call->test.identity_float", tc.floatParam)
 			require.NoError(t, err)
 			require.Len(t, results, len(resultTypes))
-			require.Equal(t, tc.expectedFloatType, resultTypes[0])
+			require.Equal(t, tc.floatType, resultTypes[0])
 			// Note that the both f32 and f64 result value are expressed as the float64 bits value in wazero.
 			require.Equal(t, tc.expectedFloatVal, math.Float64frombits(results[0]))
 		})

@@ -439,7 +439,7 @@ func TestStore_executeConstExpression(t *testing.T) {
 	})
 	t.Run("non global expr", func(t *testing.T) {
 		for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
-			t.Run(valueTypeName(vt), func(t *testing.T) {
+			t.Run(ValueTypeName(vt), func(t *testing.T) {
 				t.Run("valid", func(t *testing.T) {
 					// Allocate bytes with enough size for all types.
 					expr := &ConstantExpression{Data: make([]byte, 8)}
@@ -526,7 +526,7 @@ func TestStore_executeConstExpression(t *testing.T) {
 				{valueType: ValueTypeF32, val: uint64(math.Float32bits(634634432.12311))},
 				{valueType: ValueTypeF64, val: math.Float64bits(1.12312311)},
 			} {
-				t.Run(valueTypeName(tc.valueType), func(t *testing.T) {
+				t.Run(ValueTypeName(tc.valueType), func(t *testing.T) {
 					// The index specified in Data equals zero.
 					expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
 					globals := []*GlobalInstance{{Val: tc.val, Type: &GlobalType{ValType: tc.valueType}}}

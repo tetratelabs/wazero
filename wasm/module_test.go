@@ -99,7 +99,7 @@ func TestValueTypeName(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, valueTypeName(tc.input))
+			require.Equal(t, tc.expected, ValueTypeName(tc.input))
 		})
 	}
 }
