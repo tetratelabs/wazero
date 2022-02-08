@@ -25,7 +25,7 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	return ret
 }
 
-// TODO: delete this as this coudl be a duplication from other tests especially spectests.
+// TODO: delete this as this could be a duplication from other tests especially spectests.
 // Use this until we could run spectests on arm64.
 func TestArm64CompilerEndToEnd(t *testing.T) {
 	ctx := context.Background()

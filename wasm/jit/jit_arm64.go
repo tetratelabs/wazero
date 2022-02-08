@@ -216,6 +216,9 @@ func (c *arm64Compiler) emitPreamble() error {
 	return c.initializeReservedStackBasePointerRegister()
 }
 
+// returnFunction emits instructions to return from the current function frame.
+// If the current frame is the bottom, the code goes back to the Go code with jitCallStatusCodeReturned status.
+// Otherwise, we jump into the caller's return address (TODO).
 func (c *arm64Compiler) returnFunction() error {
 	// TODO: we don't support function calls yet.
 	// For now the following code just simply returns to Go code.
@@ -336,6 +339,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileAdd implements compiler.compileAdd for the arm64 architecture.
 func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
@@ -369,12 +373,14 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	return nil
 }
 
+// compileSub implements compiler.compileSub for the arm64 architecture.
 func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
 	}
 
+	// If both of registers are zeros, this can be nop and simply push the zero register.
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
 		c.locationStack.pushValueOnRegister(zeroRegister)
 		return nil
@@ -404,6 +410,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	return nil
 }
 
+// compileMul implements compiler.compileMul for the arm64 architecture.
 func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
@@ -663,8 +670,7 @@ func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
 		}
 		c.applyConstToRegisterInstruction(inst, int64(value), reg)
 
-		loc := c.locationStack.pushValueOnRegister(reg)
-		loc.setRegisterType(generalPurposeRegisterTypeInt)
+		c.locationStack.pushValueOnRegister(reg)
 	}
 	return nil
 }
@@ -710,8 +716,7 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 	}
 	c.applyRegisterToRegisterInstruction(inst, tmpReg, reg)
 
-	loc := c.locationStack.pushValueOnRegister(reg)
-	loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	c.locationStack.pushValueOnRegister(reg)
 	return nil
 }
 
@@ -719,6 +724,8 @@ func (c *arm64Compiler) pushZeroValue() {
 	c.locationStack.pushValueOnRegister(zeroRegister)
 }
 
+// popTwoValuesOnRegisters pops two values from the location stacks, ensures
+// these two values are located on registers, and mark them unused.
 func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
 	x2 = c.locationStack.pop()
 	if err = c.ensureOnGeneralPurposeRegister(x2); err != nil {
@@ -735,6 +742,7 @@ func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err er
 	return
 }
 
+// ensureOnGeneralPurposeRegister emits instructions to ensure that a value is located on a register.
 func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
 	if loc.onStack() {
 		err = c.loadValueOnStackToRegister(loc)
@@ -744,6 +752,7 @@ func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err 
 	return
 }
 
+// loadValueOnStackToRegister emits instructions to load the value located on the stack to a register.
 func (c *arm64Compiler) loadValueOnStackToRegister(loc *valueLocation) (err error) {
 	var inst obj.As
 	var reg int16
