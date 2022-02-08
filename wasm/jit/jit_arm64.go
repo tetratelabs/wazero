@@ -163,6 +163,16 @@ func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(insturcti
 	c.addInstruction(inst)
 }
 
+func (c *arm64Compiler) applyRegisterToRegisterInstruction(insturction obj.As, from, to int16) {
+	inst := c.newProg()
+	inst.As = insturction
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = to
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = from
+	c.addInstruction(inst)
+}
+
 func (c *arm64Compiler) String() (ret string) { return }
 
 // emitPreamble implements compiler.emitPreamble for the arm64 architecture.
@@ -183,11 +193,13 @@ func (c *arm64Compiler) returnFunction() error {
 
 	// Since we return from the function, we need to decrement the callframe stack pointer, and write it back.
 	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
-	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg); err != nil {
+	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
+		engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg); err != nil {
 		return err
 	}
 	c.applyConstToRegisterInstruction(arm64.ASUBS, 1, callFramePointerReg)
-	if err := c.applyRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg); err != nil {
+	if err := c.applyRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForEngine,
+		engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg); err != nil {
 		return err
 	}
 
@@ -198,18 +210,21 @@ func (c *arm64Compiler) returnFunction() error {
 func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 	// Write the current stack pointer to the engine.stackPointer.
 	c.applyConstToRegisterInstruction(arm64.AMOVW, int64(c.locationStack.sp), reservedRegisterForTemporary)
-	if err := c.applyRegisterToMemoryInstruction(arm64.AMOVW, reservedRegisterForEngine, engineValueStackContextStackPointerOffset, reservedRegisterForTemporary); err != nil {
+	if err := c.applyRegisterToMemoryInstruction(arm64.AMOVW, reservedRegisterForEngine,
+		engineValueStackContextStackPointerOffset, reservedRegisterForTemporary); err != nil {
 		return err
 	}
 
 	if status != 0 {
 		c.applyConstToRegisterInstruction(arm64.AMOVW, int64(status), reservedRegisterForTemporary)
-		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset, reservedRegisterForTemporary); err != nil {
+		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine,
+			engineExitContextJITCallStatusCodeOffset, reservedRegisterForTemporary); err != nil {
 			return err
 		}
 	} else {
 		// If the status == 0, we simply use zero register to store zero.
-		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset, zeroRegister); err != nil {
+		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine,
+			engineExitContextJITCallStatusCodeOffset, zeroRegister); err != nil {
 			return err
 		}
 	}
@@ -217,7 +232,8 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
 	// is embedded in engine. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
-	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineArchContextJITCallReturnAddressOffset, reservedRegisterForTemporary); err != nil {
+	if err := c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
+		engineArchContextJITCallReturnAddressOffset, reservedRegisterForTemporary); err != nil {
 		return err
 	}
 
@@ -292,24 +308,69 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 }
 
 func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
-	x2 := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(x2); err != nil {
+	x1, x2, err := c.getTwoValuesOnRegisters()
+	if err != nil {
 		return err
 	}
 
-	x1 := c.locationStack.pop()
-	if err := c.ensureOnGeneralPurposeRegister(x1); err != nil {
-		return err
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		inst = arm64.AADDW
+	case wazeroir.UnsignedTypeI64:
+		inst = arm64.AADD
+	case wazeroir.UnsignedTypeF32:
+		inst = arm64.AFADDS
+	case wazeroir.UnsignedTypeF64:
+		inst = arm64.AFADDD
 	}
-	return fmt.Errorf("TODO: unsupported on arm64")
+
+	c.applyRegisterToRegisterInstruction(inst, x1.register, x2.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.getTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		inst = arm64.ASUBW
+	case wazeroir.UnsignedTypeI64:
+		inst = arm64.ASUB
+	case wazeroir.UnsignedTypeF32:
+		inst = arm64.AFSUBS
+	case wazeroir.UnsignedTypeF64:
+		inst = arm64.AFSUBD
+	}
+
+	c.applyRegisterToRegisterInstruction(inst, x1.register, x2.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.getTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		inst = arm64.ASUBW
+	case wazeroir.UnsignedTypeI64:
+		inst = arm64.ASUB
+	case wazeroir.UnsignedTypeF32:
+		inst = arm64.AFSUBS
+	case wazeroir.UnsignedTypeF64:
+		inst = arm64.AFSUBD
+	}
+
+	c.applyRegisterToRegisterInstruction(inst, x1.register, x2.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
@@ -578,17 +639,13 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 	}
 
 	// Use FMOV instruction to move the value on integer register into the float one.
-	mov := c.newProg()
+	var inst obj.As
 	if is32bit {
-		mov.As = arm64.AFMOVS
+		inst = arm64.AFMOVS
 	} else {
-		mov.As = arm64.AFMOVD
+		inst = arm64.AFMOVD
 	}
-	mov.From.Type = obj.TYPE_REG
-	mov.From.Reg = tmpReg
-	mov.To.Type = obj.TYPE_REG
-	mov.To.Reg = reg
-	c.addInstruction(mov)
+	c.applyRegisterToRegisterInstruction(inst, tmpReg, reg)
 
 	loc := c.locationStack.pushValueOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeFloat)
@@ -597,6 +654,19 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 
 func (c *arm64Compiler) pushZeroValue() {
 	c.locationStack.pushValueOnRegister(zeroRegister)
+}
+
+func (c *arm64Compiler) getTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
+	x2 = c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(x2); err != nil {
+		return
+	}
+
+	x1 = c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return
+	}
+	return
 }
 
 func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
