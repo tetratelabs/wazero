@@ -204,6 +204,17 @@ func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(instruction obj.A
 	c.addInstruction(inst)
 }
 
+// applyTwoRegistersToNoneInstruction adds an instruction which takes two source operands on registers.
+func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, src1, src2 int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_NONE
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = src1
+	inst.Reg = src2
+	c.addInstruction(inst)
+}
+
 func (c *arm64Compiler) String() (ret string) { return }
 
 // emitPreamble implements compiler.emitPreamble for the arm64 architecture.
@@ -634,17 +645,17 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	var conditionalRegister conditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
-		inst = arm64.ASUBW
+		inst = arm64.ACMPW
 		conditionalRegister = arm64.COND_LS // Unsigned lower or same.
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.ACMP
 		conditionalRegister = arm64.COND_LS // Unsigned lower or same.
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.ACMPW
-		conditionalRegister = arm64.COND_LT // Signed less than.
+		conditionalRegister = arm64.COND_LE // Signed less than.
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.ACMP
-		conditionalRegister = arm64.COND_LT // Signed less than.
+		conditionalRegister = arm64.COND_LE // Signed less than.
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.AFCMPS
 		conditionalRegister = arm64.COND_LS
@@ -653,8 +664,7 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 		conditionalRegister = arm64.COND_LS
 	}
 
-	// Execute the cmp operation.
-	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register placed value.
 	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
@@ -822,13 +832,17 @@ func (c *arm64Compiler) loadConditionalFlagOnGeneralPurposeRegister(loc *valueLo
 	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	c.markRegisterUsed(reg)
 
-	add := c.newProg()
-	add.As = arm64.ACSET
-	add.To.Reg = reg
-	add.To.Type = obj.TYPE_REG
-	add.From.Type = obj.TYPE_REG
-	add.From.Reg = int16(loc.conditionalRegister)
-	c.addInstruction(add)
+	// Use CSET instruction to set 1 on the register if the condition satisfies.
+	// https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
+	getFlag := c.newProg()
+	getFlag.As = arm64.ACSET
+	getFlag.To.Reg = reg
+	getFlag.To.Type = obj.TYPE_REG
+	getFlag.From.Type = obj.TYPE_REG
+	getFlag.From.Reg = int16(loc.conditionalRegister)
+	c.addInstruction(getFlag)
+
+	// Record that now the value is located on a general purpose register.
 	loc.setRegister(reg)
 }
 

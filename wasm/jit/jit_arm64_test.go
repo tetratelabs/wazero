@@ -354,20 +354,19 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindLe,
-		// TODO:
-		// wazeroir.OperationKindLt,
-		// wazeroir.OperationKindGe,
-		// wazeroir.OperationKindGt,
+		// TODO: wazeroir.OperationKindLt,
+		// TODO: wazeroir.OperationKindGe,
+		// TODO: wazeroir.OperationKindGt,
 	} {
 		kind := kind
 		t.Run(kind.String(), func(t *testing.T) {
 			for _, signedType := range []wazeroir.SignedType{
 				wazeroir.SignedTypeUint32,
-				// wazeroir.SignedTypeUint64,
-				// wazeroir.SignedTypeInt32,
+				wazeroir.SignedTypeUint64,
+				wazeroir.SignedTypeInt32,
 				// wazeroir.SignedTypeInt64,
-				// wazeroir.SignedTypeFloat32,
-				// wazeroir.SignedTypeFloat64,
+				wazeroir.SignedTypeFloat32,
+				wazeroir.SignedTypeFloat64,
 			} {
 				signedType := signedType
 				t.Run(signedType.String(), func(t *testing.T) {
@@ -376,8 +375,14 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
 						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
 						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{math.Float64bits(math.MaxFloat32), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat32), 1},
+						{math.Float64bits(math.MaxFloat64), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat64), 1},
 						{0, math.Float64bits(math.Inf(1))},
 						{0, math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), 0},
+						{math.Float64bits(math.Inf(-1)), 0},
 						{math.Float64bits(math.Inf(1)), 1},
 						{math.Float64bits(math.Inf(-1)), 1},
 						{math.Float64bits(1.11231), math.Float64bits(math.Inf(1))},
@@ -399,8 +404,10 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 							// Emit consts operands.
 							for _, v := range []uint64{x1, x2} {
 								switch signedType {
-								case wazeroir.SignedTypeInt32, wazeroir.SignedTypeUint32:
+								case wazeroir.SignedTypeUint32:
 									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+								case wazeroir.SignedTypeInt32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(int32(v))})
 								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
 								case wazeroir.SignedTypeFloat32:
@@ -434,6 +441,7 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 							require.True(t, resultLocation.onConditionalRegister())
 
 							compiler.loadConditionalFlagOnGeneralPurposeRegister(resultLocation)
+							require.True(t, resultLocation.onRegister())
 
 							// Release the value to the memory stack again to verify the operation, and then return.
 							compiler.releaseRegisterToStack(resultLocation)
@@ -448,6 +456,33 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 
 							// Check the stack.
 							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindLe:
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) <= int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) <= uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) <= int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 <= x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) <= math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) <= math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
+
+							case wazeroir.OperationKindLt:
+								t.Fail()
+							case wazeroir.OperationKindGe:
+								t.Fail()
+							case wazeroir.OperationKindGt:
+								t.Fail()
+							}
 						})
 					}
 				})
