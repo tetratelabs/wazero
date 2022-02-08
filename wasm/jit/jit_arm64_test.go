@@ -321,3 +321,120 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 		})
 	}
 }
+
+func TestArm64Compiler_compileSub(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindAdd,
+		wazeroir.OperationKindSub,
+		wazeroir.OperationKindMul,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, unsignedType := range []wazeroir.UnsignedType{
+				wazeroir.UnsignedTypeI32,
+				wazeroir.UnsignedTypeI64,
+				wazeroir.UnsignedTypeF32,
+				wazeroir.UnsignedTypeF64,
+			} {
+				unsignedType := unsignedType
+				t.Run(unsignedType.String(), func(t *testing.T) {
+					for _, values := range [][2]uint64{
+						{0, 1},
+					} {
+						x1, x2 := values[0], values[1]
+						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.emitPreamble()
+							require.NoError(t, err)
+
+							// Emit consts operands.
+							for _, v := range []uint64{x1, x2} {
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+								case wazeroir.UnsignedTypeI64:
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+								case wazeroir.UnsignedTypeF32:
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+								case wazeroir.UnsignedTypeF64:
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+								}
+								require.NoError(t, err)
+							}
+
+							// At this point, two values exist.
+							require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+							// Emit the operation.
+							switch kind {
+							case wazeroir.OperationKindAdd:
+								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: unsignedType})
+							case wazeroir.OperationKindSub:
+								err = compiler.compileSub(&wazeroir.OperationSub{Type: unsignedType})
+							case wazeroir.OperationKindMul:
+								err = compiler.compileMul(&wazeroir.OperationMul{Type: unsignedType})
+							}
+							require.NoError(t, err)
+
+							// We consumed two values, but push the result back.
+							require.Equal(t, uint64(1), compiler.locationStack.sp)
+							resultLocation := compiler.locationStack.peek()
+							// Plus the result must be located on a register.
+							require.True(t, resultLocation.onRegister())
+
+							compiler.releaseRegisterToStack(resultLocation)
+							compiler.returnFunction()
+
+							// Generate the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+
+							// Run code.
+							env.exec(code)
+
+							// Check the stack.
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindAdd:
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									require.Equal(t, uint32(x1)+uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedTypeI64:
+									require.Equal(t, x1+x2, env.stackTopAsUint64())
+								case wazeroir.UnsignedTypeF32:
+									require.Equal(t, math.Float32frombits(uint32(x1))+math.Float32frombits(uint32(x2)), env.stackTopAsFloat32())
+								case wazeroir.UnsignedTypeF64:
+									require.Equal(t, math.Float64frombits(x1)+math.Float64frombits(x2), env.stackTopAsFloat64())
+								}
+							case wazeroir.OperationKindSub:
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									require.Equal(t, uint32(x1)-uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedTypeI64:
+									require.Equal(t, x1-x2, env.stackTopAsUint64())
+								case wazeroir.UnsignedTypeF32:
+									require.Equal(t, math.Float32frombits(uint32(x1))-math.Float32frombits(uint32(x2)), env.stackTopAsFloat32())
+								case wazeroir.UnsignedTypeF64:
+									require.Equal(t, math.Float64frombits(x1)-math.Float64frombits(x2), env.stackTopAsFloat64())
+								}
+							case wazeroir.OperationKindMul:
+								switch unsignedType {
+								case wazeroir.UnsignedTypeI32:
+									require.Equal(t, uint32(x1)*uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedTypeI64:
+									require.Equal(t, x1*x2, env.stackTopAsUint64())
+								case wazeroir.UnsignedTypeF32:
+									require.Equal(t, math.Float32frombits(uint32(x1))*math.Float32frombits(uint32(x2)), env.stackTopAsFloat32())
+								case wazeroir.UnsignedTypeF64:
+									require.Equal(t, math.Float64frombits(x1)*math.Float64frombits(x2), env.stackTopAsFloat64())
+								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}

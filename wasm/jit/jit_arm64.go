@@ -325,7 +325,11 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 		inst = arm64.AFADDD
 	}
 
-	c.applyRegisterToRegisterInstruction(inst, x1.register, x2.register)
+	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	// The result is placed on a register for x1, so record it.
+	c.locationStack.pushValueOnRegister(x1.register)
+	// Also, we consumed the x2 register.
+	c.locationStack.markRegisterUnused(x2.register)
 	return nil
 }
 
@@ -347,7 +351,11 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 		inst = arm64.AFSUBD
 	}
 
-	c.applyRegisterToRegisterInstruction(inst, x1.register, x2.register)
+	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	// The result is placed on a register for x1, so record it.
+	c.locationStack.pushValueOnRegister(x1.register)
+	// Also, we consumed the x2 register.
+	c.locationStack.markRegisterUnused(x2.register)
 	return nil
 }
 
@@ -369,7 +377,11 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 		inst = arm64.AFSUBD
 	}
 
-	c.applyRegisterToRegisterInstruction(inst, x1.register, x2.register)
+	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	// The result is placed on a register for x1, so record it.
+	c.locationStack.pushValueOnRegister(x1.register)
+	// Also, we consumed the x2 register.
+	c.locationStack.markRegisterUnused(x2.register)
 	return nil
 }
 

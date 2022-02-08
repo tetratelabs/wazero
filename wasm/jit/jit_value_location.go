@@ -137,6 +137,12 @@ func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation)
 			panic("bug in compiler: try pushing a register which is already in use")
 		}
 	}
+
+	if isIntRegister(reg) {
+		loc.setRegisterType(generalPurposeRegisterTypeInt)
+	} else if isFloatRegister(reg) {
+		loc.setRegisterType(generalPurposeRegisterTypeFloat)
+	}
 	s.markRegisterUsed(reg)
 	s.push(loc)
 	return
