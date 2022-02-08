@@ -336,7 +336,38 @@ func (c *arm64Compiler) compileSelect() error {
 }
 
 func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+
+	pickedRegister, err := c.allocateRegister(pickTarget.registerType())
+	if err != nil {
+		return err
+	}
+
+	if pickTarget.onRegister() {
+		// If the pick target is on a register, we simply copy the value
+		// to the pickedRegister.
+		var inst obj.As
+		switch pickTarget.registerType() {
+		case generalPurposeRegisterTypeInt:
+			inst = arm64.AMOVD
+		case generalPurposeRegisterTypeFloat:
+			inst = arm64.AFMOVD
+		}
+		c.applyRegisterToRegisterInstruction(inst, pickTarget.register, pickedRegister)
+	} else if pickTarget.onStack() {
+		// Temporarily assign a register to the pick target, and then load the value.
+		pickTarget.setRegister(pickedRegister)
+		c.loadValueOnStackToRegister(pickTarget)
+		// After the load, we revert the register assignment to the pick target.
+		pickTarget.setRegister(nilRegister)
+	} else if pickTarget.onConditionalRegister() {
+		return fmt.Errorf("TODO: support conditional register target in pick")
+	}
+
+	// Now we have the value of the target on the pickedRegister,
+	// so push the location.
+	c.locationStack.pushValueOnRegister(pickedRegister)
+	return nil
 }
 
 // compileAdd implements compiler.compileAdd for the arm64 architecture.

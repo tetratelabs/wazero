@@ -519,3 +519,106 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 		})
 	}
 }
+
+func TestArm64Compiler_compielePick(t *testing.T) {
+	const pickTargetValue uint64 = 12345
+	op := &wazeroir.OperationPick{Depth: 1}
+
+	for _, tc := range []struct {
+		name                                      string
+		pickTargetSetupFunc                       func(compiler *arm64Compiler, eng *engine) error
+		isPickTargetFloat, isPickTargetOnRegister bool
+	}{
+		{
+			name: "float on register",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				return compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(pickTargetValue)})
+			},
+			isPickTargetFloat:      true,
+			isPickTargetOnRegister: true,
+		},
+		{
+			name: "int on register",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				return compiler.compileConstI64(&wazeroir.OperationConstI64{Value: pickTargetValue})
+			},
+			isPickTargetFloat:      false,
+			isPickTargetOnRegister: true,
+		},
+		{
+			name: "float on stack",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				pickTargetLocation := compiler.locationStack.pushValueOnStack()
+				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeFloat)
+				eng.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
+				return nil
+			},
+			isPickTargetFloat:      true,
+			isPickTargetOnRegister: false,
+		},
+		{
+			name: "int on stack",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				pickTargetLocation := compiler.locationStack.pushValueOnStack()
+				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
+				eng.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
+				return nil
+			},
+			isPickTargetFloat:      false,
+			isPickTargetOnRegister: false,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			// Set up the stack before picking.
+			err = tc.pickTargetSetupFunc(compiler, env.engine())
+			require.NoError(t, err)
+			pickTargetLocation := compiler.locationStack.peek()
+
+			// Push the unused median value.
+			_ = compiler.locationStack.pushValueOnStack()
+			require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+			// Now ready to compile Pick operation.
+			err = compiler.compilePick(op)
+			require.NoError(t, err)
+			require.Equal(t, uint64(3), compiler.locationStack.sp)
+
+			pickedLocation := compiler.locationStack.peek()
+			require.True(t, pickedLocation.onRegister())
+			require.Equal(t, pickTargetLocation.registerType(), pickedLocation.registerType())
+
+			// Release the value to the memory stack again to verify the operation, and then return.
+			compiler.releaseRegisterToStack(pickedLocation)
+			if tc.isPickTargetOnRegister {
+				compiler.releaseRegisterToStack(pickTargetLocation)
+			}
+			compiler.returnFunction()
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			// Check the returned status and stack pointer.
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, uint64(3), env.stackPointer())
+
+			// Verify the top value is the picked one and the pick target's value stays the same.
+			if tc.isPickTargetFloat {
+				require.Equal(t, math.Float64frombits(pickTargetValue), env.stackTopAsFloat64())
+				require.Equal(t, math.Float64frombits(pickTargetValue), math.Float64frombits(env.stack()[pickTargetLocation.stackPointer]))
+			} else {
+				require.Equal(t, pickTargetValue, env.stackTopAsUint64())
+				require.Equal(t, pickTargetValue, env.stack()[pickTargetLocation.stackPointer])
+			}
+		})
+	}
+}
