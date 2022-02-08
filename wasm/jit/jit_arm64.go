@@ -638,16 +638,16 @@ func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.ACMPW
-		conditionalRegister = arm64.COND_LO // Unsigned lower or same.
+		conditionalRegister = arm64.COND_LO
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.ACMP
-		conditionalRegister = arm64.COND_LO // Unsigned lower or same.
+		conditionalRegister = arm64.COND_LO
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.ACMPW
-		conditionalRegister = arm64.COND_LT // Signed less than or equal.
+		conditionalRegister = arm64.COND_LT
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.ACMP
-		conditionalRegister = arm64.COND_LT // Signed less than or equal.
+		conditionalRegister = arm64.COND_LT
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.AFCMPS
 		conditionalRegister = arm64.COND_MI
