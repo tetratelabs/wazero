@@ -339,7 +339,7 @@ func TestArm64Compiler_compileSub(t *testing.T) {
 				unsignedType := unsignedType
 				t.Run(unsignedType.String(), func(t *testing.T) {
 					for _, values := range [][2]uint64{
-						{0, 1},
+						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1},
 					} {
 						x1, x2 := values[0], values[1]
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {

@@ -46,3 +46,7 @@ func isIntRegister(r int16) bool {
 func isFloatRegister(r int16) bool {
 	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
 }
+
+func isZeroRegister(r int16) bool {
+	return r == zeroRegister
+}

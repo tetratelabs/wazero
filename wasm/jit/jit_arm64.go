@@ -88,6 +88,12 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 	c.builder.AddInstruction(inst)
 }
 
+func (c *arm64Compiler) markRegisterUnused(reg int16) {
+	if !isZeroRegister(reg) {
+		c.locationStack.markRegisterUnused(reg)
+	}
+}
+
 func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, constValue int64, destinationRegister int16) {
 	applyConst := c.newProg()
 	applyConst.As = insturction
@@ -170,6 +176,17 @@ func (c *arm64Compiler) applyRegisterToRegisterInstruction(insturction obj.As, f
 	inst.To.Reg = to
 	inst.From.Type = obj.TYPE_REG
 	inst.From.Reg = from
+	c.addInstruction(inst)
+}
+
+func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(insturction obj.As, src1, src2, destination int16) {
+	inst := c.newProg()
+	inst.As = insturction
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destination
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = src1
+	inst.Reg = src2
 	c.addInstruction(inst)
 }
 
@@ -313,6 +330,15 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 		return err
 	}
 
+	// Additon can be nop if one of operands is zero.
+	if isZeroRegister(x1.register) {
+		c.locationStack.pushValueOnRegister(x2.register)
+		return nil
+	} else if isZeroRegister(x2.register) {
+		c.locationStack.pushValueOnRegister(x1.register)
+		return nil
+	}
+
 	var inst obj.As
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
@@ -328,8 +354,6 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
 	c.locationStack.pushValueOnRegister(x1.register)
-	// Also, we consumed the x2 register.
-	c.locationStack.markRegisterUnused(x2.register)
 	return nil
 }
 
@@ -339,6 +363,17 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 		return err
 	}
 
+	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
+		c.locationStack.pushValueOnRegister(zeroRegister)
+	}
+
+	// At this point, at least one of x1 or x2 registers is non zero.
+	// Choose the non-zero destination register here.
+	var destinationReg int16 = x1.register
+	if isZeroRegister(x1.register) {
+		destinationReg = x2.register
+	}
+
 	var inst obj.As
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
@@ -351,11 +386,8 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 		inst = arm64.AFSUBD
 	}
 
-	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
-	// The result is placed on a register for x1, so record it.
-	c.locationStack.pushValueOnRegister(x1.register)
-	// Also, we consumed the x2 register.
-	c.locationStack.markRegisterUnused(x2.register)
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
+	c.locationStack.pushValueOnRegister(destinationReg)
 	return nil
 }
 
@@ -365,23 +397,29 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 		return err
 	}
 
+	// Multiplcation can be done by putting a zero register if one of operands is zero.
+	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
+		c.markRegisterUnused(x1.register)
+		c.markRegisterUnused(x2.register)
+		c.locationStack.pushValueOnRegister(zeroRegister)
+		return nil
+	}
+
 	var inst obj.As
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
-		inst = arm64.ASUBW
+		inst = arm64.AMULW
 	case wazeroir.UnsignedTypeI64:
-		inst = arm64.ASUB
+		inst = arm64.AMUL
 	case wazeroir.UnsignedTypeF32:
-		inst = arm64.AFSUBS
+		inst = arm64.AFMULS
 	case wazeroir.UnsignedTypeF64:
-		inst = arm64.AFSUBD
+		inst = arm64.AFMULD
 	}
 
 	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
 	c.locationStack.pushValueOnRegister(x1.register)
-	// Also, we consumed the x2 register.
-	c.locationStack.markRegisterUnused(x2.register)
 	return nil
 }
 
@@ -678,6 +716,9 @@ func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err er
 	if err = c.ensureOnGeneralPurposeRegister(x1); err != nil {
 		return
 	}
+
+	c.markRegisterUnused(x1.register)
+	c.markRegisterUnused(x2.register)
 	return
 }
 
