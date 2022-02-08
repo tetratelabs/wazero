@@ -95,9 +95,9 @@ func (c *arm64Compiler) markRegisterUnused(reg int16) {
 }
 
 // applyConstToRegisterInstruction adds an instruction where source operand is a constant and destination is a register.
-func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, constValue int64, destinationRegister int16) {
+func (c *arm64Compiler) applyConstToRegisterInstruction(instruction obj.As, constValue int64, destinationRegister int16) {
 	applyConst := c.newProg()
-	applyConst.As = insturction
+	applyConst.As = instruction
 	applyConst.From.Type = obj.TYPE_CONST
 	// Note: in raw arm64 assembly, immediates larger than 16-bits
 	// are not supported, but the assembler takes care of this and
@@ -110,7 +110,7 @@ func (c *arm64Compiler) applyConstToRegisterInstruction(insturction obj.As, cons
 
 // applyMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
 // baseRegister is the base absolute address in the memory, and offset is the offset from the absolute address in baseRegister.
-func (c *arm64Compiler) applyMemoryToRegisterInstruction(insturction obj.As, baseRegister int16, offset int64, destinationRegister int16) (err error) {
+func (c *arm64Compiler) applyMemoryToRegisterInstruction(instruction obj.As, baseRegister int16, offset int64, destinationRegister int16) (err error) {
 	if offset > math.MaxInt16 {
 		// This is a bug in JIT copmiler: caller must check the offset at compilation time, and avoid such a large offset
 		// by loading the const to the register beforehand and then using applyRegisterOffsetMemoryToRegisterInstruction instead.
@@ -118,7 +118,7 @@ func (c *arm64Compiler) applyMemoryToRegisterInstruction(insturction obj.As, bas
 		return
 	}
 	inst := c.newProg()
-	inst.As = insturction
+	inst.As = instruction
 	inst.From.Type = obj.TYPE_MEM
 	inst.From.Reg = baseRegister
 	inst.From.Offset = offset
@@ -129,10 +129,10 @@ func (c *arm64Compiler) applyMemoryToRegisterInstruction(insturction obj.As, bas
 }
 
 // applyRegisterOffsetMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
-// The differece from applyMemoryToRegisterInstruction is that here we specify the offset by a register rather than offset constant.
-func (c *arm64Compiler) applyRegisterOffsetMemoryToRegisterInstruction(insturction obj.As, baseRegister, offsetRegister, destinationRegister int16) (err error) {
+// The difference from applyMemoryToRegisterInstruction is that here we specify the offset by a register rather than offset constant.
+func (c *arm64Compiler) applyRegisterOffsetMemoryToRegisterInstruction(instruction obj.As, baseRegister, offsetRegister, destinationRegister int16) (err error) {
 	inst := c.newProg()
-	inst.As = insturction
+	inst.As = instruction
 	inst.From.Type = obj.TYPE_MEM
 	inst.From.Reg = baseRegister
 	inst.From.Index = offsetRegister
@@ -145,7 +145,7 @@ func (c *arm64Compiler) applyRegisterOffsetMemoryToRegisterInstruction(insturcti
 
 // applyRegisterToMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
 // This is the opposite of applyMemoryToRegisterInstruction.
-func (c *arm64Compiler) applyRegisterToMemoryInstruction(insturction obj.As, baseRegister int16, offset int64, source int16) (err error) {
+func (c *arm64Compiler) applyRegisterToMemoryInstruction(instruction obj.As, baseRegister int16, offset int64, source int16) (err error) {
 	if offset > math.MaxInt16 {
 		// This is a bug in JIT copmiler: caller must check the offset at compilation time, and avoid such a large offset
 		// by loading the const to the register beforehand and then using applyRegisterToRegisterOffsetMemoryInstruction instead.
@@ -153,7 +153,7 @@ func (c *arm64Compiler) applyRegisterToMemoryInstruction(insturction obj.As, bas
 		return
 	}
 	inst := c.newProg()
-	inst.As = insturction
+	inst.As = instruction
 	inst.To.Type = obj.TYPE_MEM
 	inst.To.Reg = baseRegister
 	inst.To.Offset = offset
@@ -164,10 +164,10 @@ func (c *arm64Compiler) applyRegisterToMemoryInstruction(insturction obj.As, bas
 }
 
 // applyRegisterToRegisterOffsetMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
-// The differece from applyRegisterToMemoryInstruction is that here we specify the offset by a register rather than offset constant.
-func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(insturction obj.As, baseRegister, offsetRegister, source int16) {
+// The difference from applyRegisterToMemoryInstruction is that here we specify the offset by a register rather than offset constant.
+func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(instruction obj.As, baseRegister, offsetRegister, source int16) {
 	inst := c.newProg()
-	inst.As = insturction
+	inst.As = instruction
 	inst.To.Type = obj.TYPE_MEM
 	inst.To.Reg = baseRegister
 	inst.To.Index = offsetRegister
@@ -178,9 +178,9 @@ func (c *arm64Compiler) applyRegisterToRegisterOffsetMemoryInstruction(insturcti
 }
 
 // applyRegisterToRegisterOffsetMemoryInstruction adds an instruction where both destination and source operands are registers.
-func (c *arm64Compiler) applyRegisterToRegisterInstruction(insturction obj.As, from, to int16) {
+func (c *arm64Compiler) applyRegisterToRegisterInstruction(instruction obj.As, from, to int16) {
 	inst := c.newProg()
-	inst.As = insturction
+	inst.As = instruction
 	inst.To.Type = obj.TYPE_REG
 	inst.To.Reg = to
 	inst.From.Type = obj.TYPE_REG
@@ -189,9 +189,9 @@ func (c *arm64Compiler) applyRegisterToRegisterInstruction(insturction obj.As, f
 }
 
 // applyRegisterToRegisterOffsetMemoryInstruction adds an instruction which takes two source operands on registers and one destination register operand.
-func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(insturction obj.As, src1, src2, destination int16) {
+func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(instruction obj.As, src1, src2, destination int16) {
 	inst := c.newProg()
-	inst.As = insturction
+	inst.As = instruction
 	inst.To.Type = obj.TYPE_REG
 	inst.To.Reg = destination
 	inst.From.Type = obj.TYPE_REG

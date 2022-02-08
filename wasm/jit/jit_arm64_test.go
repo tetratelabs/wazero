@@ -86,7 +86,7 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 func TestArm64Compiler_returnFunction(t *testing.T) {
 	env := newJITEnvironment()
 
-	// Build codes.
+	// Build code.
 	compiler := env.requireNewCompiler(t)
 	err := compiler.emitPreamble()
 	require.NoError(t, err)
@@ -116,7 +116,7 @@ func TestArm64Compiler_exit(t *testing.T) {
 
 			env := newJITEnvironment()
 
-			// Build codes.
+			// Build code.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 
@@ -129,7 +129,7 @@ func TestArm64Compiler_exit(t *testing.T) {
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
-			// Run codes
+			// Run code
 			env.exec(code)
 
 			// JIT status on engine must be updated.
@@ -166,7 +166,7 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 				t.Run(fmt.Sprintf("0x%x", val), func(t *testing.T) {
 					env := newJITEnvironment()
 
-					// Build codes.
+					// Build code.
 					compiler := env.requireNewCompiler(t)
 					err := compiler.emitPreamble()
 					require.NoError(t, err)
@@ -230,7 +230,7 @@ func TestAarm64Compiler_releaseRegisterToStack(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 
-			// Build codes.
+			// Build code.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
@@ -287,7 +287,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 
-			// Build codes.
+			// Build code.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
