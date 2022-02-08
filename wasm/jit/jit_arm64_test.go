@@ -238,6 +238,8 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 			// Setup the location stack so that we push the const on the specified height.
 			compiler.locationStack.sp = tc.stackPointer
 			compiler.locationStack.stack = make([]*valueLocation, tc.stackPointer)
+			// Peek must be non-nil. Otherwise, compileConst* would fail.
+			compiler.locationStack.stack[compiler.locationStack.sp-1] = &valueLocation{}
 
 			if tc.isFloat {
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})

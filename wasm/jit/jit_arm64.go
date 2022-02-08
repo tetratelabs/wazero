@@ -351,8 +351,9 @@ func (c *arm64Compiler) compileSelect() error {
 }
 
 func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
-	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
 
+	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
 	pickedRegister, err := c.allocateRegister(pickTarget.registerType())
 	if err != nil {
 		return err
@@ -375,8 +376,6 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		c.loadValueOnStackToRegister(pickTarget)
 		// After the load, we revert the register assignment to the pick target.
 		pickTarget.setRegister(nilRegister)
-	} else if pickTarget.onConditionalRegister() {
-		return fmt.Errorf("TODO: support conditional register target in pick")
 	}
 
 	// Now we have the value of the target on the pickedRegister,
@@ -825,6 +824,8 @@ func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) load target constant.
 func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
 	if value == 0 {
 		c.pushZeroValue()
 	} else {
@@ -861,6 +862,8 @@ func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) bit representation of load target float constant.
 func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
 	// Take a register to load the value.
 	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
@@ -922,6 +925,19 @@ func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err 
 		c.loadConditionalFlagOnGeneralPurposeRegister(loc)
 	}
 	return
+}
+
+// maybeMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
+// if the value is located on a conditional register. This is usually called at the beginning of
+// arm64Compiler.compile* functions where we possibly emit istructions without saving the conditional
+// register value. The compile* functions without calling this function is saving the conditional
+// value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
+func (c *arm64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() {
+	if c.locationStack.sp > 0 {
+		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
+			c.loadConditionalFlagOnGeneralPurposeRegister(loc)
+		}
+	}
 }
 
 func (c *arm64Compiler) loadConditionalFlagOnGeneralPurposeRegister(loc *valueLocation) {
