@@ -628,11 +628,75 @@ func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 }
 
 func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalRegister conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_LO // Unsigned lower or same.
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_LO // Unsigned lower or same.
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_LT // Signed less than or equal.
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_LT // Signed less than or equal.
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalRegister = arm64.COND_MI
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalRegister = arm64.COND_MI
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register placed value.
+	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
+	return nil
 }
 
 func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalRegister conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_HI
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_HI
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_GT
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_GT
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalRegister = arm64.COND_GT
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalRegister = arm64.COND_GT
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register placed value.
+	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
+	return nil
 }
 
 func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
@@ -646,16 +710,16 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.ACMPW
-		conditionalRegister = arm64.COND_LS // Unsigned lower or same.
+		conditionalRegister = arm64.COND_LS
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.ACMP
-		conditionalRegister = arm64.COND_LS // Unsigned lower or same.
+		conditionalRegister = arm64.COND_LS
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.ACMPW
-		conditionalRegister = arm64.COND_LE // Signed less than or equal.
+		conditionalRegister = arm64.COND_LE
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.ACMP
-		conditionalRegister = arm64.COND_LE // Signed less than or equal.
+		conditionalRegister = arm64.COND_LE
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.AFCMPS
 		conditionalRegister = arm64.COND_LS
@@ -672,7 +736,39 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 }
 
 func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalRegister conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_HS
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_HS
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_GE
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_GE
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalRegister = arm64.COND_GE
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalRegister = arm64.COND_GE
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register placed value.
+	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
+	return nil
 }
 
 func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {

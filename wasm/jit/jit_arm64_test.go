@@ -354,9 +354,9 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindLe,
-		// TODO: wazeroir.OperationKindLt,
-		// TODO: wazeroir.OperationKindGe,
-		// TODO: wazeroir.OperationKindGt,
+		wazeroir.OperationKindLt,
+		wazeroir.OperationKindGe,
+		wazeroir.OperationKindGt,
 	} {
 		kind := kind
 		t.Run(kind.String(), func(t *testing.T) {
@@ -477,13 +477,57 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 									require.Equal(t, math.Float64frombits(x1) <= math.Float64frombits(x2),
 										env.stackTopAsUint32() == 1)
 								}
-
 							case wazeroir.OperationKindLt:
-								t.Fail()
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) < int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) < uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) < int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 < x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) < math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) < math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
 							case wazeroir.OperationKindGe:
-								t.Fail()
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) >= int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) >= uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) >= int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 >= x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) >= math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) >= math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
 							case wazeroir.OperationKindGt:
-								t.Fail()
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) > int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) > uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) > int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 > x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) > math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) > math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
 							}
 						})
 					}
