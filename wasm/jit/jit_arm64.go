@@ -716,7 +716,7 @@ func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
 
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
-	// Push the comparison result as a conditional register placed value.
+	// Push the comparison result as a conditional register value.
 	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
 	return nil
 }
@@ -753,7 +753,7 @@ func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
 
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
-	// Push the comparison result as a conditional register placed value.
+	// Push the comparison result as a conditional register value.
 	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
 	return nil
 }
@@ -790,7 +790,7 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
-	// Push the comparison result as a conditional register placed value.
+	// Push the comparison result as a conditional register value.
 	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
 	return nil
 }
@@ -827,7 +827,7 @@ func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
-	// Push the comparison result as a conditional register placed value.
+	// Push the comparison result as a conditional register value.
 	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
 	return nil
 }
@@ -1004,7 +1004,7 @@ func (c *arm64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() {
 	}
 }
 
-// loadConditionalRegisterToGeneralPurposeRegister saves the conditional register placed value
+// loadConditionalRegisterToGeneralPurposeRegister saves the conditional register value
 // to a general purpose register.
 //
 // We use CSET instruction to set 1 on the register if the condition satisfies:
