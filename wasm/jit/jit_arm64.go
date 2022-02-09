@@ -1019,9 +1019,6 @@ func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err er
 	}
 
 	x1, err = c.popValueOnRegister()
-	if err != nil {
-		return
-	}
 	return
 }
 
