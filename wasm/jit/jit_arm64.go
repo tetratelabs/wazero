@@ -1025,7 +1025,7 @@ func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err er
 	return
 }
 
-// popValueOnRegisters pops one value from the location stacks, ensures
+// popValueOnRegister pops one value from the location stacks, ensures
 // that it is located on a register, and mark it unused.
 func (c *arm64Compiler) popValueOnRegister() (v *valueLocation, err error) {
 	v = c.locationStack.pop()
