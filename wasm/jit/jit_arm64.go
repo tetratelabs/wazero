@@ -682,7 +682,8 @@ func (c *arm64Compiler) compileNe(o *wazeroir.OperationNe) error {
 	return c.emitEqOrNeq(false, o.Type)
 }
 
-func (c *arm64Compiler) emitEqOrNeq(isEq bool, unsignedType wazeroir.UnsignedType) error {
+// emitEqOrNe implements compiler.compileEq and compiler.compileNe for the arm64 architecture.
+func (c *arm64Compiler) emitEqOrNe(isEq bool, unsignedType wazeroir.UnsignedType) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -711,6 +712,7 @@ func (c *arm64Compiler) emitEqOrNeq(isEq bool, unsignedType wazeroir.UnsignedTyp
 	return nil
 }
 
+// compileEqz implements compiler.compileEqz for the arm64 architecture.
 func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	x1, err := c.popValueOnRegister()
 	if err != nil {

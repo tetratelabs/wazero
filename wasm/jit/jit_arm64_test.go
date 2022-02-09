@@ -351,6 +351,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 	}
 }
 
+// TODO: break this up somehow so that the test name is more readable
 func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindEq,
