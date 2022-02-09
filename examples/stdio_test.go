@@ -25,13 +25,12 @@ func Test_stdio(t *testing.T) {
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
 	stdoutBuf := bytes.NewBuffer(nil)
 	stderrBuf := bytes.NewBuffer(nil)
-	wasiEnv := wasi.NewEnvironment(
+	store := wasm.NewStore(interpreter.NewEngine())
+	err = wasi.RegisterAPI(store,
 		wasi.Stdin(stdinBuf),
 		wasi.Stdout(stdoutBuf),
 		wasi.Stderr(stderrBuf),
 	)
-	store := wasm.NewStore(interpreter.NewEngine())
-	err = wasiEnv.Register(store)
 	require.NoError(t, err)
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)

@@ -110,12 +110,11 @@ func TestExampleUpToDate(t *testing.T) {
 
 		// Add WASI to satisfy import tests
 		buf := &bytes.Buffer{} // fake stdio
-		wasiEnv := wasi.NewEnvironment(
+		err := wasi.RegisterAPI(store,
 			wasi.Stdin(buf),
 			wasi.Stdout(buf),
 			wasi.Stderr(buf),
 		)
-		err := wasiEnv.Register(store)
 		require.NoError(t, err)
 
 		// Decode and instantiate the module

@@ -55,11 +55,8 @@ func Test_file_system(t *testing.T) {
 	err = writeFile(memFS, "input.txt", []byte("Hello, file system!"))
 	require.NoError(t, err)
 
-	wasiEnv := wasi.NewEnvironment(wasi.Preopen(".", memFS))
-
 	store := wasm.NewStore(interpreter.NewEngine())
-
-	err = wasiEnv.Register(store)
+	err = wasi.RegisterAPI(store, wasi.Preopen(".", memFS))
 	require.NoError(t, err)
 
 	err = store.Instantiate(mod, "test")
