@@ -125,11 +125,9 @@ func TestArm64Compiler_exit(t *testing.T) {
 			require.NoError(t, err)
 			compiler.exit(s)
 
-			// Generate the code under test.
+			// Compile and execute the code under test.
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
-			// Run code
 			env.exec(code)
 
 			// JIT status on engine must be updated.
@@ -452,11 +450,9 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 							compiler.releaseRegisterToStack(resultLocation)
 							compiler.returnFunction()
 
-							// Generate the code under test.
+							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
 							require.NoError(t, err)
-
-							// Run code.
 							env.exec(code)
 
 							// There should only be one value on the stack
@@ -626,11 +622,9 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 							compiler.releaseRegisterToStack(resultLocation)
 							compiler.returnFunction()
 
-							// Generate the code under test.
+							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
 							require.NoError(t, err)
-
-							// Run code.
 							env.exec(code)
 
 							// Check the stack.
@@ -789,11 +783,9 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 			}
 			compiler.returnFunction()
 
-			// Generate the code under test.
+			// Compile and execute the code under test.
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
-			// Run code.
 			env.exec(code)
 
 			// Check the returned status and stack pointer.
