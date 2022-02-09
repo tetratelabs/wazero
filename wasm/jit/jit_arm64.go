@@ -208,6 +208,8 @@ func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(instruction obj.A
 func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, src1, src2 int16) {
 	inst := c.newProg()
 	inst.As = instruction
+	// TYPE_NONE indicates that this instruction doesn't have a destination.
+	// Note: this line is deletable as the value equals zero in anyway.
 	inst.To.Type = obj.TYPE_NONE
 	inst.From.Type = obj.TYPE_REG
 	inst.From.Reg = src1
@@ -219,15 +221,16 @@ func (c *arm64Compiler) String() (ret string) { return }
 
 // pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
 func (c *arm64Compiler) pushFunctionParams() {
-	if c.f != nil && c.f.FunctionType != nil {
-		for _, t := range c.f.FunctionType.Type.Params {
-			loc := c.locationStack.pushValueOnStack()
-			switch t {
-			case wasm.ValueTypeI32, wasm.ValueTypeI64:
-				loc.setRegisterType(generalPurposeRegisterTypeInt)
-			case wasm.ValueTypeF32, wasm.ValueTypeF64:
-				loc.setRegisterType(generalPurposeRegisterTypeFloat)
-			}
+	if c.f == nil || c.f.FunctionType == nil {
+		return
+	}
+	for _, t := range c.f.FunctionType.Type.Params {
+		loc := c.locationStack.pushValueOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
 		}
 	}
 }
