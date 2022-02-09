@@ -365,8 +365,7 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 	if r == nil {
 		return nil
 	} else if r.Start == 0 {
-		// If the drop starts from the top, we just mark all the regiters
-		// used by drop targets unused.
+		// When the drop starts from the top of the stack, mark all registers unused.
 		for i := 0; i <= r.End; i++ {
 			if loc := c.locationStack.pop(); loc.onRegister() {
 				c.markRegisterUnused(loc.register)
@@ -379,7 +378,7 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 	// might result in changing the flag value.
 	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	// Save the non-drop target values.
+	// Save the live values because we pop and release values in drop range below.
 	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start):]
 	c.locationStack.sp -= uint64(r.Start)
 
