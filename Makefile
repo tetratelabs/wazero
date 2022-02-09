@@ -11,18 +11,9 @@ bench_testdata_dir := tests/bench/testdata
 build.bench:
 	tinygo build -o $(bench_testdata_dir)/case.wasm -scheduler=none -target=wasi $(bench_testdata_dir)/case.go
 
-wasi_testdata_dir := ./examples/testdata ./tests/wasi/testdata
-
+wasi_testdata_dir := ./examples/testdata
 .PHONY: build.examples
 build.examples:
-	@$(MAKE) wasi_testdata_dir=./examples/testdata build.tinygo-wasi
-
-.PHONY: build.tests-wasi
-build.tests-wasi:
-	@$(MAKE) wasi_testdata_dir=./tests/wasi/testdata build.tinygo-wasi
-
-.PHONY: build.tinygo-wasi
-build.tinygo-wasi:
 	@find $(wasi_testdata_dir) -type f -name "*.go" | xargs -Ip /bin/sh -c 'tinygo build -o $$(echo p | sed -e 's/\.go/\.wasm/') -scheduler=none -target=wasi p'
 
 spectest_testdata_dir := tests/spectest/testdata
