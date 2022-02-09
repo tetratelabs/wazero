@@ -59,6 +59,12 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		locationStack: newValueLocationStack(),
 	}
 
+	if ir != nil {
+		compiler.labels = make(map[string]*labelInfo, len(ir.LabelCallers))
+		for key, callers := range ir.LabelCallers {
+			compiler.labels[key] = &labelInfo{callers: callers}
+		}
+	}
 	return compiler, nil
 }
 
