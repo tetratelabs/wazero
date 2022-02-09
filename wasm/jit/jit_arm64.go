@@ -672,12 +672,43 @@ func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileEq implements compiler.compileEq for the arm64 architecture.
 func (c *arm64Compiler) compileEq(o *wazeroir.OperationEq) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.emitEqOrNeq(true, o.Type)
 }
 
+// compileNe implements compiler.compileNe for the arm64 architecture.
 func (c *arm64Compiler) compileNe(o *wazeroir.OperationNe) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.emitEqOrNeq(false, o.Type)
+}
+
+func (c *arm64Compiler) emitEqOrNeq(isEq bool, unsignedType wazeroir.UnsignedType) error {
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	switch unsignedType {
+	case wazeroir.UnsignedTypeI32:
+		inst = arm64.ACMPW
+	case wazeroir.UnsignedTypeI64:
+		inst = arm64.ACMP
+	case wazeroir.UnsignedTypeF32:
+		inst = arm64.AFCMPS
+	case wazeroir.UnsignedTypeF64:
+		inst = arm64.AFCMPD
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register value.
+	cond := conditionalRegisterState(arm64.COND_NE)
+	if isEq {
+		cond = arm64.COND_EQ
+	}
+	c.locationStack.pushValueLocationOnConditionalRegister(cond)
+	return nil
 }
 
 func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {

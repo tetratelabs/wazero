@@ -351,8 +351,10 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
+func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Ne(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindEq,
+		wazeroir.OperationKindNe,
 		wazeroir.OperationKindLe,
 		wazeroir.OperationKindLt,
 		wazeroir.OperationKindGe,
@@ -433,6 +435,30 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 								err = compiler.compileGe(&wazeroir.OperationGe{Type: signedType})
 							case wazeroir.OperationKindGt:
 								err = compiler.compileGt(&wazeroir.OperationGt{Type: signedType})
+							case wazeroir.OperationKindEq:
+								// Eq uses UnsignedType instead, so we translate the signed one.
+								switch signedType {
+								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
+									err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
+									err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI64})
+								case wazeroir.SignedTypeFloat32:
+									err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF32})
+								case wazeroir.SignedTypeFloat64:
+									err = compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeF64})
+								}
+							case wazeroir.OperationKindNe:
+								// Ne uses UnsignedType instead, so we translate the signed one.
+								switch signedType {
+								case wazeroir.SignedTypeUint32, wazeroir.SignedTypeInt32:
+									err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+								case wazeroir.SignedTypeUint64, wazeroir.SignedTypeInt64:
+									err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI64})
+								case wazeroir.SignedTypeFloat32:
+									err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF32})
+								case wazeroir.SignedTypeFloat64:
+									err = compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeF64})
+								}
 							}
 							require.NoError(t, err)
 
@@ -526,6 +552,32 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 								case wazeroir.SignedTypeFloat64:
 									require.Equal(t, math.Float64frombits(x1) > math.Float64frombits(x2),
 										env.stackTopAsUint32() == 1)
+								}
+							case wazeroir.OperationKindEq:
+								switch signedType {
+								case wazeroir.SignedTypeInt32, wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) == uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 == x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) == math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) == math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
+							case wazeroir.OperationKindNe:
+								switch signedType {
+								case wazeroir.SignedTypeInt32, wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) != uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 != x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) == math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() != 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) == math.Float64frombits(x2),
+										env.stackTopAsUint32() != 1)
 								}
 							}
 						})
