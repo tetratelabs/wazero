@@ -198,7 +198,6 @@ func Stderr(writer io.Writer) Option {
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 type nullTerminatedStrings struct {
 	// nullTerminatedValues are null-terminated values with a NULL suffix.
-	// Each string can have arbitrary byte values, not only utf-8 encoded text.
 	nullTerminatedValues [][]byte
 	totalBufSize         uint32
 }
