@@ -382,8 +382,11 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start):]
 	c.locationStack.sp -= uint64(r.Start)
 
+	// Note: drop target range is inclusive.
+	dropNum := r.End - r.Start + 1
+
 	// Then mark all registers used by drop tragets unused.
-	for i := 0; i < r.End-r.Start+1; i++ {
+	for i := 0; i < dropNum; i++ {
 		if loc := c.locationStack.pop(); loc.onRegister() {
 			c.markRegisterUnused(loc.register)
 		}
