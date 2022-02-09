@@ -388,7 +388,7 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 
 	for i := range liveValues {
 		live := liveValues[len(liveValues)-1-i]
-		// If the value is on a memory, we have to it to a register,
+		// If the value is on a memory, we have to move it to a register,
 		// otherwise the memory location is overriden by other values
 		// after this drop instructin.
 		if err := c.ensureOnGeneralPurposeRegister(live); err != nil {
