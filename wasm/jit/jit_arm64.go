@@ -88,6 +88,10 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 	c.builder.AddInstruction(inst)
 }
 
+func (c *arm64Compiler) markRegisterUsed(reg int16) {
+	c.locationStack.markRegisterUsed(reg)
+}
+
 func (c *arm64Compiler) markRegisterUnused(reg int16) {
 	if !isZeroRegister(reg) {
 		c.locationStack.markRegisterUnused(reg)
@@ -200,7 +204,36 @@ func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(instruction obj.A
 	c.addInstruction(inst)
 }
 
+// applyTwoRegistersToNoneInstruction adds an instruction which takes two source operands on registers.
+func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, src1, src2 int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	// TYPE_NONE indicates that this instruction doesn't have a destination.
+	// Note: this line is deletable as the value equals zero in anyway.
+	inst.To.Type = obj.TYPE_NONE
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = src1
+	inst.Reg = src2
+	c.addInstruction(inst)
+}
+
 func (c *arm64Compiler) String() (ret string) { return }
+
+// pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
+func (c *arm64Compiler) pushFunctionParams() {
+	if c.f == nil || c.f.FunctionType == nil {
+		return
+	}
+	for _, t := range c.f.FunctionType.Type.Params {
+		loc := c.locationStack.pushValueLocationOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
+}
 
 // emitPreamble implements compiler.emitPreamble for the arm64 architecture.
 func (c *arm64Compiler) emitPreamble() error {
@@ -209,7 +242,7 @@ func (c *arm64Compiler) emitPreamble() error {
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
 
-	// TODO: Push function parameter constants.
+	c.pushFunctionParams()
 
 	// Before excuting function body, we must initialize the stack base pointer register
 	// so that we can manipulate the memory stack properly.
@@ -221,7 +254,7 @@ func (c *arm64Compiler) emitPreamble() error {
 // Otherwise, we jump into the caller's return address (TODO).
 func (c *arm64Compiler) returnFunction() error {
 	// TODO: we don't support function calls yet.
-	// For now the following code just simply returns to Go code.
+	// For now the following code just returns to Go code.
 
 	// Since we return from the function, we need to decrement the callframe stack pointer, and write it back.
 	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
@@ -254,7 +287,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 			return err
 		}
 	} else {
-		// If the status == 0, we simply use zero register to store zero.
+		// If the status == 0, we use zero register to store zero.
 		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine,
 			engineExitContextJITCallStatusCodeOffset, zeroRegister); err != nil {
 			return err
@@ -304,8 +337,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 // compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	if o.Target.IsReturnTarget() {
-		c.returnFunction()
-		return nil
+		return c.returnFunction()
 	} else {
 		return fmt.Errorf("TODO: only return target is available on arm64")
 	}
@@ -327,16 +359,87 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileDrop implements compiler.compileDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	r := o.Range
+	if r == nil {
+		return nil
+	} else if r.Start == 0 {
+		// When the drop starts from the top of the stack, mark all registers unused.
+		for i := 0; i <= r.End; i++ {
+			if loc := c.locationStack.pop(); loc.onRegister() {
+				c.markRegisterUnused(loc.register)
+			}
+		}
+		return nil
+	}
+
+	// Below, we might end up moving a non-top value first which
+	// might result in changing the flag value.
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
+	// Save the live values because we pop and release values in drop range below.
+	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start):]
+	c.locationStack.sp -= uint64(r.Start)
+
+	// Note: drop target range is inclusive.
+	dropNum := r.End - r.Start + 1
+
+	// Then mark all registers used by drop tragets unused.
+	for i := 0; i < dropNum; i++ {
+		if loc := c.locationStack.pop(); loc.onRegister() {
+			c.markRegisterUnused(loc.register)
+		}
+	}
+
+	for _, live := range liveValues {
+		// If the value is on a memory, we have to move it to a register,
+		// otherwise the memory location is overriden by other values
+		// after this drop instructin.
+		if err := c.ensureOnGeneralPurposeRegister(live); err != nil {
+			return err
+		}
+		// Update the runtime memory stack location by pushing onto the location stack.
+		c.locationStack.push(live)
+	}
+	return nil
 }
 
 func (c *arm64Compiler) compileSelect() error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compilePick implements compiler.compilePick for the arm64 architecture.
 func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
+	pickTarget := c.locationStack.stack[c.locationStack.sp-1-uint64(o.Depth)]
+	pickedRegister, err := c.allocateRegister(pickTarget.registerType())
+	if err != nil {
+		return err
+	}
+
+	if pickTarget.onRegister() { // Copy the value to the pickedRegister.
+		var inst obj.As
+		switch pickTarget.registerType() {
+		case generalPurposeRegisterTypeInt:
+			inst = arm64.AMOVD
+		case generalPurposeRegisterTypeFloat:
+			inst = arm64.AFMOVD
+		}
+		c.applyRegisterToRegisterInstruction(inst, pickTarget.register, pickedRegister)
+	} else if pickTarget.onStack() {
+		// Temporarily assign a register to the pick target, and then load the value.
+		pickTarget.setRegister(pickedRegister)
+		c.loadValueOnStackToRegister(pickTarget)
+		// After the load, we revert the register assignment to the pick target.
+		pickTarget.setRegister(nilRegister)
+	}
+
+	// Now we have the value of the target on the pickedRegister,
+	// so push the location.
+	c.locationStack.pushValueLocationOnRegister(pickedRegister)
+	return nil
 }
 
 // compileAdd implements compiler.compileAdd for the arm64 architecture.
@@ -348,10 +451,10 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 
 	// Additon can be nop if one of operands is zero.
 	if isZeroRegister(x1.register) {
-		c.locationStack.pushValueOnRegister(x2.register)
+		c.locationStack.pushValueLocationOnRegister(x2.register)
 		return nil
 	} else if isZeroRegister(x2.register) {
-		c.locationStack.pushValueOnRegister(x1.register)
+		c.locationStack.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -369,7 +472,7 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 
 	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
-	c.locationStack.pushValueOnRegister(x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -380,9 +483,9 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 		return err
 	}
 
-	// If both of registers are zeros, this can be nop and simply push the zero register.
+	// If both of registers are zeros, this can be nop and push the zero register.
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
-		c.locationStack.pushValueOnRegister(zeroRegister)
+		c.locationStack.pushValueLocationOnRegister(zeroRegister)
 		return nil
 	}
 
@@ -406,7 +509,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	}
 
 	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
-	c.locationStack.pushValueOnRegister(destinationReg)
+	c.locationStack.pushValueLocationOnRegister(destinationReg)
 	return nil
 }
 
@@ -419,7 +522,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	// Multiplcation can be done by putting a zero register if one of operands is zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueOnRegister(zeroRegister)
+		c.locationStack.pushValueLocationOnRegister(zeroRegister)
 		return nil
 	}
 
@@ -437,7 +540,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
-	c.locationStack.pushValueOnRegister(x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -581,20 +684,152 @@ func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileLt implements compiler.compileLt for the arm64 architecture.
 func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalRegister conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_LO
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_LO
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_LT
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_LT
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalRegister = arm64.COND_MI
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalRegister = arm64.COND_MI
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register value.
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
+	return nil
 }
 
+// compileGt implements compiler.compileGt for the arm64 architecture.
 func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalRegister conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_HI
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_HI
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_GT
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_GT
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalRegister = arm64.COND_GT
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalRegister = arm64.COND_GT
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register value.
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
+	return nil
 }
 
+// compileLe implements compiler.compileLe for the arm64 architecture.
 func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalRegister conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_LS
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_LS
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_LE
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_LE
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalRegister = arm64.COND_LS
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalRegister = arm64.COND_LS
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register value.
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
+	return nil
 }
 
+// compileGe implements compiler.compileGe for the arm64 architecture.
 func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	var conditionalRegister conditionalRegisterState
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_HS
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_HS
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ACMPW
+		conditionalRegister = arm64.COND_GE
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ACMP
+		conditionalRegister = arm64.COND_GE
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFCMPS
+		conditionalRegister = arm64.COND_GE
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFCMPD
+		conditionalRegister = arm64.COND_GE
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
+
+	// Push the comparison result as a conditional register value.
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
+	return nil
 }
 
 func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
@@ -651,6 +886,8 @@ func (c *arm64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) load target constant.
 func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
 	if value == 0 {
 		c.pushZeroValue()
 	} else {
@@ -668,7 +905,7 @@ func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
 		}
 		c.applyConstToRegisterInstruction(inst, int64(value), reg)
 
-		c.locationStack.pushValueOnRegister(reg)
+		c.locationStack.pushValueLocationOnRegister(reg)
 	}
 	return nil
 }
@@ -687,6 +924,8 @@ func (c *arm64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 // is32bit is true if the target value is originally 32-bit const, false otherwise.
 // value holds the (zero-extended for 32-bit case) bit representation of load target float constant.
 func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
 	// Take a register to load the value.
 	reg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
 	if err != nil {
@@ -714,12 +953,12 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 	}
 	c.applyRegisterToRegisterInstruction(inst, tmpReg, reg)
 
-	c.locationStack.pushValueOnRegister(reg)
+	c.locationStack.pushValueLocationOnRegister(reg)
 	return nil
 }
 
 func (c *arm64Compiler) pushZeroValue() {
-	c.locationStack.pushValueOnRegister(zeroRegister)
+	c.locationStack.pushValueLocationOnRegister(zeroRegister)
 }
 
 // popTwoValuesOnRegisters pops two values from the location stacks, ensures
@@ -745,9 +984,41 @@ func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err 
 	if loc.onStack() {
 		err = c.loadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
-		err = fmt.Errorf("TODO: support moving conditional to general purpose register")
+		c.loadConditionalRegisterToGeneralPurposeRegister(loc)
 	}
 	return
+}
+
+// maybeMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
+// if the value is located on a conditional register.
+//
+// This is usually called at the beginning of arm64Compiler.compile* functions where we possibly
+// emit istructions without saving the conditional register value.
+// The compile* functions without calling this function is saving the conditional
+// value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
+func (c *arm64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() {
+	if c.locationStack.sp > 0 {
+		if loc := c.locationStack.peek(); loc.onConditionalRegister() {
+			c.loadConditionalRegisterToGeneralPurposeRegister(loc)
+		}
+	}
+}
+
+// loadConditionalRegisterToGeneralPurposeRegister saves the conditional register value
+// to a general purpose register.
+//
+// We use CSET instruction to set 1 on the register if the condition satisfies:
+// https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
+func (c *arm64Compiler) loadConditionalRegisterToGeneralPurposeRegister(loc *valueLocation) {
+	// There must be always at least one free register at this point, as the conditional register located value
+	// is always pushed after consuming at least one value (eqz) or two values for most cases (gt, ge, etc.).
+	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	c.markRegisterUsed(reg)
+
+	c.applyRegisterToRegisterInstruction(arm64.ACSET, int16(loc.conditionalRegister), reg)
+
+	// Record that now the value is located on a general purpose register.
+	loc.setRegister(reg)
 }
 
 // loadValueOnStackToRegister emits instructions to load the value located on the stack to a register.
@@ -806,6 +1077,25 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 	reg = stealTarget.register
 	err = c.releaseRegisterToStack(stealTarget)
 	return
+}
+
+// releaseAllRegistersToStack adds instructions to store all the values located on
+// either general purpuse or conditional registers onto the memory stack.
+// See releaseRegisterToStack.
+func (c *arm64Compiler) releaseAllRegistersToStack() error {
+	for i := uint64(0); i < c.locationStack.sp; i++ {
+		if loc := c.locationStack.stack[i]; loc.onRegister() {
+			if err := c.releaseRegisterToStack(loc); err != nil {
+				return err
+			}
+		} else if loc.onConditionalRegister() {
+			c.loadConditionalRegisterToGeneralPurposeRegister(loc)
+			if err := c.releaseRegisterToStack(loc); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.

@@ -486,7 +486,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 							}
 						}
 
-						compiler.locationStack.pushValueOnRegister(indexReg)
+						compiler.locationStack.pushValueLocationOnRegister(indexReg)
 						compiler.movIntConstToRegister(tc.index, indexReg)
 
 						err = compiler.compileBrTable(tc.o)
@@ -582,7 +582,7 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 				compiler.locationStack.markRegisterUsed(r)
 			}
 		}
-		stealTargetLocation := compiler.locationStack.pushValueOnRegister(stealTarget)
+		stealTargetLocation := compiler.locationStack.pushValueLocationOnRegister(stealTarget)
 		compiler.movIntConstToRegister(int64(50), stealTargetLocation.register)
 		require.Equal(t, int16(stealTarget), stealTargetLocation.register)
 		require.True(t, stealTargetLocation.onRegister())
@@ -592,7 +592,7 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 		require.False(t, stealTargetLocation.onRegister())
 
 		// Create new value using the stolen register.
-		loc := compiler.locationStack.pushValueOnRegister(reg)
+		loc := compiler.locationStack.pushValueLocationOnRegister(reg)
 		compiler.movIntConstToRegister(int64(2000), loc.register)
 		compiler.releaseRegisterToStack(loc)
 		compiler.exit(jitCallStatusCodeReturned)
@@ -646,9 +646,9 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set up the pick target original value.
-		pickTargetLocation := compiler.locationStack.pushValueOnRegister(int16(x86.REG_R10))
+		pickTargetLocation := compiler.locationStack.pushValueLocationOnRegister(int16(x86.REG_R10))
 		pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
-		compiler.locationStack.pushValueOnStack() // Dummy value!
+		compiler.locationStack.pushValueLocationOnStack() // Dummy value!
 		compiler.movIntConstToRegister(100, pickTargetLocation.register)
 		// Now insert pick code.
 		err = compiler.compilePick(o)
@@ -691,10 +691,10 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		require.NoError(t, err)
 
 		// Setup the original value.
-		compiler.locationStack.pushValueOnStack() // Dummy value!
-		pickTargetLocation := compiler.locationStack.pushValueOnStack()
+		compiler.locationStack.pushValueLocationOnStack() // Dummy value!
+		pickTargetLocation := compiler.locationStack.pushValueLocationOnStack()
 		env.stack()[pickTargetLocation.stackPointer] = 100
-		compiler.locationStack.pushValueOnStack() // Dummy value!
+		compiler.locationStack.pushValueLocationOnStack() // Dummy value!
 
 		// Now insert pick code.
 		err = compiler.compilePick(o)
@@ -1203,7 +1203,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 			// So we intentionally use up the int registers with this function.
 			useUpIntRegistersFunc := func(compiler *amd64Compiler) {
 				for i, reg := range unreservedGeneralPurposeIntRegisters {
-					compiler.locationStack.pushValueOnRegister(reg)
+					compiler.locationStack.pushValueLocationOnRegister(reg)
 					compiler.movIntConstToRegister(int64(i), reg)
 				}
 			}
@@ -2364,21 +2364,21 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-				prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+				prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
 
 				// Setup values.
 				if tc.x1Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
-					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+					compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
 				} else {
-					loc := compiler.locationStack.pushValueOnStack()
+					loc := compiler.locationStack.pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x1Value)
 				}
 				if tc.x2Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
-					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+					compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
 				} else {
-					loc := compiler.locationStack.pushValueOnStack()
+					loc := compiler.locationStack.pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x2Value)
 				}
 
@@ -2476,21 +2476,21 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-				prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+				prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
 
 				// Setup values.
 				if tc.x1Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
-					compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+					compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
 				} else {
-					loc := compiler.locationStack.pushValueOnStack()
+					loc := compiler.locationStack.pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x1Value)
 				}
 				if tc.x2Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
-					compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+					compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
 				} else {
-					loc := compiler.locationStack.pushValueOnStack()
+					loc := compiler.locationStack.pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x2Value)
 				}
 
@@ -3109,16 +3109,16 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 							// Setup the target values.
 							if locations.x1Reg != nilRegister {
 								compiler.movIntConstToRegister(int64(vs.x1), locations.x1Reg)
-								compiler.locationStack.pushValueOnRegister(locations.x1Reg)
+								compiler.locationStack.pushValueLocationOnRegister(locations.x1Reg)
 							} else {
-								loc := compiler.locationStack.pushValueOnStack()
+								loc := compiler.locationStack.pushValueLocationOnStack()
 								env.stack()[loc.stackPointer] = uint64(vs.x1)
 							}
 							if locations.x2Reg != nilRegister {
 								compiler.movIntConstToRegister(int64(vs.x2), locations.x2Reg)
-								compiler.locationStack.pushValueOnRegister(locations.x2Reg)
+								compiler.locationStack.pushValueLocationOnRegister(locations.x2Reg)
 							} else {
-								loc := compiler.locationStack.pushValueOnStack()
+								loc := compiler.locationStack.pushValueLocationOnStack()
 								env.stack()[loc.stackPointer] = uint64(vs.x2)
 							}
 
@@ -3246,21 +3246,21 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -3403,21 +3403,21 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -3707,21 +3707,21 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -3863,21 +3863,21 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueOnRegister(x86.REG_DX)
+								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x1Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueOnRegister(tc.x2Reg)
+									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueOnStack()
+									loc := compiler.locationStack.pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -4054,7 +4054,7 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 							require.NoError(t, err)
 
 							if originOnStack {
-								loc := compiler.locationStack.pushValueOnStack()
+								loc := compiler.locationStack.pushValueLocationOnStack()
 								env.stack()[loc.stackPointer] = v
 								env.setStackPointer(1)
 							}
@@ -4799,7 +4799,7 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					reg, err := compiler.setupMemoryOffset(offset, targetSizeInByte)
 					require.NoError(t, err)
 
-					compiler.locationStack.pushValueOnRegister(reg)
+					compiler.locationStack.pushValueLocationOnRegister(reg)
 
 					// Generate the code under test.
 					err = compiler.releaseAllRegistersToStack()
@@ -4844,7 +4844,7 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := compiler.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueLocationOnStack()
 			env.stack()[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
@@ -4943,7 +4943,7 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := compiler.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueLocationOnStack()
 			env.stack()[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
@@ -5005,7 +5005,7 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 
 			// Before load operations, we must push the base offset value.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := compiler.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueLocationOnStack()
 			env.stack()[base.stackPointer] = baseOffset
 
 			// Emit the memory load instructions.
@@ -5059,7 +5059,7 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 
 	// Before load operations, we must push the base offset value.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := compiler.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[base.stackPointer] = baseOffset
 
 	// Emit the memory load instructions.
@@ -5119,10 +5119,10 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 
 			// Before store operations, we must push the base offset, and the store target values.
 			const baseOffset = 100 // For testing. Arbitrary number is fine.
-			base := compiler.locationStack.pushValueOnStack()
+			base := compiler.locationStack.pushValueLocationOnStack()
 			env.stack()[base.stackPointer] = baseOffset
 			storeTargetValue := uint64(math.MaxUint64)
-			storeTarget := compiler.locationStack.pushValueOnStack()
+			storeTarget := compiler.locationStack.pushValueLocationOnStack()
 			env.stack()[storeTarget.stackPointer] = storeTargetValue
 			switch tp {
 			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
@@ -5179,10 +5179,10 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := compiler.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[base.stackPointer] = baseOffset
 	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
-	storeTarget := compiler.locationStack.pushValueOnStack()
+	storeTarget := compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[storeTarget.stackPointer] = storeTargetValue
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
@@ -5224,10 +5224,10 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := compiler.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[base.stackPointer] = baseOffset
 	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
-	storeTarget := compiler.locationStack.pushValueOnStack()
+	storeTarget := compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[storeTarget.stackPointer] = storeTargetValue
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
@@ -5269,10 +5269,10 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 
 	// Before store operations, we must push the base offset, and the store target values.
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	base := compiler.locationStack.pushValueOnStack()
+	base := compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[base.stackPointer] = baseOffset
 	storeTargetValue := uint64(0x12_34_56_78_9a_bc_ef_01) // For testing. Arbitrary number is fine.
-	storeTarget := compiler.locationStack.pushValueOnStack()
+	storeTarget := compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[storeTarget.stackPointer] = storeTargetValue
 	storeTarget.setRegisterType(generalPurposeRegisterTypeInt)
 
@@ -5388,10 +5388,10 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 	t.Run("zero start", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
-		shouldPeek := compiler.locationStack.pushValueOnStack()
+		shouldPeek := compiler.locationStack.pushValueLocationOnStack()
 		const numReg = 10
 		for i := int16(0); i < numReg; i++ {
-			compiler.locationStack.pushValueOnRegister(i)
+			compiler.locationStack.pushValueLocationOnRegister(i)
 		}
 		err := compiler.compileDrop(&wazeroir.OperationDrop{
 			Range: &wazeroir.InclusiveRange{Start: 0, End: numReg - 1},
@@ -5410,12 +5410,12 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 		)
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
-		shouldBottom := compiler.locationStack.pushValueOnStack()
+		shouldBottom := compiler.locationStack.pushValueLocationOnStack()
 		for i := int16(0); i < dropNum; i++ {
-			compiler.locationStack.pushValueOnRegister(i)
+			compiler.locationStack.pushValueLocationOnRegister(i)
 		}
 		for i := int16(dropNum); i < numLive+dropNum; i++ {
-			compiler.locationStack.pushValueOnRegister(i)
+			compiler.locationStack.pushValueLocationOnRegister(i)
 		}
 		err := compiler.compileDrop(&wazeroir.OperationDrop{
 			Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
@@ -5445,17 +5445,17 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			)
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			bottom := compiler.locationStack.pushValueOnStack()
+			bottom := compiler.locationStack.pushValueLocationOnStack()
 			require.Equal(t, uint64(0), compiler.locationStack.stack[0].stackPointer)
 			for i := int16(0); i < dropNum; i++ {
-				compiler.locationStack.pushValueOnRegister(i)
+				compiler.locationStack.pushValueLocationOnRegister(i)
 			}
 			// The bottom live value is on the stack.
-			bottomLive := compiler.locationStack.pushValueOnStack()
+			bottomLive := compiler.locationStack.pushValueLocationOnStack()
 			// The second live value is on the register.
-			LiveRegister := compiler.locationStack.pushValueOnRegister(liveRegisterID)
+			LiveRegister := compiler.locationStack.pushValueLocationOnRegister(liveRegisterID)
 			// The top live value is on the conditional.
-			topLive := compiler.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateAE)
+			topLive := compiler.locationStack.pushValueLocationOnConditionalRegister(conditionalRegisterStateAE)
 			require.True(t, topLive.onConditionalRegister())
 			err := compiler.compileDrop(&wazeroir.OperationDrop{
 				Range: &wazeroir.InclusiveRange{Start: numLive, End: numLive + dropNum - 1},
@@ -5489,9 +5489,9 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			err := compiler.emitPreamble()
 			require.NoError(t, err)
 
-			bottom := compiler.locationStack.pushValueOnRegister(x86.REG_R10)
-			compiler.locationStack.pushValueOnRegister(x86.REG_R9)
-			top := compiler.locationStack.pushValueOnStack()
+			bottom := compiler.locationStack.pushValueLocationOnRegister(x86.REG_R10)
+			compiler.locationStack.pushValueLocationOnRegister(x86.REG_R9)
+			top := compiler.locationStack.pushValueLocationOnStack()
 			env.stack()[top.stackPointer] = 5000
 			compiler.movIntConstToRegister(300, bottom.register)
 
@@ -5529,11 +5529,11 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 
 	x1Reg := int16(x86.REG_AX)
 	x2Reg := int16(x86.REG_R10)
-	_ = compiler.locationStack.pushValueOnStack()
+	_ = compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[0] = 100
-	compiler.locationStack.pushValueOnRegister(x1Reg)
-	compiler.locationStack.pushValueOnRegister(x2Reg)
-	_ = compiler.locationStack.pushValueOnStack()
+	compiler.locationStack.pushValueLocationOnRegister(x1Reg)
+	compiler.locationStack.pushValueLocationOnRegister(x2Reg)
+	_ = compiler.locationStack.pushValueLocationOnStack()
 	env.stack()[3] = 123
 	require.Len(t, compiler.locationStack.usedRegisters, 2)
 
@@ -5627,8 +5627,8 @@ func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 
 	x1Reg := int16(x86.REG_AX)
 	x2Reg := int16(x86.REG_R10)
-	compiler.locationStack.pushValueOnRegister(x1Reg)
-	compiler.locationStack.pushValueOnRegister(x2Reg)
+	compiler.locationStack.pushValueLocationOnRegister(x1Reg)
+	compiler.locationStack.pushValueLocationOnRegister(x2Reg)
 	compiler.movIntConstToRegister(300, x1Reg)
 	compiler.movIntConstToRegister(51, x2Reg)
 	err = compiler.compileUnreachable()
@@ -5703,28 +5703,28 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 
 			var x1, x2, c *valueLocation
 			if tc.x1OnRegister {
-				x1 = compiler.locationStack.pushValueOnRegister(x86.REG_AX)
+				x1 = compiler.locationStack.pushValueLocationOnRegister(x86.REG_AX)
 				compiler.movIntConstToRegister(x1Value, x1.register)
 			} else {
-				x1 = compiler.locationStack.pushValueOnStack()
+				x1 = compiler.locationStack.pushValueLocationOnStack()
 				env.stack()[x1.stackPointer] = x1Value
 			}
 			if tc.x2OnRegister {
-				x2 = compiler.locationStack.pushValueOnRegister(x86.REG_R10)
+				x2 = compiler.locationStack.pushValueLocationOnRegister(x86.REG_R10)
 				compiler.movIntConstToRegister(x2Value, x2.register)
 			} else {
-				x2 = compiler.locationStack.pushValueOnStack()
+				x2 = compiler.locationStack.pushValueLocationOnStack()
 				env.stack()[x2.stackPointer] = x2Value
 			}
 			if tc.condlValueOnStack {
-				c = compiler.locationStack.pushValueOnStack()
+				c = compiler.locationStack.pushValueLocationOnStack()
 				if tc.selectX1 {
 					env.stack()[c.stackPointer] = 1
 				} else {
 					env.stack()[c.stackPointer] = 0
 				}
 			} else if tc.condValueOnGPRegister {
-				c = compiler.locationStack.pushValueOnRegister(x86.REG_R9)
+				c = compiler.locationStack.pushValueLocationOnRegister(x86.REG_R9)
 				if tc.selectX1 {
 					compiler.movIntConstToRegister(1, c.register)
 				} else {
@@ -5743,7 +5743,7 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 					cmp.To.Offset = 1
 				}
 				compiler.addInstruction(cmp)
-				compiler.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+				compiler.locationStack.pushValueLocationOnConditionalRegister(conditionalRegisterStateE)
 			}
 
 			// Now emit code for select.
@@ -5796,18 +5796,18 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.x2OnRegister {
-				x2 := compiler.locationStack.pushValueOnRegister(x86.REG_R10)
+				x2 := compiler.locationStack.pushValueLocationOnRegister(x86.REG_R10)
 				compiler.movIntConstToRegister(x2Value, x2.register)
 			} else {
-				x2 := compiler.locationStack.pushValueOnStack()
+				x2 := compiler.locationStack.pushValueLocationOnStack()
 				env.stack()[x2.stackPointer] = uint64(x2Value)
 			}
-			_ = compiler.locationStack.pushValueOnStack() // Dummy value!
+			_ = compiler.locationStack.pushValueLocationOnStack() // Dummy value!
 			if tc.x1OnRegister && !tc.x1OnConditionalRegister {
-				x1 := compiler.locationStack.pushValueOnRegister(x86.REG_AX)
+				x1 := compiler.locationStack.pushValueLocationOnRegister(x86.REG_AX)
 				compiler.movIntConstToRegister(x1Value, x1.register)
 			} else if !tc.x1OnConditionalRegister {
-				x1 := compiler.locationStack.pushValueOnStack()
+				x1 := compiler.locationStack.pushValueLocationOnStack()
 				env.stack()[x1.stackPointer] = uint64(x1Value)
 			} else {
 				compiler.movIntConstToRegister(0, x86.REG_AX)
@@ -5819,7 +5819,7 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 				cmp.To.Offset = 0
 				cmp.To.Offset = 0
 				compiler.addInstruction(cmp)
-				compiler.locationStack.pushValueOnConditionalRegister(conditionalRegisterStateE)
+				compiler.locationStack.pushValueLocationOnConditionalRegister(conditionalRegisterStateE)
 				x1Value = 1
 			}
 
@@ -5914,7 +5914,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}}, nil)
 
 			// Place the set target value.
-			loc := compiler.locationStack.pushValueOnStack()
+			loc := compiler.locationStack.pushValueLocationOnStack()
 			env.stack()[loc.stackPointer] = valueToSet
 
 			// Now emit the code.
@@ -6178,7 +6178,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}}}
 
 		// Place the offfset value.
-		loc := compiler.locationStack.pushValueOnStack()
+		loc := compiler.locationStack.pushValueLocationOnStack()
 		env.stack()[loc.stackPointer] = 10
 
 		// Now emit the code.

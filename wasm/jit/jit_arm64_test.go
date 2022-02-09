@@ -125,11 +125,9 @@ func TestArm64Compiler_exit(t *testing.T) {
 			require.NoError(t, err)
 			compiler.exit(s)
 
-			// Generate the code under test.
+			// Compile and execute the code under test.
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
-			// Run code
 			env.exec(code)
 
 			// JIT status on engine must be updated.
@@ -238,6 +236,8 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 			// Setup the location stack so that we push the const on the specified height.
 			compiler.locationStack.sp = tc.stackPointer
 			compiler.locationStack.stack = make([]*valueLocation, tc.stackPointer)
+			// Peek must be non-nil. Otherwise, compileConst* would fail.
+			compiler.locationStack.stack[compiler.locationStack.sp-1] = &valueLocation{}
 
 			if tc.isFloat {
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
@@ -298,7 +298,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 
 			// Record that that top value is on top.
 			require.Len(t, compiler.locationStack.usedRegisters, 0)
-			loc := compiler.locationStack.pushValueOnStack()
+			loc := compiler.locationStack.pushValueLocationOnStack()
 			if tc.isFloat {
 				loc.setRegisterType(generalPurposeRegisterTypeFloat)
 			} else {
@@ -346,6 +346,191 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 				require.Equal(t, math.Float64frombits(val)+1, env.stackTopAsFloat64())
 			} else {
 				require.Equal(t, uint64(val)+1, env.stackTopAsUint64())
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindLe,
+		wazeroir.OperationKindLt,
+		wazeroir.OperationKindGe,
+		wazeroir.OperationKindGt,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, signedType := range []wazeroir.SignedType{
+				wazeroir.SignedTypeUint32,
+				wazeroir.SignedTypeUint64,
+				wazeroir.SignedTypeInt32,
+				wazeroir.SignedTypeInt64,
+				wazeroir.SignedTypeFloat32,
+				wazeroir.SignedTypeFloat64,
+			} {
+				signedType := signedType
+				t.Run(signedType.String(), func(t *testing.T) {
+					for _, values := range [][2]uint64{
+						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1}, {math.MaxInt16, math.MaxInt32},
+						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
+						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
+						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{1, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 1},
+						{0xffff_ffff_ffff_ffff, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 0xffff_ffff_ffff_ffff},
+						{math.Float64bits(math.MaxFloat32), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat32), 1},
+						{math.Float64bits(math.MaxFloat64), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat64), 1},
+						{0, math.Float64bits(math.Inf(1))},
+						{0, math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), 0},
+						{math.Float64bits(math.Inf(-1)), 0},
+						{math.Float64bits(math.Inf(1)), 1},
+						{math.Float64bits(math.Inf(-1)), 1},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(-1))},
+					} {
+						x1, x2 := values[0], values[1]
+						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.emitPreamble()
+							require.NoError(t, err)
+
+							// Emit consts operands.
+							for _, v := range []uint64{x1, x2} {
+								switch signedType {
+								case wazeroir.SignedTypeUint32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+								case wazeroir.SignedTypeInt32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(int32(v))})
+								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+								case wazeroir.SignedTypeFloat32:
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+								case wazeroir.SignedTypeFloat64:
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+								}
+								require.NoError(t, err)
+							}
+
+							// At this point, two values exist for comparison.
+							require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+							// Emit the operation.
+							switch kind {
+							case wazeroir.OperationKindLe:
+								err = compiler.compileLe(&wazeroir.OperationLe{Type: signedType})
+							case wazeroir.OperationKindLt:
+								err = compiler.compileLt(&wazeroir.OperationLt{Type: signedType})
+							case wazeroir.OperationKindGe:
+								err = compiler.compileGe(&wazeroir.OperationGe{Type: signedType})
+							case wazeroir.OperationKindGt:
+								err = compiler.compileGt(&wazeroir.OperationGt{Type: signedType})
+							}
+							require.NoError(t, err)
+
+							// We consumed two values, but push the result back.
+							require.Equal(t, uint64(1), compiler.locationStack.sp)
+							resultLocation := compiler.locationStack.peek()
+							// Plus the result must be located on a conditional register.
+							require.True(t, resultLocation.onConditionalRegister())
+
+							// Move the conditional register value to a general purpose register to verify the value.
+							compiler.loadConditionalRegisterToGeneralPurposeRegister(resultLocation)
+							require.True(t, resultLocation.onRegister())
+
+							// Release the value to the memory stack again to verify the operation.
+							compiler.releaseRegisterToStack(resultLocation)
+							compiler.returnFunction()
+
+							// Compile and execute the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// There should only be one value on the stack
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindLe:
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) <= int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) <= uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) <= int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 <= x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) <= math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) <= math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
+							case wazeroir.OperationKindLt:
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) < int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) < uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) < int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 < x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) < math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) < math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
+							case wazeroir.OperationKindGe:
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) >= int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) >= uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) >= int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 >= x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) >= math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) >= math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
+							case wazeroir.OperationKindGt:
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									require.Equal(t, int32(x1) > int32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint32:
+									require.Equal(t, uint32(x1) > uint32(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeInt64:
+									require.Equal(t, int64(x1) > int64(x2), env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeUint64:
+									require.Equal(t, x1 > x2, env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat32:
+									require.Equal(t, math.Float32frombits(uint32(x1)) > math.Float32frombits(uint32(x2)),
+										env.stackTopAsUint32() == 1)
+								case wazeroir.SignedTypeFloat64:
+									require.Equal(t, math.Float64frombits(x1) > math.Float64frombits(x2),
+										env.stackTopAsUint32() == 1)
+								}
+							}
+						})
+					}
+				})
 			}
 		})
 	}
@@ -433,15 +618,13 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
 							}
 
-							// Release the value to the memory stack again to verify the operation, and then return.
+							// Release the value to the memory stack again to verify the operation.
 							compiler.releaseRegisterToStack(resultLocation)
 							compiler.returnFunction()
 
-							// Generate the code under test.
+							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
 							require.NoError(t, err)
-
-							// Run code.
 							env.exec(code)
 
 							// Check the stack.
@@ -518,4 +701,240 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestArm64Compiler_compielePick(t *testing.T) {
+	const pickTargetValue uint64 = 12345
+	op := &wazeroir.OperationPick{Depth: 1}
+
+	for _, tc := range []struct {
+		name                                      string
+		pickTargetSetupFunc                       func(compiler *arm64Compiler, eng *engine) error
+		isPickTargetFloat, isPickTargetOnRegister bool
+	}{
+		{
+			name: "float on register",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				return compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(pickTargetValue)})
+			},
+			isPickTargetFloat:      true,
+			isPickTargetOnRegister: true,
+		},
+		{
+			name: "int on register",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				return compiler.compileConstI64(&wazeroir.OperationConstI64{Value: pickTargetValue})
+			},
+			isPickTargetFloat:      false,
+			isPickTargetOnRegister: true,
+		},
+		{
+			name: "float on stack",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				pickTargetLocation := compiler.locationStack.pushValueLocationOnStack()
+				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeFloat)
+				eng.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
+				return nil
+			},
+			isPickTargetFloat:      true,
+			isPickTargetOnRegister: false,
+		},
+		{
+			name: "int on stack",
+			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
+				pickTargetLocation := compiler.locationStack.pushValueLocationOnStack()
+				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
+				eng.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
+				return nil
+			},
+			isPickTargetFloat:      false,
+			isPickTargetOnRegister: false,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			// Set up the stack before picking.
+			err = tc.pickTargetSetupFunc(compiler, env.engine())
+			require.NoError(t, err)
+			pickTargetLocation := compiler.locationStack.peek()
+
+			// Push the unused median value.
+			_ = compiler.locationStack.pushValueLocationOnStack()
+			require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+			// Now ready to compile Pick operation.
+			err = compiler.compilePick(op)
+			require.NoError(t, err)
+			require.Equal(t, uint64(3), compiler.locationStack.sp)
+
+			pickedLocation := compiler.locationStack.peek()
+			require.True(t, pickedLocation.onRegister())
+			require.Equal(t, pickTargetLocation.registerType(), pickedLocation.registerType())
+
+			// Release the value to the memory stack again to verify the operation, and then return.
+			compiler.releaseRegisterToStack(pickedLocation)
+			if tc.isPickTargetOnRegister {
+				compiler.releaseRegisterToStack(pickTargetLocation)
+			}
+			compiler.returnFunction()
+
+			// Compile and execute the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			// Check the returned status and stack pointer.
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			require.Equal(t, uint64(3), env.stackPointer())
+
+			// Verify the top value is the picked one and the pick target's value stays the same.
+			if tc.isPickTargetFloat {
+				require.Equal(t, math.Float64frombits(pickTargetValue), env.stackTopAsFloat64())
+				require.Equal(t, math.Float64frombits(pickTargetValue), math.Float64frombits(env.stack()[pickTargetLocation.stackPointer]))
+			} else {
+				require.Equal(t, pickTargetValue, env.stackTopAsUint64())
+				require.Equal(t, pickTargetValue, env.stack()[pickTargetLocation.stackPointer])
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_compieleDrop(t *testing.T) {
+	t.Run("range nil", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Put existing contents on stack.
+		liveNum := 10
+		for i := 0; i < liveNum; i++ {
+			compiler.locationStack.pushValueLocationOnStack()
+		}
+		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
+
+		err = compiler.compileDrop(&wazeroir.OperationDrop{Range: nil})
+		require.NoError(t, err)
+
+		// After the nil range drop, the stack must remain the same.
+		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
+
+		compiler.returnFunction()
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+	t.Run("start top", func(t *testing.T) {
+		r := &wazeroir.InclusiveRange{Start: 0, End: 2}
+		dropTargetNum := r.End - r.Start + 1 // +1 as the range is inclusive!
+		liveNum := 5
+
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Put existing contents on stack.
+		const expectedTopLiveValue = 100
+		for i := 0; i < liveNum+dropTargetNum; i++ {
+			if i == liveNum-1 {
+				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: expectedTopLiveValue})
+				require.NoError(t, err)
+			} else {
+				compiler.locationStack.pushValueLocationOnStack()
+			}
+		}
+		require.Equal(t, uint64(liveNum+dropTargetNum), compiler.locationStack.sp)
+
+		err = compiler.compileDrop(&wazeroir.OperationDrop{Range: r})
+		require.NoError(t, err)
+
+		// After the drop operation, the stack contains only live contents.
+		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
+		// Plus, the top value must stay on a register.
+		top := compiler.locationStack.peek()
+		require.True(t, top.onRegister())
+		// Release the top value after drop so that we can verify the cpu itself is not mainpulated.
+		compiler.releaseRegisterToStack(top)
+
+		compiler.returnFunction()
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(5), env.stackPointer())
+		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
+	})
+
+	t.Run("start from middle", func(t *testing.T) {
+		r := &wazeroir.InclusiveRange{Start: 2, End: 3}
+		liveAboveDropStartNum := 3
+		dropTargetNum := r.End - r.Start + 1 // +1 as the range is inclusive!
+		liveBelowDropEndNum := 5
+		total := liveAboveDropStartNum + dropTargetNum + liveBelowDropEndNum
+		liveTotal := liveAboveDropStartNum + liveBelowDropEndNum
+
+		env := newJITEnvironment()
+		eng := env.engine()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Put existing contents except the top on stack
+		for i := 0; i < total-1; i++ {
+			loc := compiler.locationStack.pushValueLocationOnStack()
+			eng.valueStack[loc.stackPointer] = uint64(i) // Put the initial value.
+		}
+
+		// Place the top value.
+		const expectedTopLiveValue = 100
+		err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: expectedTopLiveValue})
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(total), compiler.locationStack.sp)
+
+		err = compiler.compileDrop(&wazeroir.OperationDrop{Range: r})
+		require.NoError(t, err)
+
+		// After the drop operation, the stack contains only live contents.
+		require.Equal(t, uint64(liveTotal), compiler.locationStack.sp)
+		// Plus, the top value must stay on a register.
+		require.True(t, compiler.locationStack.peek().onRegister())
+
+		// Release all register values so that we can verify the register allocated values.
+		err = compiler.releaseAllRegistersToStack()
+		require.NoError(t, err)
+		compiler.returnFunction()
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(liveTotal), env.stackPointer())
+
+		stack := env.stack()[:env.stackPointer()]
+		for i, val := range stack {
+			if i <= liveBelowDropEndNum {
+				require.Equal(t, uint64(i), val)
+			} else if i == liveTotal-1 {
+				require.Equal(t, uint64(expectedTopLiveValue), val)
+			} else {
+				require.Equal(t, uint64(i+dropTargetNum), val)
+			}
+		}
+	})
 }
