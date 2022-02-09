@@ -152,6 +152,6 @@ func newStore(engine wasm.Engine) *wasm.Store {
 	}
 
 	_ = store.AddHostFunction("env", "get_random_string", reflect.ValueOf(getRandomString))
-	_ = wasi.NewEnvironment().Register(store)
+	_ = wasi.RegisterAPI(store)
 	return store
 }

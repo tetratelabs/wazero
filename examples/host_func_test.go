@@ -55,7 +55,7 @@ func Test_hostFunc(t *testing.T) {
 	err = store.AddHostFunction("env", "get_random_string", reflect.ValueOf(getRandomString))
 	require.NoError(t, err)
 
-	err = wasi.NewEnvironment().Register(store)
+	err = wasi.RegisterAPI(store)
 	require.NoError(t, err)
 
 	err = store.Instantiate(mod, "test")

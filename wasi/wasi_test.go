@@ -15,37 +15,57 @@ import (
 	"github.com/tetratelabs/wazero/wasm/text"
 )
 
-func TestNewWasiStringArray(t *testing.T) {
+func TestNewNullTerminatedStrings(t *testing.T) {
+	emptyWASIStringArray := &nullTerminatedStrings{nullTerminatedValues: [][]byte{}}
 	tests := []struct {
-		name            string
-		args            []string
-		expectedBufSize uint32
+		name     string
+		input    []string
+		expected *nullTerminatedStrings
 	}{
 		{
-			name:            "nil args",
-			args:            nil,
-			expectedBufSize: 0,
+			name:     "nil",
+			expected: emptyWASIStringArray,
 		},
 		{
-			name:            "empty",
-			args:            []string{},
-			expectedBufSize: 0,
+			name:     "none",
+			input:    []string{},
+			expected: emptyWASIStringArray,
 		},
 		{
-			name:            "simple",
-			args:            []string{"foo", "bar", "foobar", "", "baz"},
-			expectedBufSize: 20,
+			name:  "two",
+			input: []string{"a", "bc"},
+			expected: &nullTerminatedStrings{
+				nullTerminatedValues: [][]byte{
+					{'a', 0},
+					{'b', 'c', 0},
+				},
+				totalBufSize: 5,
+			},
 		},
 		{
-			name: "utf-8 string",
+			name:  "two and empty string",
+			input: []string{"a", "", "bc"},
+			expected: &nullTerminatedStrings{
+				nullTerminatedValues: [][]byte{
+					{'a', 0},
+					{0},
+					{'b', 'c', 0},
+				},
+				totalBufSize: 6,
+			},
+		},
+		{
+			name: "utf-8",
 			// "😨", "🤣", and "️🏃‍♀️" have 4, 4, and 13 bytes respectively
-			args:            []string{"😨🤣🏃\u200d♀️", "foo", "bar"},
-			expectedBufSize: 30,
-		},
-		{
-			name:            "invalid utf-8 string",
-			args:            []string{"\xff\xfe\xfd", "foo", "bar"},
-			expectedBufSize: 12,
+			input: []string{"😨🤣🏃\u200d♀️", "foo", "bar"},
+			expected: &nullTerminatedStrings{
+				nullTerminatedValues: [][]byte{
+					[]byte("😨🤣🏃\u200d♀️\x00"),
+					{'f', 'o', 'o', 0},
+					{'b', 'a', 'r', 0},
+				},
+				totalBufSize: 30,
+			},
 		},
 	}
 
@@ -53,17 +73,131 @@ func TestNewWasiStringArray(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			wasiStringsArray, err := newWASIStringArray(tc.args)
+			s, err := newNullTerminatedStrings(100, tc.input...)
 			require.NoError(t, err)
-
-			require.Equal(t, tc.expectedBufSize, wasiStringsArray.totalBufSize)
-			require.Equal(t, len(wasiStringsArray.nullTerminatedValues), len(tc.args))
-			for i, arg := range tc.args {
-				wasiString := wasiStringsArray.nullTerminatedValues[i]
-				require.Equal(t, wasiString[0:len(wasiString)-1], []byte(arg))
-				require.Equal(t, wasiString[len(wasiString)-1], byte(0))
-			}
+			require.Equal(t, tc.expected, s)
 		})
+	}
+}
+
+func TestNewNullTerminatedStrings_Errors(t *testing.T) {
+	t.Run("invalid utf-8", func(t *testing.T) {
+		_, err := newNullTerminatedStrings(100, "\xff\xfe\xfd", "foo", "bar")
+		require.EqualError(t, err, "arg[0] is not a valid UTF-8 string")
+	})
+	t.Run("arg[0] too large", func(t *testing.T) {
+		_, err := newNullTerminatedStrings(1, "a", "bc")
+		require.EqualError(t, err, "arg[0] will exceed max buffer size 1")
+	})
+	t.Run("empty arg too large due to null terminator", func(t *testing.T) {
+		_, err := newNullTerminatedStrings(2, "a", "", "bc")
+		require.EqualError(t, err, "arg[1] will exceed max buffer size 2")
+	})
+}
+
+func TestNewAPI_Args(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		o, err := Args("a", "bc")
+		require.NoError(t, err)
+		a := newAPI(o)
+		require.Equal(t, &nullTerminatedStrings{
+			nullTerminatedValues: [][]byte{
+				{'a', 0},
+				{'b', 'c', 0},
+			},
+			totalBufSize: 5,
+		}, a.args)
+	})
+	t.Run("error constructing args", func(t *testing.T) {
+		_, err := Args("\xff\xfe\xfd", "foo", "bar")
+		require.EqualError(t, err, "arg[0] is not a valid UTF-8 string")
+	})
+}
+
+func TestApi_ArgsSizesGet(t *testing.T) {
+	ctx := context.Background()
+	args, err := Args("a", "bc")
+	require.NoError(t, err)
+
+	argc := uint32(1)        // arbitrary offset
+	argvBufSize := uint32(6) // arbitrary offset
+	maskLength := 11         // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                // argc is after this
+		0x2, 0x0, 0x0, 0x0, // little endian-encoded arg count
+		'?',                // argvBufSize is after this
+		0x5, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
+		'?', // stopped after encoding
+	} // tr
+	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
+
+	t.Run("API.ArgsSizesGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(ctx, store.Memories[0])
+
+		// invoke ArgsSizesGet directly and check the memory side-effects!
+		errno := wasiAPI.ArgsSizesGet(hContext, argc, argvBufSize)
+		require.Equal(t, ESUCCESS, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run("args_sizes_get", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(argc), uint64(argvBufSize))
+		require.NoError(t, err)
+		require.Equal(t, ESUCCESS, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestApi_ArgsGet(t *testing.T) {
+	ctx := context.Background()
+	args, err := Args("a", "bc")
+	require.NoError(t, err)
+
+	argv := uint32(7)    // arbitrary offset
+	argvBuf := uint32(1) // arbitrary offset
+	maskLength := 16     // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                 // argvBuf is after this
+		'a', 0, 'b', 'c', 0, // null terminated "a", "bc"
+		'?',        // argv is after this
+		1, 0, 0, 0, // little endian-encoded offset of "a"
+		3, 0, 0, 0, // little endian-encoded offset of "bc"
+		'?', // stopped after encoding
+	} // tr
+	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
+
+	t.Run("API.ArgsGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(ctx, store.Memories[0])
+
+		// invoke ArgsGet directly and check the memory side-effects!
+		errno := wasiAPI.ArgsGet(hContext, argv, argvBuf)
+		require.Equal(t, ESUCCESS, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run("args_get", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(argv), uint64(argvBuf))
+		require.NoError(t, err)
+		require.Equal(t, ESUCCESS, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+// maskMemory overwrites the first memory in the store with '?', so tests can see what's written.
+// As the memory can be very large, this only masks up to the given length.
+//
+// Note: WebAssembly 1.0 (MVP) can have only up to one memory, so which is unambiguous.
+func maskMemory(store *wasm.Store, maskLength int) {
+	for i := 0; i < maskLength; i++ {
+		store.Memories[0].Buffer[i] = '?'
 	}
 }
 
@@ -71,150 +205,39 @@ func TestNewWasiStringArray(t *testing.T) {
 //go:embed testdata/args.wat
 var argsWat []byte
 
-// clockWat is a wasm module to call clock_time_get.
-//go:embed testdata/clock.wat
-var clockWat []byte
-
-func TestArgsAPISucceed(t *testing.T) {
+func TestArgsSizesGet_Errors(t *testing.T) {
 	ctx := context.Background()
-	tests := []struct {
-		name            string
-		args            []string
-		expectedArgs    [][]byte
-		expectedBufSize uint32
-	}{
-		{
-			name:            "no args",
-			args:            nil,
-			expectedArgs:    [][]byte{},
-			expectedBufSize: 0,
-		},
-		{
-			name:            "empty",
-			args:            []string{},
-			expectedArgs:    [][]byte{},
-			expectedBufSize: 0,
-		},
-		{
-			name: "simple",
-			args: []string{"foo", "bar", "foobar", "", "baz"},
-			expectedArgs: [][]byte{
-				[]byte("foo\x00"),
-				[]byte("bar\x00"),
-				[]byte("foobar\x00"),
-				[]byte("\x00"),
-				[]byte("baz\x00"),
-			},
-			expectedBufSize: 20,
-		},
-		{
-			name: "utf-8 string",
-			// "😨", "🤣", and "️🏃‍♀️" have 4, 4, and 13 bytes respectively
-			args: []string{"😨🤣🏃\u200d♀️", "foo", "bar"},
-			expectedArgs: [][]byte{
-				[]byte("😨🤣🏃\u200d♀️\x00"),
-				[]byte("foo\x00"),
-				[]byte("bar\x00"),
-			},
-			expectedBufSize: 30,
-		},
-		{
-			name: "invalid utf-8 string",
-			args: []string{"\xff\xfe\xfd", "foo", "bar"},
-			expectedArgs: [][]byte{
-				[]byte("\xff\xfe\xfd\x00"),
-				[]byte("foo\x00"),
-				[]byte("bar\x00"),
-			},
-			expectedBufSize: 12,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			opts := []Option{}
-			if tc.args != nil {
-				argsOpt, err := Args(tc.args)
-				require.NoError(t, err)
-				opts = append(opts, argsOpt)
-			}
-			wasiEnv := NewEnvironment(opts...)
-			store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
-
-			// Serialize the expected result of args_size_get
-			argCountPtr := uint32(0)            // arbitrary valid address
-			expectedArgCount := make([]byte, 4) // size of uint32
-			binary.LittleEndian.PutUint32(expectedArgCount, uint32(len(tc.args)))
-			bufSizePtr := uint32(0x100)        // arbitrary valid address that doesn't overwrap with argCountPtr
-			expectedBufSize := make([]byte, 4) // size of uint32
-			binary.LittleEndian.PutUint32(expectedBufSize, tc.expectedBufSize)
-
-			// Compare them
-			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(argCountPtr), uint64(bufSizePtr))
-			require.NoError(t, err)
-			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is errno
-			require.Equal(t, expectedArgCount, store.Memories[0].Buffer[argCountPtr:argCountPtr+4])
-			require.Equal(t, expectedBufSize, store.Memories[0].Buffer[bufSizePtr:bufSizePtr+4])
-
-			// Serialize the expected result of args_get
-			expectedArgs := make([]byte, 4*len(tc.args)) // expected size of the pointers to the args. 4 is the size of uint32
-			argsPtr := uint32(0)                         // arbitrary valid address
-			expectedArgv := make([]byte, tc.expectedBufSize)
-			argvPtr := uint32(0x100) // arbitrary valid address that doesn't overwrap with argsPtr
-			argvWritten := uint32(0)
-			for i, arg := range tc.expectedArgs {
-				binary.LittleEndian.PutUint32(expectedArgs[argsPtr+uint32(i*4):], argvPtr+argvWritten) // 4 is the size of uint32
-				copy(expectedArgv[argvWritten:], arg)
-				argvWritten += uint32(len(arg))
-			}
-
-			// Compare them
-			ret, _, err = store.CallFunction(ctx, "test", "args_get", uint64(argsPtr), uint64(argvPtr))
-			require.NoError(t, err)
-			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is the returned errno
-			require.Equal(t, expectedArgs, store.Memories[0].Buffer[argsPtr:argsPtr+uint32(len(expectedArgs))])
-			require.Equal(t, expectedArgv, store.Memories[0].Buffer[argvPtr:argvPtr+uint32(len(expectedArgv))])
-		})
-	}
-}
-
-func TestArgsSizesGetReturnError(t *testing.T) {
-	ctx := context.Background()
-	dummyArgs := []string{"foo", "bar", "baz"}
-	argsOpt, err := Args(dummyArgs)
+	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	wasiEnv := NewEnvironment(argsOpt)
-	store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
+	store, _ := instantiateWasmStore(t, argsWat, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {
-		name           string
-		argsCountPtr   uint32
-		argsBufSizePtr uint32
+		name        string
+		argc        uint32
+		argvBufSize uint32
 	}{
 		{
-			name:           "out-of-memory argsCountPtr",
-			argsCountPtr:   memorySize,
-			argsBufSizePtr: validAddress,
+			name:        "out-of-memory argc",
+			argc:        memorySize,
+			argvBufSize: validAddress,
 		},
 		{
-			name:           "out-of-memory argsBufSizePtr",
-			argsCountPtr:   validAddress,
-			argsBufSizePtr: memorySize,
+			name:        "out-of-memory argvBufSize",
+			argc:        validAddress,
+			argvBufSize: memorySize,
 		},
 		{
-			name:           "argsCountPtr exceeds the maximum valid address by 1",
-			argsCountPtr:   memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
-			argsBufSizePtr: validAddress,
+			name:        "argc exceeds the maximum valid address by 1",
+			argc:        memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
+			argvBufSize: validAddress,
 		},
 		{
-			name:           "argsBufSizePtr exceeds the maximum valid size by 1",
-			argsCountPtr:   validAddress,
-			argsBufSizePtr: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
+			name:        "argvBufSize exceeds the maximum valid size by 1",
+			argc:        validAddress,
+			argvBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
 		},
 	}
 
@@ -222,51 +245,47 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(tc.argsCountPtr), uint64(tc.argsBufSizePtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(tc.argc), uint64(tc.argvBufSize))
 			require.NoError(t, err)
 			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
 
-func TestArgsGetAPIReturnError(t *testing.T) {
+func TestArgsGet_Error(t *testing.T) {
 	ctx := context.Background()
-	dummyArgs := []string{"foo", "bar", "baz"}
-	argsOpt, err := Args(dummyArgs)
+	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	wasiEnv := NewEnvironment(argsOpt)
-	store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
+	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
-	argsArray, err := newWASIStringArray(dummyArgs)
-	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		argsPtr    uint32
-		argsBufPtr uint32
+		name    string
+		argv    uint32
+		argvBuf uint32
 	}{
 		{
-			name:       "out-of-memory argsPtr",
-			argsPtr:    memorySize,
-			argsBufPtr: validAddress,
+			name:    "out-of-memory argv",
+			argv:    memorySize,
+			argvBuf: validAddress,
 		},
 		{
-			name:       "out-of-memory argsBufPtr",
-			argsPtr:    validAddress,
-			argsBufPtr: memorySize,
+			name:    "out-of-memory argvBuf",
+			argv:    validAddress,
+			argvBuf: memorySize,
 		},
 		{
-			name: "argsPtr exceeds the maximum valid address by 1",
+			name: "argv exceeds the maximum valid address by 1",
 			// 4*uint32(len(argsArray.nullTerminatedValues)) is the size of the result of the pointers to args, 4 is the size of uint32
-			argsPtr:    memorySize - 4*uint32(len(argsArray.nullTerminatedValues)) + 1,
-			argsBufPtr: validAddress,
+			argv:    memorySize - 4*uint32(len(wasiAPI.(*api).args.nullTerminatedValues)) + 1,
+			argvBuf: validAddress,
 		},
 		{
-			name:       "argsBufPtr exceeds the maximum valid address by 1",
-			argsPtr:    validAddress,
-			argsBufPtr: memorySize - argsArray.totalBufSize + 1,
+			name:    "argvBuf exceeds the maximum valid address by 1",
+			argv:    validAddress,
+			argvBuf: memorySize - wasiAPI.(*api).args.totalBufSize + 1,
 		},
 	}
 
@@ -274,31 +293,20 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(tc.argsPtr), uint64(tc.argsBufPtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(tc.argv), uint64(tc.argvBuf))
 			require.NoError(t, err)
 			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
 
-func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, wasiEnv *WASIEnvironment) *wasm.Store {
-	mod, err := text.DecodeModule(wat)
-	require.NoError(t, err)
-
-	store := wasm.NewStore(interpreter.NewEngine())
-	err = wasiEnv.Register(store)
-	require.NoError(t, err)
-
-	err = store.Instantiate(mod, moduleName)
-	require.NoError(t, err)
-
-	return store
-}
+// clockWat is a wasm module to call clock_time_get.
+//go:embed testdata/clock.wat
+var clockWat []byte
 
 func TestClockGetTime(t *testing.T) {
 	ctx := context.Background()
-	wasiEnv := NewEnvironment()
-	store := instantiateWasmStore(t, clockWat, "test", wasiEnv)
+	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
 
@@ -342,7 +350,7 @@ func TestClockGetTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wasiEnv.getTimeNanosFn = func() uint64 { return tt.timestampVal }
+			wasiAPI.(*api).getTimeNanosFn = func() uint64 { return tt.timestampVal }
 			ret, _, err := store.CallFunction(ctx, "test", "clock_time_get", uint64(0), uint64(0), uint64(tt.timestampPtr))
 			require.NoError(t, err)
 			errno := Errno(ret[0])
@@ -353,4 +361,18 @@ func TestClockGetTime(t *testing.T) {
 			}
 		})
 	}
+}
+
+func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, opts ...Option) (*wasm.Store, API) {
+	mod, err := text.DecodeModule(wat)
+	require.NoError(t, err)
+
+	store := wasm.NewStore(interpreter.NewEngine())
+	wasiAPI, err := registerAPI(store, opts...)
+	require.NoError(t, err)
+
+	err = store.Instantiate(mod, moduleName)
+	require.NoError(t, err)
+
+	return store, wasiAPI
 }

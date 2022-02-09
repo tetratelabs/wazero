@@ -24,7 +24,7 @@ func Test_fibonacci(t *testing.T) {
 	store := wasm.NewStore(interpreter.NewEngine())
 	require.NoError(t, err)
 
-	err = wasi.NewEnvironment().Register(store)
+	err = wasi.RegisterAPI(store)
 	require.NoError(t, err)
 
 	err = store.Instantiate(mod, "test")
