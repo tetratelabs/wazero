@@ -674,12 +674,12 @@ func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 
 // compileEq implements compiler.compileEq for the arm64 architecture.
 func (c *arm64Compiler) compileEq(o *wazeroir.OperationEq) error {
-	return c.emitEqOrNeq(true, o.Type)
+	return c.emitEqOrNe(true, o.Type)
 }
 
 // compileNe implements compiler.compileNe for the arm64 architecture.
 func (c *arm64Compiler) compileNe(o *wazeroir.OperationNe) error {
-	return c.emitEqOrNeq(false, o.Type)
+	return c.emitEqOrNe(false, o.Type)
 }
 
 // emitEqOrNe implements compiler.compileEq and compiler.compileNe for the arm64 architecture.
@@ -1024,7 +1024,7 @@ func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err er
 	return
 }
 
-// popValueOnRegister pops one value from the location stacks, ensures
+// popValueOnRegister pops one value from the location stack, ensures
 // that it is located on a register, and mark it unused.
 func (c *arm64Compiler) popValueOnRegister() (v *valueLocation, err error) {
 	v = c.locationStack.pop()

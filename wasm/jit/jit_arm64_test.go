@@ -401,6 +401,11 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(-1))},
 					} {
 						x1, x2 := values[0], values[1]
+						isEqz := kind == wazeroir.OperationKindEqz
+						if isEqz && (signedType == wazeroir.SignedTypeFloat32 || signedType == wazeroir.SignedTypeFloat64) {
+							// Eqz isn't defined for float.
+							t.Skip()
+						}
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 							env := newJITEnvironment()
 							compiler := env.requireNewCompiler(t)
@@ -417,22 +422,14 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
 									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
 								case wazeroir.SignedTypeFloat32:
-									if kind == wazeroir.OperationKindEqz {
-										// Eqz isn't defined for float32.
-										t.Skip()
-									}
 									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
 								case wazeroir.SignedTypeFloat64:
-									if kind == wazeroir.OperationKindEqz {
-										// Eqz isn't defined for float64.
-										t.Skip()
-									}
 									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
 								}
 								require.NoError(t, err)
 							}
 
-							if kind == wazeroir.OperationKindEqz {
+							if isEqz {
 								// Eqz only needs one value, so pop the top one (x2).
 								compiler.locationStack.pop()
 								require.Equal(t, uint64(1), compiler.locationStack.sp)
