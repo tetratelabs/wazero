@@ -254,7 +254,7 @@ func (c *arm64Compiler) emitPreamble() error {
 // Otherwise, we jump into the caller's return address (TODO).
 func (c *arm64Compiler) returnFunction() error {
 	// TODO: we don't support function calls yet.
-	// For now the following code just simply returns to Go code.
+	// For now the following code just returns to Go code.
 
 	// Since we return from the function, we need to decrement the callframe stack pointer, and write it back.
 	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
@@ -287,7 +287,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 			return err
 		}
 	} else {
-		// If the status == 0, we simply use zero register to store zero.
+		// If the status == 0, we use zero register to store zero.
 		if err := c.applyRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForEngine,
 			engineExitContextJITCallStatusCodeOffset, zeroRegister); err != nil {
 			return err
@@ -420,8 +420,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	}
 
 	if pickTarget.onRegister() {
-		// If the pick target is on a register, we simply copy the value
-		// to the pickedRegister.
+		// If the pick target is on a register, we copy the value to the pickedRegister.
 		var inst obj.As
 		switch pickTarget.registerType() {
 		case generalPurposeRegisterTypeInt:
@@ -485,7 +484,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 		return err
 	}
 
-	// If both of registers are zeros, this can be nop and simply push the zero register.
+	// If both of registers are zeros, this can be nop and push the zero register.
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
 		c.locationStack.pushValueOnRegister(zeroRegister)
 		return nil
