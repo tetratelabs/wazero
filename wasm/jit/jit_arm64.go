@@ -419,8 +419,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		return err
 	}
 
-	if pickTarget.onRegister() {
-		// If the pick target is on a register, we copy the value to the pickedRegister.
+	if pickTarget.onRegister() { // Copy the value to the pickedRegister.
 		var inst obj.As
 		switch pickTarget.registerType() {
 		case generalPurposeRegisterTypeInt:
@@ -1080,8 +1079,9 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 	return
 }
 
-// releaseAllRegistersToStack adds instructions to store all the values located on either general purpuse or conditional
-// registers onto the memory stack.
+// releaseAllRegistersToStack adds instructions to store all the values located on
+// either general purpuse or conditional registers onto the memory stack.
+// See releaseRegisterToStack.
 func (c *arm64Compiler) releaseAllRegistersToStack() error {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
