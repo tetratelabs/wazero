@@ -1005,13 +1005,7 @@ func (c *arm64Compiler) loadConditionalRegisterToGeneralPurposeRegister(loc *val
 
 	// Use CSET instruction to set 1 on the register if the condition satisfies.
 	// https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
-	getFlag := c.newProg()
-	getFlag.As = arm64.ACSET
-	getFlag.To.Reg = reg
-	getFlag.To.Type = obj.TYPE_REG
-	getFlag.From.Type = obj.TYPE_REG
-	getFlag.From.Reg = int16(loc.conditionalRegister)
-	c.addInstruction(getFlag)
+	c.applyRegisterToRegisterInstruction(arm64.ACSET, int16(loc.conditionalRegister), reg)
 
 	// Record that now the value is located on a general purpose register.
 	loc.setRegister(reg)
