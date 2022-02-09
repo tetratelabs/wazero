@@ -448,7 +448,7 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 							compiler.loadConditionalRegisterToGeneralPurposeRegister(resultLocation)
 							require.True(t, resultLocation.onRegister())
 
-							// Release the value to the memory stack again to verify the operation, and then return.
+							// Release the value to the memory stack again to verify the operation.
 							compiler.releaseRegisterToStack(resultLocation)
 							compiler.returnFunction()
 
@@ -622,7 +622,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 								require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
 							}
 
-							// Release the value to the memory stack again to verify the operation, and then return.
+							// Release the value to the memory stack again to verify the operation.
 							compiler.releaseRegisterToStack(resultLocation)
 							compiler.returnFunction()
 
