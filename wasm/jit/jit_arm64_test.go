@@ -1077,7 +1077,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// Compile and execute the code under test.
-		// Note that we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
+		// Note: we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 		env.exec(code)
