@@ -1045,7 +1045,7 @@ func TestArm64Compiler_compileLabel(t *testing.T) {
 }
 
 func TestArm64Compiler_compileBr(t *testing.T) {
-	t.Run("return target", func(t *testing.T) {
+	t.Run("return", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 		err := compiler.emitPreamble()
@@ -1062,5 +1062,57 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		env.exec(code)
 
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+	t.Run("into previous label", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		// Emit code for previous label where we emit the expectedValue and then exit.
+		// Thefore, if we jmp into this label successfully, the const mustbe pushed onto the stack.
+		const expectedValue = 1000
+		targetLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
+		{
+			// We set a value location stack so that the label must not be skipped.
+			compiler.label(targetLabel.String()).initialStack = newValueLocationStack()
+			skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: targetLabel})
+			require.False(t, skip)
+			require.NoError(t, compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedValue}))
+			require.NoError(t, compiler.releaseAllRegistersToStack())
+			compiler.exit(jitCallStatusCodeReturned)
+		}
+
+		// Now emit the body. First we add NOP so that we can execute code after the target label.
+		nop := compiler.newProg()
+		nop.As = obj.ANOP
+		compiler.addInstruction(nop)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: targetLabel}})
+		require.NoError(t, err)
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// The generated code looks like this:
+		//
+		// targetLabel:
+		//    i32.const $expectedValue
+		//    exit jitCallStatusCodeReturned
+		// 	  nop
+		//    ... code from emitPreamble()
+		//    br .targetLabel
+		//
+		// Thefore, if we start executing from nop, we must end up exiting jitCallStatusCodeReturned.
+		env.exec(code[nop.Pc:])
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		// Also, the stack must end with one item, and that should be the expected value pushed by i32.const.
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, uint32(expectedValue), env.stackTopAsUint32())
+
+	})
+	t.Run("into next label", func(t *testing.T) {
+
 	})
 }
