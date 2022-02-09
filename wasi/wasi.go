@@ -18,16 +18,16 @@ import (
 
 // API is a documentation interface for WASI exported functions in version "wasi_snapshot_preview1"
 //
-// Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means the precise memory is always
-// wasm.Store Memories index zero: `store.Memories[0].Buffer`
+// Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means the wasm.HostFunctionCallContext
+// Memory is always the wasm.Store Memories index zero: `store.Memories[0].Buffer`
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 // See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
 type API interface {
 	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
 	//
-	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.MemoryInstance Buffer to
-	// write the corresponding sizes in uint32 little-endian encoding.
+	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
+	// Memory Buffer to write the corresponding sizes in uint32 little-endian encoding.
 	//
 	// * argc - is the offset to write the argument count to the wasm.MemoryInstance Buffer
 	// * argvBufSize - is the offset to write the null terminated argument length to the wasm.MemoryInstance Buffer
@@ -37,7 +37,7 @@ type API interface {
 	//		(func ($wasi_args_sizes_get (param $argc i32) (param $argv_buf_size i32) (result i32))
 	//
 	// For example, if Args are []string{"a","bc"} and
-	//   ArgsSizesGet parameters argc=1 and argvBufSize=6, we expect `store.Memories[0].Buffer` to contain:
+	//   ArgsSizesGet parameters argc=1 and argvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
 	//
 	//                    uint32         uint32
 	//                  +--------+     +--------+
@@ -55,20 +55,20 @@ type API interface {
 
 	// ArgsGet is a WASI function that reads command-line argument data (Args).
 	//
-	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.MemoryInstance Buffer to
-	// write offsets. These are encoded uint32 little-endian.
+	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
+	// Memory Buffer to write offsets. These are encoded uint32 little-endian.
 	//
 	// * argv - is the offset to begin writing argument offsets to the wasm.MemoryInstance
 	//   * ArgsSizesGet argc * 4 bytes are written to this offset
 	// * argvBuf - is the offset to write the null terminated arguments to the wasm.MemoryInstance
-	//   * ArgsSizesGet argv_buf_size are written to this offset
+	//   * ArgsSizesGet argv_buf_size bytes are written to this offset
 	//
 	// In WebAssembly 1.0 (MVP) Text format, this signature is:
 	//	(import "wasi_snapshot_preview1" "args_get"
 	//		(func ($wasi_args_get (param $argv i32) (param $argv_buf i32) (result i32))
 	//
 	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
-	//   and ArgsGet parameters argv=7 and argvBuf=1, we expect `store.Memories[0].Buffer` to contain:
+	//   and ArgsGet parameters argv=7 and argvBuf=1, we expect `ctx.Memory.Buffer` to contain:
 	//
 	//               argvBufSize                argc * 4
 	//            +----------------+     +--------------------+
