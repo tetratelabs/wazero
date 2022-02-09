@@ -459,7 +459,7 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge(t *testing.T) {
 							// Run code.
 							env.exec(code)
 
-							// Check the stack.
+							// There should only be one value on the stack
 							require.Equal(t, uint64(1), env.stackPointer())
 
 							switch kind {

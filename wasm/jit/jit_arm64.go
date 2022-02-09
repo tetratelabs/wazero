@@ -217,6 +217,7 @@ func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, s
 
 func (c *arm64Compiler) String() (ret string) { return }
 
+// pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
 func (c *arm64Compiler) pushFunctionParams() {
 	if c.f != nil && c.f.FunctionType != nil {
 		for _, t := range c.f.FunctionType.Type.Params {
