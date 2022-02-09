@@ -485,7 +485,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	c.addInstruction(jmpWithCond)
 
 	// Emit the code for branching into else branch.
-	// We save and clone the location stack so that we might end up modifying it inside of branchInto,
+	// We save and clone the location stack because we might end up modifying it inside of branchInto,
 	// and we have to avoid affecting the code generation for Then branch afterwards.
 	saved := c.locationStack
 	c.replaceLocationStack(saved.clone())
