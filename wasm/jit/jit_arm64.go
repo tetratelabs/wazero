@@ -68,15 +68,47 @@ type arm64Compiler struct {
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
+	// labels holds per wazeroir label specific informationsin this function.
+	labels map[string]*labelInfo
+	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
+	maxStackPointer uint64
 }
 
 // compile implements compiler.compile for the arm64 architecture.
 func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
+	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack(s)
+	// used for all labels (via replaceLocationStack), excluding the current one.
+	// Hence, we check here if the final block's max one exceeds the current c.maxStackPointer.
+	maxStackPointer = c.maxStackPointer
+	if maxStackPointer < c.locationStack.maxStackPointer {
+		maxStackPointer = c.locationStack.maxStackPointer
+	}
+
 	code, err = mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
 		return
 	}
 	return
+}
+
+type labelInfo struct {
+	// callers is the number of call sites which may jump into this label.
+	callers int
+	// initialInstruction is the initial instruction for this label so other block can jump into it.
+	initialInstruction *obj.Prog
+	// initialStack is the initial value location stack from which we start compiling this label.
+	initialStack *valueLocationStack
+	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
+	labelBeginningCallbacks []func(*obj.Prog)
+}
+
+func (c *arm64Compiler) label(labelKey string) *labelInfo {
+	ret, ok := c.labels[labelKey]
+	if ok {
+		return ret
+	}
+	c.labels[labelKey] = &labelInfo{}
+	return c.labels[labelKey]
 }
 
 func (c *arm64Compiler) newProg() (inst *obj.Prog) {
@@ -217,6 +249,14 @@ func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, s
 	c.addInstruction(inst)
 }
 
+func (c *arm64Compiler) emitUnconditionalJumpInstruction(targetType obj.AddrType) (jmp *obj.Prog) {
+	jmp = c.newProg()
+	jmp.As = obj.AJMP
+	jmp.To.Type = targetType
+	c.addInstruction(jmp)
+	return
+}
+
 func (c *arm64Compiler) String() (ret string) { return }
 
 // pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
@@ -314,7 +354,45 @@ func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 	return errors.New("TODO: implement compileHostFunction on arm64")
 }
 
+// replaceLocationStack sets the given valueLocationStack to .locationStack field,
+// while allowing us to track valueLocationStack.maxStackPointer across multiple stacks.
+// This is called when we branch into different block.
+func (c *arm64Compiler) replaceLocationStack(newStack *valueLocationStack) {
+	if c.maxStackPointer < c.locationStack.maxStackPointer {
+		c.maxStackPointer = c.locationStack.maxStackPointer
+	}
+	c.locationStack = newStack
+}
+
+// arm64Compiler implements compiler.arm64Compiler for the arm64 architecture.
 func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool) {
+	labelKey := o.Label.String()
+	labelInfo := c.label(labelKey)
+
+	// If initialStack is not set, that means this label has never been reached.
+	if labelInfo.initialStack == nil {
+		skipThisLabel = true
+		return
+	}
+
+	// We use NOP as a beginning of instructions in a label.
+	// This should be eventually optimized out by assembler.
+	labelBegin := c.newProg()
+	labelBegin.As = obj.ANOP
+	c.addInstruction(labelBegin)
+
+	// Save the instructions so that backward branching
+	// instructions can jump to this label.
+	labelInfo.initialInstruction = labelBegin
+
+	// Set the initial stack.
+	c.replaceLocationStack(labelInfo.initialStack)
+
+	// Invoke callbacks to notify the forward branching
+	// instructions can properly jump to this label.
+	for _, cb := range labelInfo.labelBeginningCallbacks {
+		cb(labelBegin)
+	}
 	return false
 }
 
@@ -336,10 +414,44 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 
 // compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
 	if o.Target.IsReturnTarget() {
 		return c.returnFunction()
 	} else {
-		return fmt.Errorf("TODO: only return target is available on arm64")
+		labelKey := o.Target.String()
+		targetLabel := c.label(labelKey)
+		if targetLabel.callers > 1 {
+			// If the number of callers to the target label is larget than one,
+			// we have multiple origins to the target branch. In that case,
+			// we must have unique register state.
+			if err := c.releaseAllRegistersToStack(); err != nil {
+				return err
+			}
+		}
+		// Set the initial stack of the target label, so we can start compiling the label
+		// with the appropriate value locations. Note we clone the stack here as we maybe
+		// manipulate the stack before compiler reaches the label.
+		if targetLabel.initialStack == nil {
+			targetLabel.initialStack = c.locationStack.clone()
+		}
+
+		jmp := c.emitUnconditionalJumpInstruction(obj.TYPE_BRANCH)
+		c.assignJumpTarget(labelKey, jmp)
+	}
+	return nil
+}
+
+func (c *arm64Compiler) assignJumpTarget(labelKey string, jmp *obj.Prog) {
+	target := c.label(labelKey)
+	if target.initialInstruction != nil {
+		jmp.To.SetTarget(target.initialInstruction)
+	} else {
+		// This case, the target label hasn't been compilde yet, so we append the callback and assign
+		// the target instruction when compileLabel is called for the label.
+		target.labelBeginningCallbacks = append(target.labelBeginningCallbacks, func(labelInitialInstruction *obj.Prog) {
+			jmp.To.SetTarget(labelInitialInstruction)
+		})
 	}
 }
 

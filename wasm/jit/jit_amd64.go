@@ -524,9 +524,7 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 // branchInto adds instruction necessary to jump into the given branch target.
 func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 	if target.IsReturnTarget() {
-		if err := c.returnFunction(); err != nil {
-			return err
-		}
+		return c.returnFunction()
 	} else {
 		labelKey := target.String()
 		targetLabel := c.label(labelKey)
