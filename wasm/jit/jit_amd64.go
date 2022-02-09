@@ -666,9 +666,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		return err
 	}
 	if thenTarget.Target.IsReturnTarget() {
-		if err := c.returnFunction(); err != nil {
-			return err
-		}
+		return c.returnFunction()
 	} else {
 		thenLabelKey := thenTarget.Target.Label.String()
 		labelInfo := c.label(thenLabelKey)
@@ -688,8 +686,8 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		thenJmp.To.Type = obj.TYPE_BRANCH
 		c.addInstruction(thenJmp)
 		c.assignJumpTarget(thenLabelKey, thenJmp)
+		return nil
 	}
-	return nil
 }
 
 // compileBrTable implements compiler.compileBrTable for the amd64 architecture.

@@ -71,6 +71,9 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 type arm64Compiler struct {
 	builder *asm.Builder
 	f       *wasm.FunctionInstance
+	// setJmpTargetOnNextInstructions holds jmp kind instructions where we want to set the next coming
+	// instruction as the destination of these jmp instructions.
+	setJmpTargetOnNextInstructions []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
@@ -119,11 +122,19 @@ func (c *arm64Compiler) label(labelKey string) *labelInfo {
 
 func (c *arm64Compiler) newProg() (inst *obj.Prog) {
 	inst = c.builder.NewProg()
+	for _, origin := range c.setJmpTargetOnNextInstructions {
+		origin.To.SetTarget(inst)
+	}
+	c.setJmpTargetOnNextInstructions = nil
 	return
 }
 
 func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 	c.builder.AddInstruction(inst)
+}
+
+func (c *arm64Compiler) setJmpTargetOnNext(progs ...*obj.Prog) {
+	c.setJmpTargetOnNextInstructions = append(c.setJmpTargetOnNextInstructions, progs...)
 }
 
 func (c *arm64Compiler) markRegisterUsed(reg int16) {
@@ -421,11 +432,84 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 // compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+	return c.branchInto(o.Target)
+}
 
-	if o.Target.IsReturnTarget() {
+func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
+	cond := c.locationStack.pop()
+
+	jmpWithCond := c.newProg()
+	jmpWithCond.To.Type = obj.TYPE_BRANCH
+	if cond.onConditionalRegister() {
+		switch cond.conditionalRegister {
+		case arm64.COND_EQ:
+			jmpWithCond.As = arm64.ABEQ
+		case arm64.COND_NE:
+			jmpWithCond.As = arm64.ABNE
+		case arm64.COND_HS:
+			jmpWithCond.As = arm64.ABHS
+		case arm64.COND_LO:
+			jmpWithCond.As = arm64.ABLO
+		case arm64.COND_MI:
+			jmpWithCond.As = arm64.ABMI
+		case arm64.COND_HI:
+			jmpWithCond.As = arm64.ABHI
+		case arm64.COND_LS:
+			jmpWithCond.As = arm64.ABLS
+		case arm64.COND_GE:
+			jmpWithCond.As = arm64.ABGE
+		case arm64.COND_LT:
+			jmpWithCond.As = arm64.ABLT
+		case arm64.COND_GT:
+			jmpWithCond.As = arm64.ABGT
+		case arm64.COND_LE:
+			jmpWithCond.As = arm64.ABLE
+		default:
+			// This means that we use the cond.conditionalRegister somewhere in this file,
+			// but not covered in switch ^. That shouldn't happen.
+			return fmt.Errorf("unsupported condition for br_if: %v", cond.conditionalRegister)
+		}
+	} else {
+		// If the value is not on the conditional register, we compare the value with the zero register,
+		// and then do the conditional jump if the value does't equal zero.
+		if err := c.ensureOnGeneralPurposeRegister(cond); err != nil {
+			return err
+		}
+		// Compare the value with zero register. Note that the value is ensured to be i32 by function validation phase,
+		// so we use CMPW (32-bit compare) here.
+		c.applyTwoRegistersToNoneInstruction(arm64.ACMPW, cond.register, zeroRegister)
+		jmpWithCond.As = arm64.ABNE
+	}
+
+	c.addInstruction(jmpWithCond)
+
+	// Emit the code for branching into else branch.
+	// We save and clone the location stack so that we might end up modifying it inside of branchInto,
+	// and we have to avoid affecting the code generation for Then branch afterwards.
+	saved := c.locationStack
+	c.replaceLocationStack(saved.clone())
+	if err := c.emitDropRange(o.Else.ToDrop); err != nil {
+		return err
+	}
+	c.branchInto(o.Else.Target)
+
+	// Now ready to emit the code for branching into then branch.
+	// Retrieve the original value location stack so that the code below wont'be affected by the Else branch ^^.
+	c.replaceLocationStack(saved)
+	// We jump here from the original conditinoal jump (jmpWithCond).
+	c.setJmpTargetOnNext(jmpWithCond)
+	if err := c.emitDropRange(o.Then.ToDrop); err != nil {
+		return err
+	}
+	c.branchInto(o.Then.Target)
+	return nil
+}
+
+func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
+	if target.IsReturnTarget() {
 		return c.returnFunction()
 	} else {
-		labelKey := o.Target.String()
+		labelKey := target.String()
 		targetLabel := c.label(labelKey)
 		if targetLabel.callers > 1 {
 			// If the number of callers to the target label is larger than one,
@@ -461,10 +545,6 @@ func (c *arm64Compiler) assignJumpTarget(labelKey string, jmp *obj.Prog) {
 	}
 }
 
-func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
-}
-
 func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
@@ -479,7 +559,10 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	r := o.Range
+	return c.emitDropRange(o.Range)
+}
+
+func (c *arm64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	if r == nil {
 		return nil
 	} else if r.Start == 0 {
