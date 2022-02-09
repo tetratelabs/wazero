@@ -1037,9 +1037,30 @@ func TestArm64Compiler_compileLabel(t *testing.T) {
 				compiler.labels[labelKey].initialStack = newValueLocationStack()
 				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
 				require.False(t, actual)
-				// Also, callback must not be called.
+				// Also, callback must be called.
 				require.True(t, callBackCalled)
 			}
 		})
 	}
+}
+
+func TestArm64Compiler_compileBr(t *testing.T) {
+	t.Run("return target", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: nil}})
+		require.NoError(t, err)
+
+		// Compile and execute the code under test.
+		// Note that we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
 }
