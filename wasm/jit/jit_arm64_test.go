@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -22,6 +23,7 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	require.NoError(t, err)
 	ret, ok := cmp.(*arm64Compiler)
 	require.True(t, ok)
+	ret.labels = make(map[string]*labelInfo)
 	return ret
 }
 
@@ -1007,4 +1009,37 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestArm64Compiler_compileLabel(t *testing.T) {
+	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
+	labelKey := label.String()
+	for _, expectSkip := range []bool{false, true} {
+		expectSkip := expectSkip
+		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+
+			var callBackCalled bool
+			compiler.labels[labelKey] = &labelInfo{
+				labelBeginningCallbacks: []func(*obj.Prog){func(p *obj.Prog) { callBackCalled = true }},
+			}
+
+			if expectSkip {
+				// If the initial stack is not set, compileLabel must return skip=true.
+				compiler.labels[labelKey].initialStack = nil
+				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				require.True(t, actual)
+				// Also, callback must not be called.
+				require.False(t, callBackCalled)
+			} else {
+				// If the initial stack is not set, compileLabel must return skip=false.
+				compiler.labels[labelKey].initialStack = newValueLocationStack()
+				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				require.False(t, actual)
+				// Also, callback must not be called.
+				require.True(t, callBackCalled)
+			}
+		})
+	}
 }

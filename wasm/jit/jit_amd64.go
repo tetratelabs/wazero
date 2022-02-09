@@ -529,7 +529,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		labelKey := target.String()
 		targetLabel := c.label(labelKey)
 		if targetLabel.callers > 1 {
-			// If the number of callers to the target label is larget than one,
+			// If the number of callers to the target label is larger than one,
 			// we have multiple origins to the target branch. In that case,
 			// we must have unique register state.
 			if err := c.preLabelJumpRegisterAdjustment(); err != nil {
