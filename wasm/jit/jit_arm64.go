@@ -396,7 +396,7 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 		if err := c.ensureOnGeneralPurposeRegister(live); err != nil {
 			return err
 		}
-		// Modify the stack location by pushing onto the location stack.
+		// Update the runtime memory stack location by pushing onto the location stack.
 		c.locationStack.push(live)
 	}
 	return nil
