@@ -44,7 +44,7 @@ All the functions are statically analyzed at module instantiation phase, and if 
 ### Number of globals in a module
 
 Theoretically, a module can declare globals (including imports) up to 2^32 times. However, wazero limits this to  2^27(134,217,728) per module.
-That is because internally we store globals in a slice with pointer types (meaning 8 bytes on 64-bit platforms), and thefore 2^27 globals
+That is because internally we store globals in a slice with pointer types (meaning 8 bytes on 64-bit platforms), and Therefore 2^27 globals
 means that we have 1 GiB size of slice which seems large enough for most applications.
 
 ## JIT engine implementation

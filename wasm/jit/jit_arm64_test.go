@@ -1119,7 +1119,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		//    br .backwardLabel
 		//    exit jitCallStatusCodeUnreachable
 		//
-		// Thefore, if we start executing from nop, we must end up exiting jitCallStatusCodeReturned.
+		// Therefore, if we start executing from nop, we must end up exiting jitCallStatusCodeReturned.
 		env.exec(code[nop.Pc:])
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
@@ -1152,7 +1152,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		// .forwardLabel:
 		//    exit jitCallStatusCodeReturned
 		//
-		// Thefore, if we start executing from the top, we must end up exiting jitCallStatusCodeReturned.
+		// Therefore, if we start executing from the top, we must end up exiting jitCallStatusCodeReturned.
 		env.exec(code)
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
@@ -1337,7 +1337,7 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 					// .else:
 					//    exit $elseLabelExitStatus
 					//
-					// Thefore, if we start executing from the top, we must end up exiting with an appropriate status.
+					// Therefore, if we start executing from the top, we must end up exiting with an appropriate status.
 					env.exec(code)
 					require.NotEqual(t, unreachableStatus, env.jitStatus())
 					if shouldGoToElse {

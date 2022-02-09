@@ -6389,7 +6389,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		compiler.addInstruction(ret)
 
 		// This could be the read instruction target as this is the
-		// right after RET. Thefore, the jmp instruction above
+		// right after RET. Therefore, the jmp instruction above
 		// must target here.
 		const expectedReturnValue uint32 = 10000
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})

@@ -499,7 +499,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// Now ready to emit the code for branching into then branch.
 	// Retrieve the original value location stack so that the code below wont'be affected by the Else branch ^^.
 	c.replaceLocationStack(saved)
-	// We jump here from the original conditinoal jump (jmpWithCond).
+	// We jump here from the original conditional jump (jmpWithCond).
 	c.setJmpTargetOnNext(jmpWithCond)
 	if err := c.emitDropRange(o.Then.ToDrop); err != nil {
 		return err
@@ -541,7 +541,7 @@ func (c *arm64Compiler) assignJumpTarget(labelKey string, jmp *obj.Prog) {
 	if target.initialInstruction != nil {
 		jmp.To.SetTarget(target.initialInstruction)
 	} else {
-		// This case, the target label hasn't been compilde yet, so we append the callback and assign
+		// This case, the target label hasn't been compiled yet, so we append the callback and assign
 		// the target instruction when compileLabel is called for the label.
 		target.labelBeginningCallbacks = append(target.labelBeginningCallbacks, func(labelInitialInstruction *obj.Prog) {
 			jmp.To.SetTarget(labelInitialInstruction)
