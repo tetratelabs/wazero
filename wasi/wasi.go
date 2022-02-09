@@ -15,6 +15,75 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+// Api is a documentation interface for WASI exported functions in version "wasi_snapshot_preview1"
+//
+// Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means the precise memory is always
+// wasm.Store Memories index zero: `store.Memories[0].Buffer`
+//
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
+// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
+type Api interface {
+	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
+	//
+	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.MemoryInstance Buffer to
+	// write the corresponding sizes in uint32 little-endian encoding.
+	//
+	// * argc - is the offset to write the argument count to the wasm.MemoryInstance Buffer
+	// * argvBufSize - is the offset to write the null terminated argument length to the wasm.MemoryInstance Buffer
+	//
+	// In WebAssembly 1.0 (MVP) Text format, this signature is:
+	//	(import "wasi_snapshot_preview1" "args_sizes_get"
+	//		(func ($wasi_args_sizes_get (param $argc i32) (param $argv_buf_size i32) (result i32))
+	//
+	// For example, if Args are []string{"a","bc"} and
+	//   FunctionArgsSizesGet parameters argc=1 and argvBufSize=6, we expect `store.Memories[0].Buffer` to contain:
+	//
+	//             uint32         uint32
+	//           +--------+     +--------+
+	//           |        |     |        |
+	// []byte{?, 0, 0, 0, 2, ?, 0, 0, 0, 5, ?}
+	//    argc --^        ^     ^        ^
+	//           2 args --+     |        |
+	//            argvBufSize --+        |
+	//     len([]byte{'a',0,'b',c',0}) --+
+	//
+	// See ArgsGet
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
+	// See https://en.wikipedia.org/wiki/Null-terminated_string
+	ArgsSizesGet(ctx *wasm.HostFunctionCallContext, argc, argvBufSize uint32) Errno
+
+	// ArgsGet is a WASI function that reads command-line argument data (Args).
+	//
+	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.MemoryInstance Buffer to
+	// write offsets. These are encoded uint32 little-endian.
+	//
+	// * argv - is the offset to begin writing argument offsets to the wasm.MemoryInstance
+	//   * FunctionArgsSizesGet argc * 4 bytes are written to this offset
+	// * argvBuf - is the offset to write the null terminated arguments to the wasm.MemoryInstance
+	//   * FunctionArgsSizesGet argv_buf_size are written to this offset
+	//
+	// In WebAssembly 1.0 (MVP) Text format, this signature is:
+	//	(import "wasi_snapshot_preview1" "args_get"
+	//		(func ($wasi_args_get (param $argv i32) (param $argv_buf i32) (result i32))
+	//
+	// For example, if FunctionArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
+	//   and FunctionArgsGet parameters argv=6 and argvBuf=1, we expect `store.Memories[0].Buffer` to contain:
+	//
+	//               argvBufSize                argc * 4
+	//            +----------------+     +--------------------+
+	//            |                |     |                    |
+	// []byte{?, 'a', 0, 'b', 'c', 0, ?, 0, 0, 0, 1, 0, 0, 0, 3, ?}
+	//  argvBuf --^                      ^        ^           ^
+	//                            argv --+        |           |
+	//                   offset that begins "a" --+           |
+	//                              offset that begins "bc" --+
+	//
+	// See ArgsSizesGet
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
+	// See https://en.wikipedia.org/wiki/Null-terminated_string
+	ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno
+}
+
 const (
 	wasiUnstableName         = "wasi_unstable"
 	wasiSnapshotPreview1Name = "wasi_snapshot_preview1"
@@ -78,11 +147,11 @@ func (w *WASIEnvironment) Register(store *wasm.Store) (err error) {
 		if err != nil {
 			return err
 		}
-		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(w.args_get))
+		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(w.ArgsGet))
 		if err != nil {
 			return err
 		}
-		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(w.args_sizes_get))
+		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(w.ArgsSizesGet))
 		if err != nil {
 			return err
 		}
@@ -158,8 +227,10 @@ func newWASIStringArray(args []string) (*wasiStringArray, error) {
 	return &wasiStringArray{nullTerminatedValues: strings, totalBufSize: totalBufSize}, nil
 }
 
-// Args returns an option to give a command-line arguments to the WASIEnvironment.
-// Args returns an error if the length or the total size of the given string slice exceeds the max of uint32.
+// Args returns an option to give a command-line arguments to the WASIEnvironment or errs if the inputs are too large.
+//
+// Note: The only reason to set this is to control what's written by Api.ArgsSizesGet and Api.ArgsGet
+// Note: While similar in structure to os.Args, this controls what's visible in Wasm (ex the WASI function "_start").
 func Args(args []string) (Option, error) {
 	wasiStrings, err := newWASIStringArray(args)
 	if err != nil {
@@ -349,44 +420,28 @@ func (w *WASIEnvironment) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32)
 	return ESUCCESS
 }
 
-// args_sizes_get is a WASI API that returns the number of the command-line arguments and the total buffer size that
-// args_get API will require to store the value of the command-line arguments.
-// * argsCountPtr: a pointer to an address of uint32 type. The number of the command-line arguments is written there.
-// * argsBufSizePtr: a pointer to an address of uint32 type. The total size of the buffer that the command-line argument data requires is written there.
-//
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
-func (w *WASIEnvironment) args_sizes_get(ctx *wasm.HostFunctionCallContext, argsCountPtr uint32, argsBufSizePtr uint32) Errno {
-	if !ctx.Memory.PutUint32(argsCountPtr, uint32(len(w.args.nullTerminatedValues))) {
+// ArgsSizesGet implements Api.ArgsSizesGet
+func (w *WASIEnvironment) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, argc, argvBufSize uint32) Errno {
+	if !ctx.Memory.PutUint32(argc, uint32(len(w.args.nullTerminatedValues))) {
 		return EINVAL
 	}
-	if !ctx.Memory.PutUint32(argsBufSizePtr, w.args.totalBufSize) {
+	if !ctx.Memory.PutUint32(argvBufSize, w.args.totalBufSize) {
 		return EINVAL
 	}
 
 	return ESUCCESS
 }
 
-// args_get is a WASI API to read the command-line argument data.
-// * argsPtr:
-//     A pointer to a buffer. args_get writes multiple *C.char pointers in sequence there. In other words, this is an array of *char in C.
-//     Each *C.char of them points to a command-line argument that is a null-terminated string.
-//     The number of this *C.char matches the value that args_sizes_get returns in argsCountPtr.
-// * argsBufPtr:
-//     A pointer to a buffer. args_get writes the command line arguments as null-terminated strings in the given buffer.
-//     The total number of bytes written there is the value that args_sizes_get returns in argsBufSizePtr. The caller must ensure that
-//     the buffer has the enough size.
-//     Each *C.char pointer that can be obtained from argsPtr points to the beginning of each of these null-terminated strings.
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
-// See https://en.wikipedia.org/wiki/Null-terminated_string
-func (w *WASIEnvironment) args_get(ctx *wasm.HostFunctionCallContext, argsPtr uint32, argsBufPtr uint32) (err Errno) {
-	if !ctx.Memory.ValidateAddrRange(argsPtr, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
-		!ctx.Memory.ValidateAddrRange(argsBufPtr, uint64(w.args.totalBufSize)) {
+// ArgsGet implements Api.ArgsGet
+func (w *WASIEnvironment) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
+	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
+		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(w.args.totalBufSize)) {
 		return EINVAL
 	}
 	for _, arg := range w.args.nullTerminatedValues {
-		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argsPtr:], argsBufPtr)
-		argsPtr += 4 // size of uint32
-		argsBufPtr += uint32(copy(ctx.Memory.Buffer[argsBufPtr:], arg))
+		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argv:], argvBuf)
+		argv += 4 // size of uint32
+		argvBuf += uint32(copy(ctx.Memory.Buffer[argvBuf:], arg))
 	}
 
 	return ESUCCESS

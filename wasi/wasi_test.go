@@ -75,7 +75,7 @@ var argsWat []byte
 //go:embed testdata/clock.wat
 var clockWat []byte
 
-func TestArgsAPISucceed(t *testing.T) {
+func TestArgs(t *testing.T) {
 	ctx := context.Background()
 	tests := []struct {
 		name            string
@@ -134,7 +134,7 @@ func TestArgsAPISucceed(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			opts := []Option{}
+			var opts []Option
 			if tc.args != nil {
 				argsOpt, err := Args(tc.args)
 				require.NoError(t, err)
@@ -144,43 +144,43 @@ func TestArgsAPISucceed(t *testing.T) {
 			store := instantiateWasmStore(t, argsWat, "test", wasiEnv)
 
 			// Serialize the expected result of args_size_get
-			argCountPtr := uint32(0)            // arbitrary valid address
+			argc := uint32(0)                   // arbitrary valid address
 			expectedArgCount := make([]byte, 4) // size of uint32
 			binary.LittleEndian.PutUint32(expectedArgCount, uint32(len(tc.args)))
-			bufSizePtr := uint32(0x100)        // arbitrary valid address that doesn't overwrap with argCountPtr
+			argvBufSize := uint32(0x100)       // arbitrary valid address that doesn't overwrap with argc
 			expectedBufSize := make([]byte, 4) // size of uint32
 			binary.LittleEndian.PutUint32(expectedBufSize, tc.expectedBufSize)
 
 			// Compare them
-			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(argCountPtr), uint64(bufSizePtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(argc), uint64(argvBufSize))
 			require.NoError(t, err)
 			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is errno
-			require.Equal(t, expectedArgCount, store.Memories[0].Buffer[argCountPtr:argCountPtr+4])
-			require.Equal(t, expectedBufSize, store.Memories[0].Buffer[bufSizePtr:bufSizePtr+4])
+			require.Equal(t, expectedArgCount, store.Memories[0].Buffer[argc:argc+4])
+			require.Equal(t, expectedBufSize, store.Memories[0].Buffer[argvBufSize:argvBufSize+4])
 
 			// Serialize the expected result of args_get
 			expectedArgs := make([]byte, 4*len(tc.args)) // expected size of the pointers to the args. 4 is the size of uint32
-			argsPtr := uint32(0)                         // arbitrary valid address
+			argv := uint32(0)                            // arbitrary valid address
 			expectedArgv := make([]byte, tc.expectedBufSize)
-			argvPtr := uint32(0x100) // arbitrary valid address that doesn't overwrap with argsPtr
+			argvBuf := uint32(0x100) // arbitrary valid address that doesn't overwrap with argv
 			argvWritten := uint32(0)
 			for i, arg := range tc.expectedArgs {
-				binary.LittleEndian.PutUint32(expectedArgs[argsPtr+uint32(i*4):], argvPtr+argvWritten) // 4 is the size of uint32
+				binary.LittleEndian.PutUint32(expectedArgs[argv+uint32(i*4):], argvBuf+argvWritten) // 4 is the size of uint32
 				copy(expectedArgv[argvWritten:], arg)
 				argvWritten += uint32(len(arg))
 			}
 
 			// Compare them
-			ret, _, err = store.CallFunction(ctx, "test", "args_get", uint64(argsPtr), uint64(argvPtr))
+			ret, _, err = store.CallFunction(ctx, "test", "args_get", uint64(argv), uint64(argvBuf))
 			require.NoError(t, err)
 			require.Equal(t, uint64(ESUCCESS), ret[0]) // ret[0] is the returned errno
-			require.Equal(t, expectedArgs, store.Memories[0].Buffer[argsPtr:argsPtr+uint32(len(expectedArgs))])
-			require.Equal(t, expectedArgv, store.Memories[0].Buffer[argvPtr:argvPtr+uint32(len(expectedArgv))])
+			require.Equal(t, expectedArgs, store.Memories[0].Buffer[argv:argv+uint32(len(expectedArgs))])
+			require.Equal(t, expectedArgv, store.Memories[0].Buffer[argvBuf:argvBuf+uint32(len(expectedArgv))])
 		})
 	}
 }
 
-func TestArgsSizesGetReturnError(t *testing.T) {
+func TestArgsSizesGet_Errors(t *testing.T) {
 	ctx := context.Background()
 	dummyArgs := []string{"foo", "bar", "baz"}
 	argsOpt, err := Args(dummyArgs)
@@ -192,29 +192,29 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {
-		name           string
-		argsCountPtr   uint32
-		argsBufSizePtr uint32
+		name        string
+		argc        uint32
+		argvBufSize uint32
 	}{
 		{
-			name:           "out-of-memory argsCountPtr",
-			argsCountPtr:   memorySize,
-			argsBufSizePtr: validAddress,
+			name:        "out-of-memory argc",
+			argc:        memorySize,
+			argvBufSize: validAddress,
 		},
 		{
-			name:           "out-of-memory argsBufSizePtr",
-			argsCountPtr:   validAddress,
-			argsBufSizePtr: memorySize,
+			name:        "out-of-memory argvBufSize",
+			argc:        validAddress,
+			argvBufSize: memorySize,
 		},
 		{
-			name:           "argsCountPtr exceeds the maximum valid address by 1",
-			argsCountPtr:   memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
-			argsBufSizePtr: validAddress,
+			name:        "argc exceeds the maximum valid address by 1",
+			argc:        memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
+			argvBufSize: validAddress,
 		},
 		{
-			name:           "argsBufSizePtr exceeds the maximum valid size by 1",
-			argsCountPtr:   validAddress,
-			argsBufSizePtr: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
+			name:        "argvBufSize exceeds the maximum valid size by 1",
+			argc:        validAddress,
+			argvBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
 		},
 	}
 
@@ -222,14 +222,17 @@ func TestArgsSizesGetReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(tc.argsCountPtr), uint64(tc.argsBufSizePtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(tc.argc), uint64(tc.argvBufSize))
 			require.NoError(t, err)
 			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
 
-func TestArgsGetAPIReturnError(t *testing.T) {
+// ensure we've implemented the documentation interface
+var _ Api = NewEnvironment()
+
+func TestArgsGet_Error(t *testing.T) {
 	ctx := context.Background()
 	dummyArgs := []string{"foo", "bar", "baz"}
 	argsOpt, err := Args(dummyArgs)
@@ -243,30 +246,30 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		argsPtr    uint32
-		argsBufPtr uint32
+		name    string
+		argv    uint32
+		argvBuf uint32
 	}{
 		{
-			name:       "out-of-memory argsPtr",
-			argsPtr:    memorySize,
-			argsBufPtr: validAddress,
+			name:    "out-of-memory argv",
+			argv:    memorySize,
+			argvBuf: validAddress,
 		},
 		{
-			name:       "out-of-memory argsBufPtr",
-			argsPtr:    validAddress,
-			argsBufPtr: memorySize,
+			name:    "out-of-memory argvBuf",
+			argv:    validAddress,
+			argvBuf: memorySize,
 		},
 		{
-			name: "argsPtr exceeds the maximum valid address by 1",
+			name: "argv exceeds the maximum valid address by 1",
 			// 4*uint32(len(argsArray.nullTerminatedValues)) is the size of the result of the pointers to args, 4 is the size of uint32
-			argsPtr:    memorySize - 4*uint32(len(argsArray.nullTerminatedValues)) + 1,
-			argsBufPtr: validAddress,
+			argv:    memorySize - 4*uint32(len(argsArray.nullTerminatedValues)) + 1,
+			argvBuf: validAddress,
 		},
 		{
-			name:       "argsBufPtr exceeds the maximum valid address by 1",
-			argsPtr:    validAddress,
-			argsBufPtr: memorySize - argsArray.totalBufSize + 1,
+			name:    "argvBuf exceeds the maximum valid address by 1",
+			argv:    validAddress,
+			argvBuf: memorySize - argsArray.totalBufSize + 1,
 		},
 	}
 
@@ -274,7 +277,7 @@ func TestArgsGetAPIReturnError(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(tc.argsPtr), uint64(tc.argsBufPtr))
+			ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(tc.argv), uint64(tc.argvBuf))
 			require.NoError(t, err)
 			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
 		})
