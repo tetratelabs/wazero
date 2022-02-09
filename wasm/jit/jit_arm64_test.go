@@ -1193,14 +1193,14 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 			},
 		},
 		{
-			name: "LS",
+			name: "LE",
 			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
 				x1, x2 := uint32(1), uint32(2)
 				if shoulGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
-				// Le on signed integer produces the value on COND_LS register.
+				// Le on signed integer produces the value on COND_LE register.
 				err := compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32})
 				require.NoError(t, err)
 			},
