@@ -712,7 +712,25 @@ func (c *arm64Compiler) emitEqOrNeq(isEq bool, unsignedType wazeroir.UnsignedTyp
 }
 
 func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		inst = arm64.ACMPW
+	case wazeroir.UnsignedInt64:
+		inst = arm64.ACMP
+	}
+
+	c.applyTwoRegistersToNoneInstruction(inst, zeroRegister, x1.register)
+
+	// Push the comparison result as a conditional register value.
+	cond := conditionalRegisterState(arm64.COND_EQ)
+	c.locationStack.pushValueLocationOnConditionalRegister(cond)
+	return nil
 }
 
 // compileLt implements compiler.compileLt for the arm64 architecture.
@@ -995,18 +1013,27 @@ func (c *arm64Compiler) pushZeroValue() {
 // popTwoValuesOnRegisters pops two values from the location stacks, ensures
 // these two values are located on registers, and mark them unused.
 func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
-	x2 = c.locationStack.pop()
-	if err = c.ensureOnGeneralPurposeRegister(x2); err != nil {
+	x2, err = c.popValueOnRegister()
+	if err != nil {
 		return
 	}
 
-	x1 = c.locationStack.pop()
-	if err = c.ensureOnGeneralPurposeRegister(x1); err != nil {
+	x1, err = c.popValueOnRegister()
+	if err != nil {
+		return
+	}
+	return
+}
+
+// popValueOnRegisters pops one value from the location stacks, ensures
+// that it is located on a register, and mark it unused.
+func (c *arm64Compiler) popValueOnRegister() (v *valueLocation, err error) {
+	v = c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(v); err != nil {
 		return
 	}
 
-	c.markRegisterUnused(x1.register)
-	c.markRegisterUnused(x2.register)
+	c.markRegisterUnused(v.register)
 	return
 }
 
