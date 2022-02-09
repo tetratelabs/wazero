@@ -298,7 +298,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 
 			// Record that that top value is on top.
 			require.Len(t, compiler.locationStack.usedRegisters, 0)
-			loc := compiler.locationStack.pushValueOnStack()
+			loc := compiler.locationStack.pushValueLocationOnStack()
 			if tc.isFloat {
 				loc.setRegisterType(generalPurposeRegisterTypeFloat)
 			} else {
@@ -731,7 +731,7 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 		{
 			name: "float on stack",
 			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
-				pickTargetLocation := compiler.locationStack.pushValueOnStack()
+				pickTargetLocation := compiler.locationStack.pushValueLocationOnStack()
 				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeFloat)
 				eng.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
@@ -742,7 +742,7 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 		{
 			name: "int on stack",
 			pickTargetSetupFunc: func(compiler *arm64Compiler, eng *engine) error {
-				pickTargetLocation := compiler.locationStack.pushValueOnStack()
+				pickTargetLocation := compiler.locationStack.pushValueLocationOnStack()
 				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
 				eng.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
@@ -764,7 +764,7 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 			pickTargetLocation := compiler.locationStack.peek()
 
 			// Push the unused median value.
-			_ = compiler.locationStack.pushValueOnStack()
+			_ = compiler.locationStack.pushValueLocationOnStack()
 			require.Equal(t, uint64(2), compiler.locationStack.sp)
 
 			// Now ready to compile Pick operation.
@@ -815,7 +815,7 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		// Put existing contents on stack.
 		liveNum := 10
 		for i := 0; i < liveNum; i++ {
-			compiler.locationStack.pushValueOnStack()
+			compiler.locationStack.pushValueLocationOnStack()
 		}
 		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
 
@@ -851,7 +851,7 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 				err := compiler.compileConstI64(&wazeroir.OperationConstI64{Value: expectedTopLiveValue})
 				require.NoError(t, err)
 			} else {
-				compiler.locationStack.pushValueOnStack()
+				compiler.locationStack.pushValueLocationOnStack()
 			}
 		}
 		require.Equal(t, uint64(liveNum+dropTargetNum), compiler.locationStack.sp)
@@ -895,7 +895,7 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 
 		// Put existing contents except the top on stack
 		for i := 0; i < total-1; i++ {
-			loc := compiler.locationStack.pushValueOnStack()
+			loc := compiler.locationStack.pushValueLocationOnStack()
 			eng.valueStack[loc.stackPointer] = uint64(i) // Put the initial value.
 		}
 

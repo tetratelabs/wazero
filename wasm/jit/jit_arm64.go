@@ -225,7 +225,7 @@ func (c *arm64Compiler) pushFunctionParams() {
 		return
 	}
 	for _, t := range c.f.FunctionType.Type.Params {
-		loc := c.locationStack.pushValueOnStack()
+		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
 			loc.setRegisterType(generalPurposeRegisterTypeInt)
@@ -438,7 +438,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 
 	// Now we have the value of the target on the pickedRegister,
 	// so push the location.
-	c.locationStack.pushValueOnRegister(pickedRegister)
+	c.locationStack.pushValueLocationOnRegister(pickedRegister)
 	return nil
 }
 
@@ -451,10 +451,10 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 
 	// Additon can be nop if one of operands is zero.
 	if isZeroRegister(x1.register) {
-		c.locationStack.pushValueOnRegister(x2.register)
+		c.locationStack.pushValueLocationOnRegister(x2.register)
 		return nil
 	} else if isZeroRegister(x2.register) {
-		c.locationStack.pushValueOnRegister(x1.register)
+		c.locationStack.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -472,7 +472,7 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 
 	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
-	c.locationStack.pushValueOnRegister(x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -485,7 +485,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 
 	// If both of registers are zeros, this can be nop and push the zero register.
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
-		c.locationStack.pushValueOnRegister(zeroRegister)
+		c.locationStack.pushValueLocationOnRegister(zeroRegister)
 		return nil
 	}
 
@@ -509,7 +509,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	}
 
 	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
-	c.locationStack.pushValueOnRegister(destinationReg)
+	c.locationStack.pushValueLocationOnRegister(destinationReg)
 	return nil
 }
 
@@ -522,7 +522,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	// Multiplcation can be done by putting a zero register if one of operands is zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueOnRegister(zeroRegister)
+		c.locationStack.pushValueLocationOnRegister(zeroRegister)
 		return nil
 	}
 
@@ -540,7 +540,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	c.applyRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
-	c.locationStack.pushValueOnRegister(x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -717,7 +717,7 @@ func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
 	return nil
 }
 
@@ -754,7 +754,7 @@ func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
 	return nil
 }
 
@@ -791,7 +791,7 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
 	return nil
 }
 
@@ -828,7 +828,7 @@ func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	c.applyTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	c.locationStack.pushValueOnConditionalRegister(conditionalRegister)
+	c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegister)
 	return nil
 }
 
@@ -905,7 +905,7 @@ func (c *arm64Compiler) emitIntConstant(is32bit bool, value uint64) error {
 		}
 		c.applyConstToRegisterInstruction(inst, int64(value), reg)
 
-		c.locationStack.pushValueOnRegister(reg)
+		c.locationStack.pushValueLocationOnRegister(reg)
 	}
 	return nil
 }
@@ -953,12 +953,12 @@ func (c *arm64Compiler) emitFloatConstant(is32bit bool, value uint64) error {
 	}
 	c.applyRegisterToRegisterInstruction(inst, tmpReg, reg)
 
-	c.locationStack.pushValueOnRegister(reg)
+	c.locationStack.pushValueLocationOnRegister(reg)
 	return nil
 }
 
 func (c *arm64Compiler) pushZeroValue() {
-	c.locationStack.pushValueOnRegister(zeroRegister)
+	c.locationStack.pushValueLocationOnRegister(zeroRegister)
 }
 
 // popTwoValuesOnRegisters pops two values from the location stacks, ensures

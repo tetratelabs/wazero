@@ -33,12 +33,12 @@ func Test_isFloatRegister(t *testing.T) {
 func TestValueLocationStack_basic(t *testing.T) {
 	s := newValueLocationStack()
 	// Push stack value.
-	loc := s.pushValueOnStack()
+	loc := s.pushValueLocationOnStack()
 	require.Equal(t, uint64(1), s.sp)
 	require.Equal(t, uint64(0), loc.stackPointer)
 	// Push the register value.
 	tmpReg := unreservedGeneralPurposeIntRegisters[0]
-	loc = s.pushValueOnRegister(tmpReg)
+	loc = s.pushValueLocationOnRegister(tmpReg)
 	require.Equal(t, uint64(2), s.sp)
 	require.Equal(t, uint64(1), loc.stackPointer)
 	require.Equal(t, tmpReg, loc.register)
@@ -62,7 +62,7 @@ func TestValueLocationStack_basic(t *testing.T) {
 	}
 	// Check the max stack pointer.
 	for i := 0; i < 1000; i++ {
-		s.pushValueOnStack()
+		s.pushValueLocationOnStack()
 	}
 	for i := 0; i < 1000; i++ {
 		s.pop()

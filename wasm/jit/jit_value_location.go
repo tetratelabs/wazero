@@ -33,8 +33,7 @@ type valueLocation struct {
 	register int16
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
 	conditionalRegister conditionalRegisterState
-	// This is the location of this value in the (virtual) stack,
-	// even though if .register != nilRegister, the value is not written into memory yet.
+	// This is the location of this value in the memory stack at runtime,
 	stackPointer uint64
 }
 
@@ -82,8 +81,8 @@ func newValueLocationStack() *valueLocationStack {
 }
 
 // valueLocationStack represents the wazeroir virtual stack
-// where each item holds the information about where it exists
-// on the physical machine.
+// where each item holds the location information about where it exists
+// on the physical machine at runtime.
 // Notably this is only used in the compilation phase, not runtime,
 // and we change the state of this struct at every wazeroir operation we compile.
 // In this way, we can see where the operands of a operation (for example,
@@ -133,7 +132,9 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 	return ret
 }
 
-func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation) {
+// pushValueLocationOnRegister creates a new valueLocation with a given register and pushes onto
+// the location stack.
+func (s *valueLocationStack) pushValueLocationOnRegister(reg int16) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
 	if buildoptions.IsDebugMode {
 		if _, ok := s.usedRegisters[loc.register]; ok {
@@ -151,18 +152,22 @@ func (s *valueLocationStack) pushValueOnRegister(reg int16) (loc *valueLocation)
 	return
 }
 
-func (s *valueLocationStack) pushValueOnStack() (loc *valueLocation) {
+// pushValueLocationOnRegister creates a new valueLocation and pushes onto the location stack.
+func (s *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
 	loc = &valueLocation{register: nilRegister, conditionalRegister: conditionalRegisterStateUnset}
 	s.push(loc)
 	return
 }
 
-func (s *valueLocationStack) pushValueOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
+// pushValueLocationOnRegister creates a new valueLocation with a given conditional register state
+// and pushes onto the location stack.
+func (s *valueLocationStack) pushValueLocationOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
 	loc = &valueLocation{register: nilRegister, conditionalRegister: state}
 	s.push(loc)
 	return
 }
 
+// push pushes to a given valueLocation onto the stack.
 func (s *valueLocationStack) push(loc *valueLocation) {
 	loc.stackPointer = s.sp
 	if s.sp >= uint64(len(s.stack)) {
