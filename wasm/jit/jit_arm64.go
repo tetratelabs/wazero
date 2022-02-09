@@ -480,6 +480,8 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// so we use CMPW (32-bit compare) here.
 		c.applyTwoRegistersToNoneInstruction(arm64.ACMPW, cond.register, zeroRegister)
 		jmpWithCond.As = arm64.ABNE
+
+		c.markRegisterUnused(cond.register)
 	}
 
 	c.addInstruction(jmpWithCond)
