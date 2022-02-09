@@ -125,7 +125,7 @@ type amd64Compiler struct {
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
-	// labels holds per wazeroir label specific informationsin this function.
+	// labels hold per wazeroir label specific information in this function.
 	labels map[string]*labelInfo
 	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
 	maxStackPointer uint64
