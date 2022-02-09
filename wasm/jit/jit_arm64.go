@@ -435,6 +435,7 @@ func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	return c.branchInto(o.Target)
 }
 
+// compileBrIf implements compiler.compileBrIf for the arm64 architecture.
 func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	cond := c.locationStack.pop()
 
@@ -528,10 +529,11 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 
 		jmp := c.emitUnconditionalJumpInstruction(obj.TYPE_BRANCH)
 		c.assignJumpTarget(labelKey, jmp)
+		return nil
 	}
-	return nil
 }
 
+// assignJumpTarget assigns the given label's initial instruction to the destination of jmp.
 func (c *arm64Compiler) assignJumpTarget(labelKey string, jmp *obj.Prog) {
 	target := c.label(labelKey)
 	if target.initialInstruction != nil {
@@ -562,6 +564,7 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 	return c.emitDropRange(o.Range)
 }
 
+// emitDropRange is the implementation of compileDrop. See compiler.compileDrop.
 func (c *arm64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	if r == nil {
 		return nil
