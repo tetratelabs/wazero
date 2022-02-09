@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"os"
 	"testing"
 
 	"github.com/bytecodealliance/wasmtime-go"
@@ -29,9 +28,8 @@ var example = newExample()
 //go:embed testdata/example.wat
 var exampleText []byte
 
-// exampleBinary is derived from exampleText
-//go:embed testdata/example.wasm
-var exampleBinary []byte
+// exampleBinary is the exampleText encoded in the WebAssembly 1.0 binary format.
+var exampleBinary = binary.EncodeModule(example)
 
 func newExample() *wasm.Module {
 	three := wasm.Index(3)
@@ -93,11 +91,6 @@ func newExample() *wasm.Module {
 
 func TestExampleUpToDate(t *testing.T) {
 	ctx := context.Background()
-	encoded := binary.EncodeModule(example)
-	// This means we changed something. Overwrite the example wasm file rather than force maintainers to use hex editor!
-	if !bytes.Equal(encoded, exampleBinary) {
-		require.NoError(t, os.WriteFile("testdata/example.wasm", binary.EncodeModule(example), 0600))
-	}
 
 	t.Run("binary.DecodeModule", func(t *testing.T) {
 		m, err := binary.DecodeModule(exampleBinary)
