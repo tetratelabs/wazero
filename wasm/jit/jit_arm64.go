@@ -992,9 +992,11 @@ func (c *arm64Compiler) ensureOnGeneralPurposeRegister(loc *valueLocation) (err 
 }
 
 // maybeMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
-// if the value is located on a conditional register. This is usually called at the beginning of
-// arm64Compiler.compile* functions where we possibly emit istructions without saving the conditional
-// register value. The compile* functions without calling this function is saving the conditional
+// if the value is located on a conditional register.
+//
+// This is usually called at the beginning of arm64Compiler.compile* functions where we possibly
+// emit istructions without saving the conditional register value.
+// The compile* functions without calling this function is saving the conditional
 // value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
 func (c *arm64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() {
 	if c.locationStack.sp > 0 {
@@ -1004,12 +1006,17 @@ func (c *arm64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() {
 	}
 }
 
+// loadConditionalRegisterToGeneralPurposeRegister saves the conditional register placed value
+// to a general purpose register.
+//
+// We use CSET instruction to set 1 on the register if the condition satisfies:
+// https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
 func (c *arm64Compiler) loadConditionalRegisterToGeneralPurposeRegister(loc *valueLocation) {
+	// There must be always at least one free register at this point, as the conditional register located value
+	// is always pushed after consuming at least one value (eqz) or two values for most cases (gt, ge, etc.).
 	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	c.markRegisterUsed(reg)
 
-	// Use CSET instruction to set 1 on the register if the condition satisfies.
-	// https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
 	c.applyRegisterToRegisterInstruction(arm64.ACSET, int16(loc.conditionalRegister), reg)
 
 	// Record that now the value is located on a general purpose register.
