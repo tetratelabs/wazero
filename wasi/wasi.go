@@ -192,7 +192,6 @@ func Stderr(writer io.Writer) Option {
 
 // nullTerminatedStrings holds null-terminated strings. It ensures that
 // its length and total buffer size don't exceed the max of uint32.
-// Each string can have arbitrary byte values, not only utf-8 encoded text.
 // nullTerminatedStrings are convenience struct for args_get and environ_get. (environ_get is not implemented yet)
 //
 // A Null-terminated string is a byte string with a NULL suffix ("\x00").
