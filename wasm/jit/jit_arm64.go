@@ -333,8 +333,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 // compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
 	if o.Target.IsReturnTarget() {
-		c.returnFunction()
-		return nil
+		return c.returnFunction()
 	} else {
 		return fmt.Errorf("TODO: only return target is available on arm64")
 	}
@@ -372,12 +371,13 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 		return nil
 	}
 
+	// Below, we might end up moving a non-top value first which
+	// might result in changing the flag value.
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+
 	// Save the non-drop target values.
-	liveValues := make([]*valueLocation, r.Start)
-	for i := 0; i < r.Start; i++ {
-		live := c.locationStack.pop()
-		liveValues[i] = live
-	}
+	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start):]
+	c.locationStack.sp -= uint64(r.Start)
 
 	// Then mark all registers used by drop tragets unused.
 	for i := 0; i < r.End-r.Start+1; i++ {
@@ -386,8 +386,7 @@ func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
 		}
 	}
 
-	for i := range liveValues {
-		live := liveValues[len(liveValues)-1-i]
+	for _, live := range liveValues {
 		// If the value is on a memory, we have to move it to a register,
 		// otherwise the memory location is overriden by other values
 		// after this drop instructin.
