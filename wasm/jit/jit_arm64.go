@@ -217,6 +217,20 @@ func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, s
 
 func (c *arm64Compiler) String() (ret string) { return }
 
+func (c *arm64Compiler) pushFunctionParams() {
+	if c.f != nil && c.f.FunctionType != nil {
+		for _, t := range c.f.FunctionType.Type.Params {
+			loc := c.locationStack.pushValueOnStack()
+			switch t {
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
+				loc.setRegisterType(generalPurposeRegisterTypeInt)
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
+				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+			}
+		}
+	}
+}
+
 // emitPreamble implements compiler.emitPreamble for the arm64 architecture.
 func (c *arm64Compiler) emitPreamble() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
@@ -224,7 +238,7 @@ func (c *arm64Compiler) emitPreamble() error {
 	nop.As = obj.ANOP
 	c.addInstruction(nop)
 
-	// TODO: Push function parameter constants.
+	c.pushFunctionParams()
 
 	// Before excuting function body, we must initialize the stack base pointer register
 	// so that we can manipulate the memory stack properly.
