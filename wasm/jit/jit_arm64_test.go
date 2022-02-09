@@ -1063,18 +1063,18 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
-	t.Run("into previous label", func(t *testing.T) {
+	t.Run("backward br", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
-		// Emit code for previous label where we emit the expectedValue and then exit.
+		// Emit code for the backward label where we emit the expectedValue and then exit.
 		// Thefore, if we jmp into this label successfully, the const mustbe pushed onto the stack.
 		const expectedValue = 1000
-		targetLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
+		backwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
 		{
 			// We set a value location stack so that the label must not be skipped.
-			compiler.label(targetLabel.String()).initialStack = newValueLocationStack()
-			skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: targetLabel})
+			compiler.label(backwardLabel.String()).initialStack = newValueLocationStack()
+			skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: backwardLabel})
 			require.False(t, skip)
 			require.NoError(t, compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedValue}))
 			require.NoError(t, compiler.releaseAllRegistersToStack())
@@ -1089,7 +1089,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		err := compiler.emitPreamble()
 		require.NoError(t, err)
 
-		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: targetLabel}})
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: backwardLabel}})
 		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
@@ -1097,12 +1097,12 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 
 		// The generated code looks like this:
 		//
-		// targetLabel:
+		// backwardLabel:
 		//    i32.const $expectedValue
 		//    exit jitCallStatusCodeReturned
-		// 	  nop
+		//    nop
 		//    ... code from emitPreamble()
-		//    br .targetLabel
+		//    br .backwardLabel
 		//
 		// Thefore, if we start executing from nop, we must end up exiting jitCallStatusCodeReturned.
 		env.exec(code[nop.Pc:])
@@ -1110,9 +1110,50 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		// Also, the stack must end with one item, and that should be the expected value pushed by i32.const.
 		require.Equal(t, uint64(1), env.stackPointer())
 		require.Equal(t, uint32(expectedValue), env.stackTopAsUint32())
-
 	})
-	t.Run("into next label", func(t *testing.T) {
+	t.Run("forward br", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
 
+		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
+		forwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: forwardLabel}})
+		require.NoError(t, err)
+
+		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
+		compiler.exit(jitCallStatusCodeUnreachable)
+
+		// Emit code for the forward label where we emit the expectedValue and then exit.
+		const expectedValue = 1000
+		{
+			// We set a value location stack so that the label must not be skipped.
+			compiler.label(forwardLabel.String()).initialStack = newValueLocationStack()
+			skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: forwardLabel})
+			require.False(t, skip)
+			require.NoError(t, compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedValue}))
+			require.NoError(t, compiler.releaseAllRegistersToStack())
+			compiler.exit(jitCallStatusCodeReturned)
+		}
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// The generated code looks like this:
+		//
+		//    ... code from emitPreamble()
+		//    br .forwardLabel
+		//    exit jitCallStatusCodeUnreachable
+		// forwardLabel:
+		//    i32.const $expectedValue
+		//    exit jitCallStatusCodeReturned
+		//
+		// Thefore, if we start executing from the top, we must end up exiting jitCallStatusCodeReturned.
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		// Also, the stack must end with one item, and that should be the expected value pushed by i32.const.
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, uint32(expectedValue), env.stackTopAsUint32())
 	})
 }
