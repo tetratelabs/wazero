@@ -1075,6 +1075,24 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 	return
 }
 
+// releaseAllRegistersToStack adds instructions to store all the values located on either general purpuse or conditional
+// registers onto the memory stack.
+func (c *arm64Compiler) releaseAllRegistersToStack() error {
+	for i := uint64(0); i < c.locationStack.sp; i++ {
+		if loc := c.locationStack.stack[i]; loc.onRegister() {
+			if err := c.releaseRegisterToStack(loc); err != nil {
+				return err
+			}
+		} else if loc.onConditionalRegister() {
+			c.loadConditionalRegisterToGeneralPurposeRegister(loc)
+			if err := c.releaseRegisterToStack(loc); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
 func (c *arm64Compiler) releaseRegisterToStack(loc *valueLocation) (err error) {
 	var inst obj.As = arm64.AMOVD

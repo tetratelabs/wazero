@@ -887,14 +887,15 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 	})
 
 	t.Run("start from middle", func(t *testing.T) {
-		r := &wazeroir.InclusiveRange{Start: 2, End: 2}
-		liveNum := 2
+		r := &wazeroir.InclusiveRange{Start: 2, End: 3}
+		liveAboveDropStartNum := 3
 		dropTargetNum := r.End - r.Start + 1 // +1 as the range is inclusive!
-		liveAfterDropEndNum := 5
-		total := liveNum + dropTargetNum + liveAfterDropEndNum
-		liveTotal := liveNum + liveAfterDropEndNum
+		liveBelowDropEndNum := 5
+		total := liveAboveDropStartNum + dropTargetNum + liveBelowDropEndNum
+		liveTotal := liveAboveDropStartNum + liveBelowDropEndNum
 
 		env := newJITEnvironment()
+		eng := env.engine()
 		compiler := env.requireNewCompiler(t)
 
 		err := compiler.emitPreamble()
@@ -902,7 +903,8 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 
 		// Put existing contents except the top on stack
 		for i := 0; i < total-1; i++ {
-			compiler.locationStack.pushValueOnStack()
+			loc := compiler.locationStack.pushValueOnStack()
+			eng.valueStack[loc.stackPointer] = uint64(i) // Put the initial value.
 		}
 
 		// Place the top value.
@@ -918,11 +920,11 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		// After the drop operation, the stack contains only live contents.
 		require.Equal(t, uint64(liveTotal), compiler.locationStack.sp)
 		// Plus, the top value must stay on a register.
-		top := compiler.locationStack.peek()
-		require.True(t, top.onRegister())
-		// Release the top value after drop so that we can verify the cpu itself is not mainpulated.
-		compiler.releaseRegisterToStack(top)
+		require.True(t, compiler.locationStack.peek().onRegister())
 
+		// Release all register values so that we can verify the register allocated values.
+		err = compiler.releaseAllRegistersToStack()
+		require.NoError(t, err)
 		compiler.returnFunction()
 
 		code, _, _, err := compiler.compile()
@@ -931,6 +933,16 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		env.exec(code)
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 		require.Equal(t, uint64(liveTotal), env.stackPointer())
-		require.Equal(t, uint64(expectedTopLiveValue), env.stackTopAsUint64())
+
+		stack := env.stack()[:env.stackPointer()]
+		for i, val := range stack {
+			if i <= liveBelowDropEndNum {
+				require.Equal(t, uint64(i), val)
+			} else if i == liveTotal-1 {
+				require.Equal(t, uint64(expectedTopLiveValue), val)
+			} else {
+				require.Equal(t, uint64(i+dropTargetNum), val)
+			}
+		}
 	})
 }
