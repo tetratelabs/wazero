@@ -216,7 +216,7 @@ func newNullTerminatedStrings(maxBufSize uint32, args ...string) (*nullTerminate
 		}
 		argLen := uint64(len(arg)) + 1 // + 1 for "\x00"; uint64 in case this one arg is huge
 		nextSize := uint64(totalBufSize) + argLen
-		if nextSize > uint64(maxBufSize) { //
+		if nextSize > uint64(maxBufSize) {
 			return nil, fmt.Errorf("arg[%d] will exceed max buffer size %d", i, maxBufSize)
 		}
 		totalBufSize = uint32(nextSize)
