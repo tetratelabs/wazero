@@ -3,11 +3,8 @@ package wasi
 import (
 	"context"
 	_ "embed"
-	"encoding/binary"
-	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -38,11 +35,9 @@ func TestNewAPI_Args(t *testing.T) {
 //go:embed testdata/args.wat
 var argsWat []byte
 
-func TestApi_ArgsGet(t *testing.T) {
-	ctx := context.Background()
+func TestAPI_ArgsGet(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-
 	argv := uint32(7)    // arbitrary offset
 	argvBuf := uint32(1) // arbitrary offset
 	maskLength := 16     // number of bytes to write '?' to tell what we've written
@@ -60,7 +55,7 @@ func TestApi_ArgsGet(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// provide a host context we call directly
-		hContext := wasm.NewHostFunctionCallContext(ctx, store.Memories[0])
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
 		// invoke ArgsGet directly and check the memory side-effects!
 		errno := wasiAPI.ArgsGet(hContext, argv, argvBuf)
@@ -70,15 +65,14 @@ func TestApi_ArgsGet(t *testing.T) {
 	t.Run(FunctionArgsGet, func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		ret, _, err := store.CallFunction(ctx, "test", FunctionArgsGet, uint64(argv), uint64(argvBuf))
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsGet, uint64(argv), uint64(argvBuf))
 		require.NoError(t, err)
 		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 }
 
-func TestArgsGet_Errors(t *testing.T) {
-	ctx := context.Background()
+func TestAPI_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
 	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
@@ -118,15 +112,14 @@ func TestArgsGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", FunctionArgsGet, uint64(tc.argv), uint64(tc.argvBuf))
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsGet, uint64(tc.argv), uint64(tc.argvBuf))
 			require.NoError(t, err)
 			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
 
-func TestApi_ArgsSizesGet(t *testing.T) {
-	ctx := context.Background()
+func TestAPI_ArgsSizesGet(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
 	resultArgc := uint32(1)        // arbitrary offset
@@ -145,7 +138,7 @@ func TestApi_ArgsSizesGet(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// provide a host context we call directly
-		hContext := wasm.NewHostFunctionCallContext(ctx, store.Memories[0])
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
 		// invoke ArgsSizesGet directly and check the memory side effects!
 		errno := wasiAPI.ArgsSizesGet(hContext, resultArgc, resultArgvBufSize)
@@ -155,15 +148,14 @@ func TestApi_ArgsSizesGet(t *testing.T) {
 	t.Run(FunctionArgsSizesGet, func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		ret, _, err := store.CallFunction(ctx, "test", FunctionArgsSizesGet, uint64(resultArgc), uint64(resultArgvBufSize))
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsSizesGet, uint64(resultArgc), uint64(resultArgvBufSize))
 		require.NoError(t, err)
 		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 }
 
-func TestArgsSizesGet_Errors(t *testing.T) {
-	ctx := context.Background()
+func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
 	store, _ := instantiateWasmStore(t, argsWat, "test", args)
@@ -202,120 +194,128 @@ func TestArgsSizesGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", FunctionArgsSizesGet, uint64(tc.argc), uint64(tc.argvBufSize))
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsSizesGet, uint64(tc.argc), uint64(tc.argvBufSize))
 			require.NoError(t, err)
 			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
 
-// TODO TestEnvironGet TestEnvironGet_Errors
-// TODO TestEnvironSizesGet TestEnvironSizesGet_Errors
-// TODO TestClockResGet TestClockResGet_Errors
+// TODO TestAPI_EnvironGet TestAPI_EnvironGet_Errors
+// TODO TestAPI_EnvironSizesGet TestAPI_EnvironSizesGet_Errors
+// TODO TestAPI_ClockResGet TestAPI_ClockResGet_Errors
 
 // clockWat is a wasm module to call clock_time_get.
 //go:embed testdata/clock.wat
 var clockWat []byte
 
-// TODO: rewrite
-func TestClockGetTime(t *testing.T) {
-	ctx := context.Background()
+func TestAPI_ClockTimeGet(t *testing.T) {
+	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
+	resultTimestamp := uint32(1)              // arbitrary offset
+	maskLength := 10                          // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                                          // resultTimestamp is after this
+		0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
+		'?', // stopped after encoding
+	} // tr
+
 	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
+
+	t.Run("API.ClockTimeGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		// invoke ClockTimeGet directly and check the memory side effects!
+		errno := wasiAPI.ClockTimeGet(hContext, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
+		require.Equal(t, ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run(FunctionClockTimeGet, func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionClockTimeGet, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(resultTimestamp))
+		require.NoError(t, err)
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_ClockTimeGet_Errors(t *testing.T) {
+	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
+	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
+
 	memorySize := uint32(len(store.Memories[0].Buffer))
-	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
 
 	tests := []struct {
-		name         string
-		timestampVal uint64
-		timestampPtr uint32
-		result       Errno
+		name            string
+		resultTimestamp uint32
+		argvBufSize     uint32
 	}{
 		{
-			name:         "zero uint64 value",
-			timestampVal: 0,
-			timestampPtr: validAddress,
-			result:       ErrnoSuccess,
+			name:            "resultTimestamp out-of-memory",
+			resultTimestamp: memorySize,
 		},
+
 		{
-			name:         "low uint64 value",
-			timestampVal: 12345,
-			timestampPtr: validAddress,
-			result:       ErrnoSuccess,
-		},
-		{
-			name:         "high uint64 value - no truncation",
-			timestampVal: math.MaxUint64,
-			timestampPtr: validAddress,
-			result:       ErrnoSuccess,
-		},
-		{
-			name:         "with an endian-sensitive uint64 val - no truncation",
-			timestampVal: math.MaxUint64 - 1,
-			timestampPtr: validAddress,
-			result:       ErrnoSuccess,
-		},
-		{
-			name:         "timestampPtr exceeds the maximum valid address by 1",
-			timestampVal: math.MaxUint64,
-			timestampPtr: memorySize - 8 + 1,
-			result:       ErrnoInval,
+			name:            "resultTimestamp exceeds the maximum valid address by 1",
+			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			wasiAPI.(*api).getTimeNanosFn = func() uint64 { return tt.timestampVal }
-			ret, _, err := store.CallFunction(ctx, "test", FunctionClockTimeGet, uint64(0), uint64(0), uint64(tt.timestampPtr))
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionClockTimeGet, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.NoError(t, err)
-			errno := Errno(ret[0])
-			require.Equal(t, tt.result, errno) // ret[0] is returned errno
-			if errno == ErrnoSuccess {
-				nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
-				assert.Equal(t, tt.timestampVal, nanos)
-			}
+			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
 
-// TODO: TestFDAdvise TestFDAdvise_Errors
-// TODO: TestFDAllocate TestFDAllocate_Errors
-// TODO: TestFDClose TestFDClose_Errors
-// TODO: TestFDDataSync TestFDDataSync_Errors
-// TODO: TestFDFDStatGet TestFDFDStatGet_Errors
-// TODO: TestFDFDStatSetFlags TestFDFDStatSetFlags_Errors
-// TODO: TestFDFDStatSetRights TestFDFDStatSetRights_Errors
-// TODO: TestFDFilestatGet TestFDFilestatGet_Errors
-// TODO: TestFDFilestatSetSize TestFDFilestatSetSize_Errors
-// TODO: TestFDFilestatSetTimes TestFDFilestatSetTimes_Errors
-// TODO: TestFDPread TestFDPread_Errors
-// TODO: TestFDPrestatGet TestFDPrestatGet_Errors
-// TODO: TestFDPrestatDirName TestFDPrestatDirName_Errors
-// TODO: TestFDPwrite TestFDPwrite_Errors
-// TODO: TestFDRead TestFDRead_Errors
-// TODO: TestFDReaddir TestFDReaddir_Errors
-// TODO: TestFDRenumber TestFDRenumber_Errors
-// TODO: TestFDSeek TestFDSeek_Errors
-// TODO: TestFDSync TestFDSync_Errors
-// TODO: TestFDTell TestFDTell_Errors
-// TODO: TestFDWrite TestFDWrite_Errors
-// TODO: TestPathCreateDirectory TestPathCreateDirectory_Errors
-// TODO: TestPathFilestatGet TestPathFilestatGet_Errors
-// TODO: TestPathFilestatSetTimes TestPathFilestatSetTimes_Errors
-// TODO: TestPathLink TestPathLink_Errors
-// TODO: TestPathOpen TestPathOpen_Errors
-// TODO: TestPathReadlink TestPathReadlink_Errors
-// TODO: TestPathRemoveDirectory TestPathRemoveDirectory_Errors
-// TODO: TestPathRename TestPathRename_Errors
-// TODO: TestPathSymlink TestPathSymlink_Errors
-// TODO: TestPathUnlinkFile TestPathUnlinkFile_Errors
-// TODO: TestPollOneoff TestPollOneoff_Errors
-// TODO: TestProcExit TestProcExit_Errors
-// TODO: TestProcRaise TestProcRaise_Errors
-// TODO: TestSchedYield TestSchedYield_Errors
-// TODO: TestRandomGet TestRandomGet_Errors
-// TODO: TestSockRecv TestSockRecv_Errors
-// TODO: TestSockSend TestSockSend_Errors
-// TODO: TestSockShutdown TestSockShutdown_Errors
+// TODO: TestAPI_FDAdvise TestAPI_FDAdvise_Errors
+// TODO: TestAPI_FDAllocate TestAPI_FDAllocate_Errors
+// TODO: TestAPI_FDClose TestAPI_FDClose_Errors
+// TODO: TestAPI_FDDataSync TestAPI_FDDataSync_Errors
+// TODO: TestAPI_FDFDStatGet TestAPI_FDFDStatGet_Errors
+// TODO: TestAPI_FDFDStatSetFlags TestAPI_FDFDStatSetFlags_Errors
+// TODO: TestAPI_FDFDStatSetRights TestAPI_FDFDStatSetRights_Errors
+// TODO: TestAPI_FDFilestatGet TestAPI_FDFilestatGet_Errors
+// TODO: TestAPI_FDFilestatSetSize TestAPI_FDFilestatSetSize_Errors
+// TODO: TestAPI_FDFilestatSetTimes TestAPI_FDFilestatSetTimes_Errors
+// TODO: TestAPI_FDPread TestAPI_FDPread_Errors
+// TODO: TestAPI_FDPrestatGet TestAPI_FDPrestatGet_Errors
+// TODO: TestAPI_FDPrestatDirName TestAPI_FDPrestatDirName_Errors
+// TODO: TestAPI_FDPwrite TestAPI_FDPwrite_Errors
+// TODO: TestAPI_FDRead TestAPI_FDRead_Errors
+// TODO: TestAPI_FDReaddir TestAPI_FDReaddir_Errors
+// TODO: TestAPI_FDRenumber TestAPI_FDRenumber_Errors
+// TODO: TestAPI_FDSeek TestAPI_FDSeek_Errors
+// TODO: TestAPI_FDSync TestAPI_FDSync_Errors
+// TODO: TestAPI_FDTell TestAPI_FDTell_Errors
+// TODO: TestAPI_FDWrite TestAPI_FDWrite_Errors
+// TODO: TestAPI_PathCreateDirectory TestAPI_PathCreateDirectory_Errors
+// TODO: TestAPI_PathFilestatGet TestAPI_PathFilestatGet_Errors
+// TODO: TestAPI_PathFilestatSetTimes TestAPI_PathFilestatSetTimes_Errors
+// TODO: TestAPI_PathLink TestAPI_PathLink_Errors
+// TODO: TestAPI_PathOpen TestAPI_PathOpen_Errors
+// TODO: TestAPI_PathReadlink TestAPI_PathReadlink_Errors
+// TODO: TestAPI_PathRemoveDirectory TestAPI_PathRemoveDirectory_Errors
+// TODO: TestAPI_PathRename TestAPI_PathRename_Errors
+// TODO: TestAPI_PathSymlink TestAPI_PathSymlink_Errors
+// TODO: TestAPI_PathUnlinkFile TestAPI_PathUnlinkFile_Errors
+// TODO: TestAPI_PollOneoff TestAPI_PollOneoff_Errors
+// TODO: TestAPI_ProcExit TestAPI_ProcExit_Errors
+// TODO: TestAPI_ProcRaise TestAPI_ProcRaise_Errors
+// TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
+// TODO: TestAPI_RandomGet TestAPI_RandomGet_Errors
+// TODO: TestAPI_SockRecv TestAPI_SockRecv_Errors
+// TODO: TestAPI_SockSend TestAPI_SockSend_Errors
+// TODO: TestAPI_SockShutdown TestAPI_SockShutdown_Errors
 
 func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, opts ...Option) (*wasm.Store, API) {
 	mod, err := text.DecodeModule(wat)

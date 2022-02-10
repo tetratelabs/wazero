@@ -29,12 +29,11 @@ import (
 type API interface {
 	// ArgsGet is the WASI function that reads command-line argument data (Args).
 	//
-	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
-	// Memory Buffer to write offsets. These are encoded uint32 little-endian.
+	// There are two parameters. Both are offsets in the wasm.HostFunctionCallContext Memory Buffer.
 	//
-	// * argv - is the offset to begin writing argument offsets to the wasm.MemoryInstance
+	// * argv - is the offset to begin writing argument offsets in uint32 little-endian encoding.
 	//   * ArgsSizesGet result argc * 4 bytes are written to this offset
-	// * argvBuf - is the offset to write the null terminated arguments to the wasm.MemoryInstance
+	// * argvBuf - is the offset to write the null terminated arguments to wasm.MemoryInstance
 	//   * ArgsSizesGet result argv_buf_size bytes are written to this offset
 	//
 	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
@@ -49,7 +48,7 @@ type API interface {
 	//          offset that begins "a" --+           |
 	//                     offset that begins "bc" --+
 	//
-	// Note: FunctionArgsGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: FunctionArgsGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -57,11 +56,11 @@ type API interface {
 
 	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
 	//
-	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
-	// Memory Buffer to write the corresponding sizes in uint32 little-endian encoding.
+	// There are two result parameters: these are offsets in the wasm.HostFunctionCallContext Memory Buffer to write
+	// corresponding sizes in uint32 little-endian encoding.
 	//
-	// * argc - is the offset to write the argument count to the wasm.MemoryInstance Buffer
-	// * argvBufSize - is the offset to write the null terminated argument length to the wasm.MemoryInstance Buffer
+	// * resultArgc - is the offset to write the argument count to wasm.MemoryInstance Buffer
+	// * resultArgvBufSize - is the offset to write the null-terminated argument length to wasm.MemoryInstance Buffer
 	//
 	// For example, if Args are []string{"a","bc"} and
 	//   ArgsSizesGet parameters resultArgc=1 and resultArgvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
@@ -75,7 +74,7 @@ type API interface {
 	//             resultArgvBufSize --|
 	//   len([]byte{'a',0,'b',c',0}) --+
 	//
-	// Note: FunctionArgsSizesGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: FunctionArgsSizesGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -87,7 +86,27 @@ type API interface {
 
 	// TODO: ClockResGet(ctx *wasm.HostFunctionCallContext, id, resultResolution uint32) Errno
 
-	// TODO: ClockTimeGet(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno
+	// ClockTimeGet is a WASI function that returns the time value of a clock (time.Now).
+	//
+	// * id - The clock id for which to return the time.
+	// * precision - The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
+	// * resultTimestamp - the offset to write the timestamp to wasm.MemoryInstance Buffer
+	//   * the timestamp is epoch nanoseconds encoded as a uint64 little-endian encoding.
+	//
+	// For example, if time.Now returned exactly midnight UTC 2022-01-01 (1640995200000000000), and
+	//   ClockTimeGet resultTimestamp=1, we expect `ctx.Memory.Buffer` to contain:
+	//
+	//                                       uint64
+	//                    +------------------------------------------+
+	//                    |                                          |
+	//          []byte{?, 0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, ?}
+	//  resultTimestamp --^
+	//
+	// Note: FunctionClockTimeGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: This is similar to `clock_gettime` in POSIX.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
+	// See https://linux.die.net/man/3/clock_gettime
+	ClockTimeGet(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno
 
 	// TODO: FDAdvise
 	// TODO: FDAllocate
@@ -140,8 +159,9 @@ type api struct {
 	stdin io.Reader
 	stdout,
 	stderr io.Writer
-	opened         map[uint32]fileEntry
-	getTimeNanosFn func() uint64
+	opened map[uint32]fileEntry
+	// timeNowUnixNano is mutable for testing
+	timeNowUnixNano func() uint64
 }
 
 func (a *api) register(store *wasm.Store) (err error) {
@@ -156,7 +176,7 @@ func (a *api) register(store *wasm.Store) (err error) {
 		{FunctionEnvironGet, environ_get},
 		{FunctionEnvironSizesGet, environ_sizes_get},
 		// TODO: FunctionClockResGet
-		{FunctionClockTimeGet, a.clock_time_get},
+		{FunctionClockTimeGet, a.ClockTimeGet},
 		// TODO: FunctionFDAdvise
 		// TODO: FunctionFDAllocate
 		{FunctionFDClose, a.fd_close},
@@ -209,6 +229,48 @@ func (a *api) register(store *wasm.Store) (err error) {
 		}
 	}
 	return nil
+}
+
+// ArgsGet implements API.ArgsGet
+func (a *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
+	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(a.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
+		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(a.args.totalBufSize)) {
+		return ErrnoInval
+	}
+	for _, arg := range a.args.nullTerminatedValues {
+		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argv:], argvBuf)
+		argv += 4 // size of uint32
+		argvBuf += uint32(copy(ctx.Memory.Buffer[argvBuf:], arg))
+	}
+
+	return ErrnoSuccess
+}
+
+// ArgsSizesGet implements API.ArgsSizesGet
+func (a *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
+	if !ctx.Memory.PutUint32(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
+		return ErrnoInval
+	}
+	if !ctx.Memory.PutUint32(resultArgvBufSize, a.args.totalBufSize) {
+		return ErrnoInval
+	}
+
+	return ErrnoSuccess
+}
+
+// TODO: func (a *api) EnvironGet
+
+// TODO: func (a *api) EnvironSizesGet
+
+// TODO: func (a *api) FunctionClockResGet
+
+// ClockTimeGet implements API.ClockTimeGet
+func (a *api) ClockTimeGet(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno {
+	// TODO: id and precision are currently ignored.
+	if !ctx.Memory.PutUint64(resultTimestamp, a.timeNowUnixNano()) {
+		return ErrnoInval
+	}
+	return ErrnoSuccess
 }
 
 type fileEntry struct {
@@ -280,7 +342,7 @@ func newAPI(opts ...Option) *api {
 		stdout: os.Stdout,
 		stderr: os.Stderr,
 		opened: map[uint32]fileEntry{},
-		getTimeNanosFn: func() uint64 {
+		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
 	}
@@ -441,33 +503,6 @@ func (a *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno)
 	return ErrnoSuccess
 }
 
-// ArgsSizesGet implements API.ArgsSizesGet
-func (a *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
-	if !ctx.Memory.PutUint32(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
-		return ErrnoInval
-	}
-	if !ctx.Memory.PutUint32(resultArgvBufSize, a.args.totalBufSize) {
-		return ErrnoInval
-	}
-
-	return ErrnoSuccess
-}
-
-// ArgsGet implements API.ArgsGet
-func (a *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
-	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(a.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
-		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(a.args.totalBufSize)) {
-		return ErrnoInval
-	}
-	for _, arg := range a.args.nullTerminatedValues {
-		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argv:], argvBuf)
-		argv += 4 // size of uint32
-		argvBuf += uint32(copy(ctx.Memory.Buffer[argvBuf:], arg))
-	}
-
-	return ErrnoSuccess
-}
-
 func proc_exit(*wasm.HostFunctionCallContext, uint32) {
 	// TODO: implement
 }
@@ -478,18 +513,4 @@ func environ_sizes_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno
 
 func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	return ErrnoNosys // TODO: implement
-}
-
-// clock_time_get is a WASI API that returns the time value of a clock. Note: This is similar to clock_gettime in POSIX.
-// * id: The clock id for which to return the time.
-// * precision: timestamp The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
-// * timestampPtr: a pointer to an address of uint64 type. The time value of the clock in nanoseconds is written there.
-//
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
-func (a *api) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
-	// TODO: The clock id and precision are currently ignored.
-	if !ctx.Memory.PutUint64(timestampPtr, a.getTimeNanosFn()) {
-		return ErrnoInval
-	}
-	return ErrnoSuccess
 }
