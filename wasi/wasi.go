@@ -143,100 +143,68 @@ type api struct {
 }
 
 func (w *api) register(store *wasm.Store) (err error) {
-	for _, wasiName := range []string{
-		wasiUnstableName, // TODO: check if there are any signature incompatibility between stable and preview 1
-		wasiSnapshotPreview1Name,
-	} {
-
-		// Note: these are ordered per spec for consistency
-		// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
-		err = store.AddHostFunction(wasiName, FunctionArgsGet, reflect.ValueOf(w.ArgsGet))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, FunctionArgsSizesGet, reflect.ValueOf(w.ArgsSizesGet))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, FunctionEnvironGet, reflect.ValueOf(environ_get))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, FunctionEnvironSizesGet, reflect.ValueOf(environ_sizes_get))
-		if err != nil {
-			return err
-		}
+	// Note: these are ordered per spec for consistency
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
+	nameToFunction := []struct {
+		funcName string
+		fn       interface{}
+	}{
+		{FunctionArgsGet, w.ArgsGet},
+		{FunctionArgsSizesGet, w.ArgsSizesGet},
+		{FunctionEnvironGet, environ_get},
+		{FunctionEnvironSizesGet, environ_sizes_get},
 		// TODO: FunctionClockResGet
-		err = store.AddHostFunction(wasiName, FunctionClockTimeGet, reflect.ValueOf(w.clock_time_get))
-		if err != nil {
-			return err
-		}
+		{FunctionClockTimeGet, w.clock_time_get},
 		// TODO: FunctionFDAdvise
 		// TODO: FunctionFDAllocate
-		err = store.AddHostFunction(wasiName, FunctionFDClose, reflect.ValueOf(w.fd_close))
-		if err != nil {
-			return err
-		}
+		{FunctionFDClose, w.fd_close},
 		// TODO: FunctionFDDataSync
-		err = store.AddHostFunction(wasiName, FunctionFDFDStatGet, reflect.ValueOf(w.fd_fdstat_get))
-		if err != nil {
-			return err
-		}
+		{FunctionFDFDStatGet, w.fd_fdstat_get},
 		// TODO: FunctionFDFDStatSetFlags
 		// TODO: FunctionFDFDStatSetRights
 		// TODO: FunctionFDFilestatGet
 		// TODO: FunctionFDFilestatSetSize
 		// TODO: FunctionFDFilestatSetTimes
 		// TODO: FunctionFDPread
-		err = store.AddHostFunction(wasiName, FunctionFDPrestatGet, reflect.ValueOf(w.fd_prestat_get))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, FunctionFDPrestatDirName, reflect.ValueOf(w.fd_prestat_dir_name))
-		if err != nil {
-			return err
-		}
+		{FunctionFDPrestatGet, w.fd_prestat_get},
+		{FunctionFDPrestatDirName, w.fd_prestat_dir_name},
 		// TODO: FunctionFDPwrite
-		err = store.AddHostFunction(wasiName, FunctionFDRead, reflect.ValueOf(w.fd_read))
-		if err != nil {
-			return err
-		}
+		{FunctionFDRead, w.fd_read},
 		// TODO: FunctionFDReaddir
 		// TODO: FunctionFDRenumber
-		err = store.AddHostFunction(wasiName, FunctionFDSeek, reflect.ValueOf(w.fd_seek))
-		if err != nil {
-			return err
-		}
+		{FunctionFDSeek, w.fd_seek},
 		// TODO: FunctionFDSync
 		// TODO: FunctionFDTell
-		err = store.AddHostFunction(wasiName, FunctionFDWrite, reflect.ValueOf(w.fd_write))
-		if err != nil {
-			return err
-		}
+		{FunctionFDWrite, w.fd_write},
 		// TODO: FunctionPathCreateDirectory
 		// TODO: FunctionPathFilestatGet
 		// TODO: FunctionPathFilestatSetTimes
 		// TODO: FunctionPathLink
-		err = store.AddHostFunction(wasiName, FunctionPathOpen, reflect.ValueOf(w.path_open))
-		if err != nil {
-			return err
-		}
+		{FunctionPathOpen, w.path_open},
 		// TODO: FunctionPathReadlink
 		// TODO: FunctionPathRemoveDirectory
 		// TODO: FunctionPathRename
 		// TODO: FunctionPathSymlink
 		// TODO: FunctionPathUnlinkFile
 		// TODO: FunctionPollOneoff
-		err = store.AddHostFunction(wasiName, FunctionProcExit, reflect.ValueOf(proc_exit))
-		if err != nil {
-			return err
-		}
+		{FunctionProcExit, proc_exit},
 		// TODO: FunctionProcRaise
 		// TODO: FunctionSchedYield
 		// TODO: FunctionRandomGet
 		// TODO: FunctionSockRecv
 		// TODO: FunctionSockSend
 		// TODO: FunctionSockShutdown
+	}
+	for _, wasiName := range []string{
+		wasiUnstableName, // TODO: check if there are any signature incompatibility between stable and preview 1
+		wasiSnapshotPreview1Name,
+	} {
+		for _, pair := range nameToFunction {
+			err = store.AddHostFunction(wasiName, pair.funcName, reflect.ValueOf(pair.fn))
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -334,31 +302,31 @@ func (w *api) randUnusedFD() uint32 {
 
 func (w *api) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := w.opened[fd]; !ok {
-		return EBADF
+		return ErrnoBadf
 	}
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func (w *api) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
 	f, ok := w.opened[fd]
 	if !ok {
-		return EINVAL
+		return ErrnoInval
 	}
 
 	if uint32(len(f.path)) < pathLen {
-		return ENAMETOOLONG
+		return ErrnoNametoolong
 	}
 
 	copy(ctx.Memory.Buffer[pathPtr:], f.path)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func (w *api) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := w.opened[fd]; !ok {
-		return EBADF
+		return ErrnoBadf
 	}
 	binary.LittleEndian.PutUint64(ctx.Memory.Buffer[bufPtr+16:], R_FD_READ|R_FD_WRITE)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
@@ -366,7 +334,7 @@ func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 	fdFlags, fdPtr uint32) (errno Errno) {
 	dir, ok := w.opened[fd]
 	if !ok || dir.fileSys == nil {
-		return EINVAL
+		return ErrnoInval
 	}
 
 	path := string(ctx.Memory.Buffer[pathPtr : pathPtr+pathLen])
@@ -374,9 +342,9 @@ func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 	if err != nil {
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
-			return ENOENT
+			return ErrnoNoent
 		default:
-			return EINVAL
+			return ErrnoInval
 		}
 	}
 
@@ -387,11 +355,11 @@ func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 	}
 
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[fdPtr:], newFD)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func (w *api) fd_seek(ctx *wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
-	return ENOSYS // TODO: implement
+	return ErrnoNosys // TODO: implement
 }
 
 func (w *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
@@ -405,7 +373,7 @@ func (w *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uin
 	default:
 		f, ok := w.opened[fd]
 		if !ok || f.file == nil {
-			return EBADF
+			return ErrnoBadf
 		}
 		writer = f.file
 	}
@@ -422,7 +390,7 @@ func (w *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uin
 		nwritten += uint32(n)
 	}
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[nwrittenPtr:], nwritten)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func (w *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
@@ -434,7 +402,7 @@ func (w *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint
 	default:
 		f, ok := w.opened[fd]
 		if !ok || f.file == nil {
-			return EBADF
+			return ErrnoBadf
 		}
 		reader = f.file
 	}
@@ -449,17 +417,17 @@ func (w *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint
 		if errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
-			return EIO
+			return ErrnoIo
 		}
 	}
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[nreadPtr:], nread)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func (w *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
 	f, ok := w.opened[fd]
 	if !ok {
-		return EBADF
+		return ErrnoBadf
 	}
 
 	if f.file != nil {
@@ -468,26 +436,26 @@ func (w *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno)
 
 	delete(w.opened, fd)
 
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 // ArgsSizesGet implements API.ArgsSizesGet
 func (w *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
 	if !ctx.Memory.PutUint32(resultArgc, uint32(len(w.args.nullTerminatedValues))) {
-		return EINVAL
+		return ErrnoInval
 	}
 	if !ctx.Memory.PutUint32(resultArgvBufSize, w.args.totalBufSize) {
-		return EINVAL
+		return ErrnoInval
 	}
 
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 // ArgsGet implements API.ArgsGet
 func (w *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
 	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
 		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(w.args.totalBufSize)) {
-		return EINVAL
+		return ErrnoInval
 	}
 	for _, arg := range w.args.nullTerminatedValues {
 		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argv:], argvBuf)
@@ -495,7 +463,7 @@ func (w *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) E
 		argvBuf += uint32(copy(ctx.Memory.Buffer[argvBuf:], arg))
 	}
 
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func proc_exit(*wasm.HostFunctionCallContext, uint32) {
@@ -503,11 +471,11 @@ func proc_exit(*wasm.HostFunctionCallContext, uint32) {
 }
 
 func environ_sizes_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	return ENOSYS // TODO: implement
+	return ErrnoNosys // TODO: implement
 }
 
 func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	return ENOSYS // TODO: implement
+	return ErrnoNosys // TODO: implement
 }
 
 // clock_time_get is a WASI API that returns the time value of a clock. Note: This is similar to clock_gettime in POSIX.
@@ -519,7 +487,7 @@ func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 func (w *api) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
 	// TODO: The clock id and precision are currently ignored.
 	if !ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn()) {
-		return EINVAL
+		return ErrnoInval
 	}
-	return ESUCCESS
+	return ErrnoSuccess
 }

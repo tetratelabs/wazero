@@ -64,7 +64,7 @@ func TestApi_ArgsGet(t *testing.T) {
 
 		// invoke ArgsGet directly and check the memory side-effects!
 		errno := wasiAPI.ArgsGet(hContext, argv, argvBuf)
-		require.Equal(t, ESUCCESS, errno)
+		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 	t.Run(FunctionArgsGet, func(t *testing.T) {
@@ -72,7 +72,7 @@ func TestApi_ArgsGet(t *testing.T) {
 
 		ret, _, err := store.CallFunction(ctx, "test", FunctionArgsGet, uint64(argv), uint64(argvBuf))
 		require.NoError(t, err)
-		require.Equal(t, ESUCCESS, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 }
@@ -120,7 +120,7 @@ func TestArgsGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ret, _, err := store.CallFunction(ctx, "test", FunctionArgsGet, uint64(tc.argv), uint64(tc.argvBuf))
 			require.NoError(t, err)
-			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
+			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
@@ -149,7 +149,7 @@ func TestApi_ArgsSizesGet(t *testing.T) {
 
 		// invoke ArgsSizesGet directly and check the memory side effects!
 		errno := wasiAPI.ArgsSizesGet(hContext, resultArgc, resultArgvBufSize)
-		require.Equal(t, ESUCCESS, errno)
+		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 	t.Run(FunctionArgsSizesGet, func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestApi_ArgsSizesGet(t *testing.T) {
 
 		ret, _, err := store.CallFunction(ctx, "test", FunctionArgsSizesGet, uint64(resultArgc), uint64(resultArgvBufSize))
 		require.NoError(t, err)
-		require.Equal(t, ESUCCESS, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 }
@@ -204,7 +204,7 @@ func TestArgsSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ret, _, err := store.CallFunction(ctx, "test", FunctionArgsSizesGet, uint64(tc.argc), uint64(tc.argvBufSize))
 			require.NoError(t, err)
-			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
+			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
@@ -234,31 +234,31 @@ func TestClockGetTime(t *testing.T) {
 			name:         "zero uint64 value",
 			timestampVal: 0,
 			timestampPtr: validAddress,
-			result:       ESUCCESS,
+			result:       ErrnoSuccess,
 		},
 		{
 			name:         "low uint64 value",
 			timestampVal: 12345,
 			timestampPtr: validAddress,
-			result:       ESUCCESS,
+			result:       ErrnoSuccess,
 		},
 		{
 			name:         "high uint64 value - no truncation",
 			timestampVal: math.MaxUint64,
 			timestampPtr: validAddress,
-			result:       ESUCCESS,
+			result:       ErrnoSuccess,
 		},
 		{
 			name:         "with an endian-sensitive uint64 val - no truncation",
 			timestampVal: math.MaxUint64 - 1,
 			timestampPtr: validAddress,
-			result:       ESUCCESS,
+			result:       ErrnoSuccess,
 		},
 		{
 			name:         "timestampPtr exceeds the maximum valid address by 1",
 			timestampVal: math.MaxUint64,
 			timestampPtr: memorySize - 8 + 1,
-			result:       EINVAL,
+			result:       ErrnoInval,
 		},
 	}
 
@@ -269,7 +269,7 @@ func TestClockGetTime(t *testing.T) {
 			require.NoError(t, err)
 			errno := Errno(ret[0])
 			require.Equal(t, tt.result, errno) // ret[0] is returned errno
-			if errno == ESUCCESS {
+			if errno == ErrnoSuccess {
 				nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
 				assert.Equal(t, tt.timestampVal, nanos)
 			}

@@ -9,7 +9,7 @@ import "fmt"
 // See https://linux.die.net/man/3/errno
 type Errno uint32
 
-// Error returns the POSIX error code name for the given Errno. Ex ESUCCESS = "ESUCCESS"
+// Error returns the POSIX error code name, except ErrnoSuccess, which isn't defined. Ex. Errno2big -> "E2BIG"
 func (err Errno) Error() string {
 	if int(err) < len(errnoToString) {
 		return errnoToString[err]
@@ -21,240 +21,240 @@ func (err Errno) Error() string {
 // See https://linux.die.net/man/3/errno
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#variants-1
 const (
-	// ESUCCESS No error occurred. System call completed successfully.
-	ESUCCESS Errno = iota
-	// E2BIG Argument list too long.
-	E2BIG
-	// EACCES Permission denied.
-	EACCES
-	// EADDRINUSE Address in use.
-	EADDRINUSE
-	// EADDRNOTAVAIL Address not available.
-	EADDRNOTAVAIL
-	// EAFNOSUPPORT Address family not supported.
-	EAFNOSUPPORT
-	// EAGAIN Resource unavailable, or operation would block.
-	EAGAIN
-	// EALREADY Connection already in progress.
-	EALREADY
-	// EBADF Bad file descriptor.
-	EBADF
-	// EBADMSG Bad message.
-	EBADMSG
-	// EBUSY Device or resource busy.
-	EBUSY
-	// ECANCELED Operation canceled.
-	ECANCELED
-	// ECHILD No child processes.
-	ECHILD
-	// ECONNABORTED Connection aborted.
-	ECONNABORTED
-	// ECONNREFUSED Connection refused.
-	ECONNREFUSED
-	// ECONNRESET Connection reset.
-	ECONNRESET
-	// EDEADLK Resource deadlock would occur.
-	EDEADLK
-	// EDESTADDRREQ Destination address required.
-	EDESTADDRREQ
-	// EDOM Mathematics argument out of domain of function.
-	EDOM
-	// EDQUOT Reserved.
-	EDQUOT
-	// EEXIST File exists.
-	EEXIST
-	// EFAULT Bad address.
-	EFAULT
-	// EFBIG File too large.
-	EFBIG
-	// EHOSTUNREACH Host is unreachable.
-	EHOSTUNREACH
-	// EIDRM Identifier removed.
-	EIDRM
-	// EILSEQ Illegal byte sequence.
-	EILSEQ
-	// EINPROGRESS Operation in progress.
-	EINPROGRESS
-	// EINTR Interrupted function.
-	EINTR
-	// EINVAL Invalid argument.
-	EINVAL
-	// EIO I/O error.
-	EIO
-	// EISCONN Socket is connected.
-	EISCONN
-	// EISDIR Is a directory.
-	EISDIR
-	// ELOOP Too many levels of symbolic links.
-	ELOOP
-	// EMFILE File descriptor value too large.
-	EMFILE
-	// EMLINK Too many links.
-	EMLINK
-	// EMSGSIZE Message too large.
-	EMSGSIZE
-	// EMULTIHOP Reserved.
-	EMULTIHOP
-	// ENAMETOOLONG Filename too long.
-	ENAMETOOLONG
-	// ENETDOWN Network is down.
-	ENETDOWN
-	// ENETRESET Connection aborted by network.
-	ENETRESET
-	// ENETUNREACH Network unreachable.
-	ENETUNREACH
-	// ENFILE Too many files open in system.
-	ENFILE
-	// ENOBUFS No buffer space available.
-	ENOBUFS
-	// ENODEV No such device.
-	ENODEV
-	// ENOENT No such file or directory.
-	ENOENT
-	// ENOEXEC Executable file format error.
-	ENOEXEC
-	// ENOLCK No locks available.
-	ENOLCK
-	// ENOLINK Reserved.
-	ENOLINK
-	// ENOMEM Not enough space.
-	ENOMEM
-	// ENOMSG No message of the desired type.
-	ENOMSG
-	// ENOPROTOOPT No message of the desired type.
-	ENOPROTOOPT
-	// ENOSPC No space left on device.
-	ENOSPC
-	// ENOSYS Function not supported.
-	ENOSYS
-	// ENOTCONN The socket is not connected.
-	ENOTCONN
-	// ENOTDIR Not a directory or a symbolic link to a directory.
-	ENOTDIR
-	// ENOTEMPTY Directory not empty.
-	ENOTEMPTY
-	// ENOTRECOVERABLE State not recoverable.
-	ENOTRECOVERABLE
-	// ENOTSOCK Not a socket.
-	ENOTSOCK
-	// ENOTSUP Not supported, or operation not supported on socket.
-	ENOTSUP
-	// ENOTTY Inappropriate I/O control operation.
-	ENOTTY
-	// ENXIO No such device or address.
-	ENXIO
-	// EOVERFLOW Value too large to be stored in data type.
-	EOVERFLOW
-	// EOWNERDEAD Previous owner died.
-	EOWNERDEAD
-	// EPERM Operation not permitted.
-	EPERM
-	// EPIPE Broken pipe.
-	EPIPE
-	// EPROTO Protocol error.
-	EPROTO
-	// EPROTONOSUPPORT Protocol error.
-	EPROTONOSUPPORT
-	// EPROTOTYPE Protocol wrong type for socket.
-	EPROTOTYPE
-	// ERANGE Result too large.
-	ERANGE
-	// EROFS Read-only file system.
-	EROFS
-	// ESPIPE Invalid seek.
-	ESPIPE
-	// ESRCH No such process.
-	ESRCH
-	// ESTALE Reserved.
-	ESTALE
-	// ETIMEDOUT Connection timed out.
-	ETIMEDOUT
-	// ETXTBSY Text file busy.
-	ETXTBSY
-	// EXDEV Cross-device link.
-	EXDEV
-	// ENOTCAPABLE Extension: Capabilities insufficient.
-	ENOTCAPABLE
+	// ErrnoSuccess No error occurred. System call completed successfully.
+	ErrnoSuccess Errno = iota
+	// Errno2big Argument list too long.
+	Errno2big
+	// ErrnoAcces Permission denied.
+	ErrnoAcces
+	// ErrnoAddrinuse Address in use.
+	ErrnoAddrinuse
+	// ErrnoAddrnotavail Address not available.
+	ErrnoAddrnotavail
+	// ErrnoAfnosupport Address family not supported.
+	ErrnoAfnosupport
+	// ErrnoAgain Resource unavailable, or operation would block.
+	ErrnoAgain
+	// ErrnoAlready Connection already in progress.
+	ErrnoAlready
+	// ErrnoBadf Bad file descriptor.
+	ErrnoBadf
+	// ErrnoBadmsg Bad message.
+	ErrnoBadmsg
+	// ErrnoBusy Device or resource busy.
+	ErrnoBusy
+	// ErrnoCanceled Operation canceled.
+	ErrnoCanceled
+	// ErrnoChild No child processes.
+	ErrnoChild
+	// ErrnoConnaborted Connection aborted.
+	ErrnoConnaborted
+	// ErrnoConnrefused Connection refused.
+	ErrnoConnrefused
+	// ErrnoConnreset Connection reset.
+	ErrnoConnreset
+	// ErrnoDeadlk Resource deadlock would occur.
+	ErrnoDeadlk
+	// ErrnoDestaddrreq Destination address required.
+	ErrnoDestaddrreq
+	// ErrnoDom Mathematics argument out of domain of function.
+	ErrnoDom
+	// ErrnoDquot Reserved.
+	ErrnoDquot
+	// ErrnoExist File exists.
+	ErrnoExist
+	// ErrnoFault Bad address.
+	ErrnoFault
+	// ErrnoFbig File too large.
+	ErrnoFbig
+	// ErrnoHostunreach Host is unreachable.
+	ErrnoHostunreach
+	// ErrnoIdrm Identifier removed.
+	ErrnoIdrm
+	// ErrnoIlseq Illegal byte sequence.
+	ErrnoIlseq
+	// ErrnoInprogress Operation in progress.
+	ErrnoInprogress
+	// ErrnoIntr Interrupted function.
+	ErrnoIntr
+	// ErrnoInval Invalid argument.
+	ErrnoInval
+	// ErrnoIo I/O error.
+	ErrnoIo
+	// ErrnoIsconn Socket is connected.
+	ErrnoIsconn
+	// ErrnoIsdir Is a directory.
+	ErrnoIsdir
+	// ErrnoLoop Too many levels of symbolic links.
+	ErrnoLoop
+	// ErrnoMfile File descriptor value too large.
+	ErrnoMfile
+	// ErrnoMlink Too many links.
+	ErrnoMlink
+	// ErrnoMsgsize Message too large.
+	ErrnoMsgsize
+	// ErrnoMultihop Reserved.
+	ErrnoMultihop
+	// ErrnoNametoolong Filename too long.
+	ErrnoNametoolong
+	// ErrnoNetdown Network is down.
+	ErrnoNetdown
+	// ErrnoNetreset Connection aborted by network.
+	ErrnoNetreset
+	// ErrnoNetunreach Network unreachable.
+	ErrnoNetunreach
+	// ErrnoNfile Too many files open in system.
+	ErrnoNfile
+	// ErrnoNobufs No buffer space available.
+	ErrnoNobufs
+	// ErrnoNodev No such device.
+	ErrnoNodev
+	// ErrnoNoent No such file or directory.
+	ErrnoNoent
+	// ErrnoNoexec Executable file format error.
+	ErrnoNoexec
+	// ErrnoNolck No locks available.
+	ErrnoNolck
+	// ErrnoNolink Reserved.
+	ErrnoNolink
+	// ErrnoNomem Not enough space.
+	ErrnoNomem
+	// ErrnoNomsg No message of the desired type.
+	ErrnoNomsg
+	// ErrnoNoprotoopt No message of the desired type.
+	ErrnoNoprotoopt
+	// ErrnoNospc No space left on device.
+	ErrnoNospc
+	// ErrnoNosys Function not supported.
+	ErrnoNosys
+	// ErrnoNotconn The socket is not connected.
+	ErrnoNotconn
+	// ErrnoNotdir Not a directory or a symbolic link to a directory.
+	ErrnoNotdir
+	// ErrnoNotempty Directory not empty.
+	ErrnoNotempty
+	// ErrnoNotrecoverable State not recoverable.
+	ErrnoNotrecoverable
+	// ErrnoNotsock Not a socket.
+	ErrnoNotsock
+	// ErrnoNotsup Not supported, or operation not supported on socket.
+	ErrnoNotsup
+	// ErrnoNotty Inappropriate I/O control operation.
+	ErrnoNotty
+	// ErrnoNxio No such device or address.
+	ErrnoNxio
+	// ErrnoOverflow Value too large to be stored in data type.
+	ErrnoOverflow
+	// ErrnoOwnerdead Previous owner died.
+	ErrnoOwnerdead
+	// ErrnoPerm Operation not permitted.
+	ErrnoPerm
+	// ErrnoPipe Broken pipe.
+	ErrnoPipe
+	// ErrnoProto Protocol error.
+	ErrnoProto
+	// ErrnoProtonosupport Protocol error.
+	ErrnoProtonosupport
+	// ErrnoPrototype Protocol wrong type for socket.
+	ErrnoPrototype
+	// ErrnoRange Result too large.
+	ErrnoRange
+	// ErrnoRofs Read-only file system.
+	ErrnoRofs
+	// ErrnoSpipe Invalid seek.
+	ErrnoSpipe
+	// ErrnoSrch No such process.
+	ErrnoSrch
+	// ErrnoStale Reserved.
+	ErrnoStale
+	// ErrnoTimedout Connection timed out.
+	ErrnoTimedout
+	// ErrnoTxtbsy Text file busy.
+	ErrnoTxtbsy
+	// ErrnoXdev Cross-device link.
+	ErrnoXdev
+	// ErrnoNotcapable Extension: Capabilities insufficient.
+	ErrnoNotcapable
 )
 
 var errnoToString = [...]string{
-	ESUCCESS:        "ESUCCESS",
-	E2BIG:           "E2BIG",
-	EACCES:          "EACCES",
-	EADDRINUSE:      "EADDRINUSE",
-	EADDRNOTAVAIL:   "EADDRNOTAVAIL",
-	EAFNOSUPPORT:    "EAFNOSUPPORT",
-	EAGAIN:          "EAGAIN",
-	EALREADY:        "EALREADY",
-	EBADF:           "EBADF",
-	EBADMSG:         "EBADMSG",
-	EBUSY:           "EBUSY",
-	ECANCELED:       "ECANCELED",
-	ECHILD:          "ECHILD",
-	ECONNABORTED:    "ECONNABORTED",
-	ECONNREFUSED:    "ECONNREFUSED",
-	ECONNRESET:      "ECONNRESET",
-	EDEADLK:         "EDEADLK",
-	EDESTADDRREQ:    "EDESTADDRREQ",
-	EDOM:            "EDOM",
-	EDQUOT:          "EDQUOT",
-	EEXIST:          "EEXIST",
-	EFAULT:          "EFAULT",
-	EFBIG:           "EFBIG",
-	EHOSTUNREACH:    "EHOSTUNREACH",
-	EIDRM:           "EIDRM",
-	EILSEQ:          "EILSEQ",
-	EINPROGRESS:     "EINPROGRESS",
-	EINTR:           "EINTR",
-	EINVAL:          "EINVAL",
-	EIO:             "EIO",
-	EISCONN:         "EISCONN",
-	EISDIR:          "EISDIR",
-	ELOOP:           "ELOOP",
-	EMFILE:          "EMFILE",
-	EMLINK:          "EMLINK",
-	EMSGSIZE:        "EMSGSIZE",
-	EMULTIHOP:       "EMULTIHOP",
-	ENAMETOOLONG:    "ENAMETOOLONG",
-	ENETDOWN:        "ENETDOWN",
-	ENETRESET:       "ENETRESET",
-	ENETUNREACH:     "ENETUNREACH",
-	ENFILE:          "ENFILE",
-	ENOBUFS:         "ENOBUFS",
-	ENODEV:          "ENODEV",
-	ENOENT:          "ENOENT",
-	ENOEXEC:         "ENOEXEC",
-	ENOLCK:          "ENOLCK",
-	ENOLINK:         "ENOLINK",
-	ENOMEM:          "ENOMEM",
-	ENOMSG:          "ENOMSG",
-	ENOPROTOOPT:     "ENOPROTOOPT",
-	ENOSPC:          "ENOSPC",
-	ENOSYS:          "ENOSYS",
-	ENOTCONN:        "ENOTCONN",
-	ENOTDIR:         "ENOTDIR",
-	ENOTEMPTY:       "ENOTEMPTY",
-	ENOTRECOVERABLE: "ENOTRECOVERABLE",
-	ENOTSOCK:        "ENOTSOCK",
-	ENOTSUP:         "ENOTSUP",
-	ENOTTY:          "ENOTTY",
-	ENXIO:           "ENXIO",
-	EOVERFLOW:       "EOVERFLOW",
-	EOWNERDEAD:      "EOWNERDEAD",
-	EPERM:           "EPERM",
-	EPIPE:           "EPIPE",
-	EPROTO:          "EPROTO",
-	EPROTONOSUPPORT: "EPROTONOSUPPORT",
-	EPROTOTYPE:      "EPROTOTYPE",
-	ERANGE:          "ERANGE",
-	EROFS:           "EROFS",
-	ESPIPE:          "ESPIPE",
-	ESRCH:           "ESRCH",
-	ESTALE:          "ESTALE",
-	ETIMEDOUT:       "ETIMEDOUT",
-	ETXTBSY:         "ETXTBSY",
-	EXDEV:           "EXDEV",
-	ENOTCAPABLE:     "ENOTCAPABLE",
+	ErrnoSuccess:        "ESUCCESS",
+	Errno2big:           "E2BIG",
+	ErrnoAcces:          "EACCES",
+	ErrnoAddrinuse:      "EADDRINUSE",
+	ErrnoAddrnotavail:   "EADDRNOTAVAIL",
+	ErrnoAfnosupport:    "EAFNOSUPPORT",
+	ErrnoAgain:          "EAGAIN",
+	ErrnoAlready:        "EALREADY",
+	ErrnoBadf:           "EBADF",
+	ErrnoBadmsg:         "EBADMSG",
+	ErrnoBusy:           "EBUSY",
+	ErrnoCanceled:       "ECANCELED",
+	ErrnoChild:          "ECHILD",
+	ErrnoConnaborted:    "ECONNABORTED",
+	ErrnoConnrefused:    "ECONNREFUSED",
+	ErrnoConnreset:      "ECONNRESET",
+	ErrnoDeadlk:         "EDEADLK",
+	ErrnoDestaddrreq:    "EDESTADDRREQ",
+	ErrnoDom:            "EDOM",
+	ErrnoDquot:          "EDQUOT",
+	ErrnoExist:          "EEXIST",
+	ErrnoFault:          "EFAULT",
+	ErrnoFbig:           "EFBIG",
+	ErrnoHostunreach:    "EHOSTUNREACH",
+	ErrnoIdrm:           "EIDRM",
+	ErrnoIlseq:          "EILSEQ",
+	ErrnoInprogress:     "EINPROGRESS",
+	ErrnoIntr:           "EINTR",
+	ErrnoInval:          "EINVAL",
+	ErrnoIo:             "EIO",
+	ErrnoIsconn:         "EISCONN",
+	ErrnoIsdir:          "EISDIR",
+	ErrnoLoop:           "ELOOP",
+	ErrnoMfile:          "EMFILE",
+	ErrnoMlink:          "EMLINK",
+	ErrnoMsgsize:        "EMSGSIZE",
+	ErrnoMultihop:       "EMULTIHOP",
+	ErrnoNametoolong:    "ENAMETOOLONG",
+	ErrnoNetdown:        "ENETDOWN",
+	ErrnoNetreset:       "ENETRESET",
+	ErrnoNetunreach:     "ENETUNREACH",
+	ErrnoNfile:          "ENFILE",
+	ErrnoNobufs:         "ENOBUFS",
+	ErrnoNodev:          "ENODEV",
+	ErrnoNoent:          "ENOENT",
+	ErrnoNoexec:         "ENOEXEC",
+	ErrnoNolck:          "ENOLCK",
+	ErrnoNolink:         "ENOLINK",
+	ErrnoNomem:          "ENOMEM",
+	ErrnoNomsg:          "ENOMSG",
+	ErrnoNoprotoopt:     "ENOPROTOOPT",
+	ErrnoNospc:          "ENOSPC",
+	ErrnoNosys:          "ENOSYS",
+	ErrnoNotconn:        "ENOTCONN",
+	ErrnoNotdir:         "ENOTDIR",
+	ErrnoNotempty:       "ENOTEMPTY",
+	ErrnoNotrecoverable: "ENOTRECOVERABLE",
+	ErrnoNotsock:        "ENOTSOCK",
+	ErrnoNotsup:         "ENOTSUP",
+	ErrnoNotty:          "ENOTTY",
+	ErrnoNxio:           "ENXIO",
+	ErrnoOverflow:       "EOVERFLOW",
+	ErrnoOwnerdead:      "EOWNERDEAD",
+	ErrnoPerm:           "EPERM",
+	ErrnoPipe:           "EPIPE",
+	ErrnoProto:          "EPROTO",
+	ErrnoProtonosupport: "EPROTONOSUPPORT",
+	ErrnoPrototype:      "EPROTOTYPE",
+	ErrnoRange:          "ERANGE",
+	ErrnoRofs:           "EROFS",
+	ErrnoSpipe:          "ESPIPE",
+	ErrnoSrch:           "ESRCH",
+	ErrnoStale:          "ESTALE",
+	ErrnoTimedout:       "ETIMEDOUT",
+	ErrnoTxtbsy:         "ETXTBSY",
+	ErrnoXdev:           "EXDEV",
+	ErrnoNotcapable:     "ENOTCAPABLE",
 }
 
 const (
