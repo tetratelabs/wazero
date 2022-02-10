@@ -86,7 +86,7 @@ type arm64Compiler struct {
 // compile implements compiler.compile for the arm64 architecture.
 func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error) {
 	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all valueLocationStack(s)
-	// used for all labels (via replaceLocationStack), excluding the current one.
+	// used for all labels (via setLocationStack), excluding the current one.
 	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
 	stackPointerCeil = c.stackPointerCeil
 	if stackPointerCeil < c.locationStack.stackPointerCeil {
@@ -371,10 +371,10 @@ func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 	return errors.New("TODO: implement compileHostFunction on arm64")
 }
 
-// replaceLocationStack sets the given valueLocationStack to .locationStack field,
+// setLocationStack sets the given valueLocationStack to .locationStack field,
 // while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
-func (c *arm64Compiler) replaceLocationStack(newStack *valueLocationStack) {
+func (c *arm64Compiler) setLocationStack(newStack *valueLocationStack) {
 	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
 		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
@@ -403,7 +403,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	c.replaceLocationStack(labelInfo.initialStack)
+	c.setLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
@@ -466,7 +466,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		case arm64.COND_LE:
 			jmpWithCond.As = arm64.ABLE
 		default:
-			// This means that we use the cond.conditionalRegister somewhere in this file,
+			// BUG: This means that we use the cond.conditionalRegister somewhere in this file,
 			// but not covered in switch ^. That shouldn't happen.
 			return fmt.Errorf("unsupported condition for br_if: %v", cond.conditionalRegister)
 		}
@@ -490,7 +490,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// We save and clone the location stack because we might end up modifying it inside of branchInto,
 	// and we have to avoid affecting the code generation for Then branch afterwards.
 	saved := c.locationStack
-	c.replaceLocationStack(saved.clone())
+	c.setLocationStack(saved.clone())
 	if err := c.emitDropRange(o.Else.ToDrop); err != nil {
 		return err
 	}
@@ -498,7 +498,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 	// Now ready to emit the code for branching into then branch.
 	// Retrieve the original value location stack so that the code below wont'be affected by the Else branch ^^.
-	c.replaceLocationStack(saved)
+	c.setLocationStack(saved)
 	// We jump here from the original conditional jump (jmpWithCond).
 	c.setJmpTargetOnNext(jmpWithCond)
 	if err := c.emitDropRange(o.Then.ToDrop); err != nil {

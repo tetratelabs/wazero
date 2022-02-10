@@ -127,7 +127,7 @@ type amd64Compiler struct {
 	locationStack *valueLocationStack
 	// labels hold per wazeroir label specific information in this function.
 	labels map[string]*labelInfo
-	// stackPointerCeil tracks the maximum value of stack pointer (from valueLocationStack).
+	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
 	stackPointerCeil uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel string
@@ -138,10 +138,10 @@ type amd64Compiler struct {
 	staticData          compiledFunctionStaticData
 }
 
-// replaceLocationStack sets the given valueLocationStack to .locationStack field,
+// setLocationStack sets the given valueLocationStack to .locationStack field,
 // while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
-func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
+func (c *amd64Compiler) setLocationStack(newStack *valueLocationStack) {
 	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
 		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
@@ -203,8 +203,8 @@ func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 
 // compile implements compiler.compile for the amd64 architecture.
 func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error) {
-	// c.stackPointerCeil tracks the maximum stack pointer across all valueLocationStack(s)
-	// used for all labels (via replaceLocationStack), excluding the current one.
+	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all valueLocationStack(s)
+	// used for all labels (via setLocationStack), excluding the current one.
 	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
 	stackPointerCeil = c.stackPointerCeil
 	if stackPointerCeil < c.locationStack.stackPointerCeil {
@@ -633,7 +633,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 	// Emit for else branches
 	saved := c.locationStack
-	c.replaceLocationStack(saved.clone())
+	c.setLocationStack(saved.clone())
 	if elseTarget.Target.IsReturnTarget() {
 		if err := c.returnFunction(); err != nil {
 			return err
@@ -661,7 +661,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 	// Handle then branch.
 	c.addSetJmpOrigins(jmpWithCond)
-	c.replaceLocationStack(saved)
+	c.setLocationStack(saved)
 	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
 		return err
 	}
@@ -842,7 +842,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			// as this is the last code in this block.
 			locationStack = saved
 		}
-		c.replaceLocationStack(locationStack)
+		c.setLocationStack(locationStack)
 		if err := c.emitDropRange(target.ToDrop); err != nil {
 			return err
 		}
@@ -924,7 +924,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	c.replaceLocationStack(labelInfo.initialStack)
+	c.setLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
