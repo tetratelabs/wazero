@@ -673,7 +673,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	return nil
 }
 
-func (c *arm64Compiler) readInstructionAddress(beforeTargetInstAddress obj.As, destinationRegister int16) {
+func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinationRegister int16) {
 	// Emit ADR instruction to read the specified instruction's absolute address.
 	// Note: we cannot emit the "ADR REG, $(target's offset from here)" due to the
 	// incapability of the assembler. Instead, we emit "ADR REG, ." meaning that
@@ -692,7 +692,7 @@ func (c *arm64Compiler) readInstructionAddress(beforeTargetInstAddress obj.As, d
 		// Find the target instruction.
 		target := readAddress
 		for target != nil {
-			if target.As == beforeTargetInstAddress {
+			if target.As == beforeTargetInst {
 				// At this point, target is the instruction right before the target instruction.
 				// Thus, advance one more time to make target the target instruction.
 				target = target.Link
