@@ -101,13 +101,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		builder:       b,
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
-	}
-
-	if ir != nil {
-		compiler.labels = make(map[string]*labelInfo, len(ir.LabelCallers))
-		for key, callers := range ir.LabelCallers {
-			compiler.labels[key] = &labelInfo{callers: callers}
-		}
+		ir:            ir,
 	}
 	return compiler, nil
 }
@@ -119,6 +113,7 @@ func (c *amd64Compiler) String() string {
 type amd64Compiler struct {
 	builder *asm.Builder
 	f       *wasm.FunctionInstance
+	ir      *wazeroir.CompilationResult
 	// setJmpOrigins sets jmp kind instructions where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
 	setJmpOrigins []*obj.Prog
@@ -153,7 +148,6 @@ func (c *amd64Compiler) addStaticData(d []byte) {
 }
 
 type labelInfo struct {
-	// callers is the number of call sites which may jump into this label.
 	callers uint32
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction *obj.Prog

@@ -57,13 +57,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		f:             f,
 		builder:       b,
 		locationStack: newValueLocationStack(),
-	}
-
-	if ir != nil {
-		compiler.labels = make(map[string]*labelInfo, len(ir.LabelCallers))
-		for key, callers := range ir.LabelCallers {
-			compiler.labels[key] = &labelInfo{callers: callers}
-		}
+		ir:            ir,
 	}
 	return compiler, nil
 }
@@ -71,6 +65,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 type arm64Compiler struct {
 	builder *asm.Builder
 	f       *wasm.FunctionInstance
+	ir      *wazeroir.CompilationResult
 	// setBRTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
 	//  where we want to set the next coming instruction as the destination of these BR instructions.
 	setBRTargetOnNextInstructions []*obj.Prog
@@ -102,8 +97,6 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 
 // labelInfo holds a wazeroir label specific information in this function.
 type labelInfo struct {
-	// callers is the number of call sites which branch into this label.
-	callers uint32
 	// initialInstruction is the initial instruction for this label so other block can branch into it.
 	initialInstruction *obj.Prog
 	// initialStack is the initial value location stack from which we start compiling this label.
@@ -514,8 +507,7 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		return c.returnFunction()
 	} else {
 		labelKey := target.String()
-		targetLabel := c.label(labelKey)
-		if targetLabel.callers > 1 {
+		if c.ir.LabelCallers[labelKey] > 1 {
 			// We can only re-use register state if when there's a single call-site.
 			// Release existing state to the stack if there's multiple ones to have
 			// consistent register state at the beginning of label.
@@ -526,6 +518,7 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
+		targetLabel := c.label(labelKey)
 		if targetLabel.initialStack == nil {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
