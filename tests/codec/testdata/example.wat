@@ -4,9 +4,10 @@
 	(type $i32i32_i32 (func (param $i i32) (param $j i32) (result i32)))
 
     ;; type use by symbolic ID, but no param names
-	(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type $i32i32_i32)))
+    (import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (type $i32i32_i32)))
 	;; type use on an import func which adds param names on anonymous type
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write
+	;; TODO correct the param names
+	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write
 		(param $fd i32) (param $iovs_ptr i32) (param $iovs_len i32) (param $nwritten_ptr i32) (result i32)))
 
     ;; func call referencing a func not defined, yet

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -41,7 +42,7 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "type func empty after inlined", // ensures the parser was reset properly
 			input: `(module
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32 i32 i32 i32) (result i32)))
 	(type (func))
 )`,
 			expected: &wasm.Module{
@@ -50,12 +51,12 @@ func TestDecodeModule(t *testing.T) {
 					i32i32i32i32_i32,
 				},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "fd_write",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 1,
 				}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
 				},
 			},
 		},
@@ -155,34 +156,34 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "import func inlined type",
 			input: `(module
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32) (param i32) (param i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32) (param i32) (param i32) (param i32) (result i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "fd_write",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
 				},
 			},
 		},
 		{
 			name: "import func inlined type - abbreviated",
 			input: `(module
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32 i32 i32 i32) (result i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "fd_write",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
 				},
 			},
 		},
@@ -207,34 +208,34 @@ func TestDecodeModule(t *testing.T) {
 			// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A0
 			name: "import func inlined type - mixed abbreviated",
 			input: `(module
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32) (param i32 i32) (param i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32) (param i32 i32) (param i32) (result i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "fd_write",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
 				},
 			},
 		},
 		{
 			name: "import func inlined type no result",
 			input: `(module
-	(import "wasi_snapshot_preview1" "proc_exit" (func $runtime.proc_exit (param i32)))
+	(import "wasi_snapshot_preview1" "proc_exit" (func $wasi.proc_exit (param i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32_v},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "proc_exit",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionProcExit,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.proc_exit"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.proc_exit"}},
 				},
 			},
 		},
@@ -249,58 +250,58 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "import func inlined type different param types",
 			input: `(module
-	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32) (param i32) (param i32) (param i32) (param i32) (param i64) (param i64) (param i32) (param i32) (result i32)))
+	(import "wasi_snapshot_preview1" "path_open" (func $wasi.path_open (param i32) (param i32) (param i32) (param i32) (param i32) (param i64) (param i64) (param i32) (param i32) (result i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "path_open",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionPathOpen,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.path_open"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.path_open"}},
 				},
 			},
 		},
 		{
 			name: "import func inlined type different param types - abbreviated",
 			input: `(module
-	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "path_open" (func $wasi.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32i32i64i64i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "path_open",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionPathOpen,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.path_open"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.path_open"}},
 				},
 			},
 		},
 		{
 			name: "multiple import func different inlined type",
 			input: `(module
-			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (param i32 i32) (result i32)))
-			(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+			(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (param i32 i32) (result i32)))
+			(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32 i32 i32 i32) (result i32)))
 		)`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32_i32, i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}, {
-					Module: "wasi_snapshot_preview1", Name: "fd_write",
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 1,
 				}},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.args_sizes_get"},
-						&wasm.NameAssoc{Index: 1, Name: "runtime.fd_write"},
+						&wasm.NameAssoc{Index: 0, Name: "wasi.args_sizes_get"},
+						&wasm.NameAssoc{Index: 1, Name: "wasi.fd_write"},
 					},
 				},
 			},
@@ -311,8 +312,8 @@ func TestDecodeModule(t *testing.T) {
 	(type (func) (; ensures no false match on index 0 ;))
 	(type $i32i32_i32 (func (param i32 i32) (result i32)))
 	(type $i32i32i32i32_i32 (func (param i32 i32 i32 i32) (result i32)))
-	(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type $i32i32_i32)))
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (type $i32i32i32i32_i32)))
+	(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (type $i32i32_i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (type $i32i32i32i32_i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
@@ -322,19 +323,19 @@ func TestDecodeModule(t *testing.T) {
 				},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 2,
 					},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						{Index: 0, Name: "runtime.args_sizes_get"},
-						{Index: 1, Name: "runtime.fd_write"},
+						{Index: 0, Name: "wasi.args_sizes_get"},
+						{Index: 1, Name: "wasi.fd_write"},
 					},
 				},
 			},
@@ -345,26 +346,26 @@ func TestDecodeModule(t *testing.T) {
 			(type (func) (; ensures no false match on index 0 ;))
 			(type (func (param i32 i32) (result i32)))
 			(type (func (param i32 i32 i32 i32) (result i32)))
-			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type 1)))
-			(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (type 2)))
+			(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (type 1)))
+			(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (type 2)))
 		)`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32, i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 2,
 					},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.args_sizes_get"},
-						&wasm.NameAssoc{Index: 1, Name: "runtime.fd_write"},
+						&wasm.NameAssoc{Index: 0, Name: "wasi.args_sizes_get"},
+						&wasm.NameAssoc{Index: 1, Name: "wasi.fd_write"},
 					},
 				},
 			},
@@ -373,26 +374,26 @@ func TestDecodeModule(t *testing.T) {
 			name: "multiple import func same inlined type",
 			input: `(module
 			(type (func) (; ensures no false match on index 0 ;))
-			(import "wasi_snapshot_preview1" "environ_get" (func $runtime.environ_get (param i32 i32) (result i32)))
-			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (param i32 i32) (result i32)))
+			(import "wasi_snapshot_preview1" "environ_get" (func $wasi.environ_get (param i32 i32) (result i32)))
+			(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (param i32 i32) (result i32)))
 		)`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "environ_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionEnvironGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.environ_get"},
-						&wasm.NameAssoc{Index: 1, Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: 0, Name: "wasi.environ_get"},
+						&wasm.NameAssoc{Index: 1, Name: "wasi.args_sizes_get"},
 					},
 				},
 			},
@@ -402,26 +403,26 @@ func TestDecodeModule(t *testing.T) {
 			input: `(module
 			(type (func) (; ensures no false match on index 0 ;))
 			(type (func (param i32 i32) (result i32)))
-			(import "wasi_snapshot_preview1" "environ_get" (func $runtime.environ_get (type 1)))
-			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type 1)))
+			(import "wasi_snapshot_preview1" "environ_get" (func $wasi.environ_get (type 1)))
+			(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (type 1)))
 		)`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "environ_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionEnvironGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.environ_get"},
-						&wasm.NameAssoc{Index: 1, Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: 0, Name: "wasi.environ_get"},
+						&wasm.NameAssoc{Index: 1, Name: "wasi.args_sizes_get"},
 					},
 				},
 			},
@@ -430,27 +431,27 @@ func TestDecodeModule(t *testing.T) {
 			name: "multiple import func same type index - type after import",
 			input: `(module
 			(type (func) (; ensures no false match on index 0 ;))
-			(import "wasi_snapshot_preview1" "environ_get" (func $runtime.environ_get (type 1)))
-			(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (type 1)))
+			(import "wasi_snapshot_preview1" "environ_get" (func $wasi.environ_get (type 1)))
+			(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (type 1)))
 			(type (func (param i32 i32) (result i32)))
 		)`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "environ_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionEnvironGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						&wasm.NameAssoc{Index: 0, Name: "runtime.environ_get"},
-						&wasm.NameAssoc{Index: 1, Name: "runtime.args_sizes_get"},
+						&wasm.NameAssoc{Index: 0, Name: "wasi.environ_get"},
+						&wasm.NameAssoc{Index: 1, Name: "wasi.args_sizes_get"},
 					},
 				},
 			},
@@ -518,8 +519,8 @@ func TestDecodeModule(t *testing.T) {
 			name: "multiple import func with different inlined type",
 			input: `(module
 	(type (func) (; ensures no false match on index 0 ;))
-	(import "wasi_snapshot_preview1" "path_open" (func $runtime.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
-	(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "path_open" (func $wasi.path_open (param i32 i32 i32 i32 i32 i64 i64 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32 i32 i32 i32) (result i32)))
 )`,
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
@@ -529,19 +530,19 @@ func TestDecodeModule(t *testing.T) {
 				},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "path_open",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionPathOpen,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: "fd_write",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 2,
 					},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{
-						{Index: 0, Name: "runtime.path_open"},
-						{Index: 1, Name: "runtime.fd_write"},
+						{Index: 0, Name: "wasi.path_open"},
+						{Index: 1, Name: "wasi.fd_write"},
 					},
 				},
 			},
@@ -676,28 +677,28 @@ func TestDecodeModule(t *testing.T) {
 		{
 			name: "func inlined type",
 			input: `(module
-			(func $runtime.fd_write (param i32) (param i32) (param i32) (param i32) (result i32) local.get 0 )
+			(func $wasi.fd_write (param i32) (param i32) (param i32) (param i32) (result i32) local.get 0 )
 		)`,
 			expected: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
 				},
 			},
 		},
 		{
 			name: "func inlined type - abbreviated",
 			input: `(module
-			(func $runtime.fd_write (param i32 i32 i32 i32) (result i32) local.get 0)
+			(func $wasi.fd_write (param i32 i32 i32 i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
 				},
 			},
 		},
@@ -706,14 +707,14 @@ func TestDecodeModule(t *testing.T) {
 			// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A0
 			name: "func inlined type - mixed abbreviated",
 			input: `(module
-			(func $runtime.fd_write (param i32) (param i32 i32) (param i32) (result i32) local.get 0)
+			(func $wasi.fd_write (param i32) (param i32 i32) (param i32) (result i32) local.get 0)
 		)`,
 			expected: &wasm.Module{
 				TypeSection:     []*wasm.FunctionType{i32i32i32i32_i32},
 				FunctionSection: []wasm.Index{0},
 				CodeSection:     []*wasm.Code{{Body: localGet0End}},
 				NameSection: &wasm.NameSection{
-					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "runtime.fd_write"}},
+					FunctionNames: wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "wasi.fd_write"}},
 				},
 			},
 		},
@@ -914,7 +915,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
@@ -941,7 +942,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
@@ -968,7 +969,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
@@ -995,7 +996,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
@@ -1022,7 +1023,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{v_v, i32i32_i32},
 				ImportSection: []*wasm.Import{
 					{
-						Module: "wasi_snapshot_preview1", Name: "args_get",
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsGet,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					},
