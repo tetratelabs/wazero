@@ -51,7 +51,7 @@ func TestDecodeModule(t *testing.T) {
 					i32i32i32i32_i32,
 				},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 1,
 				}},
@@ -161,7 +161,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
@@ -178,7 +178,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
@@ -213,7 +213,7 @@ func TestDecodeModule(t *testing.T) {
 			expected: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{i32i32i32i32_i32},
 				ImportSection: []*wasm.Import{{
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
@@ -294,7 +294,7 @@ func TestDecodeModule(t *testing.T) {
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}, {
-					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+					Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 					Kind:     wasm.ImportKindFunc,
 					DescFunc: 1,
 				}},
@@ -327,7 +327,7 @@ func TestDecodeModule(t *testing.T) {
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 2,
 					},
@@ -357,7 +357,7 @@ func TestDecodeModule(t *testing.T) {
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 2,
 					},
@@ -534,7 +534,7 @@ func TestDecodeModule(t *testing.T) {
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
-						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+						Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 						Kind:     wasm.ImportKindFunc,
 						DescFunc: 2,
 					},
