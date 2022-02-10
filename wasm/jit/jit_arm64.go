@@ -71,9 +71,9 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 type arm64Compiler struct {
 	builder *asm.Builder
 	f       *wasm.FunctionInstance
-	// setJmpTargetOnNextInstructions holds jmp kind instructions where we want to set the next coming
-	// instruction as the destination of these jmp instructions.
-	setJmpTargetOnNextInstructions []*obj.Prog
+	// setBRTargetOnNextInstructions holds BR kind instructions where we want to set the next coming
+	// instruction as the destination of these BR instructions.
+	setBRTargetOnNextInstructions []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
@@ -101,9 +101,9 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 }
 
 type labelInfo struct {
-	// callers is the number of call sites which jump into this label.
+	// callers is the number of call sites which branch into this label.
 	callers uint32
-	// initialInstruction is the initial instruction for this label so other block can jump into it.
+	// initialInstruction is the initial instruction for this label so other block can branch into it.
 	initialInstruction *obj.Prog
 	// initialStack is the initial value location stack from which we start compiling this label.
 	initialStack *valueLocationStack
@@ -122,10 +122,10 @@ func (c *arm64Compiler) label(labelKey string) *labelInfo {
 
 func (c *arm64Compiler) newProg() (inst *obj.Prog) {
 	inst = c.builder.NewProg()
-	for _, origin := range c.setJmpTargetOnNextInstructions {
+	for _, origin := range c.setBRTargetOnNextInstructions {
 		origin.To.SetTarget(inst)
 	}
-	c.setJmpTargetOnNextInstructions = nil
+	c.setBRTargetOnNextInstructions = nil
 	return
 }
 
@@ -133,8 +133,8 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 	c.builder.AddInstruction(inst)
 }
 
-func (c *arm64Compiler) setJmpTargetOnNext(progs ...*obj.Prog) {
-	c.setJmpTargetOnNextInstructions = append(c.setJmpTargetOnNextInstructions, progs...)
+func (c *arm64Compiler) setBRTargetOnNext(progs ...*obj.Prog) {
+	c.setBRTargetOnNextInstructions = append(c.setBRTargetOnNextInstructions, progs...)
 }
 
 func (c *arm64Compiler) markRegisterUsed(reg int16) {
@@ -266,7 +266,7 @@ func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, s
 	c.addInstruction(inst)
 }
 
-func (c *arm64Compiler) emitUnconditionalJumpInstruction(targetType obj.AddrType) (jmp *obj.Prog) {
+func (c *arm64Compiler) emitUnconditionalBRInstruction(targetType obj.AddrType) (jmp *obj.Prog) {
 	jmp = c.newProg()
 	jmp.As = obj.AJMP
 	jmp.To.Type = targetType
@@ -308,7 +308,7 @@ func (c *arm64Compiler) emitPreamble() error {
 
 // returnFunction emits instructions to return from the current function frame.
 // If the current frame is the bottom, the code goes back to the Go code with jitCallStatusCodeReturned status.
-// Otherwise, we jump into the caller's return address (TODO).
+// Otherwise, we branch into the caller's return address (TODO).
 func (c *arm64Compiler) returnFunction() error {
 	// TODO: we don't support function calls yet.
 	// For now the following code just returns to Go code.
@@ -399,14 +399,14 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 	c.addInstruction(labelBegin)
 
 	// Save the instructions so that backward branching
-	// instructions can jump to this label.
+	// instructions can branch to this label.
 	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
 	c.setLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
-	// instructions can properly jump to this label.
+	// instructions can properly branch to this label.
 	for _, cb := range labelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
@@ -439,32 +439,32 @@ func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
 func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	cond := c.locationStack.pop()
 
-	jmpWithCond := c.newProg()
-	jmpWithCond.To.Type = obj.TYPE_BRANCH
+	conditionalBR := c.newProg()
+	conditionalBR.To.Type = obj.TYPE_BRANCH
 	if cond.onConditionalRegister() {
 		switch cond.conditionalRegister {
 		case arm64.COND_EQ:
-			jmpWithCond.As = arm64.ABEQ
+			conditionalBR.As = arm64.ABEQ
 		case arm64.COND_NE:
-			jmpWithCond.As = arm64.ABNE
+			conditionalBR.As = arm64.ABNE
 		case arm64.COND_HS:
-			jmpWithCond.As = arm64.ABHS
+			conditionalBR.As = arm64.ABHS
 		case arm64.COND_LO:
-			jmpWithCond.As = arm64.ABLO
+			conditionalBR.As = arm64.ABLO
 		case arm64.COND_MI:
-			jmpWithCond.As = arm64.ABMI
+			conditionalBR.As = arm64.ABMI
 		case arm64.COND_HI:
-			jmpWithCond.As = arm64.ABHI
+			conditionalBR.As = arm64.ABHI
 		case arm64.COND_LS:
-			jmpWithCond.As = arm64.ABLS
+			conditionalBR.As = arm64.ABLS
 		case arm64.COND_GE:
-			jmpWithCond.As = arm64.ABGE
+			conditionalBR.As = arm64.ABGE
 		case arm64.COND_LT:
-			jmpWithCond.As = arm64.ABLT
+			conditionalBR.As = arm64.ABLT
 		case arm64.COND_GT:
-			jmpWithCond.As = arm64.ABGT
+			conditionalBR.As = arm64.ABGT
 		case arm64.COND_LE:
-			jmpWithCond.As = arm64.ABLE
+			conditionalBR.As = arm64.ABLE
 		default:
 			// BUG: This means that we use the cond.conditionalRegister somewhere in this file,
 			// but not covered in switch ^. That shouldn't happen.
@@ -472,19 +472,19 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		}
 	} else {
 		// If the value is not on the conditional register, we compare the value with the zero register,
-		// and then do the conditional jump if the value does't equal zero.
+		// and then do the conditional BR if the value does't equal zero.
 		if err := c.ensureOnGeneralPurposeRegister(cond); err != nil {
 			return err
 		}
 		// Compare the value with zero register. Note that the value is ensured to be i32 by function validation phase,
 		// so we use CMPW (32-bit compare) here.
 		c.applyTwoRegistersToNoneInstruction(arm64.ACMPW, cond.register, zeroRegister)
-		jmpWithCond.As = arm64.ABNE
+		conditionalBR.As = arm64.ABNE
 
 		c.markRegisterUnused(cond.register)
 	}
 
-	c.addInstruction(jmpWithCond)
+	c.addInstruction(conditionalBR)
 
 	// Emit the code for branching into else branch.
 	// We save and clone the location stack because we might end up modifying it inside of branchInto,
@@ -499,8 +499,8 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// Now ready to emit the code for branching into then branch.
 	// Retrieve the original value location stack so that the code below wont'be affected by the Else branch ^^.
 	c.setLocationStack(saved)
-	// We jump here from the original conditional jump (jmpWithCond).
-	c.setJmpTargetOnNext(jmpWithCond)
+	// We branch into here from the original conditional BR (conditionalBR).
+	c.setBRTargetOnNext(conditionalBR)
 	if err := c.emitDropRange(o.Then.ToDrop); err != nil {
 		return err
 	}
@@ -529,22 +529,22 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
-		jmp := c.emitUnconditionalJumpInstruction(obj.TYPE_BRANCH)
-		c.assignJumpTarget(labelKey, jmp)
+		jmp := c.emitUnconditionalBRInstruction(obj.TYPE_BRANCH)
+		c.assignBranchTarget(labelKey, jmp)
 		return nil
 	}
 }
 
-// assignJumpTarget assigns the given label's initial instruction to the destination of jmp.
-func (c *arm64Compiler) assignJumpTarget(labelKey string, jmp *obj.Prog) {
+// assignBranchTarget assigns the given label's initial instruction to the destination of br.
+func (c *arm64Compiler) assignBranchTarget(labelKey string, br *obj.Prog) {
 	target := c.label(labelKey)
 	if target.initialInstruction != nil {
-		jmp.To.SetTarget(target.initialInstruction)
+		br.To.SetTarget(target.initialInstruction)
 	} else {
 		// This case, the target label hasn't been compiled yet, so we append the callback and assign
 		// the target instruction when compileLabel is called for the label.
 		target.labelBeginningCallbacks = append(target.labelBeginningCallbacks, func(labelInitialInstruction *obj.Prog) {
-			jmp.To.SetTarget(labelInitialInstruction)
+			br.To.SetTarget(labelInitialInstruction)
 		})
 	}
 }
