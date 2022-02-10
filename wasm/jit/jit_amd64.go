@@ -154,7 +154,7 @@ func (c *amd64Compiler) addStaticData(d []byte) {
 
 type labelInfo struct {
 	// callers is the number of call sites which may jump into this label.
-	callers int
+	callers uint32
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction *obj.Prog
 	// initialStack is the initial value location stack from which we start compiling this label.

@@ -138,14 +138,14 @@ type CompilationResult struct {
 	// LabelCallers maps Label.String() to the number of callers to that label.
 	// Here "callers" means that the callsites which jumps to the label with br, br_if or br_table
 	// instructions.
-	LabelCallers map[string]int
+	LabelCallers map[string]uint32
 }
 
 // Compile lowers given function instance into wazeroir operations
 // so that the resulting operations can be consumed by the interpreter
 // or the JIT compilation engine.
 func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
-	c := compiler{controlFrames: &controlFrames{}, f: f, result: CompilationResult{LabelCallers: map[string]int{}}}
+	c := compiler{controlFrames: &controlFrames{}, f: f, result: CompilationResult{LabelCallers: map[string]uint32{}}}
 
 	// Push function arguments.
 	for _, t := range f.FunctionType.Type.Params {
