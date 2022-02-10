@@ -39,9 +39,9 @@ type API interface {
 	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
 	//   and ArgsGet results argv=7 and argvBuf=1, we expect `ctx.Memory.Buffer` to contain:
 	//
-	//               argvBufSize                argc * 4
-	//            +----------------+     +--------------------+
-	//            |                |     |                    |
+	//               argvBufSize          uint32le    uint32le
+	//            +----------------+     +--------+  +--------+
+	//            |                |     |        |  |        |
 	// []byte{?, 'a', 0, 'b', 'c', 0, ?, 1, 0, 0, 0, 3, 0, 0, 0, ?}
 	//  argvBuf --^                      ^           ^
 	//                            argv --|           |
@@ -65,7 +65,7 @@ type API interface {
 	// For example, if Args are []string{"a","bc"} and
 	//   ArgsSizesGet parameters resultArgc=1 and resultArgvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
 	//
-	//                    uint32         uint32
+	//                   uint32le       uint32le
 	//                  +--------+     +--------+
 	//                  |        |     |        |
 	//        []byte{?, 2, 0, 0, 0, ?, 5, 0, 0, 0, ?}
@@ -96,7 +96,7 @@ type API interface {
 	// For example, if time.Now returned exactly midnight UTC 2022-01-01 (1640995200000000000), and
 	//   ClockTimeGet resultTimestamp=1, we expect `ctx.Memory.Buffer` to contain:
 	//
-	//                                       uint64
+	//                                      uint64le
 	//                    +------------------------------------------+
 	//                    |                                          |
 	//          []byte{?, 0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, ?}
