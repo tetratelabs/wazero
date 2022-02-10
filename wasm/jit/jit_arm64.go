@@ -101,7 +101,7 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 }
 
 type labelInfo struct {
-	// callers is the number of call sites which may jump into this label.
+	// callers is the number of call sites which jump into this label.
 	callers int
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction *obj.Prog
