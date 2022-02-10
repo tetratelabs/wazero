@@ -102,6 +102,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,
+		labels:        map[string]*labelInfo{},
 	}
 	return compiler, nil
 }
@@ -148,7 +149,6 @@ func (c *amd64Compiler) addStaticData(d []byte) {
 }
 
 type labelInfo struct {
-	callers uint32
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction *obj.Prog
 	// initialStack is the initial value location stack from which we start compiling this label.
@@ -521,8 +521,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		return c.returnFunction()
 	} else {
 		labelKey := target.String()
-		targetLabel := c.label(labelKey)
-		if targetLabel.callers > 1 {
+		if c.ir.LabelCallers[labelKey] > 1 {
 			// If the number of callers to the target label is larger than one,
 			// we have multiple origins to the target branch. In that case,
 			// we must have unique register state.
@@ -533,6 +532,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
+		targetLabel := c.label(labelKey)
 		if targetLabel.initialStack == nil {
 			// It seems unnecessary to clone as branchInto is always the tail of the current block.
 			// TODO: verify ^^.
@@ -634,8 +634,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		}
 	} else {
 		elseLabelKey := elseTarget.Target.Label.String()
-		labelInfo := c.label(elseLabelKey)
-		if labelInfo.callers > 1 {
+		if c.ir.LabelCallers[elseLabelKey] > 1 {
 			if err := c.preLabelJumpRegisterAdjustment(); err != nil {
 				return err
 			}
@@ -643,6 +642,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
+		labelInfo := c.label(elseLabelKey)
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack
 		}
@@ -663,8 +663,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		return c.returnFunction()
 	} else {
 		thenLabelKey := thenTarget.Target.Label.String()
-		labelInfo := c.label(thenLabelKey)
-		if c.label(thenLabelKey).callers > 1 {
+		if c.ir.LabelCallers[thenLabelKey] > 1 {
 			if err := c.preLabelJumpRegisterAdjustment(); err != nil {
 				return err
 			}
@@ -672,6 +671,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
+		labelInfo := c.label(thenLabelKey)
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack
 		}
@@ -930,7 +930,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
-		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
+		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, c.ir.LabelCallers[labelKey], c.locationStack)
 	}
 	c.currentLabel = labelKey
 	return

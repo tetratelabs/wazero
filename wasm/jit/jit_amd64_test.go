@@ -326,7 +326,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 10; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
-			c.label(label.String()).callers = 1
+			c.ir.LabelCallers[label.String()] = 1
 			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
 			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
 			err := c.releaseAllRegistersToStack()
@@ -477,6 +477,8 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 					t.Run(tc.name, func(t *testing.T) {
 						env := newJITEnvironment()
 						compiler := env.requireNewCompiler(t)
+						compiler.ir = &wazeroir.CompilationResult{LabelCallers: map[string]uint32{}}
+
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
