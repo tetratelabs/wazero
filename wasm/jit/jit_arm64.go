@@ -720,7 +720,7 @@ func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinat
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
 		//
 		// The first 2 bits live on 29 and 30 bits of theinstruction.
-		adrInstructionBytes[3] |= (v & 0b00000011) << 1
+		adrInstructionBytes[3] |= (v & 0b00000011) << 5
 		// The 3-5 bits live on 5 to 8 bits of the instruction.
 		adrInstructionBytes[0] |= (v & 0b00011100) << 3
 		// The 6-8 bits live on 9 to 11 bits of the instruction.
