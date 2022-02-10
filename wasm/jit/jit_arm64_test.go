@@ -1373,3 +1373,70 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		})
 	}
 }
+
+func TestArm64Compiler_readInstructionAddress(t *testing.T) {
+	t.Run("invalid", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after JMP.
+		compiler.readInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
+
+		compiler.exit(jitCallStatusCodeReturned)
+
+		// If generate the code without JMP after readInstructionAddress,
+		// the call back added must return error.
+		_, _, _, err = compiler.compile()
+		require.Error(t, err)
+	})
+	t.Run("ok", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after RET,
+		// and read the absolute address into destinationRegister.
+		const addressReg = reservedRegisterForTemporary
+		compiler.readInstructionAddress(obj.ARET, addressReg)
+
+		// Jump to the instruction after RET below via the absolute
+		// address stored in destinationRegister.
+		jmpToAfterRet := compiler.newProg()
+		jmpToAfterRet.As = obj.AJMP
+		jmpToAfterRet.To.Type = obj.TYPE_MEM
+		jmpToAfterRet.To.Reg = addressReg
+		compiler.addInstruction(jmpToAfterRet)
+
+		compiler.exit(jitCallStatusCodeUnreachable)
+
+		// This could be the read instruction target as this is the
+		// right after RET. Therefore, the jmp instruction above
+		// must target here.
+		const expectedReturnValue uint32 = 10000
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+		require.NoError(t, err)
+
+		err = compiler.releaseAllRegistersToStack()
+		require.NoError(t, err)
+		err = compiler.returnFunction()
+		require.NoError(t, err)
+
+		// Generate the code under test.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
+	})
+}

@@ -77,8 +77,8 @@ type arm64Compiler struct {
 	labels map[string]*labelInfo
 	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
 	stackPointerCeil uint64
-	// beforeAssembleCallback holds the callbacks which are called before assembling native code.
-	beforeAssembleCallback []func() error
+	// afterAssembleCallback hold the callbacks which are called after assembling native code.
+	afterAssembleCallback []func(code []byte) error
 }
 
 // compile implements compiler.compile for the arm64 architecture.
@@ -91,16 +91,19 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 		stackPointerCeil = c.locationStack.stackPointerCeil
 	}
 
-	for _, cb := range c.beforeAssembleCallback {
-		if err = cb(); err != nil {
+	original := c.builder.Assemble()
+
+	for _, cb := range c.afterAssembleCallback {
+		if err = cb(original); err != nil {
 			return
 		}
 	}
 
-	code, err = mmapCodeSegment(c.builder.Assemble())
+	code, err = mmapCodeSegment(original)
 	if err != nil {
 		return
 	}
+
 	return
 }
 
@@ -222,7 +225,6 @@ func (c *arm64Compiler) applyRegisterToMemoryInstruction(instruction obj.As, sou
 		inst.From.Reg = sourceRegister
 		c.addInstruction(inst)
 	}
-	return
 }
 
 // applyRegisterToRegisterInstruction adds an instruction where both destination and source operands are registers.
@@ -672,25 +674,58 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 }
 
 func (c *arm64Compiler) readInstructionAddress(beforeTargetInstAddress obj.As, destinationRegister int16) {
-	inst := c.newProg()
-	inst.As = arm64.AADR
-	inst.From.Type = obj.TYPE_BRANCH
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationRegister
-	c.addInstruction(inst)
-	c.beforeAssembleCallback = append(c.beforeAssembleCallback, func() error {
-		target := inst
+	// Emit ADR instruction to read the specified instruction's absolute address.
+	// Note: we cannot emit the "ADR REG, $(target's offset from here)" due to the
+	// incapability of the assembler. Instead, we emit "ADR REG, ." meaning that
+	// "reading the current program counter" = "reading the absolute address of this ADR instruction".
+	// And then, after compilation phase, we directly edit the native code slice so that
+	// it can properly read the target instruction's absolute address.
+	readAddress := c.newProg()
+	readAddress.As = arm64.AADR
+	readAddress.From.Type = obj.TYPE_BRANCH
+	readAddress.To.Type = obj.TYPE_REG
+	readAddress.To.Reg = destinationRegister
+	c.addInstruction(readAddress)
+
+	// Setup the callback to modify the instruction bytes after compilation.
+	c.afterAssembleCallback = append(c.afterAssembleCallback, func(code []byte) error {
+		// Find the target instruction.
+		target := readAddress
 		for target != nil {
-			// Advance until we have the target.As has the given instruction kind.
-			target = target.Link
 			if target.As == beforeTargetInstAddress {
 				// At this point, target is the instruction right before the target instruction.
 				// Thus, advance one more time to make target the target instruction.
-				inst.From.SetTarget(target.Link)
-				return nil
+				target = target.Link
+				break
 			}
+			target = target.Link
 		}
-		return fmt.Errorf("target instruction not found for read instruction address")
+
+		if target == nil {
+			return fmt.Errorf("BUG: target instruction not found for read instruction address")
+		}
+
+		offset := target.Pc - readAddress.Pc
+		if offset >= math.MaxUint8 {
+			// We could support up to 20-bit integer, but byte should be enough for our impl.
+			// If the necessity comes up, we could fix the below to support larger offsets.
+			return fmt.Errorf("BUG: too large offset for read")
+		}
+
+		// Now ready to write an offset byte.
+		v := byte(offset)
+		// arm64 has 4-bytes = 32-bit fixed-length instruction.
+		adrInstructionBytes := code[readAddress.Pc : readAddress.Pc+4]
+		// According to the binary format of ADR instruction in arm64:
+		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
+		//
+		// The first 2 bits live on 29 and 30 bits of theinstruction.
+		adrInstructionBytes[3] |= (v & 0b00000011) << 1
+		// The 3-5 bits live on 5 to 8 bits of the instruction.
+		adrInstructionBytes[0] |= (v & 0b00011100) << 3
+		// The 6-8 bits live on 9 to 11 bits of the instruction.
+		adrInstructionBytes[1] |= (v & 0b11100000) >> 5
+		return nil
 	})
 }
 
