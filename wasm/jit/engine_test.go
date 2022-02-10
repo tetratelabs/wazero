@@ -51,7 +51,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Offsets for compiledFunction.
 	var compiledFunc compiledFunction
 	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), compiledFunctionCodeInitialAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(compiledFunc.maxStackPointer)), compiledFunctionMaxStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), compiledFunctionStackPointerCeilOffset)
 
 	// Offsets for wasm.TableElement.
 	var tableElement wasm.TableElement

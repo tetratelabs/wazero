@@ -14,9 +14,9 @@ type compiler interface {
 	// This is used, for example, to initilize the reserved registers, etc.
 	emitPreamble() error
 	// compile generates the byte slice of native code.
-	// maxStackPointer is the max stack pointer that the target function would reach.
+	// stackPointerCeil is the max stack pointer that the target function would reach.
 	// staticData is compiledFunctionStaticData for the resutling native code.
-	compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error)
+	compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error)
 	// compileHostFunction emits the trampoline code from which native code can jump into the host function.
 	// TODO: maybe we wouldn't need to have trampoline for host functions.
 	compileHostFunction(address wasm.FunctionAddress) error

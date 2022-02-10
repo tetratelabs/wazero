@@ -127,23 +127,23 @@ type amd64Compiler struct {
 	locationStack *valueLocationStack
 	// labels hold per wazeroir label specific information in this function.
 	labels map[string]*labelInfo
-	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
-	maxStackPointer uint64
+	// stackPointerCeil tracks the maximum value of stack pointer (from valueLocationStack).
+	stackPointerCeil uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel string
-	// onMaxStackPointerDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
-	onMaxStackPointerDeterminedCallBack func(maxStackPointer uint64)
+	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
+	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
 	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
 	onGenerateCallbacks []func(code []byte) error
 	staticData          compiledFunctionStaticData
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
-// while allowing us to track valueLocationStack.maxStackPointer across multiple stacks.
+// while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
 func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
-	if c.maxStackPointer < c.locationStack.maxStackPointer {
-		c.maxStackPointer = c.locationStack.maxStackPointer
+	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
+		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
 	c.locationStack = newStack
 }
@@ -202,19 +202,19 @@ func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 }
 
 // compile implements compiler.compile for the amd64 architecture.
-func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
-	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack(s)
+func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error) {
+	// c.stackPointerCeil tracks the maximum stack pointer across all valueLocationStack(s)
 	// used for all labels (via replaceLocationStack), excluding the current one.
-	// Hence, we check here if the final block's max one exceeds the current c.maxStackPointer.
-	maxStackPointer = c.maxStackPointer
-	if maxStackPointer < c.locationStack.maxStackPointer {
-		maxStackPointer = c.locationStack.maxStackPointer
+	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
+	stackPointerCeil = c.stackPointerCeil
+	if stackPointerCeil < c.locationStack.stackPointerCeil {
+		stackPointerCeil = c.locationStack.stackPointerCeil
 	}
 
 	// Now that the max stack pointer is determined, we are invoking the callback.
 	// Note this MUST be called before Assemble() befolow.
-	if c.onMaxStackPointerDeterminedCallBack != nil {
-		c.onMaxStackPointerDeterminedCallBack(maxStackPointer)
+	if c.onStackPointerCeilDeterminedCallBack != nil {
+		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
 	}
 
 	code, err = mmapCodeSegment(c.builder.Assemble())
@@ -5332,15 +5332,15 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	c.addInstruction(subStackBasePointer)
 
 	// If stack base pointer + max stack poitner > valueStackLen, we need to grow the stack.
-	cmpWithMaxStackPointer := c.newProg()
-	cmpWithMaxStackPointer.As = x86.ACMPQ
-	cmpWithMaxStackPointer.From.Type = obj.TYPE_REG
-	cmpWithMaxStackPointer.From.Reg = tmpRegister
-	cmpWithMaxStackPointer.To.Type = obj.TYPE_CONST
+	cmpWithStackPointerCeil := c.newProg()
+	cmpWithStackPointerCeil.As = x86.ACMPQ
+	cmpWithStackPointerCeil.From.Type = obj.TYPE_REG
+	cmpWithStackPointerCeil.From.Reg = tmpRegister
+	cmpWithStackPointerCeil.To.Type = obj.TYPE_CONST
 	// We don't yet know the max stack poitner at this point.
 	// The max stack pointer is determined after emitting all the instructions.
-	c.onMaxStackPointerDeterminedCallBack = func(maxStackPointer uint64) { cmpWithMaxStackPointer.To.Offset = int64(maxStackPointer) }
-	c.addInstruction(cmpWithMaxStackPointer)
+	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { cmpWithStackPointerCeil.To.Offset = int64(stackPointerCeil) }
+	c.addInstruction(cmpWithStackPointerCeil)
 
 	// Jump if we have no need to grow.
 	jmpIfNoNeedToGrowStack := c.newProg()

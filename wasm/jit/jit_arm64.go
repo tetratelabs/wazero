@@ -79,18 +79,18 @@ type arm64Compiler struct {
 	locationStack *valueLocationStack
 	// labels hold per wazeroir label specific information in this function.
 	labels map[string]*labelInfo
-	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
-	maxStackPointer uint64
+	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
+	stackPointerCeil uint64
 }
 
 // compile implements compiler.compile for the arm64 architecture.
-func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
-	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack(s)
+func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error) {
+	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all valueLocationStack(s)
 	// used for all labels (via replaceLocationStack), excluding the current one.
-	// Hence, we check here if the final block's max one exceeds the current c.maxStackPointer.
-	maxStackPointer = c.maxStackPointer
-	if maxStackPointer < c.locationStack.maxStackPointer {
-		maxStackPointer = c.locationStack.maxStackPointer
+	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
+	stackPointerCeil = c.stackPointerCeil
+	if stackPointerCeil < c.locationStack.stackPointerCeil {
+		stackPointerCeil = c.locationStack.stackPointerCeil
 	}
 
 	code, err = mmapCodeSegment(c.builder.Assemble())
@@ -372,11 +372,11 @@ func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 }
 
 // replaceLocationStack sets the given valueLocationStack to .locationStack field,
-// while allowing us to track valueLocationStack.maxStackPointer across multiple stacks.
+// while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
 func (c *arm64Compiler) replaceLocationStack(newStack *valueLocationStack) {
-	if c.maxStackPointer < c.locationStack.maxStackPointer {
-		c.maxStackPointer = c.locationStack.maxStackPointer
+	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
+		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
 	c.locationStack = newStack
 }
