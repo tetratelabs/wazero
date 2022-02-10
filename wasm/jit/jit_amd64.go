@@ -101,13 +101,8 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		builder:       b,
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
-	}
-
-	if ir != nil {
-		compiler.labels = make(map[string]*labelInfo, len(ir.LabelCallers))
-		for key, callers := range ir.LabelCallers {
-			compiler.labels[key] = &labelInfo{callers: callers}
-		}
+		ir:            ir,
+		labels:        map[string]*labelInfo{},
 	}
 	return compiler, nil
 }
@@ -119,31 +114,32 @@ func (c *amd64Compiler) String() string {
 type amd64Compiler struct {
 	builder *asm.Builder
 	f       *wasm.FunctionInstance
+	ir      *wazeroir.CompilationResult
 	// setJmpOrigins sets jmp kind instructions where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
 	setJmpOrigins []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
-	// labels holds per wazeroir label specific informationsin this function.
+	// labels hold per wazeroir label specific information in this function.
 	labels map[string]*labelInfo
-	// maxStackPointer tracks the maximum value of stack pointer (from valueLocationStack).
-	maxStackPointer uint64
+	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
+	stackPointerCeil uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
 	currentLabel string
-	// onMaxStackPointerDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
-	onMaxStackPointerDeterminedCallBack func(maxStackPointer uint64)
+	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
+	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
 	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
 	onGenerateCallbacks []func(code []byte) error
 	staticData          compiledFunctionStaticData
 }
 
-// replaceLocationStack sets the given valueLocationStack to .locationStack field,
-// while allowing us to track valueLocationStack.maxStackPointer across multiple stacks.
+// setLocationStack sets the given valueLocationStack to .locationStack field,
+// while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.
-func (c *amd64Compiler) replaceLocationStack(newStack *valueLocationStack) {
-	if c.maxStackPointer < c.locationStack.maxStackPointer {
-		c.maxStackPointer = c.locationStack.maxStackPointer
+func (c *amd64Compiler) setLocationStack(newStack *valueLocationStack) {
+	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
+		c.stackPointerCeil = c.locationStack.stackPointerCeil
 	}
 	c.locationStack = newStack
 }
@@ -153,8 +149,6 @@ func (c *amd64Compiler) addStaticData(d []byte) {
 }
 
 type labelInfo struct {
-	// callers is the number of call sites which may jump into this label.
-	callers int
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction *obj.Prog
 	// initialStack is the initial value location stack from which we start compiling this label.
@@ -202,19 +196,19 @@ func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 }
 
 // compile implements compiler.compile for the amd64 architecture.
-func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
-	// c.maxStackPointer tracks the maximum stack pointer across all valueLocationStack(s)
-	// used for all labels (via replaceLocationStack), excluding the current one.
-	// Hence, we check here if the final block's max one exceeds the current c.maxStackPointer.
-	maxStackPointer = c.maxStackPointer
-	if maxStackPointer < c.locationStack.maxStackPointer {
-		maxStackPointer = c.locationStack.maxStackPointer
+func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error) {
+	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all valueLocationStack(s)
+	// used for all labels (via setLocationStack), excluding the current one.
+	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
+	stackPointerCeil = c.stackPointerCeil
+	if stackPointerCeil < c.locationStack.stackPointerCeil {
+		stackPointerCeil = c.locationStack.stackPointerCeil
 	}
 
 	// Now that the max stack pointer is determined, we are invoking the callback.
 	// Note this MUST be called before Assemble() befolow.
-	if c.onMaxStackPointerDeterminedCallBack != nil {
-		c.onMaxStackPointerDeterminedCallBack(maxStackPointer)
+	if c.onStackPointerCeilDeterminedCallBack != nil {
+		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
 	}
 
 	code, err = mmapCodeSegment(c.builder.Assemble())
@@ -524,14 +518,11 @@ func (c *amd64Compiler) compileBr(o *wazeroir.OperationBr) error {
 // branchInto adds instruction necessary to jump into the given branch target.
 func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 	if target.IsReturnTarget() {
-		if err := c.returnFunction(); err != nil {
-			return err
-		}
+		return c.returnFunction()
 	} else {
 		labelKey := target.String()
-		targetLabel := c.label(labelKey)
-		if targetLabel.callers > 1 {
-			// If the number of callers to the target label is larget than one,
+		if c.ir.LabelCallers[labelKey] > 1 {
+			// If the number of callers to the target label is larger than one,
 			// we have multiple origins to the target branch. In that case,
 			// we must have unique register state.
 			if err := c.preLabelJumpRegisterAdjustment(); err != nil {
@@ -541,6 +532,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
+		targetLabel := c.label(labelKey)
 		if targetLabel.initialStack == nil {
 			// It seems unnecessary to clone as branchInto is always the tail of the current block.
 			// TODO: verify ^^.
@@ -635,15 +627,14 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 	// Emit for else branches
 	saved := c.locationStack
-	c.replaceLocationStack(saved.clone())
+	c.setLocationStack(saved.clone())
 	if elseTarget.Target.IsReturnTarget() {
 		if err := c.returnFunction(); err != nil {
 			return err
 		}
 	} else {
 		elseLabelKey := elseTarget.Target.Label.String()
-		labelInfo := c.label(elseLabelKey)
-		if labelInfo.callers > 1 {
+		if c.ir.LabelCallers[elseLabelKey] > 1 {
 			if err := c.preLabelJumpRegisterAdjustment(); err != nil {
 				return err
 			}
@@ -651,6 +642,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
+		labelInfo := c.label(elseLabelKey)
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack
 		}
@@ -663,18 +655,15 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 
 	// Handle then branch.
 	c.addSetJmpOrigins(jmpWithCond)
-	c.replaceLocationStack(saved)
+	c.setLocationStack(saved)
 	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
 		return err
 	}
 	if thenTarget.Target.IsReturnTarget() {
-		if err := c.returnFunction(); err != nil {
-			return err
-		}
+		return c.returnFunction()
 	} else {
 		thenLabelKey := thenTarget.Target.Label.String()
-		labelInfo := c.label(thenLabelKey)
-		if c.label(thenLabelKey).callers > 1 {
+		if c.ir.LabelCallers[thenLabelKey] > 1 {
 			if err := c.preLabelJumpRegisterAdjustment(); err != nil {
 				return err
 			}
@@ -682,6 +671,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
+		labelInfo := c.label(thenLabelKey)
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack
 		}
@@ -690,8 +680,8 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		thenJmp.To.Type = obj.TYPE_BRANCH
 		c.addInstruction(thenJmp)
 		c.assignJumpTarget(thenLabelKey, thenJmp)
+		return nil
 	}
-	return nil
 }
 
 // compileBrTable implements compiler.compileBrTable for the amd64 architecture.
@@ -846,7 +836,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			// as this is the last code in this block.
 			locationStack = saved
 		}
-		c.replaceLocationStack(locationStack)
+		c.setLocationStack(locationStack)
 		if err := c.emitDropRange(target.ToDrop); err != nil {
 			return err
 		}
@@ -928,7 +918,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	labelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	c.replaceLocationStack(labelInfo.initialStack)
+	c.setLocationStack(labelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
@@ -940,7 +930,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
-		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, labelInfo.callers, c.locationStack)
+		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, c.ir.LabelCallers[labelKey], c.locationStack)
 	}
 	c.currentLabel = labelKey
 	return
@@ -5336,15 +5326,15 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	c.addInstruction(subStackBasePointer)
 
 	// If stack base pointer + max stack poitner > valueStackLen, we need to grow the stack.
-	cmpWithMaxStackPointer := c.newProg()
-	cmpWithMaxStackPointer.As = x86.ACMPQ
-	cmpWithMaxStackPointer.From.Type = obj.TYPE_REG
-	cmpWithMaxStackPointer.From.Reg = tmpRegister
-	cmpWithMaxStackPointer.To.Type = obj.TYPE_CONST
+	cmpWithStackPointerCeil := c.newProg()
+	cmpWithStackPointerCeil.As = x86.ACMPQ
+	cmpWithStackPointerCeil.From.Type = obj.TYPE_REG
+	cmpWithStackPointerCeil.From.Reg = tmpRegister
+	cmpWithStackPointerCeil.To.Type = obj.TYPE_CONST
 	// We don't yet know the max stack poitner at this point.
 	// The max stack pointer is determined after emitting all the instructions.
-	c.onMaxStackPointerDeterminedCallBack = func(maxStackPointer uint64) { cmpWithMaxStackPointer.To.Offset = int64(maxStackPointer) }
-	c.addInstruction(cmpWithMaxStackPointer)
+	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { cmpWithStackPointerCeil.To.Offset = int64(stackPointerCeil) }
+	c.addInstruction(cmpWithStackPointerCeil)
 
 	// Jump if we have no need to grow.
 	jmpIfNoNeedToGrowStack := c.newProg()

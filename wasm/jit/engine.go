@@ -158,7 +158,7 @@ type (
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
 		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
-		maxStackPointer uint64
+		stackPointerCeil uint64
 
 		// Followings are not accessed by JITed code.
 
@@ -214,7 +214,7 @@ const (
 
 	// Offsets for compiledFunction.
 	compiledFunctionCodeInitialAddressOffset = 0
-	compiledFunctionMaxStackPointerOffset    = 8
+	compiledFunctionStackPointerCeilOffset   = 8
 
 	// Offsets for wasm.TableElement
 	tableElementFunctionAddressOffset = 0
@@ -551,7 +551,7 @@ jitentry:
 				e.builtinFunctionMemoryGrow(callerCompiledFunction.source.ModuleInstance.Memory)
 			case builtinFunctionAddressGrowValueStack:
 				callerCompiledFunction := e.callFrameTop().compiledFunction
-				e.builtinFunctionGrowValueStack(callerCompiledFunction.maxStackPointer)
+				e.builtinFunctionGrowValueStack(callerCompiledFunction.stackPointerCeil)
 			case builtinFunctionAddressGrowCallFrameStack:
 				e.builtinFunctionGrowCallFrameStack()
 			}
@@ -590,9 +590,9 @@ func (e *engine) pushCallFrame(f *compiledFunction) {
 		e.valueStackContext.stackBasePointer + e.valueStackContext.stackPointer - uint64(len(f.source.FunctionType.Type.Params))
 }
 
-func (e *engine) builtinFunctionGrowValueStack(maxStackPointer uint64) {
-	// Extends the valueStack's length to currentLen*2+maxStackPointer.
-	newLen := e.globalContext.valueStackLen*2 + (maxStackPointer)
+func (e *engine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
+	// Extends the valueStack's length to currentLen*2+stackPointerCeil.
+	newLen := e.globalContext.valueStackLen*2 + (stackPointerCeil)
 	newStack := make([]uint64, newLen)
 	top := e.valueStackContext.stackBasePointer + e.valueStackContext.stackPointer
 	copy(newStack[:top], e.valueStack[:top])
@@ -675,16 +675,16 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, err
 	}
 
-	maxStackPointer := uint64(len(f.FunctionType.Type.Params))
-	if res := uint64(len(f.FunctionType.Type.Results)); maxStackPointer < res {
-		maxStackPointer = res
+	stackPointerCeil := uint64(len(f.FunctionType.Type.Params))
+	if res := uint64(len(f.FunctionType.Type.Results)); stackPointerCeil < res {
+		stackPointerCeil = res
 	}
 
 	return &compiledFunction{
 		source:             f,
 		codeSegment:        code,
 		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-		maxStackPointer:    maxStackPointer,
+		stackPointerCeil:   stackPointerCeil,
 	}, nil
 }
 
@@ -866,7 +866,7 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		}
 	}
 
-	code, staticData, maxStackPointer, err := compiler.compile()
+	code, staticData, stackPointerCeil, err := compiler.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
@@ -879,7 +879,7 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		source:             f,
 		codeSegment:        code,
 		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-		maxStackPointer:    maxStackPointer,
+		stackPointerCeil:   stackPointerCeil,
 		staticData:         staticData,
 	}, nil
 }

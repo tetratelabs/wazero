@@ -90,14 +90,14 @@ func newValueLocationStack() *valueLocationStack {
 // moving the variable to registers to perform actual CPU instruction
 // to achieve wazeroir's add operation.
 type valueLocationStack struct {
-	// Holds all the variables.
+	// stack holds all the variables.
 	stack []*valueLocation
-	// The current stack pointer.
+	// sp is the current stack pointer.
 	sp uint64
-	// Stores the used registers.
+	// usedRegisters stores the used registers.
 	usedRegisters map[int16]struct{}
-	// Records max(.sp) across the lifespan of this struct.
-	maxStackPointer uint64
+	// stackPointerCeil tracks max(.sp) across the lifespan of this struct.
+	stackPointerCeil uint64
 }
 
 func (v *valueLocationStack) String() string {
@@ -128,7 +128,7 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 			register:            v.register,
 		}
 	}
-	ret.maxStackPointer = s.maxStackPointer
+	ret.stackPointerCeil = s.stackPointerCeil
 	return ret
 }
 
@@ -177,8 +177,8 @@ func (s *valueLocationStack) push(loc *valueLocation) {
 	} else {
 		s.stack[s.sp] = loc
 	}
-	if s.sp > s.maxStackPointer {
-		s.maxStackPointer = s.sp
+	if s.sp > s.stackPointerCeil {
+		s.stackPointerCeil = s.sp
 	}
 	s.sp++
 }

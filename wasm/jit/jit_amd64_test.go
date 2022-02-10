@@ -54,13 +54,13 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 			compiler.initializeReservedStackBasePointer()
 			err := compiler.maybeGrowValueStack()
 			require.NoError(t, err)
-			require.NotNil(t, compiler.onMaxStackPointerDeterminedCallBack)
+			require.NotNil(t, compiler.onStackPointerCeilDeterminedCallBack)
 
 			valueStackLen := uint64(len(env.stack()))
-			maxStackPointer := uint64(5)
+			stackPointerCeil := uint64(5)
 			stackBasePointer := valueStackLen - baseOffset // Base + Max <= valueStackLen = no need to grow!
-			compiler.onMaxStackPointerDeterminedCallBack(maxStackPointer)
-			compiler.onMaxStackPointerDeterminedCallBack = nil
+			compiler.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
+			compiler.onStackPointerCeilDeterminedCallBack = nil
 			env.setValueStackBasePointer(stackBasePointer)
 
 			compiler.exit(jitCallStatusCodeReturned)
@@ -87,8 +87,8 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		// On the return from grow value stack, we just exit with "Returned" status.
 		compiler.exit(jitCallStatusCodeReturned)
 
-		maxStackPointer := uint64(6)
-		compiler.maxStackPointer = maxStackPointer
+		stackPointerCeil := uint64(6)
+		compiler.stackPointerCeil = stackPointerCeil
 		valueStackLen := uint64(len(env.stack()))
 		stackBasePointer := valueStackLen - 5 // Base + Max > valueStackLen = need to grow!
 		env.setValueStackBasePointer(stackBasePointer)
@@ -326,7 +326,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 10; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
-			c.label(label.String()).callers = 1
+			c.ir.LabelCallers[label.String()] = 1
 			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
 			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
 			err := c.releaseAllRegistersToStack()
@@ -477,6 +477,8 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 					t.Run(tc.name, func(t *testing.T) {
 						env := newJITEnvironment()
 						compiler := env.requireNewCompiler(t)
+						compiler.ir = &wazeroir.CompilationResult{LabelCallers: map[string]uint32{}}
+
 						err := compiler.emitPreamble()
 						require.NoError(t, err)
 
@@ -5572,31 +5574,31 @@ func TestAmd64Compiler_generate(t *testing.T) {
 			compiler.addInstruction(ret)
 			return
 		}
-		verify := func(t *testing.T, compiler *amd64Compiler, expectedMaxStackPointer uint64) {
+		verify := func(t *testing.T, compiler *amd64Compiler, expectedStackPointerCeil uint64) {
 			var called bool
-			compiler.onMaxStackPointerDeterminedCallBack = func(acutalMaxStackPointerInCallBack uint64) {
+			compiler.onStackPointerCeilDeterminedCallBack = func(acutalStackPointerCeilInCallBack uint64) {
 				called = true
-				require.Equal(t, expectedMaxStackPointer, acutalMaxStackPointerInCallBack)
+				require.Equal(t, expectedStackPointerCeil, acutalStackPointerCeilInCallBack)
 			}
 
-			_, _, acutalMaxStackPointer, err := compiler.compile()
+			_, _, acutalStackPointerCeil, err := compiler.compile()
 			require.NoError(t, err)
 			require.True(t, called)
-			require.Equal(t, expectedMaxStackPointer, acutalMaxStackPointer)
+			require.Equal(t, expectedStackPointerCeil, acutalStackPointerCeil)
 		}
 		t.Run("current one win", func(t *testing.T) {
 			compiler := getCompiler(t)
-			const expectedMaxStackPointer uint64 = 100
-			compiler.maxStackPointer = expectedMaxStackPointer
-			compiler.locationStack.maxStackPointer = expectedMaxStackPointer - 1
-			verify(t, compiler, expectedMaxStackPointer)
+			const expectedStackPointerCeil uint64 = 100
+			compiler.stackPointerCeil = expectedStackPointerCeil
+			compiler.locationStack.stackPointerCeil = expectedStackPointerCeil - 1
+			verify(t, compiler, expectedStackPointerCeil)
 		})
 		t.Run("previous one win", func(t *testing.T) {
 			compiler := getCompiler(t)
-			const expectedMaxStackPointer uint64 = 100
-			compiler.locationStack.maxStackPointer = expectedMaxStackPointer
-			compiler.maxStackPointer = expectedMaxStackPointer - 1
-			verify(t, compiler, expectedMaxStackPointer)
+			const expectedStackPointerCeil uint64 = 100
+			compiler.locationStack.stackPointerCeil = expectedStackPointerCeil
+			compiler.stackPointerCeil = expectedStackPointerCeil - 1
+			verify(t, compiler, expectedStackPointerCeil)
 		})
 	})
 
@@ -6389,7 +6391,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		compiler.addInstruction(ret)
 
 		// This could be the read instruction target as this is the
-		// right after RET. Thefore, the jmp instruction above
+		// right after RET. Therefore, the jmp instruction above
 		// must target here.
 		const expectedReturnValue uint32 = 10000
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})

@@ -67,7 +67,7 @@ func TestValueLocationStack_basic(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		s.pop()
 	}
-	require.Equal(t, uint64(1001), s.maxStackPointer)
+	require.Equal(t, uint64(1001), s.stackPointerCeil)
 }
 
 func TestValueLocationStack_takeFreeRegister(t *testing.T) {

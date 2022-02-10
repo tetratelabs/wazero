@@ -57,21 +57,38 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		f:             f,
 		builder:       b,
 		locationStack: newValueLocationStack(),
+		ir:            ir,
+		labels:        map[string]*labelInfo{},
 	}
-
 	return compiler, nil
 }
 
 type arm64Compiler struct {
 	builder *asm.Builder
 	f       *wasm.FunctionInstance
+	ir      *wazeroir.CompilationResult
+	// setBRTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
+	// where we want to set the next coming instruction as the destination of these BR instructions.
+	setBRTargetOnNextInstructions []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
+	// labels maps a label (Ex. ".L1_then") to *labelInfo.
+	labels map[string]*labelInfo
+	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
+	stackPointerCeil uint64
 }
 
 // compile implements compiler.compile for the arm64 architecture.
-func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, maxStackPointer uint64, err error) {
+func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error) {
+	// c.stackPointerCeil tracks the stack pointer ceiling (max seen) value across all valueLocationStack(s)
+	// used for all labels (via setLocationStack), excluding the current one.
+	// Hence, we check here if the final block's max one exceeds the current c.stackPointerCeil.
+	stackPointerCeil = c.stackPointerCeil
+	if stackPointerCeil < c.locationStack.stackPointerCeil {
+		stackPointerCeil = c.locationStack.stackPointerCeil
+	}
+
 	code, err = mmapCodeSegment(c.builder.Assemble())
 	if err != nil {
 		return
@@ -79,13 +96,40 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	return
 }
 
+// labelInfo holds a wazeroir label specific information in this function.
+type labelInfo struct {
+	// initialInstruction is the initial instruction for this label so other block can branch into it.
+	initialInstruction *obj.Prog
+	// initialStack is the initial value location stack from which we start compiling this label.
+	initialStack *valueLocationStack
+	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
+	labelBeginningCallbacks []func(*obj.Prog)
+}
+
+func (c *arm64Compiler) label(labelKey string) *labelInfo {
+	ret, ok := c.labels[labelKey]
+	if ok {
+		return ret
+	}
+	c.labels[labelKey] = &labelInfo{}
+	return c.labels[labelKey]
+}
+
 func (c *arm64Compiler) newProg() (inst *obj.Prog) {
 	inst = c.builder.NewProg()
+	for _, origin := range c.setBRTargetOnNextInstructions {
+		origin.To.SetTarget(inst)
+	}
+	c.setBRTargetOnNextInstructions = nil
 	return
 }
 
 func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 	c.builder.AddInstruction(inst)
+}
+
+func (c *arm64Compiler) setBRTargetOnNext(progs ...*obj.Prog) {
+	c.setBRTargetOnNextInstructions = append(c.setBRTargetOnNextInstructions, progs...)
 }
 
 func (c *arm64Compiler) markRegisterUsed(reg int16) {
@@ -217,6 +261,14 @@ func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, s
 	c.addInstruction(inst)
 }
 
+func (c *arm64Compiler) emitUnconditionalBRInstruction(targetType obj.AddrType) (jmp *obj.Prog) {
+	jmp = c.newProg()
+	jmp.As = obj.AJMP
+	jmp.To.Type = targetType
+	c.addInstruction(jmp)
+	return
+}
+
 func (c *arm64Compiler) String() (ret string) { return }
 
 // pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
@@ -251,7 +303,7 @@ func (c *arm64Compiler) emitPreamble() error {
 
 // returnFunction emits instructions to return from the current function frame.
 // If the current frame is the bottom, the code goes back to the Go code with jitCallStatusCodeReturned status.
-// Otherwise, we jump into the caller's return address (TODO).
+// Otherwise, we branch into the caller's return address (TODO).
 func (c *arm64Compiler) returnFunction() error {
 	// TODO: we don't support function calls yet.
 	// For now the following code just returns to Go code.
@@ -314,7 +366,45 @@ func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 	return errors.New("TODO: implement compileHostFunction on arm64")
 }
 
+// setLocationStack sets the given valueLocationStack to .locationStack field,
+// while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
+// This is called when we branch into different block.
+func (c *arm64Compiler) setLocationStack(newStack *valueLocationStack) {
+	if c.stackPointerCeil < c.locationStack.stackPointerCeil {
+		c.stackPointerCeil = c.locationStack.stackPointerCeil
+	}
+	c.locationStack = newStack
+}
+
+// arm64Compiler implements compiler.arm64Compiler for the arm64 architecture.
 func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel bool) {
+	labelKey := o.Label.String()
+	labelInfo := c.label(labelKey)
+
+	// If initialStack is not set, that means this label has never been reached.
+	if labelInfo.initialStack == nil {
+		skipThisLabel = true
+		return
+	}
+
+	// We use NOP as a beginning of instructions in a label.
+	// This should be eventually optimized out by assembler.
+	labelBegin := c.newProg()
+	labelBegin.As = obj.ANOP
+	c.addInstruction(labelBegin)
+
+	// Save the instructions so that backward branching
+	// instructions can branch to this label.
+	labelInfo.initialInstruction = labelBegin
+
+	// Set the initial stack.
+	c.setLocationStack(labelInfo.initialStack)
+
+	// Invoke callbacks to notify the forward branching
+	// instructions can properly branch to this label.
+	for _, cb := range labelInfo.labelBeginningCallbacks {
+		cb(labelBegin)
+	}
 	return false
 }
 
@@ -336,15 +426,128 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 
 // compileBr implements compiler.compileBr for the arm64 architecture.
 func (c *arm64Compiler) compileBr(o *wazeroir.OperationBr) error {
-	if o.Target.IsReturnTarget() {
+	c.maybeMoveTopConditionalToFreeGeneralPurposeRegister()
+	return c.branchInto(o.Target)
+}
+
+// compileBrIf implements compiler.compileBrIf for the arm64 architecture.
+func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
+	cond := c.locationStack.pop()
+
+	conditionalBR := c.newProg()
+	conditionalBR.To.Type = obj.TYPE_BRANCH
+	if cond.onConditionalRegister() {
+		// If the cond is on a conditional register, it corresponds to one of "conditonal codes"
+		// https://developer.arm.com/documentation/dui0801/a/Condition-Codes/Condition-code-suffixes
+		// Here we represent the conditional codes by using arm64.COND_** registers, and that means the
+		// conditional jump can be performed if we use arm64.AB**.
+		// For example, if we have arm64.COND_EQ on cond, that means we performed compileEq right before
+		// this compileBrIf and BrIf can be achieved by arm64.ABEQ.
+		switch cond.conditionalRegister {
+		case arm64.COND_EQ:
+			conditionalBR.As = arm64.ABEQ
+		case arm64.COND_NE:
+			conditionalBR.As = arm64.ABNE
+		case arm64.COND_HS:
+			conditionalBR.As = arm64.ABHS
+		case arm64.COND_LO:
+			conditionalBR.As = arm64.ABLO
+		case arm64.COND_MI:
+			conditionalBR.As = arm64.ABMI
+		case arm64.COND_HI:
+			conditionalBR.As = arm64.ABHI
+		case arm64.COND_LS:
+			conditionalBR.As = arm64.ABLS
+		case arm64.COND_GE:
+			conditionalBR.As = arm64.ABGE
+		case arm64.COND_LT:
+			conditionalBR.As = arm64.ABLT
+		case arm64.COND_GT:
+			conditionalBR.As = arm64.ABGT
+		case arm64.COND_LE:
+			conditionalBR.As = arm64.ABLE
+		default:
+			// BUG: This means that we use the cond.conditionalRegister somewhere in this file,
+			// but not covered in switch ^. That shouldn't happen.
+			return fmt.Errorf("unsupported condition for br_if: %v", cond.conditionalRegister)
+		}
+	} else {
+		// If the value is not on the conditional register, we compare the value with the zero register,
+		// and then do the conditional BR if the value does't equal zero.
+		if err := c.ensureOnGeneralPurposeRegister(cond); err != nil {
+			return err
+		}
+		// Compare the value with zero register. Note that the value is ensured to be i32 by function validation phase,
+		// so we use CMPW (32-bit compare) here.
+		c.applyTwoRegistersToNoneInstruction(arm64.ACMPW, cond.register, zeroRegister)
+		conditionalBR.As = arm64.ABNE
+
+		c.markRegisterUnused(cond.register)
+	}
+
+	c.addInstruction(conditionalBR)
+
+	// Emit the code for branching into else branch.
+	// We save and clone the location stack because we might end up modifying it inside of branchInto,
+	// and we have to avoid affecting the code generation for Then branch afterwards.
+	saved := c.locationStack
+	c.setLocationStack(saved.clone())
+	if err := c.emitDropRange(o.Else.ToDrop); err != nil {
+		return err
+	}
+	c.branchInto(o.Else.Target)
+
+	// Now ready to emit the code for branching into then branch.
+	// Retrieve the original value location stack so that the code below wont'be affected by the Else branch ^^.
+	c.setLocationStack(saved)
+	// We branch into here from the original conditional BR (conditionalBR).
+	c.setBRTargetOnNext(conditionalBR)
+	if err := c.emitDropRange(o.Then.ToDrop); err != nil {
+		return err
+	}
+	c.branchInto(o.Then.Target)
+	return nil
+}
+
+func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
+	if target.IsReturnTarget() {
 		return c.returnFunction()
 	} else {
-		return fmt.Errorf("TODO: only return target is available on arm64")
+		labelKey := target.String()
+		if c.ir.LabelCallers[labelKey] > 1 {
+			// We can only re-use register state if when there's a single call-site.
+			// Release existing values on registers to the stack if there's multiple ones to have
+			// the consistent value location state at the beginning of label.
+			if err := c.releaseAllRegistersToStack(); err != nil {
+				return err
+			}
+		}
+		// Set the initial stack of the target label, so we can start compiling the label
+		// with the appropriate value locations. Note we clone the stack here as we maybe
+		// manipulate the stack before compiler reaches the label.
+		targetLabel := c.label(labelKey)
+		if targetLabel.initialStack == nil {
+			targetLabel.initialStack = c.locationStack.clone()
+		}
+
+		jmp := c.emitUnconditionalBRInstruction(obj.TYPE_BRANCH)
+		c.assignBranchTarget(labelKey, jmp)
+		return nil
 	}
 }
 
-func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+// assignBranchTarget assigns the given label's initial instruction to the destination of br.
+func (c *arm64Compiler) assignBranchTarget(labelKey string, br *obj.Prog) {
+	target := c.label(labelKey)
+	if target.initialInstruction != nil {
+		br.To.SetTarget(target.initialInstruction)
+	} else {
+		// This case, the target label hasn't been compiled yet, so we append the callback and assign
+		// the target instruction when compileLabel is called for the label.
+		target.labelBeginningCallbacks = append(target.labelBeginningCallbacks, func(labelInitialInstruction *obj.Prog) {
+			br.To.SetTarget(labelInitialInstruction)
+		})
+	}
 }
 
 func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
@@ -361,7 +564,11 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	r := o.Range
+	return c.emitDropRange(o.Range)
+}
+
+// emitDropRange is the implementation of compileDrop. See compiler.compileDrop.
+func (c *arm64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
 	if r == nil {
 		return nil
 	} else if r.Start == 0 {

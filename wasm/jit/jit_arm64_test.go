@@ -11,17 +11,41 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
+func requireAddLabel(t *testing.T, compiler *arm64Compiler, label *wazeroir.Label) {
+	// We set a value location stack so that the label must not be skipped.
+	compiler.label(label.String()).initialStack = newValueLocationStack()
+	skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+	require.False(t, skip)
+}
+
+func requirePushTwoInt32Consts(t *testing.T, x1, x2 uint32, compiler *arm64Compiler) {
+	err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1})
+	require.NoError(t, err)
+	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2})
+	require.NoError(t, err)
+}
+
+func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler *arm64Compiler) {
+	err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: x1})
+	require.NoError(t, err)
+	err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: x2})
+	require.NoError(t, err)
+}
+
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	cmp, err := newCompiler(&wasm.FunctionInstance{ModuleInstance: j.moduleInstance}, nil)
 	require.NoError(t, err)
 	ret, ok := cmp.(*arm64Compiler)
 	require.True(t, ok)
+	ret.labels = make(map[string]*labelInfo)
+	ret.ir = &wazeroir.CompilationResult{}
 	return ret
 }
 
@@ -1007,4 +1031,323 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestArm64Compiler_compileLabel(t *testing.T) {
+	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
+	labelKey := label.String()
+	for _, expectSkip := range []bool{false, true} {
+		expectSkip := expectSkip
+		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+
+			var callBackCalled bool
+			compiler.labels[labelKey] = &labelInfo{
+				labelBeginningCallbacks: []func(*obj.Prog){func(p *obj.Prog) { callBackCalled = true }},
+			}
+
+			if expectSkip {
+				// If the initial stack is not set, compileLabel must return skip=true.
+				compiler.labels[labelKey].initialStack = nil
+				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				require.True(t, actual)
+				// Also, callback must not be called.
+				require.False(t, callBackCalled)
+			} else {
+				// If the initial stack is not set, compileLabel must return skip=false.
+				compiler.labels[labelKey].initialStack = newValueLocationStack()
+				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				require.False(t, actual)
+				// Also, callback must be called.
+				require.True(t, callBackCalled)
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_compileBr(t *testing.T) {
+	t.Run("return", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: nil}})
+		require.NoError(t, err)
+
+		// Compile and execute the code under test.
+		// Note: we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+	t.Run("backward br", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		// Emit code for the backward label.
+		backwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
+		requireAddLabel(t, compiler, backwardLabel)
+		compiler.exit(jitCallStatusCodeReturned)
+
+		// Now emit the body. First we add NOP so that we can execute code after the target label.
+		nop := compiler.newProg()
+		nop.As = obj.ANOP
+		compiler.addInstruction(nop)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: backwardLabel}})
+		require.NoError(t, err)
+
+		// We must not reach the code after Br, so emit the code exiting with unreachable status.
+		compiler.exit(jitCallStatusCodeUnreachable)
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// The generated code looks like this:
+		//
+		// .backwardLabel:
+		//    exit jitCallStatusCodeReturned
+		//    nop
+		//    ... code from emitPreamble()
+		//    br .backwardLabel
+		//    exit jitCallStatusCodeUnreachable
+		//
+		// Therefore, if we start executing from nop, we must end up exiting jitCallStatusCodeReturned.
+		env.exec(code[nop.Pc:])
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+	t.Run("forward br", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
+		forwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: forwardLabel}})
+		require.NoError(t, err)
+
+		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
+		compiler.exit(jitCallStatusCodeUnreachable)
+
+		// Emit code for the forward label where we emit the expectedValue and then exit.
+		requireAddLabel(t, compiler, forwardLabel)
+		compiler.exit(jitCallStatusCodeReturned)
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// The generated code looks like this:
+		//
+		//    ... code from emitPreamble()
+		//    br .forwardLabel
+		//    exit jitCallStatusCodeUnreachable
+		// .forwardLabel:
+		//    exit jitCallStatusCodeReturned
+		//
+		// Therefore, if we start executing from the top, we must end up exiting jitCallStatusCodeReturned.
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+}
+
+func TestArm64Compiler_compileBrIf(t *testing.T) {
+	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus :=
+		jitCallStatusCodeUnreachable, jitCallStatusCodeUnreachable+1, jitCallStatusCodeUnreachable+2
+	thenBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}}}
+	elseBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 2}}}
+
+	for _, tc := range []struct {
+		name      string
+		setupFunc func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool)
+	}{
+		{
+			name: "cond on register",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				val := uint32(1)
+				if shoulGoElse {
+					val = 0
+				}
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: val})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LS",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Le on unsigned integer produces the value on COND_LS register.
+				err := compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LE",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Le on signed integer produces the value on COND_LE register.
+				err := compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		// {name: "EQ"} TODO: after compileEq support
+		// {name: "NE"} TODO: after compileNe support
+		{
+			name: "HS",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Ge on unsigned integer produces the value on COND_HS register.
+				err := compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "GE",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Ge on signed integer produces the value on COND_GE register.
+				err := compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "HI",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Gt on unsigned integer produces the value on COND_HI register.
+				err := compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "GT",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Gt on signed integer produces the value on COND_GT register.
+				err := compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LO",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Lt on unsigned integer produces the value on COND_LO register.
+				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LT",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Lt on signed integer produces the value on COND_LT register.
+				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "MI",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := float32(1), float32(2)
+				if shoulGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoFloat32Consts(t, x1, x2, compiler)
+				// Lt on floats produces the value on COND_MI register.
+				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat32})
+				require.NoError(t, err)
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			for _, shouldGoToElse := range []bool{false, true} {
+				shouldGoToElse := shouldGoToElse
+				t.Run(fmt.Sprintf("should_goto_else=%v", shouldGoToElse), func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
+					err := compiler.emitPreamble()
+					require.NoError(t, err)
+
+					tc.setupFunc(t, compiler, shouldGoToElse)
+					require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+					err = compiler.compileBrIf(&wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
+					require.NoError(t, err)
+					compiler.exit(unreachableStatus)
+
+					// Emit code for .then label.
+					requireAddLabel(t, compiler, thenBranchTarget.Target.Label)
+					compiler.exit(thenLabelExitStatus)
+
+					// Emit code for .else label.
+					requireAddLabel(t, compiler, elseBranchTarget.Target.Label)
+					compiler.exit(elseLabelExitStatus)
+
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+
+					// The generated code looks like this:
+					//
+					//    ... code from emitPreamble()
+					//    br_if .then, .else
+					//    exit $unreachableStatus
+					// .then:
+					//    exit $thenLabelExitStatus
+					// .else:
+					//    exit $elseLabelExitStatus
+					//
+					// Therefore, if we start executing from the top, we must end up exiting with an appropriate status.
+					env.exec(code)
+					require.NotEqual(t, unreachableStatus, env.jitStatus())
+					if shouldGoToElse {
+						require.Equal(t, elseLabelExitStatus, env.jitStatus())
+					} else {
+						require.Equal(t, thenLabelExitStatus, env.jitStatus())
+					}
+				})
+			}
+		})
+	}
 }
