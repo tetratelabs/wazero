@@ -1417,12 +1417,6 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// This could be the read instruction target as this is the
 		// right after RET. Therefore, the jmp instruction above
 		// must target here.
-		const expectedReturnValue uint32 = 10000
-		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
-		require.NoError(t, err)
-
-		err = compiler.releaseAllRegistersToStack()
-		require.NoError(t, err)
 		err = compiler.returnFunction()
 		require.NoError(t, err)
 
@@ -1436,7 +1430,5 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		env.exec(code)
 
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-		require.Equal(t, uint64(1), env.stackPointer())
-		require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
 	})
 }
