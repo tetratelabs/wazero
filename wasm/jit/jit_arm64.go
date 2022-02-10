@@ -516,9 +516,9 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		labelKey := target.String()
 		targetLabel := c.label(labelKey)
 		if targetLabel.callers > 1 {
-			// If the number of callers to the target label is larger than one,
-			// we have multiple origins to the target branch. In that case,
-			// we must have unique register state.
+			// We can only re-use register state if when there's a single call-site.
+			// Release existing state to the stack if there's multiple ones to have
+			// consistent register state at the beginning of label.
 			if err := c.releaseAllRegistersToStack(); err != nil {
 				return err
 			}
