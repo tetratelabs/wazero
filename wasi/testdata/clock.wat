@@ -7,7 +7,8 @@
 ;; this file is put here for now, because this is a temporary file until the parser supports
 ;; the enough syntax, and this file will be embedded in unit test codes after that.
 (module
-  (import "wasi_snapshot_preview1" "clock_time_get" (func $wasi_clock_time_get (param i32 i64 i32) (result i32)))
+  (import "wasi_snapshot_preview1" "clock_time_get"
+    (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))
   (memory 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   ;; Define wrapper functions instead of just exporting the imported WASI APIS for now
@@ -18,7 +19,7 @@
         local.get 0
         local.get 1
         local.get 2
-        call $wasi_clock_time_get
+        call $wasi.clock_time_get
         )
   (export "clock_time_get" (func $clock_time_get))
   )

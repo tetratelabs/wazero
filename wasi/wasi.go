@@ -3,7 +3,6 @@ package wasi
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"math"
@@ -11,64 +10,35 @@ import (
 	"os"
 	"reflect"
 	"time"
-	"unicode/utf8"
 
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-// API is a documentation interface for WASI exported functions in version "wasi_snapshot_preview1"
+// API includes all host functions to export for WASI version "wasi_snapshot_preview1"
+//
+// Note: When translating WASI functions, each result besides Errno is always an uint32 parameter. WebAssembly 1.0 (MVP)
+// can have up to one result, which is already used by Errno. This forces other results to be parameters. A result
+// parameter is a memory offset to write the result to. As memory offsets are uint32, each parameter representing a
+// result is uint32.
 //
 // Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means the wasm.HostFunctionCallContext
 // Memory is always the wasm.Store Memories index zero: `store.Memories[0].Buffer`
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
+// See https://wwa.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
 type API interface {
-	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
-	//
-	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
-	// Memory Buffer to write the corresponding sizes in uint32 little-endian encoding.
-	//
-	// * argc - is the offset to write the argument count to the wasm.MemoryInstance Buffer
-	// * argvBufSize - is the offset to write the null terminated argument length to the wasm.MemoryInstance Buffer
-	//
-	// In WebAssembly 1.0 (MVP) Text format, this signature is:
-	//	(import "wasi_snapshot_preview1" "args_sizes_get"
-	//		(func ($wasi_args_sizes_get (param $argc i32) (param $argv_buf_size i32) (result i32))
-	//
-	// For example, if Args are []string{"a","bc"} and
-	//   ArgsSizesGet parameters argc=1 and argvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
-	//
-	//                    uint32         uint32
-	//                  +--------+     +--------+
-	//                  |        |     |        |
-	//        []byte{?, 2, 0, 0, 0, ?, 5, 0, 0, 0, ?}
-	//           argc --^              ^
-	//         2 args --+              |
-	//                   argvBufSize --|
-	//   len([]byte{'a',0,'b',c',0}) --+
-	//
-	// See ArgsGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsSizesGet(ctx *wasm.HostFunctionCallContext, argc, argvBufSize uint32) Errno
-
-	// ArgsGet is a WASI function that reads command-line argument data (Args).
+	// ArgsGet is the WASI function that reads command-line argument data (Args).
 	//
 	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
 	// Memory Buffer to write offsets. These are encoded uint32 little-endian.
 	//
 	// * argv - is the offset to begin writing argument offsets to the wasm.MemoryInstance
-	//   * ArgsSizesGet argc * 4 bytes are written to this offset
+	//   * ArgsSizesGet result argc * 4 bytes are written to this offset
 	// * argvBuf - is the offset to write the null terminated arguments to the wasm.MemoryInstance
-	//   * ArgsSizesGet argv_buf_size bytes are written to this offset
-	//
-	// In WebAssembly 1.0 (MVP) Text format, this signature is:
-	//	(import "wasi_snapshot_preview1" "args_get"
-	//		(func ($wasi_args_get (param $argv i32) (param $argv_buf i32) (result i32))
+	//   * ArgsSizesGet result argv_buf_size bytes are written to this offset
 	//
 	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
-	//   and ArgsGet parameters argv=7 and argvBuf=1, we expect `ctx.Memory.Buffer` to contain:
+	//   and ArgsGet results argv=7 and argvBuf=1, we expect `ctx.Memory.Buffer` to contain:
 	//
 	//               argvBufSize                argc * 4
 	//            +----------------+     +--------------------+
@@ -79,10 +49,85 @@ type API interface {
 	//          offset that begins "a" --+           |
 	//                     offset that begins "bc" --+
 	//
+	// Note: FunctionArgsGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno
+
+	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
+	//
+	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
+	// Memory Buffer to write the corresponding sizes in uint32 little-endian encoding.
+	//
+	// * argc - is the offset to write the argument count to the wasm.MemoryInstance Buffer
+	// * argvBufSize - is the offset to write the null terminated argument length to the wasm.MemoryInstance Buffer
+	//
+	// For example, if Args are []string{"a","bc"} and
+	//   ArgsSizesGet parameters resultArgc=1 and resultArgvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
+	//
+	//                    uint32         uint32
+	//                  +--------+     +--------+
+	//                  |        |     |        |
+	//        []byte{?, 2, 0, 0, 0, ?, 5, 0, 0, 0, ?}
+	//     resultArgc --^              ^
+	//         2 args --+              |
+	//             resultArgvBufSize --|
+	//   len([]byte{'a',0,'b',c',0}) --+
+	//
+	// Note: FunctionArgsSizesGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See ArgsGet
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
+	// See https://en.wikipedia.org/wiki/Null-terminated_string
+	ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno
+
+	// TODO: EnvironGet(ctx *wasm.HostFunctionCallContext, environ, environBuf uint32) Errno
+
+	// TODO: EnvironSizesGet(ctx *wasm.HostFunctionCallContext, resulEnvironc, resultEnvironBufSize uint32) Errno
+
+	// TODO: ClockResGet(ctx *wasm.HostFunctionCallContext, id, resultResolution uint32) Errno
+
+	// TODO: ClockTimeGet(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno
+
+	// TODO: FDAdvise
+	// TODO: FDAllocate
+	// TODO: FDClose
+	// TODO: FDDataSync
+	// TODO: FDFDStatGet
+	// TODO: FDFDStatSetFlags
+	// TODO: FDFDStatSetRights
+	// TODO: FDFilestatGet
+	// TODO: FDFilestatSetSize
+	// TODO: FDFilestatSetTimes
+	// TODO: FDPread
+	// TODO: FDPrestatGet
+	// TODO: FDPrestatDirName
+	// TODO: FDPwrite
+	// TODO: FDRead
+	// TODO: FDReaddir
+	// TODO: FDRenumber
+	// TODO: FDSeek
+	// TODO: FDSync
+	// TODO: FDTell
+	// TODO: FDWrite
+	// TODO: PathCreateDirectory
+	// TODO: PathFilestatGet
+	// TODO: PathFilestatSetTimes
+	// TODO: PathLink
+	// TODO: PathOpen
+	// TODO: PathReadlink
+	// TODO: PathRemoveDirectory
+	// TODO: PathRename
+	// TODO: PathSymlink
+	// TODO: PathUnlinkFile
+	// TODO: PollOneoff
+	// TODO: ProcExit
+	// TODO: ProcRaise
+	// TODO: SchedYield
+	// TODO: RandomGet
+	// TODO: SockRecv
+	// TODO: SockSend
+	// TODO: SockShutdown
 }
 
 const (
@@ -99,66 +144,68 @@ type api struct {
 	getTimeNanosFn func() uint64
 }
 
-func (w *api) register(store *wasm.Store) (err error) {
+func (a *api) register(store *wasm.Store) (err error) {
+	// Note: these are ordered per spec for consistency
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
+	nameToFunction := []struct {
+		funcName string
+		fn       interface{}
+	}{
+		{FunctionArgsGet, a.ArgsGet},
+		{FunctionArgsSizesGet, a.ArgsSizesGet},
+		{FunctionEnvironGet, environ_get},
+		{FunctionEnvironSizesGet, environ_sizes_get},
+		// TODO: FunctionClockResGet
+		{FunctionClockTimeGet, a.clock_time_get},
+		// TODO: FunctionFDAdvise
+		// TODO: FunctionFDAllocate
+		{FunctionFDClose, a.fd_close},
+		// TODO: FunctionFDDataSync
+		{FunctionFDFDStatGet, a.fd_fdstat_get},
+		// TODO: FunctionFDFDStatSetFlags
+		// TODO: FunctionFDFDStatSetRights
+		// TODO: FunctionFDFilestatGet
+		// TODO: FunctionFDFilestatSetSize
+		// TODO: FunctionFDFilestatSetTimes
+		// TODO: FunctionFDPread
+		{FunctionFDPrestatGet, a.fd_prestat_get},
+		{FunctionFDPrestatDirName, a.fd_prestat_dir_name},
+		// TODO: FunctionFDPwrite
+		{FunctionFDRead, a.fd_read},
+		// TODO: FunctionFDReaddir
+		// TODO: FunctionFDRenumber
+		{FunctionFDSeek, a.fd_seek},
+		// TODO: FunctionFDSync
+		// TODO: FunctionFDTell
+		{FunctionFDWrite, a.fd_write},
+		// TODO: FunctionPathCreateDirectory
+		// TODO: FunctionPathFilestatGet
+		// TODO: FunctionPathFilestatSetTimes
+		// TODO: FunctionPathLink
+		{FunctionPathOpen, a.path_open},
+		// TODO: FunctionPathReadlink
+		// TODO: FunctionPathRemoveDirectory
+		// TODO: FunctionPathRename
+		// TODO: FunctionPathSymlink
+		// TODO: FunctionPathUnlinkFile
+		// TODO: FunctionPollOneoff
+		{FunctionProcExit, proc_exit},
+		// TODO: FunctionProcRaise
+		// TODO: FunctionSchedYield
+		// TODO: FunctionRandomGet
+		// TODO: FunctionSockRecv
+		// TODO: FunctionSockSend
+		// TODO: FunctionSockShutdown
+	}
 	for _, wasiName := range []string{
-		wasiUnstableName,
+		wasiUnstableName, // TODO: check if there are any signature incompatibility between stable and preview 1
 		wasiSnapshotPreview1Name,
 	} {
-		err = store.AddHostFunction(wasiName, "proc_exit", reflect.ValueOf(proc_exit))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "fd_write", reflect.ValueOf(w.fd_write))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "environ_sizes_get", reflect.ValueOf(environ_sizes_get))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "environ_get", reflect.ValueOf(environ_get))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "fd_prestat_get", reflect.ValueOf(w.fd_prestat_get))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "fd_prestat_dir_name", reflect.ValueOf(w.fd_prestat_dir_name))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "fd_fdstat_get", reflect.ValueOf(w.fd_fdstat_get))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "fd_close", reflect.ValueOf(w.fd_close))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "fd_read", reflect.ValueOf(w.fd_read))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "fd_seek", reflect.ValueOf(w.fd_seek))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "path_open", reflect.ValueOf(w.path_open))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "args_get", reflect.ValueOf(w.ArgsGet))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "args_sizes_get", reflect.ValueOf(w.ArgsSizesGet))
-		if err != nil {
-			return err
-		}
-		err = store.AddHostFunction(wasiName, "clock_time_get", reflect.ValueOf(w.clock_time_get))
-		if err != nil {
-			return err
+		for _, pair := range nameToFunction {
+			err = store.AddHostFunction(wasiName, pair.funcName, reflect.ValueOf(pair.fn))
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -173,56 +220,21 @@ type fileEntry struct {
 type Option func(*api)
 
 func Stdin(reader io.Reader) Option {
-	return func(w *api) {
-		w.stdin = reader
+	return func(a *api) {
+		a.stdin = reader
 	}
 }
 
 func Stdout(writer io.Writer) Option {
-	return func(w *api) {
-		w.stdout = writer
+	return func(a *api) {
+		a.stdout = writer
 	}
 }
 
 func Stderr(writer io.Writer) Option {
-	return func(w *api) {
-		w.stderr = writer
+	return func(a *api) {
+		a.stderr = writer
 	}
-}
-
-// nullTerminatedStrings holds null-terminated strings. It ensures that
-// its length and total buffer size don't exceed the max of uint32.
-// nullTerminatedStrings are convenience struct for args_get and environ_get. (environ_get is not implemented yet)
-//
-// A Null-terminated string is a byte string with a NULL suffix ("\x00").
-// See https://en.wikipedia.org/wiki/Null-terminated_string
-type nullTerminatedStrings struct {
-	// nullTerminatedValues are null-terminated values with a NULL suffix.
-	nullTerminatedValues [][]byte
-	totalBufSize         uint32
-}
-
-// newNullTerminatedStrings creates a nullTerminatedStrings from the given string slice. It returns an error
-// if the length or the total buffer size of the result WASIStringArray exceeds the maxBufSize
-func newNullTerminatedStrings(maxBufSize uint32, args ...string) (*nullTerminatedStrings, error) {
-	if len(args) == 0 {
-		return &nullTerminatedStrings{nullTerminatedValues: [][]byte{}}, nil
-	}
-	var strings [][]byte // don't pre-allocate as this function is size bound
-	totalBufSize := uint32(0)
-	for i, arg := range args {
-		if !utf8.ValidString(arg) {
-			return nil, fmt.Errorf("arg[%d] is not a valid UTF-8 string", i)
-		}
-		argLen := uint64(len(arg)) + 1 // + 1 for "\x00"; uint64 in case this one arg is huge
-		nextSize := uint64(totalBufSize) + argLen
-		if nextSize > uint64(maxBufSize) {
-			return nil, fmt.Errorf("arg[%d] will exceed max buffer size %d", i, maxBufSize)
-		}
-		totalBufSize = uint32(nextSize)
-		strings = append(strings, append([]byte(arg), 0))
-	}
-	return &nullTerminatedStrings{nullTerminatedValues: strings, totalBufSize: totalBufSize}, nil
 }
 
 // Args returns an option to give a command-line arguments to the API or errs if the inputs are too large.
@@ -234,14 +246,14 @@ func Args(args ...string) (Option, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(w *api) {
-		w.args = wasiStrings
+	return func(a *api) {
+		a.args = wasiStrings
 	}, nil
 }
 
 func Preopen(dir string, fileSys FS) Option {
-	return func(w *api) {
-		w.opened[uint32(len(w.opened))+3] = fileEntry{
+	return func(a *api) {
+		a.opened[uint32(len(a.opened))+3] = fileEntry{
 			path:    dir,
 			fileSys: fileSys,
 		}
@@ -280,51 +292,51 @@ func newAPI(opts ...Option) *api {
 	return ret
 }
 
-func (w *api) randUnusedFD() uint32 {
+func (a *api) randUnusedFD() uint32 {
 	fd := uint32(rand.Int31())
 	for {
-		if _, ok := w.opened[fd]; !ok {
+		if _, ok := a.opened[fd]; !ok {
 			return fd
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
 }
 
-func (w *api) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
-	if _, ok := w.opened[fd]; !ok {
-		return EBADF
+func (a *api) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+	if _, ok := a.opened[fd]; !ok {
+		return ErrnoBadf
 	}
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
-func (w *api) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
-	f, ok := w.opened[fd]
+func (a *api) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
+	f, ok := a.opened[fd]
 	if !ok {
-		return EINVAL
+		return ErrnoInval
 	}
 
 	if uint32(len(f.path)) < pathLen {
-		return ENAMETOOLONG
+		return ErrnoNametoolong
 	}
 
 	copy(ctx.Memory.Buffer[pathPtr:], f.path)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
-func (w *api) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
-	if _, ok := w.opened[fd]; !ok {
-		return EBADF
+func (a *api) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+	if _, ok := a.opened[fd]; !ok {
+		return ErrnoBadf
 	}
 	binary.LittleEndian.PutUint64(ctx.Memory.Buffer[bufPtr+16:], R_FD_READ|R_FD_WRITE)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
-func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+func (a *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
 	fsRightsBase, fsRightsInheriting uint64,
 	fdFlags, fdPtr uint32) (errno Errno) {
-	dir, ok := w.opened[fd]
+	dir, ok := a.opened[fd]
 	if !ok || dir.fileSys == nil {
-		return EINVAL
+		return ErrnoInval
 	}
 
 	path := string(ctx.Memory.Buffer[pathPtr : pathPtr+pathLen])
@@ -332,39 +344,38 @@ func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 	if err != nil {
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
-			return ENOENT
+			return ErrnoNoent
 		default:
-			return EINVAL
+			return ErrnoInval
 		}
 	}
 
-	newFD := w.randUnusedFD()
+	newFD := a.randUnusedFD()
 
-	w.opened[newFD] = fileEntry{
+	a.opened[newFD] = fileEntry{
 		file: f,
 	}
 
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[fdPtr:], newFD)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
-func (w *api) fd_seek(ctx *wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
-	// not implemented yet
-	return ENOSYS
+func (a *api) fd_seek(ctx *wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
+	return ErrnoNosys // TODO: implement
 }
 
-func (w *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
+func (a *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
 	var writer io.Writer
 
 	switch fd {
 	case 1:
-		writer = w.stdout
+		writer = a.stdout
 	case 2:
-		writer = w.stderr
+		writer = a.stderr
 	default:
-		f, ok := w.opened[fd]
+		f, ok := a.opened[fd]
 		if !ok || f.file == nil {
-			return EBADF
+			return ErrnoBadf
 		}
 		writer = f.file
 	}
@@ -381,19 +392,19 @@ func (w *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uin
 		nwritten += uint32(n)
 	}
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[nwrittenPtr:], nwritten)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
-func (w *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
+func (a *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
 	var reader io.Reader
 
 	switch fd {
 	case 0:
-		reader = w.stdin
+		reader = a.stdin
 	default:
-		f, ok := w.opened[fd]
+		f, ok := a.opened[fd]
 		if !ok || f.file == nil {
-			return EBADF
+			return ErrnoBadf
 		}
 		reader = f.file
 	}
@@ -408,66 +419,65 @@ func (w *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint
 		if errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
-			return EIO
+			return ErrnoIo
 		}
 	}
 	binary.LittleEndian.PutUint32(ctx.Memory.Buffer[nreadPtr:], nread)
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
-func (w *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
-	f, ok := w.opened[fd]
+func (a *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
+	f, ok := a.opened[fd]
 	if !ok {
-		return EBADF
+		return ErrnoBadf
 	}
 
 	if f.file != nil {
 		f.file.Close()
 	}
 
-	delete(w.opened, fd)
+	delete(a.opened, fd)
 
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 // ArgsSizesGet implements API.ArgsSizesGet
-func (w *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, argc, argvBufSize uint32) Errno {
-	if !ctx.Memory.PutUint32(argc, uint32(len(w.args.nullTerminatedValues))) {
-		return EINVAL
+func (a *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
+	if !ctx.Memory.PutUint32(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
+		return ErrnoInval
 	}
-	if !ctx.Memory.PutUint32(argvBufSize, w.args.totalBufSize) {
-		return EINVAL
+	if !ctx.Memory.PutUint32(resultArgvBufSize, a.args.totalBufSize) {
+		return ErrnoInval
 	}
 
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 // ArgsGet implements API.ArgsGet
-func (w *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
-	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
-		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(w.args.totalBufSize)) {
-		return EINVAL
+func (a *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
+	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(a.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
+		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(a.args.totalBufSize)) {
+		return ErrnoInval
 	}
-	for _, arg := range w.args.nullTerminatedValues {
+	for _, arg := range a.args.nullTerminatedValues {
 		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argv:], argvBuf)
 		argv += 4 // size of uint32
 		argvBuf += uint32(copy(ctx.Memory.Buffer[argvBuf:], arg))
 	}
 
-	return ESUCCESS
+	return ErrnoSuccess
 }
 
 func proc_exit(*wasm.HostFunctionCallContext, uint32) {
-	// not implemented yet
+	// TODO: implement
 }
 
 func environ_sizes_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	// not implemented yet
-	return
+	return ErrnoNosys // TODO: implement
 }
 
 func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	return
+	return ErrnoNosys // TODO: implement
 }
 
 // clock_time_get is a WASI API that returns the time value of a clock. Note: This is similar to clock_gettime in POSIX.
@@ -476,10 +486,10 @@ func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 // * timestampPtr: a pointer to an address of uint64 type. The time value of the clock in nanoseconds is written there.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
-func (w *api) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
+func (a *api) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
 	// TODO: The clock id and precision are currently ignored.
-	if !ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn()) {
-		return EINVAL
+	if !ctx.Memory.PutUint64(timestampPtr, a.getTimeNanosFn()) {
+		return ErrnoInval
 	}
-	return ESUCCESS
+	return ErrnoSuccess
 }

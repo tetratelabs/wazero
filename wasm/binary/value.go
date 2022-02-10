@@ -26,15 +26,15 @@ func encodeValTypes(vt []wasm.ValueType) []byte {
 	switch uint32(len(vt)) {
 	case 0: // nullary
 		return noValType
-	case 1: // ex $wasi_snapshot_preview1.fd_close or any result
+	case 1: // ex $wasi.fd_close or any result
 		if encoded, ok := encodedValTypes[vt[0]]; ok {
 			return encoded
 		}
-	case 2: // ex $wasi_snapshot_preview1.environ_sizes_get
+	case 2: // ex $wasi.environ_sizes_get
 		return []byte{2, vt[0], vt[1]}
-	case 4: // ex $wasi_snapshot_preview1.fd_write
+	case 4: // ex $wasi.fd_write
 		return []byte{4, vt[0], vt[1], vt[2], vt[3]}
-	case 9: // ex $wasi_snapshot_preview1.fd_write
+	case 9: // ex $wasi.fd_write
 		return []byte{9, vt[0], vt[1], vt[2], vt[3], vt[4], vt[5], vt[6], vt[7], vt[8]}
 	}
 	// Slow path others until someone complains with a valid signature

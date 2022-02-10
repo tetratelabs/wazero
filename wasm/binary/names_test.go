@@ -52,24 +52,24 @@ func TestEncodeNameSectionData(t *testing.T) {
 		{
 			name: "two function names", // Ex. TinyGo which at one point didn't set a module name
 			//	(module
-			//		(import "wasi_snapshot_preview1" "args_sizes_get" (func $runtime.args_sizes_get (param i32, i32) (result i32)))
-			//		(import "wasi_snapshot_preview1" "fd_write" (func $runtime.fd_write (param i32, i32, i32, i32) (result i32)))
+			//		(import "wasi_snapshot_preview1" "args_sizes_get" (func $wasi.args_sizes_get (param i32, i32) (result i32)))
+			//		(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32, i32, i32, i32) (result i32)))
 			//	)
 			input: &wasm.NameSection{
 				FunctionNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					{Index: wasm.Index(0), Name: "wasi.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "wasi.fd_write"},
 				},
 			},
 			expected: []byte{
-				subsectionIDFunctionNames, 0x2b, // 43 bytes
+				subsectionIDFunctionNames, 0x25, // 37 bytes
 				0x02, // two function names
 				0x00, // the function index is zero
-				0x16, // the function name runtime.args_sizes_get is 22 bytes long
-				'r', 'u', 'n', 't', 'i', 'm', 'e', '.', 'a', 'r', 'g', 's', '_', 's', 'i', 'z', 'e', 's', '_', 'g', 'e', 't',
+				0x13, // the function name wasi.args_sizes_get is 19 bytes long
+				'w', 'a', 's', 'i', '.', 'a', 'r', 'g', 's', '_', 's', 'i', 'z', 'e', 's', '_', 'g', 'e', 't',
 				0x01, // the function index is one
-				0x10, // the function name runtime.fd_write is 16 bytes long
-				'r', 'u', 'n', 't', 'i', 'm', 'e', '.', 'f', 'd', '_', 'w', 'r', 'i', 't', 'e',
+				0x0d, // the function name wasi.fd_write is 13 bytes long
+				'w', 'a', 's', 'i', '.', 'f', 'd', '_', 'w', 'r', 'i', 't', 'e',
 			},
 		},
 		{
@@ -164,15 +164,15 @@ func TestDecodeNameSection(t *testing.T) {
 			name: "module and function name",
 			input: &wasm.NameSection{
 				ModuleName:    "simple",
-				FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "runtime.hello"}},
+				FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "wasi.hello"}},
 			},
 		},
 		{
 			name: "two function names",
 			input: &wasm.NameSection{
 				FunctionNames: wasm.NameMap{
-					{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-					{Index: wasm.Index(1), Name: "runtime.fd_write"},
+					{Index: wasm.Index(0), Name: "wasi.args_sizes_get"},
+					{Index: wasm.Index(1), Name: "wasi.fd_write"},
 				},
 			},
 		},

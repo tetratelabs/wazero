@@ -42,11 +42,11 @@ func newExample() *wasm.Module {
 		},
 		ImportSection: []*wasm.Import{
 			{
-				Module: "wasi_snapshot_preview1", Name: "args_sizes_get",
+				Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 				Kind:     wasm.ImportKindFunc,
 				DescFunc: 0,
 			}, {
-				Module: "wasi_snapshot_preview1", Name: "fd_write",
+				Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
 				Kind:     wasm.ImportKindFunc,
 				DescFunc: 2,
 			},
@@ -67,8 +67,8 @@ func newExample() *wasm.Module {
 		NameSection: &wasm.NameSection{
 			ModuleName: "example",
 			FunctionNames: wasm.NameMap{
-				{Index: wasm.Index(0), Name: "runtime.args_sizes_get"},
-				{Index: wasm.Index(1), Name: "runtime.fd_write"},
+				{Index: wasm.Index(0), Name: "wasi.args_sizes_get"},
+				{Index: wasm.Index(1), Name: "wasi.fd_write"},
 				{Index: wasm.Index(2), Name: "call_hello"},
 				{Index: wasm.Index(3), Name: "hello"},
 				{Index: wasm.Index(4), Name: "addInt"},
