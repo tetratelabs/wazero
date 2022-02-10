@@ -584,30 +584,44 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	// 1) Set rb.1 so that we can return back to this function properly.
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset,
-		reservedRegisterForTemporary)
+		tmpRegisters[1])
 	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
-		reservedRegisterForTemporary,
+		tmpRegisters[1],
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset))
 
 	// 2) Set engine.valueStackContext.stackBasePointer for the next function.
 	//
-	// At this point, reservedRegisterForTemporary holds the old stack base pointer. We could get the new frame's
+	// At this point, tmpRegisters[1] holds the old stack base pointer. We could get the new frame's
 	// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 	// See the comments in engine.pushCallFrame which does exactly the same calculation in Go.
 	c.applyConstToRegisterInstruction(arm64.AADD,
 		int64(c.locationStack.sp)-int64(len(functype.Params)),
-		reservedRegisterForTemporary)
+		tmpRegisters[1])
 	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
-		reservedRegisterForTemporary, reservedRegisterForEngine,
-		engineValueStackContextStackBasePointerOffset)
+		tmpRegisters[1],
+		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset)
 
 	// Alias for readability.
 	compiledFunctionAddressRegister := tmpRegisters[1]
 
 	// 3) Set rc.next to specify which function is executed on the current call frame.
+	//
+	// First, we read the address of the first item of engine.compiledFunctions slice (= &engine.compiledFunctions[0])
+	// into tmpRegisters[1].
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineGlobalContextCompiledFunctionsElement0AddressOffset,
+		tmpRegisters[1])
+
+	// Next, read the address of the target function (= &engine.compiledFunctions[offset])
+	// into compiledFunctionAddressRegister.
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		tmpRegisters[1], int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
 		compiledFunctionAddressRegister)
+
+	// Finally, we are ready to place the address of the target function's *compiledFunction into the new callframe.
+	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
+		compiledFunctionAddressRegister,
+		callFrameStackTopAddressRegister, callFrameCompiledFunctionOffset)
 
 	return nil
 }
