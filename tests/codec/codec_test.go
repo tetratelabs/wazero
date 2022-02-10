@@ -46,7 +46,7 @@ func newExample() *wasm.Module {
 				Kind:     wasm.ImportKindFunc,
 				DescFunc: 0,
 			}, {
-				Module: "wasi_snapshot_preview1", Name: wasi.FunctionFDWrite,
+				Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
 				Kind:     wasm.ImportKindFunc,
 				DescFunc: 2,
 			},

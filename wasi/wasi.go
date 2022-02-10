@@ -108,27 +108,27 @@ type API interface {
 	// See https://linux.die.net/man/3/clock_gettime
 	ClockTimeGet(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno
 
-	// TODO: FDAdvise
-	// TODO: FDAllocate
-	// TODO: FDClose
-	// TODO: FDDataSync
-	// TODO: FDFDStatGet
-	// TODO: FDFDStatSetFlags
-	// TODO: FDFDStatSetRights
-	// TODO: FDFilestatGet
-	// TODO: FDFilestatSetSize
-	// TODO: FDFilestatSetTimes
-	// TODO: FDPread
-	// TODO: FDPrestatGet
-	// TODO: FDPrestatDirName
-	// TODO: FDPwrite
-	// TODO: FDRead
-	// TODO: FDReaddir
-	// TODO: FDRenumber
-	// TODO: FDSeek
-	// TODO: FDSync
-	// TODO: FDTell
-	// TODO: FDWrite
+	// TODO: FdAdvise
+	// TODO: FdAllocate
+	// TODO: FdClose
+	// TODO: FdDataSync
+	// TODO: FdFdstatGet
+	// TODO: FdFdstatSetFlags
+	// TODO: FdFdstatSetRights
+	// TODO: FdFilestatGet
+	// TODO: FdFilestatSetSize
+	// TODO: FdFilestatSetTimes
+	// TODO: FdPread
+	// TODO: FdPrestatGet
+	// TODO: FdPrestatDirName
+	// TODO: FdPwrite
+	// TODO: FdRead
+	// TODO: FdReaddir
+	// TODO: FdRenumber
+	// TODO: FdSeek
+	// TODO: FdSync
+	// TODO: FdTell
+	// TODO: FdWrite
 	// TODO: PathCreateDirectory
 	// TODO: PathFilestatGet
 	// TODO: PathFilestatSetTimes
@@ -177,27 +177,27 @@ func (a *api) register(store *wasm.Store) (err error) {
 		{FunctionEnvironSizesGet, environ_sizes_get},
 		// TODO: FunctionClockResGet
 		{FunctionClockTimeGet, a.ClockTimeGet},
-		// TODO: FunctionFDAdvise
-		// TODO: FunctionFDAllocate
-		{FunctionFDClose, a.fd_close},
-		// TODO: FunctionFDDataSync
-		{FunctionFDFDStatGet, a.fd_fdstat_get},
-		// TODO: FunctionFDFDStatSetFlags
-		// TODO: FunctionFDFDStatSetRights
-		// TODO: FunctionFDFilestatGet
-		// TODO: FunctionFDFilestatSetSize
-		// TODO: FunctionFDFilestatSetTimes
-		// TODO: FunctionFDPread
-		{FunctionFDPrestatGet, a.fd_prestat_get},
-		{FunctionFDPrestatDirName, a.fd_prestat_dir_name},
-		// TODO: FunctionFDPwrite
-		{FunctionFDRead, a.fd_read},
-		// TODO: FunctionFDReaddir
-		// TODO: FunctionFDRenumber
-		{FunctionFDSeek, a.fd_seek},
-		// TODO: FunctionFDSync
-		// TODO: FunctionFDTell
-		{FunctionFDWrite, a.fd_write},
+		// TODO: FunctionFdAdvise
+		// TODO: FunctionFdAllocate
+		{FunctionFdClose, a.fd_close},
+		// TODO: FunctionFdDataSync
+		{FunctionFdFdstatGet, a.fd_fdstat_get},
+		// TODO: FunctionFdFdstatSetFlags
+		// TODO: FunctionFdFdstatSetRights
+		// TODO: FunctionFdFilestatGet
+		// TODO: FunctionFdFilestatSetSize
+		// TODO: FunctionFdFilestatSetTimes
+		// TODO: FunctionFdPread
+		{FunctionFdPrestatGet, a.fd_prestat_get},
+		{FunctionFdPrestatDirName, a.fd_prestat_dir_name},
+		// TODO: FunctionFdPwrite
+		{FunctionFdRead, a.fd_read},
+		// TODO: FunctionFdReaddir
+		// TODO: FunctionFdRenumber
+		{FunctionFdSeek, a.fd_seek},
+		// TODO: FunctionFdSync
+		// TODO: FunctionFdTell
+		{FunctionFdWrite, a.fd_write},
 		// TODO: FunctionPathCreateDirectory
 		// TODO: FunctionPathFilestatGet
 		// TODO: FunctionPathFilestatSetTimes
