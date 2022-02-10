@@ -1206,8 +1206,6 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 				require.NoError(t, err)
 			},
 		},
-		// {name: "EQ"} TODO: after compileEq support
-		// {name: "NE"} TODO: after compileNe support
 		{
 			name: "HS",
 			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
@@ -1296,6 +1294,30 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 				requirePushTwoFloat32Consts(t, x1, x2, compiler)
 				// Lt on floats produces the value on COND_MI register.
 				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "EQ",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(1)
+				if shoulGoElse {
+					x2++
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				err := compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "NE",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shoulGoElse {
+					x2 = x1
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				err := compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
 			},
 		},
