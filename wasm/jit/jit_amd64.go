@@ -4729,8 +4729,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 
 	// 2) Set engine.valueStackContext.stackBasePointer for the next function.
 	{
-		// At this point, tmpRegister holds the OLD stack base pointer. We could get the new frame's
-		// stack base pointer by "OLD stack base pointer + OLD stack pointer - # of function params"
+		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
+		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 		// See the comments in engine.pushCallFrame which does exactly the same calculation in Go.
 		calculateNextStackBasePointer := c.newProg()
 		calculateNextStackBasePointer.As = x86.AADDQ
