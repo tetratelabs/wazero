@@ -25,9 +25,9 @@ import (
 // Memory is always the wasm.Store Memories index zero: `store.Memories[0].Buffer`
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
+// See https://wwa.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
 type API interface {
-	// ArgsGet (FunctionArgsGet) is the WASI function that reads command-line argument data (Args).
+	// ArgsGet is the WASI function that reads command-line argument data (Args).
 	//
 	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
 	// Memory Buffer to write offsets. These are encoded uint32 little-endian.
@@ -49,12 +49,13 @@ type API interface {
 	//          offset that begins "a" --+           |
 	//                     offset that begins "bc" --+
 	//
+	// Note: FunctionArgsGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno
 
-	// ArgsSizesGet (FunctionArgsSizesGet) is a WASI function that reads command-line argument data (Args) sizes.
+	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
 	//
 	// There are two parameters and an Errno result. Both parameters are offsets in the wasm.HostFunctionCallContext
 	// Memory Buffer to write the corresponding sizes in uint32 little-endian encoding.
@@ -74,6 +75,7 @@ type API interface {
 	//             resultArgvBufSize --|
 	//   len([]byte{'a',0,'b',c',0}) --+
 	//
+	// Note: FunctionArgsSizesGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -142,45 +144,45 @@ type api struct {
 	getTimeNanosFn func() uint64
 }
 
-func (w *api) register(store *wasm.Store) (err error) {
+func (a *api) register(store *wasm.Store) (err error) {
 	// Note: these are ordered per spec for consistency
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToFunction := []struct {
 		funcName string
 		fn       interface{}
 	}{
-		{FunctionArgsGet, w.ArgsGet},
-		{FunctionArgsSizesGet, w.ArgsSizesGet},
+		{FunctionArgsGet, a.ArgsGet},
+		{FunctionArgsSizesGet, a.ArgsSizesGet},
 		{FunctionEnvironGet, environ_get},
 		{FunctionEnvironSizesGet, environ_sizes_get},
 		// TODO: FunctionClockResGet
-		{FunctionClockTimeGet, w.clock_time_get},
+		{FunctionClockTimeGet, a.clock_time_get},
 		// TODO: FunctionFDAdvise
 		// TODO: FunctionFDAllocate
-		{FunctionFDClose, w.fd_close},
+		{FunctionFDClose, a.fd_close},
 		// TODO: FunctionFDDataSync
-		{FunctionFDFDStatGet, w.fd_fdstat_get},
+		{FunctionFDFDStatGet, a.fd_fdstat_get},
 		// TODO: FunctionFDFDStatSetFlags
 		// TODO: FunctionFDFDStatSetRights
 		// TODO: FunctionFDFilestatGet
 		// TODO: FunctionFDFilestatSetSize
 		// TODO: FunctionFDFilestatSetTimes
 		// TODO: FunctionFDPread
-		{FunctionFDPrestatGet, w.fd_prestat_get},
-		{FunctionFDPrestatDirName, w.fd_prestat_dir_name},
+		{FunctionFDPrestatGet, a.fd_prestat_get},
+		{FunctionFDPrestatDirName, a.fd_prestat_dir_name},
 		// TODO: FunctionFDPwrite
-		{FunctionFDRead, w.fd_read},
+		{FunctionFDRead, a.fd_read},
 		// TODO: FunctionFDReaddir
 		// TODO: FunctionFDRenumber
-		{FunctionFDSeek, w.fd_seek},
+		{FunctionFDSeek, a.fd_seek},
 		// TODO: FunctionFDSync
 		// TODO: FunctionFDTell
-		{FunctionFDWrite, w.fd_write},
+		{FunctionFDWrite, a.fd_write},
 		// TODO: FunctionPathCreateDirectory
 		// TODO: FunctionPathFilestatGet
 		// TODO: FunctionPathFilestatSetTimes
 		// TODO: FunctionPathLink
-		{FunctionPathOpen, w.path_open},
+		{FunctionPathOpen, a.path_open},
 		// TODO: FunctionPathReadlink
 		// TODO: FunctionPathRemoveDirectory
 		// TODO: FunctionPathRename
@@ -218,20 +220,20 @@ type fileEntry struct {
 type Option func(*api)
 
 func Stdin(reader io.Reader) Option {
-	return func(w *api) {
-		w.stdin = reader
+	return func(a *api) {
+		a.stdin = reader
 	}
 }
 
 func Stdout(writer io.Writer) Option {
-	return func(w *api) {
-		w.stdout = writer
+	return func(a *api) {
+		a.stdout = writer
 	}
 }
 
 func Stderr(writer io.Writer) Option {
-	return func(w *api) {
-		w.stderr = writer
+	return func(a *api) {
+		a.stderr = writer
 	}
 }
 
@@ -244,14 +246,14 @@ func Args(args ...string) (Option, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(w *api) {
-		w.args = wasiStrings
+	return func(a *api) {
+		a.args = wasiStrings
 	}, nil
 }
 
 func Preopen(dir string, fileSys FS) Option {
-	return func(w *api) {
-		w.opened[uint32(len(w.opened))+3] = fileEntry{
+	return func(a *api) {
+		a.opened[uint32(len(a.opened))+3] = fileEntry{
 			path:    dir,
 			fileSys: fileSys,
 		}
@@ -290,25 +292,25 @@ func newAPI(opts ...Option) *api {
 	return ret
 }
 
-func (w *api) randUnusedFD() uint32 {
+func (a *api) randUnusedFD() uint32 {
 	fd := uint32(rand.Int31())
 	for {
-		if _, ok := w.opened[fd]; !ok {
+		if _, ok := a.opened[fd]; !ok {
 			return fd
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
 }
 
-func (w *api) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
-	if _, ok := w.opened[fd]; !ok {
+func (a *api) fd_prestat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+	if _, ok := a.opened[fd]; !ok {
 		return ErrnoBadf
 	}
 	return ErrnoSuccess
 }
 
-func (w *api) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
-	f, ok := w.opened[fd]
+func (a *api) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
+	f, ok := a.opened[fd]
 	if !ok {
 		return ErrnoInval
 	}
@@ -321,18 +323,18 @@ func (w *api) fd_prestat_dir_name(ctx *wasm.HostFunctionCallContext, fd uint32, 
 	return ErrnoSuccess
 }
 
-func (w *api) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
-	if _, ok := w.opened[fd]; !ok {
+func (a *api) fd_fdstat_get(ctx *wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+	if _, ok := a.opened[fd]; !ok {
 		return ErrnoBadf
 	}
 	binary.LittleEndian.PutUint64(ctx.Memory.Buffer[bufPtr+16:], R_FD_READ|R_FD_WRITE)
 	return ErrnoSuccess
 }
 
-func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+func (a *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
 	fsRightsBase, fsRightsInheriting uint64,
 	fdFlags, fdPtr uint32) (errno Errno) {
-	dir, ok := w.opened[fd]
+	dir, ok := a.opened[fd]
 	if !ok || dir.fileSys == nil {
 		return ErrnoInval
 	}
@@ -348,9 +350,9 @@ func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 		}
 	}
 
-	newFD := w.randUnusedFD()
+	newFD := a.randUnusedFD()
 
-	w.opened[newFD] = fileEntry{
+	a.opened[newFD] = fileEntry{
 		file: f,
 	}
 
@@ -358,20 +360,20 @@ func (w *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 	return ErrnoSuccess
 }
 
-func (w *api) fd_seek(ctx *wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
+func (a *api) fd_seek(ctx *wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
 	return ErrnoNosys // TODO: implement
 }
 
-func (w *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
+func (a *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
 	var writer io.Writer
 
 	switch fd {
 	case 1:
-		writer = w.stdout
+		writer = a.stdout
 	case 2:
-		writer = w.stderr
+		writer = a.stderr
 	default:
-		f, ok := w.opened[fd]
+		f, ok := a.opened[fd]
 		if !ok || f.file == nil {
 			return ErrnoBadf
 		}
@@ -393,14 +395,14 @@ func (w *api) fd_write(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uin
 	return ErrnoSuccess
 }
 
-func (w *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
+func (a *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
 	var reader io.Reader
 
 	switch fd {
 	case 0:
-		reader = w.stdin
+		reader = a.stdin
 	default:
-		f, ok := w.opened[fd]
+		f, ok := a.opened[fd]
 		if !ok || f.file == nil {
 			return ErrnoBadf
 		}
@@ -424,8 +426,8 @@ func (w *api) fd_read(ctx *wasm.HostFunctionCallContext, fd uint32, iovsPtr uint
 	return ErrnoSuccess
 }
 
-func (w *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
-	f, ok := w.opened[fd]
+func (a *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno) {
+	f, ok := a.opened[fd]
 	if !ok {
 		return ErrnoBadf
 	}
@@ -434,17 +436,17 @@ func (w *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno)
 		f.file.Close()
 	}
 
-	delete(w.opened, fd)
+	delete(a.opened, fd)
 
 	return ErrnoSuccess
 }
 
 // ArgsSizesGet implements API.ArgsSizesGet
-func (w *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
-	if !ctx.Memory.PutUint32(resultArgc, uint32(len(w.args.nullTerminatedValues))) {
+func (a *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
+	if !ctx.Memory.PutUint32(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
 		return ErrnoInval
 	}
-	if !ctx.Memory.PutUint32(resultArgvBufSize, w.args.totalBufSize) {
+	if !ctx.Memory.PutUint32(resultArgvBufSize, a.args.totalBufSize) {
 		return ErrnoInval
 	}
 
@@ -452,12 +454,12 @@ func (w *api) ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, result
 }
 
 // ArgsGet implements API.ArgsGet
-func (w *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
-	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(w.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
-		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(w.args.totalBufSize)) {
+func (a *api) ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
+	if !ctx.Memory.ValidateAddrRange(argv, uint64(len(a.args.nullTerminatedValues))*4) /*4 is the size of uint32*/ ||
+		!ctx.Memory.ValidateAddrRange(argvBuf, uint64(a.args.totalBufSize)) {
 		return ErrnoInval
 	}
-	for _, arg := range w.args.nullTerminatedValues {
+	for _, arg := range a.args.nullTerminatedValues {
 		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[argv:], argvBuf)
 		argv += 4 // size of uint32
 		argvBuf += uint32(copy(ctx.Memory.Buffer[argvBuf:], arg))
@@ -484,9 +486,9 @@ func environ_get(*wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 // * timestampPtr: a pointer to an address of uint64 type. The time value of the clock in nanoseconds is written there.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
-func (w *api) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
+func (a *api) clock_time_get(ctx *wasm.HostFunctionCallContext, id uint32, precision uint64, timestampPtr uint32) (err Errno) {
 	// TODO: The clock id and precision are currently ignored.
-	if !ctx.Memory.PutUint64(timestampPtr, w.getTimeNanosFn()) {
+	if !ctx.Memory.PutUint64(timestampPtr, a.getTimeNanosFn()) {
 		return ErrnoInval
 	}
 	return ErrnoSuccess
