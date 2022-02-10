@@ -248,25 +248,6 @@ func (c *arm64Compiler) applyTwoRegistersToRegisterInstruction(instruction obj.A
 	c.addInstruction(inst)
 }
 
-// applyRegisterAndOffsetToRegisterInstruction adds an instruction which takes one source register operand and offset, and one destination register operand.
-func (c *arm64Compiler) applyRegisterAndOffsetToRegisterInstruction(instruction obj.As, src int16, offset int64, destination int16) (err error) {
-	if offset > math.MaxInt16 {
-		// BUG: caller must check the offset at compilation time, and avoid such a large offset
-		// by loading the const to the register beforehand and then using applyTwoRegistersToRegisterInstruction instead.
-		err = fmt.Errorf("const offset must be smaller than or equal %d, but got %d", math.MaxInt16, offset)
-		return
-	}
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destination
-	inst.From.Type = obj.TYPE_CONST
-	inst.From.Offset = offset
-	inst.Reg = src
-	c.addInstruction(inst)
-	return
-}
-
 // applyTwoRegistersToNoneInstruction adds an instruction which takes two source operands on registers.
 func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, src1, src2 int16) {
 	inst := c.newProg()
