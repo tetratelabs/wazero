@@ -77,6 +77,8 @@ type arm64Compiler struct {
 	labels map[string]*labelInfo
 	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
 	stackPointerCeil uint64
+	// beforeAssembleCallback holds the callbacks which are called before assembling native code.
+	beforeAssembleCallback []func() error
 }
 
 // compile implements compiler.compile for the arm64 architecture.
@@ -87,6 +89,12 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	stackPointerCeil = c.stackPointerCeil
 	if stackPointerCeil < c.locationStack.stackPointerCeil {
 		stackPointerCeil = c.locationStack.stackPointerCeil
+	}
+
+	for _, cb := range c.beforeAssembleCallback {
+		if err := cb(); err != nil {
+			return err
+		}
 	}
 
 	code, err = mmapCodeSegment(c.builder.Assemble())
@@ -136,9 +144,11 @@ func (c *arm64Compiler) markRegisterUsed(reg int16) {
 	c.locationStack.markRegisterUsed(reg)
 }
 
-func (c *arm64Compiler) markRegisterUnused(reg int16) {
-	if !isZeroRegister(reg) {
-		c.locationStack.markRegisterUnused(reg)
+func (c *arm64Compiler) markRegisterUnused(regs ...int16) {
+	for _, reg := range regs {
+		if !isZeroRegister(reg) {
+			c.locationStack.markRegisterUnused(reg)
+		}
 	}
 }
 
@@ -587,6 +597,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 		tmpRegisters[1])
 	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
 		tmpRegisters[1],
+		// "rb.1" is BELOW the top address. See the above example for detail.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset))
 
 	// 2) Set engine.valueStackContext.stackBasePointer for the next function.
@@ -618,18 +629,76 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 		tmpRegisters[1], int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
 		compiledFunctionAddressRegister)
 
-	// Finally, we are ready to place the address of the target function's *compiledFunction into the new callframe.
+	// Finally, we are ready to write the address of the target function's *compiledFunction into the new callframe.
 	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
 		compiledFunctionAddressRegister,
 		callFrameStackTopAddressRegister, callFrameCompiledFunctionOffset)
 
+	// 4) Set ra.1 so that we can return back to this function properly.
+	//
+	// First, Get the return address into the tmpRegisters[2].
+	c.readInstructionAddress(obj.AJMP, tmpRegisters[2])
+	// Then write the address into the callframe.
+	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
+		tmpRegisters[2],
+		// "ra.1" is BELOW the top address. See the above example for detail.
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
+	)
+
+	// Everthing is done to make function call now.
+	// We increment the callframe stack pointer.
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
+		tmpRegisters[2])
+	c.applyConstToRegisterInstruction(arm64.AADD, 1, tmpRegisters[2])
+	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
+		tmpRegisters[2],
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset)
+
+	// Then, br into the target function's initial address.
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
+		tmpRegisters[2])
+	br := c.emitUnconditionalBRInstruction(obj.TYPE_REG)
+	br.To.Reg = tmpRegisters[2]
+
+	// All the registers used are temporary so we mark them unused.
+	c.markRegisterUnused(tmpRegisters...)
+
+	// On the function return, we initialize the state for this function.
+	c.initializeReservedStackBasePointerRegister()
+	// TODO: initialize module context, and memory pointer.
 	return nil
+}
+
+func (c *arm64Compiler) readInstructionAddress(beforeTargetInstAddress obj.As, destinationRegister int16) {
+	inst := c.newProg()
+	inst.As = arm64.AADR
+	inst.From.Type = obj.TYPE_BRANCH
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationRegister
+	c.addInstruction(inst)
+	c.beforeAssembleCallback = append(c.beforeAssembleCallback, func() error {
+		target := inst
+		for target != nil {
+			// Advance until we have the target.As has the given instruction kind.
+			target = target.Link
+			if target.As == beforeTargetInstAddress {
+				// At this point, target is the instruction right before the target instruction.
+				// Thus, advance one more time to make target the target instruction.
+				inst.From.SetTarget(target.Link)
+				return nil
+			}
+		}
+		return fmt.Errorf("target instruction not found for read instruction address")
+	})
 }
 
 func (c *arm64Compiler) getCallFrameStackPointerOffsetInBytes(destinationRegister int16) {
 	// First we get the callFrameStackPointer in engine.globalContext.
-	c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
-		engineGlobalContextCallFrameStackPointerOffset, destinationRegister)
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
+		destinationRegister)
 
 	// The value is an index to engine.callFrameStack ([]callFrame type), so
 	// we shift it by callFrameDataSizeMostSignificantSetBit to get the offset in bytes.
