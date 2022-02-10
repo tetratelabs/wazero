@@ -71,8 +71,8 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 type arm64Compiler struct {
 	builder *asm.Builder
 	f       *wasm.FunctionInstance
-	// setBRTargetOnNextInstructions holds BR kind instructions where we want to set the next coming
-	// instruction as the destination of these BR instructions.
+	// setBRTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
+	//  where we want to set the next coming instruction as the destination of these BR instructions.
 	setBRTargetOnNextInstructions []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
