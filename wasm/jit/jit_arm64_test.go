@@ -45,6 +45,7 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	ret, ok := cmp.(*arm64Compiler)
 	require.True(t, ok)
 	ret.labels = make(map[string]*labelInfo)
+	ret.ir = &wazeroir.CompilationResult{}
 	return ret
 }
 

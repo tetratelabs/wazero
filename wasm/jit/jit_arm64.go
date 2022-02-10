@@ -58,6 +58,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		builder:       b,
 		locationStack: newValueLocationStack(),
 		ir:            ir,
+		labels:        map[string]*labelInfo{},
 	}
 	return compiler, nil
 }
@@ -509,8 +510,8 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 		labelKey := target.String()
 		if c.ir.LabelCallers[labelKey] > 1 {
 			// We can only re-use register state if when there's a single call-site.
-			// Release existing state to the stack if there's multiple ones to have
-			// consistent register state at the beginning of label.
+			// Release existing values on registers to the stack if there's multiple ones to have
+			// the consistent value location state at the beginning of label.
 			if err := c.releaseAllRegistersToStack(); err != nil {
 				return err
 			}
