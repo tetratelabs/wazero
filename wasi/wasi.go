@@ -50,7 +50,7 @@ type API interface {
 	//                     offset that begins "bc" --+
 	//
 	// Note: FunctionArgsGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
-	// See ArgsSizesGet
+	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsGet(ctx *wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno
@@ -76,7 +76,7 @@ type API interface {
 	//   len([]byte{'a',0,'b',c',0}) --+
 	//
 	// Note: FunctionArgsSizesGet documentation has an example of this signature in the WebAssembly 1.0 (MVP) Text Format.
-	// See ArgsGet
+	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsSizesGet(ctx *wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno
