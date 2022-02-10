@@ -92,8 +92,8 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	}
 
 	for _, cb := range c.beforeAssembleCallback {
-		if err := cb(); err != nil {
-			return err
+		if err = cb(); err != nil {
+			return
 		}
 	}
 
@@ -562,7 +562,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	// Alias for readability.
 	callFrameStackTopAddressRegister := tmpRegisters[0]
 
-	// TODO: Check the callfram stack length, and if necessary, grow the call frame stack before jump into the target.
+	// TODO: Check the callframe stack length, and if necessary, grow the call frame stack before jump into the target.
 
 	c.getCallFrameStackPointerOffsetInBytes(tmpRegisters[1])
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
