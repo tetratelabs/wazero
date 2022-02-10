@@ -68,7 +68,7 @@ type arm64Compiler struct {
 	f       *wasm.FunctionInstance
 	ir      *wazeroir.CompilationResult
 	// setBRTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
-	//  where we want to set the next coming instruction as the destination of these BR instructions.
+	// where we want to set the next coming instruction as the destination of these BR instructions.
 	setBRTargetOnNextInstructions []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
@@ -437,6 +437,12 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	conditionalBR := c.newProg()
 	conditionalBR.To.Type = obj.TYPE_BRANCH
 	if cond.onConditionalRegister() {
+		// If the cond is on a conditional register, it corresponds to one of "conditonal codes"
+		// https://developer.arm.com/documentation/dui0801/a/Condition-Codes/Condition-code-suffixes
+		// Here we represent the conditional codes by using arm64.COND_** registers, and that means the
+		// conditional jump can be performed if we use arm64.AB**.
+		// For example, if we have arm64.COND_EQ on cond, that means we performed compileEq right before
+		// this compileBrIf and BrIf can be achieved by arm64.ABEQ.
 		switch cond.conditionalRegister {
 		case arm64.COND_EQ:
 			conditionalBR.As = arm64.ABEQ
