@@ -312,7 +312,28 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_ProcExit TestAPI_ProcExit_Errors
 // TODO: TestAPI_ProcRaise TestAPI_ProcRaise_Errors
 // TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
-// TODO: TestAPI_RandomGet TestAPI_RandomGet_Errors
+
+// randomWat is a wasm module to call random_get.
+//go:embed testdata/random.wat
+var randomWat []byte
+func TestAPI_RandomGet(t *testing.T) {
+	store, wasiAPI := instantiateWasmStore(t, randomWat, "test")
+	var buf_len uint32 = 5
+	var buf uint32 = 0
+	
+	t.Run("API.RandomGet", func(t *testing.T) {
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		errno := wasiAPI.RandomGet(hContext, buf, buf_len)
+		require.Equal(t, ErrnoSuccess, errno)
+	})
+}
+
+func TestAPI_RandomGet_Errors(t *testing.T) {
+
+}
+
 // TODO: TestAPI_SockRecv TestAPI_SockRecv_Errors
 // TODO: TestAPI_SockSend TestAPI_SockSend_Errors
 // TODO: TestAPI_SockShutdown TestAPI_SockShutdown_Errors
