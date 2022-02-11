@@ -143,7 +143,15 @@ type API interface {
 	// TODO: ProcExit
 	// TODO: ProcRaise
 	// TODO: SchedYield
-	// TODO: RandomGet
+
+	// RandomGet is a WASI function that write random data in buffer.
+	//
+	// * buf - buffer to be filled with random values
+	// * buf_len - buffer size
+	//
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-buf_len-size---errno
+	RandomGet(ctx *wasm.HostFunctionCallContext, buf, buf_len uint32) Errno
+
 	// TODO: SockRecv
 	// TODO: SockSend
 	// TODO: SockShutdown
@@ -212,7 +220,7 @@ func (a *api) register(store *wasm.Store) (err error) {
 		{FunctionProcExit, proc_exit},
 		// TODO: FunctionProcRaise
 		// TODO: FunctionSchedYield
-		// TODO: FunctionRandomGet
+		{FunctionRandomGet, a.RandomGet},
 		// TODO: FunctionSockRecv
 		// TODO: FunctionSockSend
 		// TODO: FunctionSockShutdown
@@ -499,6 +507,18 @@ func (a *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno)
 	}
 
 	delete(a.opened, fd)
+
+	return ErrnoSuccess
+}
+
+func (a *api) RandomGet(ctx *wasm.HostFunctionCallContext, buf uint32, buf_len uint32) (errno Errno) {
+	random_bytes := make([]byte, buf_len)
+	_, err := rand.Read(random_bytes)
+	if err != nil {
+		return ErrnoInval
+	}
+	
+	copy(ctx.Memory.Buffer[buf:buf_len], random_bytes)
 
 	return ErrnoSuccess
 }
