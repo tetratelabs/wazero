@@ -3,97 +3,14 @@ package wasi
 import (
 	"context"
 	_ "embed"
-	"encoding/binary"
-	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/text"
 )
-
-func TestNewNullTerminatedStrings(t *testing.T) {
-	emptyWASIStringArray := &nullTerminatedStrings{nullTerminatedValues: [][]byte{}}
-	tests := []struct {
-		name     string
-		input    []string
-		expected *nullTerminatedStrings
-	}{
-		{
-			name:     "nil",
-			expected: emptyWASIStringArray,
-		},
-		{
-			name:     "none",
-			input:    []string{},
-			expected: emptyWASIStringArray,
-		},
-		{
-			name:  "two",
-			input: []string{"a", "bc"},
-			expected: &nullTerminatedStrings{
-				nullTerminatedValues: [][]byte{
-					{'a', 0},
-					{'b', 'c', 0},
-				},
-				totalBufSize: 5,
-			},
-		},
-		{
-			name:  "two and empty string",
-			input: []string{"a", "", "bc"},
-			expected: &nullTerminatedStrings{
-				nullTerminatedValues: [][]byte{
-					{'a', 0},
-					{0},
-					{'b', 'c', 0},
-				},
-				totalBufSize: 6,
-			},
-		},
-		{
-			name: "utf-8",
-			// "😨", "🤣", and "️🏃‍♀️" have 4, 4, and 13 bytes respectively
-			input: []string{"😨🤣🏃\u200d♀️", "foo", "bar"},
-			expected: &nullTerminatedStrings{
-				nullTerminatedValues: [][]byte{
-					[]byte("😨🤣🏃\u200d♀️\x00"),
-					{'f', 'o', 'o', 0},
-					{'b', 'a', 'r', 0},
-				},
-				totalBufSize: 30,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			s, err := newNullTerminatedStrings(100, tc.input...)
-			require.NoError(t, err)
-			require.Equal(t, tc.expected, s)
-		})
-	}
-}
-
-func TestNewNullTerminatedStrings_Errors(t *testing.T) {
-	t.Run("invalid utf-8", func(t *testing.T) {
-		_, err := newNullTerminatedStrings(100, "\xff\xfe\xfd", "foo", "bar")
-		require.EqualError(t, err, "arg[0] is not a valid UTF-8 string")
-	})
-	t.Run("arg[0] too large", func(t *testing.T) {
-		_, err := newNullTerminatedStrings(1, "a", "bc")
-		require.EqualError(t, err, "arg[0] will exceed max buffer size 1")
-	})
-	t.Run("empty arg too large due to null terminator", func(t *testing.T) {
-		_, err := newNullTerminatedStrings(2, "a", "", "bc")
-		require.EqualError(t, err, "arg[1] will exceed max buffer size 2")
-	})
-}
 
 func TestNewAPI_Args(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
@@ -114,49 +31,13 @@ func TestNewAPI_Args(t *testing.T) {
 	})
 }
 
-func TestApi_ArgsSizesGet(t *testing.T) {
-	ctx := context.Background()
+// argsWat is a wasm module to call args_get and args_sizes_get.
+//go:embed testdata/args.wat
+var argsWat []byte
+
+func TestAPI_ArgsGet(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-
-	argc := uint32(1)        // arbitrary offset
-	argvBufSize := uint32(6) // arbitrary offset
-	maskLength := 11         // number of bytes to write '?' to tell what we've written
-	expectedMemory := []byte{
-		'?',                // argc is after this
-		0x2, 0x0, 0x0, 0x0, // little endian-encoded arg count
-		'?',                // argvBufSize is after this
-		0x5, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
-		'?', // stopped after encoding
-	} // tr
-	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
-
-	t.Run("API.ArgsSizesGet", func(t *testing.T) {
-		maskMemory(store, maskLength)
-
-		// provide a host context we call directly
-		hContext := wasm.NewHostFunctionCallContext(ctx, store.Memories[0])
-
-		// invoke ArgsSizesGet directly and check the memory side-effects!
-		errno := wasiAPI.ArgsSizesGet(hContext, argc, argvBufSize)
-		require.Equal(t, ESUCCESS, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
-	})
-	t.Run("args_sizes_get", func(t *testing.T) {
-		maskMemory(store, maskLength)
-
-		ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(argc), uint64(argvBufSize))
-		require.NoError(t, err)
-		require.Equal(t, ESUCCESS, Errno(ret[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
-	})
-}
-
-func TestApi_ArgsGet(t *testing.T) {
-	ctx := context.Background()
-	args, err := Args("a", "bc")
-	require.NoError(t, err)
-
 	argv := uint32(7)    // arbitrary offset
 	argvBuf := uint32(1) // arbitrary offset
 	maskLength := 16     // number of bytes to write '?' to tell what we've written
@@ -174,86 +55,24 @@ func TestApi_ArgsGet(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// provide a host context we call directly
-		hContext := wasm.NewHostFunctionCallContext(ctx, store.Memories[0])
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
 		// invoke ArgsGet directly and check the memory side-effects!
 		errno := wasiAPI.ArgsGet(hContext, argv, argvBuf)
-		require.Equal(t, ESUCCESS, errno)
+		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
-	t.Run("args_get", func(t *testing.T) {
+	t.Run(FunctionArgsGet, func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(argv), uint64(argvBuf))
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsGet, uint64(argv), uint64(argvBuf))
 		require.NoError(t, err)
-		require.Equal(t, ESUCCESS, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 }
 
-// maskMemory overwrites the first memory in the store with '?', so tests can see what's written.
-// As the memory can be very large, this only masks up to the given length.
-//
-// Note: WebAssembly 1.0 (MVP) can have only up to one memory, so which is unambiguous.
-func maskMemory(store *wasm.Store, maskLength int) {
-	for i := 0; i < maskLength; i++ {
-		store.Memories[0].Buffer[i] = '?'
-	}
-}
-
-// argsWat is a wasm module to call args_get and args_sizes_get.
-//go:embed testdata/args.wat
-var argsWat []byte
-
-func TestArgsSizesGet_Errors(t *testing.T) {
-	ctx := context.Background()
-	args, err := Args("a", "bc")
-	require.NoError(t, err)
-	store, _ := instantiateWasmStore(t, argsWat, "test", args)
-
-	memorySize := uint32(len(store.Memories[0].Buffer))
-	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
-
-	tests := []struct {
-		name        string
-		argc        uint32
-		argvBufSize uint32
-	}{
-		{
-			name:        "out-of-memory argc",
-			argc:        memorySize,
-			argvBufSize: validAddress,
-		},
-		{
-			name:        "out-of-memory argvBufSize",
-			argc:        validAddress,
-			argvBufSize: memorySize,
-		},
-		{
-			name:        "argc exceeds the maximum valid address by 1",
-			argc:        memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
-			argvBufSize: validAddress,
-		},
-		{
-			name:        "argvBufSize exceeds the maximum valid size by 1",
-			argc:        validAddress,
-			argvBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", "args_sizes_get", uint64(tc.argc), uint64(tc.argvBufSize))
-			require.NoError(t, err)
-			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
-		})
-	}
-}
-
-func TestArgsGet_Error(t *testing.T) {
-	ctx := context.Background()
+func TestAPI_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
 	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
@@ -293,75 +112,210 @@ func TestArgsGet_Error(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(ctx, "test", "args_get", uint64(tc.argv), uint64(tc.argvBuf))
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsGet, uint64(tc.argv), uint64(tc.argvBuf))
 			require.NoError(t, err)
-			require.Equal(t, uint64(EINVAL), ret[0]) // ret[0] is returned errno
+			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
+
+func TestAPI_ArgsSizesGet(t *testing.T) {
+	args, err := Args("a", "bc")
+	require.NoError(t, err)
+	resultArgc := uint32(1)        // arbitrary offset
+	resultArgvBufSize := uint32(6) // arbitrary offset
+	maskLength := 11               // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                // resultArgc is after this
+		0x2, 0x0, 0x0, 0x0, // little endian-encoded arg count
+		'?',                // resultArgvBufSize is after this
+		0x5, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
+		'?', // stopped after encoding
+	} // tr
+	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
+
+	t.Run("API.ArgsSizesGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		// invoke ArgsSizesGet directly and check the memory side effects!
+		errno := wasiAPI.ArgsSizesGet(hContext, resultArgc, resultArgvBufSize)
+		require.Equal(t, ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run(FunctionArgsSizesGet, func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsSizesGet, uint64(resultArgc), uint64(resultArgvBufSize))
+		require.NoError(t, err)
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
+	args, err := Args("a", "bc")
+	require.NoError(t, err)
+	store, _ := instantiateWasmStore(t, argsWat, "test", args)
+
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
+
+	tests := []struct {
+		name        string
+		argc        uint32
+		argvBufSize uint32
+	}{
+		{
+			name:        "out-of-memory argc",
+			argc:        memorySize,
+			argvBufSize: validAddress,
+		},
+		{
+			name:        "out-of-memory argvBufSize",
+			argc:        validAddress,
+			argvBufSize: memorySize,
+		},
+		{
+			name:        "argc exceeds the maximum valid address by 1",
+			argc:        memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
+			argvBufSize: validAddress,
+		},
+		{
+			name:        "argvBufSize exceeds the maximum valid size by 1",
+			argc:        validAddress,
+			argvBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsSizesGet, uint64(tc.argc), uint64(tc.argvBufSize))
+			require.NoError(t, err)
+			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
+		})
+	}
+}
+
+// TODO TestAPI_EnvironGet TestAPI_EnvironGet_Errors
+// TODO TestAPI_EnvironSizesGet TestAPI_EnvironSizesGet_Errors
+// TODO TestAPI_ClockResGet TestAPI_ClockResGet_Errors
 
 // clockWat is a wasm module to call clock_time_get.
 //go:embed testdata/clock.wat
 var clockWat []byte
 
-func TestClockGetTime(t *testing.T) {
-	ctx := context.Background()
+func TestAPI_ClockTimeGet(t *testing.T) {
+	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
+	resultTimestamp := uint32(1)              // arbitrary offset
+	maskLength := 10                          // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                                          // resultTimestamp is after this
+		0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, // little endian-encoded epochNanos
+		'?', // stopped after encoding
+	} // tr
+
 	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
+
+	t.Run("API.ClockTimeGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		// provide a host context we call directly
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		// invoke ClockTimeGet directly and check the memory side effects!
+		errno := wasiAPI.ClockTimeGet(hContext, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
+		require.Equal(t, ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run(FunctionClockTimeGet, func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, _, err := store.CallFunction(context.Background(), "test", FunctionClockTimeGet, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(resultTimestamp))
+		require.NoError(t, err)
+		require.Equal(t, ErrnoSuccess, Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_ClockTimeGet_Errors(t *testing.T) {
+	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
+	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
+
 	memorySize := uint32(len(store.Memories[0].Buffer))
-	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
 
 	tests := []struct {
-		name         string
-		timestampVal uint64
-		timestampPtr uint32
-		result       Errno
+		name            string
+		resultTimestamp uint32
+		argvBufSize     uint32
 	}{
 		{
-			name:         "zero uint64 value",
-			timestampVal: 0,
-			timestampPtr: validAddress,
-			result:       ESUCCESS,
+			name:            "resultTimestamp out-of-memory",
+			resultTimestamp: memorySize,
 		},
+
 		{
-			name:         "low uint64 value",
-			timestampVal: 12345,
-			timestampPtr: validAddress,
-			result:       ESUCCESS,
-		},
-		{
-			name:         "high uint64 value - no truncation",
-			timestampVal: math.MaxUint64,
-			timestampPtr: validAddress,
-			result:       ESUCCESS,
-		},
-		{
-			name:         "with an endian-sensitive uint64 val - no truncation",
-			timestampVal: math.MaxUint64 - 1,
-			timestampPtr: validAddress,
-			result:       ESUCCESS,
-		},
-		{
-			name:         "timestampPtr exceeds the maximum valid address by 1",
-			timestampVal: math.MaxUint64,
-			timestampPtr: memorySize - 8 + 1,
-			result:       EINVAL,
+			name:            "resultTimestamp exceeds the maximum valid address by 1",
+			resultTimestamp: memorySize - 4 + 1, // 4 is the size of uint32, the type of the count of args
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			wasiAPI.(*api).getTimeNanosFn = func() uint64 { return tt.timestampVal }
-			ret, _, err := store.CallFunction(ctx, "test", "clock_time_get", uint64(0), uint64(0), uint64(tt.timestampPtr))
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionClockTimeGet, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.NoError(t, err)
-			errno := Errno(ret[0])
-			require.Equal(t, tt.result, errno) // ret[0] is returned errno
-			if errno == ESUCCESS {
-				nanos := binary.LittleEndian.Uint64(store.Memories[0].Buffer)
-				assert.Equal(t, tt.timestampVal, nanos)
-			}
+			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
+
+// TODO: TestAPI_FdAdvise TestAPI_FdAdvise_Errors
+// TODO: TestAPI_FdAllocate TestAPI_FdAllocate_Errors
+// TODO: TestAPI_FdClose TestAPI_FdClose_Errors
+// TODO: TestAPI_FdDataSync TestAPI_FdDataSync_Errors
+// TODO: TestAPI_FdFdstatGet TestAPI_FdFdstatGet_Errors
+// TODO: TestAPI_FdFdstatSetFlags TestAPI_FdFdstatSetFlags_Errors
+// TODO: TestAPI_FdFdstatSetRights TestAPI_FdFdstatSetRights_Errors
+// TODO: TestAPI_FdFilestatGet TestAPI_FdFilestatGet_Errors
+// TODO: TestAPI_FdFilestatSetSize TestAPI_FdFilestatSetSize_Errors
+// TODO: TestAPI_FdFilestatSetTimes TestAPI_FdFilestatSetTimes_Errors
+// TODO: TestAPI_FdPread TestAPI_FdPread_Errors
+// TODO: TestAPI_FdPrestatGet TestAPI_FdPrestatGet_Errors
+// TODO: TestAPI_FdPrestatDirName TestAPI_FdPrestatDirName_Errors
+// TODO: TestAPI_FdPwrite TestAPI_FdPwrite_Errors
+// TODO: TestAPI_FdRead TestAPI_FdRead_Errors
+// TODO: TestAPI_FdReaddir TestAPI_FdReaddir_Errors
+// TODO: TestAPI_FdRenumber TestAPI_FdRenumber_Errors
+// TODO: TestAPI_FdSeek TestAPI_FdSeek_Errors
+// TODO: TestAPI_FdSync TestAPI_FdSync_Errors
+// TODO: TestAPI_FdTell TestAPI_FdTell_Errors
+// TODO: TestAPI_FdWrite TestAPI_FdWrite_Errors
+// TODO: TestAPI_PathCreateDirectory TestAPI_PathCreateDirectory_Errors
+// TODO: TestAPI_PathFilestatGet TestAPI_PathFilestatGet_Errors
+// TODO: TestAPI_PathFilestatSetTimes TestAPI_PathFilestatSetTimes_Errors
+// TODO: TestAPI_PathLink TestAPI_PathLink_Errors
+// TODO: TestAPI_PathOpen TestAPI_PathOpen_Errors
+// TODO: TestAPI_PathReadlink TestAPI_PathReadlink_Errors
+// TODO: TestAPI_PathRemoveDirectory TestAPI_PathRemoveDirectory_Errors
+// TODO: TestAPI_PathRename TestAPI_PathRename_Errors
+// TODO: TestAPI_PathSymlink TestAPI_PathSymlink_Errors
+// TODO: TestAPI_PathUnlinkFile TestAPI_PathUnlinkFile_Errors
+// TODO: TestAPI_PollOneoff TestAPI_PollOneoff_Errors
+// TODO: TestAPI_ProcExit TestAPI_ProcExit_Errors
+// TODO: TestAPI_ProcRaise TestAPI_ProcRaise_Errors
+// TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
+// TODO: TestAPI_RandomGet TestAPI_RandomGet_Errors
+// TODO: TestAPI_SockRecv TestAPI_SockRecv_Errors
+// TODO: TestAPI_SockSend TestAPI_SockSend_Errors
+// TODO: TestAPI_SockShutdown TestAPI_SockShutdown_Errors
 
 func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, opts ...Option) (*wasm.Store, API) {
 	mod, err := text.DecodeModule(wat)
@@ -375,4 +329,14 @@ func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, opts ...O
 	require.NoError(t, err)
 
 	return store, wasiAPI
+}
+
+// maskMemory overwrites the first memory in the store with '?', so tests can see what's written.
+// As the memory can be very large, this only masks up to the given length.
+//
+// Note: WebAssembly 1.0 (MVP) can have only up to one memory, so which is unambiguous.
+func maskMemory(store *wasm.Store, maskLength int) {
+	for i := 0; i < maskLength; i++ {
+		store.Memories[0].Buffer[i] = '?'
+	}
 }

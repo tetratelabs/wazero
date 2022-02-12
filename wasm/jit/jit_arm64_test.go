@@ -797,6 +797,108 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 	}
 }
 
+func TestArm64Compiler_compile_And_Or_Xor(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindAnd,
+		wazeroir.OperationKindOr,
+		wazeroir.OperationKindXor,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, unsignedInt := range []wazeroir.UnsignedInt{
+				wazeroir.UnsignedInt32,
+				wazeroir.UnsignedInt64,
+			} {
+				unsignedInt := unsignedInt
+				t.Run(unsignedInt.String(), func(t *testing.T) {
+					for _, values := range [][2]uint64{
+						{0, 0}, {0, 1}, {1, 0}, {1, 1},
+						{1 << 31, 1}, {1, 1 << 31}, {1 << 31, 1 << 31},
+						{1 << 63, 1}, {1, 1 << 63}, {1 << 63, 1 << 63},
+					} {
+						x1, x2 := values[0], values[1]
+						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.emitPreamble()
+							require.NoError(t, err)
+
+							// Emit consts operands.
+							for _, v := range []uint64{x1, x2} {
+								switch unsignedInt {
+								case wazeroir.UnsignedInt32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+								case wazeroir.UnsignedInt64:
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+								}
+								require.NoError(t, err)
+							}
+
+							// At this point, two values exist.
+							require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+							// Emit the operation.
+							switch kind {
+							case wazeroir.OperationKindAnd:
+								err = compiler.compileAnd(&wazeroir.OperationAnd{Type: unsignedInt})
+							case wazeroir.OperationKindOr:
+								err = compiler.compileOr(&wazeroir.OperationOr{Type: unsignedInt})
+							case wazeroir.OperationKindXor:
+								err = compiler.compileXor(&wazeroir.OperationXor{Type: unsignedInt})
+							}
+							require.NoError(t, err)
+
+							// We consumed two values, but push the result back.
+							require.Equal(t, uint64(1), compiler.locationStack.sp)
+							resultLocation := compiler.locationStack.peek()
+							// Plus the result must be located on a register.
+							require.True(t, resultLocation.onRegister())
+							// Also, the result must have an appropriate register type.
+							require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+
+							// Release the value to the memory stack again to verify the operation.
+							compiler.releaseRegisterToStack(resultLocation)
+							compiler.returnFunction()
+
+							// Compile and execute the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// Check the stack.
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindAnd:
+								switch unsignedInt {
+								case wazeroir.UnsignedInt32:
+									require.Equal(t, uint32(x1)&uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedInt64:
+									require.Equal(t, x1&x2, env.stackTopAsUint64())
+								}
+							case wazeroir.OperationKindOr:
+								switch unsignedInt {
+								case wazeroir.UnsignedInt32:
+									require.Equal(t, uint32(x1)|uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedInt64:
+									require.Equal(t, x1|x2, env.stackTopAsUint64())
+								}
+							case wazeroir.OperationKindXor:
+								switch unsignedInt {
+								case wazeroir.UnsignedInt32:
+									require.Equal(t, uint32(x1)^uint32(x2), env.stackTopAsUint32())
+								case wazeroir.UnsignedInt64:
+									require.Equal(t, x1^x2, env.stackTopAsUint64())
+								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestArm64Compiler_compielePick(t *testing.T) {
 	const pickTargetValue uint64 = 12345
 	op := &wazeroir.OperationPick{Depth: 1}

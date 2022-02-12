@@ -1040,16 +1040,94 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileAnd implements compiler.compileAnd for the arm64 architecture.
 func (c *arm64Compiler) compileAnd(o *wazeroir.OperationAnd) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	// If either of the registers x1 or x2 is zero,
+	// the result will always be zero.
+	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
+		c.locationStack.pushValueLocationOnRegister(zeroRegister)
+		return nil
+	}
+
+	// At this point, at least one of x1 or x2 registers is non zero.
+	// Choose the non-zero register as destination.
+	var destinationReg int16 = x1.register
+	if isZeroRegister(x1.register) {
+		destinationReg = x2.register
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		inst = arm64.AANDW
+	case wazeroir.UnsignedInt64:
+		inst = arm64.AAND
+	}
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
+// compileOr implements compiler.compileOr for the arm64 architecture.
 func (c *arm64Compiler) compileOr(o *wazeroir.OperationOr) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(x1.register) {
+		c.locationStack.pushValueLocationOnRegister(x2.register)
+		return nil
+	}
+	if isZeroRegister(x2.register) {
+		c.locationStack.pushValueLocationOnRegister(x1.register)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		inst = arm64.AORRW
+	case wazeroir.UnsignedInt64:
+		inst = arm64.AORR
+	}
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
+// compileXor implements compiler.compileXor for the arm64 architecture.
 func (c *arm64Compiler) compileXor(o *wazeroir.OperationXor) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	// At this point, at least one of x1 or x2 registers is non zero.
+	// Choose the non-zero register as destination.
+	var destinationReg int16 = x1.register
+	if isZeroRegister(x1.register) {
+		destinationReg = x2.register
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		inst = arm64.AEORW
+	case wazeroir.UnsignedInt64:
+		inst = arm64.AEOR
+	}
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
+	c.locationStack.pushValueLocationOnRegister(destinationReg)
+	return nil
 }
 
 func (c *arm64Compiler) compileShl(o *wazeroir.OperationShl) error {
