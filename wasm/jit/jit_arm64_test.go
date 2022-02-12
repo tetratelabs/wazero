@@ -108,25 +108,83 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {
-	env := newJITEnvironment()
+	t.Run("exit", func(t *testing.T) {
+		env := newJITEnvironment()
 
-	// Build code.
-	compiler := env.requireNewCompiler(t)
-	err := compiler.emitPreamble()
-	require.NoError(t, err)
-	compiler.returnFunction()
+		// Build code.
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+		compiler.returnFunction()
 
-	// Generate the code under test.
-	code, _, _, err := compiler.compile()
-	require.NoError(t, err)
+		// Generate the code under test.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
 
-	// Run native code.
-	env.exec(code)
+		// Run native code.
+		env.exec(code)
 
-	// JIT status on engine must be returned.
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-	// Plus, the call frame stack pointer must be zero after return.
-	require.Equal(t, uint64(0), env.callFrameStackPointer())
+		// JIT status on engine must be returned.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		// Plus, the call frame stack pointer must be zero after return.
+		require.Equal(t, uint64(0), env.callFrameStackPointer())
+	})
+	t.Run("deep call stack", func(t *testing.T) {
+		env := newJITEnvironment()
+		engine := env.engine()
+
+		// Push the call frames.
+		const callFrameNums = 10
+		stackPointerToExpectedValue := map[uint64]uint32{}
+		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
+			//	Each function pushes its funcaddr and soon returns.
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			// Push its funcaddr.
+			expValue := uint32(funcaddr)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+			require.NoError(t, err)
+
+			// And then return.
+			err = compiler.returnFunction()
+			require.NoError(t, err)
+
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Compiles and adds to the engine.
+			codeInitialAddress := uintptr(unsafe.Pointer(&code[0]))
+			compiledFunction := &compiledFunction{codeSegment: code, codeInitialAddress: codeInitialAddress}
+			engine.addCompiledFunction(funcaddr, compiledFunction)
+
+			// Pushes the frame whose return address equals the beginning of the function just compiled ^.
+			frame := callFrame{
+				returnAddress: codeInitialAddress,
+				// Note that return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
+				returnStackBasePointer: uint64(funcaddr) * 10,
+				compiledFunction:       compiledFunction,
+			}
+			engine.callFrameStack[engine.globalContext.callFrameStackPointer] = frame
+			engine.globalContext.callFrameStackPointer++
+
+			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
+		}
+
+		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
+
+		// Run codes.
+		env.exec(engine.callFrameTop().compiledFunction.codeSegment)
+
+		// Check the exit status.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+		// Check the stack values.
+		for pos, exp := range stackPointerToExpectedValue {
+			require.Equal(t, exp, uint32(env.stack()[pos]))
+		}
+	})
 }
 
 func TestArm64Compiler_exit(t *testing.T) {

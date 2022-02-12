@@ -360,13 +360,14 @@ func (c *arm64Compiler) returnFunction() error {
 		reservedRegisterForEngine, engineGlobalContextCallFrameStackElement0AddressOffset,
 		tmpReg,
 	)
-	// "callFrameStackTopAddressRegister = [tmpReg + callFramePointerReg << ${callFrameDataSizeMostSignificantSetBit} ]"
+	// "callFrameStackTopAddressRegister = tmpReg + callFramePointerReg << ${callFrameDataSizeMostSignificantSetBit}"
 	calcCallFrameStackTopAddress := c.newProg()
-	calcCallFrameStackTopAddress.As = arm64.AMOVD
+	calcCallFrameStackTopAddress.As = arm64.AADD
 	calcCallFrameStackTopAddress.To.Type = obj.TYPE_REG
 	calcCallFrameStackTopAddress.To.Reg = callFrameStackTopAddressRegister
 	calcCallFrameStackTopAddress.Reg = tmpReg
 	setLeftShiftedRegister(calcCallFrameStackTopAddress, callFramePointerReg, callFrameDataSizeMostSignificantSetBit)
+	c.addInstruction(calcCallFrameStackTopAddress)
 
 	// At this point, we have
 	//
@@ -397,7 +398,7 @@ func (c *arm64Compiler) returnFunction() error {
 	// 2) Jump into the address of "ra.caller".
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		// "rb.caller" is below the top address.
-		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 		tmpReg)
 	c.emitUnconditionalBRToAddressTargertInstruction(tmpReg)
 
@@ -793,7 +794,7 @@ func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinat
 		}
 
 		offset := target.Pc - readAddress.Pc
-		if offset >= math.MaxUint8 {
+		if offset > math.MaxUint8 {
 			// We could support up to 20-bit integer, but byte should be enough for our impl.
 			// If the necessity comes up, we could fix the below to support larger offsets.
 			return fmt.Errorf("BUG: too large offset for read")
