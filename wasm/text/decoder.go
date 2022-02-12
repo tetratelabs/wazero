@@ -184,8 +184,8 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 			p.funcParser.currentIdx = wasm.Index(len(p.module.FunctionSection))
 			return p.funcAbbreviationParser.begin, nil
 		case "memory":
-			if p.memoryNamespace.count == 1 {
-				return nil, errors.New("redundant memory")
+			if err := p.memoryNamespace.requireEmpty(); err != nil {
+				return nil, err
 			}
 			p.pos = positionMemory
 			return p.memoryParser.begin, nil
@@ -194,7 +194,7 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 			return p.parseExportName, nil
 		case "start":
 			if p.module.StartSection != nil {
-				return nil, errors.New("redundant start")
+				return nil, moreThanOneInvalid("start")
 			}
 			p.pos = positionStart
 			return p.parseStart, nil
@@ -308,16 +308,17 @@ func (p *moduleParser) beginImportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 
 	switch string(tokenBytes) {
 	case "func":
-		if len(p.module.FunctionSection) > 0 {
-			return nil, errors.New("import after module-defined function")
+		if count := importableSectionCount(p.module, wasm.SectionIDFunction); count > 0 {
+			return nil, importAfterModuleDefined(wasm.SectionIDFunction)
 		}
 		p.pos = positionImportFunc
 		return p.parseImportFuncID, nil
 	case "table":
 		return nil, fmt.Errorf("TODO: %s", tokenBytes)
 	case "memory":
-		if p.memoryNamespace.count == 1 {
-			return nil, errors.New("redundant memory")
+		// Both "imports first" and "at most one" could fail here, but "at most one" is the better problem to fix.
+		if err := p.memoryNamespace.requireEmpty(); err != nil {
+			return nil, err
 		}
 		return nil, fmt.Errorf("TODO: %s", tokenBytes)
 	case "global":
@@ -528,7 +529,7 @@ func (p *moduleParser) parseExportName(tok tokenType, tokenBytes []byte, _, _ ui
 	case tokenString: // Ex. "" or "PI"
 		name := string(tokenBytes[1 : len(tokenBytes)-1]) // strip quotes
 		if _, ok := p.module.ExportSection[name]; ok {
-			return nil, fmt.Errorf("duplicate name %q", name)
+			return nil, fmt.Errorf("%q already exported", name)
 		}
 		p.currentModuleField = &wasm.Export{Name: name}
 		return p.parseExport, nil
@@ -822,4 +823,20 @@ func (p *moduleParser) errorContext() string {
 	default: // parserPosition is an enum, we expect to have handled all cases above. panic if we didn't
 		panic(fmt.Errorf("BUG: unhandled parsing state on errorContext: %v", p.pos))
 	}
+}
+
+// importableSectionCount returns the count of a section whose index namespace is preceded by imports. A section ID that
+// cannot have imports (such as wasm.SectionIDStart), is ignored.
+func importableSectionCount(module *wasm.Module, sectionID wasm.SectionID) int {
+	switch sectionID {
+	case wasm.SectionIDFunction:
+		return len(module.FunctionSection)
+	case wasm.SectionIDTable:
+		return len(module.TableSection)
+	case wasm.SectionIDMemory:
+		return len(module.MemorySection)
+	case wasm.SectionIDGlobal:
+		return len(module.GlobalSection)
+	}
+	return 0 // ignore
 }

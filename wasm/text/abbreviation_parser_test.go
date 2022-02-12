@@ -217,7 +217,7 @@ func TestAbbreviationParser_Errors(t *testing.T) {
 		{
 			name:        "export duplicate name",
 			source:      `((export "e") (export "e"))`,
-			expectedErr: `1:23: duplicate name "e"`,
+			expectedErr: `1:23: "e" already exported`,
 		},
 		{
 			name:        "export redundant name",
@@ -232,12 +232,12 @@ func TestAbbreviationParser_Errors(t *testing.T) {
 		{
 			name:        "export after import",
 			source:      `((import "m" "n") (export "e1"))`,
-			expectedErr: "1:20: export abbreviation after import",
+			expectedErr: "1:20: export abbreviations must be declared first",
 		},
 		{
 			name:        "import between exports",
 			source:      `((export "e1") (import "m" "n") (export "e2"))`,
-			expectedErr: "1:34: export abbreviation after import",
+			expectedErr: "1:34: export abbreviations must be declared first",
 		},
 	}
 

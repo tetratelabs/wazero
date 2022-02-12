@@ -39,6 +39,12 @@ func newAbbreviationParser(module *wasm.Module, indexNamespace *indexNamespace, 
 // neither "import" nor "export": pos clarifies this.
 //
 // Note: Any Exports are already added to the wasm.Module ExportSection.
+//
+// Note: An abbreviated  `(func $main...` could later be found to be an import. Ex. `(func $main (import...`
+// In other words, it isn't known if what's being parsed is module-defined vs import, and the latter could have an
+// ordering error. The ordering constraint imposed on "module composition" is that abbreviations are well-formed if and
+// only if their expansions are. This means `(module (func $one) (func $two (import "" "")))` is invalid as it expands
+// to `(module (func $one) (import "" "" (func $two)))` which violates the ordering constraint of imports first.
 type onAbbreviations func(name string, i *wasm.Import, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error)
 
 // abbreviationParser parses any abbreviated imports or exports from a field such "func" and calls onAbbreviations.
@@ -115,17 +121,6 @@ func (p *abbreviationParser) begin(tok tokenType, tokenBytes []byte, line, col u
 
 // setID adds the current ID into the indexNamespace. This errs when the ID was already in use.
 //
-// Note: Due to abbreviated syntax, `(func $main...` could later be found to be an import. Ex. `(func $main (import...`
-// In other words, it isn't known if what's being parsed is module-defined vs import, and the latter could have an
-// ordering error. The ordering constraint imposed on "module composition" is that abbreviations are well-formed if and
-// only if their expansions are. This means `(module (func $one) (func $two (import "" "")))` is invalid as it expands
-// to `(module (func $one) (import "" "" (func $two)))` which violates the ordering constraint of imports first.
-//
-// We may set an ID here and find that the function declaration is invalid later due to above. Should we save off the
-// source position? No: this function only ensures there's no ID conflict: an error here is about reuse of an ID. It
-// cannot and shouldn't check for other errors like ordering due to expansion. If later, there's a failure due to the
-// "import" abbreviation field, the parser would be at a relevant source position to err.
-//
 // See https://github.com/WebAssembly/spec/issues/1417
 // See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A8
 func (p *abbreviationParser) setID(tokenBytes []byte) error {
@@ -147,15 +142,17 @@ func (p *abbreviationParser) beginExportOrImport(tok tokenType, tokenBytes []byt
 	case "export":
 		// See https://github.com/WebAssembly/spec/issues/1420
 		if p.currentImport != nil {
-			return nil, errors.New("export abbreviation after import")
+			return nil, errors.New("export abbreviations must be declared first")
 		}
 		p.pos = positionExport
 		return p.parseExport, nil
 	case "import":
-		if len(p.module.FunctionSection) > 0 {
-			return nil, errors.New("import after module-defined function")
+		sectionID := p.indexNamespace.sectionID
+		if count := importableSectionCount(p.module, sectionID); count > 0 {
+			return nil, importAfterModuleDefined(sectionID)
 		}
-		if p.currentImport != nil {
+		if p.currentImport != nil { // ex. (func (import "" "") (import "" ""))
+			// TODO: is this possible?
 			return nil, errors.New("redundant import")
 		}
 		p.pos = positionImport
@@ -190,10 +187,12 @@ func (p *abbreviationParser) parseExport(tok tokenType, tokenBytes []byte, _, _ 
 	switch tok {
 	case tokenString: // Ex. "" or "PI"
 		name := string(tokenBytes[1 : len(tokenBytes)-1]) // strip quotes
+		// Exports are added as they are parsed to allow index collisions to have correct line/col numbers.
 		if _, ok := p.module.ExportSection[name]; ok {
-			return nil, fmt.Errorf("duplicate name %q", name)
+			return nil, fmt.Errorf("%q already exported", name)
 		}
-		// Exports are added as they are parsed to allow index collisions to have correct line/col numbers
+		// After expansion, this will point to either an imported or module-defined entity, but either case it the same
+		// position in the index namespace
 		export := &wasm.Export{Kind: p.exportKind, Name: name, Index: p.indexNamespace.count}
 		if p.module.ExportSection == nil {
 			p.module.ExportSection = map[string]*wasm.Export{name: export}

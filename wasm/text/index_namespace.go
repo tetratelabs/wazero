@@ -89,6 +89,16 @@ func (i *indexNamespace) parseIndex(section wasm.SectionID, idx wasm.Index, body
 	return
 }
 
+// requireEmpty should only be called on a namespace that can only have one item.
+//
+// See moreThanOneInvalidInSection
+func (i *indexNamespace) requireEmpty() error {
+	if i.count > 0 {
+		return moreThanOneInvalidInSection(i.sectionID)
+	}
+	return nil
+}
+
 // recordUnresolved records an ID, such as "main", is not yet resolvable.
 //
 // See unresolvedIndex for parameter descriptions

@@ -213,7 +213,7 @@ func TestFuncParser_Errors(t *testing.T) {
 		{
 			name:        "duplicate result",
 			source:      "(func (result i32) (result i32))",
-			expectedErr: "1:21: duplicate result",
+			expectedErr: "1:21: at most one result allowed",
 		},
 	}
 

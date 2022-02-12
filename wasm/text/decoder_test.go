@@ -1870,7 +1870,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "func duplicate result",
 			input:       "(module (func (param i32) (result i32) (result i32)))",
-			expectedErr: "1:41: duplicate result in module.func[0]",
+			expectedErr: "1:41: at most one result allowed in module.func[0]",
 		},
 		{
 			name:        "func double result type",
@@ -1981,13 +1981,13 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "import memory after memory",
 			input:       "(module (memory 1) (import \"\" \"\" (memory)))",
-			expectedErr: "1:35: redundant memory in module.import[0]",
+			expectedErr: "1:35: at most one memory allowed in module.import[0]",
 		},
 		// TODO: memory after import memory
 		{
 			name:        "second memory",
 			input:       "(module (memory 1) (memory 1))",
-			expectedErr: "1:21: redundant memory in module",
+			expectedErr: "1:21: at most one memory allowed in module",
 		},
 		{
 			name: "export duplicates empty name",
@@ -1997,7 +1997,7 @@ func TestParseModule_Errors(t *testing.T) {
     (export "" (func 0))
     (export "" (memory 1))
 )`,
-			expectedErr: "5:13: duplicate name \"\" in module.export[1]",
+			expectedErr: `5:13: "" already exported in module.export[1]`,
 		},
 		{
 			name: "export duplicates name",
@@ -2007,7 +2007,7 @@ func TestParseModule_Errors(t *testing.T) {
     (export "a" (func 0))
     (export "a" (memory 1))
 )`,
-			expectedErr: "5:13: duplicate name \"a\" in module.export[1]",
+			expectedErr: `5:13: "a" already exported in module.export[1]`,
 		},
 		{
 			name:        "export double name",
@@ -2100,7 +2100,7 @@ func TestParseModule_Errors(t *testing.T) {
 		{
 			name:        "double start",
 			input:       "(module (start $main) (start $main))",
-			expectedErr: "1:24: redundant start in module",
+			expectedErr: "1:24: at most one start allowed in module",
 		},
 		{
 			name:        "wrong start",
