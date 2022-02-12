@@ -1592,3 +1592,85 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
 }
+
+func TestArm64Compiler_compieleCall(t *testing.T) {
+	t.Run("need to grow call frame stack", func(t *testing.T) {
+		// TODO
+		t.Skip()
+	})
+	t.Run("callframe stack ok", func(t *testing.T) {
+		env := newJITEnvironment()
+		engine := env.engine()
+
+		// Emit the call target function.
+		const numCalls = 10
+		targetFunctionType := &wasm.FunctionType{
+			Params:  []wasm.ValueType{wasm.ValueTypeI32},
+			Results: []wasm.ValueType{wasm.ValueTypeI32},
+		}
+		expectedValue := uint32(0)
+		for i := 0; i < numCalls; i++ {
+			// Each function takes one arguments, adds the value with 100 + i and returns the result.
+			addTargetValue := uint32(100 + i)
+
+			compiler := env.requireNewCompiler(t)
+			compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			expectedValue += addTargetValue
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
+			require.NoError(t, err)
+
+			err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+			require.NoError(t, err)
+
+			err = compiler.returnFunction()
+			require.NoError(t, err)
+
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			compiledFunction := &compiledFunction{
+				codeSegment:        code,
+				codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+			}
+			engine.addCompiledFunction(wasm.FunctionAddress(i), compiledFunction)
+		}
+
+		// Now we start building the caller's code.
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		const initialValue = 100
+		expectedValue += initialValue
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0}) // Dummy value so the base pointer would be non-trivial for callees.
+		require.NoError(t, err)
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: initialValue})
+		require.NoError(t, err)
+
+		// Call all the built functions.
+		for i := 0; i < numCalls; i++ {
+			err = compiler.callFunction(wasm.FunctionAddress(i), targetFunctionType)
+			require.NoError(t, err)
+		}
+
+		err = compiler.returnFunction()
+		require.NoError(t, err)
+
+		// Generate the code under test.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		// Check status and returned values.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(2), env.stackPointer()) // Must be 2 (dummy value + the calculation results)
+		require.Equal(t, uint64(0), env.stackBasePointer())
+		require.Equal(t, expectedValue, env.stackTopAsUint32())
+	})
+}

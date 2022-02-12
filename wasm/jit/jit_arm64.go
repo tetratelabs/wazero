@@ -668,7 +668,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	//    [..., ra.current, rb.current, rc.current, _, ra.next, rb.next, rc.next, ...]  <- call frame stack's data region (somewhere in the memory)
 	//                                               |
 	//                              callFrameStackTopAddressRegister
-	//               (the absolute address of &callFrame[engine.callFrameStackPointer]])
+	//                (absolute address of &callFrame[engine.callFrameStackPointer]])
 	//
 	// where:
 	//      ra.* = callFrame.returnAddress
