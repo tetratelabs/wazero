@@ -5,23 +5,40 @@ portability features like cross compilation. Import wazero and extend your Go ap
 language!
 
 ## Example
+
 Here's an example of using wazero to invoke a Fibonacci function included in a Wasm binary.
 
-While our [source for this](examples/testdata/fibonacci.go) is [TinyGo](https://tinygo.org/), it could have been written in
-another language that targets Wasm, such as Rust.
+While our [source for this](examples/testdata/fibonacci.go) is [TinyGo](https://tinygo.org/), it could have been written in another language that targets Wasm, such as AssemblyScript/C/C++/Rust/Zig.
 
 ```golang
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/tetratelabs/wazero/wasi"
+	"github.com/tetratelabs/wazero/wasm"
+	"github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
+)
+
 func main() {
+	// Default context impl. by Go
+	ctx := context.Background()
 	// Read WebAssembly binary.
-	source, _ := os.ReadFile("fibonacci.wasm")
+	source, _ := os.ReadFile("examples/testdata/fibonacci.wasm")
 	// Decode the binary as WebAssembly module.
 	mod, _ := binary.DecodeModule(source)
 	// Initialize the execution environment called "store" with Interpreter-based engine.
 	store := wasm.NewStore(interpreter.NewEngine())
+	// To resolve WASI specific methods, such as `fd_write`
+	wasi.RegisterAPI(store)
 	// Instantiate the decoded module.
 	store.Instantiate(mod, "test")
 	// Execute the exported "fibonacci" function from the instantiated module.
-	ret, _, err := store.CallFunction("test", "fibonacci", 20)
+	ret, _, _ := store.CallFunction(ctx, "test", "fibonacci", 20)
 	// Give us the fibonacci number for 20, namely 6765!
 	fmt.Println(ret[0])
 }
