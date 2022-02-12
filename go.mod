@@ -12,3 +12,6 @@ require (
 	// only used in benchmarks
 	github.com/wasmerio/wasmer-go v1.0.4
 )
+
+// per https://github.com/tetratelabs/wazero/issues/227
+replace github.com/tetratelabs/wazero => ./wazero
