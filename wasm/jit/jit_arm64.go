@@ -653,13 +653,15 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 
 	// TODO: Check the callframe stack length, and if necessary, grow the call frame stack before jump into the target.
 
-	c.getCallFrameStackPointerOffsetInBytes(tmpRegisters[1])
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
+		tmpRegisters[1])
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
 		engineGlobalContextCallFrameStackElement0AddressOffset, tmpRegisters[2])
 	// Calculate "callFrameStackTopAddressRegister = tmpRegisters[1] + tmpRegisters[2] << 3".
 	c.emitAddInstructionWithLeftShiftedRegister(
-		tmpRegisters[2], callFrameDataSizeMostSignificantSetBit,
-		tmpRegisters[1],
+		tmpRegisters[1], callFrameDataSizeMostSignificantSetBit,
+		tmpRegisters[2],
 		callFrameStackTopAddressRegister,
 	)
 
@@ -817,17 +819,6 @@ func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinat
 		adrInstructionBytes[1] |= (v & 0b11100000) >> 5
 		return nil
 	})
-}
-
-func (c *arm64Compiler) getCallFrameStackPointerOffsetInBytes(destinationRegister int16) {
-	// First we get the callFrameStackPointer in engine.globalContext.
-	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
-		destinationRegister)
-
-	// The value is an index to engine.callFrameStack ([]callFrame type), so
-	// we shift it by callFrameDataSizeMostSignificantSetBit to get the offset in bytes.
-	c.applyConstToRegisterInstruction(arm64.ALSL, callFrameDataSizeMostSignificantSetBit, destinationRegister)
 }
 
 func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
