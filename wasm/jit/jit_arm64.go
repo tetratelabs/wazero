@@ -656,8 +656,12 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	c.getCallFrameStackPointerOffsetInBytes(tmpRegisters[1])
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
 		engineGlobalContextCallFrameStackElement0AddressOffset, tmpRegisters[2])
-	// Calculate "callFrameStackTopAddressRegister = tmp[1] + tmp[2]".
-	c.applyTwoRegistersToRegisterInstruction(arm64.AADD, tmpRegisters[1], tmpRegisters[2], callFrameStackTopAddressRegister)
+	// Calculate "callFrameStackTopAddressRegister = tmpRegisters[1] + tmpRegisters[2] << 3".
+	c.emitAddInstructionWithLeftShiftedRegister(
+		tmpRegisters[2], callFrameDataSizeMostSignificantSetBit,
+		tmpRegisters[1],
+		callFrameStackTopAddressRegister,
+	)
 
 	// At this point, we have:
 	//
@@ -1736,6 +1740,7 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() error {
 	return nil
 }
 
+// emitAddInstructionWithLeftShiftedRegister emits an ADD instruction to perform "destinationReg = srcReg + (shiftedSourceReg << shiftNum)".
 func (c *arm64Compiler) emitAddInstructionWithLeftShiftedRegister(shiftedSourceReg int16, shiftNum int64, srcReg, destinationReg int16) {
 	inst := c.newProg()
 	inst.As = arm64.AADD
