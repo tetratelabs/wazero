@@ -263,11 +263,20 @@ func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, s
 	c.addInstruction(inst)
 }
 
-func (c *arm64Compiler) emitUnconditionalBRInstruction(targetType obj.AddrType) (jmp *obj.Prog) {
-	jmp = c.newProg()
-	jmp.As = obj.AJMP
-	jmp.To.Type = targetType
-	c.addInstruction(jmp)
+func (c *arm64Compiler) emitUnconditionalBRInstruction() (br *obj.Prog) {
+	br = c.newProg()
+	br.As = obj.AJMP
+	br.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(br)
+	return
+}
+
+func (c *arm64Compiler) emitUnconditionalBRToAddressTargertInstruction(addressRegister int16) (br *obj.Prog) {
+	br = c.newProg()
+	br.As = obj.AJMP
+	br.To.Type = obj.TYPE_MEM
+	br.To.Reg = addressRegister
+	c.addInstruction(br)
 	return
 }
 
@@ -307,15 +316,94 @@ func (c *arm64Compiler) emitPreamble() error {
 // If the current frame is the bottom, the code goes back to the Go code with jitCallStatusCodeReturned status.
 // Otherwise, we branch into the caller's return address (TODO).
 func (c *arm64Compiler) returnFunction() error {
-	// TODO: we don't support function calls yet.
-	// For now the following code just returns to Go code.
+	// Release all the registers as our calling convention requires the caller-save.
+	if err := c.releaseAllRegistersToStack(); err != nil {
+		return err
+	}
 
 	// Since we return from the function, we need to decrement the callframe stack pointer, and write it back.
-	callFramePointerReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
+	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	if !found {
+		// This should never happen as all the registers must be free at this point.
+		return fmt.Errorf("BUG: could not find enough free registers")
+	}
+
+	// Alias for readability.
+	callFramePointerReg, callFrameStackTopAddressRegister, tmpReg := tmpRegs[0], tmpRegs[1], tmpRegs[2]
+
+	// First we decrement the callframe stack pointer.
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset, callFramePointerReg)
 	c.applyConstToRegisterInstruction(arm64.ASUBS, 1, callFramePointerReg)
 	c.applyRegisterToMemoryInstruction(arm64.AMOVD, callFramePointerReg, reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset)
-	return c.exit(jitCallStatusCodeReturned)
+
+	// Next we compare the decremented call frame stack pointer with the engine.precviousCallFrameStackPointer.
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextPreviouscallFrameStackPointer,
+		tmpReg,
+	)
+	c.applyTwoRegistersToNoneInstruction(arm64.ACMP, callFramePointerReg, tmpReg)
+
+	// If the values are identical, we return back to the Go code with returned status.
+	brIfNotEqual := c.newProg()
+	brIfNotEqual.As = arm64.ABNE
+	brIfNotEqual.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(brIfNotEqual)
+	c.exit(jitCallStatusCodeReturned)
+
+	// Otherwise, we have to jump to the caller's return address.
+	c.setBRTargetOnNext(brIfNotEqual)
+
+	// First, we have to calculate the caller callFrame's absolute address to aquire the return address.
+	//
+	// "tmpReg = &engine.callFrameStack[0]"
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackElement0AddressOffset,
+		tmpReg,
+	)
+	// "callFrameStackTopAddressRegister = [tmpReg + callFramePointerReg << ${callFrameDataSizeMostSignificantSetBit} ]"
+	calcCallFrameStackTopAddress := c.newProg()
+	calcCallFrameStackTopAddress.As = arm64.AMOVD
+	calcCallFrameStackTopAddress.To.Type = obj.TYPE_REG
+	calcCallFrameStackTopAddress.To.Reg = callFrameStackTopAddressRegister
+	calcCallFrameStackTopAddress.Reg = tmpReg
+	setLeftShiftedRegister(calcCallFrameStackTopAddress, callFramePointerReg, callFrameDataSizeMostSignificantSetBit)
+
+	// At this point, we have
+	//
+	//      [......., ra.caller, rb.caller, rc.caller, _, ra.current, rb.current, rc.current, _, ...]  <--- call frame stack's data region (somewhere in the memory)
+	//                                                  |
+	//                               callFrameStackTopAddressRegister
+	//                   (absolute address of &callFrameStack[engine.callFrameStackPointer])
+	//
+	// where:
+	//      ra.* = callFrame.returnAddress
+	//      rb.* = callFrame.returnStackBasePointer
+	//      rc.* = callFrame.compiledFunction
+	//      _  = callFrame's padding (see comment on callFrame._ field.)
+	//
+	// What we have to do in the following is that
+	//   1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller".
+	//   2) Jump into the address of "ra.caller".
+
+	// 1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller".
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		// "rb.caller" is below the top address.
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+		tmpReg)
+	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
+		tmpReg,
+		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset)
+
+	// 2) Jump into the address of "ra.caller".
+	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
+		// "rb.caller" is below the top address.
+		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
+		tmpReg)
+	c.emitUnconditionalBRToAddressTargertInstruction(tmpReg)
+
+	// They were temporarily used, so we mark them unused.
+	c.locationStack.markRegisterUnused(tmpRegs...)
+	return nil
 }
 
 // exit adds instructions to give the control back to engine.exec with the given status code.
@@ -514,8 +602,8 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
-		jmp := c.emitUnconditionalBRInstruction(obj.TYPE_BRANCH)
-		c.assignBranchTarget(labelKey, jmp)
+		br := c.emitUnconditionalBRInstruction()
+		c.assignBranchTarget(labelKey, br)
 		return nil
 	}
 }
@@ -574,7 +662,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 
 	// At this point, we have:
 	//
-	//      [ra.0, rb.0, rc.0, _, ra.1, rb.1, rc.1, _, ra.next, rb.next, rc.next, ...]  <--- call frame stack's data region (somewhere in the memory)
+	//    [..., ra.current, rb.current, rc.current, _, ra.next, rb.next, rc.next, ...]  <--- call frame stack's data region (somewhere in the memory)
 	//                                               |
 	//                              callFrameStackTopAddressRegister
 	//               (the absolute address of &callFrame[engine.callFrameStackPointer]])
@@ -588,18 +676,18 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	// In the following comment, we use the notations in the above example.
 	//
 	// What we have to do in the following is that
-	//   1) Set rb.1 so that we can return back to this function properly.
+	//   1) Set rb.current so that we can return back to this function properly.
 	//   2) Set engine.valueStackContext.stackBasePointer for the next function.
 	//   3) Set rc.next to specify which function is executed on the current call frame (needs to make Go function calls).
-	//   4) Set ra.1 so that we can return back to this function properly.
+	//   4) Set ra.current so that we can return back to this function properly.
 
-	// 1) Set rb.1 so that we can return back to this function properly.
+	// 1) Set rb.current so that we can return back to this function properly.
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset,
 		tmpRegisters[1])
 	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
 		tmpRegisters[1],
-		// "rb.1" is BELOW the top address. See the above example for detail.
+		// "rb.current" is BELOW the top address. See the above example for detail.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset))
 
 	// 2) Set engine.valueStackContext.stackBasePointer for the next function.
@@ -636,14 +724,14 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 		compiledFunctionAddressRegister,
 		callFrameStackTopAddressRegister, callFrameCompiledFunctionOffset)
 
-	// 4) Set ra.1 so that we can return back to this function properly.
+	// 4) Set ra.current so that we can return back to this function properly.
 	//
 	// First, Get the return address into the tmpRegisters[2].
 	c.readInstructionAddress(obj.AJMP, tmpRegisters[2])
 	// Then write the address into the callframe.
 	c.applyRegisterToMemoryInstruction(arm64.AMOVD,
 		tmpRegisters[2],
-		// "ra.1" is BELOW the top address. See the above example for detail.
+		// "ra.current" is BELOW the top address. See the above example for detail.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 	)
 
@@ -661,8 +749,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
 		tmpRegisters[2])
-	br := c.emitUnconditionalBRInstruction(obj.TYPE_REG)
-	br.To.Reg = tmpRegisters[2]
+	c.emitUnconditionalBRToAddressTargertInstruction(tmpRegisters[2])
 
 	// All the registers used are temporary so we mark them unused.
 	c.markRegisterUnused(tmpRegisters...)

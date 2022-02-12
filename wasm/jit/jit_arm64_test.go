@@ -272,7 +272,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
 			compiler.releaseRegisterToStack(compiler.locationStack.peek())
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -351,7 +351,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 
 			// Release the value to the memory stack so that we can see the value after exiting.
 			compiler.releaseRegisterToStack(loc)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()

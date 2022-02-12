@@ -4870,7 +4870,7 @@ func (c *amd64Compiler) returnFunction() error {
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
-		// This in theory never happen as all the registers must be free except addrReg.
+		// This in theory never happen as all the registers must be free.
 		return fmt.Errorf("could not find enough free registers")
 	}
 	c.locationStack.markRegisterUsed(regs...)
