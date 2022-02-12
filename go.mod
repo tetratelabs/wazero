@@ -14,4 +14,4 @@ require (
 )
 
 // per https://github.com/tetratelabs/wazero/issues/227
-replace github.com/tetratelabs/wazero => ./wazero
+replace github.com/tetratelabs/wazero => ./
