@@ -628,7 +628,27 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	return c.callFunction(target.Address, target.FunctionType.Type)
+
+	if err := c.callFunction(target.Address, target.FunctionType.Type); err != nil {
+		return err
+	}
+
+	// We consumed the function parameters from the stack after call.
+	for i := 0; i < len(target.FunctionType.Type.Params); i++ {
+		c.locationStack.pop()
+	}
+
+	// Also, the function results were pushed by the call.
+	for _, t := range target.FunctionType.Type.Results {
+		loc := c.locationStack.pushValueLocationOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
+	return nil
 }
 
 // compileCall implements compiler.compileCall and compiler.compileCallIndirect (TODO) for the arm64 architecture.
@@ -658,7 +678,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 		tmpRegisters[1])
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine,
 		engineGlobalContextCallFrameStackElement0AddressOffset, tmpRegisters[2])
-	// Calculate "callFrameStackTopAddressRegister = tmpRegisters[1] + tmpRegisters[2] << 3".
+	// Calculate "callFrameStackTopAddressRegister = tmpRegisters[2] + tmpRegisters[1] << $callFrameDataSizeMostSignificantSetBit".
 	c.emitAddInstructionWithLeftShiftedRegister(
 		tmpRegisters[1], callFrameDataSizeMostSignificantSetBit,
 		tmpRegisters[2],
@@ -1563,12 +1583,18 @@ func (c *arm64Compiler) pushZeroValue() {
 // popTwoValuesOnRegisters pops two values from the location stacks, ensures
 // these two values are located on registers, and mark them unused.
 func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
-	x2, err = c.popValueOnRegister()
-	if err != nil {
+	x2 = c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(x2); err != nil {
 		return
 	}
 
-	x1, err = c.popValueOnRegister()
+	x1 = c.locationStack.pop()
+	if err = c.ensureOnGeneralPurposeRegister(x1); err != nil {
+		return
+	}
+
+	c.markRegisterUnused(x2.register)
+	c.markRegisterUnused(x1.register)
 	return
 }
 
