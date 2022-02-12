@@ -361,17 +361,15 @@ func (c *arm64Compiler) returnFunction() error {
 		tmpReg,
 	)
 	// "callFrameStackTopAddressRegister = tmpReg + callFramePointerReg << ${callFrameDataSizeMostSignificantSetBit}"
-	calcCallFrameStackTopAddress := c.newProg()
-	calcCallFrameStackTopAddress.As = arm64.AADD
-	calcCallFrameStackTopAddress.To.Type = obj.TYPE_REG
-	calcCallFrameStackTopAddress.To.Reg = callFrameStackTopAddressRegister
-	calcCallFrameStackTopAddress.Reg = tmpReg
-	setLeftShiftedRegister(calcCallFrameStackTopAddress, callFramePointerReg, callFrameDataSizeMostSignificantSetBit)
-	c.addInstruction(calcCallFrameStackTopAddress)
+	c.emitAddInstructionWithLeftShiftedRegister(
+		callFramePointerReg, callFrameDataSizeMostSignificantSetBit,
+		tmpReg,
+		callFrameStackTopAddressRegister,
+	)
 
 	// At this point, we have
 	//
-	//      [......., ra.caller, rb.caller, rc.caller, _, ra.current, rb.current, rc.current, _, ...]  <--- call frame stack's data region (somewhere in the memory)
+	//      [......., ra.caller, rb.caller, rc.caller, _, ra.current, rb.current, rc.current, _, ...]  <- call frame stack's data region (somewhere in the memory)
 	//                                                  |
 	//                               callFrameStackTopAddressRegister
 	//                   (absolute address of &callFrameStack[engine.callFrameStackPointer])
@@ -663,7 +661,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 
 	// At this point, we have:
 	//
-	//    [..., ra.current, rb.current, rc.current, _, ra.next, rb.next, rc.next, ...]  <--- call frame stack's data region (somewhere in the memory)
+	//    [..., ra.current, rb.current, rc.current, _, ra.next, rb.next, rc.next, ...]  <- call frame stack's data region (somewhere in the memory)
 	//                                               |
 	//                              callFrameStackTopAddressRegister
 	//               (the absolute address of &callFrame[engine.callFrameStackPointer]])
@@ -1724,29 +1722,28 @@ func (c *arm64Compiler) initializeReservedStackBasePointerRegister() error {
 		reservedRegisterForEngine, engineGlobalContextValueStackElement0AddressOffset,
 		reservedRegisterForStackBasePointerAddress)
 
-	// Next we move the base pointer (engine.stackBasePointer) to the tmp register.
+	// Next we move the base pointer (engine.stackBasePointer) to reservedRegisterForTemporary.
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset,
 		reservedRegisterForTemporary)
 
-	// Finally, we calculate "reservedRegisterForStackBasePointerAddress + tmpReg * 8"
-	// where we multiply tmpReg by 8 because stack pointer is an index in the []uint64
-	// so as an bytes we must multiply the size of uint64 = 8 bytes.
-	calcStackBasePointerAddress := c.newProg()
-	calcStackBasePointerAddress.As = arm64.AADD
-	calcStackBasePointerAddress.To.Type = obj.TYPE_REG
-	calcStackBasePointerAddress.To.Reg = reservedRegisterForStackBasePointerAddress
-	// We calculate "tmpReg * 8" as "tmpReg << 3".
-	setLeftShiftedRegister(calcStackBasePointerAddress, reservedRegisterForTemporary, 3)
-	c.addInstruction(calcStackBasePointerAddress)
+	// Finally, we calculate "reservedRegisterForStackBasePointerAddress + reservedRegisterForTemporary << 3"
+	// where we shift tmpReg by 3 because stack pointer is an index in the []uint64
+	// so we must multiply the value by the size of uint64 = 8 bytes.
+	c.emitAddInstructionWithLeftShiftedRegister(
+		reservedRegisterForTemporary, 3, reservedRegisterForStackBasePointerAddress,
+		reservedRegisterForStackBasePointerAddress)
 	return nil
 }
 
-// setShiftedRegister modifies the given *obj.Prog so that .From (source operand)
-// becomes the "left shifted register". For example, this is used to emit instruction like
-// "add  x1, x2, x3, lsl #3" which means "x1 = x2 + (x3 << 3)".
-// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131
-func setLeftShiftedRegister(inst *obj.Prog, register int16, shiftNum int64) {
+func (c *arm64Compiler) emitAddInstructionWithLeftShiftedRegister(shiftedSourceReg int16, shiftNum int64, srcReg, destinationReg int16) {
+	inst := c.newProg()
+	inst.As = arm64.AADD
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationReg
+	// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131
 	inst.From.Type = obj.TYPE_SHIFT
-	inst.From.Offset = (int64(register)&31)<<16 | 0<<22 | (shiftNum&63)<<10
+	inst.From.Offset = (int64(shiftedSourceReg)&31)<<16 | 0<<22 | (shiftNum&63)<<10
+	inst.Reg = srcReg
+	c.addInstruction(inst)
 }
