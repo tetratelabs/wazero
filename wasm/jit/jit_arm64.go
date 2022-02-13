@@ -271,13 +271,12 @@ func (c *arm64Compiler) emitUnconditionalBRInstruction() (br *obj.Prog) {
 	return
 }
 
-func (c *arm64Compiler) emitUnconditionalBRToAddressOnRegister(addressRegister int16) (br *obj.Prog) {
-	br = c.newProg()
+func (c *arm64Compiler) emitUnconditionalBRToAddressOnRegister(addressRegister int16) {
+	br := c.newProg()
 	br.As = obj.AJMP
 	br.To.Type = obj.TYPE_MEM
 	br.To.Reg = addressRegister
 	c.addInstruction(br)
-	return
 }
 
 func (c *arm64Compiler) String() (ret string) { return }
@@ -831,11 +830,11 @@ func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinat
 		// According to the binary format of ADR instruction in arm64:
 		// https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADR--Form-PC-relative-address-?lang=en
 		//
-		// The first 2 bits live on 29 and 30 bits of theinstruction.
+		// The 0 to 1 bits live on 29 to 30 bits of the instruction.
 		adrInstructionBytes[3] |= (v & 0b00000011) << 5
-		// The 3-5 bits live on 5 to 8 bits of the instruction.
+		// The 2 to 4 bits live on 5 to 7 bits of the instruction.
 		adrInstructionBytes[0] |= (v & 0b00011100) << 3
-		// The 6-8 bits live on 9 to 11 bits of the instruction.
+		// The 5 to 7 bits live on 8 to 10 bits of the instruction.
 		adrInstructionBytes[1] |= (v & 0b11100000) >> 5
 		return nil
 	})
