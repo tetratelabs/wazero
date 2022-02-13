@@ -106,7 +106,7 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("%s section: %v", wasm.SectionIDName(sectionID[0]), err)
+			return nil, fmt.Errorf("section %s: %v", wasm.SectionIDName(sectionID[0]), err)
 		}
 	}
 
