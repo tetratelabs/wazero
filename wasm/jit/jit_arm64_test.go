@@ -4,7 +4,6 @@
 package jit
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"math/bits"
@@ -48,58 +47,6 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	ret.labels = make(map[string]*labelInfo)
 	ret.ir = &wazeroir.CompilationResult{}
 	return ret
-}
-
-// TODO: delete this as this could be a duplication from other tests especially spectests.
-// Use this until we could run spectests on arm64.
-func TestArm64CompilerEndToEnd(t *testing.T) {
-	ctx := context.Background()
-	for _, tc := range []struct {
-		name string
-		body []byte
-		sig  *wasm.FunctionType
-	}{
-		{name: "empty", body: []byte{wasm.OpcodeEnd}, sig: &wasm.FunctionType{}},
-		{name: "br .return", body: []byte{wasm.OpcodeBr, 0, wasm.OpcodeEnd}, sig: &wasm.FunctionType{}},
-		{
-			name: "consts",
-			body: []byte{
-				wasm.OpcodeI32Const, 1, wasm.OpcodeI64Const, 1,
-				wasm.OpcodeF32Const, 1, 1, 1, 1, wasm.OpcodeF64Const, 1, 2, 3, 4, 5, 6, 7, 8,
-				wasm.OpcodeEnd,
-			},
-			// We push four constants.
-			sig: &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64}},
-		},
-		{
-			name: "add",
-			body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeI32Const, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd},
-			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32}},
-		},
-		{
-			name: "sub",
-			body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeI64Const, 1, wasm.OpcodeI64Sub, wasm.OpcodeEnd},
-			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}},
-		},
-		{
-			name: "mul",
-			body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeI64Const, 1, wasm.OpcodeI64Mul, wasm.OpcodeEnd},
-			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}},
-		},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			engine := newEngine()
-			f := &wasm.FunctionInstance{
-				FunctionType: &wasm.TypeInstance{Type: tc.sig},
-				Body:         tc.body,
-			}
-			err := engine.Compile(f)
-			require.NoError(t, err)
-			_, err = engine.Call(ctx, f)
-			require.NoError(t, err)
-		})
-	}
 }
 
 func TestArchContextOffsetInEngine(t *testing.T) {
