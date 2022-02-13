@@ -1,6 +1,8 @@
 package wasm
 
-// DecodeModule parses the configured source into a wasm.Module. This function returns when the source is exhausted or
+import "fmt"
+
+// DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or
 // an error occurs. The result can be initialized for use via Store.Instantiate.
 //
 // Here's a description of the return values:
@@ -115,7 +117,8 @@ type Module struct {
 	// this module at TableSection[0].
 	//
 	// Note: Version 1.0 (MVP) of the WebAssembly spec allows at most one table definition per module, so the length of
-	// the TableSection can be zero or one.
+	// the TableSection can be zero or one, and can only be one if there is no ImportKindTable.
+	//
 	// Note: In the Binary Format, this is SectionIDTable.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#table-section%E2%91%A0
@@ -128,7 +131,8 @@ type Module struct {
 	// this module at TableSection[0].
 	//
 	// Note: Version 1.0 (MVP) of the WebAssembly spec allows at most one memory definition per module, so the length of
-	// the MemorySection can be zero or one.
+	// the MemorySection can be zero or one, and can only be one if there is no ImportKindMemory.
+	//
 	// Note: In the Binary Format, this is SectionIDMemory.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#memory-section%E2%91%A0
@@ -154,6 +158,7 @@ type Module struct {
 	//
 	// Note: The index here is not the position in the FunctionSection, rather in the function index namespace, which
 	// begins with imported functions.
+	//
 	// Note: In the Binary Format, this is SectionIDStart.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
@@ -226,7 +231,7 @@ const (
 	ValueTypeF64 ValueType = 0x7c
 )
 
-// ValuTypeName returns the type name of the given ValueType as a string.
+// ValueTypeName returns the type name of the given ValueType as a string.
 // These type names match the names used in the WebAssembly text format.
 // Note that ValueTypeName returns "unknown", if an undefined ValueType value is passed.
 func ValueTypeName(t ValueType) string {
@@ -460,4 +465,43 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 	memories = append(memories, m.MemorySection...)
 	tables = append(tables, m.TableSection...)
 	return
+}
+
+// SectionSize returns the count of items in a given section
+func (m *Module) SectionSize(sectionID SectionID) uint32 {
+	switch sectionID {
+	case SectionIDCustom:
+		count := uint32(len(m.CustomSections))
+		if m.NameSection != nil {
+			return count + 1
+		}
+		return count
+	case SectionIDType:
+		return uint32(len(m.TypeSection))
+	case SectionIDImport:
+		return uint32(len(m.ImportSection))
+	case SectionIDFunction:
+		return uint32(len(m.FunctionSection))
+	case SectionIDTable:
+		return uint32(len(m.TableSection))
+	case SectionIDMemory:
+		return uint32(len(m.MemorySection))
+	case SectionIDGlobal:
+		return uint32(len(m.GlobalSection))
+	case SectionIDExport:
+		return uint32(len(m.ExportSection))
+	case SectionIDStart:
+		if m.StartSection != nil {
+			return 1
+		}
+		return 0
+	case SectionIDElement:
+		return uint32(len(m.ElementSection))
+	case SectionIDCode:
+		return uint32(len(m.CodeSection))
+	case SectionIDData:
+		return uint32(len(m.DataSection))
+	default:
+		panic(fmt.Errorf("BUG: unknown section: %d", sectionID))
+	}
 }

@@ -17,8 +17,8 @@ type onFunc func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wa
 // funcParser parses any instructions and dispatches to onFunc.
 //
 // Ex.  `(module (func (nop)))`
-//       starts here --^    ^
-//      calls onFunc here --+
+//        begin here --^    ^
+//  end calls onFunc here --+
 //
 // Note: funcParser is reusable. The caller resets via begin.
 type funcParser struct {
@@ -73,11 +73,11 @@ func (p *funcParser) begin(tok tokenType, tokenBytes []byte, line, col uint32) (
 // are read. Finally, this finishes via endFunc.
 //
 // Ex. `(module (func $math.pi (result f32))`
-//               starts here --^           ^
+//                begin here --^           ^
 //                  endFunc resumes here --+
 //
 // Ex.    `(module (func $math.pi (result f32) (local i32) )`
-//                  starts here --^            ^           ^
+//                   begin here --^            ^           ^
 //      funcParser.afterTypeUse resumes here --+           |
 //                                  endFunc resumes here --+
 //
@@ -98,11 +98,11 @@ func (p *funcParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 // Ex. Given the source `(module (func nop))`
 //          afterTypeUse starts here --^  ^
 //                    calls onFunc here --+
-func (p *funcParser) afterTypeUse(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *funcParser) afterTypeUse(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	switch pos {
-	case onTypeUseEndField:
+	case callbackPositionEndField:
 		return p.onFunc(typeIdx, codeEnd, p.currentName, paramNames)
-	case onTypeUseUnhandledField:
+	case callbackPositionUnhandledField:
 		return sExpressionsUnsupported(tok, tokenBytes, line, col)
 	}
 
@@ -120,7 +120,7 @@ func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) (tok
 	case "param":
 		return nil, errors.New("param after result")
 	case "result":
-		return nil, errors.New("duplicate result")
+		return nil, moreThanOneInvalid("result")
 	case "local":
 		return nil, errors.New("TODO: local")
 	}

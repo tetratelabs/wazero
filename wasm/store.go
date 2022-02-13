@@ -288,17 +288,21 @@ func (s *Store) Instantiate(module *Module, name string) error {
 
 	for i, f := range instance.Functions {
 		if err := s.engine.Compile(f); err != nil {
-			return fmt.Errorf("compilation failed at index %d/%d: %v", i, len(module.FunctionSection)-1, err)
+			idx := module.SectionSize(SectionIDFunction) - 1
+			return fmt.Errorf("compilation failed at index %d/%d: %v", i, idx, err)
 		}
 	}
 
 	// Check the start function is valid.
-	if startIndex := module.StartSection; startIndex != nil {
-		index := *startIndex
-		if int(index) >= len(instance.Functions) {
-			return fmt.Errorf("invalid start function index: %d", index)
+	// TODO: this should be verified during decode so that errors have the correct source positions
+	var startFunction *FunctionInstance
+	if module.StartSection != nil {
+		startIndex := *module.StartSection
+		if startIndex >= uint32(len(instance.Functions)) {
+			return fmt.Errorf("invalid start function index: %d", startIndex)
 		}
-		ft := instance.Functions[index].FunctionType
+		startFunction = instance.Functions[startIndex]
+		ft := startFunction.FunctionType
 		if len(ft.Type.Params) != 0 || len(ft.Type.Results) != 0 {
 			return fmt.Errorf("start function must have the empty function type")
 		}
@@ -308,10 +312,8 @@ func (s *Store) Instantiate(module *Module, name string) error {
 	rollbackFuncs = nil
 
 	// Execute the start function.
-	ctx := context.Background()
-	if startIndex := module.StartSection; startIndex != nil {
-		f := instance.Functions[*startIndex]
-		if _, err := s.engine.Call(ctx, f); err != nil {
+	if startFunction != nil {
+		if _, err = s.engine.Call(context.Background(), startFunction); err != nil {
 			return fmt.Errorf("calling start function failed: %v", err)
 		}
 	}
@@ -596,9 +598,9 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	n, nLen := 0, len(functionNames)
 
 	for codeIndex, typeIndex := range module.FunctionSection {
-		if typeIndex >= uint32(len(module.TypeSection)) {
+		if typeIndex >= module.SectionSize(SectionIDType) {
 			return rollbackFuncs, fmt.Errorf("function type index out of range")
-		} else if codeIndex >= len(module.CodeSection) {
+		} else if uint32(codeIndex) >= module.SectionSize(SectionIDCode) {
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
@@ -629,7 +631,8 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		if err := validateFunctionInstance(f, funcs, globals, mems, tables, module.TypeSection, maximumValuesOnStack); err != nil {
-			return rollbackFuncs, fmt.Errorf("invalid function '%s' (%d/%d): %v", f.Name, codeIndex, len(module.FunctionSection)-1, err)
+			idx := module.SectionSize(SectionIDFunction) - 1
+			return rollbackFuncs, fmt.Errorf("invalid function '%s' (%d/%d): %v", f.Name, codeIndex, idx, err)
 		}
 
 		err = s.addFunctionInstance(f)
@@ -680,8 +683,8 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 		}
 
 		size := uint64(offset) + uint64(len(d.Init))
-		maxPage := uint32(MemoryMaxPages)
-		if int(d.MemoryIndex) < len(module.MemorySection) && module.MemorySection[d.MemoryIndex].Max != nil {
+		maxPage := MemoryMaxPages
+		if d.MemoryIndex < module.SectionSize(SectionIDMemory) && module.MemorySection[d.MemoryIndex].Max != nil {
 			maxPage = *module.MemorySection[d.MemoryIndex].Max
 		}
 		if size > memoryPagesToBytesNum(maxPage) {
@@ -734,7 +737,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 		size := offset + len(elem.Init)
 
 		max := uint32(math.MaxUint32)
-		if int(elem.TableIndex) < len(module.TableSection) && module.TableSection[elem.TableIndex].Limit.Max != nil {
+		if elem.TableIndex < module.SectionSize(SectionIDTable) && module.TableSection[elem.TableIndex].Limit.Max != nil {
 			max = *module.TableSection[elem.TableIndex].Limit.Max
 		}
 
@@ -772,7 +775,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 }
 
 func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	target.Exports = make(map[string]*ExportInstance, len(module.ExportSection))
+	target.Exports = make(map[string]*ExportInstance, module.SectionSize(SectionIDExport))
 	for name, exp := range module.ExportSection {
 		index := exp.Index
 		var ei *ExportInstance
