@@ -861,20 +861,118 @@ func (c *arm64Compiler) compileXor(o *wazeroir.OperationXor) error {
 	return nil
 }
 
+// compileShl implements compiler.compileShl for the arm64 architecture.
 func (c *arm64Compiler) compileShl(o *wazeroir.OperationShl) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
+		c.locationStack.pushValueLocationOnRegister(x1.register)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		inst = arm64.ALSLW
+	case wazeroir.UnsignedInt64:
+		inst = arm64.ALSL
+	}
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
+// compileShr implements compiler.compileShr for the arm64 architecture.
 func (c *arm64Compiler) compileShr(o *wazeroir.OperationShr) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
+		c.locationStack.pushValueLocationOnRegister(x1.register)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.SignedInt32:
+		inst = arm64.AASRW
+	case wazeroir.SignedInt64:
+		inst = arm64.AASR
+	case wazeroir.SignedUint32:
+		inst = arm64.ALSRW
+	case wazeroir.SignedUint64:
+		inst = arm64.ALSR
+	}
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
+// compileRotl implements compiler.compileRotl for the arm64 architecture.
 func (c *arm64Compiler) compileRotl(o *wazeroir.OperationRotl) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
+		c.locationStack.pushValueLocationOnRegister(x1.register)
+		return nil
+	}
+
+	var (
+		inst    obj.As
+		neginst obj.As
+	)
+
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		inst = arm64.ARORW
+		neginst = arm64.ANEGW
+	case wazeroir.UnsignedInt64:
+		inst = arm64.AROR
+		neginst = arm64.ANEG
+	}
+
+	// Arm64 doesn't have rotate left instruction.
+	// The shift amount needs to be converted to a negative number, similar to assembly output of bits.RotateLeft.
+	c.applyRegisterToRegisterInstruction(neginst, x2.register, x2.register)
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
+// compileRotr implements compiler.compileRotr for the arm64 architecture.
 func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
+		c.locationStack.pushValueLocationOnRegister(x1.register)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.UnsignedInt32:
+		inst = arm64.ARORW
+	case wazeroir.UnsignedInt64:
+		inst = arm64.AROR
+	}
+
+	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileAbs(o *wazeroir.OperationAbs) error {
