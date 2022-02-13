@@ -271,7 +271,7 @@ func (c *arm64Compiler) emitUnconditionalBRInstruction() (br *obj.Prog) {
 	return
 }
 
-func (c *arm64Compiler) emitUnconditionalBRToAddressTargertInstruction(addressRegister int16) (br *obj.Prog) {
+func (c *arm64Compiler) emitUnconditionalBRToAddressOnRegister(addressRegister int16) (br *obj.Prog) {
 	br = c.newProg()
 	br.As = obj.AJMP
 	br.To.Type = obj.TYPE_MEM
@@ -398,7 +398,7 @@ func (c *arm64Compiler) returnFunction() error {
 		// "rb.caller" is below the top address.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 		tmpReg)
-	c.emitUnconditionalBRToAddressTargertInstruction(tmpReg)
+	c.emitUnconditionalBRToAddressOnRegister(tmpReg)
 
 	// They were temporarily used, so we mark them unused.
 	c.locationStack.markRegisterUnused(tmpRegs...)
@@ -774,7 +774,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
 		tmpRegisters[2])
-	c.emitUnconditionalBRToAddressTargertInstruction(tmpRegisters[2])
+	c.emitUnconditionalBRToAddressOnRegister(tmpRegisters[2])
 
 	// All the registers used are temporary so we mark them unused.
 	c.markRegisterUnused(tmpRegisters...)
