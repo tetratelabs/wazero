@@ -942,7 +942,7 @@ func (c *arm64Compiler) compileRotl(o *wazeroir.OperationRotl) error {
 	}
 
 	// Arm64 doesn't have rotate left instruction.
-	// The shift amount needs to be converted to a negative number.
+	// The shift amount needs to be converted to a negative number, similar to assembly output of bits.RotateLeft.
 	c.applyRegisterToRegisterInstruction(neginst, x2.register, x2.register)
 
 	c.applyTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
