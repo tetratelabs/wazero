@@ -1,6 +1,5 @@
 package text
 
-import "C"
 import (
 	"errors"
 	"fmt"
