@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/bits"
 	"testing"
 	"unsafe"
 
@@ -797,11 +798,14 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compile_And_Or_Xor(t *testing.T) {
+func TestArm64Compiler_compile_And_Or_Xor_Shl_Rotr(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindAnd,
 		wazeroir.OperationKindOr,
 		wazeroir.OperationKindXor,
+		wazeroir.OperationKindShl,
+		wazeroir.OperationKindRotl,
+		wazeroir.OperationKindRotr,
 	} {
 		kind := kind
 		t.Run(kind.String(), func(t *testing.T) {
@@ -845,6 +849,12 @@ func TestArm64Compiler_compile_And_Or_Xor(t *testing.T) {
 								err = compiler.compileOr(&wazeroir.OperationOr{Type: unsignedInt})
 							case wazeroir.OperationKindXor:
 								err = compiler.compileXor(&wazeroir.OperationXor{Type: unsignedInt})
+							case wazeroir.OperationKindShl:
+								err = compiler.compileShl(&wazeroir.OperationShl{Type: unsignedInt})
+							case wazeroir.OperationKindRotl:
+								err = compiler.compileRotl(&wazeroir.OperationRotl{Type: unsignedInt})
+							case wazeroir.OperationKindRotr:
+								err = compiler.compileRotr(&wazeroir.OperationRotr{Type: unsignedInt})
 							}
 							require.NoError(t, err)
 
@@ -890,6 +900,27 @@ func TestArm64Compiler_compile_And_Or_Xor(t *testing.T) {
 								case wazeroir.UnsignedInt64:
 									require.Equal(t, x1^x2, env.stackTopAsUint64())
 								}
+							case wazeroir.OperationKindShl:
+								switch unsignedInt {
+								case wazeroir.UnsignedInt32:
+									require.Equal(t, uint32(x1)<<uint32(x2%32), env.stackTopAsUint32())
+								case wazeroir.UnsignedInt64:
+									require.Equal(t, x1<<(x2%64), env.stackTopAsUint64())
+								}
+							case wazeroir.OperationKindRotl:
+								switch unsignedInt {
+								case wazeroir.UnsignedInt32:
+									require.Equal(t, bits.RotateLeft32(uint32(x1), int(x2)), env.stackTopAsUint32())
+								case wazeroir.UnsignedInt64:
+									require.Equal(t, bits.RotateLeft64(x1, int(x2)), env.stackTopAsUint64())
+								}
+							case wazeroir.OperationKindRotr:
+								switch unsignedInt {
+								case wazeroir.UnsignedInt32:
+									require.Equal(t, bits.RotateLeft32(uint32(x1), -int(x2)), env.stackTopAsUint32())
+								case wazeroir.UnsignedInt64:
+									require.Equal(t, bits.RotateLeft64(x1, -int(x2)), env.stackTopAsUint64())
+								}
 							}
 						})
 					}
@@ -897,6 +928,88 @@ func TestArm64Compiler_compile_And_Or_Xor(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestArm64Compiler_compileShr(t *testing.T) {
+	kind := wazeroir.OperationKindShr
+	t.Run(kind.String(), func(t *testing.T) {
+		for _, signedInt := range []wazeroir.SignedInt{
+			wazeroir.SignedInt32,
+			wazeroir.SignedInt64,
+			wazeroir.SignedUint32,
+			wazeroir.SignedUint64,
+		} {
+			signedInt := signedInt
+			t.Run(signedInt.String(), func(t *testing.T) {
+				for _, values := range [][2]uint64{
+					{0, 0}, {0, 1}, {1, 0}, {1, 1},
+					{1 << 31, 1}, {1, 1 << 31}, {1 << 31, 1 << 31},
+					{1 << 63, 1}, {1, 1 << 63}, {1 << 63, 1 << 63},
+				} {
+					x1, x2 := values[0], values[1]
+					t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+						env := newJITEnvironment()
+						compiler := env.requireNewCompiler(t)
+						err := compiler.emitPreamble()
+						require.NoError(t, err)
+
+						// Emit consts operands.
+						for _, v := range []uint64{x1, x2} {
+							switch signedInt {
+							case wazeroir.SignedInt32:
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(int32(v))})
+							case wazeroir.SignedInt64:
+								err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+							case wazeroir.SignedUint32:
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+							case wazeroir.SignedUint64:
+								err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+							}
+							require.NoError(t, err)
+						}
+
+						// At this point, two values exist.
+						require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+						// Emit the operation.
+						err = compiler.compileShr(&wazeroir.OperationShr{Type: signedInt})
+						require.NoError(t, err)
+
+						// We consumed two values, but push the result back.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+						resultLocation := compiler.locationStack.peek()
+						// Plus the result must be located on a register.
+						require.True(t, resultLocation.onRegister())
+						// Also, the result must have an appropriate register type.
+						require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
+
+						// Release the value to the memory stack again to verify the operation.
+						compiler.releaseRegisterToStack(resultLocation)
+						compiler.returnFunction()
+
+						// Compile and execute the code under test.
+						code, _, _, err := compiler.compile()
+						require.NoError(t, err)
+						env.exec(code)
+
+						// Check the stack.
+						require.Equal(t, uint64(1), env.stackPointer())
+
+						switch signedInt {
+						case wazeroir.SignedInt32:
+							require.Equal(t, int32(x1)>>(uint32(x2)%32), env.stackTopAsInt32())
+						case wazeroir.SignedInt64:
+							require.Equal(t, int64(x1)>>(x2%64), env.stackTopAsInt64())
+						case wazeroir.SignedUint32:
+							require.Equal(t, uint32(x1)>>(uint32(x2)%32), env.stackTopAsUint32())
+						case wazeroir.SignedUint64:
+							require.Equal(t, x1>>(x2%64), env.stackTopAsUint64())
+						}
+					})
+				}
+			})
+		}
+	})
 }
 
 func TestArm64Compiler_compielePick(t *testing.T) {
