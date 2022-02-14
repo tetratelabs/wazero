@@ -33,34 +33,6 @@ func TestModule_Encode(t *testing.T) {
 				's', 'i', 'm', 'p', 'l', 'e'),
 		},
 		{
-			name: "only custom section",
-			input: &wasm.Module{CustomSections: map[string][]byte{
-				"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-			}},
-			expected: append(append(magic, version...),
-				wasm.SectionIDCustom, 0xf, // 15 bytes in this section
-				0x04, 'm', 'e', 'm', 'e',
-				1, 2, 3, 4, 5, 6, 7, 8, 9, 0),
-		},
-		{
-			name: "name section and a custom section", // name should encode last
-			input: &wasm.Module{
-				NameSection: &wasm.NameSection{ModuleName: "simple"},
-				CustomSections: map[string][]byte{
-					"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-				},
-			},
-			expected: append(append(magic, version...),
-				wasm.SectionIDCustom, 0xf, // 15 bytes in this section
-				0x04, 'm', 'e', 'm', 'e',
-				1, 2, 3, 4, 5, 6, 7, 8, 9, 0,
-				wasm.SectionIDCustom, 0x0e, // 14 bytes in this section
-				0x04, 'n', 'a', 'm', 'e',
-				subsectionIDModuleName, 0x07, // 7 bytes in this subsection
-				0x06, // the Module name simple is 6 bytes long
-				's', 'i', 'm', 'p', 'l', 'e'),
-		},
-		{
 			name: "type section",
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{

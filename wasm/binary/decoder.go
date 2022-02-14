@@ -29,8 +29,8 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 	for {
 		// TODO: except custom sections, all others are required to be in order, but we aren't checking yet.
 		// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%93%AA
-		sectionID := make([]byte, 1)
-		if _, err := io.ReadFull(r, sectionID); err == io.EOF {
+		sectionID, err := r.ReadByte()
+		if err == io.EOF {
 			break
 		} else if err != nil {
 			return nil, fmt.Errorf("read section id: %w", err)
@@ -38,11 +38,11 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 
 		sectionSize, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("get size of section %s: %v", wasm.SectionIDName(sectionID[0]), err)
+			return nil, fmt.Errorf("get size of section %s: %v", wasm.SectionIDName(sectionID), err)
 		}
 
 		sectionContentStart := r.Len()
-		switch sectionID[0] {
+		switch sectionID {
 		case wasm.SectionIDCustom:
 			// First, validate the section and determine if the section for this name has already been set
 			name, nameSize, decodeErr := decodeUTF8(r, "custom section name")
@@ -55,25 +55,19 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 			} else if name == "name" && m.NameSection != nil {
 				err = fmt.Errorf("redundant custom section %s", name)
 				break
-			} else if _, ok := m.CustomSections[name]; ok {
-				err = fmt.Errorf("redundant custom section %s", name)
-				break
 			}
 
-			// Now, either decode the NameSection or store an unsupported one
-			// TODO: Do we care to store something we don't use? We could also skip it!
-			data, dataErr := readCustomSectionData(r, sectionSize-nameSize)
-			if dataErr != nil {
-				err = dataErr
-			} else if name == "name" {
-				m.NameSection, err = decodeNameSection(data)
+			// Now, either decode the NameSection or skip an unsupported one
+			limit := sectionSize - nameSize
+			if name == "name" {
+				m.NameSection, err = decodeNameSection(r, uint64(limit))
 			} else {
-				if m.CustomSections == nil {
-					m.CustomSections = map[string][]byte{name: data}
-				} else {
-					m.CustomSections[name] = data
+				// Note: Not Seek because it doesn't err when given an offset past EOF. Rather, it leads to undefined state.
+				if _, err = io.CopyN(io.Discard, r, int64(limit)); err != nil {
+					return nil, fmt.Errorf("failed to skip name[%s]: %w", name, err)
 				}
 			}
+
 		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(r)
 		case wasm.SectionIDImport:
@@ -106,11 +100,11 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("section %s: %v", wasm.SectionIDName(sectionID[0]), err)
+			return nil, fmt.Errorf("section %s: %v", wasm.SectionIDName(sectionID), err)
 		}
 	}
 
-	functionCount, codeCount := m.SectionSize(wasm.SectionIDFunction), m.SectionSize(wasm.SectionIDCode)
+	functionCount, codeCount := m.SectionElementCount(wasm.SectionIDFunction), m.SectionElementCount(wasm.SectionIDCode)
 	if functionCount != codeCount {
 		return nil, fmt.Errorf("function and code section have inconsistent lengths: %d != %d", functionCount, codeCount)
 	}

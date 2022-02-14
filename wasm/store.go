@@ -290,7 +290,7 @@ func (s *Store) Instantiate(module *Module, name string) error {
 
 	for i, f := range instance.Functions {
 		if err := s.engine.Compile(f); err != nil {
-			idx := module.SectionSize(SectionIDFunction) - 1
+			idx := module.SectionElementCount(SectionIDFunction) - 1
 			return fmt.Errorf("compilation failed at index %d/%d: %v", i, idx, err)
 		}
 	}
@@ -600,9 +600,9 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	n, nLen := 0, len(functionNames)
 
 	for codeIndex, typeIndex := range module.FunctionSection {
-		if typeIndex >= module.SectionSize(SectionIDType) {
+		if typeIndex >= module.SectionElementCount(SectionIDType) {
 			return rollbackFuncs, fmt.Errorf("function type index out of range")
-		} else if uint32(codeIndex) >= module.SectionSize(SectionIDCode) {
+		} else if uint32(codeIndex) >= module.SectionElementCount(SectionIDCode) {
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
@@ -633,7 +633,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		if err := validateFunctionInstance(f, funcs, globals, mems, tables, module.TypeSection, maximumValuesOnStack); err != nil {
-			idx := module.SectionSize(SectionIDFunction) - 1
+			idx := module.SectionElementCount(SectionIDFunction) - 1
 			return rollbackFuncs, fmt.Errorf("invalid function '%s' (%d/%d): %v", f.Name, codeIndex, idx, err)
 		}
 
@@ -686,7 +686,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 
 		size := uint64(offset) + uint64(len(d.Init))
 		maxPage := MemoryMaxPages
-		if d.MemoryIndex < module.SectionSize(SectionIDMemory) && module.MemorySection[d.MemoryIndex].Max != nil {
+		if d.MemoryIndex < module.SectionElementCount(SectionIDMemory) && module.MemorySection[d.MemoryIndex].Max != nil {
 			maxPage = *module.MemorySection[d.MemoryIndex].Max
 		}
 		if size > memoryPagesToBytesNum(maxPage) {
@@ -739,7 +739,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 		size := offset + len(elem.Init)
 
 		max := uint32(math.MaxUint32)
-		if elem.TableIndex < module.SectionSize(SectionIDTable) && module.TableSection[elem.TableIndex].Limit.Max != nil {
+		if elem.TableIndex < module.SectionElementCount(SectionIDTable) && module.TableSection[elem.TableIndex].Limit.Max != nil {
 			max = *module.TableSection[elem.TableIndex].Limit.Max
 		}
 
@@ -777,7 +777,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 }
 
 func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	target.Exports = make(map[string]*ExportInstance, module.SectionSize(SectionIDExport))
+	target.Exports = make(map[string]*ExportInstance, module.SectionElementCount(SectionIDExport))
 	for name, exp := range module.ExportSection {
 		index := exp.Index
 		var ei *ExportInstance
