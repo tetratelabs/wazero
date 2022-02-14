@@ -605,8 +605,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 		globalInstanceAddressRegister, globalInstanceValueOffset,
 	)
 
-	// Now the global value is saved on val.register, so push the value location on the top.
-	c.locationStack.pushValueLocationOnRegister(val.register)
+	c.markRegisterUnused(val.register)
 	return nil
 }
 
