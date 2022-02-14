@@ -319,18 +319,18 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 var randomWat []byte
 
 // Non-deterministic random rource using crypto/rand
-type DummyRandomSource struct {
+type dummyRandomSource struct {
 	rng *mrand.Rand
 }
 
-func (d *DummyRandomSource) Read(p []byte) (n int, err error) {
+func (d *dummyRandomSource) Read(p []byte) (n int, err error) {
 	return d.rng.Read(p)
 }
 
-func NewDummyRandomSource(seed int64) RandomSource {
+func newDummyRandomSource(seed int64) randomSource {
 	s := mrand.NewSource(seed)
 
-	return &DummyRandomSource{
+	return &dummyRandomSource{
 		rng: mrand.New(s),
 	}
 }
@@ -348,7 +348,7 @@ func TestAPI_RandomGet(t *testing.T) {
 	var buf = uint32(1)    // offset,
 	var seed = int64(42)   // and seed value
 
-	wasiAPI.(*api).randSource = NewDummyRandomSource(seed)
+	wasiAPI.(*api).randSource = newDummyRandomSource(seed)
 
 	t.Run("API.RandomGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
