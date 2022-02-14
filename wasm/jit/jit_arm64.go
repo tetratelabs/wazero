@@ -368,7 +368,7 @@ func (c *arm64Compiler) returnFunction() error {
 	// At this point, we have
 	//
 	//      [......., ra.caller, rb.caller, rc.caller, _, ra.current, rb.current, rc.current, _, ...]  <- call frame stack's data region (somewhere in the memory)
-	//                                                 ^
+	//                                                  ^
 	//                               callFrameStackTopAddressRegister
 	//                   (absolute address of &callFrameStack[engine.callFrameStackPointer])
 	//
@@ -672,7 +672,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	// At this point, we have:
 	//
 	//    [..., ra.current, rb.current, rc.current, _, ra.next, rb.next, rc.next, ...]  <- call frame stack's data region (somewhere in the memory)
-	//                                              ^
+	//                                               ^
 	//                              callFrameStackTopAddressRegister
 	//                (absolute address of &callFrame[engine.callFrameStackPointer]])
 	//
