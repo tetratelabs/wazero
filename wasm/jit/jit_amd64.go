@@ -278,9 +278,6 @@ func (c *amd64Compiler) newProg() (prog *obj.Prog) {
 
 // compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
 func (c *amd64Compiler) compileUnreachable() error {
-	if err := c.releaseAllRegistersToStack(); err != nil {
-		return err
-	}
 	c.exit(jitCallStatusCodeUnreachable)
 	return nil
 }

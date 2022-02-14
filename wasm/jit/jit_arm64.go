@@ -485,8 +485,20 @@ func (c *arm64Compiler) compileUnreachable() error {
 	return c.exit(jitCallStatusCodeUnreachable)
 }
 
+// compileSwap implements compiler.compileSwap for the arm64 architecture.
 func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x := c.locationStack.peek()
+	y := c.locationStack.stack[int(c.locationStack.sp)-1-o.Depth]
+
+	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(x); err != nil {
+		return err
+	}
+	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(y); err != nil {
+		return err
+	}
+
+	x.register, y.register = y.register, x.register
+	return nil
 }
 
 func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {

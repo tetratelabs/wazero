@@ -1807,3 +1807,46 @@ func TestArm64Compiler_compieleSelect(t *testing.T) {
 		})
 	}
 }
+
+func TestArm64Compiler_compieleSwap(t *testing.T) {
+	const x, y uint64 = 100, 200
+	op := &wazeroir.OperationSwap{Depth: 10}
+
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	// Setup the initial values on the stack would look like: [y, ...., x]
+	err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: y})
+	require.NoError(t, err)
+	// Push the middle dummy values.
+	for i := 0; i < op.Depth-1; i++ {
+		compiler.locationStack.pushValueLocationOnStack()
+	}
+	err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x})
+	require.NoError(t, err)
+
+	err = compiler.compileSwap(op)
+	require.NoError(t, err)
+
+	// After the swap, both values must be on registers.
+	require.True(t, compiler.locationStack.peek().onRegister())
+	require.True(t, compiler.locationStack.stack[0].onRegister())
+
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	// Generate the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+
+	// Run code.
+	env.exec(code)
+
+	require.Equal(t, uint64(op.Depth+1), env.stackPointer())
+	// y must be on the top due to Swap.
+	require.Equal(t, y, env.stackTopAsUint64())
+	// x must be on the bottom.
+	require.Equal(t, x, env.stack()[0])
+}
