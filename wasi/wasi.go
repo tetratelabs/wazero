@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"math/rand"
 	"os"
 	"reflect"
 	"time"
@@ -173,7 +174,6 @@ const (
 
 type RandomSource interface {
 	Read([]byte) (int, error)
-	Int31() (int32, error)
 }
 
 // Non-deterministic random source using crypto/rand
@@ -181,12 +181,6 @@ type CryptoRandomSource struct{}
 
 func (c *CryptoRandomSource) Read(p []byte) (n int, err error) {
 	return crand.Read(p)
-}
-
-func (c *CryptoRandomSource) Int31() (v int32, err error) {
-	err = binary.Read(crand.Reader, binary.BigEndian, &v)
-
-	return v, err
 }
 
 type api struct {
@@ -391,16 +385,12 @@ func newAPI(opts ...Option) *api {
 	return ret
 }
 
-func (a *api) randUnusedFD() (uint32, error) {
-	v, err := a.randSource.Int31()
-	if err != nil {
-		return 0, err
-	}
-
+func (a *api) randUnusedFD() uint32 {
+	v := rand.Int31()
 	fd := uint32(v)
 	for {
 		if _, ok := a.opened[fd]; !ok {
-			return fd, nil
+			return fd
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
@@ -454,10 +444,7 @@ func (a *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 		}
 	}
 
-	newFD, err := a.randUnusedFD()
-	if err != nil {
-		return ErrnoInval
-	}
+	newFD := a.randUnusedFD()
 
 	a.opened[newFD] = fileEntry{
 		file: f,

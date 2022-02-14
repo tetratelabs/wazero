@@ -327,11 +327,6 @@ func (d *DummyRandomSource) Read(p []byte) (n int, err error) {
 	return d.rng.Read(p)
 }
 
-func (d *DummyRandomSource) Int31() (v int32, err error) {
-	return d.rng.Int31(), nil
-
-}
-
 func NewDummyRandomSource(seed int64) RandomSource {
 	s := mrand.NewSource(seed)
 
