@@ -1671,8 +1671,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 func TestArm64Compiler_compieleCall(t *testing.T) {
 	t.Run("need to grow call frame stack", func(t *testing.T) {
-		// TODO
-		t.Skip()
+		t.Skip("TODO")
 	})
 	t.Run("callframe stack ok", func(t *testing.T) {
 		env := newJITEnvironment()

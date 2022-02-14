@@ -203,8 +203,8 @@ func (c *arm64Compiler) applyMemoryToRegisterInstruction(instruction obj.As, sou
 func (c *arm64Compiler) applyRegisterToMemoryInstruction(instruction obj.As, sourceRegister int16, destinationBaseRegister int16, destinationOffsetConst int64) {
 	if destinationOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
-		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
-		// but instead load the constant manually to "our" temporary register, then emit the load with it.
+		// but we cannot track its temporary register. Therefore, we avoid directly emitting memory load with large offsets:
+		// load the constant manually to "our" temporary register, then emit the load with it.
 		c.applyConstToRegisterInstruction(arm64.AMOVD, destinationOffsetConst, reservedRegisterForTemporary)
 		inst := c.newProg()
 		inst.As = instruction
@@ -323,8 +323,7 @@ func (c *arm64Compiler) returnFunction() error {
 	// Since we return from the function, we need to decrement the callframe stack pointer, and write it back.
 	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
-		// This should never happen as all the registers must be free at this point.
-		return fmt.Errorf("BUG: could not find enough free registers")
+		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
 
 	// Alias for readability.
@@ -369,7 +368,7 @@ func (c *arm64Compiler) returnFunction() error {
 	// At this point, we have
 	//
 	//      [......., ra.caller, rb.caller, rc.caller, _, ra.current, rb.current, rc.current, _, ...]  <- call frame stack's data region (somewhere in the memory)
-	//                                                  |
+	//                                                 ^
 	//                               callFrameStackTopAddressRegister
 	//                   (absolute address of &callFrameStack[engine.callFrameStackPointer])
 	//
@@ -399,7 +398,6 @@ func (c *arm64Compiler) returnFunction() error {
 		tmpReg)
 	c.emitUnconditionalBranchToAddressOnRegister(tmpReg)
 
-	// They were temporarily used, so we mark them unused.
 	c.locationStack.markRegisterUnused(tmpRegs...)
 	return nil
 }
@@ -646,8 +644,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	// Obtain the temporary registers to be used in the followings.
 	tmpRegisters, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
-		// This in theory never happen as all the registers must be free except addrReg.
-		return fmt.Errorf("could not find enough free registers")
+		return fmt.Errorf("BUG: all registers except addrReg should be free at this point")
 	}
 	c.locationStack.markRegisterUsed(tmpRegisters...)
 
@@ -671,7 +668,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	// At this point, we have:
 	//
 	//    [..., ra.current, rb.current, rc.current, _, ra.next, rb.next, rc.next, ...]  <- call frame stack's data region (somewhere in the memory)
-	//                                               |
+	//                                              ^
 	//                              callFrameStackTopAddressRegister
 	//                (absolute address of &callFrame[engine.callFrameStackPointer]])
 	//
