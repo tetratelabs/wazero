@@ -297,6 +297,13 @@ func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSour
 	c.addInstruction(inst)
 }
 
+func (c *arm64Compiler) compileNOP() (nop *obj.Prog) {
+	nop = c.newProg()
+	nop.As = obj.ANOP
+	c.addInstruction(nop)
+	return
+}
+
 func (c *arm64Compiler) String() (ret string) { return }
 
 // pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
@@ -318,9 +325,7 @@ func (c *arm64Compiler) pushFunctionParams() {
 // compilePreamble implements compiler.compilePreamble for the arm64 architecture.
 func (c *arm64Compiler) compilePreamble() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
-	nop := c.newProg()
-	nop.As = obj.ANOP
-	c.addInstruction(nop)
+	c.compileNOP()
 
 	c.pushFunctionParams()
 
@@ -486,9 +491,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
-	labelBegin := c.newProg()
-	labelBegin.As = obj.ANOP
-	c.addInstruction(labelBegin)
+	labelBegin := c.compileNOP()
 
 	// Save the instructions so that backward branching
 	// instructions can branch to this label.
@@ -629,6 +632,8 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 		reservedRegisterForEngine, engineModuleContextGlobalElement0AddressOffset,
 		reservedRegisterForTemporary,
 	)
+
+	// TODO: it seems the following two instruction can be performed by one.
 
 	// "destinationRegister = reservedRegisterForTemporary + destinationRegister << 3 (== &globals[globalIndex])".
 	c.compileAddInstructionWithLeftShiftedRegister(
@@ -2099,8 +2104,6 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	brIfMdouleUnchanged.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(brIfMdouleUnchanged)
 
-	fmt.Println(moduleInstanceAddressRegister)
-
 	// Otherwise, we have to update the following fields:
 	// * engine.moduleContext.globalElement0Address
 	// * (TODO) engine.moduleContext.tableElement0Address
@@ -2119,12 +2122,6 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 			moduleInstanceAddressRegister, moduleInstanceGlobalsOffset,
 			tmpRegister,
 		)
-
-		// a := c.newProg()
-		// a.As = obj.AUNDEF
-		// c.addInstruction(a)
-		//
-		fmt.Println(tmpRegister)
 
 		// "engine.GlobalElement0Address = tmpRegister (== &moduleInstance.Globals[0])"
 		c.compileRegisterToMemoryInstruction(

@@ -4,7 +4,6 @@
 package jit
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -1877,10 +1876,11 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			compiler := env.requireNewCompiler(t)
 			compiler.f.ModuleInstance = tc.moduleInstance
 
+			// The assembler skips the first instruction so we intentionally add NOP here.
+			compiler.compileNOP()
+
 			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
-			require.Empty(t, compiler.locationStack.usedRegisters)
-
 			require.Empty(t, compiler.locationStack.usedRegisters)
 
 			compiler.exit(jitCallStatusCodeReturned)
@@ -1891,8 +1891,6 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 
 			// Run codes
 			env.exec(code)
-
-			fmt.Println(hex.EncodeToString(code))
 
 			// Check the exit status.
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
