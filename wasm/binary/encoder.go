@@ -11,47 +11,50 @@ var sizePrefixedName = []byte{4, 'n', 'a', 'm', 'e'}
 // See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
 func EncodeModule(m *wasm.Module) (bytes []byte) {
 	bytes = append(magic, version...)
-	for name, data := range m.CustomSections {
-		bytes = append(bytes, encodeCustomSection(name, data)...)
-	}
-	if len(m.TypeSection) > 0 {
+	if m.SectionSize(wasm.SectionIDType) > 0 {
 		bytes = append(bytes, encodeTypeSection(m.TypeSection)...)
 	}
-	if len(m.ImportSection) > 0 {
+	if m.SectionSize(wasm.SectionIDImport) > 0 {
 		bytes = append(bytes, encodeImportSection(m.ImportSection)...)
 	}
-	if len(m.FunctionSection) > 0 {
+	if m.SectionSize(wasm.SectionIDFunction) > 0 {
 		bytes = append(bytes, encodeFunctionSection(m.FunctionSection)...)
 	}
-	if len(m.TableSection) > 0 {
+	if m.SectionSize(wasm.SectionIDTable) > 0 {
 		panic("TODO: TableSection")
 	}
-	if len(m.MemorySection) > 0 {
+	if m.SectionSize(wasm.SectionIDMemory) > 0 {
 		bytes = append(bytes, encodeMemorySection(m.MemorySection)...)
 	}
-	if len(m.GlobalSection) > 0 {
+	if m.SectionSize(wasm.SectionIDGlobal) > 0 {
 		panic("TODO: GlobalSection")
 	}
-	if len(m.ExportSection) > 0 {
+	if m.SectionSize(wasm.SectionIDExport) > 0 {
 		bytes = append(bytes, encodeExportSection(m.ExportSection)...)
 	}
-	if m.StartSection != nil {
+	if m.SectionSize(wasm.SectionIDStart) > 0 {
 		bytes = append(bytes, encodeStartSection(*m.StartSection)...)
 	}
-	if len(m.ElementSection) > 0 {
+	if m.SectionSize(wasm.SectionIDElement) > 0 {
 		panic("TODO: ElementSection")
 	}
-	if len(m.CodeSection) > 0 {
+	if m.SectionSize(wasm.SectionIDCode) > 0 {
 		bytes = append(bytes, encodeCodeSection(m.CodeSection)...)
 	}
-	if len(m.DataSection) > 0 {
+	if m.SectionSize(wasm.SectionIDData) > 0 {
 		panic("TODO: DataSection")
 	}
-	// >> The name section should appear only once in a module, and only after the data section.
-	// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-	if m.NameSection != nil {
-		nameSection := append(sizePrefixedName, encodeNameSectionData(m.NameSection)...)
-		bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
+	if m.SectionSize(wasm.SectionIDCustom) > 0 {
+		for name, data := range m.CustomSections {
+			bytes = append(bytes, encodeCustomSection(name, data)...)
+		}
+
+		// >> The name section should appear only once in a module, and only after the data section.
+		// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
+		if m.NameSection != nil {
+			nameSection := append(sizePrefixedName, encodeNameSectionData(m.NameSection)...)
+			bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)
+		}
 	}
 	return
 }

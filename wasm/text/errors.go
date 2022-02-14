@@ -45,6 +45,36 @@ func unexpectedToken(tok tokenType, tokenBytes []byte) error {
 	}
 }
 
+// importAfterModuleDefined is the failure for the condition "all imports must occur before any regular definition",
+// which applies regardless of abbreviation.
+//
+// Ex. Both of these fail because an import can only be declared when SectionIDFunction is empty.
+// `(func) (import "" "" (func))` which is the same as  `(func) (import "" "" (func))`
+//
+// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
+func importAfterModuleDefined(section wasm.SectionID) error {
+	return fmt.Errorf("import after module-defined %s", wasm.SectionIDName(section))
+}
+
+// moreThanOneInvalidInSection allows enforcement of section size limits.
+//
+// Ex. All of these fail because they result in two memories.
+// * `(module (memory 1) (memory 1))`
+// * `(module (memory 1) (import "" "" (memory 1)))`
+//   * Note the latter expands to the same as the former: `(import "" "" (memory 1))`
+// * `(module (import "" "" (memory 1)) (import "" "" (memory 1)))`
+//
+// See https://www.w3.org/TR/wasm-core-1/#tables%E2%91%A0
+// See https://www.w3.org/TR/wasm-core-1/#memories%E2%91%A0
+func moreThanOneInvalidInSection(section wasm.SectionID) error {
+	return moreThanOneInvalid(wasm.SectionIDName(section))
+}
+
+// moreThanOneInvalid is the failure when a declaration that can result in more than one item.
+func moreThanOneInvalid(context string) error {
+	return fmt.Errorf("at most one %s allowed", context)
+}
+
 func unhandledSection(section wasm.SectionID) error {
 	return fmt.Errorf("BUG: unhandled %s", wasm.SectionIDName(section))
 }
