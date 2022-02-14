@@ -10,9 +10,9 @@ import (
 type compiler interface {
 	// String is for debugging purpose.
 	String() string
-	// emitPreamble is called before compiling any wazeroir operation.
+	// compilePreamble is called before compiling any wazeroir operation.
 	// This is used, for example, to initilize the reserved registers, etc.
-	emitPreamble() error
+	compilePreamble() error
 	// compile generates the byte slice of native code.
 	// stackPointerCeil is the max stack pointer that the target function would reach.
 	// staticData is compiledFunctionStaticData for the resutling native code.

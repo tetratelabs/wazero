@@ -61,9 +61,9 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 
 		// Build code.
 		compiler := env.requireNewCompiler(t)
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
-		compiler.returnFunction()
+		compiler.compileReturnFunction()
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
 			//	Each function pushes its funcaddr and soon returns.
 			compiler := env.requireNewCompiler(t)
-			err := compiler.emitPreamble()
+			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
 			// Push its funcaddr.
@@ -93,7 +93,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
 			require.NoError(t, err)
 
-			err = compiler.returnFunction()
+			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
 			code, _, _, err := compiler.compile()
@@ -142,7 +142,7 @@ func TestArm64Compiler_exit(t *testing.T) {
 
 			// Build code.
 			compiler := env.requireNewCompiler(t)
-			err := compiler.emitPreamble()
+			err := compiler.compilePreamble()
 
 			expStackPointer := uint64(100)
 			compiler.locationStack.sp = expStackPointer
@@ -190,7 +190,7 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 
 					// Build code.
 					compiler := env.requireNewCompiler(t)
-					err := compiler.emitPreamble()
+					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
 					switch op {
@@ -210,8 +210,8 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 					require.True(t, loc.onRegister())
 
 					// Release the register allocated value to the memory stack so that we can see the value after exiting.
-					compiler.releaseRegisterToStack(loc)
-					compiler.returnFunction()
+					compiler.compileReleaseRegisterToStack(loc)
+					compiler.compileReturnFunction()
 
 					// Generate the code under test.
 					code, _, _, err := compiler.compile()
@@ -254,7 +254,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 
 			// Build code.
 			compiler := env.requireNewCompiler(t)
-			err := compiler.emitPreamble()
+			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
 			// Setup the location stack so that we push the const on the specified height.
@@ -271,7 +271,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
-			compiler.releaseRegisterToStack(compiler.locationStack.peek())
+			compiler.compileReleaseRegisterToStack(compiler.locationStack.peek())
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
@@ -295,7 +295,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
+func TestArm64Compiler_compileLoadValueOnStackToRegister(t *testing.T) {
 	const val = 123
 	for _, tc := range []struct {
 		name         string
@@ -313,7 +313,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 
 			// Build code.
 			compiler := env.requireNewCompiler(t)
-			err := compiler.emitPreamble()
+			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
 			// Setup the location stack so that we push the const on the specified height.
@@ -332,25 +332,25 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 			require.True(t, loc.onStack())
 
 			// Release the stack-allocated value to register.
-			compiler.loadValueOnStackToRegister(loc)
+			compiler.compileLoadValueOnStackToRegister(loc)
 			require.Len(t, compiler.locationStack.usedRegisters, 1)
 			require.True(t, loc.onRegister())
 
 			// To verify the behavior, increment the value on the register.
 			if tc.isFloat {
 				// For float, we cannot add consts, so load the constant first.
-				err = compiler.emitFloatConstant(false, math.Float64bits(1))
+				err = compiler.compileFloatConstant(false, math.Float64bits(1))
 				require.NoError(t, err)
 				// Then, do the increment.
-				compiler.applyRegisterToRegisterInstruction(arm64.AFADDD, compiler.locationStack.peek().register, loc.register)
+				compiler.compileRegisterToRegisterInstruction(arm64.AFADDD, compiler.locationStack.peek().register, loc.register)
 				// Delete the loaded const.
 				compiler.locationStack.pop()
 			} else {
-				compiler.applyConstToRegisterInstruction(arm64.AADD, 1, loc.register)
+				compiler.compileConstToRegisterInstruction(arm64.AADD, 1, loc.register)
 			}
 
 			// Release the value to the memory stack so that we can see the value after exiting.
-			compiler.releaseRegisterToStack(loc)
+			compiler.compileReleaseRegisterToStack(loc)
 			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
@@ -433,7 +433,7 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 							env := newJITEnvironment()
 							compiler := env.requireNewCompiler(t)
-							err := compiler.emitPreamble()
+							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
 							// Emit consts operands.
@@ -514,12 +514,12 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							require.True(t, resultLocation.onConditionalRegister())
 
 							// Move the conditional register value to a general purpose register to verify the value.
-							compiler.loadConditionalRegisterToGeneralPurposeRegister(resultLocation)
+							compiler.compileLoadConditionalRegisterToGeneralPurposeRegister(resultLocation)
 							require.True(t, resultLocation.onRegister())
 
 							// Release the value to the memory stack again to verify the operation.
-							compiler.releaseRegisterToStack(resultLocation)
-							compiler.returnFunction()
+							compiler.compileReleaseRegisterToStack(resultLocation)
+							compiler.compileReturnFunction()
 
 							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
@@ -668,7 +668,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 							env := newJITEnvironment()
 							compiler := env.requireNewCompiler(t)
-							err := compiler.emitPreamble()
+							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
 							// Emit consts operands.
@@ -713,8 +713,8 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 							}
 
 							// Release the value to the memory stack again to verify the operation.
-							compiler.releaseRegisterToStack(resultLocation)
-							compiler.returnFunction()
+							compiler.compileReleaseRegisterToStack(resultLocation)
+							compiler.compileReturnFunction()
 
 							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
@@ -823,7 +823,7 @@ func TestArm64Compiler_compile_And_Or_Xor_Shl_Rotr(t *testing.T) {
 						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 							env := newJITEnvironment()
 							compiler := env.requireNewCompiler(t)
-							err := compiler.emitPreamble()
+							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
 							// Emit consts operands.
@@ -866,8 +866,8 @@ func TestArm64Compiler_compile_And_Or_Xor_Shl_Rotr(t *testing.T) {
 							require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
 
 							// Release the value to the memory stack again to verify the operation.
-							compiler.releaseRegisterToStack(resultLocation)
-							compiler.returnFunction()
+							compiler.compileReleaseRegisterToStack(resultLocation)
+							compiler.compileReturnFunction()
 
 							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
@@ -949,7 +949,7 @@ func TestArm64Compiler_compileShr(t *testing.T) {
 					t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
 						env := newJITEnvironment()
 						compiler := env.requireNewCompiler(t)
-						err := compiler.emitPreamble()
+						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
 						// Emit consts operands.
@@ -983,8 +983,8 @@ func TestArm64Compiler_compileShr(t *testing.T) {
 						require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
 
 						// Release the value to the memory stack again to verify the operation.
-						compiler.releaseRegisterToStack(resultLocation)
-						compiler.returnFunction()
+						compiler.compileReleaseRegisterToStack(resultLocation)
+						compiler.compileReturnFunction()
 
 						// Compile and execute the code under test.
 						code, _, _, err := compiler.compile()
@@ -1063,7 +1063,7 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			err := compiler.emitPreamble()
+			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
 			// Set up the stack before picking.
@@ -1085,11 +1085,11 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 			require.Equal(t, pickTargetLocation.registerType(), pickedLocation.registerType())
 
 			// Release the value to the memory stack again to verify the operation, and then return.
-			compiler.releaseRegisterToStack(pickedLocation)
+			compiler.compileReleaseRegisterToStack(pickedLocation)
 			if tc.isPickTargetOnRegister {
-				compiler.releaseRegisterToStack(pickTargetLocation)
+				compiler.compileReleaseRegisterToStack(pickTargetLocation)
 			}
-			compiler.returnFunction()
+			compiler.compileReturnFunction()
 
 			// Compile and execute the code under test.
 			code, _, _, err := compiler.compile()
@@ -1117,7 +1117,7 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Put existing contents on stack.
@@ -1133,7 +1133,7 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		// After the nil range drop, the stack must remain the same.
 		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
 
-		compiler.returnFunction()
+		compiler.compileReturnFunction()
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1149,7 +1149,7 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Put existing contents on stack.
@@ -1173,9 +1173,9 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		top := compiler.locationStack.peek()
 		require.True(t, top.onRegister())
 		// Release the top value after drop so that we can verify the cpu itself is not mainpulated.
-		compiler.releaseRegisterToStack(top)
+		compiler.compileReleaseRegisterToStack(top)
 
-		compiler.returnFunction()
+		compiler.compileReturnFunction()
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1198,7 +1198,7 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		eng := env.engine()
 		compiler := env.requireNewCompiler(t)
 
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Put existing contents except the top on stack
@@ -1223,9 +1223,9 @@ func TestArm64Compiler_compieleDrop(t *testing.T) {
 		require.True(t, compiler.locationStack.peek().onRegister())
 
 		// Release all register values so that we can verify the register allocated values.
-		err = compiler.releaseAllRegistersToStack()
+		err = compiler.compileReleaseAllRegistersToStack()
 		require.NoError(t, err)
-		compiler.returnFunction()
+		compiler.compileReturnFunction()
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1284,7 +1284,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 	t.Run("return", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
@@ -1313,7 +1313,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		nop.As = obj.ANOP
 		compiler.addInstruction(nop)
 
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: backwardLabel}})
@@ -1330,7 +1330,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		// .backwardLabel:
 		//    exit jitCallStatusCodeReturned
 		//    nop
-		//    ... code from emitPreamble()
+		//    ... code from compilePreamble()
 		//    br .backwardLabel
 		//    exit jitCallStatusCodeUnreachable
 		//
@@ -1341,7 +1341,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 	t.Run("forward br", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
@@ -1361,7 +1361,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 
 		// The generated code looks like this:
 		//
-		//    ... code from emitPreamble()
+		//    ... code from compilePreamble()
 		//    br .forwardLabel
 		//    exit jitCallStatusCodeUnreachable
 		// .forwardLabel:
@@ -1543,7 +1543,7 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 				t.Run(fmt.Sprintf("should_goto_else=%v", shouldGoToElse), func(t *testing.T) {
 					env := newJITEnvironment()
 					compiler := env.requireNewCompiler(t)
-					err := compiler.emitPreamble()
+					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
 					tc.setupFunc(t, compiler, shouldGoToElse)
@@ -1566,7 +1566,7 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 
 					// The generated code looks like this:
 					//
-					//    ... code from emitPreamble()
+					//    ... code from compilePreamble()
 					//    br_if .then, .else
 					//    exit $unreachableStatus
 					// .then:
@@ -1593,7 +1593,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
@@ -1611,7 +1611,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after RET.
@@ -1626,7 +1626,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		ret.As = obj.ARET
 		ret.To.Type = obj.TYPE_REG
 		ret.To.Reg = reservedRegisterForTemporary
-		compiler.returnFunction()
+		compiler.compileReturnFunction()
 
 		// If generate the code with too many instruction between ADR and
 		// the target, compile must fail.
@@ -1638,7 +1638,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after RET,
@@ -1648,7 +1648,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		// Branch to the instruction after RET below via the absolute
 		// address stored in destinationRegister.
-		compiler.emitUnconditionalBranchToAddressOnRegister(addressReg)
+		compiler.compileUnconditionalBranchToAddressOnRegister(addressReg)
 
 		// If we fail to branch, we reach here and exit with unreachable status,
 		// so the assertion would fail.
@@ -1657,7 +1657,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// This could be the read instruction target as this is the
 		// right after RET. Therefore, the branch instruction above
 		// must target here.
-		err = compiler.returnFunction()
+		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
@@ -1692,14 +1692,14 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 			compiler := env.requireNewCompiler(t)
 			compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
 
-			err := compiler.emitPreamble()
+			err := compiler.compilePreamble()
 			require.NoError(t, err)
 
 			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
 			require.NoError(t, err)
 			err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 			require.NoError(t, err)
-			err = compiler.returnFunction()
+			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
 			code, _, _, err := compiler.compile()
@@ -1712,7 +1712,7 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 
 		// Now we start building the caller's code.
 		compiler := env.requireNewCompiler(t)
-		err := compiler.emitPreamble()
+		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
 		const initialValue = 100
@@ -1724,11 +1724,11 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 
 		// Call all the built functions.
 		for i := 0; i < numCalls; i++ {
-			err = compiler.callFunction(wasm.FunctionAddress(i), targetFunctionType)
+			err = compiler.compileCallFunction(wasm.FunctionAddress(i), targetFunctionType)
 			require.NoError(t, err)
 		}
 
-		err = compiler.returnFunction()
+		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()

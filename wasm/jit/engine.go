@@ -703,7 +703,7 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
 	}
 
-	if err := compiler.emitPreamble(); err != nil {
+	if err := compiler.compilePreamble(); err != nil {
 		return nil, fmt.Errorf("failed to emit preamble: %w", err)
 	}
 
