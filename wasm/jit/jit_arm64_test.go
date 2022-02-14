@@ -4,7 +4,6 @@
 package jit
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"math/bits"
@@ -50,58 +49,6 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	return ret
 }
 
-// TODO: delete this as this could be a duplication from other tests especially spectests.
-// Use this until we could run spectests on arm64.
-func TestArm64CompilerEndToEnd(t *testing.T) {
-	ctx := context.Background()
-	for _, tc := range []struct {
-		name string
-		body []byte
-		sig  *wasm.FunctionType
-	}{
-		{name: "empty", body: []byte{wasm.OpcodeEnd}, sig: &wasm.FunctionType{}},
-		{name: "br .return", body: []byte{wasm.OpcodeBr, 0, wasm.OpcodeEnd}, sig: &wasm.FunctionType{}},
-		{
-			name: "consts",
-			body: []byte{
-				wasm.OpcodeI32Const, 1, wasm.OpcodeI64Const, 1,
-				wasm.OpcodeF32Const, 1, 1, 1, 1, wasm.OpcodeF64Const, 1, 2, 3, 4, 5, 6, 7, 8,
-				wasm.OpcodeEnd,
-			},
-			// We push four constants.
-			sig: &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64}},
-		},
-		{
-			name: "add",
-			body: []byte{wasm.OpcodeI32Const, 1, wasm.OpcodeI32Const, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd},
-			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32}},
-		},
-		{
-			name: "sub",
-			body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeI64Const, 1, wasm.OpcodeI64Sub, wasm.OpcodeEnd},
-			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}},
-		},
-		{
-			name: "mul",
-			body: []byte{wasm.OpcodeI64Const, 1, wasm.OpcodeI64Const, 1, wasm.OpcodeI64Mul, wasm.OpcodeEnd},
-			sig:  &wasm.FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}},
-		},
-	} {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			engine := newEngine()
-			f := &wasm.FunctionInstance{
-				FunctionType: &wasm.TypeInstance{Type: tc.sig},
-				Body:         tc.body,
-			}
-			err := engine.Compile(f)
-			require.NoError(t, err)
-			_, err = engine.Call(ctx, f)
-			require.NoError(t, err)
-		})
-	}
-}
-
 func TestArchContextOffsetInEngine(t *testing.T) {
 	var eng engine
 	// If this fails, we have to fix jit_arm64.s as well.
@@ -109,25 +56,77 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {
-	env := newJITEnvironment()
+	t.Run("exit", func(t *testing.T) {
+		env := newJITEnvironment()
 
-	// Build code.
-	compiler := env.requireNewCompiler(t)
-	err := compiler.emitPreamble()
-	require.NoError(t, err)
-	compiler.returnFunction()
+		// Build code.
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+		compiler.returnFunction()
 
-	// Generate the code under test.
-	code, _, _, err := compiler.compile()
-	require.NoError(t, err)
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
 
-	// Run native code.
-	env.exec(code)
+		env.exec(code)
 
-	// JIT status on engine must be returned.
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-	// Plus, the call frame stack pointer must be zero after return.
-	require.Equal(t, uint64(0), env.callFrameStackPointer())
+		// JIT status on engine must be returned.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		// Plus, the call frame stack pointer must be zero after return.
+		require.Equal(t, uint64(0), env.callFrameStackPointer())
+	})
+	t.Run("deep call stack", func(t *testing.T) {
+		env := newJITEnvironment()
+		engine := env.engine()
+
+		// Push the call frames.
+		const callFrameNums = 10
+		stackPointerToExpectedValue := map[uint64]uint32{}
+		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
+			//	Each function pushes its funcaddr and soon returns.
+			compiler := env.requireNewCompiler(t)
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			// Push its funcaddr.
+			expValue := uint32(funcaddr)
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+			require.NoError(t, err)
+
+			err = compiler.returnFunction()
+			require.NoError(t, err)
+
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Compiles and adds to the engine.
+			compiledFunction := &compiledFunction{codeSegment: code, codeInitialAddress: uintptr(unsafe.Pointer(&code[0]))}
+			engine.addCompiledFunction(funcaddr, compiledFunction)
+
+			// Pushes the frame whose return address equals the beginning of the function just compiled.
+			frame := callFrame{
+				// Set the return address to the beginning of the function so that we can execute the constI32 above.
+				returnAddress: compiledFunction.codeInitialAddress,
+				// Note: return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
+				returnStackBasePointer: uint64(funcaddr) * 10,
+				compiledFunction:       compiledFunction,
+			}
+			engine.callFrameStack[engine.globalContext.callFrameStackPointer] = frame
+			engine.globalContext.callFrameStackPointer++
+			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
+		}
+
+		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
+
+		// Run code from the top frame.
+		env.exec(engine.callFrameTop().compiledFunction.codeSegment)
+
+		// Check the exit status and the values on stack.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		for pos, exp := range stackPointerToExpectedValue {
+			require.Equal(t, exp, uint32(env.stack()[pos]))
+		}
+	})
 }
 
 func TestArm64Compiler_exit(t *testing.T) {
@@ -273,7 +272,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
 			compiler.releaseRegisterToStack(compiler.locationStack.peek())
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -352,7 +351,7 @@ func TestArm64Compiler_loadValueOnStackToRegister(t *testing.T) {
 
 			// Release the value to the memory stack so that we can see the value after exiting.
 			compiler.releaseRegisterToStack(loc)
-			compiler.returnFunction()
+			compiler.exit(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -1421,8 +1420,6 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 				require.NoError(t, err)
 			},
 		},
-		// {name: "EQ"} TODO: after compileEq support
-		// {name: "NE"} TODO: after compileNe support
 		{
 			name: "HS",
 			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
@@ -1514,6 +1511,30 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 				require.NoError(t, err)
 			},
 		},
+		{
+			name: "EQ",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(1)
+				if shoulGoElse {
+					x2++
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				err := compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "NE",
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shoulGoElse {
+					x2 = x1
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				err := compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -1565,4 +1586,160 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestArm64Compiler_readInstructionAddress(t *testing.T) {
+	t.Run("target instruction not found", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after JMP.
+		compiler.readInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
+
+		compiler.exit(jitCallStatusCodeReturned)
+
+		// If generate the code without JMP after readInstructionAddress,
+		// the call back added must return error.
+		_, _, _, err = compiler.compile()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "target instruction not found")
+	})
+	t.Run("too large offset", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after RET.
+		compiler.readInstructionAddress(obj.ARET, reservedRegisterForTemporary)
+
+		// Add many instruction between the target and readInstructionAddress.
+		for i := 0; i < 100; i++ {
+			compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+		}
+
+		ret := compiler.newProg()
+		ret.As = obj.ARET
+		ret.To.Type = obj.TYPE_REG
+		ret.To.Reg = reservedRegisterForTemporary
+		compiler.returnFunction()
+
+		// If generate the code with too many instruction between ADR and
+		// the target, compile must fail.
+		_, _, _, err = compiler.compile()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "too large offset")
+	})
+	t.Run("ok", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after RET,
+		// and read the absolute address into destinationRegister.
+		const addressReg = reservedRegisterForTemporary
+		compiler.readInstructionAddress(obj.ARET, addressReg)
+
+		// Branch to the instruction after RET below via the absolute
+		// address stored in destinationRegister.
+		compiler.emitUnconditionalBranchToAddressOnRegister(addressReg)
+
+		// If we fail to branch, we reach here and exit with unreachable status,
+		// so the assertion would fail.
+		compiler.exit(jitCallStatusCodeUnreachable)
+
+		// This could be the read instruction target as this is the
+		// right after RET. Therefore, the branch instruction above
+		// must target here.
+		err = compiler.returnFunction()
+		require.NoError(t, err)
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+}
+
+func TestArm64Compiler_compieleCall(t *testing.T) {
+	t.Run("need to grow call frame stack", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+	t.Run("callframe stack ok", func(t *testing.T) {
+		env := newJITEnvironment()
+		engine := env.engine()
+		expectedValue := uint32(0)
+
+		// Emit the call target function.
+		const numCalls = 10
+		targetFunctionType := &wasm.FunctionType{
+			Params:  []wasm.ValueType{wasm.ValueTypeI32},
+			Results: []wasm.ValueType{wasm.ValueTypeI32},
+		}
+		for i := 0; i < numCalls; i++ {
+			// Each function takes one arguments, adds the value with 100 + i and returns the result.
+			addTargetValue := uint32(100 + i)
+			expectedValue += addTargetValue
+
+			compiler := env.requireNewCompiler(t)
+			compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+
+			err := compiler.emitPreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
+			require.NoError(t, err)
+			err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+			require.NoError(t, err)
+			err = compiler.returnFunction()
+			require.NoError(t, err)
+
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			engine.addCompiledFunction(wasm.FunctionAddress(i), &compiledFunction{
+				codeSegment:        code,
+				codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+			})
+		}
+
+		// Now we start building the caller's code.
+		compiler := env.requireNewCompiler(t)
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		const initialValue = 100
+		expectedValue += initialValue
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0}) // Dummy value so the base pointer would be non-trivial for callees.
+		require.NoError(t, err)
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: initialValue})
+		require.NoError(t, err)
+
+		// Call all the built functions.
+		for i := 0; i < numCalls; i++ {
+			err = compiler.callFunction(wasm.FunctionAddress(i), targetFunctionType)
+			require.NoError(t, err)
+		}
+
+		err = compiler.returnFunction()
+		require.NoError(t, err)
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		env.exec(code)
+
+		// Check status and returned values.
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		require.Equal(t, uint64(2), env.stackPointer()) // Must be 2 (dummy value + the calculation results)
+		require.Equal(t, uint64(0), env.stackBasePointer())
+		require.Equal(t, expectedValue, env.stackTopAsUint32())
+	})
 }
