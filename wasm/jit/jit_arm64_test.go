@@ -1743,3 +1743,67 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 		require.Equal(t, expectedValue, env.stackTopAsUint32())
 	})
 }
+
+func TestArm64Compiler_compieleSelect(t *testing.T) {
+	for _, isFloat := range []bool{false, true} {
+		isFloat := isFloat
+		t.Run(fmt.Sprintf("float=%v", isFloat), func(t *testing.T) {
+			for _, vals := range [][2]uint64{
+				{1, 2}, {0, 1}, {1, 0},
+				{math.Float64bits(-1), math.Float64bits(-1)},
+				{math.Float64bits(-1), math.Float64bits(1)},
+				{math.Float64bits(1), math.Float64bits(-1)},
+			} {
+				vals := vals
+				t.Run(fmt.Sprintf("x1=%x,x2=%x", vals[0], vals[1]), func(t *testing.T) {
+					for _, selectX1 := range []bool{false, true} {
+						selectX1 := selectX1
+						t.Run(fmt.Sprintf("select x1=%v", selectX1), func(t *testing.T) {
+
+							env := newJITEnvironment()
+
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							for _, val := range vals {
+								if isFloat {
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
+								} else {
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: val})
+								}
+								require.NoError(t, err)
+							}
+
+							if selectX1 {
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+							} else {
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0})
+							}
+							require.NoError(t, err)
+
+							err = compiler.compileSelect()
+							require.NoError(t, err)
+
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+
+							env.exec(code)
+
+							require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+							if selectX1 {
+								require.Equal(t, vals[0], env.stackTopAsUint64())
+							} else {
+								require.Equal(t, vals[1], env.stackTopAsUint64())
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}

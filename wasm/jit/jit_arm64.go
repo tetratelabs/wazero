@@ -143,8 +143,12 @@ func (c *arm64Compiler) setBranchTargetOnNext(progs ...*obj.Prog) {
 	c.setBranchTargetOnNextInstructions = append(c.setBranchTargetOnNextInstructions, progs...)
 }
 
-func (c *arm64Compiler) markRegisterUsed(reg int16) {
-	c.locationStack.markRegisterUsed(reg)
+func (c *arm64Compiler) markRegisterUsed(regs ...int16) {
+	for _, reg := range regs {
+		if !isZeroRegister(reg) {
+			c.locationStack.markRegisterUsed(reg)
+		}
+	}
 }
 
 func (c *arm64Compiler) markRegisterUnused(regs ...int16) {
@@ -476,8 +480,9 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 	return false
 }
 
+// compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
 func (c *arm64Compiler) compileUnreachable() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.exit(jitCallStatusCodeUnreachable)
 }
 
 func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
@@ -901,8 +906,52 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 	return nil
 }
 
+// compileSelect implements compiler.compileSelect for the arm64 architecture.
 func (c *arm64Compiler) compileSelect() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	cv, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
+		c.locationStack.pushValueLocationOnRegister(zeroRegister)
+		c.markRegisterUnused(cv.register)
+		return nil
+	} else if isZeroRegister(x1.register) {
+		c.markRegisterUsed(x2.register, cv.register)
+		x1Reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		x1.setRegister(x1Reg)
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, x1Reg)
+	}
+
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, zeroRegister, cv.register)
+	brIfNotZero := c.newProg()
+	brIfNotZero.As = arm64.ABNE
+	brIfNotZero.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(brIfNotZero)
+
+	// If cv == 0, we choose the value of x2 to the x1.register.
+	if x1.registerType() == generalPurposeRegisterTypeInt {
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, x2.register, x1.register)
+	} else {
+		c.compileRegisterToRegisterInstruction(arm64.AFMOVD, x2.register, x1.register)
+	}
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+
+	// Otherwise, nothing to do for select.
+	c.setBranchTargetOnNext(brIfNotZero)
+
+	// Only x1.register is reused.
+	c.markRegisterUnused(cv.register, x2.register)
+	return nil
 }
 
 // compilePick implements compiler.compilePick for the arm64 architecture.
