@@ -641,16 +641,16 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 		return err
 	}
 
-	// Obtain the temporary registers to be used in the followings.
-	tmpRegisters, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 5)
+	// Obtain the free registers to be used in the followings.
+	freeRegisters, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 5)
 	if !found {
 		return fmt.Errorf("BUG: all registers except addrReg should be free at this point")
 	}
-	c.locationStack.markRegisterUsed(tmpRegisters...)
+	c.locationStack.markRegisterUsed(freeRegisters...)
 
 	// Alias for readability.
 	callFrameStackTopAddressRegister, compiledFunctionAddressRegister, oldStackBasePointer,
-		tmp := tmpRegisters[0], tmpRegisters[1], tmpRegisters[2], tmpRegisters[3]
+		tmp := freeRegisters[0], freeRegisters[1], freeRegisters[2], freeRegisters[3]
 
 	// TODO: Check the callframe stack length, and if necessary, grow the call frame stack before jump into the target.
 
