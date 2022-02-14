@@ -4,9 +4,11 @@
 package jit
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
+	"reflect"
 	"testing"
 	"unsafe"
 
@@ -1567,6 +1569,7 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 					// The generated code looks like this:
 					//
 					//    ... code from compilePreamble()
+					//    ... code from tc.setupFunc()
 					//    br_if .then, .else
 					//    exit $unreachableStatus
 					// .then:
@@ -1849,4 +1852,68 @@ func TestArm64Compiler_compieleSwap(t *testing.T) {
 	require.Equal(t, y, env.stackTopAsUint64())
 	// x must be on the bottom.
 	require.Equal(t, x, env.stack()[0])
+}
+
+func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		moduleInstance *wasm.ModuleInstance
+	}{
+		{
+			name: "no nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		// TODO: Add memory, table, etc
+		{
+			name:           "nil",
+			moduleInstance: &wasm.ModuleInstance{},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = tc.moduleInstance
+
+			err := compiler.compileModuleContextInitialization()
+			require.NoError(t, err)
+			require.Empty(t, compiler.locationStack.usedRegisters)
+
+			require.Empty(t, compiler.locationStack.usedRegisters)
+
+			compiler.exit(jitCallStatusCodeReturned)
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run codes
+			env.exec(code)
+
+			fmt.Println(hex.EncodeToString(code))
+
+			// Check the exit status.
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+			// Check if the fields of engine.moduleContext are updated.
+			engine := env.engine()
+
+			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
+			require.Equal(t, bufSliceHeader.Data, engine.moduleContext.globalElement0Address)
+
+			if tc.moduleInstance.Memory != nil {
+				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
+				require.Equal(t, uint64(bufSliceHeader.Len), engine.moduleContext.memorySliceLen)
+				require.Equal(t, bufSliceHeader.Data, engine.moduleContext.memoryElement0Address)
+			}
+
+			if len(tc.moduleInstance.Tables) > 0 {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
+				require.Equal(t, uint64(tableHeader.Len), engine.moduleContext.tableSliceLen)
+				require.Equal(t, tableHeader.Data, engine.moduleContext.tableElement0Address)
+			}
+		})
+	}
 }

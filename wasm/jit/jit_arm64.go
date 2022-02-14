@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
@@ -283,6 +284,19 @@ func (c *arm64Compiler) compileUnconditionalBranchToAddressOnRegister(addressReg
 	c.addInstruction(br)
 }
 
+// emitAddInstructionWithLeftShiftedRegister emits an ADD instruction to perform "destinationReg = srcReg + (shiftedSourceReg << shiftNum)".
+func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSourceReg int16, shiftNum int64, srcReg, destinationReg int16) {
+	inst := c.newProg()
+	inst.As = arm64.AADD
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationReg
+	// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131
+	inst.From.Type = obj.TYPE_SHIFT
+	inst.From.Offset = (int64(shiftedSourceReg)&31)<<16 | 0<<22 | (shiftNum&63)<<10
+	inst.Reg = srcReg
+	c.addInstruction(inst)
+}
+
 func (c *arm64Compiler) String() (ret string) { return }
 
 // pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
@@ -310,9 +324,20 @@ func (c *arm64Compiler) compilePreamble() error {
 
 	c.pushFunctionParams()
 
+	// TODO: Add maybeGrowValueStack() .
+
 	// Before excuting function body, we must initialize the stack base pointer register
 	// so that we can manipulate the memory stack properly.
-	return c.compileInitializeReservedStackBasePointerRegister()
+	if err := c.compileInitializeReservedStackBasePointerRegister(); err != nil {
+		return err
+	}
+
+	if err := c.compileModuleContextInitialization(); err != nil {
+		return err
+	}
+
+	// TODO: Add initializeReservedMemoryPointer()
+	return nil
 }
 
 // returnFunction emits instructions to return from the current function frame.
@@ -910,7 +935,11 @@ func (c *arm64Compiler) compileCallFunction(addr wasm.FunctionAddress, functype 
 	// On the function return, we initialize the state for this function.
 	c.compileInitializeReservedStackBasePointerRegister()
 
-	// TODO: initialize module context, and memory pointer.
+	if err := c.compileModuleContextInitialization(); err != nil {
+		return err
+	}
+	// TODO: initialize memory pointer.
+
 	return nil
 }
 
@@ -2045,15 +2074,71 @@ func (c *arm64Compiler) compileInitializeReservedStackBasePointerRegister() erro
 	return nil
 }
 
-// emitAddInstructionWithLeftShiftedRegister emits an ADD instruction to perform "destinationReg = srcReg + (shiftedSourceReg << shiftNum)".
-func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSourceReg int16, shiftNum int64, srcReg, destinationReg int16) {
-	inst := c.newProg()
-	inst.As = arm64.AADD
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationReg
-	// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131
-	inst.From.Type = obj.TYPE_SHIFT
-	inst.From.Offset = (int64(shiftedSourceReg)&31)<<16 | 0<<22 | (shiftNum&63)<<10
-	inst.Reg = srcReg
-	c.addInstruction(inst)
+func (c *arm64Compiler) compileModuleContextInitialization() error {
+	// Obtain the free registers to be used in the followings.
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
+	if !found {
+		return fmt.Errorf("BUG: all the registers should be free at this point")
+	}
+	c.locationStack.markRegisterUsed(regs...)
+
+	// Alias these free registers for readability.
+	moduleInstanceAddressRegister, tmpRegister := regs[0], regs[1]
+
+	// Load the absolute address of the current function.
+	// Note: this should be modified to support Clone() functionality per #179.
+	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(uintptr(unsafe.Pointer(c.f.ModuleInstance))), moduleInstanceAddressRegister)
+
+	// "tmpRegister = engine.ModuleInstanceAddress"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineModuleContextModuleInstanceAddressOffset, tmpRegister)
+
+	// If the module instance address stays the same, we could skip the entire code below.
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, moduleInstanceAddressRegister, tmpRegister)
+	brIfMdouleUnchanged := c.newProg()
+	brIfMdouleUnchanged.As = arm64.ABEQ
+	brIfMdouleUnchanged.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(brIfMdouleUnchanged)
+
+	fmt.Println(moduleInstanceAddressRegister)
+
+	// Otherwise, we have to update the following fields:
+	// * engine.moduleContext.globalElement0Address
+	// * (TODO) engine.moduleContext.tableElement0Address
+	// * (TODO) engine.moduleContext.tableSliceLen
+	// * (TODO) engine.moduleContext.memoryElement0Address
+	// * (TODO) engine.moduleContext.memorySliceLen
+
+	// Update globalElement0Address.
+	//
+	// Note: if there's global.get or set instruction in the function, the existence of the globals
+	// is ensured by function validation at module instantiation phase, and that's why it is ok to
+	// skip the initialization if the module's globals slice is empty.
+	if len(c.f.ModuleInstance.Globals) > 0 {
+		// "tmpRegister = &moduleInstance.Globals[0]"
+		c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+			moduleInstanceAddressRegister, moduleInstanceGlobalsOffset,
+			tmpRegister,
+		)
+
+		// a := c.newProg()
+		// a.As = obj.AUNDEF
+		// c.addInstruction(a)
+		//
+		fmt.Println(tmpRegister)
+
+		// "engine.GlobalElement0Address = tmpRegister (== &moduleInstance.Globals[0])"
+		c.compileRegisterToMemoryInstruction(
+			arm64.AMOVD, tmpRegister,
+			reservedRegisterForEngine, engineModuleContextGlobalElement0AddressOffset,
+		)
+
+	}
+
+	// TODO: Update tableElement0Address and tableSliceLen.
+	// TODO: Update memoryElement0Address and memorySliceLen.
+
+	c.setBranchTargetOnNext(brIfMdouleUnchanged)
+
+	c.locationStack.markRegisterUnused(regs...)
+	return nil
 }
