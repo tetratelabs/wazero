@@ -203,3 +203,120 @@ func TestModule_allDeclarations(t *testing.T) {
 		})
 	}
 }
+
+func TestModule_SectionSize(t *testing.T) {
+	i32, f32 := ValueTypeI32, ValueTypeF32
+	zero := uint32(0)
+	empty := &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x00}}
+
+	tests := []struct {
+		name     string
+		input    *Module
+		expected map[string]uint32
+	}{
+		{
+			name:     "empty",
+			input:    &Module{},
+			expected: map[string]uint32{},
+		},
+		{
+			name:     "only name section",
+			input:    &Module{NameSection: &NameSection{ModuleName: "simple"}},
+			expected: map[string]uint32{"custom": 1},
+		},
+		{
+			name: "only custom section",
+			input: &Module{CustomSections: map[string][]byte{
+				"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
+			}},
+			expected: map[string]uint32{"custom": 1},
+		},
+		{
+			name: "name section and a custom section",
+			input: &Module{
+				NameSection: &NameSection{ModuleName: "simple"},
+				CustomSections: map[string][]byte{
+					"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
+				},
+			},
+			expected: map[string]uint32{"custom": 2},
+		},
+		{
+			name: "type section",
+			input: &Module{
+				TypeSection: []*FunctionType{
+					{},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
+				},
+			},
+			expected: map[string]uint32{"type": 3},
+		},
+		{
+			name: "type and import section",
+			input: &Module{
+				TypeSection: []*FunctionType{
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{f32, f32}, Results: []ValueType{f32}},
+				},
+				ImportSection: []*Import{
+					{
+						Module: "Math", Name: "Mul",
+						Kind:     ImportKindFunc,
+						DescFunc: 1,
+					}, {
+						Module: "Math", Name: "Add",
+						Kind:     ImportKindFunc,
+						DescFunc: 0,
+					},
+				},
+			},
+			expected: map[string]uint32{"import": 2, "type": 2},
+		},
+		{
+			name: "type function and start section",
+			input: &Module{
+				TypeSection:     []*FunctionType{{}},
+				FunctionSection: []Index{0},
+				CodeSection: []*Code{
+					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},
+				},
+				ExportSection: map[string]*Export{
+					"AddInt": {Name: "AddInt", Kind: ExportKindFunc, Index: Index(0)},
+				},
+				StartSection: &zero,
+			},
+			expected: map[string]uint32{"code": 1, "export": 1, "function": 1, "start": 1, "type": 1},
+		},
+		{
+			name: "memory and data",
+			input: &Module{
+				MemorySection: []*MemoryType{{Min: 1}},
+				DataSection:   []*DataSegment{{MemoryIndex: 0, OffsetExpression: empty}},
+			},
+			expected: map[string]uint32{"data": 1, "memory": 1},
+		},
+		{
+			name: "table and element",
+			input: &Module{
+				TableSection:   []*TableType{{ElemType: 0x70, Limit: &LimitsType{Min: 1}}},
+				ElementSection: []*ElementSegment{{TableIndex: 0, OffsetExpr: empty}},
+			},
+			expected: map[string]uint32{"element": 1, "table": 1},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			actual := map[string]uint32{}
+			for i := SectionID(0); i <= SectionIDData; i++ {
+				if size := tc.input.SectionSize(i); size > 0 {
+					actual[SectionIDName(i)] = size
+				}
+			}
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}

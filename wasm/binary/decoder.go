@@ -27,6 +27,8 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 
 	m := &wasm.Module{}
 	for {
+		// TODO: except custom sections, all others are required to be in order, but we aren't checking yet.
+		// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%93%AA
 		sectionID := make([]byte, 1)
 		if _, err := io.ReadFull(r, sectionID); err == io.EOF {
 			break
@@ -36,7 +38,7 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 
 		sectionSize, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("get size of section for id=%d: %v", sectionID[0], err)
+			return nil, fmt.Errorf("get size of section %s: %v", wasm.SectionIDName(sectionID[0]), err)
 		}
 
 		sectionContentStart := r.Len()
@@ -104,11 +106,11 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("section ID %d: %v", sectionID[0], err)
+			return nil, fmt.Errorf("section %s: %v", wasm.SectionIDName(sectionID[0]), err)
 		}
 	}
 
-	functionCount, codeCount := len(m.FunctionSection), len(m.CodeSection)
+	functionCount, codeCount := m.SectionSize(wasm.SectionIDFunction), m.SectionSize(wasm.SectionIDCode)
 	if functionCount != codeCount {
 		return nil, fmt.Errorf("function and code section have inconsistent lengths: %d != %d", functionCount, codeCount)
 	}

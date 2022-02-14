@@ -12,32 +12,21 @@ func newTypeUseParser(module *wasm.Module, typeNamespace *indexNamespace) *typeU
 	return &typeUseParser{module: module, typeNamespace: typeNamespace}
 }
 
-type onTypeUsePosition byte
-
-const (
-	// onTypeUseUnhandledToken is set on a token besides a paren.
-	onTypeUseUnhandledToken onTypeUsePosition = iota
-	// onTypeUseUnhandledField is at the field name (tokenKeyword) which isn't "type", "param" or "result"
-	onTypeUseUnhandledField
-	// onTypeUseEndField is at the end (tokenRParen) of the field enclosing the type use.
-	onTypeUseEndField
-)
-
 // onTypeUse is invoked when the grammar "(param)* (result)?" completes.
 //
-// * typeIdx if unresolved, this is replaced in typeUseParser.resolveTypeUses
+// * typeIdx if unresolved, this is replaced in moduleParser.resolveTypeUses
 // * paramNames is nil unless IDs existed on at least one "param" field.
 // * pos is the context used to determine which tokenParser to return
 //
 // Note: this is called when neither a "param" nor a "result" field are parsed, or on any field following a "param"
 // that is not a "result": pos clarifies this.
-type onTypeUse func(typeIdx wasm.Index, paramNames wasm.NameMap, pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error)
+type onTypeUse func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error)
 
-// typeUseParser parses an inlined type from a field such "func" and calls to onTypeUse or onUnknownField.
+// typeUseParser parses an inlined type from a field such "func" and calls onTypeUse.
 //
-// Ex. `(import "Math" "PI" (func $math.pi (result f32))`
+// Ex. `(import "Math" "PI" (func $math.pi (result f32)))`
 //                           starts here --^           ^
-//                         onTypeUse resumes here --+
+//                            onTypeUse resumes here --+
 //
 // Note: Unlike normal parsers, this is not used for an entire field (enclosed by parens). Rather, this only handles
 // "type", "param" and "result" inner fields in the correct order.
@@ -113,7 +102,7 @@ type typeUseParser struct {
 //                                onTypeUse resumes here --+
 //
 func (p *typeUseParser) begin(section wasm.SectionID, idx wasm.Index, onTypeUse onTypeUse, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	pos := onTypeUseUnhandledToken
+	pos := callbackPositionUnhandledToken
 	p.pos = positionInitial // to ensure errorContext reports properly
 	switch tok {
 	case tokenLParen:
@@ -122,7 +111,7 @@ func (p *typeUseParser) begin(section wasm.SectionID, idx wasm.Index, onTypeUse 
 		p.onTypeUse = onTypeUse
 		return p.beginTypeParamOrResult, nil
 	case tokenRParen:
-		pos = onTypeUseEndField
+		pos = callbackPositionEndField
 	}
 	return onTypeUse(p.emptyTypeIndex(section, idx), nil, pos, tok, tokenBytes, line, col)
 }
@@ -222,7 +211,7 @@ func (p *typeUseParser) beginParamOrResult(tok tokenType, tokenBytes []byte, lin
 	case "type":
 		return nil, errors.New("redundant type")
 	default:
-		return p.end(onTypeUseUnhandledField, tok, tokenBytes, line, col)
+		return p.end(callbackPositionUnhandledField, tok, tokenBytes, line, col)
 	}
 }
 
@@ -282,9 +271,10 @@ func (p *typeUseParser) setParamID(idToken []byte) error {
 //                         records i32 --^  ^
 //   parseMoreParamsOrResult resumes here --+
 //
-// Ex. One param type is present `(param i32)`
-//                         records i32 --^  ^
-//   parseMoreParamsOrResult resumes here --+
+// Ex. Multiple param types are present `(param i32 i64)`
+//                                records i32 --^   ^  ^
+//                                    records i32 --+  |
+//              parseMoreParamsOrResult resumes here --+
 //
 // Ex. type is missing `(param)`
 //                errs here --^
@@ -351,9 +341,9 @@ func (p *typeUseParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint3
 }
 
 func (p *typeUseParser) parseEnd(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	pos := onTypeUseUnhandledToken
+	pos := callbackPositionUnhandledToken
 	if tok == tokenRParen {
-		pos = onTypeUseEndField
+		pos = callbackPositionEndField
 	}
 	return p.end(pos, tok, tokenBytes, line, col)
 }
@@ -379,7 +369,7 @@ type lineCol struct {
 }
 
 // end invokes onTypeUse to continue parsing
-func (p *typeUseParser) end(pos onTypeUsePosition, tok tokenType, tokenBytes []byte, line, col uint32) (parser tokenParser, err error) {
+func (p *typeUseParser) end(pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (parser tokenParser, err error) {
 	// Record the potentially inlined type if needed and invoke onTypeUse with the parsed index
 	var typeIdx wasm.Index
 	if p.parsedTypeField {

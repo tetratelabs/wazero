@@ -38,12 +38,22 @@ type indexNamespace struct {
 // setID ensures the given tokenID is unique within this context and raises an error if not. The resulting mapping is
 // stripped of the leading '$' to match other tools, as described in stripDollar.
 func (i *indexNamespace) setID(idToken []byte) (string, error) {
-	id := string(stripDollar(idToken))
-	if _, ok := i.idToIdx[id]; ok {
-		return id, fmt.Errorf("duplicate ID %s", idToken)
+	name, err := i.requireNoID(idToken)
+	if err != nil {
+		return name, err
 	}
-	i.idToIdx[id] = i.count
-	return id, nil
+	i.idToIdx[name] = i.count
+	return name, nil
+}
+
+// hasID checks to see if this tokenID is unique within this context and returns an error. The result string is
+// stripped of the leading '$' to match other tools, as described in stripDollar.
+func (i *indexNamespace) requireNoID(idToken []byte) (string, error) {
+	name := string(stripDollar(idToken))
+	if _, ok := i.idToIdx[name]; ok {
+		return name, fmt.Errorf("duplicate ID %s", idToken)
+	}
+	return name, nil
 }
 
 // parseIndex is a tokenParser called in a field that can only contain a symbolic identifier or raw numeric index.

@@ -165,7 +165,7 @@ func decodeExportSection(r *bytes.Reader) (map[string]*wasm.Export, error) {
 	return exportSection, nil
 }
 
-func decodeStartSection(r *bytes.Reader) (*uint32, error) {
+func decodeStartSection(r *bytes.Reader) (*wasm.Index, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -260,10 +260,10 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 // WebAssembly 1.0 (MVP) Binary Format.
 //
 // See https://www.w3.org/TR/wasm-core-1/#function-section%E2%91%A0
-func encodeFunctionSection(functions []wasm.Index) []byte {
-	contents := leb128.EncodeUint32(uint32(len(functions)))
-	for _, typeIndex := range functions {
-		contents = append(contents, leb128.EncodeUint32(typeIndex)...)
+func encodeFunctionSection(typeIndices []wasm.Index) []byte {
+	contents := leb128.EncodeUint32(uint32(len(typeIndices)))
+	for _, index := range typeIndices {
+		contents = append(contents, leb128.EncodeUint32(index)...)
 	}
 	return encodeSection(wasm.SectionIDFunction, contents)
 }
@@ -307,6 +307,6 @@ func encodeExportSection(exports map[string]*wasm.Export) []byte {
 // encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
-func encodeStartSection(funcidx uint32) []byte {
+func encodeStartSection(funcidx wasm.Index) []byte {
 	return encodeSection(wasm.SectionIDStart, leb128.EncodeUint32(funcidx))
 }
