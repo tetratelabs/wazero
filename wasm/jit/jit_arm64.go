@@ -790,7 +790,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 // the target is determined by "the instruction right after beforeTargetInst type".
 //
 // For example, if beforeTargetInst == RET and we have the instruction sequence like
-// ADR -> X -> Y -> RET -> MOV, then the ADR instruction emitted by this function set the absolute
+// ADR -> X -> Y -> ... -> RET -> MOV, then the ADR instruction emitted by this function set the absolute
 // address of MOV instruction into the destination register.
 func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinationRegister int16) {
 	// Emit ADR instruction to read the specified instruction's absolute address.
