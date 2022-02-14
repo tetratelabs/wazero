@@ -27,17 +27,17 @@ const (
 // * LocalNames decode from subsection 2
 //
 // See https://www.w3.org/TR/wasm-core-1/#binary-namesec
-func decodeNameSection(data []byte) (result *wasm.NameSection, err error) {
+func decodeNameSection(r *bytes.Reader, limit uint64) (result *wasm.NameSection, err error) {
 	// TODO: add leb128 functions that work on []byte and offset. While using a reader allows us to reuse reader-based
 	// leb128 functions, it is less efficient, causes untestable code and in some cases more complex vs plain []byte.
-	r := bytes.NewReader(data)
 	result = &wasm.NameSection{}
 
 	// subsectionID is decoded if known, and skipped if not
 	var subsectionID uint8
 	// subsectionSize is the length to skip when the subsectionID is unknown
 	var subsectionSize uint32
-	for {
+	var bytesRead uint64
+	for limit > 0 {
 		if subsectionID, err = r.ReadByte(); err != nil {
 			if err == io.EOF {
 				return result, nil
@@ -45,11 +45,12 @@ func decodeNameSection(data []byte) (result *wasm.NameSection, err error) {
 			// TODO: untestable as this can't fail for a reason beside EOF reading a byte from a buffer
 			return nil, fmt.Errorf("failed to read a subsection ID: %w", err)
 		}
+		limit--
 
-		// TODO: unused except when skipping. This means we can pass on a corrupt length of a known subsection
-		if subsectionSize, _, err = leb128.DecodeUint32(r); err != nil {
+		if subsectionSize, bytesRead, err = leb128.DecodeUint32(r); err != nil {
 			return nil, fmt.Errorf("failed to read the size of subsection[%d]: %w", subsectionID, err)
 		}
+		limit -= bytesRead
 
 		switch subsectionID {
 		case subsectionIDModuleName:
@@ -66,11 +67,13 @@ func decodeNameSection(data []byte) (result *wasm.NameSection, err error) {
 			}
 		default: // Skip other subsections.
 			// Note: Not Seek because it doesn't err when given an offset past EOF. Rather, it leads to undefined state.
-			if _, err := io.CopyN(io.Discard, r, int64(subsectionSize)); err != nil {
+			if _, err = io.CopyN(io.Discard, r, int64(subsectionSize)); err != nil {
 				return nil, fmt.Errorf("failed to skip subsection[%d]: %w", subsectionID, err)
 			}
 		}
+		limit -= uint64(subsectionSize)
 	}
+	return
 }
 
 func decodeFunctionNames(r *bytes.Reader) (wasm.NameMap, error) {

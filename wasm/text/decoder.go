@@ -175,7 +175,7 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 			return p.parseImportModule, nil
 		case "func":
 			p.pos = positionFunc
-			p.funcParser.currentIdx = p.module.SectionSize(wasm.SectionIDFunction)
+			p.funcParser.currentIdx = p.module.SectionElementCount(wasm.SectionIDFunction)
 			return p.funcParser.begin, nil
 		case "table":
 			return nil, errors.New("TODO: table")
@@ -191,7 +191,7 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 			p.pos = positionExport
 			return p.parseExportName, nil
 		case "start":
-			if p.module.SectionSize(wasm.SectionIDStart) > 0 {
+			if p.module.SectionElementCount(wasm.SectionIDStart) > 0 {
 				return nil, moreThanOneInvalid("start")
 			}
 			p.pos = positionStart
@@ -310,7 +310,7 @@ func (p *moduleParser) beginImportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 
 	switch string(tokenBytes) {
 	case "func":
-		if p.module.SectionSize(wasm.SectionIDFunction) > 0 {
+		if p.module.SectionElementCount(wasm.SectionIDFunction) > 0 {
 			return nil, importAfterModuleDefined(wasm.SectionIDFunction)
 		}
 		p.pos = positionImportFunc
@@ -361,7 +361,7 @@ func (p *moduleParser) addFunctionName(name string) {
 // Ex. If there is no signature `(import "" "main" (func))`
 //                     calls onImportFunc here ---^
 func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	idx := p.module.SectionSize(wasm.SectionIDImport)
+	idx := p.module.SectionElementCount(wasm.SectionIDImport)
 	if tok == tokenID { // Ex. (func $main $main)
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
 	}
@@ -520,7 +520,7 @@ func (p *moduleParser) parseExportDesc(tok tokenType, tokenBytes []byte, line, c
 	default:
 		panic(fmt.Errorf("BUG: unhandled parsing state on parseExportDesc: %v", p.pos))
 	}
-	eIdx := p.module.SectionSize(wasm.SectionIDExport)
+	eIdx := p.module.SectionElementCount(wasm.SectionIDExport)
 	typeIdx, resolved, err := namespace.parseIndex(wasm.SectionIDExport, eIdx, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
@@ -730,22 +730,22 @@ func (p *moduleParser) errorContext() string {
 	case positionModule:
 		return "module"
 	case positionType:
-		idx := p.module.SectionSize(wasm.SectionIDType)
+		idx := p.module.SectionElementCount(wasm.SectionIDType)
 		return fmt.Sprintf("module.type[%d]%s", idx, p.typeParser.errorContext())
 	case positionImport, positionImportFunc: // TODO: table, memory or global
-		idx := p.module.SectionSize(wasm.SectionIDImport)
+		idx := p.module.SectionElementCount(wasm.SectionIDImport)
 		if p.pos == positionImport {
 			return fmt.Sprintf("module.import[%d]", idx)
 		}
 		return fmt.Sprintf("module.import[%d].func%s", idx, p.typeUseParser.errorContext())
 	case positionFunc:
-		idx := p.module.SectionSize(wasm.SectionIDFunction)
+		idx := p.module.SectionElementCount(wasm.SectionIDFunction)
 		return fmt.Sprintf("module.func[%d]%s", idx, p.typeUseParser.errorContext())
 	case positionMemory:
-		idx := p.module.SectionSize(wasm.SectionIDMemory)
+		idx := p.module.SectionElementCount(wasm.SectionIDMemory)
 		return fmt.Sprintf("module.memory[%d]", idx)
 	case positionExport, positionExportFunc: // TODO: table, memory or global
-		idx := p.module.SectionSize(wasm.SectionIDExport)
+		idx := p.module.SectionElementCount(wasm.SectionIDExport)
 		if p.pos == positionExport {
 			return fmt.Sprintf("module.export[%d]", idx)
 		}
