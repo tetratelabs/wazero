@@ -501,6 +501,7 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	return nil
 }
 
+// compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
 func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
@@ -546,6 +547,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	return nil
 }
 
+// compileGlobalSet implements compiler.compileGlobalSet for the arm64 architecture.
 func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	val := c.locationStack.pop()
 	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(val); err != nil {
@@ -557,8 +559,20 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 		return err
 	}
 
+	var mov obj.As
+	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
+	case wasm.ValueTypeI32:
+		mov = arm64.AMOVW
+	case wasm.ValueTypeI64:
+		mov = arm64.AMOVD
+	case wasm.ValueTypeF32:
+		mov = arm64.AFMOVS
+	case wasm.ValueTypeF64:
+		mov = arm64.AFMOVD
+	}
+
 	c.compileRegisterToMemoryInstruction(
-		arm64.AMOVD,
+		mov,
 		val.register,
 		globalInstanceAddressRegister, globalInstanceValueOffset,
 	)
