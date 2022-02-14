@@ -263,7 +263,7 @@ func (c *arm64Compiler) applyTwoRegistersToNoneInstruction(instruction obj.As, s
 	c.addInstruction(inst)
 }
 
-func (c *arm64Compiler) emitUnconditionalBRInstruction() (br *obj.Prog) {
+func (c *arm64Compiler) emitUnconditionalBranchInstruction() (br *obj.Prog) {
 	br = c.newProg()
 	br.As = obj.AJMP
 	br.To.Type = obj.TYPE_BRANCH
@@ -271,7 +271,7 @@ func (c *arm64Compiler) emitUnconditionalBRInstruction() (br *obj.Prog) {
 	return
 }
 
-func (c *arm64Compiler) emitUnconditionalBRToAddressOnRegister(addressRegister int16) {
+func (c *arm64Compiler) emitUnconditionalBranchToAddressOnRegister(addressRegister int16) {
 	br := c.newProg()
 	br.As = obj.AJMP
 	br.To.Type = obj.TYPE_MEM
@@ -397,7 +397,7 @@ func (c *arm64Compiler) returnFunction() error {
 		// "rb.caller" is below the top address.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 		tmpReg)
-	c.emitUnconditionalBRToAddressOnRegister(tmpReg)
+	c.emitUnconditionalBranchToAddressOnRegister(tmpReg)
 
 	// They were temporarily used, so we mark them unused.
 	c.locationStack.markRegisterUnused(tmpRegs...)
@@ -600,7 +600,7 @@ func (c *arm64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
-		br := c.emitUnconditionalBRInstruction()
+		br := c.emitUnconditionalBranchInstruction()
 		c.assignBranchTarget(labelKey, br)
 		return nil
 	}
@@ -757,7 +757,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
 		tmpRegisters[2])
-	c.emitUnconditionalBRToAddressOnRegister(tmpRegisters[2])
+	c.emitUnconditionalBranchToAddressOnRegister(tmpRegisters[2])
 
 	// All the registers used are temporary so we mark them unused.
 	c.markRegisterUnused(tmpRegisters...)
