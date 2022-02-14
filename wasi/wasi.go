@@ -1,12 +1,12 @@
 package wasi
 
 import (
+	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
 	"io"
 	"io/fs"
 	"math"
-	"math/rand"
 	"os"
 	"reflect"
 	"time"
@@ -171,6 +171,24 @@ const (
 	wasiSnapshotPreview1Name = "wasi_snapshot_preview1"
 )
 
+type RandomSource interface {
+	Read([]byte) (int, error)
+	Int31() (int32, error)
+}
+
+// Non-deterministic random source using crypto/rand
+type CryptoRandomSource struct{}
+
+func (c *CryptoRandomSource) Read(p []byte) (n int, err error) {
+	return crand.Read(p)
+}
+
+func (c *CryptoRandomSource) Int31() (v int32, err error) {
+	err = binary.Read(crand.Reader, binary.BigEndian, &v)
+
+	return v, err
+}
+
 type api struct {
 	args  *nullTerminatedStrings
 	stdin io.Reader
@@ -179,7 +197,7 @@ type api struct {
 	opened map[uint32]fileEntry
 	// timeNowUnixNano is mutable for testing
 	timeNowUnixNano func() uint64
-	randSource      *rand.Rand
+	randSource      RandomSource
 }
 
 func (a *api) register(store *wasm.Store) (err error) {
@@ -354,7 +372,6 @@ func registerAPI(store *wasm.Store, opts ...Option) (API, error) {
 }
 
 func newAPI(opts ...Option) *api {
-	s := rand.NewSource(time.Now().UnixNano())
 	ret := &api{
 		args:   &nullTerminatedStrings{},
 		stdin:  os.Stdin,
@@ -364,7 +381,7 @@ func newAPI(opts ...Option) *api {
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
-		randSource: rand.New(s),
+		randSource: &CryptoRandomSource{},
 	}
 
 	// apply functional options
@@ -374,15 +391,16 @@ func newAPI(opts ...Option) *api {
 	return ret
 }
 
-func (a *api) seedRandSource(seed int64) {
-	a.randSource.Seed(seed)
-}
+func (a *api) randUnusedFD() (uint32, error) {
+	v, err := a.randSource.Int31()
+	if err != nil {
+		return 0, err
+	}
 
-func (a *api) randUnusedFD() uint32 {
-	fd := uint32(rand.Int31())
+	fd := uint32(v)
 	for {
 		if _, ok := a.opened[fd]; !ok {
-			return fd
+			return fd, nil
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
@@ -436,7 +454,10 @@ func (a *api) path_open(ctx *wasm.HostFunctionCallContext, fd, dirFlags, pathPtr
 		}
 	}
 
-	newFD := a.randUnusedFD()
+	newFD, err := a.randUnusedFD()
+	if err != nil {
+		return ErrnoInval
+	}
 
 	a.opened[newFD] = fileEntry{
 		file: f,
