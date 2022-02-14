@@ -1972,7 +1972,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 	const valueToSet uint64 = 12345
 	for i, tp := range []wasm.ValueType{
-		// wasm.ValueTypeF32, wasm.ValueTypeF64,
+		wasm.ValueTypeF32, wasm.ValueTypeF64,
 		wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
 		tp := tp
@@ -1989,6 +1989,12 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 
 			// Place the set target value.
 			loc := compiler.locationStack.pushValueLocationOnStack()
+			switch tp {
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
+				loc.setRegisterType(generalPurposeRegisterTypeInt)
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
+				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+			}
 			env.stack()[loc.stackPointer] = valueToSet
 
 			op := &wazeroir.OperationGlobalSet{Index: 1}
@@ -2007,7 +2013,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			env.exec(code)
 
 			// The global value should be set to valueToSet.
-			// require.Equal(t, valueToSet, env.getGlobal(op.Index))
+			require.Equal(t, valueToSet, env.getGlobal(op.Index))
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
 			require.Equal(t, uint64(0), env.stackPointer())
 		})
