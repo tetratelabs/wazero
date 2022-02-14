@@ -92,6 +92,7 @@ type Module struct {
 	// (Store.Instantiate).
 	//
 	// Note: there are no unique constraints relating to the two-level namespace of Import.Module and Import.Name.
+	//
 	// Note: In the Binary Format, this is SectionIDImport.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
@@ -105,6 +106,7 @@ type Module struct {
 	//
 	// Note: FunctionSection is index correlated with the CodeSection. If given the same position, ex. 2, a function
 	// type is at TypeSection[FunctionSection[2]], while its locals and body are at CodeSection[2].
+	//
 	// Note: In the Binary Format, this is SectionIDFunction.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#function-section%E2%91%A0
@@ -151,6 +153,8 @@ type Module struct {
 
 	// ExportSection contains each export defined in this module.
 	//
+	// Note: In the Binary Format, this is SectionIDExport.
+	//
 	// See https://www.w3.org/TR/wasm-core-1/#exports%E2%91%A0
 	ExportSection map[string]*Export
 
@@ -179,20 +183,12 @@ type Module struct {
 
 	// NameSection is set when the SectionIDCustom "name" was successfully decoded from the binary format.
 	//
-	// Note: This is the only SectionIDCustom defined in the WebAssembly 1.0 (MVP) Binary Format. Others are in
-	// CustomSections
+	// Note: This is the only SectionIDCustom defined in the WebAssembly 1.0 (MVP) Binary Format.
+	// Others are skipped as they are not used in wazero.
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#name-section%E2%91%A0
-	NameSection *NameSection
-
-	// CustomSections is set when at least one non-standard, or otherwise unsupported custom section was found in the
-	// binary format.
-	//
-	// Note: This never contains a "name" because that is standard and parsed into the NameSection.
-	// Note: In the Binary Format, this is SectionIDCode.
-	//
 	// See https://www.w3.org/TR/wasm-core-1/#custom-section%E2%91%A0
-	CustomSections map[string][]byte
+	NameSection *NameSection
 }
 
 // Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because
@@ -467,20 +463,19 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 	return
 }
 
-// SectionSize returns the count of items for a given section ID
+// SectionElementCount returns the count of elements in a given section ID
 //
-// For example, given...
-// * SectionIDType this returns the count of FunctionType
-// * SectionIDCustom this returns the count of unique section names
-// * SectionIDExport this returns the count of unique export names
-func (m *Module) SectionSize(sectionID SectionID) uint32 {
+// For example...
+// * SectionIDType returns the count of FunctionType
+// * SectionIDCustom returns one if the NameSection is present
+// * SectionIDExport returns the count of unique export names
+func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as in vector elements!
 	switch sectionID {
 	case SectionIDCustom:
-		count := uint32(len(m.CustomSections))
 		if m.NameSection != nil {
-			return count + 1
+			return 1
 		}
-		return count
+		return 0
 	case SectionIDType:
 		return uint32(len(m.TypeSection))
 	case SectionIDImport:

@@ -9,14 +9,6 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
-func readCustomSectionData(r *bytes.Reader, dataSize uint32) ([]byte, error) {
-	data := make([]byte, dataSize)
-	if _, err := io.ReadFull(r, data); err != nil {
-		return nil, fmt.Errorf("cannot read custom section data: %w", err)
-	}
-	return data, nil
-}
-
 func decodeTypeSection(r io.Reader) ([]*wasm.FunctionType, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
@@ -216,14 +208,6 @@ func decodeDataSection(r *bytes.Reader) ([]*wasm.DataSegment, error) {
 		}
 	}
 	return result, nil
-}
-
-// encodeCustomSection encodes the opaque bytes for the given name as a SectionIDCustom
-// See https://www.w3.org/TR/wasm-core-1/#binary-customsec
-func encodeCustomSection(name string, data []byte) []byte {
-	// The contents of a custom section is the non-empty name followed by potentially empty opaque data
-	contents := append(encodeSizePrefixed([]byte(name)), data...)
-	return encodeSection(wasm.SectionIDCustom, contents)
 }
 
 // encodeSection encodes the sectionID, the size of its contents in bytes, followed by the contents.

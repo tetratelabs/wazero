@@ -225,23 +225,6 @@ func TestModule_SectionSize(t *testing.T) {
 			expected: map[string]uint32{"custom": 1},
 		},
 		{
-			name: "only custom section",
-			input: &Module{CustomSections: map[string][]byte{
-				"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-			}},
-			expected: map[string]uint32{"custom": 1},
-		},
-		{
-			name: "name section and a custom section",
-			input: &Module{
-				NameSection: &NameSection{ModuleName: "simple"},
-				CustomSections: map[string][]byte{
-					"meme": {1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-				},
-			},
-			expected: map[string]uint32{"custom": 2},
-		},
-		{
 			name: "type section",
 			input: &Module{
 				TypeSection: []*FunctionType{
@@ -312,7 +295,7 @@ func TestModule_SectionSize(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := map[string]uint32{}
 			for i := SectionID(0); i <= SectionIDData; i++ {
-				if size := tc.input.SectionSize(i); size > 0 {
+				if size := tc.input.SectionElementCount(i); size > 0 {
 					actual[SectionIDName(i)] = size
 				}
 			}

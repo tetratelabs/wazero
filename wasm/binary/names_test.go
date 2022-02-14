@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -201,7 +202,8 @@ func TestDecodeNameSection(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ns, err := decodeNameSection(encodeNameSectionData(tc.input))
+			data := encodeNameSectionData(tc.input)
+			ns, err := decodeNameSection(bytes.NewReader(data), uint64(len(data)))
 			require.NoError(t, err)
 			require.Equal(t, tc.input, ns)
 		})
@@ -302,7 +304,7 @@ func TestDecodeNameSection_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeNameSection(tc.input)
+			_, err := decodeNameSection(bytes.NewReader(tc.input), uint64(len(tc.input)))
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
