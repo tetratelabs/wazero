@@ -313,7 +313,7 @@ func (c *arm64Compiler) emitPreamble() error {
 
 // returnFunction emits instructions to return from the current function frame.
 // If the current frame is the bottom, the code goes back to the Go code with jitCallStatusCodeReturned status.
-// Otherwise, we branch into the caller's return address (TODO).
+// Otherwise, we branch into the caller's return address.
 func (c *arm64Compiler) returnFunction() error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
@@ -392,7 +392,7 @@ func (c *arm64Compiler) returnFunction() error {
 		tmpReg,
 		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset)
 
-	// 2) Jump into the address of "ra.caller".
+	// 2) Branch into the address of "ra.caller".
 	c.applyMemoryToRegisterInstruction(arm64.AMOVD,
 		// "rb.caller" is below the top address.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
@@ -631,22 +631,6 @@ func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	if err := c.callFunction(target.Address, target.FunctionType.Type); err != nil {
 		return err
 	}
-
-	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(target.FunctionType.Type.Params); i++ {
-		c.locationStack.pop()
-	}
-
-	// Also, the function results were pushed by the call.
-	for _, t := range target.FunctionType.Type.Results {
-		loc := c.locationStack.pushValueLocationOnStack()
-		switch t {
-		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
-		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
-		}
-	}
 	return nil
 }
 
@@ -778,12 +762,36 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	// All the registers used are temporary so we mark them unused.
 	c.markRegisterUnused(tmpRegisters...)
 
+	// We consumed the function parameters from the stack after call.
+	for i := 0; i < len(functype.Params); i++ {
+		c.locationStack.pop()
+	}
+
+	// Also, the function results were pushed by the call.
+	for _, t := range functype.Results {
+		loc := c.locationStack.pushValueLocationOnStack()
+		switch t {
+		case wasm.ValueTypeI32, wasm.ValueTypeI64:
+			loc.setRegisterType(generalPurposeRegisterTypeInt)
+		case wasm.ValueTypeF32, wasm.ValueTypeF64:
+			loc.setRegisterType(generalPurposeRegisterTypeFloat)
+		}
+	}
+
 	// On the function return, we initialize the state for this function.
 	c.initializeReservedStackBasePointerRegister()
+
 	// TODO: initialize module context, and memory pointer.
 	return nil
 }
 
+// readInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
+// into destinationRegister. "target instruction" is specified by beforeTargetInst argument and
+// the target is determined by "the instruction right after beforeTargetInst type".
+//
+// For example, if beforeTargetInst == RET and we have the instruction sequence like
+// ADR -> X -> Y -> RET -> MOV, then the ADR instruction emitted by this function set the absolute
+// address of MOV instruction into the destination register.
 func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinationRegister int16) {
 	// Emit ADR instruction to read the specified instruction's absolute address.
 	// Note: we cannot emit the "ADR REG, $(target's offset from here)" due to the
@@ -799,6 +807,7 @@ func (c *arm64Compiler) readInstructionAddress(beforeTargetInst obj.As, destinat
 	c.addInstruction(readAddress)
 
 	// Setup the callback to modify the instruction bytes after compilation.
+	// Note: this is the closure over readAddress (*obj.Prog).
 	c.afterAssembleCallback = append(c.afterAssembleCallback, func(code []byte) error {
 		// Find the target instruction.
 		target := readAddress

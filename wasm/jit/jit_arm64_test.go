@@ -1595,7 +1595,7 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 }
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
-	t.Run("invalid", func(t *testing.T) {
+	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
@@ -1611,6 +1611,32 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// the call back added must return error.
 		_, _, _, err = compiler.compile()
 		require.Error(t, err)
+		require.Contains(t, err.Error(), "target instruction not found")
+	})
+	t.Run("too large offset", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.emitPreamble()
+		require.NoError(t, err)
+
+		// Set the acquisition target instruction to the one after RET.
+		compiler.readInstructionAddress(obj.ARET, reservedRegisterForTemporary)
+
+		// Add many instruction between the target and readInstructionAddress.
+		for i := 0; i < 100; i++ {
+			compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+		}
+
+		compiler.exit(jitCallStatusCodeReturned)
+		compiler.exit(jitCallStatusCodeUnreachable)
+
+		// If generate the code without JMP after readInstructionAddress,
+		// the call back added must return error.
+		_, _, _, err = compiler.compile()
+		fmt.Println(err)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "too large offset")
 	})
 	t.Run("ok", func(t *testing.T) {
 		env := newJITEnvironment()
