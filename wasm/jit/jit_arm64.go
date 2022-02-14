@@ -758,7 +758,7 @@ func (c *arm64Compiler) callFunction(addr wasm.FunctionAddress, functype *wasm.F
 	c.emitUnconditionalBranchToAddressOnRegister(tmp)
 
 	// All the registers used are temporary so we mark them unused.
-	c.markRegisterUnused(tmpRegisters...)
+	c.markRegisterUnused(freeRegisters...)
 
 	// We consumed the function parameters from the stack after call.
 	for i := 0; i < len(functype.Params); i++ {
