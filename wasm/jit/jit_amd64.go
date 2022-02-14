@@ -5219,7 +5219,7 @@ func (c *amd64Compiler) exit(status jitCallStatusCode) {
 	c.addInstruction(ret)
 }
 
-func (c *amd64Compiler) emitPreamble() (err error) {
+func (c *amd64Compiler) compilePreamble() (err error) {
 	// We assume all function parameters are already pushed onto the stack by
 	// the caller.
 	c.pushFunctionParams()
