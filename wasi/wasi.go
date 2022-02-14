@@ -144,10 +144,19 @@ type API interface {
 	// TODO: ProcRaise
 	// TODO: SchedYield
 
-	// RandomGet is a WASI function that write random data in buffer.
+	// RandomGet is a WASI function that write random data in buffer (rand.Read()).
 	//
-	// * buf - buffer to be filled with random values
-	// * buf_len - buffer size
+	// * buf - is a offset to write random values
+	// * buf_len - size of random data in bytes
+	//
+	// For example, if `HostFunctionCallContext.Randomizer` initialized 
+	// with random seed `rand.NewSource(42)`, we expect `ctx.Memory.Buffer` to contain: 
+	//
+	//                             buf_len (5)
+	//                    +------------------------+
+	//                    |                        |
+	//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
+	//              buf --^
 	//
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-buf_len-size---errno
 	RandomGet(ctx *wasm.HostFunctionCallContext, buf, buf_len uint32) Errno
@@ -512,13 +521,18 @@ func (a *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno)
 }
 
 func (a *api) RandomGet(ctx *wasm.HostFunctionCallContext, buf uint32, buf_len uint32) (errno Errno) {
+	if !ctx.Memory.ValidateAddrRange(buf, uint64(buf_len)) {
+		return ErrnoInval
+	}
+	
 	random_bytes := make([]byte, buf_len)
-	_, err := rand.Read(random_bytes)
+	_, err := ctx.Randomizer.Read(random_bytes)
 	if err != nil {
 		return ErrnoInval
 	}
 	
-	copy(ctx.Memory.Buffer[buf:buf_len], random_bytes)
+
+	copy(ctx.Memory.Buffer[buf:buf+buf_len], random_bytes)
 
 	return ErrnoSuccess
 }

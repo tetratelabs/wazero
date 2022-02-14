@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"reflect"
+	"time"
 
 	"github.com/tetratelabs/wazero/wasm/internal/ieee754"
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
@@ -865,15 +867,25 @@ type HostFunctionCallContext struct {
 	ctx context.Context
 	// Memory is the currently used memory instance at the time when the host function call is made.
 	Memory *MemoryInstance
+	// Used in `RandomGet` method 
+	Randomizer *rand.Rand
 	// TODO: Add others if necessary.
 }
 
 // NewHostFunctionCallContext creates a new HostFunctionCallContext with a
 // context and memory instance.
 func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) *HostFunctionCallContext {
+	return NewHostFunctionCallContextWithSeed(ctx, memory, time.Now().Unix())
+}
+
+// NewHostFunctionCallContextWithRandomSeed creates a new HostFunctionCallContext 
+// with a random generator initialized by a `seed` value. 
+func NewHostFunctionCallContextWithSeed(ctx context.Context, memory *MemoryInstance, seed int64) *HostFunctionCallContext {
+	s := rand.NewSource(seed)
 	return &HostFunctionCallContext{
 		ctx:    ctx,
 		Memory: memory,
+		Randomizer: rand.New(s),
 	}
 }
 

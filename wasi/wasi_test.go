@@ -316,22 +316,63 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // randomWat is a wasm module to call random_get.
 //go:embed testdata/random.wat
 var randomWat []byte
+
 func TestAPI_RandomGet(t *testing.T) {
 	store, wasiAPI := instantiateWasmStore(t, randomWat, "test")
-	var buf_len uint32 = 5
-	var buf uint32 = 0
-	
+	maskLength := 7 // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                          // random bytes in `buf` is after this
+		0x53, 0x8c, 0x7f, 0x96, 0xb1, // random data from seed value of 42
+		'?', // stopped after encoding
+	} // tr
+
+	var buf_len = uint32(5) // arbitrary buffer size,
+	var buf = uint32(1)     // offset,
+	var seed = int64(42)    // and seed value
+
 	t.Run("API.RandomGet", func(t *testing.T) {
-		// provide a host context we call directly
-		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+		maskMemory(store, maskLength)
+		// provide a host context with a seed value for random generator
+		hContext := wasm.NewHostFunctionCallContextWithSeed(context.Background(), store.Memories[0], seed)
 
 		errno := wasiAPI.RandomGet(hContext, buf, buf_len)
 		require.Equal(t, ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
 }
 
 func TestAPI_RandomGet_Errors(t *testing.T) {
+	store, _ := instantiateWasmStore(t, randomWat, "test")
 
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
+	tests := []struct {
+		name    string
+		buf     uint32
+		buf_len uint32
+	}{
+		{
+			name:    "random buffer out-of-memory",
+			buf:     memorySize,
+			buf_len: 1,
+		},
+
+		{
+			name:    "random buffer size exceeds the maximum valid address by 1",
+			buf:     validAddress,
+			buf_len: memorySize + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionRandomGet, uint64(tc.buf), uint64(tc.buf_len))
+			require.NoError(t, err)
+			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
+		})
+	}
 }
 
 // TODO: TestAPI_SockRecv TestAPI_SockRecv_Errors
