@@ -560,7 +560,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	// and we have to avoid affecting the code generation for Then branch afterwards.
 	saved := c.locationStack
 	c.setLocationStack(saved.clone())
-	if err := c.emitDropRange(o.Else.ToDrop); err != nil {
+	if err := c.compileDropRange(o.Else.ToDrop); err != nil {
 		return err
 	}
 	c.compileBranchInto(o.Else.Target)
@@ -570,7 +570,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	c.setLocationStack(saved)
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.setBranchTargetOnNext(conditionalBR)
-	if err := c.emitDropRange(o.Then.ToDrop); err != nil {
+	if err := c.compileDropRange(o.Then.ToDrop); err != nil {
 		return err
 	}
 	c.compileBranchInto(o.Then.Target)
@@ -853,11 +853,11 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
 func (c *arm64Compiler) compileDrop(o *wazeroir.OperationDrop) error {
-	return c.emitDropRange(o.Range)
+	return c.compileDropRange(o.Range)
 }
 
-// emitDropRange is the implementation of compileDrop. See compiler.compileDrop.
-func (c *arm64Compiler) emitDropRange(r *wazeroir.InclusiveRange) error {
+// compileDropRange is the implementation of compileDrop. See compiler.compileDrop.
+func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 	if r == nil {
 		return nil
 	} else if r.Start == 0 {
