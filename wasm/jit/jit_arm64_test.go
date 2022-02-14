@@ -1692,7 +1692,8 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 			expectedValue += addTargetValue
 
 			compiler := env.requireNewCompiler(t)
-			compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+			compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType},
+				ModuleInstance: &wasm.ModuleInstance{}}
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
