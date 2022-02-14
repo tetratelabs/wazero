@@ -149,8 +149,8 @@ type API interface {
 	// * buf - is a offset to write random values
 	// * buf_len - size of random data in bytes
 	//
-	// For example, if `HostFunctionCallContext.Randomizer` initialized 
-	// with random seed `rand.NewSource(42)`, we expect `ctx.Memory.Buffer` to contain: 
+	// For example, if `HostFunctionCallContext.Randomizer` initialized
+	// with random seed `rand.NewSource(42)`, we expect `ctx.Memory.Buffer` to contain:
 	//
 	//                             buf_len (5)
 	//                    +------------------------+
@@ -524,13 +524,12 @@ func (a *api) RandomGet(ctx *wasm.HostFunctionCallContext, buf uint32, buf_len u
 	if !ctx.Memory.ValidateAddrRange(buf, uint64(buf_len)) {
 		return ErrnoInval
 	}
-	
+
 	random_bytes := make([]byte, buf_len)
 	_, err := ctx.Randomizer.Read(random_bytes)
 	if err != nil {
 		return ErrnoInval
 	}
-	
 
 	copy(ctx.Memory.Buffer[buf:buf+buf_len], random_bytes)
 

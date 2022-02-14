@@ -870,7 +870,7 @@ type HostFunctionCallContext struct {
 	ctx context.Context
 	// Memory is the currently used memory instance at the time when the host function call is made.
 	Memory *MemoryInstance
-	// Used in `RandomGet` method 
+	// Used in `RandomGet` method
 	Randomizer *rand.Rand
 	// TODO: Add others if necessary.
 }
@@ -881,13 +881,13 @@ func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) *Ho
 	return NewHostFunctionCallContextWithSeed(ctx, memory, time.Now().Unix())
 }
 
-// NewHostFunctionCallContextWithRandomSeed creates a new HostFunctionCallContext 
-// with a random generator initialized by a `seed` value. 
+// NewHostFunctionCallContextWithRandomSeed creates a new HostFunctionCallContext
+// with a random generator initialized by a `seed` value.
 func NewHostFunctionCallContextWithSeed(ctx context.Context, memory *MemoryInstance, seed int64) *HostFunctionCallContext {
 	s := rand.NewSource(seed)
 	return &HostFunctionCallContext{
-		ctx:    ctx,
-		Memory: memory,
+		ctx:        ctx,
+		Memory:     memory,
 		Randomizer: rand.New(s),
 	}
 }
