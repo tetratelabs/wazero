@@ -1,5 +1,3 @@
-# prevents windows runners from failing on lint
-* text eol=lf
 # Ignore the auto-generated Wasm spectest files from language statistics of wazero repo.
 # https://stackoverflow.com/questions/19052834/is-it-possible-to-exclude-files-from-git-language-statistics
 wasm/internal/spectests/cases/* linguist-vendored
