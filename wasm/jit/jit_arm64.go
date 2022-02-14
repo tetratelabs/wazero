@@ -502,11 +502,111 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 }
 
 func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
+
+	// Get the address of globals[index] into intReg.
+	intReg, err := c.compileReadGlobalAddress(o.Index)
+	if err != nil {
+		return err
+	}
+
+	var intMov, floatMov obj.As = obj.ANOP, obj.ANOP
+	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
+	case wasm.ValueTypeI32:
+		intMov = arm64.AMOVW
+	case wasm.ValueTypeI64:
+		intMov = arm64.AMOVD
+	case wasm.ValueTypeF32:
+		intMov = arm64.AMOVW
+		floatMov = arm64.AFMOVS
+	case wasm.ValueTypeF64:
+		intMov = arm64.AMOVW
+		floatMov = arm64.AFMOVD
+	}
+
+	// "intReg = [intReg + globalInstanceValueOffset] (== globals[index].Val)"
+	c.compileMemoryToRegisterInstruction(
+		intMov,
+		intReg, globalInstanceValueOffset,
+		intReg,
+	)
+
+	// If the value type is float32 or float64, we have to move the value
+	// further into the float register.
+	resultReg := intReg
+	if floatMov != obj.ANOP {
+		resultReg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+		if err != nil {
+			return err
+		}
+		c.compileRegisterToRegisterInstruction(floatMov, intReg, resultReg)
+	}
+
+	c.locationStack.pushValueLocationOnRegister(resultReg)
+	return nil
 }
 
 func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	val := c.locationStack.pop()
+	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(val); err != nil {
+		return err
+	}
+
+	globalInstanceAddressRegister, err := c.compileReadGlobalAddress(o.Index)
+	if err != nil {
+		return err
+	}
+
+	c.compileRegisterToMemoryInstruction(
+		arm64.AMOVD,
+		val.register,
+		globalInstanceAddressRegister, globalInstanceValueOffset,
+	)
+
+	// Now the global value is saved on val.register, so push the value location on the top.
+	c.locationStack.pushValueLocationOnRegister(val.register)
+	return nil
+}
+
+// compileReadGlobalAddress adds instruction to read the absolute address of the global instance whose index equals globalIndex,
+// and returns a register which holds the absolute address.
+func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinationRegister int16, err error) {
+	// TODO: rethink about the type used in store `globals []*GlobalInstance`.
+	// If we use `[]GlobalInstance` instead, we could reduce one MOV instruction here.
+
+	destinationRegister, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return
+	}
+
+	// "destinationRegister = globalIndex"
+	c.compileConstToRegisterInstruction(
+		arm64.AMOVW, int64(globalIndex), destinationRegister,
+	)
+
+	// "reservedRegisterForTemporary = &globals[0]"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD,
+		reservedRegisterForEngine, engineModuleContextGlobalElement0AddressOffset,
+		reservedRegisterForTemporary,
+	)
+
+	// "destinationRegister = reservedRegisterForTemporary + destinationRegister << 3 (== &globals[globalIndex])".
+	c.compileAddInstructionWithLeftShiftedRegister(
+		// Shifting by 3 because globals has []*GlobalInstance type and globalIndex is the slice index, therfore
+		// we have to multiply it by the size of *GlobalInstance == the pointer size == 8.
+		destinationRegister, 3,
+		reservedRegisterForTemporary,
+		destinationRegister,
+	)
+
+	// "destinationRegister = *destinationRegister (== globals[globalIndex])"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD,
+		destinationRegister, 0,
+		destinationRegister,
+	)
+	return
 }
 
 // compileBr implements compiler.compileBr for the arm64 architecture.
