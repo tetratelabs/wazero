@@ -467,7 +467,12 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 	return
 }
 
-// SectionSize returns the count of items in a given section
+// SectionSize returns the count of items for a given section ID
+//
+// For example, given...
+// * SectionIDType this returns the count of FunctionType
+// * SectionIDCustom this returns the count of unique section names
+// * SectionIDExport this returns the count of unique export names
 func (m *Module) SectionSize(sectionID SectionID) uint32 {
 	switch sectionID {
 	case SectionIDCustom:

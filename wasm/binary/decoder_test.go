@@ -134,7 +134,7 @@ func TestDecodeModule_Errors(t *testing.T) {
 				wasm.SectionIDCustom, 0x09, // 9 bytes in this section
 				0x04, 'm', 'e', 'm', 'e',
 				subsectionIDModuleName, 0x03, 0x01, 'y'),
-			expectedErr: "custom section: redundant custom section meme",
+			expectedErr: "section custom: redundant custom section meme",
 		},
 		{
 			name: "redundant name section",
@@ -145,7 +145,7 @@ func TestDecodeModule_Errors(t *testing.T) {
 				wasm.SectionIDCustom, 0x09, // 9 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x03, 0x01, 'x'),
-			expectedErr: "custom section: redundant custom section name",
+			expectedErr: "section custom: redundant custom section name",
 		},
 	}
 
