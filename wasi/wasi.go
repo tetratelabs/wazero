@@ -147,19 +147,19 @@ type API interface {
 	// RandomGet is a WASI function that write random data in buffer (rand.Read()).
 	//
 	// * buf - is a offset to write random values
-	// * buf_len - size of random data in bytes
+	// * bufLen - size of random data in bytes
 	//
 	// For example, if `HostFunctionCallContext.Randomizer` initialized
 	// with random seed `rand.NewSource(42)`, we expect `ctx.Memory.Buffer` to contain:
 	//
-	//                             buf_len (5)
-	//                    +------------------------+
-	//                    |                        |
+	//                             bufLen (5)
+	//                    +--------------------------+
+	//                    |                        	 |
 	//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
 	//              buf --^
 	//
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-buf_len-size---errno
-	RandomGet(ctx *wasm.HostFunctionCallContext, buf, buf_len uint32) Errno
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
+	RandomGet(ctx *wasm.HostFunctionCallContext, buf, bufLen uint32) Errno
 
 	// TODO: SockRecv
 	// TODO: SockSend
@@ -179,6 +179,7 @@ type api struct {
 	opened map[uint32]fileEntry
 	// timeNowUnixNano is mutable for testing
 	timeNowUnixNano func() uint64
+	randSource      *rand.Rand
 }
 
 func (a *api) register(store *wasm.Store) (err error) {
@@ -353,6 +354,7 @@ func registerAPI(store *wasm.Store, opts ...Option) (API, error) {
 }
 
 func newAPI(opts ...Option) *api {
+	s := rand.NewSource(time.Now().UnixNano())
 	ret := &api{
 		args:   &nullTerminatedStrings{},
 		stdin:  os.Stdin,
@@ -362,6 +364,7 @@ func newAPI(opts ...Option) *api {
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
+		randSource: rand.New(s),
 	}
 
 	// apply functional options
@@ -369,6 +372,10 @@ func newAPI(opts ...Option) *api {
 		f(ret)
 	}
 	return ret
+}
+
+func (a *api) seedRandSource(seed int64) {
+	a.randSource.Seed(seed)
 }
 
 func (a *api) randUnusedFD() uint32 {
@@ -520,18 +527,19 @@ func (a *api) fd_close(ctx *wasm.HostFunctionCallContext, fd uint32) (err Errno)
 	return ErrnoSuccess
 }
 
-func (a *api) RandomGet(ctx *wasm.HostFunctionCallContext, buf uint32, buf_len uint32) (errno Errno) {
-	if !ctx.Memory.ValidateAddrRange(buf, uint64(buf_len)) {
+// RandomGet implements API.RandomGet
+func (a *api) RandomGet(ctx *wasm.HostFunctionCallContext, buf uint32, bufLen uint32) (errno Errno) {
+	if !ctx.Memory.ValidateAddrRange(buf, uint64(bufLen)) {
 		return ErrnoInval
 	}
 
-	random_bytes := make([]byte, buf_len)
-	_, err := ctx.Randomizer.Read(random_bytes)
+	random_bytes := make([]byte, bufLen)
+	_, err := a.randSource.Read(random_bytes)
 	if err != nil {
 		return ErrnoInval
 	}
 
-	copy(ctx.Memory.Buffer[buf:buf+buf_len], random_bytes)
+	copy(ctx.Memory.Buffer[buf:buf+bufLen], random_bytes)
 
 	return ErrnoSuccess
 }

@@ -326,16 +326,18 @@ func TestAPI_RandomGet(t *testing.T) {
 		'?', // stopped after encoding
 	} // tr
 
-	var buf_len = uint32(5) // arbitrary buffer size,
-	var buf = uint32(1)     // offset,
-	var seed = int64(42)    // and seed value
+	var bufLen = uint32(5) // arbitrary buffer size,
+	var buf = uint32(1)    // offset,
+	var seed = int64(42)   // and seed value
+
+	wasiAPI.(*api).seedRandSource(seed)
 
 	t.Run("API.RandomGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 		// provide a host context with a seed value for random generator
-		hContext := wasm.NewHostFunctionCallContextWithSeed(context.Background(), store.Memories[0], seed)
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
-		errno := wasiAPI.RandomGet(hContext, buf, buf_len)
+		errno := wasiAPI.RandomGet(hContext, buf, bufLen)
 		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
@@ -347,20 +349,20 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 	tests := []struct {
-		name    string
-		buf     uint32
-		buf_len uint32
+		name   string
+		buf    uint32
+		bufLen uint32
 	}{
 		{
-			name:    "random buffer out-of-memory",
-			buf:     memorySize,
-			buf_len: 1,
+			name:   "random buffer out-of-memory",
+			buf:    memorySize,
+			bufLen: 1,
 		},
 
 		{
-			name:    "random buffer size exceeds the maximum valid address by 1",
-			buf:     validAddress,
-			buf_len: memorySize + 1,
+			name:   "random buffer size exceeds the maximum valid address by 1",
+			buf:    validAddress,
+			bufLen: memorySize + 1,
 		},
 	}
 
@@ -368,7 +370,7 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			ret, _, err := store.CallFunction(context.Background(), "test", FunctionRandomGet, uint64(tc.buf), uint64(tc.buf_len))
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionRandomGet, uint64(tc.buf), uint64(tc.bufLen))
 			require.NoError(t, err)
 			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
