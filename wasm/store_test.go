@@ -109,6 +109,33 @@ func TestStore_AddHostFunction(t *testing.T) {
 	require.Equal(t, map[string]*ExportInstance{"fn": exp}, m.Exports)
 }
 
+func TestStore_ExportImportedHostFunction(t *testing.T) {
+	s := NewStore(nopEngineInstance)
+	hostFunction := func(_ *HostFunctionCallContext) {
+	}
+
+	err := s.AddHostFunction("", "host_fn", reflect.ValueOf(hostFunction))
+	require.NoError(t, err)
+
+	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
+		err = s.Instantiate(&Module{
+			TypeSection:   []*FunctionType{{}},
+			ImportSection: []*Import{{Kind: ImportKindFunc, Name: "host_fn", DescFunc: 0}},
+			MemorySection: []*MemoryType{{1, nil}},
+			ExportSection: map[string]*Export{"host.fn": {Kind: ExportKindFunc, Name: "host.fn", Index: 0}},
+		}, "test")
+		require.NoError(t, err)
+
+		ei, err := s.getExport("test", "host.fn", ExportKindFunc)
+		require.NoError(t, err)
+
+		// We expect the host function to be called in context of the importing module.
+		// Otherwise, it would be the pseudo-module of the host, which only includes types and function definitions.
+		// Notably, this ensures the host function call context has the correct memory (from the importing module).
+		require.Equal(t, s.ModuleInstances["test"], ei.Function.ModuleInstance)
+	})
+}
+
 func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 	name := "test"
 

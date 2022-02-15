@@ -617,14 +617,14 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			}
 		}
 
-		typeInstace, err := s.getTypeInstance(module.TypeSection[typeIndex])
+		typeInstance, err := s.getTypeInstance(module.TypeSection[typeIndex])
 		if err != nil {
 			return rollbackFuncs, err
 		}
 
 		f := &FunctionInstance{
 			Name:           name,
-			FunctionType:   typeInstace,
+			FunctionType:   typeInstance,
 			Body:           module.CodeSection[codeIndex].Body,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
 			ModuleInstance: target,
@@ -785,6 +785,12 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 				return nil, fmt.Errorf("unknown function for export[%s]", name)
 			}
 			ei = &ExportInstance{Kind: exp.Kind, Function: target.Functions[index]}
+			// The module instance of the host function is a fake that only includes the function and its types.
+			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
+			// available to the HostFunctionCallContext.
+			if ei.Function.HostFunction != nil {
+				ei.Function.ModuleInstance = target
+			}
 		case ExportKindGlobal:
 			if index >= uint32(len(target.Globals)) {
 				return nil, fmt.Errorf("unknown global for export[%s]", name)
@@ -887,6 +893,11 @@ func (c *HostFunctionCallContext) Context() context.Context {
 	return c.ctx
 }
 
+// AddHostFunction exports a function so that it can be imported under the given module and name. If a function already
+// exists for this module and name it is ignored rather than overwritten.
+//
+// Note: The HostFunctionCallContext.Memory of the fn will be from the importing module.
+// Note: The ModuleInstance of this host function is lazy created and only includes exported functions and their types.
 func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
 	getTypeOf := func(kind reflect.Kind) (ValueType, error) {
 		switch kind {
@@ -932,7 +943,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 		return fmt.Errorf("invalid signature: %w", err)
 	}
 
-	typeInstace, err := s.getTypeInstance(sig)
+	typeInstance, err := s.getTypeInstance(sig)
 	if err != nil {
 		return err
 	}
@@ -940,7 +951,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	f := &FunctionInstance{
 		Name:           fmt.Sprintf("%s.%s", moduleName, funcName),
 		HostFunction:   &fn,
-		FunctionType:   typeInstace,
+		FunctionType:   typeInstance,
 		ModuleInstance: m,
 	}
 
@@ -950,8 +961,10 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	if err = s.addFunctionInstance(f); err != nil {
 		return err
 	}
+	// TODO: This races on adding export. A future design may be able to eliminate this race, possibly via a HostModule
+	// type.
 	if err = m.addExport(funcName, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
-		s.Functions = s.Functions[:len(s.Functions)-1] // revert the add on conflict
+		s.Functions = s.Functions[:len(s.Functions)-1] // lost race: revert the add on conflict
 		return err
 	}
 	return nil
