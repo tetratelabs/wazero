@@ -1,10 +1,13 @@
 package interpreter
 
 import (
+	"context"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
 
@@ -37,4 +40,30 @@ func TestInterpreter_PushFrame_StackOverflow(t *testing.T) {
 	it.pushFrame(f2)
 	it.pushFrame(f3)
 	require.Panics(t, func() { it.pushFrame(f4) })
+}
+
+func TestInterpreter_CallHostFunc(t *testing.T) {
+	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
+		memory := &wasm.MemoryInstance{}
+		var ctxMemory *wasm.MemoryInstance
+		hostFn := reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext) {
+			ctxMemory = ctx.Memory
+		})
+		it := interpreter{functions: map[wasm.FunctionAddress]*interpreterFunction{
+			0: {hostFn: &hostFn, funcInstance: &wasm.FunctionInstance{
+				FunctionType: &wasm.TypeInstance{
+					Type: &wasm.FunctionType{
+						Params:  []wasm.ValueType{},
+						Results: []wasm.ValueType{},
+					},
+				},
+				ModuleInstance: &wasm.ModuleInstance{Memory: memory},
+			},
+			},
+		}}
+
+		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
+		it.callHostFunc(context.Background(), it.functions[0])
+		require.Same(t, memory, ctxMemory)
+	})
 }
