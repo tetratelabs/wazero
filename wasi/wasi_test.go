@@ -3,6 +3,7 @@ package wasi
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -330,7 +331,6 @@ func TestAPI_RandomGet(t *testing.T) {
 
 	t.Run("API.RandomGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
-		// provide a host context with a seed value for random generator
 		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
 		errno := wasiAPI.RandomGet(hContext, buf, bufLen)
@@ -340,10 +340,10 @@ func TestAPI_RandomGet(t *testing.T) {
 }
 
 func TestAPI_RandomGet_Errors(t *testing.T) {
-	store, _ := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
+	store, wasiAPI := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
-	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
+	validAddress := uint32(0) // arbitrary valid address
 	tests := []struct {
 		name   string
 		buf    uint32
@@ -356,7 +356,7 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 		},
 
 		{
-			name:   "random buffer size exceeds the maximum valid address by 1",
+			name:   "random buffer size exceeds maximum valid address by 1",
 			buf:    validAddress,
 			bufLen: memorySize + 1,
 		},
@@ -371,6 +371,19 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
 		})
 	}
+
+	t.Run("API.RandomGet returns ErrnoIO on random source err", func(t *testing.T) {
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		wasiAPI.(*api).randSource = func(p []byte) error {
+			return errors.New("random source error")
+		}
+		var bufLen = uint32(5) // arbitrary buffer size,
+		var buf = uint32(1)    // and offset
+		errno := wasiAPI.RandomGet(hContext, buf, bufLen)
+		require.Equal(t, ErrnoIo, errno)
+	})
+
 }
 
 // TODO: TestAPI_SockRecv TestAPI_SockRecv_Errors
