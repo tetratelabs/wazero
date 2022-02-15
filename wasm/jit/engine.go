@@ -460,7 +460,7 @@ const (
 // After the execution, the result of host function is pushed onto the stack.
 //
 // ctx parameter is passed to the host function as a first argument.
-func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallContext) {
+func (e *engine) execHostFunction(f *reflect.Value, ctx wasm.HostFunctionCallContext) {
 	tp := f.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
@@ -483,7 +483,7 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 		in[i] = val
 	}
 
-	// Host function must receive *wasm.HostFunctionCallContext as a first argument.
+	// Host function must receive api.hostFunctionCallContext as a first argument.
 	val := reflect.New(tp.In(0)).Elem()
 	val.Set(reflect.ValueOf(ctx))
 	in[0] = val

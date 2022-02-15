@@ -45,9 +45,9 @@ func TestInterpreter_PushFrame_StackOverflow(t *testing.T) {
 func TestInterpreter_CallHostFunc(t *testing.T) {
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		memory := &wasm.MemoryInstance{}
-		var ctxMemory *wasm.MemoryInstance
-		hostFn := reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext) {
-			ctxMemory = ctx.Memory
+		var ctxMemory wasm.Memory
+		hostFn := reflect.ValueOf(func(ctx wasm.HostFunctionCallContext) {
+			ctxMemory = ctx.Memory()
 		})
 		it := interpreter{functions: map[wasm.FunctionAddress]*interpreterFunction{
 			0: {hostFn: &hostFn, funcInstance: &wasm.FunctionInstance{

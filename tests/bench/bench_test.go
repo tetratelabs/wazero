@@ -3,7 +3,6 @@ package bench
 import (
 	"context"
 	_ "embed"
-	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -143,12 +142,14 @@ func runRandomMatMul(b *testing.B, store *wasm.Store) {
 
 func newStore(engine wasm.Engine) *wasm.Store {
 	store := wasm.NewStore(engine)
-	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
+	getRandomString := func(ctx wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
 		ret, _, _ := store.CallFunction(ctx.Context(), "test", "allocate_buffer", 10)
-		bufAddr := ret[0]
-		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[retBufPtr:], uint32(bufAddr))
-		binary.LittleEndian.PutUint32(ctx.Memory.Buffer[retBufSize:], 10)
-		_, _ = rand.Read(ctx.Memory.Buffer[bufAddr : bufAddr+10])
+		bufAddr := uint32(ret[0])
+		ctx.Memory().WriteUint32Le(retBufPtr, bufAddr)
+		ctx.Memory().WriteUint32Le(retBufSize, 10)
+		b := make([]byte, 10)
+		_, _ = rand.Read(b)
+		ctx.Memory().Write(bufAddr, b)
 	}
 
 	_ = store.AddHostFunction("env", "get_random_string", reflect.ValueOf(getRandomString))

@@ -81,7 +81,7 @@ func TestStore_CallFunction(t *testing.T) {
 
 func TestStore_AddHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
-	hostFunction := func(_ *HostFunctionCallContext) {
+	hostFunction := func(_ HostFunctionCallContext) {
 	}
 
 	err := s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction))
@@ -98,8 +98,8 @@ func TestStore_AddHostFunction(t *testing.T) {
 	exp, ok := m.Exports["fn"]
 	require.True(t, ok)
 
-	// Trying to add it again should fail
-	hostFunction2 := func(_ *HostFunctionCallContext) {
+	// Trying to offset it again should fail
+	hostFunction2 := func(_ HostFunctionCallContext) {
 	}
 	err = s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction2))
 	require.EqualError(t, err, `"fn" is already exported in module "test"`)
@@ -111,7 +111,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
-	hostFunction := func(_ *HostFunctionCallContext) {
+	hostFunction := func(_ HostFunctionCallContext) {
 	}
 
 	err := s.AddHostFunction("", "host_fn", reflect.ValueOf(hostFunction))
@@ -184,7 +184,7 @@ func (e *nopEngine) Compile(_ *FunctionInstance) error {
 	return nil
 }
 
-func TestStore_addFunctionInstance(t *testing.T) {
+func TestStore_addHostFunction(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
 		s := NewStore(nopEngineInstance)
 		const max = 10
@@ -205,7 +205,7 @@ func TestStore_addFunctionInstance(t *testing.T) {
 			// After the addition, one instance is added.
 			require.Len(t, s.Functions, i+1)
 
-			// The added function instance must have i for its funcaddr.
+			// The added function instance must have i for its address.
 			require.Equal(t, FunctionAddress(i), f.Address)
 		}
 	})
@@ -243,164 +243,6 @@ func TestStore_getTypeInstance(t *testing.T) {
 			})
 		}
 	})
-}
-
-func TestMemoryInstance_ValidateAddrRange(t *testing.T) {
-	memory := &MemoryInstance{
-		Buffer: make([]byte, 100),
-	}
-
-	tests := []struct {
-		name      string
-		addr      uint32
-		rangeSize uint64
-		expected  bool
-	}{
-		{
-			name:      "simple valid arguments",
-			addr:      0,   // arbitrary valid address
-			rangeSize: 100, // arbitrary valid size
-			expected:  true,
-		},
-		{
-			name:      "maximum valid rangeSize",
-			addr:      0, // arbitrary valid address
-			rangeSize: uint64(len(memory.Buffer)),
-			expected:  true,
-		},
-		{
-			name:      "rangeSize exceeds the valid size by 1",
-			addr:      100, // arbitrary valid address
-			rangeSize: uint64(len(memory.Buffer)) - 99,
-			expected:  false,
-		},
-		{
-			name:      "rangeSize exceeds the valid size and the memory size by 1",
-			addr:      0, // arbitrary valid address
-			rangeSize: uint64(len(memory.Buffer)) + 1,
-			expected:  false,
-		},
-		{
-			name:      "addr exceeds the memory size",
-			addr:      uint32(len(memory.Buffer)),
-			rangeSize: 0, // arbitrary size
-			expected:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, memory.ValidateAddrRange(tc.addr, tc.rangeSize))
-		})
-	}
-}
-
-func TestMemoryInstance_PutUint32(t *testing.T) {
-	memory := &MemoryInstance{
-		Buffer: make([]byte, 100),
-	}
-
-	tests := []struct {
-		name               string
-		addr               uint32
-		val                uint32
-		shouldSuceed       bool
-		expectedWrittenVal uint32
-	}{
-		{
-			name:               "valid addr with an endian-insensitive val",
-			addr:               0, // arbitrary valid address.
-			val:                math.MaxUint32,
-			shouldSuceed:       true,
-			expectedWrittenVal: math.MaxUint32,
-		},
-		{
-			name:               "valid addr with an endian-sensitive val",
-			addr:               0, // arbitrary valid address.
-			val:                math.MaxUint32 - 1,
-			shouldSuceed:       true,
-			expectedWrittenVal: math.MaxUint32 - 1,
-		},
-		{
-			name:               "maximum boundary valid addr",
-			addr:               uint32(len(memory.Buffer)) - 4, // 4 is the size of uint32
-			val:                1,                              // arbitrary valid val
-			shouldSuceed:       true,
-			expectedWrittenVal: 1,
-		},
-		{
-			name:         "addr exceeds the maximum valid addr by 1",
-			addr:         uint32(len(memory.Buffer)) - 4 + 1, // 4 is the size of uint32
-			val:          1,                                  // arbitrary valid val
-			shouldSuceed: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.shouldSuceed, memory.PutUint32(tc.addr, tc.val))
-			if tc.shouldSuceed {
-				require.Equal(t, tc.expectedWrittenVal, binary.LittleEndian.Uint32(memory.Buffer[tc.addr:tc.addr+4])) // 4 is the size of uint32
-			}
-		})
-	}
-}
-
-func TestMemoryInstance_PutUint64(t *testing.T) {
-	memory := &MemoryInstance{
-		Buffer: make([]byte, 100),
-	}
-
-	tests := []struct {
-		name               string
-		addr               uint32
-		val                uint64
-		shouldSuceed       bool
-		expectedWrittenVal uint64
-	}{
-		{
-			name:               "valid addr with an endian-insensitive val",
-			addr:               0, // arbitrary valid address.
-			val:                math.MaxUint64,
-			shouldSuceed:       true,
-			expectedWrittenVal: math.MaxUint64,
-		},
-		{
-			name:               "valid addr with an endian-sensitive val",
-			addr:               0, // arbitrary valid address.
-			val:                math.MaxUint64 - 1,
-			shouldSuceed:       true,
-			expectedWrittenVal: math.MaxUint64 - 1,
-		},
-		{
-			name:               "maximum boundary valid addr",
-			addr:               uint32(len(memory.Buffer)) - 8, // 8 is the size of uint64
-			val:                1,                              // arbitrary valid val
-			shouldSuceed:       true,
-			expectedWrittenVal: 1,
-		},
-		{
-			name:         "addr exceeds the maximum valid addr by 1",
-			addr:         uint32(len(memory.Buffer)) - 8 + 1, // 8 is the size of uint64
-			val:          1,                                  // arbitrary valid val
-			shouldSuceed: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.shouldSuceed, memory.PutUint64(tc.addr, tc.val))
-			if tc.shouldSuceed {
-				require.Equal(t, tc.expectedWrittenVal, binary.LittleEndian.Uint64(memory.Buffer[tc.addr:tc.addr+8])) // 8 is the size of uint64
-			}
-		})
-	}
 }
 
 func TestStore_buildGlobalInstances(t *testing.T) {
