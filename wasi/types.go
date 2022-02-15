@@ -367,8 +367,19 @@ const (
 	FunctionProcExit             = "proc_exit"
 	FunctionProcRaise            = "proc_raise"
 	FunctionSchedYield           = "sched_yield"
-	FunctionRandomGet            = "random_get"
-	FunctionSockRecv             = "sock_recv"
-	FunctionSockSend             = "sock_send"
-	FunctionSockShutdown         = "sock_shutdown"
+
+	// FunctionRandomGet write random data in buffer
+	//
+	// See ImportRandomGet
+	// See API.RandomGet
+	// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-buf_len-size---errno
+	FunctionRandomGet = "random_get"
+
+	// ImportRandomGet is the WebAssembly 1.0 (MVP) Text format import of FunctionRandomGet
+	ImportRandomGet = `(import "wasi_snapshot_preview1" "random_get"
+    (func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))`
+
+	FunctionSockRecv     = "sock_recv"
+	FunctionSockSend     = "sock_send"
+	FunctionSockShutdown = "sock_shutdown"
 )

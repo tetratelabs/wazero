@@ -1,11 +1,12 @@
 package wasi
 
 import (
+	crand "crypto/rand"
 	"errors"
 	"io"
 	"io/fs"
 	"math"
-	"math/rand"
+	mrand "math/rand"
 	"os"
 	"reflect"
 	"time"
@@ -144,7 +145,24 @@ type API interface {
 	// TODO: ProcExit
 	// TODO: ProcRaise
 	// TODO: SchedYield
-	// TODO: RandomGet
+
+	// RandomGet is a WASI function that write random data in buffer (rand.Read()).
+	//
+	// * buf - is a offset to write random values
+	// * bufLen - size of random data in bytes
+	//
+	// For example, if `HostFunctionCallContext.Randomizer` initialized
+	// with random seed `rand.NewSource(42)`, we expect `ctx.Memory.Buffer` to contain:
+	//
+	//                             bufLen (5)
+	//                    +--------------------------+
+	//                    |                        	 |
+	//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
+	//              buf --^
+	//
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
+	RandomGet(ctx wasm.HostFunctionCallContext, buf, bufLen uint32) Errno
+
 	// TODO: SockRecv
 	// TODO: SockSend
 	// TODO: SockShutdown
@@ -163,6 +181,7 @@ type wasiAPI struct {
 	opened map[uint32]fileEntry
 	// timeNowUnixNano is mutable for testing
 	timeNowUnixNano func() uint64
+	randSource      func([]byte) error
 }
 
 func (a *wasiAPI) register(store *wasm.Store) (err error) {
@@ -213,7 +232,7 @@ func (a *wasiAPI) register(store *wasm.Store) (err error) {
 		{FunctionProcExit, proc_exit},
 		// TODO: FunctionProcRaise
 		// TODO: FunctionSchedYield
-		// TODO: FunctionRandomGet
+		{FunctionRandomGet, a.RandomGet},
 		// TODO: FunctionSockRecv
 		// TODO: FunctionSockSend
 		// TODO: FunctionSockShutdown
@@ -346,6 +365,10 @@ func newAPI(opts ...Option) *wasiAPI {
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
+		randSource: func(p []byte) error {
+			_, err := crand.Read(p)
+			return err
+		},
 	}
 
 	// apply functional options
@@ -356,7 +379,7 @@ func newAPI(opts ...Option) *wasiAPI {
 }
 
 func (a *wasiAPI) randUnusedFD() uint32 {
-	fd := uint32(rand.Int31())
+	fd := uint32(mrand.Int31())
 	for {
 		if _, ok := a.opened[fd]; !ok {
 			return fd
@@ -534,6 +557,22 @@ func (a *wasiAPI) fd_close(ctx wasm.HostFunctionCallContext, fd uint32) (err Err
 	}
 
 	delete(a.opened, fd)
+
+	return ErrnoSuccess
+}
+
+// RandomGet implements API.RandomGet
+func (a *wasiAPI) RandomGet(ctx wasm.HostFunctionCallContext, buf uint32, bufLen uint32) (errno Errno) {
+	randomBytes := make([]byte, bufLen)
+	err := a.randSource(randomBytes)
+	if err != nil {
+		// TODO: handle different errors that syscal to entropy source can return
+		return ErrnoIo
+	}
+
+	if !ctx.Memory().Write(buf, randomBytes) {
+		return ErrnoFault
+	}
 
 	return ErrnoSuccess
 }

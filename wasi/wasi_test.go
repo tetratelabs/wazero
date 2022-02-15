@@ -3,7 +3,9 @@ package wasi
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -305,7 +307,85 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_ProcExit TestAPI_ProcExit_Errors
 // TODO: TestAPI_ProcRaise TestAPI_ProcRaise_Errors
 // TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
-// TODO: TestAPI_RandomGet TestAPI_RandomGet_Errors
+
+func TestAPI_RandomGet(t *testing.T) {
+	store, api := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
+	maskLength := 7 // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',                          // random bytes in `buf` is after this
+		0x53, 0x8c, 0x7f, 0x96, 0xb1, // random data from seed value of 42
+		'?', // stopped after encoding
+	} // tr
+
+	var bufLen = uint32(5) // arbitrary buffer size,
+	var buf = uint32(1)    // offset,
+	var seed = int64(42)   // and seed value
+
+	api.(*wasiAPI).randSource = func(p []byte) error {
+		s := rand.NewSource(seed)
+		rng := rand.New(s)
+		_, err := rng.Read(p)
+
+		return err
+	}
+
+	t.Run("API.RandomGet", func(t *testing.T) {
+		maskMemory(store, maskLength)
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		errno := api.RandomGet(hContext, buf, bufLen)
+		require.Equal(t, ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_RandomGet_Errors(t *testing.T) {
+	store, api := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
+
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0) // arbitrary valid address
+	tests := []struct {
+		name   string
+		buf    uint32
+		bufLen uint32
+	}{
+		{
+			name:   "random buffer out-of-memory",
+			buf:    memorySize,
+			bufLen: 1,
+		},
+
+		{
+			name:   "random buffer size exceeds maximum valid address by 1",
+			buf:    validAddress,
+			bufLen: memorySize + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			ret, _, err := store.CallFunction(context.Background(), "test", FunctionRandomGet, uint64(tc.buf), uint64(tc.bufLen))
+			require.NoError(t, err)
+			require.Equal(t, uint64(ErrnoFault), ret[0]) // ret[0] is returned errno
+		})
+	}
+
+	t.Run("API.RandomGet returns ErrnoIO on random source err", func(t *testing.T) {
+		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
+
+		api.(*wasiAPI).randSource = func(p []byte) error {
+			return errors.New("random source error")
+		}
+		var bufLen = uint32(5) // arbitrary buffer size,
+		var buf = uint32(1)    // and offset
+		errno := api.RandomGet(hContext, buf, bufLen)
+		require.Equal(t, ErrnoIo, errno)
+	})
+
+}
+
 // TODO: TestAPI_SockRecv TestAPI_SockRecv_Errors
 // TODO: TestAPI_SockSend TestAPI_SockSend_Errors
 // TODO: TestAPI_SockShutdown TestAPI_SockShutdown_Errors
