@@ -13,6 +13,7 @@ import (
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
+	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/jit"
 )
 
@@ -20,11 +21,11 @@ import (
 var caseWasm []byte
 
 func BenchmarkEngines(b *testing.B) {
-	// b.Run("wazeroir", func(b *testing.B) {
-	// store := newStore(interpreter.NewEngine())
-	// setUpStore(store)
-	// runAllBenches(b, store)
-	// })
+	b.Run("wazeroir", func(b *testing.B) {
+		store := newStore(interpreter.NewEngine())
+		setUpStore(store)
+		runAllBenches(b, store)
+	})
 	if runtime.GOARCH == "amd64" {
 		b.Run("jit", func(b *testing.B) {
 			store := newStore(jit.NewEngine())
