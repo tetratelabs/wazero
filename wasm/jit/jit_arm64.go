@@ -176,31 +176,35 @@ func (c *arm64Compiler) compileConstToRegisterInstruction(instruction obj.As, co
 
 // compileMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
 // baseRegister is the base absolute address in the memory, and offset is the offset from the absolute address in baseRegister.
-func (c *arm64Compiler) compileMemoryToRegisterInstruction(instruction obj.As, sourceBaseRegister int16, sourceOffsetConst int64, destinationRegister int16) {
+func (c *arm64Compiler) compileMemoryToRegisterInstruction(instruction obj.As, sourceBaseReg int16, sourceOffsetConst int64, destinationReg int16) {
 	if sourceOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
 		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
 		// but instead load the constant manually to "our" temporary register, then emit the load with it.
 		c.compileConstToRegisterInstruction(arm64.AMOVD, sourceOffsetConst, reservedRegisterForTemporary)
-		inst := c.newProg()
-		inst.As = instruction
-		inst.From.Type = obj.TYPE_MEM
-		inst.From.Reg = sourceBaseRegister
-		inst.From.Index = reservedRegisterForTemporary
-		inst.From.Scale = 1
-		inst.To.Type = obj.TYPE_REG
-		inst.To.Reg = destinationRegister
-		c.addInstruction(inst)
+		c.compileMemoryWithRegisterOffsetToRegisterInstruction(instruction, sourceBaseReg, reservedRegisterForTemporary, destinationReg)
 	} else {
 		inst := c.newProg()
 		inst.As = instruction
 		inst.From.Type = obj.TYPE_MEM
-		inst.From.Reg = sourceBaseRegister
+		inst.From.Reg = sourceBaseReg
 		inst.From.Offset = sourceOffsetConst
 		inst.To.Type = obj.TYPE_REG
-		inst.To.Reg = destinationRegister
+		inst.To.Reg = destinationReg
 		c.addInstruction(inst)
 	}
+}
+
+func (c *arm64Compiler) compileMemoryWithRegisterOffsetToRegisterInstruction(instruction obj.As, sourceBaseReg, sourceOffsetReg, destinationReg int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.From.Type = obj.TYPE_MEM
+	inst.From.Reg = sourceBaseReg
+	inst.From.Index = sourceOffsetReg
+	inst.From.Scale = 1
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationReg
+	c.addInstruction(inst)
 }
 
 // compileRegisterToMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
@@ -620,9 +624,11 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 		return
 	}
 
-	// "destinationRegister = globalIndex"
+	// "destinationRegister = globalIndex * 8"
 	c.compileConstToRegisterInstruction(
-		arm64.AMOVW, int64(globalIndex), destinationRegister,
+		// globalIndex is an index to []*GlobalInstance, therefore
+		// we have to multiply it by the size of *GlobalInstance == the pointer size == 8.
+		arm64.AMOVW, int64(globalIndex)*8, destinationRegister,
 	)
 
 	// "reservedRegisterForTemporary = &globals[0]"
@@ -632,21 +638,10 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 		reservedRegisterForTemporary,
 	)
 
-	// TODO: it seems the following two instruction can be performed by one.
-
-	// "destinationRegister = reservedRegisterForTemporary + destinationRegister << 3 (== &globals[globalIndex])".
-	c.compileAddInstructionWithLeftShiftedRegister(
-		// Shifting by 3 because globals has []*GlobalInstance type and globalIndex is the slice index, therfore
-		// we have to multiply it by the size of *GlobalInstance == the pointer size == 8.
-		destinationRegister, 3,
-		reservedRegisterForTemporary,
-		destinationRegister,
-	)
-
-	// "destinationRegister = *destinationRegister (== globals[globalIndex])"
-	c.compileMemoryToRegisterInstruction(
+	// "destinationRegister = [reservedRegisterForTemporary + destinationRegister] (== &globals[globalIndex])".
+	c.compileMemoryWithRegisterOffsetToRegisterInstruction(
 		arm64.AMOVD,
-		destinationRegister, 0,
+		reservedRegisterForTemporary, destinationRegister,
 		destinationRegister,
 	)
 	return

@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -1957,6 +1958,8 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
+
+			fmt.Println(hex.EncodeToString(code))
 
 			// Run the code assembled above.
 			env.exec(code)
