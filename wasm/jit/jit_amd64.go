@@ -3907,30 +3907,30 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 // compileLoad implements compiler.compileLoad for the amd64 architecture.
 func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	var (
-		isIntType        bool
-		movInst          obj.As
-		targetSizeInByte int64
+		isIntType         bool
+		movInst           obj.As
+		targetSizeInBytes int64
 	)
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		isIntType = true
 		movInst = x86.AMOVL
-		targetSizeInByte = 32 / 8
+		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeI64:
 		isIntType = true
 		movInst = x86.AMOVQ
-		targetSizeInByte = 64 / 8
+		targetSizeInBytes = 64 / 8
 	case wazeroir.UnsignedTypeF32:
 		isIntType = false
 		movInst = x86.AMOVL
-		targetSizeInByte = 32 / 8
+		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeF64:
 		isIntType = false
 		movInst = x86.AMOVQ
-		targetSizeInByte = 64 / 8
+		targetSizeInBytes = 64 / 8
 	}
 
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInByte)
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3944,6 +3944,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.To.Reg = reg
 		moveFromMemory.From.Type = obj.TYPE_MEM
 		moveFromMemory.From.Reg = reservedRegisterForMemory
+		moveFromMemory.From.Offset = -targetSizeInBytes
 		moveFromMemory.From.Index = reg
 		moveFromMemory.From.Scale = 1
 		c.addInstruction(moveFromMemory)
@@ -3960,6 +3961,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.To.Type = obj.TYPE_REG
 		moveFromMemory.To.Reg = floatReg
 		moveFromMemory.From.Type = obj.TYPE_MEM
+		moveFromMemory.From.Offset = -targetSizeInBytes
 		moveFromMemory.From.Reg = reservedRegisterForMemory
 		moveFromMemory.From.Index = reg
 		moveFromMemory.From.Scale = 1
@@ -3974,7 +3976,8 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 
 // compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, 1)
+	const targetSizeInBytes = 1
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3996,6 +3999,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
 	c.addInstruction(moveFromMemory)
@@ -4008,7 +4012,8 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 
 // compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, 16/8)
+	const targetSizeInBytes = 16 / 8
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -4030,6 +4035,7 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
 	c.addInstruction(moveFromMemory)
@@ -4042,7 +4048,8 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 
 // compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, 32/8)
+	const targetSizeInBytes = 32 / 8
+	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -4058,6 +4065,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
 	c.addInstruction(moveFromMemory)
@@ -4118,16 +4126,6 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInBytes in
 
 	c.addSetJmpOrigins(okJmp)
 
-	// Finally we have to subtract targetSizeInBytes from the result register
-	// because we access memory with [offset: offset+targetSizeInBytes]
-	sub := c.newProg()
-	sub.As = x86.ASUBL
-	sub.To.Type = obj.TYPE_REG
-	sub.To.Reg = result
-	sub.From.Type = obj.TYPE_CONST
-	sub.From.Offset = targetSizeInBytes
-	c.addInstruction(sub)
-
 	c.locationStack.markRegisterUnused(result)
 	return result, nil
 }
@@ -4179,6 +4177,7 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 	moveToMemory.From.Reg = val.register
 	moveToMemory.To.Type = obj.TYPE_MEM
 	moveToMemory.To.Reg = reservedRegisterForMemory
+	moveToMemory.To.Offset = -targetSizeInByte
 	moveToMemory.To.Index = reg
 	moveToMemory.To.Scale = 1
 	c.addInstruction(moveToMemory)

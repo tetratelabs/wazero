@@ -4813,15 +4813,14 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					env.exec(code)
 
 					mem := env.memory()
-					baseOffset := int64(base) + int64(offset)
-					if ceil := baseOffset + int64(targetSizeInByte); int64(len(mem)) < ceil {
+					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
 						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
 						// with jitCallStatusCodeMemoryOutOfBounds status code.
 						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
 					} else {
 						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 						require.Equal(t, uint64(1), env.stackPointer())
-						require.Equal(t, uint64(baseOffset), env.stackTopAsUint64())
+						require.Equal(t, uint64(ceil), env.stackTopAsUint64())
 					}
 				})
 			}
