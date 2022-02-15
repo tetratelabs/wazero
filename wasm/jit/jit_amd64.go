@@ -3930,7 +3930,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		targetSizeInBytes = 64 / 8
 	}
 
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3977,7 +3977,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 // compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	const targetSizeInBytes = 1
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -4013,7 +4013,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 // compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	const targetSizeInBytes = 16 / 8
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -4049,7 +4049,7 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 // compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	const targetSizeInBytes = 32 / 8
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInBytes)
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -4076,15 +4076,13 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	return nil
 }
 
-// setupMemoryOffset pops the top value from the stack (called "base"), and returns the result of addition with
-// base and offsetArg, which we call "offset". The returned offsetRegister is the register number with the offset calculation value.
-// targetSizeInBytes is the original memory operation's target size in byte. For example, 4 = 32 / 8 for Load32 operation.
-// This is used for all Store* and Load* instructions.
+// setupMemoryAccessCeil pops the top value from the stack (called "base"), stores "base + offsetArg + targetSizeInBytes"
+// into a register, and returns the stored register. We call the result "ceil" because we access the memory
+// as memory.Buffer[ceil-targetSizeInBytes: ceil].
 //
-// Note that this also emits the instructions to check the out of bounds memory access. That means
-// if the base+offsetArg+targetSizeInBytes exceeds the memory size, we exit this function with
-// jitCallStatusCodeMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInBytes].
-func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInBytes int64) (int16, error) {
+// Note: this also emits the instructions to check the out of bounds memory access.
+// In other words, the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
+func (c *amd64Compiler) setupMemoryAccessCeil(offsetArg uint32, targetSizeInBytes int64) (int16, error) {
 	base := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
 		return 0, err
@@ -4166,7 +4164,7 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 		return err
 	}
 
-	reg, err := c.setupMemoryOffset(offsetConst, targetSizeInByte)
+	reg, err := c.setupMemoryAccessCeil(offsetConst, targetSizeInByte)
 	if err != nil {
 		return nil
 	}
