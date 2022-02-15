@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
+	"reflect"
 	"testing"
 	"unsafe"
 
@@ -1567,6 +1568,7 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 					// The generated code looks like this:
 					//
 					//    ... code from compilePreamble()
+					//    ... code from tc.setupFunc()
 					//    br_if .then, .else
 					//    exit $unreachableStatus
 					// .then:
@@ -1690,7 +1692,8 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 			expectedValue += addTargetValue
 
 			compiler := env.requireNewCompiler(t)
-			compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}}
+			compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType},
+				ModuleInstance: &wasm.ModuleInstance{}}
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -1742,4 +1745,278 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 		require.Equal(t, uint64(0), env.stackBasePointer())
 		require.Equal(t, expectedValue, env.stackTopAsUint32())
 	})
+}
+
+func TestArm64Compiler_compieleSelect(t *testing.T) {
+	for _, isFloat := range []bool{false, true} {
+		isFloat := isFloat
+		t.Run(fmt.Sprintf("float=%v", isFloat), func(t *testing.T) {
+			for _, vals := range [][2]uint64{
+				{1, 2}, {0, 1}, {1, 0},
+				{math.Float64bits(-1), math.Float64bits(-1)},
+				{math.Float64bits(-1), math.Float64bits(1)},
+				{math.Float64bits(1), math.Float64bits(-1)},
+			} {
+				vals := vals
+				t.Run(fmt.Sprintf("x1=%x,x2=%x", vals[0], vals[1]), func(t *testing.T) {
+					for _, selectX1 := range []bool{false, true} {
+						selectX1 := selectX1
+						t.Run(fmt.Sprintf("select x1=%v", selectX1), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							// Push the select targets.
+							for _, val := range vals {
+								if isFloat {
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
+								} else {
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: val})
+								}
+								require.NoError(t, err)
+							}
+
+							// Push the selection seed.
+							if selectX1 {
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+							} else {
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 0})
+							}
+							require.NoError(t, err)
+
+							err = compiler.compileSelect()
+							require.NoError(t, err)
+
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+
+							env.exec(code)
+							require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+							// Check if the correct value is chosen.
+							if selectX1 {
+								require.Equal(t, vals[0], env.stackTopAsUint64())
+							} else {
+								require.Equal(t, vals[1], env.stackTopAsUint64())
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_compieleSwap(t *testing.T) {
+	const x, y uint64 = 100, 200
+	op := &wazeroir.OperationSwap{Depth: 10}
+
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	// Setup the initial values on the stack would look like: [y, ...., x]
+	err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: y})
+	require.NoError(t, err)
+	// Push the middle dummy values.
+	for i := 0; i < op.Depth-1; i++ {
+		compiler.locationStack.pushValueLocationOnStack()
+	}
+	err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: x})
+	require.NoError(t, err)
+
+	err = compiler.compileSwap(op)
+	require.NoError(t, err)
+
+	// After the swap, both values must be on registers.
+	require.True(t, compiler.locationStack.peek().onRegister())
+	require.True(t, compiler.locationStack.stack[0].onRegister())
+
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	// Generate the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+
+	// Run code.
+	env.exec(code)
+
+	require.Equal(t, uint64(op.Depth+1), env.stackPointer())
+	// y must be on the top due to Swap.
+	require.Equal(t, y, env.stackTopAsUint64())
+	// x must be on the bottom.
+	require.Equal(t, x, env.stack()[0])
+}
+
+func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		moduleInstance *wasm.ModuleInstance
+	}{
+		{
+			name: "no nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				// TODO: Add memory, table
+			},
+		},
+		// TODO: Add memory, table
+		{
+			name:           "nil",
+			moduleInstance: &wasm.ModuleInstance{},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = tc.moduleInstance
+
+			// The assembler skips the first instruction so we intentionally add NOP here.
+			compiler.compileNOP()
+
+			err := compiler.compileModuleContextInitialization()
+			require.NoError(t, err)
+			require.Empty(t, compiler.locationStack.usedRegisters)
+
+			compiler.exit(jitCallStatusCodeReturned)
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run codes
+			env.exec(code)
+
+			// Check the exit status.
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+
+			// Check if the fields of engine.moduleContext are updated.
+			engine := env.engine()
+
+			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
+			require.Equal(t, bufSliceHeader.Data, engine.moduleContext.globalElement0Address)
+
+			if tc.moduleInstance.Memory != nil {
+				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
+				require.Equal(t, uint64(bufSliceHeader.Len), engine.moduleContext.memorySliceLen)
+				require.Equal(t, bufSliceHeader.Data, engine.moduleContext.memoryElement0Address)
+			}
+
+			if len(tc.moduleInstance.Tables) > 0 {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
+				require.Equal(t, uint64(tableHeader.Len), engine.moduleContext.tableSliceLen)
+				require.Equal(t, tableHeader.Data, engine.moduleContext.tableElement0Address)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
+	const globalValue uint64 = 12345
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			// Compiler needs global type information at compilation time.
+			compiler.f.ModuleInstance = env.moduleInstance
+
+			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}}
+			env.addGlobals(globals...)
+
+			// Emit the code.
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+			op := &wazeroir.OperationGlobalGet{Index: 1}
+			err = compiler.compileGlobalGet(op)
+			require.NoError(t, err)
+
+			// At this point, the top of stack must be the retrieved global on a register.
+			global := compiler.locationStack.peek()
+			require.True(t, global.onRegister())
+			require.Len(t, compiler.locationStack.usedRegisters, 1)
+			switch tp {
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
+				require.True(t, isFloatRegister(global.register))
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
+				require.True(t, isIntRegister(global.register))
+			}
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run the code assembled above.
+			env.exec(code)
+
+			// Since we call global.get, the top of the stack must be the global value.
+			require.Equal(t, globalValue, env.stack()[0])
+			// Plus as we push the value, the stack pointer must be incremented.
+			require.Equal(t, uint64(1), env.stackPointer())
+		})
+	}
+}
+
+func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
+	const valueToSet uint64 = 12345
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64,
+		wasm.ValueTypeI32, wasm.ValueTypeI64,
+	} {
+		tp := tp
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			// Compiler needs global type information at compilation time.
+			compiler.f.ModuleInstance = env.moduleInstance
+
+			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
+			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}})
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Place the set target value.
+			loc := compiler.locationStack.pushValueLocationOnStack()
+			switch tp {
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
+				loc.setRegisterType(generalPurposeRegisterTypeInt)
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
+				loc.setRegisterType(generalPurposeRegisterTypeFloat)
+			}
+			env.stack()[loc.stackPointer] = valueToSet
+
+			op := &wazeroir.OperationGlobalSet{Index: 1}
+			err = compiler.compileGlobalSet(op)
+			require.Equal(t, uint64(0), compiler.locationStack.sp)
+			require.NoError(t, err)
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			// The global value should be set to valueToSet.
+			require.Equal(t, valueToSet, env.getGlobal(op.Index))
+			// Plus we consumed the top of the stack, the stack pointer must be decremented.
+			require.Equal(t, uint64(0), env.stackPointer())
+		})
+	}
 }

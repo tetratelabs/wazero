@@ -1,2 +1,0 @@
-# don't accidentally check-in binaries when a developer uses wat2wasm to test manually
-*.wasm

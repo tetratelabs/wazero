@@ -3,6 +3,7 @@ package wasi
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -32,10 +33,6 @@ func TestNewAPI_Args(t *testing.T) {
 	})
 }
 
-// argsWat is a wasm module to call args_get and args_sizes_get.
-//go:embed testdata/args.wat
-var argsWat []byte
-
 func TestAPI_ArgsGet(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
@@ -50,7 +47,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 		3, 0, 0, 0, // little endian-encoded offset of "bc"
 		'?', // stopped after encoding
 	} // tr
-	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
 
 	t.Run("API.ArgsGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -76,7 +73,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 func TestAPI_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -133,7 +130,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 		0x5, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
 		'?', // stopped after encoding
 	} // tr
-	store, wasiAPI := instantiateWasmStore(t, argsWat, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
 
 	t.Run("API.ArgsSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -159,7 +156,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, _ := instantiateWasmStore(t, argsWat, "test", args)
+	store, _ := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -206,10 +203,6 @@ func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 // TODO TestAPI_EnvironSizesGet TestAPI_EnvironSizesGet_Errors
 // TODO TestAPI_ClockResGet TestAPI_ClockResGet_Errors
 
-// clockWat is a wasm module to call clock_time_get.
-//go:embed testdata/clock.wat
-var clockWat []byte
-
 func TestAPI_ClockTimeGet(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
 	resultTimestamp := uint32(1)              // arbitrary offset
@@ -220,7 +213,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 		'?', // stopped after encoding
 	} // tr
 
-	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	store, wasiAPI := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test")
 	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	t.Run("API.ClockTimeGet", func(t *testing.T) {
@@ -246,7 +239,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 
 func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
-	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	store, wasiAPI := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test")
 	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
@@ -314,12 +307,9 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_ProcRaise TestAPI_ProcRaise_Errors
 // TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
 
-// randomWat is a wasm module to call random_get.
-//go:embed testdata/random.wat
-var randomWat []byte
 
 func TestAPI_RandomGet(t *testing.T) {
-	store, wasiAPI := instantiateWasmStore(t, randomWat, "test")
+	store, wasiAPI := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
 	maskLength := 7 // number of bytes to write '?' to tell what we've written
 	expectedMemory := []byte{
 		'?',                          // random bytes in `buf` is after this
@@ -351,7 +341,7 @@ func TestAPI_RandomGet(t *testing.T) {
 }
 
 func TestAPI_RandomGet_Errors(t *testing.T) {
-	store, _ := instantiateWasmStore(t, randomWat, "test")
+	store, _ := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -388,8 +378,13 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 // TODO: TestAPI_SockSend TestAPI_SockSend_Errors
 // TODO: TestAPI_SockShutdown TestAPI_SockShutdown_Errors
 
-func instantiateWasmStore(t *testing.T, wat []byte, moduleName string, opts ...Option) (*wasm.Store, API) {
-	mod, err := text.DecodeModule(wat)
+func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport string, moduleName string, opts ...Option) (*wasm.Store, API) {
+	mod, err := text.DecodeModule([]byte(fmt.Sprintf(`(module
+  %[2]s
+  (memory 1)  ;; just an arbitrary size big enough for tests
+  (export "memory" (memory 0))
+  (export "%[1]s" (func $wasi.%[1]s))
+)`, wasiFunction, wasiImport)))
 	require.NoError(t, err)
 
 	store := wasm.NewStore(interpreter.NewEngine())

@@ -3907,30 +3907,30 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 // compileLoad implements compiler.compileLoad for the amd64 architecture.
 func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	var (
-		isIntType        bool
-		movInst          obj.As
-		targetSizeInByte int64
+		isIntType         bool
+		movInst           obj.As
+		targetSizeInBytes int64
 	)
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		isIntType = true
 		movInst = x86.AMOVL
-		targetSizeInByte = 32 / 8
+		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeI64:
 		isIntType = true
 		movInst = x86.AMOVQ
-		targetSizeInByte = 64 / 8
+		targetSizeInBytes = 64 / 8
 	case wazeroir.UnsignedTypeF32:
 		isIntType = false
 		movInst = x86.AMOVL
-		targetSizeInByte = 32 / 8
+		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeF64:
 		isIntType = false
 		movInst = x86.AMOVQ
-		targetSizeInByte = 64 / 8
+		targetSizeInBytes = 64 / 8
 	}
 
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, targetSizeInByte)
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3944,6 +3944,8 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.To.Reg = reg
 		moveFromMemory.From.Type = obj.TYPE_MEM
 		moveFromMemory.From.Reg = reservedRegisterForMemory
+		// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
+		moveFromMemory.From.Offset = -targetSizeInBytes
 		moveFromMemory.From.Index = reg
 		moveFromMemory.From.Scale = 1
 		c.addInstruction(moveFromMemory)
@@ -3960,6 +3962,8 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.To.Type = obj.TYPE_REG
 		moveFromMemory.To.Reg = floatReg
 		moveFromMemory.From.Type = obj.TYPE_MEM
+		// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
+		moveFromMemory.From.Offset = -targetSizeInBytes
 		moveFromMemory.From.Reg = reservedRegisterForMemory
 		moveFromMemory.From.Index = reg
 		moveFromMemory.From.Scale = 1
@@ -3974,7 +3978,8 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 
 // compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, 1)
+	const targetSizeInBytes = 1
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -3996,6 +4001,8 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
+	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
 	c.addInstruction(moveFromMemory)
@@ -4008,7 +4015,8 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 
 // compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, 16/8)
+	const targetSizeInBytes = 16 / 8
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -4030,6 +4038,8 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
+	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
 	c.addInstruction(moveFromMemory)
@@ -4042,7 +4052,8 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 
 // compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
 func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
-	reg, err := c.setupMemoryOffset(o.Arg.Offset, 32/8)
+	const targetSizeInBytes = 32 / 8
+	reg, err := c.setupMemoryAccessCeil(o.Arg.Offset, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
@@ -4058,6 +4069,8 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
+	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
 	c.addInstruction(moveFromMemory)
@@ -4068,64 +4081,38 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	return nil
 }
 
-// setupMemoryOffset pops the top value from the stack (called "base"), and returns the result of addition with
-// base and offsetArg, which we call "offset". The returned offsetRegister is the register number with the offset calculation value.
-// targetSizeInByte is the original memory operation's target size in byte. For example, 4 = 32 / 8 for Load32 operation.
-// This is used for all Store* and Load* instructions.
+// setupMemoryAccessCeil pops the top value from the stack (called "base"), stores "base + offsetArg + targetSizeInBytes"
+// into a register, and returns the stored register. We call the result "ceil" because we access the memory
+// as memory.Buffer[ceil-targetSizeInBytes: ceil].
 //
-// Note that this also emits the instructions to check the out of bounds memory access. That means
-// if the base+offsetArg+targetSizeInByte exceeds the memory size, we exit this function with
-// jitCallStatusCodeMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInByte].
-func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (offsetRegister int16, err error) {
+// Note: this also emits the instructions to check the out of bounds memory access.
+// In other words, if the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
+func (c *amd64Compiler) setupMemoryAccessCeil(offsetArg uint32, targetSizeInBytes int64) (int16, error) {
 	base := c.locationStack.pop()
-	if err = c.ensureOnGeneralPurposeRegister(base); err != nil {
+	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
 		return 0, err
 	}
 
-	// First, we calculate the offset on the memory region.
-	addOffsetToBase := c.newProg()
-	addOffsetToBase.As = x86.AADDL // 32-bit!
-	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = base.register
-	addOffsetToBase.From.Type = obj.TYPE_CONST
-	addOffsetToBase.From.Offset = int64(offsetArg)
-	c.addInstruction(addOffsetToBase)
-
-	// If the base+offset already overflows from uint32 range, we exit with the out of boundary status.
-	overflowJmp := c.newProg()
-	overflowJmp.As = x86.AJCS
-	overflowJmp.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(overflowJmp)
-
-	// Otherwise, we calculate base+offset+targetSizeInByte and check if it is within memory boundary.
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-	if err != nil {
-		return 0, err
+	result := base.register
+	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
+		addOffsetToBase := c.newProg()
+		addOffsetToBase.As = x86.AADDQ
+		addOffsetToBase.To.Type = obj.TYPE_REG
+		addOffsetToBase.To.Reg = result
+		addOffsetToBase.From.Type = obj.TYPE_CONST
+		addOffsetToBase.From.Offset = offsetConst
+		c.addInstruction(addOffsetToBase)
+	} else {
+		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
+		c.exit(jitCallStatusCodeMemoryOutOfBounds)
+		return result, nil
 	}
-
-	// Copy the 32-bit base+offset as to the temporary register as 64-bit integer.
-	copyOffset := c.newProg()
-	copyOffset.As = x86.AMOVLQZX // Zero extend
-	copyOffset.To.Type = obj.TYPE_REG
-	copyOffset.To.Reg = tmpReg
-	copyOffset.From.Type = obj.TYPE_REG
-	copyOffset.From.Reg = base.register
-	c.addInstruction(copyOffset)
-
-	// Adds targetSizeInByte to base+offset stored in the temporary register.
-	addTargetSize := c.newProg()
-	addTargetSize.As = x86.AADDQ
-	addTargetSize.To.Type = obj.TYPE_REG
-	addTargetSize.To.Reg = tmpReg
-	addTargetSize.From.Type = obj.TYPE_CONST
-	addTargetSize.From.Offset = targetSizeInByte
-	c.addInstruction(addTargetSize)
 
 	// Now we compare the value with the memory length which is held by engine.
 	cmp := c.newProg()
 	cmp.As = x86.ACMPQ
 	cmp.To.Type = obj.TYPE_REG
-	cmp.To.Reg = tmpReg
+	cmp.To.Reg = result
 	cmp.From.Type = obj.TYPE_MEM
 	cmp.From.Reg = reservedRegisterForEngine
 	cmp.From.Offset = engineModuleContextMemorySliceLenOffset
@@ -4138,13 +4125,12 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	c.addInstruction(okJmp)
 
 	// Otherwise, we exit the function with out of bounds status code.
-	c.addSetJmpOrigins(overflowJmp)
 	c.exit(jitCallStatusCodeMemoryOutOfBounds)
 
 	c.addSetJmpOrigins(okJmp)
 
-	c.locationStack.markRegisterUnused(base.register)
-	return base.register, nil
+	c.locationStack.markRegisterUnused(result)
+	return result, nil
 }
 
 // compileStore implements compiler.compileStore for the amd64 architecture.
@@ -4183,7 +4169,7 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 		return err
 	}
 
-	reg, err := c.setupMemoryOffset(offsetConst, targetSizeInByte)
+	reg, err := c.setupMemoryAccessCeil(offsetConst, targetSizeInByte)
 	if err != nil {
 		return nil
 	}
@@ -4194,6 +4180,8 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 	moveToMemory.From.Reg = val.register
 	moveToMemory.To.Type = obj.TYPE_MEM
 	moveToMemory.To.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
+	moveToMemory.To.Offset = -targetSizeInByte
 	moveToMemory.To.Index = reg
 	moveToMemory.To.Scale = 1
 	c.addInstruction(moveToMemory)
