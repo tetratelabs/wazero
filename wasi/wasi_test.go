@@ -3,6 +3,7 @@ package wasi
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,14 +32,9 @@ func TestNewAPI_Args(t *testing.T) {
 	})
 }
 
-// argsGetWat is a wasm module to call args_get
-var argsGetWat = `(module
-  (import "wasi_snapshot_preview1" "args_get"
-    (func $wasi.args_get (param $argv i32) (param $argv_buf i32) (result (;errno;) i32)))
-  (memory 1)  ;; just an arbitrary size big enough for tests
-  (export "memory" (memory 0))
-  (export "args_get" (func $wasi.args_get))
-)`
+var argsGetImport = `
+(import "wasi_snapshot_preview1" "args_get"
+    (func $wasi.args_get (param $argv i32) (param $argv_buf i32) (result (;errno;) i32)))`
 
 func TestAPI_ArgsGet(t *testing.T) {
 	args, err := Args("a", "bc")
@@ -54,7 +50,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 		3, 0, 0, 0, // little endian-encoded offset of "bc"
 		'?', // stopped after encoding
 	} // tr
-	store, wasiAPI := instantiateWasmStore(t, argsGetWat, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, FunctionArgsGet, argsGetImport, "test", args)
 
 	t.Run("API.ArgsGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -80,7 +76,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 func TestAPI_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, wasiAPI := instantiateWasmStore(t, argsGetWat, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, FunctionArgsGet, argsGetImport, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -124,14 +120,9 @@ func TestAPI_ArgsGet_Errors(t *testing.T) {
 	}
 }
 
-// argsSizesGetWat is a wasm module to call args_sizes_get
-var argsSizesGetWat = `(module
-  (import "wasi_snapshot_preview1" "args_sizes_get"
-    (func $wasi.args_sizes_get (param $result.argc i32) (param $result.argv_buf_size i32) (result (;errno;) i32)))
-  (memory 1)  ;; just an arbitrary size big enough for tests
-  (export "memory" (memory 0))
-  (export "args_sizes_get" (func $wasi.args_sizes_get))
-)`
+var argsSizesGetImport = `
+(import "wasi_snapshot_preview1" "args_sizes_get"
+    (func $wasi.args_sizes_get (param $result.argc i32) (param $result.argv_buf_size i32) (result (;errno;) i32)))`
 
 func TestAPI_ArgsSizesGet(t *testing.T) {
 	args, err := Args("a", "bc")
@@ -146,7 +137,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 		0x5, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
 		'?', // stopped after encoding
 	} // tr
-	store, wasiAPI := instantiateWasmStore(t, argsSizesGetWat, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, FunctionArgsSizesGet, argsSizesGetImport, "test", args)
 
 	t.Run("API.ArgsSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -172,7 +163,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, _ := instantiateWasmStore(t, argsSizesGetWat, "test", args)
+	store, _ := instantiateWasmStore(t, FunctionArgsSizesGet, argsSizesGetImport, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -219,14 +210,9 @@ func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 // TODO TestAPI_EnvironSizesGet TestAPI_EnvironSizesGet_Errors
 // TODO TestAPI_ClockResGet TestAPI_ClockResGet_Errors
 
-// clockWat is a wasm module to call clock_time_get.
-var clockWat = `(module
-  (import "wasi_snapshot_preview1" "clock_time_get"
-    (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))
-  (memory 1)  ;; just an arbitrary size big enough for tests
-  (export "memory" (memory 0))
-  (export "clock_time_get" (func $wasi.clock_time_get))
-)`
+var clockTimeGetImport = `
+(import "wasi_snapshot_preview1" "clock_time_get"
+    (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))`
 
 func TestAPI_ClockTimeGet(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
@@ -238,7 +224,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 		'?', // stopped after encoding
 	} // tr
 
-	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	store, wasiAPI := instantiateWasmStore(t, FunctionClockTimeGet, clockTimeGetImport, "test")
 	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	t.Run("API.ClockTimeGet", func(t *testing.T) {
@@ -264,7 +250,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 
 func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
-	store, wasiAPI := instantiateWasmStore(t, clockWat, "test")
+	store, wasiAPI := instantiateWasmStore(t, FunctionClockTimeGet, clockTimeGetImport, "test")
 	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
@@ -336,8 +322,13 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_SockSend TestAPI_SockSend_Errors
 // TODO: TestAPI_SockShutdown TestAPI_SockShutdown_Errors
 
-func instantiateWasmStore(t *testing.T, wat string, moduleName string, opts ...Option) (*wasm.Store, API) {
-	mod, err := text.DecodeModule([]byte(wat))
+func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport string, moduleName string, opts ...Option) (*wasm.Store, API) {
+	mod, err := text.DecodeModule([]byte(fmt.Sprintf(`(module
+  %[2]s
+  (memory 1)  ;; just an arbitrary size big enough for tests
+  (export "memory" (memory 0))
+  (export "%[1]s" (func $wasi.%[1]s))
+)`, wasiFunction, wasiImport)))
 	require.NoError(t, err)
 
 	store := wasm.NewStore(interpreter.NewEngine())
