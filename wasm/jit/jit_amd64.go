@@ -4081,7 +4081,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 // as memory.Buffer[ceil-targetSizeInBytes: ceil].
 //
 // Note: this also emits the instructions to check the out of bounds memory access.
-// In other words, the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
+// In other words, if the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
 func (c *amd64Compiler) setupMemoryAccessCeil(offsetArg uint32, targetSizeInBytes int64) (int16, error) {
 	base := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
