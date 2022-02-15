@@ -4774,7 +4774,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
+func TestAmd64Compiler_setupMemoryAccessCeil(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
 	offsets := []uint32{0,
 		1 << 10, 1 << 31, math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
@@ -4798,7 +4798,7 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
 					require.NoError(t, err)
 
-					reg, err := compiler.setupMemoryOffset(offset, targetSizeInByte)
+					reg, err := compiler.setupMemoryAccessCeil(offset, targetSizeInByte)
 					require.NoError(t, err)
 
 					compiler.locationStack.pushValueLocationOnRegister(reg)
@@ -4813,15 +4813,14 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					env.exec(code)
 
 					mem := env.memory()
-					baseOffset := int64(base) + int64(offset)
-					if ceil := baseOffset + int64(targetSizeInByte); int64(len(mem)) < ceil {
+					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
 						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
 						// with jitCallStatusCodeMemoryOutOfBounds status code.
 						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
 					} else {
 						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 						require.Equal(t, uint64(1), env.stackPointer())
-						require.Equal(t, uint64(baseOffset), env.stackTopAsUint64())
+						require.Equal(t, uint64(ceil), env.stackTopAsUint64())
 					}
 				})
 			}
