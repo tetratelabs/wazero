@@ -174,8 +174,8 @@ func (c *arm64Compiler) compileConstToRegisterInstruction(instruction obj.As, co
 	c.addInstruction(applyConst)
 }
 
-// compileMemoryToRegisterInstruction adds an instruction where source operand is a memory location and destination is a register.
-// baseRegister is the base absolute address in the memory, and offset is the offset from the absolute address in baseRegister.
+// compileMemoryToRegisterInstruction adds an instruction where source operand points a memory location and destination is a register.
+// sourceBaseReg is the base absolute address in the memory, and sourceOffsetConst is the offset from the absolute address in sourceBaseReg.
 func (c *arm64Compiler) compileMemoryToRegisterInstruction(instruction obj.As, sourceBaseReg int16, sourceOffsetConst int64, destinationReg int16) {
 	if sourceOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
@@ -207,7 +207,7 @@ func (c *arm64Compiler) compileMemoryWithRegisterOffsetToRegisterInstruction(ins
 	c.addInstruction(inst)
 }
 
-// compileRegisterToMemoryInstruction adds an instruction where destination operand is a memory location and source is a register.
+// compileRegisterToMemoryInstruction adds an instruction where destination operand points a memory location and source is a register.
 // This is the opposite of compileMemoryToRegisterInstruction.
 func (c *arm64Compiler) compileRegisterToMemoryInstruction(instruction obj.As, sourceRegister int16, destinationBaseRegister int16, destinationOffsetConst int64) {
 	if destinationOffsetConst > math.MaxInt16 {
@@ -335,7 +335,7 @@ func (c *arm64Compiler) compilePreamble() error {
 
 	// TODO: Add maybeGrowValueStack() .
 
-	// Before excuting function body, we must initialize the stack base pointer register
+	// Before executing function body, we must initialize the stack base pointer register
 	// so that we can manipulate the memory stack properly.
 	if err := c.compileInitializeReservedStackBasePointerRegister(); err != nil {
 		return err
@@ -520,7 +520,7 @@ func (c *arm64Compiler) compileUnreachable() error {
 // compileSwap implements compiler.compileSwap for the arm64 architecture.
 func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	x := c.locationStack.peek()
-	y := c.locationStack.stack[int(c.locationStack.sp)-1-o.Depth]
+	y := c.locationStack.stack[int(c.locationStack.sp)-1-o.Depth] // Depth is relative to the last stack value
 
 	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(x); err != nil {
 		return err
@@ -615,8 +615,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	return nil
 }
 
-// compileReadGlobalAddress adds instruction to read the absolute address of the global instance whose index equals globalIndex,
-// and returns a register which holds the absolute address.
+// compileReadGlobalAddress adds instructions to store the absolute address of the global instance at globalIndex into a register
 func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinationRegister int16, err error) {
 	// TODO: rethink about the type used in store `globals []*GlobalInstance`.
 	// If we use `[]GlobalInstance` instead, we could reduce one MOV instruction here.
@@ -2103,7 +2102,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Alias these free registers for readability.
 	moduleInstanceAddressRegister, tmpRegister := regs[0], regs[1]
 
-	// Load the absolute address of the current function.
+	// Load the absolute address of the current function's module instance.
 	// Note: this should be modified to support Clone() functionality per #179.
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(uintptr(unsafe.Pointer(c.f.ModuleInstance))), moduleInstanceAddressRegister)
 
