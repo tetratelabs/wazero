@@ -7,7 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"math/rand"
+	mrand "math/rand"
 	"os"
 	"reflect"
 	"time"
@@ -172,17 +172,6 @@ const (
 	wasiSnapshotPreview1Name = "wasi_snapshot_preview1"
 )
 
-type randomSource interface {
-	Read([]byte) (int, error)
-}
-
-// Non-deterministic random source using crypto/rand
-type cryptoRandomSource struct{}
-
-func (c *cryptoRandomSource) Read(p []byte) (n int, err error) {
-	return crand.Read(p)
-}
-
 type api struct {
 	args  *nullTerminatedStrings
 	stdin io.Reader
@@ -191,7 +180,7 @@ type api struct {
 	opened map[uint32]fileEntry
 	// timeNowUnixNano is mutable for testing
 	timeNowUnixNano func() uint64
-	randSource      randomSource
+	randSource      func([]byte) error
 }
 
 func (a *api) register(store *wasm.Store) (err error) {
@@ -375,7 +364,10 @@ func newAPI(opts ...Option) *api {
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
-		randSource: &cryptoRandomSource{},
+		randSource: func(p []byte) error {
+			_, err := crand.Read(p)
+			return err
+		},
 	}
 
 	// apply functional options
@@ -386,8 +378,7 @@ func newAPI(opts ...Option) *api {
 }
 
 func (a *api) randUnusedFD() uint32 {
-	v := rand.Int31()
-	fd := uint32(v)
+	fd := uint32(mrand.Int31())
 	for {
 		if _, ok := a.opened[fd]; !ok {
 			return fd
@@ -542,9 +533,10 @@ func (a *api) RandomGet(ctx *wasm.HostFunctionCallContext, buf uint32, bufLen ui
 	}
 
 	randomBytes := make([]byte, bufLen)
-	_, err := a.randSource.Read(randomBytes)
+	err := a.randSource(randomBytes)
 	if err != nil {
-		return ErrnoInval
+		// TODO: handle different errors that syscal to entropy source can return
+		return ErrnoIo
 	}
 
 	copy(ctx.Memory.Buffer[buf:buf+bufLen], randomBytes)

@@ -3,7 +3,7 @@ package wasi
 import (
 	"context"
 	_ "embed"
-	mrand "math/rand"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -318,23 +318,6 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 //go:embed testdata/random.wat
 var randomWat []byte
 
-// Non-deterministic random rource using crypto/rand
-type dummyRandomSource struct {
-	rng *mrand.Rand
-}
-
-func (d *dummyRandomSource) Read(p []byte) (n int, err error) {
-	return d.rng.Read(p)
-}
-
-func newDummyRandomSource(seed int64) randomSource {
-	s := mrand.NewSource(seed)
-
-	return &dummyRandomSource{
-		rng: mrand.New(s),
-	}
-}
-
 func TestAPI_RandomGet(t *testing.T) {
 	store, wasiAPI := instantiateWasmStore(t, randomWat, "test")
 	maskLength := 7 // number of bytes to write '?' to tell what we've written
@@ -348,7 +331,13 @@ func TestAPI_RandomGet(t *testing.T) {
 	var buf = uint32(1)    // offset,
 	var seed = int64(42)   // and seed value
 
-	wasiAPI.(*api).randSource = newDummyRandomSource(seed)
+	wasiAPI.(*api).randSource = func(p []byte) error {
+		s := rand.NewSource(seed)
+		rng := rand.New(s)
+		_, err := rng.Read(p)
+
+		return err
+	}
 
 	t.Run("API.RandomGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
