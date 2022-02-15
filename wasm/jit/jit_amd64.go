@@ -3944,6 +3944,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.To.Reg = reg
 		moveFromMemory.From.Type = obj.TYPE_MEM
 		moveFromMemory.From.Reg = reservedRegisterForMemory
+		// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
 		moveFromMemory.From.Offset = -targetSizeInBytes
 		moveFromMemory.From.Index = reg
 		moveFromMemory.From.Scale = 1
@@ -3961,6 +3962,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		moveFromMemory.To.Type = obj.TYPE_REG
 		moveFromMemory.To.Reg = floatReg
 		moveFromMemory.From.Type = obj.TYPE_MEM
+		// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
 		moveFromMemory.From.Offset = -targetSizeInBytes
 		moveFromMemory.From.Reg = reservedRegisterForMemory
 		moveFromMemory.From.Index = reg
@@ -3999,6 +4001,7 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
 	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
@@ -4035,6 +4038,7 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
 	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
@@ -4065,6 +4069,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	moveFromMemory.To.Reg = reg
 	moveFromMemory.From.Type = obj.TYPE_MEM
 	moveFromMemory.From.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
 	moveFromMemory.From.Offset = -targetSizeInBytes
 	moveFromMemory.From.Index = reg
 	moveFromMemory.From.Scale = 1
@@ -4175,6 +4180,7 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 	moveToMemory.From.Reg = val.register
 	moveToMemory.To.Type = obj.TYPE_MEM
 	moveToMemory.To.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
 	moveToMemory.To.Offset = -targetSizeInByte
 	moveToMemory.To.Index = reg
 	moveToMemory.To.Scale = 1
