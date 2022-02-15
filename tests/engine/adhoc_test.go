@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
@@ -217,11 +216,11 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 
 	store := wasm.NewStore(newEngine())
 
-	storeInt := func(ctx *wasm.HostFunctionCallContext, offset uint32, val uint64) wasi.Errno {
+	storeInt := func(ctx *wasm.HostFunctionCallContext, offset uint32, val uint64) uint32 {
 		if !ctx.Memory.PutUint64(offset, val) {
-			return wasi.ErrnoInval
+			return 1
 		}
-		return wasi.ErrnoSuccess
+		return 0
 	}
 
 	err = store.AddHostFunction("", "store_int", reflect.ValueOf(storeInt))
@@ -233,7 +232,7 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	// We should be able to call the exported store_int and it should store two ints.
 	results, _, err := store.CallFunction(ctx, "test", "store_int", 1, math.MaxUint64)
 	require.NoError(t, err)
-	require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0]))
+	require.Equal(t, uint64(0), results[0])
 
 	// Since offset=1 and val=math.MaxUint64, we expect to have written exactly 8 bytes, with all bits set, at index 1.
 	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, store.Memories[0].Buffer[0:10])
