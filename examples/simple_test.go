@@ -26,7 +26,7 @@ func Test_Simple(t *testing.T) {
 	store := wasm.NewStore(interpreter.NewEngine())
 
 	stdout := new(bytes.Buffer)
-	hostFunction := func(_ api.HostFunctionCallContext) {
+	hostFunction := func(api.HostFunctionCallContext) {
 		_, _ = fmt.Fprintln(stdout, "hello!")
 	}
 
