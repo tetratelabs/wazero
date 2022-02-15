@@ -288,7 +288,7 @@ func (c *arm64Compiler) compileUnconditionalBranchToAddressOnRegister(addressReg
 	c.addInstruction(br)
 }
 
-// emitAddInstructionWithLeftShiftedRegister emits an ADD instruction to perform "destinationReg = srcReg + (shiftedSourceReg << shiftNum)".
+// compileAddInstructionWithLeftShiftedRegister emits an ADD instruction to perform "destinationReg = srcReg + (shiftedSourceReg << shiftNum)".
 func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSourceReg int16, shiftNum int64, srcReg, destinationReg int16) {
 	inst := c.newProg()
 	inst.As = arm64.AADD
@@ -603,6 +603,8 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 		mov = arm64.AFMOVD
 	}
 
+	// At this point "globalInstanceAddressRegister = globals[index]".
+	// Therefore, this means "globals[index].Val = val.register"
 	c.compileRegisterToMemoryInstruction(
 		mov,
 		val.register,
@@ -1073,18 +1075,32 @@ func (c *arm64Compiler) compileSelect() error {
 	}
 
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
+		// If both values are zero, the result is always zero.
 		c.locationStack.pushValueLocationOnRegister(zeroRegister)
 		c.markRegisterUnused(cv.register)
 		return nil
-	} else if isZeroRegister(x1.register) {
+	}
+
+	// In the following, we emit the code so that x1's register contains the chosen value
+	// no matter which of oroginal x1 or x2 is selected.
+	//
+	// If x1 is currently on zero register, we cannot place the result because
+	// "MOV zeroRegister x2.register" results in zeroRegister regardless of the value.
+	// So we explicitly assign a general purpuse register to x1 here.
+	if isZeroRegister(x1.register) {
+		// Mark x2 and cv's regiseters are used so they won't be chosen.
 		c.markRegisterUsed(x2.register, cv.register)
+		// Pick the non-zero register for x1.
 		x1Reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
 		}
 		x1.setRegister(x1Reg)
+		// And zero our the picked register.
 		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, x1Reg)
 	}
+
+	// At this point, x1 is non-zero register, and x2 is either general purpuse or zero register.
 
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, zeroRegister, cv.register)
 	brIfNotZero := c.newProg()
@@ -1092,7 +1108,7 @@ func (c *arm64Compiler) compileSelect() error {
 	brIfNotZero.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(brIfNotZero)
 
-	// If cv == 0, we choose the value of x2 to the x1.register.
+	// If cv == 0, we move the value of x2 to the x1.register.
 	if x1.registerType() == generalPurposeRegisterTypeInt {
 		c.compileRegisterToRegisterInstruction(arm64.AMOVD, x2.register, x1.register)
 	} else {
@@ -2073,6 +2089,9 @@ func (c *arm64Compiler) compileInitializeReservedStackBasePointerRegister() erro
 	return nil
 }
 
+// compileModuleContextInitialization adds instructions to initialize engine.ModuleContext's fields based on
+// engine.ModuleContext.ModuleInstanceAddress.
+// This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Obtain the free registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)

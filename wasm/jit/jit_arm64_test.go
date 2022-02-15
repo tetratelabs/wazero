@@ -4,7 +4,6 @@
 package jit
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/bits"
@@ -1763,13 +1762,12 @@ func TestArm64Compiler_compieleSelect(t *testing.T) {
 					for _, selectX1 := range []bool{false, true} {
 						selectX1 := selectX1
 						t.Run(fmt.Sprintf("select x1=%v", selectX1), func(t *testing.T) {
-
 							env := newJITEnvironment()
-
 							compiler := env.requireNewCompiler(t)
 							err := compiler.compilePreamble()
 							require.NoError(t, err)
 
+							// Push the select targets.
 							for _, val := range vals {
 								if isFloat {
 									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(val)})
@@ -1779,6 +1777,7 @@ func TestArm64Compiler_compieleSelect(t *testing.T) {
 								require.NoError(t, err)
 							}
 
+							// Push the selection seed.
 							if selectX1 {
 								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
 							} else {
@@ -1796,9 +1795,9 @@ func TestArm64Compiler_compieleSelect(t *testing.T) {
 							require.NoError(t, err)
 
 							env.exec(code)
-
 							require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 
+							// Check if the correct value is chosen.
 							if selectX1 {
 								require.Equal(t, vals[0], env.stackTopAsUint64())
 							} else {
@@ -1864,9 +1863,10 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				// TODO: Add memory, table
 			},
 		},
-		// TODO: Add memory, table, etc
+		// TODO: Add memory, table
 		{
 			name:           "nil",
 			moduleInstance: &wasm.ModuleInstance{},
@@ -1927,13 +1927,12 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
+			// Compiler needs global type information at compilation time.
 			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}}
 			env.addGlobals(globals...)
-			// Compiler needs global type information at compilation time.
-			compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
 
 			// Emit the code.
 			err := compiler.compilePreamble()
@@ -1959,8 +1958,6 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
-			fmt.Println(hex.EncodeToString(code))
-
 			// Run the code assembled above.
 			env.exec(code)
 
@@ -1982,6 +1979,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
+			// Compiler needs global type information at compilation time.
 			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
