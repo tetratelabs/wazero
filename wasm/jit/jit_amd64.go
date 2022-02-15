@@ -4092,6 +4092,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInBytes in
 		addOffsetToBase.From.Offset = offsetConst
 		c.addInstruction(addOffsetToBase)
 	} else {
+		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
 		c.exit(jitCallStatusCodeMemoryOutOfBounds)
 		return result, nil
 	}
