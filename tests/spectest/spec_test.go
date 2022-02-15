@@ -234,13 +234,21 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)
 
+	jsonfiles := make([]string, 0, len(files))
 	for _, f := range files {
 		filename := f.Name()
-		if filepath.Ext(f.Name()) != ".json" {
+		if filepath.Ext(filename) != ".json" {
 			continue
 		}
+		jsonfiles = append(jsonfiles, filepath.Join("testdata", filename))
+	}
 
-		raw, err := testcases.ReadFile(filepath.Join("testdata", filename))
+	// If the go:embed path resolution was wrong, this fails.
+	// https://github.com/tetratelabs/wazero/issues/247
+	require.Greater(t, len(jsonfiles), 1)
+
+	for _, f := range jsonfiles {
+		raw, err := testcases.ReadFile(f)
 		require.NoError(t, err)
 
 		var base testbase
