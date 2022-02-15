@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
@@ -28,7 +27,7 @@ func Test_hostFunc(t *testing.T) {
 	store := wasm.NewStore(interpreter.NewEngine())
 
 	// Host-side implementation of get_random_string on Wasm import.
-	getRandomString := func(ctx api.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
+	getRandomString := func(ctx wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
 		// Assert that context values passed in from CallFunctionContext are accessible.
 		contextValue := ctx.Context().Value(testKey{}).(int64)
 		require.Equal(t, int64(12345), contextValue)

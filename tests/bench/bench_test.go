@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	binaryFormat "github.com/tetratelabs/wazero/wasm/binary"
@@ -143,7 +142,7 @@ func runRandomMatMul(b *testing.B, store *wasm.Store) {
 
 func newStore(engine wasm.Engine) *wasm.Store {
 	store := wasm.NewStore(engine)
-	getRandomString := func(ctx api.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
+	getRandomString := func(ctx wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
 		ret, _, _ := store.CallFunction(ctx.Context(), "test", "allocate_buffer", 10)
 		bufAddr := uint32(ret[0])
 		ctx.Memory().WriteUint32Le(retBufPtr, bufAddr)

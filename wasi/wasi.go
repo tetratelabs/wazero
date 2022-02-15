@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -53,7 +52,7 @@ type API interface {
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsGet(ctx api.HostFunctionCallContext, argv, argvBuf uint32) Errno
+	ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno
 
 	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
 	//
@@ -80,7 +79,7 @@ type API interface {
 	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsSizesGet(ctx api.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno
+	ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno
 
 	// TODO: EnvironGet(ctx api.hostFunctionCallContext, environ, environBuf uint32) Errno
 
@@ -108,7 +107,7 @@ type API interface {
 	// Note: This is similar to `clock_gettime` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 	// See https://linux.die.net/man/3/clock_gettime
-	ClockTimeGet(ctx api.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno
+	ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno
 
 	// TODO: FdAdvise
 	// TODO: FdAllocate
@@ -234,7 +233,7 @@ func (a *wasiAPI) register(store *wasm.Store) (err error) {
 }
 
 // ArgsGet implements API.ArgsGet
-func (a *wasiAPI) ArgsGet(ctx api.HostFunctionCallContext, argv, argvBuf uint32) Errno {
+func (a *wasiAPI) ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
 	for _, arg := range a.args.nullTerminatedValues {
 		if !ctx.Memory().WriteUint32Le(argv, argvBuf) {
 			return ErrnoFault
@@ -250,7 +249,7 @@ func (a *wasiAPI) ArgsGet(ctx api.HostFunctionCallContext, argv, argvBuf uint32)
 }
 
 // ArgsSizesGet implements API.ArgsSizesGet
-func (a *wasiAPI) ArgsSizesGet(ctx api.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
+func (a *wasiAPI) ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
 	if !ctx.Memory().WriteUint32Le(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
 		return ErrnoFault
 	}
@@ -267,7 +266,7 @@ func (a *wasiAPI) ArgsSizesGet(ctx api.HostFunctionCallContext, resultArgc, resu
 // TODO: func (a *wasiAPI) FunctionClockResGet
 
 // ClockTimeGet implements API.ClockTimeGet
-func (a *wasiAPI) ClockTimeGet(ctx api.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno {
+func (a *wasiAPI) ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno {
 	// TODO: id and precision are currently ignored.
 	if !ctx.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
 		return ErrnoFault
@@ -366,14 +365,14 @@ func (a *wasiAPI) randUnusedFD() uint32 {
 	}
 }
 
-func (a *wasiAPI) fd_prestat_get(ctx api.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+func (a *wasiAPI) fd_prestat_get(ctx wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := a.opened[fd]; !ok {
 		return ErrnoBadf
 	}
 	return ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_prestat_dir_name(ctx api.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
+func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
 	f, ok := a.opened[fd]
 	if !ok {
 		return ErrnoInval
@@ -389,7 +388,7 @@ func (a *wasiAPI) fd_prestat_dir_name(ctx api.HostFunctionCallContext, fd uint32
 	return ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_fdstat_get(ctx api.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
+func (a *wasiAPI) fd_fdstat_get(ctx wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
 	if _, ok := a.opened[fd]; !ok {
 		return ErrnoBadf
 	}
@@ -399,7 +398,7 @@ func (a *wasiAPI) fd_fdstat_get(ctx api.HostFunctionCallContext, fd uint32, bufP
 	return ErrnoSuccess
 }
 
-func (a *wasiAPI) path_open(ctx api.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+func (a *wasiAPI) path_open(ctx wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
 	fsRightsBase, fsRightsInheriting uint64,
 	fdFlags, fdPtr uint32) (errno Errno) {
 	dir, ok := a.opened[fd]
@@ -434,11 +433,11 @@ func (a *wasiAPI) path_open(ctx api.HostFunctionCallContext, fd, dirFlags, pathP
 	return ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_seek(ctx api.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
+func (a *wasiAPI) fd_seek(ctx wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
 	return ErrnoNosys // TODO: implement
 }
 
-func (a *wasiAPI) fd_write(ctx api.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
+func (a *wasiAPI) fd_write(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
 	var writer io.Writer
 
 	switch fd {
@@ -481,7 +480,7 @@ func (a *wasiAPI) fd_write(ctx api.HostFunctionCallContext, fd uint32, iovsPtr u
 	return ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_read(ctx api.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
+func (a *wasiAPI) fd_read(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
 	var reader io.Reader
 
 	switch fd {
@@ -524,7 +523,7 @@ func (a *wasiAPI) fd_read(ctx api.HostFunctionCallContext, fd uint32, iovsPtr ui
 	return ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_close(ctx api.HostFunctionCallContext, fd uint32) (err Errno) {
+func (a *wasiAPI) fd_close(ctx wasm.HostFunctionCallContext, fd uint32) (err Errno) {
 	f, ok := a.opened[fd]
 	if !ok {
 		return ErrnoBadf
@@ -539,14 +538,14 @@ func (a *wasiAPI) fd_close(ctx api.HostFunctionCallContext, fd uint32) (err Errn
 	return ErrnoSuccess
 }
 
-func proc_exit(api.HostFunctionCallContext, uint32) {
+func proc_exit(wasm.HostFunctionCallContext, uint32) {
 	// TODO: implement
 }
 
-func environ_sizes_get(api.HostFunctionCallContext, uint32, uint32) (err Errno) {
+func environ_sizes_get(wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	return ErrnoNosys // TODO: implement
 }
 
-func environ_get(api.HostFunctionCallContext, uint32, uint32) (err Errno) {
+func environ_get(wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
 	return ErrnoNosys // TODO: implement
 }

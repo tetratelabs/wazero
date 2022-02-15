@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasm/internal/leb128"
 )
 
@@ -82,7 +81,7 @@ func TestStore_CallFunction(t *testing.T) {
 
 func TestStore_AddHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
-	hostFunction := func(_ api.HostFunctionCallContext) {
+	hostFunction := func(_ HostFunctionCallContext) {
 	}
 
 	err := s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction))
@@ -100,7 +99,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 	require.True(t, ok)
 
 	// Trying to offset it again should fail
-	hostFunction2 := func(_ api.HostFunctionCallContext) {
+	hostFunction2 := func(_ HostFunctionCallContext) {
 	}
 	err = s.AddHostFunction("test", "fn", reflect.ValueOf(hostFunction2))
 	require.EqualError(t, err, `"fn" is already exported in module "test"`)
@@ -112,7 +111,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
-	hostFunction := func(_ api.HostFunctionCallContext) {
+	hostFunction := func(_ HostFunctionCallContext) {
 	}
 
 	err := s.AddHostFunction("", "host_fn", reflect.ValueOf(hostFunction))

@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"math"
-
-	"github.com/tetratelabs/wazero/api"
 )
 
 // hostFunctionCallContext is the first argument of all host functions.
@@ -17,7 +15,7 @@ type hostFunctionCallContext struct {
 }
 
 // NewHostFunctionCallContext creates a new api.HostFunctionCallContext with a context and memory instance.
-func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) api.HostFunctionCallContext {
+func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) HostFunctionCallContext {
 	return &hostFunctionCallContext{ctx: ctx, memory: memory}
 }
 
@@ -27,7 +25,7 @@ func (c *hostFunctionCallContext) Context() context.Context {
 }
 
 // Memory implements api.HostFunctionCallContext Memory
-func (c *hostFunctionCallContext) Memory() api.Memory {
+func (c *hostFunctionCallContext) Memory() Memory {
 	return c.memory
 }
 

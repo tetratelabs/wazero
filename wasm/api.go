@@ -1,5 +1,4 @@
-// Package api only includes constants and interfaces. This ensures no package cycles in implementation.
-package api
+package wasm
 
 import "context"
 

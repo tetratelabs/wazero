@@ -11,7 +11,6 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
@@ -461,7 +460,7 @@ const (
 // After the execution, the result of host function is pushed onto the stack.
 //
 // ctx parameter is passed to the host function as a first argument.
-func (e *engine) execHostFunction(f *reflect.Value, ctx api.HostFunctionCallContext) {
+func (e *engine) execHostFunction(f *reflect.Value, ctx wasm.HostFunctionCallContext) {
 	tp := f.Type()
 	in := make([]reflect.Value, tp.NumIn())
 

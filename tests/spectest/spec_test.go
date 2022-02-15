@@ -15,7 +15,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
@@ -188,13 +187,13 @@ func (c command) expectedError() (err error) {
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
 	for n, v := range map[string]reflect.Value{
-		"print":         reflect.ValueOf(func(api.HostFunctionCallContext) {}),
-		"print_i32":     reflect.ValueOf(func(api.HostFunctionCallContext, uint32) {}),
-		"print_f32":     reflect.ValueOf(func(api.HostFunctionCallContext, float32) {}),
-		"print_i64":     reflect.ValueOf(func(api.HostFunctionCallContext, uint64) {}),
-		"print_f64":     reflect.ValueOf(func(api.HostFunctionCallContext, float64) {}),
-		"print_i32_f32": reflect.ValueOf(func(api.HostFunctionCallContext, uint32, float32) {}),
-		"print_f64_f64": reflect.ValueOf(func(api.HostFunctionCallContext, float64, float64) {}),
+		"print":         reflect.ValueOf(func(wasm.HostFunctionCallContext) {}),
+		"print_i32":     reflect.ValueOf(func(wasm.HostFunctionCallContext, uint32) {}),
+		"print_f32":     reflect.ValueOf(func(wasm.HostFunctionCallContext, float32) {}),
+		"print_i64":     reflect.ValueOf(func(wasm.HostFunctionCallContext, uint64) {}),
+		"print_f64":     reflect.ValueOf(func(wasm.HostFunctionCallContext, float64) {}),
+		"print_i32_f32": reflect.ValueOf(func(wasm.HostFunctionCallContext, uint32, float32) {}),
+		"print_f64_f64": reflect.ValueOf(func(wasm.HostFunctionCallContext, float64, float64) {}),
 	} {
 		require.NoError(t, store.AddHostFunction("spectest", n, v), "AddHostFunction(%s)", n)
 	}
