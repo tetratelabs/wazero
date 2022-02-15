@@ -4070,33 +4070,30 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 
 // setupMemoryOffset pops the top value from the stack (called "base"), and returns the result of addition with
 // base and offsetArg, which we call "offset". The returned offsetRegister is the register number with the offset calculation value.
-// targetSizeInByte is the original memory operation's target size in byte. For example, 4 = 32 / 8 for Load32 operation.
+// targetSizeInBytes is the original memory operation's target size in byte. For example, 4 = 32 / 8 for Load32 operation.
 // This is used for all Store* and Load* instructions.
 //
 // Note that this also emits the instructions to check the out of bounds memory access. That means
-// if the base+offsetArg+targetSizeInByte exceeds the memory size, we exit this function with
-// jitCallStatusCodeMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInByte].
-func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (int16, error) {
+// if the base+offsetArg+targetSizeInBytes exceeds the memory size, we exit this function with
+// jitCallStatusCodeMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInBytes].
+func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInBytes int64) (int16, error) {
 	base := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
 		return 0, err
 	}
 
 	result := base.register
-	var overflowOffsetConstJmp *obj.Prog
-	if rhs := int64(offsetArg) + targetSizeInByte; rhs <= math.MaxUint32 {
+	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
 		addOffsetToBase := c.newProg()
 		addOffsetToBase.As = x86.AADDQ
 		addOffsetToBase.To.Type = obj.TYPE_REG
 		addOffsetToBase.To.Reg = result
 		addOffsetToBase.From.Type = obj.TYPE_CONST
-		addOffsetToBase.From.Offset = int64(offsetArg) + targetSizeInByte
+		addOffsetToBase.From.Offset = offsetConst
 		c.addInstruction(addOffsetToBase)
 	} else {
-		overflowOffsetConstJmp = c.newProg()
-		overflowOffsetConstJmp.As = x86.AJCS
-		overflowOffsetConstJmp.To.Type = obj.TYPE_BRANCH
-		c.addInstruction(overflowOffsetConstJmp)
+		c.exit(jitCallStatusCodeMemoryOutOfBounds)
+		return result, nil
 	}
 
 	// Now we compare the value with the memory length which is held by engine.
@@ -4115,14 +4112,20 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	okJmp.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmp)
 
-	if overflowOffsetConstJmp != nil {
-		c.addSetJmpOrigins(overflowOffsetConstJmp)
-	}
-
 	// Otherwise, we exit the function with out of bounds status code.
 	c.exit(jitCallStatusCodeMemoryOutOfBounds)
 
 	c.addSetJmpOrigins(okJmp)
+
+	// Finally we have to subtract targetSizeInBytes from the result register
+	// because we access memory with [offset: offset+targetSizeInBytes]
+	sub := c.newProg()
+	sub.As = x86.ASUBL
+	sub.To.Type = obj.TYPE_REG
+	sub.To.Reg = result
+	sub.From.Type = obj.TYPE_CONST
+	sub.From.Offset = targetSizeInBytes
+	c.addInstruction(sub)
 
 	c.locationStack.markRegisterUnused(result)
 	return result, nil
