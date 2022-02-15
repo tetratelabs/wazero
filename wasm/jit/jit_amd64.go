@@ -4083,6 +4083,7 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	}
 
 	result := base.register
+	var overflowOffsetConstJmp *obj.Prog
 	if rhs := int64(offsetArg) + targetSizeInByte; rhs <= math.MaxUint32 {
 		addOffsetToBase := c.newProg()
 		addOffsetToBase.As = x86.AADDQ
@@ -4092,26 +4093,10 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 		addOffsetToBase.From.Offset = int64(offsetArg) + targetSizeInByte
 		c.addInstruction(addOffsetToBase)
 	} else {
-		tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-		if err != nil {
-			return 0, err
-		}
-
-		movConst := c.newProg()
-		movConst.As = x86.AMOVQ
-		movConst.To.Type = obj.TYPE_REG
-		movConst.To.Reg = tmpReg
-		movConst.From.Type = obj.TYPE_CONST
-		movConst.From.Offset = rhs
-		c.addInstruction(movConst)
-
-		addOffsetToBase := c.newProg()
-		addOffsetToBase.As = x86.AADDQ
-		addOffsetToBase.To.Type = obj.TYPE_REG
-		addOffsetToBase.To.Reg = result
-		addOffsetToBase.From.Type = obj.TYPE_REG
-		addOffsetToBase.From.Reg = tmpReg
-		c.addInstruction(addOffsetToBase)
+		overflowOffsetConstJmp = c.newProg()
+		overflowOffsetConstJmp.As = x86.AJCS
+		overflowOffsetConstJmp.To.Type = obj.TYPE_BRANCH
+		c.addInstruction(overflowOffsetConstJmp)
 	}
 
 	// Now we compare the value with the memory length which is held by engine.
@@ -4129,6 +4114,10 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	okJmp.As = x86.AJCC
 	okJmp.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(okJmp)
+
+	if overflowOffsetConstJmp != nil {
+		c.addSetJmpOrigins(overflowOffsetConstJmp)
+	}
 
 	// Otherwise, we exit the function with out of bounds status code.
 	c.exit(jitCallStatusCodeMemoryOutOfBounds)
