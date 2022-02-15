@@ -307,7 +307,6 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_ProcRaise TestAPI_ProcRaise_Errors
 // TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
 
-
 func TestAPI_RandomGet(t *testing.T) {
 	store, wasiAPI := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
 	maskLength := 7 // number of bytes to write '?' to tell what we've written
