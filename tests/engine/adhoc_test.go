@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
@@ -201,31 +202,40 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 // importedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
+// Notably, this uses memory, which ensures wasm.HostFunctionCallContext is valid in both interpreter and JIT engines.
 func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
-	mod, err := text.DecodeModule([]byte(`(module
-		;; arbitrary function with params
-		(import "env" "add_int" (func $add_int (param i32 i32) (result i32)))
-		;; add_int is imported from the environment, but it's also exported back to the environment
-		(export "add_int" (func $add_int))
+	mod, err := text.DecodeModule([]byte(`(module $test
+		(import "" "store_int"
+			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
+		(memory $memory 1 1)
+		(export "memory" (memory $memory))
+		;; store_int is imported from the environment, but it's also exported back to the environment
+		(export "store_int" (func $store_int))
 		)`))
 	require.NoError(t, err)
 
 	store := wasm.NewStore(newEngine())
 
-	addInt := func(ctx *wasm.HostFunctionCallContext, x int32, y int32) int32 {
-		return x + y
+	storeInt := func(ctx *wasm.HostFunctionCallContext, offset uint32, val uint64) wasi.Errno {
+		if !ctx.Memory.PutUint64(offset, val) {
+			return wasi.ErrnoInval
+		}
+		return wasi.ErrnoSuccess
 	}
-	err = store.AddHostFunction("env", "add_int", reflect.ValueOf(addInt))
+
+	err = store.AddHostFunction("", "store_int", reflect.ValueOf(storeInt))
 	require.NoError(t, err)
 
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	// We should be able to call the exported add_int and it should add two ints.
-	results, _, err := store.CallFunction(ctx, "test", "add_int", uint64(12), uint64(30))
+	// We should be able to call the exported store_int and it should store two ints.
+	results, _, err := store.CallFunction(ctx, "test", "store_int", 1, math.MaxUint64)
 	require.NoError(t, err)
-	require.Equal(t, uint64(42), results[0])
+	require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0]))
+
+	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, store.Memories[0].Buffer[0:10])
 }
 
 //  hostFuncWithFloatParam fails if a float parameter corrupts a host function value
@@ -237,7 +247,7 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() wasm.Engine) {
 		;; 'identity_float' just returns the given float value as is.
 		(import "test" "identity_float" (func $test.identity_float (param {{ . }}) (result {{ . }})))
 
-		;; 'call->test.identity_float' proxies 'test.identity_float' via call in order to test floats aren't corrupted 
+		;; 'call->test.identity_float' proxies 'test.identity_float' via call in order to test floats aren't corrupted
 		;; when the float values are passed through OpCodeCall
 		(func $call->test.identity_float (param {{ . }}) (result {{ . }})
 			local.get 0
