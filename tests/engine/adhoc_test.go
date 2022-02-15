@@ -235,6 +235,7 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	require.NoError(t, err)
 	require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0]))
 
+	// Since offset=1 and val=math.MaxUint64, we expect to have written exactly 8 bytes, with all bits set, at index 1.
 	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, store.Memories[0].Buffer[0:10])
 }
 
