@@ -27,7 +27,7 @@ func Test_hostFunc(t *testing.T) {
 	store := wasm.NewStore(interpreter.NewEngine())
 
 	// Host-side implementation of get_random_string on Wasm import.
-	getRandomString := func(ctx *wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
+	getRandomString := func(ctx wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
 		// Assert that context values passed in from CallFunctionContext are accessible.
 		contextValue := ctx.Context().Value(testKey{}).(int64)
 		require.Equal(t, int64(12345), contextValue)
@@ -43,11 +43,14 @@ func Test_hostFunc(t *testing.T) {
 		bufAddr := ret[0]
 
 		// Store the address info to the memory.
-		ctx.Memory.PutUint32(retBufPtr, uint32(bufAddr))
-		ctx.Memory.PutUint32(retBufSize, uint32(bufferSize))
+		require.True(t, ctx.Memory().WriteUint32Le(retBufPtr, uint32(bufAddr)))
+		require.True(t, ctx.Memory().WriteUint32Le(retBufSize, uint32(bufferSize)))
 
 		// Now store the random values in the region.
-		n, err := rand.Read(ctx.Memory.Buffer[bufAddr : bufAddr+bufferSize])
+		b, ok := ctx.Memory().Read(uint32(bufAddr), bufferSize)
+		require.True(t, ok)
+
+		n, err := rand.Read(b)
 		require.NoError(t, err)
 		require.Equal(t, bufferSize, n)
 	}
@@ -70,7 +73,7 @@ func Test_hostFunc(t *testing.T) {
 	_, _, err = store.CallFunction(ctx, "test", "_start")
 	require.NoError(t, err)
 
-	// Set a context variable that should be available in HostFunctionCallContext.
+	// Set a context variable that should be available in api.hostFunctionCallContext.
 	ctx = context.WithValue(ctx, testKey{}, int64(12345))
 
 	_, _, err = store.CallFunction(ctx, "test", "base64", 5)

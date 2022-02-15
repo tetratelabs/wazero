@@ -72,7 +72,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 func TestAPI_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, wasiAPI := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
+	store, api := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -95,13 +95,13 @@ func TestAPI_ArgsGet_Errors(t *testing.T) {
 		{
 			name: "argv exceeds the maximum valid address by 1",
 			// 4*uint32(len(argsArray.nullTerminatedValues)) is the size of the result of the pointers to args, 4 is the size of uint32
-			argv:    memorySize - 4*uint32(len(wasiAPI.(*api).args.nullTerminatedValues)) + 1,
+			argv:    memorySize - 4*uint32(len(api.(*wasiAPI).args.nullTerminatedValues)) + 1,
 			argvBuf: validAddress,
 		},
 		{
 			name:    "argvBuf exceeds the maximum valid address by 1",
 			argv:    validAddress,
-			argvBuf: memorySize - wasiAPI.(*api).args.totalBufSize + 1,
+			argvBuf: memorySize - api.(*wasiAPI).args.totalBufSize + 1,
 		},
 	}
 
@@ -111,7 +111,7 @@ func TestAPI_ArgsGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsGet, uint64(tc.argv), uint64(tc.argvBuf))
 			require.NoError(t, err)
-			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
+			require.Equal(t, uint64(ErrnoFault), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
@@ -193,7 +193,7 @@ func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ret, _, err := store.CallFunction(context.Background(), "test", FunctionArgsSizesGet, uint64(tc.argc), uint64(tc.argvBufSize))
 			require.NoError(t, err)
-			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
+			require.Equal(t, uint64(ErrnoFault), ret[0]) // ret[0] is returned errno
 		})
 	}
 }
@@ -212,8 +212,8 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 		'?', // stopped after encoding
 	} // tr
 
-	store, wasiAPI := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test")
-	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
+	store, api := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test")
+	api.(*wasiAPI).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	t.Run("API.ClockTimeGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -222,7 +222,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
 		// invoke ClockTimeGet directly and check the memory side effects!
-		errno := wasiAPI.ClockTimeGet(hContext, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
+		errno := api.ClockTimeGet(hContext, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
 		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
@@ -238,8 +238,8 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 
 func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
-	store, wasiAPI := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test")
-	wasiAPI.(*api).timeNowUnixNano = func() uint64 { return epochNanos }
+	store, api := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test")
+	api.(*wasiAPI).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 
@@ -265,7 +265,7 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ret, _, err := store.CallFunction(context.Background(), "test", FunctionClockTimeGet, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.NoError(t, err)
-			require.Equal(t, uint64(ErrnoInval), ret[0]) // ret[0] is returned errno
+			require.Equal(t, uint64(ErrnoFault), ret[0]) // ret[0] is returned errno
 		})
 	}
 }

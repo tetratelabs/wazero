@@ -3,7 +3,6 @@ package wasm
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
@@ -325,7 +324,7 @@ func (s *Store) Instantiate(module *Module, name string) error {
 // up to one result. An error is returned for any failure looking up or invoking the function including
 // signature mismatch.
 //
-// Note: The ctx parameter will be the outer-most ancestor of HostFunctionCallContext.Context.
+// Note: The ctx parameter will be the outer-most ancestor of api.HostFunctionCallContext Context.
 // ctx will default to context.Background() is nil is passed.
 // Note: this API is unstable. See tetratelabs/wazero#170
 func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
@@ -787,7 +786,7 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			ei = &ExportInstance{Kind: exp.Kind, Function: target.Functions[index]}
 			// The module instance of the host function is a fake that only includes the function and its types.
 			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
-			// available to the HostFunctionCallContext.
+			// available to the api.hostFunctionCallContext Memory.
 			if ei.Function.HostFunction != nil {
 				ei.Function.ModuleInstance = target
 			}
@@ -812,33 +811,6 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 		}
 	}
 	return
-}
-
-// ValidateAddrRange checks if the given address range is a valid address range.
-// It accepts rangeSize as uint64 so that callers can add or multiply two uint32 addresses
-// without overflow. eg.) ValidateAddrRange(uint32Offset, uint64(uint32Size) + 1)
-func (m *MemoryInstance) ValidateAddrRange(addr uint32, rangeSize uint64) bool {
-	return uint64(addr) < uint64(len(m.Buffer)) && rangeSize <= uint64(len(m.Buffer))-uint64(addr)
-}
-
-// PutUint32 writes a uint32 value to the specified address. If the specified address
-// is not a valid address range, it returns false. Otherwise, it returns true.
-func (m *MemoryInstance) PutUint32(addr uint32, val uint32) bool {
-	if !m.ValidateAddrRange(addr, uint64(4)) {
-		return false
-	}
-	binary.LittleEndian.PutUint32(m.Buffer[addr:], val)
-	return true
-}
-
-// PutUint64 writes a uint64 value to the specified address. If the specified address
-// is not a valid address range, it returns false. Otherwise, it returns true.
-func (m *MemoryInstance) PutUint64(addr uint32, val uint64) bool {
-	if !m.ValidateAddrRange(addr, uint64(8)) {
-		return false
-	}
-	binary.LittleEndian.PutUint64(m.Buffer[addr:], val)
-	return true
 }
 
 // DecodeBlockType is exported for use in the compiler
@@ -869,34 +841,10 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 	return ret, num, nil
 }
 
-// HostFunctionCallContext is the first argument of all host functions.
-type HostFunctionCallContext struct {
-	ctx context.Context
-	// Memory is the currently used memory instance at the time when the host function call is made.
-	Memory *MemoryInstance
-	// TODO: Add others if necessary.
-}
-
-// NewHostFunctionCallContext creates a new HostFunctionCallContext with a
-// context and memory instance.
-func NewHostFunctionCallContext(ctx context.Context, memory *MemoryInstance) *HostFunctionCallContext {
-	return &HostFunctionCallContext{
-		ctx:    ctx,
-		Memory: memory,
-	}
-}
-
-// Context returns the host call's context.
-//
-// The returned context is always non-nil; it defaults to the background context.
-func (c *HostFunctionCallContext) Context() context.Context {
-	return c.ctx
-}
-
 // AddHostFunction exports a function so that it can be imported under the given module and name. If a function already
 // exists for this module and name it is ignored rather than overwritten.
 //
-// Note: The HostFunctionCallContext.Memory of the fn will be from the importing module.
+// Note: The hostFunctionCallContext.Memory of the fn will be from the importing module.
 // Note: The ModuleInstance of this host function is lazy created and only includes exported functions and their types.
 func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) error {
 	getTypeOf := func(kind reflect.Kind) (ValueType, error) {
@@ -916,7 +864,7 @@ func (s *Store) AddHostFunction(moduleName, funcName string, fn reflect.Value) e
 	getType := func(p reflect.Type) (*FunctionType, error) {
 		var err error
 		if p.NumIn() == 0 {
-			return nil, fmt.Errorf("host function must accept *wasm.HostFunctionCallContext as the first param")
+			return nil, fmt.Errorf("host function must accept api.hostFunctionCallContext as the first param")
 		}
 		paramTypes := make([]ValueType, p.NumIn()-1)
 		for i := range paramTypes {
