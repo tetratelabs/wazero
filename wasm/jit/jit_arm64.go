@@ -522,10 +522,10 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	x := c.locationStack.peek()
 	y := c.locationStack.stack[int(c.locationStack.sp)-1-o.Depth] // Depth is relative to the last stack value
 
-	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(x); err != nil {
+	if err := c.compileEnsureOnGeneralPurposeRegister(x); err != nil {
 		return err
 	}
-	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(y); err != nil {
+	if err := c.compileEnsureOnGeneralPurposeRegister(y); err != nil {
 		return err
 	}
 
@@ -582,7 +582,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 // compileGlobalSet implements compiler.compileGlobalSet for the arm64 architecture.
 func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	val := c.locationStack.pop()
-	if err := c.maybeCompileEnsureOnGeneralPurposeRegister(val); err != nil {
+	if err := c.compileEnsureOnGeneralPurposeRegister(val); err != nil {
 		return err
 	}
 
@@ -698,7 +698,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	} else {
 		// If the value is not on the conditional register, we compare the value with the zero register,
 		// and then do the conditional BR if the value does't equal zero.
-		if err := c.maybeCompileEnsureOnGeneralPurposeRegister(cond); err != nil {
+		if err := c.compileEnsureOnGeneralPurposeRegister(cond); err != nil {
 			return err
 		}
 		// Compare the value with zero register. Note that the value is ensured to be i32 by function validation phase,
@@ -1052,7 +1052,7 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 		// If the value is on a memory, we have to move it to a register,
 		// otherwise the memory location is overriden by other values
 		// after this drop instructin.
-		if err := c.maybeCompileEnsureOnGeneralPurposeRegister(live); err != nil {
+		if err := c.compileEnsureOnGeneralPurposeRegister(live); err != nil {
 			return err
 		}
 		// Update the runtime memory stack location by pushing onto the location stack.
@@ -1909,12 +1909,12 @@ func (c *arm64Compiler) pushZeroValue() {
 // but the name seems awkward.
 func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err error) {
 	x2 = c.locationStack.pop()
-	if err = c.maybeCompileEnsureOnGeneralPurposeRegister(x2); err != nil {
+	if err = c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
 		return
 	}
 
 	x1 = c.locationStack.pop()
-	if err = c.maybeCompileEnsureOnGeneralPurposeRegister(x1); err != nil {
+	if err = c.compileEnsureOnGeneralPurposeRegister(x1); err != nil {
 		return
 	}
 
@@ -1930,7 +1930,7 @@ func (c *arm64Compiler) popTwoValuesOnRegisters() (x1, x2 *valueLocation, err er
 // but the name seems awkward.
 func (c *arm64Compiler) popValueOnRegister() (v *valueLocation, err error) {
 	v = c.locationStack.pop()
-	if err = c.maybeCompileEnsureOnGeneralPurposeRegister(v); err != nil {
+	if err = c.compileEnsureOnGeneralPurposeRegister(v); err != nil {
 		return
 	}
 
@@ -1938,8 +1938,8 @@ func (c *arm64Compiler) popValueOnRegister() (v *valueLocation, err error) {
 	return
 }
 
-// maybeCompileEnsureOnGeneralPurposeRegister emits instructions to ensure that a value is located on a register.
-func (c *arm64Compiler) maybeCompileEnsureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
+// compileEnsureOnGeneralPurposeRegister emits instructions to ensure that a value is located on a register.
+func (c *arm64Compiler) compileEnsureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
 	if loc.onStack() {
 		err = c.compileLoadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
