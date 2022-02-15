@@ -4076,56 +4076,49 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 // Note that this also emits the instructions to check the out of bounds memory access. That means
 // if the base+offsetArg+targetSizeInByte exceeds the memory size, we exit this function with
 // jitCallStatusCodeMemoryOutOfBounds status code since we read memory as [base+offsetArg: base+offsetArg+targetSizeInByte].
-func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (offsetRegister int16, err error) {
+func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int64) (int16, error) {
 	base := c.locationStack.pop()
-	if err = c.ensureOnGeneralPurposeRegister(base); err != nil {
+	if err := c.ensureOnGeneralPurposeRegister(base); err != nil {
 		return 0, err
 	}
 
-	// First, we calculate the offset on the memory region.
-	addOffsetToBase := c.newProg()
-	addOffsetToBase.As = x86.AADDL // 32-bit!
-	addOffsetToBase.To.Type = obj.TYPE_REG
-	addOffsetToBase.To.Reg = base.register
-	addOffsetToBase.From.Type = obj.TYPE_CONST
-	addOffsetToBase.From.Offset = int64(offsetArg)
-	c.addInstruction(addOffsetToBase)
+	result := base.register
+	if rhs := int64(offsetArg) + targetSizeInByte; rhs <= math.MaxUint32 {
+		addOffsetToBase := c.newProg()
+		addOffsetToBase.As = x86.AADDQ
+		addOffsetToBase.To.Type = obj.TYPE_REG
+		addOffsetToBase.To.Reg = result
+		addOffsetToBase.From.Type = obj.TYPE_CONST
+		addOffsetToBase.From.Offset = int64(offsetArg) + targetSizeInByte
+		c.addInstruction(addOffsetToBase)
+	} else {
+		tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return 0, err
+		}
 
-	// If the base+offset already overflows from uint32 range, we exit with the out of boundary status.
-	overflowJmp := c.newProg()
-	overflowJmp.As = x86.AJCS
-	overflowJmp.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(overflowJmp)
+		movConst := c.newProg()
+		movConst.As = x86.AMOVQ
+		movConst.To.Type = obj.TYPE_REG
+		movConst.To.Reg = tmpReg
+		movConst.From.Type = obj.TYPE_CONST
+		movConst.From.Offset = rhs
+		c.addInstruction(movConst)
 
-	// Otherwise, we calculate base+offset+targetSizeInByte and check if it is within memory boundary.
-	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-	if err != nil {
-		return 0, err
+		addOffsetToBase := c.newProg()
+		addOffsetToBase.As = x86.AADDQ
+		addOffsetToBase.To.Type = obj.TYPE_REG
+		addOffsetToBase.To.Reg = result
+		addOffsetToBase.From.Type = obj.TYPE_REG
+		addOffsetToBase.From.Reg = tmpReg
+		c.addInstruction(addOffsetToBase)
 	}
-
-	// Copy the 32-bit base+offset as to the temporary register as 64-bit integer.
-	copyOffset := c.newProg()
-	copyOffset.As = x86.AMOVLQZX // Zero extend
-	copyOffset.To.Type = obj.TYPE_REG
-	copyOffset.To.Reg = tmpReg
-	copyOffset.From.Type = obj.TYPE_REG
-	copyOffset.From.Reg = base.register
-	c.addInstruction(copyOffset)
-
-	// Adds targetSizeInByte to base+offset stored in the temporary register.
-	addTargetSize := c.newProg()
-	addTargetSize.As = x86.AADDQ
-	addTargetSize.To.Type = obj.TYPE_REG
-	addTargetSize.To.Reg = tmpReg
-	addTargetSize.From.Type = obj.TYPE_CONST
-	addTargetSize.From.Offset = targetSizeInByte
-	c.addInstruction(addTargetSize)
 
 	// Now we compare the value with the memory length which is held by engine.
 	cmp := c.newProg()
 	cmp.As = x86.ACMPQ
 	cmp.To.Type = obj.TYPE_REG
-	cmp.To.Reg = tmpReg
+	cmp.To.Reg = result
 	cmp.From.Type = obj.TYPE_MEM
 	cmp.From.Reg = reservedRegisterForEngine
 	cmp.From.Offset = engineModuleContextMemorySliceLenOffset
@@ -4138,13 +4131,12 @@ func (c *amd64Compiler) setupMemoryOffset(offsetArg uint32, targetSizeInByte int
 	c.addInstruction(okJmp)
 
 	// Otherwise, we exit the function with out of bounds status code.
-	c.addSetJmpOrigins(overflowJmp)
 	c.exit(jitCallStatusCodeMemoryOutOfBounds)
 
 	c.addSetJmpOrigins(okJmp)
 
-	c.locationStack.markRegisterUnused(base.register)
-	return base.register, nil
+	c.locationStack.markRegisterUnused(result)
+	return result, nil
 }
 
 // compileStore implements compiler.compileStore for the amd64 architecture.

@@ -4816,8 +4816,8 @@ func TestAmd64Compiler_setupMemoryOffset(t *testing.T) {
 					// If the memory offset exceeds the length of memory, we must exit the function
 					// with jitCallStatusCodeMemoryOutOfBounds status code.
 					mem := env.memory()
-					baseOffset := int(base) + int(offset)
-					if baseOffset >= math.MaxUint32 || len(mem) < baseOffset+int(targetSizeInByte) {
+					baseOffset := int64(base) + int64(offset)
+					if int64(len(mem)) < baseOffset+int64(targetSizeInByte) {
 						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
 					} else {
 						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
