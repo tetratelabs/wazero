@@ -229,7 +229,7 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	err = store.Instantiate(mod, "test")
 	require.NoError(t, err)
 
-	// We should be able to call the exported store_int and it should store two ints.
+	// Call store_int and ensure it didn't return an error code.
 	results, _, err := store.CallFunction(ctx, "test", "store_int", 1, math.MaxUint64)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), results[0])
