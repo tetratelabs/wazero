@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/binary"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
@@ -129,7 +130,7 @@ func unreachable(t *testing.T, newEngine func() wasm.Engine) {
 
 	const moduleName = "test"
 
-	callUnreachable := func(ctx *wasm.HostFunctionCallContext) {
+	callUnreachable := func(ctx api.HostFunctionCallContext) {
 		_, _, err := store.CallFunction(ctx.Context(), moduleName, "unreachable_func")
 		require.NoError(t, err)
 	}
@@ -186,7 +187,7 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 
 	store := wasm.NewStore(newEngine())
 
-	hostfunc := func(ctx *wasm.HostFunctionCallContext) {
+	hostfunc := func(ctx api.HostFunctionCallContext) {
 		_, _, err := store.CallFunction(ctx.Context(), "test", "called_by_host_func")
 		require.NoError(t, err)
 	}
@@ -201,7 +202,7 @@ func recursiveEntry(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 // importedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
-// Notably, this uses memory, which ensures wasm.HostFunctionCallContext is valid in both interpreter and JIT engines.
+// Notably, this uses memory, which ensures api.HostFunctionCallContext is valid in both interpreter and JIT engines.
 func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
 	mod, err := text.DecodeModule([]byte(`(module $test
@@ -216,8 +217,8 @@ func importedAndExportedFunc(t *testing.T, newEngine func() wasm.Engine) {
 
 	store := wasm.NewStore(newEngine())
 
-	storeInt := func(ctx *wasm.HostFunctionCallContext, offset uint32, val uint64) uint32 {
-		if !ctx.Memory.PutUint64(offset, val) {
+	storeInt := func(ctx api.HostFunctionCallContext, offset uint32, val uint64) uint32 {
+		if !ctx.Memory().WriteUint64Le(offset, val) {
 			return 1
 		}
 		return 0
@@ -267,7 +268,7 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() wasm.Engine) {
 		{
 			testName:  "host function with f32 param",
 			floatType: wasm.ValueTypeF32,
-			identityFloatFunc: reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext, value float32) float32 {
+			identityFloatFunc: reflect.ValueOf(func(ctx api.HostFunctionCallContext, value float32) float32 {
 				return value
 			}),
 			floatParam:       uint64(math.Float32bits(math.MaxFloat32)), // float bits as a uint32 value, but casted to uint64 to be passed to CallFunction
@@ -276,7 +277,7 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() wasm.Engine) {
 		{
 			testName:  "host function with f64 param",
 			floatType: wasm.ValueTypeF64,
-			identityFloatFunc: reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext, value float64) float64 {
+			identityFloatFunc: reflect.ValueOf(func(ctx api.HostFunctionCallContext, value float64) float64 {
 				return value
 			}),
 			floatParam:       math.Float64bits(math.MaxFloat64),

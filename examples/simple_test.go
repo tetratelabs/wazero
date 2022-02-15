@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/interpreter"
 	"github.com/tetratelabs/wazero/wasm/text"
@@ -25,7 +26,7 @@ func Test_Simple(t *testing.T) {
 	store := wasm.NewStore(interpreter.NewEngine())
 
 	stdout := new(bytes.Buffer)
-	hostFunction := func(_ *wasm.HostFunctionCallContext) {
+	hostFunction := func(_ api.HostFunctionCallContext) {
 		_, _ = fmt.Fprintln(stdout, "hello!")
 	}
 

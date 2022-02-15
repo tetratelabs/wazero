@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/wasm"
 	"github.com/tetratelabs/wazero/wasm/buildoptions"
 )
@@ -45,9 +46,9 @@ func TestInterpreter_PushFrame_StackOverflow(t *testing.T) {
 func TestInterpreter_CallHostFunc(t *testing.T) {
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		memory := &wasm.MemoryInstance{}
-		var ctxMemory *wasm.MemoryInstance
-		hostFn := reflect.ValueOf(func(ctx *wasm.HostFunctionCallContext) {
-			ctxMemory = ctx.Memory
+		var ctxMemory api.Memory
+		hostFn := reflect.ValueOf(func(ctx api.HostFunctionCallContext) {
+			ctxMemory = ctx.Memory()
 		})
 		it := interpreter{functions: map[wasm.FunctionAddress]*interpreterFunction{
 			0: {hostFn: &hostFn, funcInstance: &wasm.FunctionInstance{
