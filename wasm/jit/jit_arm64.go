@@ -785,34 +785,11 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-
-	if err := c.compileCallFunction(target.Address, target.FunctionType.Type); err != nil {
-		return err
-	}
-	return nil
+	return c.compileCallImpl(target.Address, target.FunctionType.Type)
 }
 
-// compileCalcCallFrameStackTopAddress adds instruction to set the absolute address of
-// engine.callFrameStack[engine.callFrameStackPointer] into destinationRegister.
-func (c *arm64Compiler) compileCalcCallFrameStackTopAddress(tmpRegister, destinationRegister int16) {
-	// "tmpRegister = engine.callFrameStackPointer"
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
-		tmpRegister)
-	// "destinationRegister = &engine.callFrameStack[0]"
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForEngine, engineGlobalContextCallFrameStackElement0AddressOffset,
-		destinationRegister)
-	// "destinationRegister += tmpRegister << $callFrameDataSizeMostSignificantSetBit"
-	c.compileAddInstructionWithLeftShiftedRegister(
-		tmpRegister, callFrameDataSizeMostSignificantSetBit,
-		destinationRegister,
-		destinationRegister,
-	)
-}
-
-// compileCall implements compiler.compileCall and compiler.compileCallIndirect (TODO) for the arm64 architecture.
-func (c *arm64Compiler) compileCallFunction(addr wasm.FunctionAddress, functype *wasm.FunctionType) error {
+// compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect (TODO) for the arm64 architecture.
+func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *wasm.FunctionType) error {
 	// TODO: the following code can be generalized for CallIndirect.
 
 	// Release all the registers as our calling convention requires the caller-save.
@@ -827,12 +804,45 @@ func (c *arm64Compiler) compileCallFunction(addr wasm.FunctionAddress, functype 
 	c.locationStack.markRegisterUsed(freeRegisters...)
 
 	// Alias for readability.
-	callFrameStackTopAddressRegister, compiledFunctionAddressRegister, oldStackBasePointer,
-		tmp := freeRegisters[0], freeRegisters[1], freeRegisters[2], freeRegisters[3]
+	callFrameStackPointerRegister, callFrameStackTopAddressRegister, compiledFunctionAddressRegister, oldStackBasePointer,
+		tmp := freeRegisters[0], freeRegisters[1], freeRegisters[2], freeRegisters[3], freeRegisters[4]
 
-	// TODO: Check the callframe stack length, and if necessary, grow the call frame stack before jump into the target.
+	// First, we have to check if we need to grow the callFrame stack.
+	//
+	// "callFrameStackPointerRegister = engine.callFrameStackPointer"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
+		callFrameStackPointerRegister)
+	// "tmp = len(engine.callFrameStack)"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackLenOffset,
+		tmp,
+	)
+	// Compare tmp(len(engine.callFrameStack)) with callFrameStackPointerRegister(engine.callFrameStackPointer).
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, callFrameStackPointerRegister)
+	brIfCallFrameStackOK := c.newProg()
+	brIfCallFrameStackOK.As = arm64.ABNE
+	brIfCallFrameStackOK.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(brIfCallFrameStackOK)
 
-	c.compileCalcCallFrameStackTopAddress(tmp, callFrameStackTopAddressRegister)
+	// If these values equal, we need to grow the callFrame stack.
+	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
+		return err
+	}
+
+	// On the function return, we again have to set engine.callFrameStackPointer into callFrameStackPointerRegister.
+	// "callFrameStackPointerRegister = engine.callFrameStackPointer"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
+		callFrameStackPointerRegister)
+	// Plus, re-initialize stack base pointer.
+	// TODO: investigate if we really need this or not.
+	c.compileReservedStackBasePointerRegisterInitialization()
+
+	// Now that we ensured callFrameStack length is enough.
+	c.setBranchTargetOnNext(brIfCallFrameStackOK)
+	c.compileCalcCallFrameStackTopAddress(callFrameStackPointerRegister, callFrameStackTopAddressRegister)
 
 	// At this point, we have:
 	//
@@ -950,6 +960,21 @@ func (c *arm64Compiler) compileCallFunction(addr wasm.FunctionAddress, functype 
 
 	c.compileReservedMemoryRegisterInitialization()
 	return nil
+}
+
+// compileCalcCallFrameStackTopAddress adds instruction to set the absolute address of
+// engine.callFrameStack[callFrameStackPointerRegister] into destinationRegister.
+func (c *arm64Compiler) compileCalcCallFrameStackTopAddress(callFrameStackPointerRegister, destinationRegister int16) {
+	// "destinationRegister = &engine.callFrameStack[0]"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackElement0AddressOffset,
+		destinationRegister)
+	// "destinationRegister += callFrameStackPointerRegister << $callFrameDataSizeMostSignificantSetBit"
+	c.compileAddInstructionWithLeftShiftedRegister(
+		callFrameStackPointerRegister, callFrameDataSizeMostSignificantSetBit,
+		destinationRegister,
+		destinationRegister,
+	)
 }
 
 // readInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
@@ -2035,14 +2060,15 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr 
 		return err
 	}
 
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	freeRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 4)
 	if !found {
 		return fmt.Errorf("BUG: all registers except addrReg should be free at this point")
 	}
-	c.locationStack.markRegisterUsed(regs...)
+	c.locationStack.markRegisterUsed(freeRegs...)
 
 	// Alias these free tmp registers for readability.
-	tmp, currentCallFrameTopAddressRegister, returnAddressRegister := regs[0], regs[1], regs[2]
+	tmp, currentCallFrameStackPointerRegister, currentCallFrameTopAddressRegister, returnAddressRegister :=
+		freeRegs[0], freeRegs[1], freeRegs[2], freeRegs[3]
 
 	// Set the target function address to engine.functionCallAddress
 	// "tmp = $addr"
@@ -2061,10 +2087,17 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr 
 
 	// Next, we have to set the return address into callFrameStack[engine.callFrameStackPointer-1].returnAddress.
 	//
+	// "currentCallFrameStackPointerRegister = engine.callFrameStackPointer"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
+		currentCallFrameStackPointerRegister)
+
 	// Set the address of callFrameStack[engine.callFrameStackPointer] into currentCallFrameTopAddressRegister.
-	c.compileCalcCallFrameStackTopAddress(tmp, currentCallFrameTopAddressRegister)
+	c.compileCalcCallFrameStackTopAddress(currentCallFrameStackPointerRegister, currentCallFrameTopAddressRegister)
+
 	// Set the return address (after RET in c.exit below) into returnAddressRegister.
 	c.compileReadInstructionAddress(obj.ARET, returnAddressRegister)
+
 	// Write returnAddressRegister into callFrameStack[engine.callFrameStackPointer-1].returnAddress.
 	c.compileRegisterToMemoryInstruction(
 		arm64.AMOVD,
@@ -2073,6 +2106,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr 
 		currentCallFrameTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 	)
 
+	c.markRegisterUnused(freeRegs...)
 	return c.exit(jitStatus)
 }
 
