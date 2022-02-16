@@ -2463,8 +2463,6 @@ func TestArm64Compiler_compileMemryGrow(t *testing.T) {
 
 	// Emit arbitrary code after MemoryGrow returned.
 	const expValue uint32 = 100
-	err = compiler.compilePreamble()
-	require.NoError(t, err)
 	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
 	require.NoError(t, err)
 	compiler.compileReturnFunction()
