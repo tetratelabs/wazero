@@ -1790,8 +1790,10 @@ func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
+		loadInst = arm64.AMOVWU
 		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeI64:
+		loadInst = arm64.AMOVD
 		targetSizeInBytes = 64 / 8
 	case wazeroir.UnsignedTypeF32:
 		isFloat = true
@@ -1807,10 +1809,12 @@ func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	var loadInst obj.As
 	switch o.Type {
-	case wazeroir.SignedInt32:
-	case wazeroir.SignedInt64:
-	case wazeroir.SignedUint32:
-	case wazeroir.SignedUint64:
+	case wazeroir.SignedInt32, wazeroir.SignedInt64:
+		// TODO: looks like the assembler cannot emit 32-bit variant of LDRSB.
+		// Differentiate s32 vs u32 after #233.
+		loadInst = arm64.AMOVB
+	case wazeroir.SignedUint32, wazeroir.SignedUint64:
+		loadInst = arm64.AMOVBU
 	}
 	return c.compileLoadImpl(o.Arg.Offset, loadInst, 1, false)
 }
@@ -1819,10 +1823,12 @@ func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	var loadInst obj.As
 	switch o.Type {
-	case wazeroir.SignedInt32:
-	case wazeroir.SignedInt64:
-	case wazeroir.SignedUint32:
-	case wazeroir.SignedUint64:
+	case wazeroir.SignedInt32, wazeroir.SignedInt64:
+		// TODO: looks like the assembler cannot emit 32-bit variant of LDRSH.
+		// Differentiate s32 vs u32 after #233.
+		loadInst = arm64.AMOVH
+	case wazeroir.SignedUint32, wazeroir.SignedUint64:
+		loadInst = arm64.AMOVHU
 	}
 	return c.compileLoadImpl(o.Arg.Offset, loadInst, 16/8, false)
 }
@@ -1831,7 +1837,9 @@ func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 func (c *arm64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	var loadInst obj.As
 	if o.Signed {
+		loadInst = arm64.AMOVW
 	} else {
+		loadInst = arm64.AMOVWU
 	}
 	return c.compileLoadImpl(o.Arg.Offset, loadInst, 32/8, false)
 }
