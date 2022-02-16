@@ -2099,9 +2099,11 @@ func TestArm64Compiler_compileMemoryAccessOffsetSetup(t *testing.T) {
 }
 
 func TestArm64Compiler_compileStore(t *testing.T) {
-	const baseOffset = 100 // For testing. Arbitrary number is fine.
+	// For testing. Arbitrary number is fine.
+	const baseOffset = 100
 	storeTargetValue := uint64(0x8000_8000)
 	arg := &wazeroir.MemoryImmediate{Offset: 361}
+
 	for _, tp := range []wazeroir.UnsignedType{
 		wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64,
 		wazeroir.UnsignedTypeF32, wazeroir.UnsignedTypeF64,
@@ -2145,7 +2147,7 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 			require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 			// Generate the code under test.
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileReturnFunction()
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
@@ -2159,7 +2161,7 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 				ceil += 8
 			}
 			mem := env.memory()
-			expectedNeighbor8Bytes := uint64(0xffff_ffff_ffff_ffff)
+			expectedNeighbor8Bytes := uint64(0x12_34_56_78_9a_bc_ef_fe)
 			binary.LittleEndian.PutUint64(mem[offset-8:offset], expectedNeighbor8Bytes)
 			binary.LittleEndian.PutUint64(mem[ceil:ceil+8], expectedNeighbor8Bytes)
 
@@ -2180,6 +2182,107 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 			// The neighboring bytes must be intact.
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
 			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
+		})
+	}
+}
+
+func TestArm64Compiler_compileStore8_16_32(t *testing.T) {
+	// For testing. Arbitrary number is fine.
+	const baseOffset = 100
+	storeTargetValue := uint64(math.MaxUint64)
+	arg := &wazeroir.MemoryImmediate{Offset: 361}
+	offset := arg.Offset + baseOffset
+
+	for _, tp := range []wazeroir.UnsignedInt{wazeroir.UnsignedInt32, wazeroir.UnsignedInt64} {
+		tp := tp
+		t.Run(tp.String(), func(t *testing.T) {
+			for _, tc := range []struct {
+				name                string
+				targetSizeInBytes   uint32
+				operationSetupFn    func(t *testing.T, compiler *arm64Compiler)
+				storedValueVerifyFn func(t *testing.T, mem []byte)
+			}{
+				{
+					name:              "store8",
+					targetSizeInBytes: 1,
+					operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+						// Emit the memory load instructions.
+						err := compiler.compileStore8(&wazeroir.OperationStore8{Arg: arg, Type: tp})
+						require.NoError(t, err)
+					},
+					storedValueVerifyFn: func(t *testing.T, mem []byte) {
+						require.Equal(t, byte(storeTargetValue), mem[offset])
+					},
+				},
+				{
+					name:              "store16",
+					targetSizeInBytes: 16 / 8,
+					operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+						// Emit the memory load instructions.
+						err := compiler.compileStore16(&wazeroir.OperationStore16{Arg: arg, Type: tp})
+						require.NoError(t, err)
+					},
+					storedValueVerifyFn: func(t *testing.T, mem []byte) {
+						require.Equal(t, uint16(storeTargetValue), binary.LittleEndian.Uint16(mem[offset:]))
+					},
+				},
+				{
+					name:              "store32",
+					targetSizeInBytes: 32 / 8,
+					operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+						// Emit the memory load instructions.
+						err := compiler.compileStore32(&wazeroir.OperationStore32{Arg: arg})
+						require.NoError(t, err)
+					},
+					storedValueVerifyFn: func(t *testing.T, mem []byte) {
+						require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem[offset:]))
+					},
+				},
+			} {
+				tc := tc
+				t.Run(tc.name, func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
+					compiler.f.ModuleInstance = env.moduleInstance
+
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+
+					// Before store operations, we must push the base offset, and the store target values.
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: baseOffset})
+					require.NoError(t, err)
+					if tp == wazeroir.UnsignedInt32 {
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(storeTargetValue)})
+					} else {
+						err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: storeTargetValue})
+					}
+					require.NoError(t, err)
+
+					tc.operationSetupFn(t, compiler)
+
+					// Generate the code under test.
+					compiler.compileReturnFunction()
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+
+					// Set the value on the left and right neighboring memoryregion,
+					// so that we can veirfy the operation doesn't affect there.
+					ceil := offset + tc.targetSizeInBytes
+					mem := env.memory()
+					expectedNeighbor8Bytes := uint64(0x12_34_56_78_9a_bc_ef_fe)
+					binary.LittleEndian.PutUint64(mem[offset-8:offset], expectedNeighbor8Bytes)
+					binary.LittleEndian.PutUint64(mem[ceil:ceil+8], expectedNeighbor8Bytes)
+
+					// Run code.
+					env.exec(code)
+
+					tc.storedValueVerifyFn(t, mem)
+
+					// The neighboring bytes must be intact.
+					require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
+					require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
+				})
+			}
 		})
 	}
 }
