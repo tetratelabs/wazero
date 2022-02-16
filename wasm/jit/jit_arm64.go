@@ -1782,22 +1782,83 @@ func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 
 // compileLoad implements compiler.compileLoad for the amd64 architecture.
 func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	var (
+		isFloat           bool
+		loadInst          obj.As
+		targetSizeInBytes int64
+	)
+
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		targetSizeInBytes = 32 / 8
+	case wazeroir.UnsignedTypeI64:
+		targetSizeInBytes = 64 / 8
+	case wazeroir.UnsignedTypeF32:
+		isFloat = true
+		targetSizeInBytes = 32 / 8
+	case wazeroir.UnsignedTypeF64:
+		isFloat = true
+		targetSizeInBytes = 64 / 8
+	}
+	return c.compileLoadImpl(o.Arg.Offset, loadInst, targetSizeInBytes, isFloat)
 }
 
 // compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
 func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	var loadInst obj.As
+	switch o.Type {
+	case wazeroir.SignedInt32:
+	case wazeroir.SignedInt64:
+	case wazeroir.SignedUint32:
+	case wazeroir.SignedUint64:
+	}
+	return c.compileLoadImpl(o.Arg.Offset, loadInst, 1, false)
 }
 
 // compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
 func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	var loadInst obj.As
+	switch o.Type {
+	case wazeroir.SignedInt32:
+	case wazeroir.SignedInt64:
+	case wazeroir.SignedUint32:
+	case wazeroir.SignedUint64:
+	}
+	return c.compileLoadImpl(o.Arg.Offset, loadInst, 16/8, false)
 }
 
 // compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
 func (c *arm64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	var loadInst obj.As
+	if o.Signed {
+	} else {
+	}
+	return c.compileLoadImpl(o.Arg.Offset, loadInst, 32/8, false)
+}
+
+// compileLoadImpl implements compileLoadImpl* variants for arm64 architecture.
+func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst obj.As, targetSizeInBytes int64, isFloat bool) error {
+	offsetReg, err := c.compileMemoryAccessOffsetSetup(offsetArg, targetSizeInBytes)
+	if err != nil {
+		return err
+	}
+
+	resultRegister := offsetReg
+	if isFloat {
+		resultRegister, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+		if err != nil {
+			return err
+		}
+	}
+
+	c.compileMemoryWithRegisterOffsetToRegisterInstruction(
+		loadInst,
+		reservedRegisterForMemory, offsetReg,
+		resultRegister,
+	)
+
+	c.locationStack.pushValueLocationOnRegister(resultRegister)
+	return nil
 }
 
 // compileStore implements compiler.compileStore for the amd64 architecture.
