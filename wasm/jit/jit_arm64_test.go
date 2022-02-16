@@ -2459,7 +2459,8 @@ func TestArm64Compiler_compileMemryGrow(t *testing.T) {
 	err = compiler.compileMemoryGrow()
 	require.NoError(t, err)
 
-	// Emit arbitrary code after MemoryGrow returned.
+	// Emit arbitrary code after MemoryGrow returned so that we can verify
+	// that the code can set the return address properly.
 	const expValue uint32 = 100
 	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
 	require.NoError(t, err)
@@ -2471,13 +2472,14 @@ func TestArm64Compiler_compileMemryGrow(t *testing.T) {
 	require.NoError(t, err)
 	env.exec(code)
 
+	// After the initial exec, the code must exit with builtin function call status and funcaddress for memory grow.
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
 	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
 
-	returnAddress := env.callFrameStackPeek().returnAddress
-	require.NotZero(t, returnAddress)
-	jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+	// Reenter from the return address.
+	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
 
+	// Check if the code successfully executed the code after builtin function call.
 	require.Equal(t, expValue, env.stackTopAsUint32())
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 }

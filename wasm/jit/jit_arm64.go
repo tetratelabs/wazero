@@ -1048,7 +1048,7 @@ func (c *arm64Compiler) compileCalcCallFrameStackTopAddress(callFrameStackPointe
 	)
 }
 
-// readInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
+// compileReadInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
 // into destinationRegister. "target instruction" is specified by beforeTargetInst argument and
 // the target is determined by "the instruction right after beforeTargetInst type".
 //
@@ -2081,6 +2081,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 	return offsetRegister, nil
 }
 
+// compileMemoryGrow implements compileMemoryGrow variants for arm64 architecture.
 func (c *arm64Compiler) compileMemoryGrow() error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
@@ -2094,6 +2095,7 @@ func (c *arm64Compiler) compileMemoryGrow() error {
 	return nil
 }
 
+// compileMemorySize implements compileMemorySize variants for arm64 architecture.
 func (c *arm64Compiler) compileMemorySize() error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
@@ -2121,6 +2123,9 @@ func (c *arm64Compiler) compileMemorySize() error {
 	return nil
 }
 
+// compileCallGoFunction adds instructions to call a Go function whose address equals the addr parameter.
+// jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
+// jitCallStatusCodeCallHostFunction.
 func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
