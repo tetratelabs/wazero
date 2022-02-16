@@ -4163,13 +4163,13 @@ func (c *amd64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
 	return c.moveToMemory(o.Arg.Offset, x86.AMOVL, 32/8)
 }
 
-func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As, targetSizeInByte int64) error {
+func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As, targetSizeInBytes int64) error {
 	val := c.locationStack.pop()
 	if err := c.ensureOnGeneralPurposeRegister(val); err != nil {
 		return err
 	}
 
-	reg, err := c.setupMemoryAccessCeil(offsetConst, targetSizeInByte)
+	reg, err := c.setupMemoryAccessCeil(offsetConst, targetSizeInBytes)
 	if err != nil {
 		return nil
 	}
@@ -4181,7 +4181,7 @@ func (c *amd64Compiler) moveToMemory(offsetConst uint32, moveInstruction obj.As,
 	moveToMemory.To.Type = obj.TYPE_MEM
 	moveToMemory.To.Reg = reservedRegisterForMemory
 	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
-	moveToMemory.To.Offset = -targetSizeInByte
+	moveToMemory.To.Offset = -targetSizeInBytes
 	moveToMemory.To.Index = reg
 	moveToMemory.To.Scale = 1
 	c.addInstruction(moveToMemory)
@@ -5529,9 +5529,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		readMemoryLength.To.Reg = tmpRegister2
 		readMemoryLength.From.Type = obj.TYPE_MEM
 		readMemoryLength.From.Reg = tmpRegister
-		// We add "+8" to get the length of MemoryInstance.Buffer
-		// since the slice header {Data uintptr, Len, int64, Cap int64} internally.
-		readMemoryLength.From.Offset = memoryInstanceBufferOffset + 8
+		readMemoryLength.From.Offset = memoryInstanceBufferLenOffset
 		c.addInstruction(readMemoryLength)
 
 		putMemoryLength := c.newProg()

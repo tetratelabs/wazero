@@ -1854,7 +1854,7 @@ func TestArm64Compiler_compieleSwap(t *testing.T) {
 	require.Equal(t, x, env.stack()[0])
 }
 
-func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
+func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -1863,10 +1863,31 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				// TODO: Add memory, table
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				// TODO: Add  table
 			},
 		},
-		// TODO: Add memory, table
+		{
+			name: "globals nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				// TODO: Add  table
+			},
+		},
+		{
+			name: "memory nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				// TODO: Add  table
+			},
+		},
+		{
+			name: "memory zero length",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+			},
+		},
 		{
 			name:           "nil",
 			moduleInstance: &wasm.ModuleInstance{},
@@ -2018,5 +2039,60 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
 			require.Equal(t, uint64(0), env.stackPointer())
 		})
+	}
+}
+
+func TestArm64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
+	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
+	offsets := []uint32{
+		0, 1 << 10, 1 << 31,
+		defaultMemoryPageNumInTest*wasm.MemoryPageSize - 1, defaultMemoryPageNumInTest * wasm.MemoryPageSize,
+		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
+		math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9, math.MaxInt32, math.MaxUint32,
+	}
+	targetSizeInBytes := []int64{1, 2, 4, 8}
+	for _, base := range bases {
+		base := base
+		for _, offset := range offsets {
+			offset := offset
+			for _, targetSizeInByte := range targetSizeInBytes {
+				targetSizeInByte := targetSizeInByte
+				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
+					compiler.f.ModuleInstance = env.moduleInstance
+
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
+					require.NoError(t, err)
+
+					reg, err := compiler.compileMemoryAccessCeilSetup(offset, targetSizeInByte)
+					require.NoError(t, err)
+
+					compiler.locationStack.pushValueLocationOnRegister(reg)
+
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
+
+					// Generate the code under test and run.
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+					env.exec(code)
+
+					mem := env.memory()
+					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
+						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
+						// with jitCallStatusCodeMemoryOutOfBounds status code.
+						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+					} else {
+						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+						require.Equal(t, uint64(1), env.stackPointer())
+						require.Equal(t, uint64(ceil), env.stackTopAsUint64())
+					}
+				})
+			}
+		}
 	}
 }

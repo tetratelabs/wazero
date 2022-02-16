@@ -337,7 +337,7 @@ func (c *arm64Compiler) compilePreamble() error {
 
 	// Before executing function body, we must initialize the stack base pointer register
 	// so that we can manipulate the memory stack properly.
-	if err := c.compileInitializeReservedStackBasePointerRegister(); err != nil {
+	if err := c.compileReservedStackBasePointerRegisterInitialization(); err != nil {
 		return err
 	}
 
@@ -345,7 +345,7 @@ func (c *arm64Compiler) compilePreamble() error {
 		return err
 	}
 
-	// TODO: Add initializeReservedMemoryPointer()
+	c.compileReservedMemoryRegisterInitialization()
 	return nil
 }
 
@@ -384,7 +384,9 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	brIfNotEqual.As = arm64.ABNE
 	brIfNotEqual.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(brIfNotEqual)
-	c.exit(jitCallStatusCodeReturned)
+	if err := c.exit(jitCallStatusCodeReturned); err != nil {
+		return err
+	}
 
 	// Otherwise, we have to jump to the caller's return address.
 	c.setBranchTargetOnNext(brIfNotEqual)
@@ -933,13 +935,13 @@ func (c *arm64Compiler) compileCallFunction(addr wasm.FunctionAddress, functype 
 	}
 
 	// On the function return, we initialize the state for this function.
-	c.compileInitializeReservedStackBasePointerRegister()
+	c.compileReservedStackBasePointerRegisterInitialization()
 
 	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
-	// TODO: initialize memory pointer.
 
+	c.compileReservedMemoryRegisterInitialization()
 	return nil
 }
 
@@ -1773,36 +1775,142 @@ func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	return nil
 }
 
+// compileLoad implements compiler.compileLoad for the amd64 architecture.
 func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
 func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
 func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
 func (c *arm64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileStore implements compiler.compileStore for the amd64 architecture.
 func (c *arm64Compiler) compileStore(o *wazeroir.OperationStore) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	var movInst obj.As
+	var targetSizeInBytes int64
+	switch o.Type {
+	case wazeroir.UnsignedTypeI32:
+		movInst = arm64.AMOVW
+		targetSizeInBytes = 32 / 8
+	case wazeroir.UnsignedTypeF32:
+		movInst = arm64.AFMOVS
+		targetSizeInBytes = 32 / 8
+	case wazeroir.UnsignedTypeI64:
+		movInst = arm64.AMOVD
+		targetSizeInBytes = 64 / 8
+	case wazeroir.UnsignedTypeF64:
+		movInst = arm64.AFMOVD
+		targetSizeInBytes = 64 / 8
+	}
+	return c.compileStoreImpl(o.Arg.Offset, movInst, targetSizeInBytes)
 }
 
+// compileStore8 implements compiler.compileStore8 for the amd64 architecture.
 func (c *arm64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileStoreImpl(o.Arg.Offset, arm64.AMOVB, 1)
 }
 
+// compileStore16 implements compiler.compileStore16 for the amd64 architecture.
 func (c *arm64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileStoreImpl(o.Arg.Offset, arm64.AMOVH, 16/8)
 }
 
+// compileStore32 implements compiler.compileStore32 for the amd64 architecture.
 func (c *arm64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileStoreImpl(o.Arg.Offset, arm64.AMOVW, 32/8)
+}
+
+// compileStoreImpl implements compleStore* variants for arm64 architecture.
+func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst obj.As, targetSizeInBytes int64) error {
+	val, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+	// Mark temporarily used as compileMemoryAccessCeilSetup might try allocating register.
+	c.markRegisterUsed(val.register)
+
+	ceilReg, err := c.compileMemoryAccessCeilSetup(offsetArg, targetSizeInBytes)
+	if err != nil {
+		return err
+	}
+
+	inst := c.newProg()
+	inst.As = storeInst
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = val.register
+	inst.To.Reg = reservedRegisterForMemory
+	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
+	inst.To.Offset = -targetSizeInBytes
+	inst.To.Index = ceilReg
+	inst.To.Scale = 1
+	c.addInstruction(inst)
+
+	c.markRegisterUnused(val.register)
+	return nil
+}
+
+// compileMemoryAccessCeilSetup pops the top value from the stack (called "base"), stores "base + offsetArg + targetSizeInBytes"
+// into a register, and returns the stored register. We call the result "ceil" because we access the memory
+// as memory.Buffer[ceil-targetSizeInBytes: ceil].
+//
+// Note: this also emits the instructions to check the out of bounds memory access.
+// In other words, if the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
+func (c *arm64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (ceilRegister int16, err error) {
+	base, err := c.popValueOnRegister()
+	if err != nil {
+		return 0, err
+	}
+
+	ceilRegister = base.register
+	if isZeroRegister(base.register) {
+		ceilRegister, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return
+		}
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, ceilRegister)
+	}
+
+	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
+		// "ceilRegister = base + offsetArg + targetSizeInBytes"
+		c.compileConstToRegisterInstruction(arm64.AADD, offsetConst, ceilRegister)
+	} else {
+		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
+		err = c.exit(jitCallStatusCodeMemoryOutOfBounds)
+		return
+	}
+
+	// "reservedRegisterForTemporary = len(memory.Buffer)"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineModuleContextMemorySliceLenOffset,
+		reservedRegisterForTemporary)
+
+	// Check if ceilRegister > len(memory.Buffer).
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, ceilRegister)
+	boundsOK := c.newProg()
+	boundsOK.As = arm64.ABLS
+	boundsOK.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(boundsOK)
+
+	// If the ceil exceeds the memory length, we exit the function with jitCallStatusCodeMemoryOutOfBounds.
+	if err = c.exit(jitCallStatusCodeMemoryOutOfBounds); err != nil {
+		return
+	}
+
+	// Otherwise, we branch into the next instruction.
+	c.setBranchTargetOnNext(boundsOK)
+
+	return ceilRegister, nil
 }
 
 func (c *arm64Compiler) compileMemoryGrow() error {
@@ -2066,9 +2174,9 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) (err e
 	return
 }
 
-// compilaleInitializeReservedStackBasePointerRegister adds intructions to initialize reservedRegisterForStackBasePointerAddress
+// compileReservedStackBasePointerRegisterInitialization adds intructions to initialize reservedRegisterForStackBasePointerAddress
 // so that it points to the absolute address of the stack base for this function.
-func (c *arm64Compiler) compileInitializeReservedStackBasePointerRegister() error {
+func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() error {
 	// First, load the address of the first element in the value stack into reservedRegisterForStackBasePointerAddress temporarily.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineGlobalContextValueStackElement0AddressOffset,
@@ -2088,29 +2196,40 @@ func (c *arm64Compiler) compileInitializeReservedStackBasePointerRegister() erro
 	return nil
 }
 
+func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
+	if c.f.ModuleInstance.Memory != nil {
+		// "reservedRegisterForMemory = engine.MemoryElement0Address"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			reservedRegisterForEngine, engineModuleContextMemoryElement0AddressOffset,
+			reservedRegisterForMemory,
+		)
+	}
+}
+
 // compileModuleContextInitialization adds instructions to initialize engine.ModuleContext's fields based on
 // engine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Obtain the free registers to be used in the followings.
-	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
+	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
 	c.locationStack.markRegisterUsed(regs...)
 
 	// Alias these free registers for readability.
-	moduleInstanceAddressRegister, tmpRegister := regs[0], regs[1]
+	moduleInstanceAddressRegister, tmpX, tmpY := regs[0], regs[1], regs[2]
 
 	// Load the absolute address of the current function's module instance.
 	// Note: this should be modified to support Clone() functionality per #179.
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(uintptr(unsafe.Pointer(c.f.ModuleInstance))), moduleInstanceAddressRegister)
 
-	// "tmpRegister = engine.ModuleInstanceAddress"
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineModuleContextModuleInstanceAddressOffset, tmpRegister)
+	// "tmpX = engine.ModuleInstanceAddress"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForEngine, engineModuleContextModuleInstanceAddressOffset, tmpX)
 
 	// If the module instance address stays the same, we could skip the entire code below.
-	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, moduleInstanceAddressRegister, tmpRegister)
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, moduleInstanceAddressRegister, tmpX)
 	brIfMdouleUnchanged := c.newProg()
 	brIfMdouleUnchanged.As = arm64.ABEQ
 	brIfMdouleUnchanged.To.Type = obj.TYPE_BRANCH
@@ -2118,10 +2237,10 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 
 	// Otherwise, we have to update the following fields:
 	// * engine.moduleContext.globalElement0Address
+	// * engine.moduleContext.memoryElement0Address
+	// * engine.moduleContext.memorySliceLen
 	// * (TODO) engine.moduleContext.tableElement0Address
 	// * (TODO) engine.moduleContext.tableSliceLen
-	// * (TODO) engine.moduleContext.memoryElement0Address
-	// * (TODO) engine.moduleContext.memorySliceLen
 
 	// Update globalElement0Address.
 	//
@@ -2129,25 +2248,67 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// is ensured by function validation at module instantiation phase, and that's why it is ok to
 	// skip the initialization if the module's globals slice is empty.
 	if len(c.f.ModuleInstance.Globals) > 0 {
-		// "tmpRegister = &moduleInstance.Globals[0]"
+		// "tmpX = &moduleInstance.Globals[0]"
 		c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 			moduleInstanceAddressRegister, moduleInstanceGlobalsOffset,
-			tmpRegister,
+			tmpX,
 		)
 
-		// "engine.GlobalElement0Address = tmpRegister (== &moduleInstance.Globals[0])"
+		// "engine.GlobalElement0Address = tmpX (== &moduleInstance.Globals[0])"
 		c.compileRegisterToMemoryInstruction(
-			arm64.AMOVD, tmpRegister,
+			arm64.AMOVD, tmpX,
 			reservedRegisterForEngine, engineModuleContextGlobalElement0AddressOffset,
 		)
 
 	}
 
+	// Update memoryElement0Address and memorySliceLen.
+	//
+	// Note: if there's memory instruction in the function, memory instance must be non-nil.
+	// That is ensured by function validation at module instantiation phase, and that's
+	// why it is ok to skip the initialization if the module's memory instance is nil.
+	if c.f.ModuleInstance.Memory != nil {
+		// "tmpX = moduleInstance.Memory"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			moduleInstanceAddressRegister, moduleInstanceMemoryOffset,
+			tmpX,
+		)
+
+		// First, we write the memory length into engine.MemorySliceLen.
+		//
+		// "tmpY = [tmpX + memoryInstanceBufferLenOffset] (== len(memory.Buffer))"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmpX, memoryInstanceBufferLenOffset,
+			tmpY,
+		)
+		// "engine.MemorySliceLen = tmpY".
+		c.compileRegisterToMemoryInstruction(
+			arm64.AMOVD,
+			tmpY,
+			reservedRegisterForEngine, engineModuleContextMemorySliceLenOffset,
+		)
+
+		// Next write engine.memoryElement0Address.
+		//
+		// "tmpY = *tmpX (== &memory.Buffer[0])"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmpX, memoryInstanceBufferOffset,
+			tmpY,
+		)
+		// "engine.memoryElement0Address = tmpY".
+		c.compileRegisterToMemoryInstruction(
+			arm64.AMOVD,
+			tmpY,
+			reservedRegisterForEngine, engineModuleContextMemoryElement0AddressOffset,
+		)
+	}
+
 	// TODO: Update tableElement0Address and tableSliceLen.
-	// TODO: Update memoryElement0Address and memorySliceLen.
 
 	c.setBranchTargetOnNext(brIfMdouleUnchanged)
-
 	c.locationStack.markRegisterUnused(regs...)
 	return nil
 }
