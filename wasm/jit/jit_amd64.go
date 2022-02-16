@@ -175,23 +175,6 @@ func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error 
 	if err := c.callGoFunction(jitCallStatusCodeCallHostFunction, address); err != nil {
 		return err
 	}
-
-	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(c.f.FunctionType.Type.Params); i++ {
-		c.locationStack.pop()
-	}
-
-	// Also, the function results were pushed by the call.
-	for _, t := range c.f.FunctionType.Type.Results {
-		loc := c.locationStack.pushValueLocationOnStack()
-		switch t {
-		case wasm.ValueTypeI32, wasm.ValueTypeI64:
-			loc.setRegisterType(generalPurposeRegisterTypeInt)
-		case wasm.ValueTypeF32, wasm.ValueTypeF64:
-			loc.setRegisterType(generalPurposeRegisterTypeFloat)
-		}
-	}
-
 	return c.returnFunction()
 }
 
@@ -4241,7 +4224,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 	getMemorySizeInPageUnit.To.Type = obj.TYPE_REG
 	getMemorySizeInPageUnit.To.Reg = loc.register
 	getMemorySizeInPageUnit.From.Type = obj.TYPE_CONST
-	getMemorySizeInPageUnit.From.Offset = 16
+	getMemorySizeInPageUnit.From.Offset = wasm.MemoryPageSizeInBits
 	c.addInstruction(getMemorySizeInPageUnit)
 	return nil
 }

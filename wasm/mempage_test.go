@@ -7,7 +7,7 @@ import (
 )
 
 func TestMemoryPageConsts(t *testing.T) {
-	require.Equal(t, MemoryPageSize, uint32(1)<<memoryPageSizeInBit)
+	require.Equal(t, MemoryPageSize, uint32(1)<<MemoryPageSizeInBits)
 	require.Equal(t, MemoryPageSize, MemoryMaxPages)
 	require.Equal(t, MemoryPageSize, uint32(1<<16))
 }
@@ -24,7 +24,7 @@ func Test_MemoryBytesNumToPages(t *testing.T) {
 	}
 }
 
-func TestMemryInstance_Grow_Size(t *testing.T) {
+func TestMemoryInstance_Grow_Size(t *testing.T) {
 	t.Run("with max", func(t *testing.T) {
 		max := uint32(10)
 		m := &MemoryInstance{Max: &max, Buffer: make([]byte, 0)}
