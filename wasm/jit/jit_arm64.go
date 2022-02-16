@@ -80,6 +80,8 @@ type arm64Compiler struct {
 	stackPointerCeil uint64
 	// afterAssembleCallback hold the callbacks which are called after assembling native code.
 	afterAssembleCallback []func(code []byte) error
+	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
+	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
 }
 
 // compile implements compiler.compile for the arm64 architecture.
@@ -90,6 +92,12 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	stackPointerCeil = c.stackPointerCeil
 	if stackPointerCeil < c.locationStack.stackPointerCeil {
 		stackPointerCeil = c.locationStack.stackPointerCeil
+	}
+
+	// Now that the ceil of stack pointer is determined, we are invoking the callback.
+	// Note: this must be called before Assemble() befolow.
+	if c.onStackPointerCeilDeterminedCallBack != nil {
+		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
 	}
 
 	original := c.builder.Assemble()
@@ -161,17 +169,18 @@ func (c *arm64Compiler) markRegisterUnused(regs ...int16) {
 }
 
 // compileConstToRegisterInstruction adds an instruction where source operand is a constant and destination is a register.
-func (c *arm64Compiler) compileConstToRegisterInstruction(instruction obj.As, constValue int64, destinationRegister int16) {
-	applyConst := c.newProg()
-	applyConst.As = instruction
-	applyConst.From.Type = obj.TYPE_CONST
+func (c *arm64Compiler) compileConstToRegisterInstruction(instruction obj.As, constValue int64, destinationRegister int16) (inst *obj.Prog) {
+	inst = c.newProg()
+	inst.As = instruction
+	inst.From.Type = obj.TYPE_CONST
 	// Note: in raw arm64 assembly, immediates larger than 16-bits
 	// are not supported, but the assembler takes care of this and
 	// emits corresponding (at most) 4-instructions to load such large constants.
-	applyConst.From.Offset = constValue
-	applyConst.To.Type = obj.TYPE_REG
-	applyConst.To.Reg = destinationRegister
-	c.addInstruction(applyConst)
+	inst.From.Offset = constValue
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = destinationRegister
+	c.addInstruction(inst)
+	return
 }
 
 // compileMemoryToRegisterInstruction adds an instruction where source operand points a memory location and destination is a register.
@@ -278,8 +287,13 @@ func (c *arm64Compiler) compileTwoRegistersToNoneInstruction(instruction obj.As,
 }
 
 func (c *arm64Compiler) compileUnconditionalBranchInstruction() (br *obj.Prog) {
+	br = c.compilelBranchInstruction(obj.AJMP)
+	return
+}
+
+func (c *arm64Compiler) compilelBranchInstruction(inst obj.As) (br *obj.Prog) {
 	br = c.newProg()
-	br.As = obj.AJMP
+	br.As = inst
 	br.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(br)
 	return
@@ -334,14 +348,17 @@ func (c *arm64Compiler) pushFunctionParams() {
 // compilePreamble implements compiler.compilePreamble for the arm64 architecture.
 func (c *arm64Compiler) compilePreamble() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
+	// TODO: delete after #233
 	c.compileNOP()
 
 	c.pushFunctionParams()
 
-	// TODO: Add maybeGrowValueStack() .
+	// Check if it's necessary to grow the value stack before entring function body.
+	if err := c.compileMaybeGrowValueStack(); err != nil {
+		return err
+	}
 
-	// Before executing function body, we must initialize the stack base pointer register
-	// so that we can manipulate the stack properly.
+	// We must initialize the stack base pointer register so that we can manipulate the stack properly.
 	c.compileReservedStackBasePointerRegisterInitialization()
 
 	if err := c.compileModuleContextInitialization(); err != nil {
@@ -349,6 +366,60 @@ func (c *arm64Compiler) compilePreamble() error {
 	}
 
 	c.compileReservedMemoryRegisterInitialization()
+	return nil
+}
+
+// compileMaybeGrowValueStack adds instructions to check the necessity to grow the value stack,
+// and if so, make the builtin function call to do so. These instructions are called in the function's
+// preamble.
+func (c *arm64Compiler) compileMaybeGrowValueStack() error {
+	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	if !found {
+		return fmt.Errorf("BUG: all the registers should be free at this point")
+	}
+	tmpX, tmpY := tmpRegs[0], tmpRegs[1]
+
+	// "tmpX = len(engine.valueStack)"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD,
+		reservedRegisterForEngine, engineGlobalContextValueStackLenOffset,
+		tmpX,
+	)
+
+	// "tmpY = engine.stackBasePointer"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD,
+		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset,
+		tmpY,
+	)
+
+	// "tmpX = tmpX - tmpY", in other words "tmpX = len(engine.valueStack) - engine.stackBasePointer"
+	c.compileRegisterToRegisterInstruction(
+		arm64.ASUB,
+		tmpY,
+		tmpX,
+	)
+
+	// "tmpY = stackPointerCeil"
+	loadStackPointerCeil := c.compileConstToRegisterInstruction(
+		arm64.AMOVD,
+		math.MaxInt32,
+		tmpY,
+	)
+	// At this point of compilation, we don't know the value of stack pointe ceil,
+	// so we layzily resolve the value later.
+	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { loadStackPointerCeil.To.Offset = int64(stackPointerCeil) }
+
+	// Compare tmpX (len(engine.valueStack) - engine.stackBasePointer) and tmpY (engine.stackPointerCeil)
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmpX, tmpY)
+
+	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABHI) // TODO:
+
+	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
+		return err
+	}
+
+	c.setBranchTargetOnNext(brIfValueStackOK)
 	return nil
 }
 
@@ -382,10 +453,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, callFramePointerReg, tmpReg)
 
 	// If the values are identical, we return back to the Go code with returned status.
-	brIfNotEqual := c.newProg()
-	brIfNotEqual.As = arm64.ABNE
-	brIfNotEqual.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(brIfNotEqual)
+	brIfNotEqual := c.compilelBranchInstruction(arm64.ABNE)
 	if err := c.exit(jitCallStatusCodeReturned); err != nil {
 		return err
 	}
@@ -821,10 +889,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 	)
 	// Compare tmp(len(engine.callFrameStack)) with callFrameStackPointerRegister(engine.callFrameStackPointer).
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, callFrameStackPointerRegister)
-	brIfCallFrameStackOK := c.newProg()
-	brIfCallFrameStackOK.As = arm64.ABNE
-	brIfCallFrameStackOK.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(brIfCallFrameStackOK)
+	brIfCallFrameStackOK := c.compilelBranchInstruction(arm64.ABNE)
 
 	// If these values equal, we need to grow the callFrame stack.
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
@@ -836,9 +901,6 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForEngine, engineGlobalContextCallFrameStackPointerOffset,
 		callFrameStackPointerRegister)
-	// Plus, re-initialize stack base pointer.
-	// TODO: investigate if we really need this or not.
-	c.compileReservedStackBasePointerRegisterInitialization()
 
 	// Now that we ensured callFrameStack length is enough.
 	c.setBranchTargetOnNext(brIfCallFrameStackOK)
@@ -1136,9 +1198,7 @@ func (c *arm64Compiler) compileSelect() error {
 	// At this point, x1 is non-zero register, and x2 is either general purpuse or zero register.
 
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, zeroRegister, cv.register)
-	brIfNotZero := c.newProg()
-	brIfNotZero.As = arm64.ABNE
-	brIfNotZero.To.Type = obj.TYPE_BRANCH
+	brIfNotZero := c.compilelBranchInstruction(arm64.ABNE)
 	c.addInstruction(brIfNotZero)
 
 	// If cv == 0, we move the value of x2 to the x1.register.
@@ -1998,10 +2058,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	// Check if offsetRegister(= base+offsetArg+targetSizeInBytes) > len(memory.Buffer).
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, offsetRegister)
-	boundsOK := c.newProg()
-	boundsOK.As = arm64.ABLS
-	boundsOK.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(boundsOK)
+	boundsOK := c.compilelBranchInstruction(arm64.ABLS)
 
 	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length, we exit the function with jitCallStatusCodeMemoryOutOfBounds.
 	if err = c.exit(jitCallStatusCodeMemoryOutOfBounds); err != nil {
@@ -2382,7 +2439,6 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 	c.compileAddInstructionWithLeftShiftedRegister(
 		reservedRegisterForTemporary, 3, reservedRegisterForStackBasePointerAddress,
 		reservedRegisterForStackBasePointerAddress)
-	return
 }
 
 func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
@@ -2418,9 +2474,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, moduleInstanceAddressRegister, tmpX)
-	brIfMdouleUnchanged := c.newProg()
-	brIfMdouleUnchanged.As = arm64.ABEQ
-	brIfMdouleUnchanged.To.Type = obj.TYPE_BRANCH
+	brIfMdouleUnchanged := c.compilelBranchInstruction(arm64.ABEQ)
 	c.addInstruction(brIfMdouleUnchanged)
 
 	// Otherwise, we have to update the following fields:
