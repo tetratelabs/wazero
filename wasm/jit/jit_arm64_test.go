@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/bits"
@@ -1854,7 +1855,7 @@ func TestArm64Compiler_compieleSwap(t *testing.T) {
 	require.Equal(t, x, env.stack()[0])
 }
 
-func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
+func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -1863,10 +1864,31 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				// TODO: Add memory, table
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				// TODO: Add  table
 			},
 		},
-		// TODO: Add memory, table
+		{
+			name: "globals nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				// TODO: Add  table
+			},
+		},
+		{
+			name: "memory nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				// TODO: Add  table
+			},
+		},
+		{
+			name: "memory zero length",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+			},
+		},
 		{
 			name:           "nil",
 			moduleInstance: &wasm.ModuleInstance{},
@@ -2017,6 +2039,403 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			require.Equal(t, valueToSet, env.getGlobal(op.Index))
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
 			require.Equal(t, uint64(0), env.stackPointer())
+		})
+	}
+}
+
+func TestArm64Compiler_compileMemoryAccessOffsetSetup(t *testing.T) {
+	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
+	offsets := []uint32{
+		0, 1 << 10, 1 << 31,
+		defaultMemoryPageNumInTest*wasm.MemoryPageSize - 1, defaultMemoryPageNumInTest * wasm.MemoryPageSize,
+		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
+		math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9, math.MaxInt32, math.MaxUint32,
+	}
+	targetSizeInBytes := []int64{1, 2, 4, 8}
+	for _, base := range bases {
+		base := base
+		for _, offset := range offsets {
+			offset := offset
+			for _, targetSizeInByte := range targetSizeInBytes {
+				targetSizeInByte := targetSizeInByte
+				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
+
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
+					require.NoError(t, err)
+
+					reg, err := compiler.compileMemoryAccessOffsetSetup(offset, targetSizeInByte)
+					require.NoError(t, err)
+
+					compiler.locationStack.pushValueLocationOnRegister(reg)
+
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
+
+					// Generate the code under test and run.
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+					env.exec(code)
+
+					mem := env.memory()
+					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
+						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
+						// with jitCallStatusCodeMemoryOutOfBounds status code.
+						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+					} else {
+						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+						require.Equal(t, uint64(1), env.stackPointer())
+						require.Equal(t, uint64(ceil-targetSizeInByte), env.stackTopAsUint64())
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestArm64Compiler_compileStore(t *testing.T) {
+	// For testing. Arbitrary number is fine.
+	storeTargetValue := uint64(math.MaxUint64)
+	baseOffset := uint32(100)
+	arg := &wazeroir.MemoryImmediate{Offset: 361}
+	offset := arg.Offset + baseOffset
+
+	for _, tc := range []struct {
+		name                string
+		isFloatTarget       bool
+		targetSizeInBytes   uint32
+		operationSetupFn    func(t *testing.T, compiler *arm64Compiler)
+		storedValueVerifyFn func(t *testing.T, mem []byte)
+	}{
+		{
+			name:              "i32.store",
+			targetSizeInBytes: 32 / 8,
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileStore(&wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+			storedValueVerifyFn: func(t *testing.T, mem []byte) {
+				require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem[offset:]))
+			},
+		},
+		{
+			name:              "f32.store",
+			isFloatTarget:     true,
+			targetSizeInBytes: 32 / 8,
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileStore(&wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeF32})
+				require.NoError(t, err)
+			},
+			storedValueVerifyFn: func(t *testing.T, mem []byte) {
+				require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem[offset:]))
+			},
+		},
+		{
+			name:              "i64.store",
+			targetSizeInBytes: 64 / 8,
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileStore(&wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeI64})
+				require.NoError(t, err)
+			},
+			storedValueVerifyFn: func(t *testing.T, mem []byte) {
+				require.Equal(t, storeTargetValue, binary.LittleEndian.Uint64(mem[offset:]))
+			},
+		},
+		{
+			name:              "f64.store",
+			isFloatTarget:     true,
+			targetSizeInBytes: 64 / 8,
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileStore(&wazeroir.OperationStore{Arg: arg, Type: wazeroir.UnsignedTypeF64})
+				require.NoError(t, err)
+			},
+			storedValueVerifyFn: func(t *testing.T, mem []byte) {
+				require.Equal(t, storeTargetValue, binary.LittleEndian.Uint64(mem[offset:]))
+			},
+		},
+		{
+			name:              "store8",
+			targetSizeInBytes: 1,
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileStore8(&wazeroir.OperationStore8{Arg: arg})
+				require.NoError(t, err)
+			},
+			storedValueVerifyFn: func(t *testing.T, mem []byte) {
+				require.Equal(t, byte(storeTargetValue), mem[offset])
+			},
+		},
+		{
+			name:              "store16",
+			targetSizeInBytes: 16 / 8,
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileStore16(&wazeroir.OperationStore16{Arg: arg})
+				require.NoError(t, err)
+			},
+			storedValueVerifyFn: func(t *testing.T, mem []byte) {
+				require.Equal(t, uint16(storeTargetValue), binary.LittleEndian.Uint16(mem[offset:]))
+			},
+		},
+		{
+			name:              "store32",
+			targetSizeInBytes: 32 / 8,
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileStore32(&wazeroir.OperationStore32{Arg: arg})
+				require.NoError(t, err)
+			},
+			storedValueVerifyFn: func(t *testing.T, mem []byte) {
+				require.Equal(t, uint32(storeTargetValue), binary.LittleEndian.Uint32(mem[offset:]))
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Before store operations, we must push the base offset, and the store target values.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: baseOffset})
+			require.NoError(t, err)
+			if tc.isFloatTarget {
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(storeTargetValue)})
+			} else {
+				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: storeTargetValue})
+			}
+			require.NoError(t, err)
+
+			tc.operationSetupFn(t, compiler)
+
+			// At this point, no registers must be in use, and no values on the stack since we consumed two values.
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
+			require.Equal(t, uint64(0), compiler.locationStack.sp)
+
+			// Generate the code under test.
+			compiler.compileReturnFunction()
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Set the value on the left and right neighboring memoryregion,
+			// so that we can veirfy the operation doesn't affect there.
+			ceil := offset + tc.targetSizeInBytes
+			mem := env.memory()
+			expectedNeighbor8Bytes := uint64(0x12_34_56_78_9a_bc_ef_fe)
+			binary.LittleEndian.PutUint64(mem[offset-8:offset], expectedNeighbor8Bytes)
+			binary.LittleEndian.PutUint64(mem[ceil:ceil+8], expectedNeighbor8Bytes)
+
+			// Run code.
+			env.exec(code)
+
+			tc.storedValueVerifyFn(t, mem)
+
+			// The neighboring bytes must be intact.
+			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
+			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
+		})
+	}
+}
+
+func TestArm64Compiler_compileLoad(t *testing.T) {
+	// For testing. Arbitrary number is fine.
+	loadTargetValue := uint64(0x12_34_56_78_9a_bc_ef_fe)
+	baseOffset := uint32(100)
+	arg := &wazeroir.MemoryImmediate{Offset: 361}
+	offset := baseOffset + arg.Offset
+
+	for _, tc := range []struct {
+		name                string
+		isFloatTarget       bool
+		operationSetupFn    func(t *testing.T, compiler *arm64Compiler)
+		loadedValueVerifyFn func(t *testing.T, loadedValueAsUint64 uint64)
+	}{
+		{
+			name: "i32.load",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad(&wazeroir.OperationLoad{Arg: arg, Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, uint32(loadTargetValue), uint32(loadedValueAsUint64))
+			},
+		},
+		{
+			name: "i64.load",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad(&wazeroir.OperationLoad{Arg: arg, Type: wazeroir.UnsignedTypeI64})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, loadTargetValue, loadedValueAsUint64)
+			},
+		},
+		{
+			name: "f32.load",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad(&wazeroir.OperationLoad{Arg: arg, Type: wazeroir.UnsignedTypeF32})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, uint32(loadTargetValue), uint32(loadedValueAsUint64))
+			},
+			isFloatTarget: true,
+		},
+		{
+			name: "f64.load",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad(&wazeroir.OperationLoad{Arg: arg, Type: wazeroir.UnsignedTypeF64})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, loadTargetValue, loadedValueAsUint64)
+			},
+			isFloatTarget: true,
+		},
+		{
+			name: "i32.load8s",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad8(&wazeroir.OperationLoad8{Arg: arg, Type: wazeroir.SignedInt32})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, int32(int8(loadedValueAsUint64)), int32(uint32(loadedValueAsUint64)))
+			},
+		},
+		{
+			name: "i32.load8u",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad8(&wazeroir.OperationLoad8{Arg: arg, Type: wazeroir.SignedUint32})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, uint32(byte(loadedValueAsUint64)), uint32(loadedValueAsUint64))
+			},
+		},
+		{
+			name: "i64.load8s",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad8(&wazeroir.OperationLoad8{Arg: arg, Type: wazeroir.SignedInt64})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, int64(int8(loadedValueAsUint64)), int64(loadedValueAsUint64))
+			},
+		},
+		{
+			name: "i64.load8u",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad8(&wazeroir.OperationLoad8{Arg: arg, Type: wazeroir.SignedUint64})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, uint64(byte(loadedValueAsUint64)), loadedValueAsUint64)
+			},
+		},
+		{
+			name: "i32.load16s",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad16(&wazeroir.OperationLoad16{Arg: arg, Type: wazeroir.SignedInt32})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, int32(int16(loadedValueAsUint64)), int32(uint32(loadedValueAsUint64)))
+			},
+		},
+		{
+			name: "i32.load16u",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad16(&wazeroir.OperationLoad16{Arg: arg, Type: wazeroir.SignedUint32})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, uint32(loadedValueAsUint64), uint32(loadedValueAsUint64))
+			},
+		},
+		{
+			name: "i64.load16s",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad16(&wazeroir.OperationLoad16{Arg: arg, Type: wazeroir.SignedInt64})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, int64(int16(loadedValueAsUint64)), int64(loadedValueAsUint64))
+			},
+		},
+		{
+			name: "i64.load16u",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad16(&wazeroir.OperationLoad16{Arg: arg, Type: wazeroir.SignedUint64})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, uint64(uint16(loadedValueAsUint64)), loadedValueAsUint64)
+			},
+		},
+		{
+			name: "i64.load32s",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad32(&wazeroir.OperationLoad32{Arg: arg, Signed: true})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, int64(int32(loadedValueAsUint64)), int64(loadedValueAsUint64))
+			},
+		},
+		{
+			name: "i64.load32u",
+			operationSetupFn: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileLoad32(&wazeroir.OperationLoad32{Arg: arg, Signed: false})
+				require.NoError(t, err)
+			},
+			loadedValueVerifyFn: func(t *testing.T, loadedValueAsUint64 uint64) {
+				require.Equal(t, uint64(uint32(loadedValueAsUint64)), loadedValueAsUint64)
+			},
+		},
+	} {
+
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			binary.LittleEndian.PutUint64(env.memory()[offset:], loadTargetValue)
+
+			// Before load operation, we must push the base offset value.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: baseOffset})
+			require.NoError(t, err)
+
+			tc.operationSetupFn(t, compiler)
+
+			// At this point, the loaded value must be on top of the stack, and placed on a register.
+			require.Equal(t, uint64(1), compiler.locationStack.sp)
+			require.Len(t, compiler.locationStack.usedRegisters, 1)
+			loadedLocation := compiler.locationStack.peek()
+			require.True(t, loadedLocation.onRegister())
+			if tc.isFloatTarget {
+				require.Equal(t, generalPurposeRegisterTypeFloat, loadedLocation.registerType())
+			} else {
+				require.Equal(t, generalPurposeRegisterTypeInt, loadedLocation.registerType())
+			}
+
+			// Generate the code under test.
+			compiler.compileReturnFunction()
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			// Verify the loaded value.
+			require.Equal(t, uint64(1), env.stackPointer())
+			tc.loadedValueVerifyFn(t, env.stackTopAsUint64())
 		})
 	}
 }

@@ -4777,7 +4777,9 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 func TestAmd64Compiler_setupMemoryAccessCeil(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
 	offsets := []uint32{0,
-		1 << 10, 1 << 31, math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
+		1 << 10, 1 << 31,
+		defaultMemoryPageNumInTest*wasm.MemoryPageSize - 1, defaultMemoryPageNumInTest * wasm.MemoryPageSize,
+		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
 		math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9, math.MaxInt32, math.MaxUint32,
 	}
 	targetSizeInBytes := []int64{1, 2, 4, 8}

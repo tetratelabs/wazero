@@ -229,7 +229,8 @@ const (
 	tableInstanceTableOffset = 0
 
 	// Offsets for wasm.MemoryInstance.
-	memoryInstanceBufferOffset = 0
+	memoryInstanceBufferOffset    = 0
+	memoryInstanceBufferLenOffset = 8
 
 	// Offsets for wasm.GlobalInstance.
 	globalInstanceValueOffset = 8

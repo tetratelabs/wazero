@@ -552,6 +552,7 @@ func (o *OperationStore) Kind() OperationKind {
 }
 
 type OperationStore8 struct {
+	// TODO: Semantically Type doesn't affect operation so consider deleting this field.
 	Type UnsignedInt
 	Arg  *MemoryImmediate
 }
@@ -561,6 +562,7 @@ func (o *OperationStore8) Kind() OperationKind {
 }
 
 type OperationStore16 struct {
+	// TODO: Semantically Type doesn't affect operation so consider deleting this field.
 	Type UnsignedInt
 	Arg  *MemoryImmediate
 }

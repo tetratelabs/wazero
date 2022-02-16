@@ -71,6 +71,8 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Offsets for wasm.MemoryInstance
 	var memoryInstance wasm.MemoryInstance
 	require.Equal(t, int(unsafe.Offsetof(memoryInstance.Buffer)), memoryInstanceBufferOffset)
+	// "+8" because the slice header is laid out as {Data uintptr, Len int64, Cap int64} on memory.
+	require.Equal(t, int(unsafe.Offsetof(memoryInstance.Buffer)+8), memoryInstanceBufferLenOffset)
 
 	// Offsets for wasm.GlobalInstance
 	var globalInstance wasm.GlobalInstance
