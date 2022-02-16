@@ -1780,7 +1780,7 @@ func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	return nil
 }
 
-// compileLoad implements compiler.compileLoad for the amd64 architecture.
+// compileLoad implements compiler.compileLoad for the arm64 architecture.
 func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	var (
 		isFloat           bool
@@ -1807,7 +1807,7 @@ func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	return c.compileLoadImpl(o.Arg.Offset, loadInst, targetSizeInBytes, isFloat)
 }
 
-// compileLoad8 implements compiler.compileLoad8 for the amd64 architecture.
+// compileLoad8 implements compiler.compileLoad8 for the arm64 architecture.
 func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	var loadInst obj.As
 	switch o.Type {
@@ -1821,7 +1821,7 @@ func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	return c.compileLoadImpl(o.Arg.Offset, loadInst, 1, false)
 }
 
-// compileLoad16 implements compiler.compileLoad16 for the amd64 architecture.
+// compileLoad16 implements compiler.compileLoad16 for the arm64 architecture.
 func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	var loadInst obj.As
 	switch o.Type {
@@ -1835,7 +1835,7 @@ func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	return c.compileLoadImpl(o.Arg.Offset, loadInst, 16/8, false)
 }
 
-// compileLoad32 implements compiler.compileLoad32 for the amd64 architecture.
+// compileLoad32 implements compiler.compileLoad32 for the arm64 architecture.
 func (c *arm64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	var loadInst obj.As
 	if o.Signed {
@@ -1873,7 +1873,7 @@ func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst obj.As, targe
 	return nil
 }
 
-// compileStore implements compiler.compileStore for the amd64 architecture.
+// compileStore implements compiler.compileStore for the arm64 architecture.
 func (c *arm64Compiler) compileStore(o *wazeroir.OperationStore) error {
 	var movInst obj.As
 	var targetSizeInBytes int64
@@ -1894,17 +1894,17 @@ func (c *arm64Compiler) compileStore(o *wazeroir.OperationStore) error {
 	return c.compileStoreImpl(o.Arg.Offset, movInst, targetSizeInBytes)
 }
 
-// compileStore8 implements compiler.compileStore8 for the amd64 architecture.
+// compileStore8 implements compiler.compileStore8 for the arm64 architecture.
 func (c *arm64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
 	return c.compileStoreImpl(o.Arg.Offset, arm64.AMOVB, 1)
 }
 
-// compileStore16 implements compiler.compileStore16 for the amd64 architecture.
+// compileStore16 implements compiler.compileStore16 for the arm64 architecture.
 func (c *arm64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
 	return c.compileStoreImpl(o.Arg.Offset, arm64.AMOVH, 16/8)
 }
 
-// compileStore32 implements compiler.compileStore32 for the amd64 architecture.
+// compileStore32 implements compiler.compileStore32 for the arm64 architecture.
 func (c *arm64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
 	return c.compileStoreImpl(o.Arg.Offset, arm64.AMOVW, 32/8)
 }
