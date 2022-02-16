@@ -1324,14 +1324,16 @@ func (it *interpreter) callNativeFunc(ctx context.Context, f *interpreterFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v2 := math.Float32frombits(uint32(it.pop()))
-					v1 := math.Float32frombits(uint32(it.pop()))
-					it.push(uint64(math.Float32bits(float32(math.Copysign(float64(v1), float64(v2))))))
+					v2 := uint32(it.pop())
+					v1 := uint32(it.pop())
+					const signbit = 1 << 31
+					it.push(uint64(v1&^signbit | v2&signbit))
 				} else {
 					// Float64
-					v2 := math.Float64frombits(it.pop())
-					v1 := math.Float64frombits(it.pop())
-					it.push(uint64(math.Float64bits(math.Copysign(v1, v2))))
+					v2 := it.pop()
+					v1 := it.pop()
+					const signbit = 1 << 63
+					it.push(v1&^signbit | v2&signbit)
 				}
 				frame.pc++
 			}
