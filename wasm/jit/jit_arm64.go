@@ -1813,7 +1813,7 @@ func (c *arm64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 	switch o.Type {
 	case wazeroir.SignedInt32, wazeroir.SignedInt64:
 		// TODO: looks like the assembler cannot emit 32-bit variant of LDRSB.
-		// Differentiate s32 vs u32 after #233.
+		// Differentiate 32-bit vs 64-bit after #233.
 		loadInst = arm64.AMOVB
 	case wazeroir.SignedUint32, wazeroir.SignedUint64:
 		loadInst = arm64.AMOVBU
@@ -1827,7 +1827,7 @@ func (c *arm64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 	switch o.Type {
 	case wazeroir.SignedInt32, wazeroir.SignedInt64:
 		// TODO: looks like the assembler cannot emit 32-bit variant of LDRSH.
-		// Differentiate s32 vs u32 after #233.
+		// Differentiate 32-bit vs 64-bit after #233.
 		loadInst = arm64.AMOVH
 	case wazeroir.SignedUint32, wazeroir.SignedUint64:
 		loadInst = arm64.AMOVHU
