@@ -231,16 +231,24 @@ func TestInterpreter(t *testing.T) {
 
 func runTest(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
-	files, err := testcases.ReadDir(".")
+	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)
 
+	jsonfiles := make([]string, 0, len(files))
 	for _, f := range files {
 		filename := f.Name()
-		if filepath.Ext(f.Name()) != ".json" {
+		if filepath.Ext(filename) != ".json" {
 			continue
 		}
+		jsonfiles = append(jsonfiles, filepath.Join("testdata", filename))
+	}
 
-		raw, err := testcases.ReadFile(filename)
+	// If the go:embed path resolution was wrong, this fails.
+	// https://github.com/tetratelabs/wazero/issues/247
+	require.Greater(t, len(jsonfiles), 1)
+
+	for _, f := range jsonfiles {
+		raw, err := testcases.ReadFile(f)
 		require.NoError(t, err)
 
 		var base testbase
@@ -258,7 +266,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 					switch c.CommandType {
 					case "module":
-						buf, err := testcases.ReadFile(c.Filename)
+						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
 						require.NoError(t, err, msg)
 
 						mod, err := binary.DecodeModule(buf)
@@ -329,7 +337,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							// We don't support direct loading of wast yet.
 							t.Skip()
 						}
-						buf, err := testcases.ReadFile(c.Filename)
+						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
@@ -358,7 +366,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							// We don't support direct loading of wast yet.
 							t.Skip()
 						}
-						buf, err := testcases.ReadFile(c.Filename)
+						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
@@ -387,7 +395,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							// We don't support direct loading of wast yet.
 							t.Skip()
 						}
-						buf, err := testcases.ReadFile(c.Filename)
+						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
@@ -395,7 +403,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						require.Error(t, err, msg)
 					case "assert_uninstantiable":
-						buf, err := testcases.ReadFile(c.Filename)
+						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
 						require.NoError(t, err, msg)
 
 						mod, err := binary.DecodeModule(buf)

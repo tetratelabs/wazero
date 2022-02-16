@@ -83,8 +83,9 @@ jobs:
         target:
         - arch: arm64
           image: arm64v8/ubuntu
-        - arch: riscv64
-          image: riscv64/ubuntu
+        # TODO: re-enable after https://github.com/tetratelabs/wazero/issues/249
+        #- arch: riscv64
+        #  image: riscv64/ubuntu
 
     steps:
       - uses: actions/setup-go@v2
