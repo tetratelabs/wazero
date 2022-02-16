@@ -1406,8 +1406,8 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		return nil
 	}
 
-	// Since arm64 doesn't have an instruction deirectly counting trailing zeros,
-	// we reverse the bits first, and the does CLZ, which is exactly the same as
+	// Since arm64 doesn't have an instruction directly counting trailing zeros,
+	// we reverse the bits first, and then do CLZ, which is exactly the same as
 	// gcc implements __builtin_ctz for arm64.
 	reg := v.register
 	if o.Type == wazeroir.UnsignedInt32 {
