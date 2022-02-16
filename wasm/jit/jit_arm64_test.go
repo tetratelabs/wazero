@@ -2100,7 +2100,7 @@ func TestArm64Compiler_compileMemoryAccessOffsetSetup(t *testing.T) {
 
 func TestArm64Compiler_compileStore(t *testing.T) {
 	const baseOffset = 100 // For testing. Arbitrary number is fine.
-	storeTargetValue := uint64(math.MaxUint64)
+	storeTargetValue := uint64(0x8000_8000)
 	arg := &wazeroir.MemoryImmediate{Offset: 361}
 	for _, tp := range []wazeroir.UnsignedType{
 		wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64,
@@ -2119,12 +2119,15 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: baseOffset})
 			require.NoError(t, err)
 
+			var is32bit bool
 			switch tp {
 			case wazeroir.UnsignedTypeI32:
+				is32bit = true
 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(storeTargetValue)})
 			case wazeroir.UnsignedTypeI64:
 				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: storeTargetValue})
 			case wazeroir.UnsignedTypeF32:
+				is32bit = true
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(storeTargetValue))})
 			case wazeroir.UnsignedTypeF64:
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(storeTargetValue)})
@@ -2146,25 +2149,37 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
+			// Set the value on the left and right neighboring memoryregion,
+			// so that we can veirfy the operation doesn't affect there.
+			offset := o.Arg.Offset + baseOffset
+			ceil := offset
+			if is32bit {
+				ceil += 4
+			} else {
+				ceil += 8
+			}
+			mem := env.memory()
+			expectedNeighbor8Bytes := uint64(0xffff_ffff_ffff_ffff)
+			binary.LittleEndian.PutUint64(mem[offset-8:offset], expectedNeighbor8Bytes)
+			binary.LittleEndian.PutUint64(mem[ceil:ceil+8], expectedNeighbor8Bytes)
+
 			// Run code.
 			env.exec(code)
 
 			// All the values are popped, so the stack pointer must be zero.
 			require.Equal(t, uint64(0), env.stackPointer())
+
 			// Check the stored value.
-			offset := o.Arg.Offset + baseOffset
-			mem := env.memory()
-			switch o.Type {
-			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
+			if is32bit {
 				v := binary.LittleEndian.Uint32(mem[offset : offset+4])
 				require.Equal(t, uint32(storeTargetValue), v)
-				// The trailing bytes must be intact since this is 32-bit mov.
-				v = binary.LittleEndian.Uint32(mem[offset+4 : offset+8])
-				require.Equal(t, uint32(0), v)
-			case wazeroir.UnsignedTypeF64, wazeroir.UnsignedTypeI64:
+			} else {
 				v := binary.LittleEndian.Uint64(mem[offset : offset+8])
 				require.Equal(t, storeTargetValue, v)
 			}
+			// The neighboring bytes must be intact.
+			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[offset-8:offset]))
+			require.Equal(t, expectedNeighbor8Bytes, binary.LittleEndian.Uint64(mem[ceil:ceil+8]))
 		})
 	}
 }

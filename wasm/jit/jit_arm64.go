@@ -1806,7 +1806,7 @@ func (c *arm64Compiler) compileStore(o *wazeroir.OperationStore) error {
 	var targetSizeInBytes int64
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
-		movInst = arm64.AMOVD
+		movInst = arm64.AMOVW
 		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeI64:
 		movInst = arm64.AMOVD
