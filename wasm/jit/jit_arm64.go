@@ -1861,6 +1861,8 @@ func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst obj.As, targe
 		}
 	}
 
+	// "resultRegister = [reservedRegisterForMemory + offsetReg]"
+	// In other words, "resultRegister = memory.Buffer[offset: offset+targetSizeInBytes]"
 	c.compileMemoryWithRegisterOffsetToRegisterInstruction(
 		loadInst,
 		reservedRegisterForMemory, offsetReg,
@@ -1921,7 +1923,12 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst obj.As, tar
 		return err
 	}
 
-	c.compileRegisterToMemoryWithRegisterOffsetInstruction(storeInst, val.register, reservedRegisterForMemory, offsetReg)
+	// "[reservedRegisterForMemory + offsetReg] = val.register"
+	// In other words, "memory.Buffer[offset: offset+targetSizeInBytes] = val.register"
+	c.compileRegisterToMemoryWithRegisterOffsetInstruction(
+		storeInst, val.register,
+		reservedRegisterForMemory, offsetReg,
+	)
 
 	c.markRegisterUnused(val.register)
 	return nil

@@ -2211,6 +2211,10 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 
 			tc.operationSetupFn(t, compiler)
 
+			// At this point, no registers must be in use, and no values on the stack since we consumed two values.
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
+			require.Equal(t, uint64(0), compiler.locationStack.sp)
+
 			// Generate the code under test.
 			compiler.compileReturnFunction()
 			code, _, _, err := compiler.compile()
