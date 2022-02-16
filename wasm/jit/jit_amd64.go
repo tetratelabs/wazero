@@ -5217,7 +5217,6 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 		return err
 	}
 
-	// Initialize the reserved stack base pointer register.
 	c.initializeReservedStackBasePointer()
 
 	// Once the stack base pointer is initialized and the size of stack is ok,
