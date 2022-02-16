@@ -3,12 +3,14 @@ package wasi
 import (
 	crand "crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
 	mrand "math/rand"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/tetratelabs/wazero/wasm"
@@ -82,9 +84,60 @@ type API interface {
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno
 
-	// TODO: EnvironGet(ctx api.hostFunctionCallContext, environ, environBuf uint32) Errno
+	// EnvironGet is the WASI function that reads environment variables. (Environ)
+	//
+	// There are two parameters. Both are offsets in wasm.HostFunctionCallContext Memory. If either are invalid due to
+	// memory constraints, this returns ErrnoFault.
+	//
+	// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
+	//   * EnvironSizesGet result environc * 4 bytes are written to this offset
+	// * environBuf - is the offset to write the null terminated environment variables in the form of "key=val", the same format as os.Environ(), to wasm.MemoryInstance.
+	//   * EnvironSizesGet result environBufSize bytes are written to this offset
+	//
+	// For example, if EnvironSizesGet wrote environc=2 and environBufSize=9 for environment variables: "a=b", "b=cd"
+	//   and EnvironGet parameters environ=11 and environBuf=1, we expect `ctx.Memory.Buffer` to contain:
+	//
+	//                           environBufSize                 uint32le    uint32le
+	//              +------------------------------------+     +--------+  +--------+
+	//              |                                    |     |        |  |        |
+	//   []byte{?, 'a', '=', 'b', 0, 'b', '=', 'c', 'd', 0, ?, 1, 0, 0, 0, 5, 0, 0, 0, ?}
+	// environBuf --^                                          ^           ^
+	//                              environ offset for "a=b" --+           |
+	//                                         environ offset for "b=cd" --+
+	//
+	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See EnvironSizesGet
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
+	// See https://en.wikipedia.org/wiki/Null-terminated_string
+	EnvironGet(ctx wasm.HostFunctionCallContext, environ, environBuf uint32) Errno
 
-	// TODO: EnvironSizesGet(ctx api.hostFunctionCallContext, resulEnvironc, resultEnvironBufSize uint32) Errno
+	// EnvironSizesGet is a WASI function that reads environment variable (Environ) sizes.
+	//
+	// There are two result parameters: these are offsets in the wasi.HostFunctionCallContext Memory to write
+	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
+	// returns ErrnoFault.
+	//
+	// * resultEnvironc - is the offset to write the environment variable count to wasm.MemoryInstance Buffer
+	// * resultEnvironBufSize - is the offset to write the null-terminated environment variable length to wasm.MemoryInstance Buffer
+	//
+	// For example, if Environ is []string{"a=b","b=cd"} and
+	//   EnvironSizesGet parameters are resultEnvironc=1 and resultEncironBufSize=6, we expect `ctx.Memory.Buffer` to contain:
+	//
+	//                   uint32le       uint32le
+	//                  +--------+     +--------+
+	//                  |        |     |        |
+	//        []byte{?, 2, 0, 0, 0, ?, 9, 0, 0, 0, ?}
+	// resultEnvironc --^              ^
+	//    2 variables --+              |
+	//          resultEnvironBufSize --|
+	//    len([]byte{'a','=','b',0,    |
+	//           'b','=','c','d',0}) --+
+	//
+	// Note: EnvironSizesGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See EnvironGet
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
+	// See https://en.wikipedia.org/wiki/Null-terminated_string
+	EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnvironc, resultEnvironBufSize uint32) Errno
 
 	// TODO: ClockResGet(ctx api.hostFunctionCallContext, id, resultResolution uint32) Errno
 
@@ -174,8 +227,11 @@ const (
 )
 
 type wasiAPI struct {
-	args  *nullTerminatedStrings
-	stdin io.Reader
+	args *nullTerminatedStrings
+	// environ stores each environment variable in the form of "key=value",
+	// which is both convenient for the implementation of environ_get and matches os.Environ
+	environ *nullTerminatedStrings
+	stdin   io.Reader
 	stdout,
 	stderr io.Writer
 	opened map[uint32]fileEntry
@@ -193,8 +249,8 @@ func (a *wasiAPI) register(store *wasm.Store) (err error) {
 	}{
 		{FunctionArgsGet, a.ArgsGet},
 		{FunctionArgsSizesGet, a.ArgsSizesGet},
-		{FunctionEnvironGet, environ_get},
-		{FunctionEnvironSizesGet, environ_sizes_get},
+		{FunctionEnvironGet, a.EnvironGet},
+		{FunctionEnvironSizesGet, a.EnvironSizesGet},
 		// TODO: FunctionClockResGet
 		{FunctionClockTimeGet, a.ClockTimeGet},
 		// TODO: FunctionFdAdvise
@@ -278,9 +334,34 @@ func (a *wasiAPI) ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, res
 	return ErrnoSuccess
 }
 
-// TODO: func (a *wasiAPI) EnvironGet
+// EnvironGet implements API.EnvironGet
+func (w *wasiAPI) EnvironGet(ctx wasm.HostFunctionCallContext, environ uint32, environBuf uint32) (err Errno) {
+	// w.environ holds the environment variables in the form of "key=val\x00", so just copies it to the linear memory.
+	for _, env := range w.environ.nullTerminatedValues {
+		if !ctx.Memory().WriteUint32Le(environ, environBuf) {
+			return ErrnoFault
+		}
+		environ += 4 // size of uint32
+		if !ctx.Memory().Write(environBuf, env) {
+			return ErrnoFault
+		}
+		environBuf += uint32(len(env))
+	}
 
-// TODO: func (a *wasiAPI) EnvironSizesGet
+	return ErrnoSuccess
+}
+
+// EnvironSizesGet implements API.EnvironSizesGet
+func (w *wasiAPI) EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnvironc uint32, resultEnvironBufSize uint32) (err Errno) {
+	if !ctx.Memory().WriteUint32Le(resultEnvironc, uint32(len(w.environ.nullTerminatedValues))) {
+		return ErrnoFault
+	}
+	if !ctx.Memory().WriteUint32Le(resultEnvironBufSize, w.environ.totalBufSize) {
+		return ErrnoFault
+	}
+
+	return ErrnoSuccess
+}
 
 // TODO: func (a *wasiAPI) FunctionClockResGet
 
@@ -324,12 +405,35 @@ func Stderr(writer io.Writer) Option {
 // Note: The only reason to set this is to control what's written by API.ArgsSizesGet and API.ArgsGet
 // Note: While similar in structure to os.Args, this controls what's visible in Wasm (ex the WASI function "_start").
 func Args(args ...string) (Option, error) {
-	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, args...) // TODO: this is crazy high even if spec allows it
+	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "arg", args...) // TODO: this is crazy high even if spec allows it
 	if err != nil {
 		return nil, err
 	}
 	return func(a *wasiAPI) {
 		a.args = wasiStrings
+	}, nil
+}
+
+// Environ returns an option to set environment variables to the API.
+// Environ returns an error if the input contains a string not joined with `=`, or if the inputs are too large.
+//  * environ: environment variables in the same format as that of `os.Environ`, where key/value pairs are joined with `=`.
+// See os.Environ
+//
+// Note: Implicit environment variable propagation into WASI is intentionally not done.
+// Note: The only reason to set this is to control what's written by API.EnvironSizesGet and API.EnvironGet
+// Note: While similar in structure to os.Environ, this controls what's visible in Wasm (ex the WASI function "_start").
+func Environ(environ ...string) (Option, error) {
+	for i, env := range environ {
+		if !strings.Contains(env, "=") {
+			return nil, fmt.Errorf("environ[%d] is not joined with '='", i)
+		}
+	}
+	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "environ", environ...) // TODO: this is crazy high even if spec allows it
+	if err != nil {
+		return nil, err
+	}
+	return func(w *wasiAPI) {
+		w.environ = wasiStrings
 	}, nil
 }
 
@@ -357,11 +461,12 @@ func registerAPI(store *wasm.Store, opts ...Option) (API, error) {
 
 func newAPI(opts ...Option) *wasiAPI {
 	ret := &wasiAPI{
-		args:   &nullTerminatedStrings{},
-		stdin:  os.Stdin,
-		stdout: os.Stdout,
-		stderr: os.Stderr,
-		opened: map[uint32]fileEntry{},
+		args:    &nullTerminatedStrings{},
+		environ: &nullTerminatedStrings{},
+		stdin:   os.Stdin,
+		stdout:  os.Stdout,
+		stderr:  os.Stderr,
+		opened:  map[uint32]fileEntry{},
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
@@ -579,12 +684,4 @@ func (a *wasiAPI) RandomGet(ctx wasm.HostFunctionCallContext, buf uint32, bufLen
 
 func proc_exit(wasm.HostFunctionCallContext, uint32) {
 	// TODO: implement
-}
-
-func environ_sizes_get(wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	return ErrnoNosys // TODO: implement
-}
-
-func environ_get(wasm.HostFunctionCallContext, uint32, uint32) (err Errno) {
-	return ErrnoNosys // TODO: implement
 }
