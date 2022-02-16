@@ -363,7 +363,6 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		return err
 	}
 
-	// Since we return from the function, we need to decrement the callframe stack pointer, and write it back.
 	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
@@ -804,7 +803,6 @@ func (c *arm64Compiler) compileCallFunction(addr wasm.FunctionAddress, functype 
 		return err
 	}
 
-	// Obtain the free registers to be used in the followings.
 	freeRegisters, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 5)
 	if !found {
 		return fmt.Errorf("BUG: all registers except addrReg should be free at this point")
@@ -2285,7 +2283,6 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 // engine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *arm64Compiler) compileModuleContextInitialization() error {
-	// Obtain the free registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
