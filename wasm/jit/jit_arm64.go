@@ -412,13 +412,13 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	// Compare tmpX (len(engine.valueStack) - engine.stackBasePointer) and tmpY (engine.stackPointerCeil)
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmpX, tmpY)
 
-	// If ceil > valueStackLen - stack base pointer, we need to grow the stack.
+	// If ceil > valueStackLen - stack base pointer, we need to grow the stack by calling builtin Go function.
 	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABLS)
-
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
 		return err
 	}
 
+	// Otherwise, skip calling it.
 	c.setBranchTargetOnNext(brIfValueStackOK)
 
 	c.locationStack.markRegisterUnused(tmpRegs...)
@@ -456,7 +456,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	// If the values are identical, we return back to the Go code with returned status.
 	brIfNotEqual := c.compilelBranchInstruction(arm64.ABNE)
-	if err := c.exit(jitCallStatusCodeReturned); err != nil {
+	if err := c.compileExitFromNativeCode(jitCallStatusCodeReturned); err != nil {
 		return err
 	}
 
@@ -514,8 +514,8 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	return nil
 }
 
-// exit adds instructions to give the control back to engine.exec with the given status code.
-func (c *arm64Compiler) exit(status jitCallStatusCode) error {
+// compileExitFromNativeCode adds instructions to give the control back to engine.exec with the given status code.
+func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) error {
 	// Write the current stack pointer to the engine.stackPointer.
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(c.locationStack.sp), reservedRegisterForTemporary)
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForTemporary, reservedRegisterForEngine,
@@ -542,6 +542,7 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 	return nil
 }
 
+// compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
 func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
@@ -594,7 +595,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 
 // compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
 func (c *arm64Compiler) compileUnreachable() error {
-	return c.exit(jitCallStatusCodeUnreachable)
+	return c.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 }
 
 // compileSwap implements compiler.compileSwap for the arm64 architecture.
@@ -2055,7 +2056,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 		c.compileConstToRegisterInstruction(arm64.AADD, offsetConst, offsetRegister)
 	} else {
 		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
-		err = c.exit(jitCallStatusCodeMemoryOutOfBounds)
+		err = c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
 		return
 	}
 
@@ -2068,8 +2069,9 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, offsetRegister)
 	boundsOK := c.compilelBranchInstruction(arm64.ABLS)
 
-	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length, we exit the function with jitCallStatusCodeMemoryOutOfBounds.
-	if err = c.exit(jitCallStatusCodeMemoryOutOfBounds); err != nil {
+	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length,
+	//  we exit the function with jitCallStatusCodeMemoryOutOfBounds.
+	if err = c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds); err != nil {
 		return
 	}
 
@@ -2172,7 +2174,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr 
 	)
 
 	c.markRegisterUnused(freeRegs...)
-	return c.exit(jitStatus)
+	return c.compileExitFromNativeCode(jitStatus)
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the arm64 architecture.

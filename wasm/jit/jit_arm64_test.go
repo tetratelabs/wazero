@@ -149,7 +149,7 @@ func TestArm64Compiler_exit(t *testing.T) {
 			expStackPointer := uint64(100)
 			compiler.locationStack.sp = expStackPointer
 			require.NoError(t, err)
-			compiler.exit(s)
+			compiler.compileExitFromNativeCode(s)
 
 			// Compile and execute the code under test.
 			code, _, _, err := compiler.compile()
@@ -274,7 +274,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
 			compiler.compileReleaseRegisterToStack(compiler.locationStack.peek())
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -353,7 +353,7 @@ func TestArm64Compiler_compileLoadValueOnStackToRegister(t *testing.T) {
 
 			// Release the value to the memory stack so that we can see the value after exiting.
 			compiler.compileReleaseRegisterToStack(loc)
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -1308,7 +1308,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		// Emit code for the backward label.
 		backwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
 		requireAddLabel(t, compiler, backwardLabel)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// Now emit the body. First we add NOP so that we can execute code after the target label.
 		nop := compiler.compileNOP()
@@ -1317,7 +1317,7 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with unreachable status.
-		compiler.exit(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1347,11 +1347,11 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
-		compiler.exit(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 
 		// Emit code for the forward label where we emit the expectedValue and then exit.
 		requireAddLabel(t, compiler, forwardLabel)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1548,15 +1548,15 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 
 					err = compiler.compileBrIf(&wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
 					require.NoError(t, err)
-					compiler.exit(unreachableStatus)
+					compiler.compileExitFromNativeCode(unreachableStatus)
 
 					// Emit code for .then label.
 					requireAddLabel(t, compiler, thenBranchTarget.Target.Label)
-					compiler.exit(thenLabelExitStatus)
+					compiler.compileExitFromNativeCode(thenLabelExitStatus)
 
 					// Emit code for .else label.
 					requireAddLabel(t, compiler, elseBranchTarget.Target.Label)
-					compiler.exit(elseLabelExitStatus)
+					compiler.compileExitFromNativeCode(elseLabelExitStatus)
 
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
@@ -1597,7 +1597,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// Set the acquisition target instruction to the one after JMP.
 		compiler.compileReadInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
 
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// If generate the code without JMP after compileReadInstructionAddress,
 		// the call back added must return error.
@@ -1650,7 +1650,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		// If we fail to branch, we reach here and exit with unreachable status,
 		// so the assertion would fail.
-		compiler.exit(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 
 		// This could be the read instruction target as this is the
 		// right after RET. Therefore, the branch instruction above
@@ -1919,7 +1919,7 @@ func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
 			require.NoError(t, err)
 			require.Empty(t, compiler.locationStack.usedRegisters)
 
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -2531,7 +2531,7 @@ func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 				compiler.onStackPointerCeilDeterminedCallBack = nil
 				env.setValueStackBasePointer(stackBasePointer)
 
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
