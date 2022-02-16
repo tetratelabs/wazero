@@ -5212,13 +5212,12 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 	// the caller.
 	c.pushFunctionParams()
 
-	// Initialize the reserved stack base pointer register.
-	c.initializeReservedStackBasePointer()
-
 	// Check if it's necessary to grow the value stack by using max stack pointer.
 	if err = c.maybeGrowValueStack(); err != nil {
 		return err
 	}
+
+	c.initializeReservedStackBasePointer()
 
 	// Once the stack base pointer is initialized and the size of stack is ok,
 	// initialize the module context next.
@@ -5333,8 +5332,6 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	if err := c.callGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
 		return err
 	}
-	// After grow the stack, we have to inialize the stack base pointer again.
-	c.initializeReservedStackBasePointer()
 
 	c.addSetJmpOrigins(jmpIfNoNeedToGrowStack)
 	return nil
