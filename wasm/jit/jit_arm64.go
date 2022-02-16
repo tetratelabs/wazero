@@ -2081,7 +2081,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr 
 	// In other words, "engine.functionCallAddress = tmp (== $addr)"
 	c.compileRegisterToMemoryInstruction(
 		arm64.AMOVD,
-		reservedRegisterForTemporary,
+		tmp,
 		reservedRegisterForEngine, engineExitContextFunctionCallAddressOffset,
 	)
 

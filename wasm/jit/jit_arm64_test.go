@@ -1675,13 +1675,14 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 func TestArm64Compiler_compieleCall(t *testing.T) {
 	for _, growCallFrameStack := range []bool{false, true} {
 		growCallFrameStack := growCallFrameStack
-		t.Run(fmt.Sprintf("grow callframe stack %v", growCallFrameStack), func(t *testing.T) {
+		t.Run(fmt.Sprintf("grow=%v", growCallFrameStack), func(t *testing.T) {
 			env := newJITEnvironment()
 			engine := env.engine()
 			expectedValue := uint32(0)
 
 			if growCallFrameStack {
 				env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
+				env.setPreviousCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
 			}
 
 			// Emit the call target function.
@@ -1741,18 +1742,17 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
+			env.exec(code)
+
 			if growCallFrameStack {
 				// If the call frame stack pointer equals the length of call frame stack length,
 				// we have to call the builtin function to grow the slice.
 				require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-				require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress())
+				require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
 
-				// Exec again from the return address.
-				returnAddress := env.callFrameStackPeek().returnAddress
-				require.NotZero(t, returnAddress)
-				jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
-			} else {
-				env.exec(code)
+				// Grow the callFrame stack, and exec again from the return address.
+				env.engine().builtinFunctionGrowCallFrameStack()
+				jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
 			}
 
 			// Check status and returned values.
