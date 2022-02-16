@@ -456,10 +456,10 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 
 	if status != 0 {
 		c.compileConstToRegisterInstruction(arm64.AMOVW, int64(status), reservedRegisterForTemporary)
-		c.compileRegisterToMemoryInstruction(arm64.AMOVWU, reservedRegisterForTemporary, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset)
+		c.compileRegisterToMemoryInstruction(arm64.AMOVW, reservedRegisterForTemporary, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset)
 	} else {
 		// If the status == 0, we use zero register to store zero.
-		c.compileRegisterToMemoryInstruction(arm64.AMOVWU, zeroRegister, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset)
+		c.compileRegisterToMemoryInstruction(arm64.AMOVW, zeroRegister, reservedRegisterForEngine, engineExitContextJITCallStatusCodeOffset)
 	}
 
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
@@ -553,11 +553,11 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	var intMov, floatMov obj.As = obj.ANOP, obj.ANOP
 	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
 	case wasm.ValueTypeI32:
-		intMov = arm64.AMOVW
+		intMov = arm64.AMOVWU
 	case wasm.ValueTypeI64:
 		intMov = arm64.AMOVD
 	case wasm.ValueTypeF32:
-		intMov = arm64.AMOVW
+		intMov = arm64.AMOVWU
 		floatMov = arm64.AFMOVS
 	case wasm.ValueTypeF64:
 		intMov = arm64.AMOVW
@@ -601,7 +601,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	var mov obj.As
 	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
 	case wasm.ValueTypeI32:
-		mov = arm64.AMOVW
+		mov = arm64.AMOVWU
 	case wasm.ValueTypeI64:
 		mov = arm64.AMOVD
 	case wasm.ValueTypeF32:
