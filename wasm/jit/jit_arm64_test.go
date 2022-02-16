@@ -4,6 +4,7 @@
 package jit
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/bits"
@@ -2042,7 +2043,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
+func TestArm64Compiler_compileMemoryAccessOffsetSetup(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
 	offsets := []uint32{
 		0, 1 << 10, 1 << 31,
@@ -2068,7 +2069,7 @@ func TestArm64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
 					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
 					require.NoError(t, err)
 
-					reg, err := compiler.compileMemoryAccessCeilSetup(offset, targetSizeInByte)
+					reg, err := compiler.compileMemoryAccessOffsetSetup(offset, targetSizeInByte)
 					require.NoError(t, err)
 
 					compiler.locationStack.pushValueLocationOnRegister(reg)
@@ -2089,10 +2090,81 @@ func TestArm64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
 					} else {
 						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 						require.Equal(t, uint64(1), env.stackPointer())
-						require.Equal(t, uint64(ceil), env.stackTopAsUint64())
+						require.Equal(t, uint64(ceil-targetSizeInByte), env.stackTopAsUint64())
 					}
 				})
 			}
 		}
+	}
+}
+
+func TestArm64Compiler_compileStore(t *testing.T) {
+	const baseOffset = 100 // For testing. Arbitrary number is fine.
+	storeTargetValue := uint64(math.MaxUint64)
+	arg := &wazeroir.MemoryImmediate{Offset: 361}
+	for _, tp := range []wazeroir.UnsignedType{
+		wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64,
+		wazeroir.UnsignedTypeF32, wazeroir.UnsignedTypeF64,
+	} {
+		tp := tp
+		t.Run(tp.String(), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			compiler.f.ModuleInstance = env.moduleInstance
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Before store operations, we must push the base offset, and the store target values.
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: baseOffset})
+			require.NoError(t, err)
+
+			switch tp {
+			case wazeroir.UnsignedTypeI32:
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(storeTargetValue)})
+			case wazeroir.UnsignedTypeI64:
+				err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: storeTargetValue})
+			case wazeroir.UnsignedTypeF32:
+				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(storeTargetValue))})
+			case wazeroir.UnsignedTypeF64:
+				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(storeTargetValue)})
+			}
+			require.NoError(t, err)
+
+			// Emit the memory load instructions.
+			o := &wazeroir.OperationStore{Type: tp, Arg: arg}
+			err = compiler.compileStore(o)
+			require.NoError(t, err)
+
+			// At this point, two values are popped so the stack pointer must be zero.
+			require.Equal(t, uint64(0), compiler.locationStack.sp)
+			// Plus there should be no used registers.
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
+
+			// Generate the code under test.
+			compiler.exit(jitCallStatusCodeReturned)
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			// All the values are popped, so the stack pointer must be zero.
+			require.Equal(t, uint64(0), env.stackPointer())
+			// Check the stored value.
+			offset := o.Arg.Offset + baseOffset
+			mem := env.memory()
+			switch o.Type {
+			case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
+				v := binary.LittleEndian.Uint32(mem[offset : offset+4])
+				require.Equal(t, uint32(storeTargetValue), v)
+				// The trailing bytes must be intact since this is 32-bit mov.
+				v = binary.LittleEndian.Uint32(mem[offset+4 : offset+8])
+				require.Equal(t, uint32(0), v)
+			case wazeroir.UnsignedTypeF64, wazeroir.UnsignedTypeI64:
+				v := binary.LittleEndian.Uint64(mem[offset : offset+8])
+				require.Equal(t, storeTargetValue, v)
+			}
+		})
 	}
 }

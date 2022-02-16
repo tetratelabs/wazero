@@ -176,6 +176,7 @@ func (c *arm64Compiler) compileConstToRegisterInstruction(instruction obj.As, co
 
 // compileMemoryToRegisterInstruction adds an instruction where source operand points a memory location and destination is a register.
 // sourceBaseReg is the base absolute address in the memory, and sourceOffsetConst is the offset from the absolute address in sourceBaseReg.
+// This is the opposite of compileRegisterToMemoryInstruction.
 func (c *arm64Compiler) compileMemoryToRegisterInstruction(instruction obj.As, sourceBaseReg int16, sourceOffsetConst int64, destinationReg int16) {
 	if sourceOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
@@ -215,15 +216,7 @@ func (c *arm64Compiler) compileRegisterToMemoryInstruction(instruction obj.As, s
 		// but we cannot track its temporary register. Therefore, we avoid directly emitting memory load with large offsets:
 		// load the constant manually to "our" temporary register, then emit the load with it.
 		c.compileConstToRegisterInstruction(arm64.AMOVD, destinationOffsetConst, reservedRegisterForTemporary)
-		inst := c.newProg()
-		inst.As = instruction
-		inst.To.Type = obj.TYPE_MEM
-		inst.To.Reg = destinationBaseRegister
-		inst.To.Index = reservedRegisterForTemporary
-		inst.To.Scale = 1
-		inst.From.Type = obj.TYPE_REG
-		inst.From.Reg = sourceRegister
-		c.addInstruction(inst)
+		c.compileRegisterToMemoryWithRegisterOffsetInstruction(instruction, sourceRegister, destinationBaseRegister, reservedRegisterForTemporary)
 	} else {
 		inst := c.newProg()
 		inst.As = instruction
@@ -234,6 +227,18 @@ func (c *arm64Compiler) compileRegisterToMemoryInstruction(instruction obj.As, s
 		inst.From.Reg = sourceRegister
 		c.addInstruction(inst)
 	}
+}
+
+func (c *arm64Compiler) compileRegisterToMemoryWithRegisterOffsetInstruction(instruction obj.As, sourceRegister, destinationBaseRegister, destinationOffsetRegister int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_MEM
+	inst.To.Reg = destinationBaseRegister
+	inst.To.Index = destinationOffsetRegister
+	inst.To.Scale = 1
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = sourceRegister
+	c.addInstruction(inst)
 }
 
 // compileRegisterToRegisterInstruction adds an instruction where both destination and source operands are registers.
@@ -1801,14 +1806,14 @@ func (c *arm64Compiler) compileStore(o *wazeroir.OperationStore) error {
 	var targetSizeInBytes int64
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
-		movInst = arm64.AMOVW
-		targetSizeInBytes = 32 / 8
-	case wazeroir.UnsignedTypeF32:
-		movInst = arm64.AFMOVS
+		movInst = arm64.AMOVD
 		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeI64:
 		movInst = arm64.AMOVD
 		targetSizeInBytes = 64 / 8
+	case wazeroir.UnsignedTypeF32:
+		movInst = arm64.AFMOVS
+		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeF64:
 		movInst = arm64.AFMOVD
 		targetSizeInBytes = 64 / 8
@@ -1837,53 +1842,44 @@ func (c *arm64Compiler) compileStoreImpl(offsetArg uint32, storeInst obj.As, tar
 	if err != nil {
 		return err
 	}
-	// Mark temporarily used as compileMemoryAccessCeilSetup might try allocating register.
+	// Mark temporarily used as compileMemoryAccessOffsetSetup might try allocating register.
 	c.markRegisterUsed(val.register)
 
-	ceilReg, err := c.compileMemoryAccessCeilSetup(offsetArg, targetSizeInBytes)
+	offsetReg, err := c.compileMemoryAccessOffsetSetup(offsetArg, targetSizeInBytes)
 	if err != nil {
 		return err
 	}
 
-	inst := c.newProg()
-	inst.As = storeInst
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = val.register
-	inst.To.Reg = reservedRegisterForMemory
-	// because this is accessed as memory.Buffer[ceil-targetSizeInBytes: ceil]
-	inst.To.Offset = -targetSizeInBytes
-	inst.To.Index = ceilReg
-	inst.To.Scale = 1
-	c.addInstruction(inst)
+	c.compileRegisterToMemoryWithRegisterOffsetInstruction(storeInst, val.register, reservedRegisterForMemory, offsetReg)
 
 	c.markRegisterUnused(val.register)
 	return nil
 }
 
-// compileMemoryAccessCeilSetup pops the top value from the stack (called "base"), stores "base + offsetArg + targetSizeInBytes"
-// into a register, and returns the stored register. We call the result "ceil" because we access the memory
-// as memory.Buffer[ceil-targetSizeInBytes: ceil].
+// compileMemoryAccessOffsetSetup pops the top value from the stack (called "base"), stores "base + offsetArg + targetSizeInBytes"
+// into a register, and returns the stored register. We call the result "offset" because we access the memory
+// as memory.Buffer[offset: offset+targetSizeInBytes].
 //
 // Note: this also emits the instructions to check the out of bounds memory access.
-// In other words, if the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
-func (c *arm64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (ceilRegister int16, err error) {
+// In other words, if the offset+targetSizeInBytes exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
+func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetSizeInBytes int64) (offsetRegister int16, err error) {
 	base, err := c.popValueOnRegister()
 	if err != nil {
 		return 0, err
 	}
 
-	ceilRegister = base.register
+	offsetRegister = base.register
 	if isZeroRegister(base.register) {
-		ceilRegister, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		offsetRegister, err = c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return
 		}
-		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, ceilRegister)
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, offsetRegister)
 	}
 
 	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
-		// "ceilRegister = base + offsetArg + targetSizeInBytes"
-		c.compileConstToRegisterInstruction(arm64.AADD, offsetConst, ceilRegister)
+		// "offsetRegister = base + offsetArg + targetSizeInBytes"
+		c.compileConstToRegisterInstruction(arm64.AADD, offsetConst, offsetRegister)
 	} else {
 		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
 		err = c.exit(jitCallStatusCodeMemoryOutOfBounds)
@@ -1895,8 +1891,8 @@ func (c *arm64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 		reservedRegisterForEngine, engineModuleContextMemorySliceLenOffset,
 		reservedRegisterForTemporary)
 
-	// Check if ceilRegister > len(memory.Buffer).
-	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, ceilRegister)
+	// Check if offsetRegister > len(memory.Buffer).
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, offsetRegister)
 	boundsOK := c.newProg()
 	boundsOK.As = arm64.ABLS
 	boundsOK.To.Type = obj.TYPE_BRANCH
@@ -1907,10 +1903,10 @@ func (c *arm64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 		return
 	}
 
-	// Otherwise, we branch into the next instruction.
+	// Otherwise, we subtract targetSizeInBytes from offsetRegister.
 	c.setBranchTargetOnNext(boundsOK)
-
-	return ceilRegister, nil
+	c.compileConstToRegisterInstruction(arm64.ASUB, targetSizeInBytes, offsetRegister)
+	return offsetRegister, nil
 }
 
 func (c *arm64Compiler) compileMemoryGrow() error {
