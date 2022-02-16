@@ -86,7 +86,7 @@ type API interface {
 
 	// EnvironGet is the WASI function that reads environment variables.
 	//
-	// There are two parameters. Both are offsets in api.HostFunctionCallContext Memory. If either are invalid due to
+	// There are two parameters. Both are offsets in wasm.HostFunctionCallContext Memory. If either are invalid due to
 	// memory constraints, this returns ErrnoFault.
 	//
 	// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
@@ -105,15 +105,15 @@ type API interface {
 	//                              environ offset for "a=b" --+           |
 	//                                         environ offset for "b=cd" --+
 	//
-	// Note: FunctionEnvironGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See EnvironSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironGet(ctx wasm.HostFunctionCallContext, resultEnviron, resultEnvironBuf uint32) Errno
+	EnvironGet(ctx wasm.HostFunctionCallContext, environ, environBuf uint32) Errno
 
 	// EnvironSizesGet is a WASI function that reads environment variable (Environ) sizes.
 	//
-	// There are two result parameters: these are offsets in the api.HostFunctionCallContext Memory to write
+	// There are two result parameters: these are offsets in the wasi.HostFunctionCallContext Memory to write
 	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
 	// returns ErrnoFault.
 	//
@@ -229,7 +229,7 @@ const (
 type wasiAPI struct {
 	args *nullTerminatedStrings
 	// environ stores each environment variable in the form of "key=value",
-	// which is convenient for the implementation of environ_get.
+	// which is both convenient for the implementation of environ_get and matches os.Environ
 	environ *nullTerminatedStrings
 	stdin   io.Reader
 	stdout,
@@ -417,7 +417,7 @@ func Args(args ...string) (Option, error) {
 // Environ returns an option to set environment variables to the API.
 // Environ returns an error if the input contains a string not joined with `=`, or if the inputs are too large.
 //  * environ: environment variables in the same format as that of `os.Environ`, where key/value pairs are joined with `=`.
-// See https://pkg.go.dev/os#Environ
+// See os.Environ
 //
 // Note: Implicit environment variable propagation into WASI is intentionally not done.
 // Note: The only reason to set this is to control what's written by API.EnvironSizesGet and API.EnvironGet
