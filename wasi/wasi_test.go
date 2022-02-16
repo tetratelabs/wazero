@@ -53,10 +53,10 @@ func TestAPI_ArgsGet(t *testing.T) {
 	t.Run("API.ArgsGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		// provide a host context we call directly
+		// Provide a host context we call directly.
 		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
-		// invoke ArgsGet directly and check the memory side-effects!
+		// Invoke ArgsGet directly and check the memory side-effects!
 		errno := wasiAPI.ArgsGet(hContext, argv, argvBuf)
 		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
@@ -136,10 +136,10 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 	t.Run("API.ArgsSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		// provide a host context we call directly
+		// Provide a host context we call directly.
 		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
-		// invoke ArgsSizesGet directly and check the memory side effects!
+		// Invoke ArgsSizesGet directly and check the memory side effects!
 		errno := wasiAPI.ArgsSizesGet(hContext, resultArgc, resultArgvBufSize)
 		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
@@ -256,10 +256,10 @@ func TestAPI_EnvironGet(t *testing.T) {
 	t.Run("API.EnvironGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		// provide a host context we call directly
+		// Provide a host context we call directly.
 		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
-		// invoke EnvironGet directly and check the memory side-effects
+		// Invoke EnvironGet directly and check the memory side-effects.
 		errno := wasiAPI.EnvironGet(hContext, resultEnviron, resultEnvironBuf)
 		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
@@ -339,10 +339,10 @@ func TestAPI_EnvironSizesGet(t *testing.T) {
 	t.Run("API.EnvironSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		// provide a host context we call directly
+		// Provide a host context we call directly.
 		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
-		// invoke EnvironSizesGet directly and check the memory side effects
+		// Invoke EnvironSizesGet directly and check the memory side effects.
 		errno := wasiAPI.EnvironSizesGet(hContext, resultEnvironc, resultEnvironBufSize)
 		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
@@ -422,10 +422,10 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 	t.Run("API.ClockTimeGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		// provide a host context we call directly
+		// Provide a host context we call directly.
 		hContext := wasm.NewHostFunctionCallContext(context.Background(), store.Memories[0])
 
-		// invoke ClockTimeGet directly and check the memory side effects!
+		// Invoke ClockTimeGet directly and check the memory side effects!
 		errno := api.ClockTimeGet(hContext, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
 		require.Equal(t, ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
