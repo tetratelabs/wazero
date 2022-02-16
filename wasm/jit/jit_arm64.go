@@ -1796,9 +1796,11 @@ func (c *arm64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		loadInst = arm64.AMOVD
 		targetSizeInBytes = 64 / 8
 	case wazeroir.UnsignedTypeF32:
+		loadInst = arm64.AFMOVS
 		isFloat = true
 		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeF64:
+		loadInst = arm64.AFMOVD
 		isFloat = true
 		targetSizeInBytes = 64 / 8
 	}
