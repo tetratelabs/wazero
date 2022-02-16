@@ -2436,13 +2436,11 @@ func TestArm64Compiler_compileLoad(t *testing.T) {
 			} else {
 				require.Equal(t, generalPurposeRegisterTypeInt, loadedLocation.registerType())
 			}
-
-			// Generate the code under test.
 			compiler.compileReturnFunction()
+
+			// Generate and run the code under test.
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
-			// Run code.
 			env.exec(code)
 
 			// Verify the loaded value.
@@ -2468,11 +2466,9 @@ func TestArm64Compiler_compileMemryGrow(t *testing.T) {
 	compiler.compileReturnFunction()
 	require.NoError(t, err)
 
-	// Generate the code under test.
+	// Generate and run the code under test.
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
-
-	// Run code.
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
@@ -2504,10 +2500,9 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	compiler.compileReturnFunction()
 	require.NoError(t, err)
 
+	// Generate and run the code under test.
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
-
-	// Run code.
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -2538,11 +2533,9 @@ func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 
 				compiler.exit(jitCallStatusCodeReturned)
 
-				// Generate the code under test.
+				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
-
-				// Run codes
 				env.exec(code)
 
 				// The status code must be "Returned", not "BuiltinFunctionCall".
@@ -2570,11 +2563,9 @@ func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 		stackBasePointer := valueStackLen - 5 // Ceil > valueStackLen - stackBasePointer = need to grow!
 		env.setValueStackBasePointer(stackBasePointer)
 
-		// Generate the code under test.
+		// Generate and run the code under test.
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
-
-		// Run codes
 		env.exec(code)
 
 		// Check if the call exits with builtin function call status.
@@ -2588,4 +2579,32 @@ func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 		// Check the result. This should be "Returned".
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	})
+}
+
+func TestArm64Compiler_compieleHostFunction(t *testing.T) {
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
+
+	// The assembler skips the first instruction so we intentionally add NOP here.
+	// TODO: delete after #233
+	compiler.compileNOP()
+
+	addr := wasm.FunctionAddress(100)
+	err := compiler.compileHostFunction(addr)
+	require.NoError(t, err)
+
+	// Generate and run the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+	env.exec(code)
+
+	// On the return, the code must exit with the host call status and the specified call address.
+	require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
+	require.Equal(t, addr, env.functionCallAddress())
+
+	// Re-enter the return address.
+	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
+
+	// After that, the code must exit with returned status.
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 }

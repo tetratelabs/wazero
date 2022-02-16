@@ -13,7 +13,6 @@
 package jit
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"unsafe"
@@ -544,7 +543,13 @@ func (c *arm64Compiler) exit(status jitCallStatusCode) error {
 }
 
 func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
-	return errors.New("TODO: implement compileHostFunction on arm64")
+	// First we must update the location stack to reflect the number of host function inputs.
+	c.pushFunctionParams()
+
+	if err := c.compileCallGoFunction(jitCallStatusCodeCallHostFunction, address); err != nil {
+		return err
+	}
+	return c.compileReturnFunction()
 }
 
 // setLocationStack sets the given valueLocationStack to .locationStack field,
