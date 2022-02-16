@@ -1600,11 +1600,11 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
-		compiler.readInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
+		compiler.compileReadInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
 
 		compiler.exit(jitCallStatusCodeReturned)
 
-		// If generate the code without JMP after readInstructionAddress,
+		// If generate the code without JMP after compileReadInstructionAddress,
 		// the call back added must return error.
 		_, _, _, err = compiler.compile()
 		require.Error(t, err)
@@ -1618,9 +1618,9 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after RET.
-		compiler.readInstructionAddress(obj.ARET, reservedRegisterForTemporary)
+		compiler.compileReadInstructionAddress(obj.ARET, reservedRegisterForTemporary)
 
-		// Add many instruction between the target and readInstructionAddress.
+		// Add many instruction between the target and compileReadInstructionAddress.
 		for i := 0; i < 100; i++ {
 			compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
 		}
@@ -1647,7 +1647,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// Set the acquisition target instruction to the one after RET,
 		// and read the absolute address into destinationRegister.
 		const addressReg = reservedRegisterForTemporary
-		compiler.readInstructionAddress(obj.ARET, addressReg)
+		compiler.compileReadInstructionAddress(obj.ARET, addressReg)
 
 		// Branch to the instruction after RET below via the absolute
 		// address stored in destinationRegister.
@@ -2438,4 +2438,68 @@ func TestArm64Compiler_compileLoad(t *testing.T) {
 			tc.loadedValueVerifyFn(t, env.stackTopAsUint64())
 		})
 	}
+}
+
+func TestArm64Compiler_compileMemryGrow(t *testing.T) {
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	err = compiler.compileMemoryGrow()
+	require.NoError(t, err)
+
+	// Emit arbitrary code after MemoryGrow returned.
+	const expValue uint32 = 100
+	err = compiler.compilePreamble()
+	require.NoError(t, err)
+	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+	require.NoError(t, err)
+	compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	// Generate the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+
+	// Run code.
+	env.exec(code)
+
+	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
+
+	returnAddress := env.callFrameStackPeek().returnAddress
+	require.NotZero(t, returnAddress)
+	jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+
+	require.Equal(t, expValue, env.stackTopAsUint32())
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+}
+
+func TestAmd64Compiler_compileMemorySize(t *testing.T) {
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
+	compiler.f.ModuleInstance = env.moduleInstance
+
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	// Emit memory.size instructions.
+	err = compiler.compileMemorySize()
+	require.NoError(t, err)
+	// At this point, the size of memory should be pushed onto the stack.
+	require.Equal(t, uint64(1), compiler.locationStack.sp)
+	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
+
+	compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+
+	// Run code.
+	env.exec(code)
+
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
 }
