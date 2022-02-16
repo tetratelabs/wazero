@@ -4241,7 +4241,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 	getMemorySizeInPageUnit.To.Type = obj.TYPE_REG
 	getMemorySizeInPageUnit.To.Reg = loc.register
 	getMemorySizeInPageUnit.From.Type = obj.TYPE_CONST
-	getMemorySizeInPageUnit.From.Offset = 16
+	getMemorySizeInPageUnit.From.Offset = wasm.MemoryPageSizeInBit
 	c.addInstruction(getMemorySizeInPageUnit)
 	return nil
 }

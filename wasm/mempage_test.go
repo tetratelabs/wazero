@@ -7,7 +7,7 @@ import (
 )
 
 func TestMemoryPageConsts(t *testing.T) {
-	require.Equal(t, MemoryPageSize, uint32(1)<<memoryPageSizeInBit)
+	require.Equal(t, MemoryPageSize, uint32(1)<<MemoryPageSizeInBit)
 	require.Equal(t, MemoryPageSize, MemoryMaxPages)
 	require.Equal(t, MemoryPageSize, uint32(1<<16))
 }

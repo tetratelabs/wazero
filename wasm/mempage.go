@@ -8,18 +8,18 @@ const (
 	// MemoryMaxPages is maximum number of pages defined (2^16).
 	// See https://www.w3.org/TR/wasm-core-1/#grow-mem
 	MemoryMaxPages = MemoryPageSize
-	// memoryPageSizeInBit satisfies the relation: "1 << memoryPageSizeInBit == memoryPageSize".
-	memoryPageSizeInBit = uint32(16)
+	// MemoryPageSizeInBit satisfies the relation: "1 << MemoryPageSizeInBit == MemoryPageSize".
+	MemoryPageSizeInBit = 16
 )
 
 // MemoryPagesToBytesNum converts the given pages into the number of bytes contained in these pages.
 func memoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
-	return uint64(pages) << memoryPageSizeInBit
+	return uint64(pages) << MemoryPageSizeInBit
 }
 
 // MemoryPagesToBytesNum converts the given number of bytes into the number of pages.
 func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
-	return uint32(bytesNum >> memoryPageSizeInBit)
+	return uint32(bytesNum >> MemoryPageSizeInBit)
 }
 
 // Grow extends the memory buffer by "newPages" * memoryPageSize.
