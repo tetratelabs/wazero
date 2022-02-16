@@ -1013,7 +1013,7 @@ func TestArm64Compiler_compileShr(t *testing.T) {
 	})
 }
 
-func TestArm64Compiler_compielePick(t *testing.T) {
+func TestArm64Compiler_compilePick(t *testing.T) {
 	const pickTargetValue uint64 = 12345
 	op := &wazeroir.OperationPick{Depth: 1}
 
@@ -1114,7 +1114,7 @@ func TestArm64Compiler_compielePick(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compieleDrop(t *testing.T) {
+func TestArm64Compiler_compileDrop(t *testing.T) {
 	t.Run("range nil", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
@@ -1667,7 +1667,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	})
 }
 
-func TestArm64Compiler_compieleCall(t *testing.T) {
+func TestArm64Compiler_compileCall(t *testing.T) {
 	for _, growCallFrameStack := range []bool{false, true} {
 		growCallFrameStack := growCallFrameStack
 		t.Run(fmt.Sprintf("grow=%v", growCallFrameStack), func(t *testing.T) {
@@ -1759,7 +1759,7 @@ func TestArm64Compiler_compieleCall(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compieleSelect(t *testing.T) {
+func TestArm64Compiler_compileSelect(t *testing.T) {
 	for _, isFloat := range []bool{false, true} {
 		isFloat := isFloat
 		t.Run(fmt.Sprintf("float=%v", isFloat), func(t *testing.T) {
@@ -1823,7 +1823,7 @@ func TestArm64Compiler_compieleSelect(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compieleSwap(t *testing.T) {
+func TestArm64Compiler_compileSwap(t *testing.T) {
 	const x, y uint64 = 100, 200
 	op := &wazeroir.OperationSwap{Depth: 10}
 
@@ -2450,7 +2450,7 @@ func TestArm64Compiler_compileLoad(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compileMemryGrow(t *testing.T) {
+func TestArm64Compiler_compileMemoryGrow(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
 	err := compiler.compilePreamble()
@@ -2583,7 +2583,7 @@ func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 	})
 }
 
-func TestArm64Compiler_compieleHostFunction(t *testing.T) {
+func TestArm64Compiler_compileHostFunction(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
 

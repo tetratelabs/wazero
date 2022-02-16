@@ -285,11 +285,6 @@ func (c *arm64Compiler) compileTwoRegistersToNoneInstruction(instruction obj.As,
 	c.addInstruction(inst)
 }
 
-func (c *arm64Compiler) compileUnconditionalBranchInstruction() (br *obj.Prog) {
-	br = c.compilelBranchInstruction(obj.AJMP)
-	return
-}
-
 func (c *arm64Compiler) compilelBranchInstruction(inst obj.As) (br *obj.Prog) {
 	br = c.newProg()
 	br.As = inst
@@ -352,7 +347,7 @@ func (c *arm64Compiler) compilePreamble() error {
 
 	c.pushFunctionParams()
 
-	// Check if it's necessary to grow the value stack before entring function body.
+	// Check if it's necessary to grow the value stack before entering function body.
 	if err := c.compileMaybeGrowValueStack(); err != nil {
 		return err
 	}
@@ -372,7 +367,7 @@ func (c *arm64Compiler) compilePreamble() error {
 // and if so, make the builtin function call to do so. These instructions are called in the function's
 // preamble.
 func (c *arm64Compiler) compileMaybeGrowValueStack() error {
-	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
+	tmpRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 2)
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
@@ -835,7 +830,7 @@ func (c *arm64Compiler) compileBranchInto(target *wazeroir.BranchTarget) error {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
-		br := c.compileUnconditionalBranchInstruction()
+		br := c.compilelBranchInstruction(obj.AJMP)
 		c.assignBranchTarget(labelKey, br)
 		return nil
 	}
@@ -1033,7 +1028,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 	return nil
 }
 
-// compileCalcCallFrameStackTopAddress adds instruction to set the absolute address of
+// compileCalcCallFrameStackTopAddress adds instructions to set the absolute address of
 // engine.callFrameStack[callFrameStackPointerRegister] into destinationRegister.
 func (c *arm64Compiler) compileCalcCallFrameStackTopAddress(callFrameStackPointerRegister, destinationRegister int16) {
 	// "destinationRegister = &engine.callFrameStack[0]"
@@ -2112,10 +2107,10 @@ func (c *arm64Compiler) compileMemorySize() error {
 	)
 
 	// memory.size loads the page size of memory, so we have to divide by the page size.
-	// "reg = reg >> wasm.MemoryPageSizeInBit (== reg / wasm.MemoryPageSize) "
+	// "reg = reg >> wasm.MemoryPageSizeInBits (== reg / wasm.MemoryPageSize) "
 	c.compileConstToRegisterInstruction(
 		arm64.ALSR,
-		wasm.MemoryPageSizeInBit,
+		wasm.MemoryPageSizeInBits,
 		reg,
 	)
 
@@ -2489,8 +2484,8 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, moduleInstanceAddressRegister, tmpX)
-	brIfMdouleUnchanged := c.compilelBranchInstruction(arm64.ABEQ)
-	c.addInstruction(brIfMdouleUnchanged)
+	brIfModuleUnchanged := c.compilelBranchInstruction(arm64.ABEQ)
+	c.addInstruction(brIfModuleUnchanged)
 
 	// Otherwise, we have to update the following fields:
 	// * engine.moduleContext.globalElement0Address
@@ -2565,7 +2560,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 
 	// TODO: Update tableElement0Address and tableSliceLen.
 
-	c.setBranchTargetOnNext(brIfMdouleUnchanged)
+	c.setBranchTargetOnNext(brIfModuleUnchanged)
 	c.locationStack.markRegisterUnused(regs...)
 	return nil
 }
