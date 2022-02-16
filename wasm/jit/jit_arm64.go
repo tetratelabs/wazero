@@ -413,7 +413,7 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	// Compare tmpX (len(engine.valueStack) - engine.stackBasePointer) and tmpY (engine.stackPointerCeil)
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmpX, tmpY)
 
-	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABHI) // TODO:
+	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABHS) // TODO:
 
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
 		return err

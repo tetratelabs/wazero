@@ -2519,3 +2519,70 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
 }
+
+func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
+	t.Run("not grow", func(t *testing.T) {
+		const stackPointerCeil = 5
+		for _, baseOffset := range []uint64{5, 10, 20} {
+
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+
+			err := compiler.compileMaybeGrowValueStack()
+			require.NoError(t, err)
+			require.NotNil(t, compiler.onStackPointerCeilDeterminedCallBack)
+
+			valueStackLen := uint64(len(env.stack()))
+			stackBasePointer := valueStackLen - baseOffset // Base + Max <= valueStackLen = no need to grow!
+			compiler.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
+			compiler.onStackPointerCeilDeterminedCallBack = nil
+			env.setValueStackBasePointer(stackBasePointer)
+
+			compiler.exit(jitCallStatusCodeReturned)
+
+			// Generate the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run codes
+			env.exec(code)
+
+			// The status code must be "Returned", not "BuiltinFunctionCall".
+			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+		}
+	})
+	t.Run("grow", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+
+		err := compiler.compileMaybeGrowValueStack()
+		require.NoError(t, err)
+
+		// On the return from grow value stack, we just exit with "Returned" status.
+		compiler.exit(jitCallStatusCodeReturned)
+
+		stackPointerCeil := uint64(6)
+		compiler.stackPointerCeil = stackPointerCeil
+		valueStackLen := uint64(len(env.stack()))
+		stackBasePointer := valueStackLen - 5 // Base + Max > valueStackLen = need to grow!
+		env.setValueStackBasePointer(stackBasePointer)
+
+		// Generate the code under test.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// Run codes
+		env.exec(code)
+
+		// Check if the call exits with builtin function call status.
+		require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+
+		// Reenter from the return address.
+		returnAddress := env.callFrameStackPeek().returnAddress
+		require.NotZero(t, returnAddress)
+		jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+
+		// Check the result. This should be "Returned".
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+}
