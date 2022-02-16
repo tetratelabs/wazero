@@ -4616,12 +4616,12 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		return err
 	}
 
-	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
-	c.initializeReservedStackBasePointer()
-	c.initializeReservedMemoryPointer()
-
 	// For call_indirect, we need to push the value back to the register.
 	if !isNilRegister(addrReg) {
+		// Since this is right after callGoFunction, we have to initialize the stack base pointer
+		// to properly load the value on memory stack.
+		c.initializeReservedStackBasePointer()
+
 		savedOffsetLocation := c.locationStack.pop()
 		savedOffsetLocation.setRegister(addrReg)
 		c.moveStackToRegister(savedOffsetLocation)
@@ -5212,13 +5212,12 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 	// the caller.
 	c.pushFunctionParams()
 
-	// Initialize the reserved stack base pointer register.
-	c.initializeReservedStackBasePointer()
-
 	// Check if it's necessary to grow the value stack by using max stack pointer.
 	if err = c.maybeGrowValueStack(); err != nil {
 		return err
 	}
+
+	c.initializeReservedStackBasePointer()
 
 	// Once the stack base pointer is initialized and the size of stack is ok,
 	// initialize the module context next.
@@ -5333,8 +5332,6 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	if err := c.callGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
 		return err
 	}
-	// After grow the stack, we have to inialize the stack base pointer again.
-	c.initializeReservedStackBasePointer()
 
 	c.addSetJmpOrigins(jmpIfNoNeedToGrowStack)
 	return nil
