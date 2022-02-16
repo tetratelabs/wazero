@@ -1357,11 +1357,68 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 }
 
 func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(v.register) {
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		if o.Type == wazeroir.UnsignedInt32 {
+			c.compileConstToRegisterInstruction(arm64.AMOVW, 32, reg)
+		} else {
+			c.compileConstToRegisterInstruction(arm64.AMOVD, 64, reg)
+		}
+		c.locationStack.pushValueLocationOnRegister(reg)
+		return nil
+	}
+
+	reg := v.register
+	if o.Type == wazeroir.UnsignedInt32 {
+		c.compileRegisterToRegisterInstruction(arm64.ACLZW, reg, reg)
+	} else {
+		c.compileRegisterToRegisterInstruction(arm64.ACLZ, reg, reg)
+	}
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
 func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(v.register) {
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		if o.Type == wazeroir.UnsignedInt32 {
+			c.compileConstToRegisterInstruction(arm64.AMOVW, 32, reg)
+		} else {
+			c.compileConstToRegisterInstruction(arm64.AMOVD, 64, reg)
+		}
+		c.locationStack.pushValueLocationOnRegister(reg)
+		return nil
+	}
+
+	// Since arm64 doesn't have an instruction deirectly counting trailing zeros,
+	// we reverse the bits first, and the does CLZ, which is exactly the same as
+	// gcc implements __builtin_ctz for arm64.
+	reg := v.register
+	if o.Type == wazeroir.UnsignedInt32 {
+		c.compileRegisterToRegisterInstruction(arm64.ARBITW, reg, reg)
+		c.compileRegisterToRegisterInstruction(arm64.ACLZW, reg, reg)
+	} else {
+		c.compileRegisterToRegisterInstruction(arm64.ARBIT, reg, reg)
+		c.compileRegisterToRegisterInstruction(arm64.ACLZ, reg, reg)
+	}
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
 func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
