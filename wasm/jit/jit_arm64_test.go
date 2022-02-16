@@ -1311,14 +1311,9 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		compiler.exit(jitCallStatusCodeReturned)
 
 		// Now emit the body. First we add NOP so that we can execute code after the target label.
-		nop := compiler.newProg()
-		nop.As = obj.ANOP
-		compiler.addInstruction(nop)
+		nop := compiler.compileNOP()
 
-		err := compiler.compilePreamble()
-		require.NoError(t, err)
-
-		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: backwardLabel}})
+		err := compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: backwardLabel}})
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with unreachable status.
@@ -1917,6 +1912,7 @@ func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
 			compiler.f.ModuleInstance = tc.moduleInstance
 
 			// The assembler skips the first instruction so we intentionally add NOP here.
+			// TODO: delete after #233
 			compiler.compileNOP()
 
 			err := compiler.compileModuleContextInitialization()
@@ -2524,47 +2520,56 @@ func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 	t.Run("not grow", func(t *testing.T) {
 		const stackPointerCeil = 5
 		for _, baseOffset := range []uint64{5, 10, 20} {
+			t.Run(fmt.Sprintf("%d", baseOffset), func(t *testing.T) {
+				env := newJITEnvironment()
+				compiler := env.requireNewCompiler(t)
 
-			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t)
+				// The assembler skips the first instruction so we intentionally add NOP here.
+				// TODO: delete after #233
+				compiler.compileNOP()
 
-			err := compiler.compileMaybeGrowValueStack()
-			require.NoError(t, err)
-			require.NotNil(t, compiler.onStackPointerCeilDeterminedCallBack)
+				err := compiler.compileMaybeGrowValueStack()
+				require.NoError(t, err)
+				require.NotNil(t, compiler.onStackPointerCeilDeterminedCallBack)
 
-			valueStackLen := uint64(len(env.stack()))
-			stackBasePointer := valueStackLen - baseOffset // Base + Max <= valueStackLen = no need to grow!
-			compiler.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
-			compiler.onStackPointerCeilDeterminedCallBack = nil
-			env.setValueStackBasePointer(stackBasePointer)
+				valueStackLen := uint64(len(env.stack()))
+				stackBasePointer := valueStackLen - baseOffset // Ceil <= valueStackLen - stackBasePointer = no need to grow!
+				compiler.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
+				compiler.onStackPointerCeilDeterminedCallBack = nil
+				env.setValueStackBasePointer(stackBasePointer)
 
-			compiler.exit(jitCallStatusCodeReturned)
+				compiler.exit(jitCallStatusCodeReturned)
 
-			// Generate the code under test.
-			code, _, _, err := compiler.compile()
-			require.NoError(t, err)
+				// Generate the code under test.
+				code, _, _, err := compiler.compile()
+				require.NoError(t, err)
 
-			// Run codes
-			env.exec(code)
+				// Run codes
+				env.exec(code)
 
-			// The status code must be "Returned", not "BuiltinFunctionCall".
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				// The status code must be "Returned", not "BuiltinFunctionCall".
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+			})
 		}
 	})
 	t.Run("grow", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
+		// The assembler skips the first instruction so we intentionally add NOP here.
+		// TODO: delete after #233
+		compiler.compileNOP()
+
 		err := compiler.compileMaybeGrowValueStack()
 		require.NoError(t, err)
 
-		// On the return from grow value stack, we just exit with "Returned" status.
-		compiler.exit(jitCallStatusCodeReturned)
+		// On the return from grow value stack, we simply return.
+		compiler.compileReturnFunction()
 
 		stackPointerCeil := uint64(6)
 		compiler.stackPointerCeil = stackPointerCeil
 		valueStackLen := uint64(len(env.stack()))
-		stackBasePointer := valueStackLen - 5 // Base + Max > valueStackLen = need to grow!
+		stackBasePointer := valueStackLen - 5 // Ceil > valueStackLen - stackBasePointer = need to grow!
 		env.setValueStackBasePointer(stackBasePointer)
 
 		// Generate the code under test.

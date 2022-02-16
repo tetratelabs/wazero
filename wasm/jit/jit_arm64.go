@@ -408,18 +408,21 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	)
 	// At this point of compilation, we don't know the value of stack pointe ceil,
 	// so we layzily resolve the value later.
-	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { loadStackPointerCeil.To.Offset = int64(stackPointerCeil) }
+	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { loadStackPointerCeil.From.Offset = int64(stackPointerCeil) }
 
 	// Compare tmpX (len(engine.valueStack) - engine.stackBasePointer) and tmpY (engine.stackPointerCeil)
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmpX, tmpY)
 
-	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABHS) // TODO:
+	// If ceil > valueStackLen - stack base pointer, we need to grow the stack.
+	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABLS)
 
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
 		return err
 	}
 
 	c.setBranchTargetOnNext(brIfValueStackOK)
+
+	c.locationStack.markRegisterUnused(tmpRegs...)
 	return nil
 }
 
