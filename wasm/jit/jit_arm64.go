@@ -1969,14 +1969,14 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 		reservedRegisterForEngine, engineModuleContextMemorySliceLenOffset,
 		reservedRegisterForTemporary)
 
-	// Check if offsetRegister > len(memory.Buffer).
+	// Check if offsetRegister(= base+offsetArg+targetSizeInBytes) > len(memory.Buffer).
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, offsetRegister)
 	boundsOK := c.newProg()
 	boundsOK.As = arm64.ABLS
 	boundsOK.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(boundsOK)
 
-	// If the ceil exceeds the memory length, we exit the function with jitCallStatusCodeMemoryOutOfBounds.
+	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length, we exit the function with jitCallStatusCodeMemoryOutOfBounds.
 	if err = c.exit(jitCallStatusCodeMemoryOutOfBounds); err != nil {
 		return
 	}
