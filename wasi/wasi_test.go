@@ -30,7 +30,7 @@ func TestNewAPI_Args(t *testing.T) {
 	})
 	t.Run("error constructing args", func(t *testing.T) {
 		_, err := Args("\xff\xfe\xfd", "foo", "bar")
-		require.EqualError(t, err, "value at 0 is not a valid UTF-8 string")
+		require.EqualError(t, err, "arg[0] is not a valid UTF-8 string")
 	})
 }
 
@@ -221,10 +221,10 @@ func TestNewAPI_Environ(t *testing.T) {
 	}{
 		{name: "error invalid utf-8",
 			environ:     "non_utf8=\xff\xfe\xfd",
-			errorMesage: "value at 0 is not a valid UTF-8 string"},
+			errorMesage: "environ[0] is not a valid UTF-8 string"},
 		{name: "error not '='-joined pair",
 			environ:     "no_equal_pair",
-			errorMesage: "value at 0 is not joined with '='"},
+			errorMesage: "environ[0] is not joined with '='"},
 	}
 	for _, tt := range errorTests {
 		tc := tt

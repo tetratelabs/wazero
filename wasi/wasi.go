@@ -40,7 +40,7 @@ type API interface {
 	//   * ArgsSizesGet result argv_buf_size bytes are written to this offset
 	//
 	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
-	//   and ArgsGet parameters are argv=7 and argvBuf=1, we expect `ctx.Memory.Buffer` to contain:
+	//   and ArgsGet results argv=7 and argvBuf=1, we expect `ctx.Memory.Buffer` to contain:
 	//
 	//               argvBufSize          uint32le    uint32le
 	//            +----------------+     +--------+  +--------+
@@ -67,7 +67,7 @@ type API interface {
 	// * resultArgvBufSize - is the offset to write the null-terminated argument length to wasm.MemoryInstance Buffer
 	//
 	// For example, if Args are []string{"a","bc"} and
-	//   ArgsSizesGet parameters are resultArgc=1 and resultArgvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
+	//   ArgsSizesGet parameters resultArgc=1 and resultArgvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
 	//
 	//                   uint32le       uint32le
 	//                  +--------+     +--------+
@@ -84,7 +84,7 @@ type API interface {
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno
 
-	// EnvironGet is the WASI function that reads environment variables.
+	// EnvironGet is the WASI function that reads environment variables. (Environ)
 	//
 	// There are two parameters. Both are offsets in wasm.HostFunctionCallContext Memory. If either are invalid due to
 	// memory constraints, this returns ErrnoFault.
@@ -95,7 +95,7 @@ type API interface {
 	//   * EnvironSizesGet result environBufSize bytes are written to this offset
 	//
 	// For example, if EnvironSizesGet wrote environc=2 and environBufSize=9 for environment variables: "a=b", "b=cd"
-	//   and EnvironGet parameters are environ=11 and environBuf=1, we expect `ctx.Memory.Buffer` to contain:
+	//   and EnvironGet parameters environ=11 and environBuf=1, we expect `ctx.Memory.Buffer` to contain:
 	//
 	//                           environBufSize                 uint32le    uint32le
 	//              +------------------------------------+     +--------+  +--------+
@@ -335,17 +335,17 @@ func (a *wasiAPI) ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, res
 }
 
 // EnvironGet implements API.EnvironGet
-func (w *wasiAPI) EnvironGet(ctx wasm.HostFunctionCallContext, resultEnviron uint32, resultEnvironBuf uint32) (err Errno) {
+func (w *wasiAPI) EnvironGet(ctx wasm.HostFunctionCallContext, environ uint32, environBuf uint32) (err Errno) {
 	// w.environ holds the environment variables in the form of "key=val\x00", so just copies it to the linear memory.
 	for _, env := range w.environ.nullTerminatedValues {
-		if !ctx.Memory().WriteUint32Le(resultEnviron, resultEnvironBuf) {
+		if !ctx.Memory().WriteUint32Le(environ, environBuf) {
 			return ErrnoFault
 		}
-		resultEnviron += 4 // size of uint32
-		if !ctx.Memory().Write(resultEnvironBuf, env) {
+		environ += 4 // size of uint32
+		if !ctx.Memory().Write(environBuf, env) {
 			return ErrnoFault
 		}
-		resultEnvironBuf += uint32(len(env))
+		environBuf += uint32(len(env))
 	}
 
 	return ErrnoSuccess
@@ -405,7 +405,7 @@ func Stderr(writer io.Writer) Option {
 // Note: The only reason to set this is to control what's written by API.ArgsSizesGet and API.ArgsGet
 // Note: While similar in structure to os.Args, this controls what's visible in Wasm (ex the WASI function "_start").
 func Args(args ...string) (Option, error) {
-	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, args...) // TODO: this is crazy high even if spec allows it
+	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "arg", args...) // TODO: this is crazy high even if spec allows it
 	if err != nil {
 		return nil, err
 	}
@@ -425,10 +425,10 @@ func Args(args ...string) (Option, error) {
 func Environ(environ ...string) (Option, error) {
 	for i, env := range environ {
 		if !strings.Contains(env, "=") {
-			return nil, fmt.Errorf("value at %v is not joined with '='", i)
+			return nil, fmt.Errorf("environ[%d] is not joined with '='", i)
 		}
 	}
-	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, environ...) // TODO: this is crazy high even if spec allows it
+	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "environ", environ...) // TODO: this is crazy high even if spec allows it
 	if err != nil {
 		return nil, err
 	}
