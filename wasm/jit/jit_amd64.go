@@ -4616,12 +4616,12 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		return err
 	}
 
-	// After the function call, we have to initialize the stack base pointer and memory reserved registers.
-	c.initializeReservedStackBasePointer()
-	c.initializeReservedMemoryPointer()
-
 	// For call_indirect, we need to push the value back to the register.
 	if !isNilRegister(addrReg) {
+		// Since this is right after callGoFunction, we have to initialize the stack base pointer
+		// to properly load the value on memory stack.
+		c.initializeReservedStackBasePointer()
+
 		savedOffsetLocation := c.locationStack.pop()
 		savedOffsetLocation.setRegister(addrReg)
 		c.moveStackToRegister(savedOffsetLocation)
