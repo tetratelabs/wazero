@@ -112,9 +112,22 @@ const (
 	FunctionPathSymlink          = "path_symlink"
 	FunctionPathUnlinkFile       = "path_unlink_file"
 	FunctionPollOneoff           = "poll_oneoff"
-	FunctionProcExit             = "proc_exit"
-	FunctionProcRaise            = "proc_raise"
-	FunctionSchedYield           = "sched_yield"
+
+	// ProcExit terminates the execution of the module with an exit code.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
+	FunctionProcExit = "proc_exit"
+
+	// ImportProcExit is the WebAssembly 1.0 (MVP) Text format import of ProcExit
+	//
+	// See ImportProcExit
+	// See API.ProcExit
+	// See FunctionProcExit
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#proc_exit
+	ImportProcExit = `(import "wasi_snapshot_preview1" "proc_exit"
+    (func $wasi.proc_exit (param $rval i32)))`
+
+	FunctionProcRaise  = "proc_raise"
+	FunctionSchedYield = "sched_yield"
 
 	// FunctionRandomGet write random data in buffer
 	// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-buf_len-size---errno
@@ -314,7 +327,20 @@ type SnapshotPreview1 interface {
 	// TODO: PathSymlink
 	// TODO: PathUnlinkFile
 	// TODO: PollOneoff
-	// TODO: ProcExit
+
+	// ProcExit is the WASI function that terminates the execution of the module with an exit code.
+	// An exit code of 0 indicates successful termination. The meanings of other values are not defined by WASI.
+	//
+	// * rval - The exit code.
+	//
+	// In wazero, if ProcExit is called, the calling function returns immediately, returning the given exit code as the error.
+	// You can get the exit code by casting the error to wasi.ExitCode.
+	// See wasi.ExitCode
+	//
+	// Note: ImportProcExit shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
+	ProcExit(ctx wasm.HostFunctionCallContext, rval uint32)
+
 	// TODO: ProcRaise
 	// TODO: SchedYield
 
@@ -401,7 +427,7 @@ func SnapshotPreview1Functions(opts ...Option) (a *wasiAPI, nameToGoFunc map[str
 		// TODO: FunctionPathSymlink
 		// TODO: FunctionPathUnlinkFile
 		// TODO: FunctionPollOneoff
-		FunctionProcExit: proc_exit,
+		FunctionProcExit: a.ProcExit,
 		// TODO: FunctionProcRaise
 		// TODO: FunctionSchedYield
 		FunctionRandomGet: a.RandomGet,
@@ -477,6 +503,13 @@ func (a *wasiAPI) ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, prec
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
+}
+
+// ProcExit implements API.ProcExit
+func (a *wasiAPI) ProcExit(ctx wasm.HostFunctionCallContext, exitCode uint32) {
+	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
+	// See the document of API.ProcExit.
+	panic(wasi.ExitCode(exitCode))
 }
 
 type fileEntry struct {
@@ -772,10 +805,6 @@ func (a *wasiAPI) RandomGet(ctx wasm.HostFunctionCallContext, buf uint32, bufLen
 	}
 
 	return wasi.ErrnoSuccess
-}
-
-func proc_exit(wasm.HostFunctionCallContext, uint32) {
-	// TODO: implement
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {

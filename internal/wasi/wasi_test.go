@@ -491,7 +491,38 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_PathSymlink TestAPI_PathSymlink_Errors
 // TODO: TestAPI_PathUnlinkFile TestAPI_PathUnlinkFile_Errors
 // TODO: TestAPI_PollOneoff TestAPI_PollOneoff_Errors
-// TODO: TestAPI_ProcExit TestAPI_ProcExit_Errors
+
+func TestAPI_ProcExit(t *testing.T) {
+	store, _ := instantiateWasmStore(t, FunctionProcExit, ImportProcExit, "test")
+
+	tests := []struct {
+		name     string
+		exitCode uint32
+	}{
+		{
+			name:     "success (exitcode 0)",
+			exitCode: 0,
+		},
+
+		{
+			name:     "arbitrary non-zero exitcode",
+			exitCode: 42,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			// When ProcExit is called, store.CallFunction returns immediately, returning the exit code as the error.
+			_, _, err := store.CallFunction(context.Background(), "test", FunctionProcExit, uint64(tc.exitCode))
+			var code wasi.ExitCode
+			require.ErrorAs(t, err, &code)
+			require.Equal(t, code, wasi.ExitCode(tc.exitCode))
+		})
+	}
+}
+
 // TODO: TestAPI_ProcRaise TestAPI_ProcRaise_Errors
 // TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
 
