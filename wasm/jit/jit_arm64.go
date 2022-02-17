@@ -1392,7 +1392,8 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		return err
 	}
 
-	if isZeroRegister(v.register) {
+	reg := v.register
+	if isZeroRegister(reg) {
 		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
@@ -1409,7 +1410,6 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	// Since arm64 doesn't have an instruction directly counting trailing zeros,
 	// we reverse the bits first, and then do CLZ, which is exactly the same as
 	// gcc implements __builtin_ctz for arm64.
-	reg := v.register
 	if o.Type == wazeroir.UnsignedInt32 {
 		c.compileRegisterToRegisterInstruction(arm64.ARBITW, reg, reg)
 		c.compileRegisterToRegisterInstruction(arm64.ACLZW, reg, reg)
@@ -1422,7 +1422,29 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 }
 
 func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	reg := v.register
+	if isZeroRegister(reg) {
+		c.locationStack.pushValueLocationOnRegister(reg)
+		return nil
+	}
+
+	freg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, reg, freg)
+	vreg := simdRegisterForScalarFloatRegister(freg)
+	c.compileRegisterToRegisterInstruction(arm64.AVCNT, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5)
+	c.compileRegisterToRegisterInstruction(arm64.AVUADDLV, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg)
+	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, freg, reg)
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
 func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {

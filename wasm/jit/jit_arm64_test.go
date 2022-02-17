@@ -2610,3 +2610,85 @@ func TestArm64Compiler_compileHostFunction(t *testing.T) {
 	// After that, the code must exit with returned status.
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 }
+
+func TestArm64Compiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		// wazeroir.OperationKindClz,
+		// wazeroir.OperationKindCtz,
+		wazeroir.OperationKindPopcnt,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, tp := range []wazeroir.UnsignedInt{wazeroir.UnsignedInt32, wazeroir.UnsignedInt64} {
+				tp := tp
+				is32bit := tp == wazeroir.UnsignedInt32
+				t.Run(tp.String(), func(t *testing.T) {
+					for _, v := range []uint64{
+						0, 1, 1 << 4, 1 << 6, 1 << 31,
+						0b11111111110000, 0b010101010, 0b1111111111111, math.MaxUint64,
+					} {
+						name := fmt.Sprintf("%064b", v)
+						if is32bit {
+							name = fmt.Sprintf("%032b", v)
+						}
+						t.Run(name, func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							if is32bit {
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+							} else {
+								err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+							}
+							require.NoError(t, err)
+
+							switch kind {
+							case wazeroir.OperationKindClz:
+								err = compiler.compileClz(&wazeroir.OperationClz{Type: tp})
+							case wazeroir.OperationKindCtz:
+								err = compiler.compileCtz(&wazeroir.OperationCtz{Type: tp})
+							case wazeroir.OperationKindPopcnt:
+								err = compiler.compilePopcnt(&wazeroir.OperationPopcnt{Type: tp})
+							}
+							require.NoError(t, err)
+
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							// Generate and run the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// One value must be pushed as aresult.
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindClz:
+								if is32bit {
+									require.Equal(t, bits.LeadingZeros32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.LeadingZeros64(v), int(env.stackTopAsUint32()))
+								}
+							case wazeroir.OperationKindCtz:
+								if is32bit {
+									require.Equal(t, bits.TrailingZeros32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.TrailingZeros64(v), int(env.stackTopAsUint32()))
+								}
+							case wazeroir.OperationKindPopcnt:
+								if is32bit {
+									require.Equal(t, bits.OnesCount32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.OnesCount64(v), int(env.stackTopAsUint32()))
+								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
