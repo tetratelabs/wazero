@@ -14,10 +14,11 @@ import (
 	"github.com/wasmerio/wasmer-go/wasmer"
 
 	"github.com/tetratelabs/wazero"
+	wasi "github.com/tetratelabs/wazero/internal/wasi"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
-	"github.com/tetratelabs/wazero/wasi"
+	publicwasi "github.com/tetratelabs/wazero/wasi"
 )
 
 // example holds the latest supported features as described in the comments of exampleText
@@ -107,7 +108,7 @@ func TestExampleUpToDate(t *testing.T) {
 		// Add WASI to satisfy import tests
 		store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
 			ModuleToHostFunctions: map[string]*wazero.HostFunctions{
-				wasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1(),
+				publicwasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1(),
 			},
 		})
 		require.NoError(t, err)

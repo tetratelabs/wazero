@@ -30,35 +30,103 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
 	FunctionInitialize = "_initialize"
 
-	// ImportArgsGet is the WebAssembly 1.0 (MVP) Text format import of wasi.FunctionArgsGet
+	// FunctionArgsGet reads command-line argument data.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
+	FunctionArgsGet = "args_get"
+
+	// ImportArgsGet is the WebAssembly 1.0 (MVP) Text format import of FunctionArgsGet
 	ImportArgsGet = `(import "wasi_snapshot_preview1" "args_get"
     (func $wasi.args_get (param $argv i32) (param $argv_buf i32) (result (;errno;) i32)))`
+
+	// FunctionArgsSizesGet returns command-line argument data sizes.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
+	FunctionArgsSizesGet = "args_sizes_get"
 
 	// ImportArgsSizesGet is the WebAssembly 1.0 (MVP) Text format import of FunctionArgsSizesGet
 	ImportArgsSizesGet = `(import "wasi_snapshot_preview1" "args_sizes_get"
     (func $wasi.args_sizes_get (param $result.argc i32) (param $result.argv_buf_size i32) (result (;errno;) i32)))`
 
+	// FunctionEnvironGet reads environment variable data.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-environ_getenviron-pointerpointeru8-environ_buf-pointeru8---errno
+	FunctionEnvironGet = "environ_get"
+
 	// ImportEnvironGet is the WebAssembly 1.0 (MVP) Text format import of FunctionEnvironGet
 	ImportEnvironGet = `(import "wasi_snapshot_preview1" "environ_get"
     (func $wasi.environ_get (param $environ i32) (param $environ_buf i32) (result (;errno;) i32)))`
+
+	// FunctionEnvironSizesGet returns environment variable data sizes.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-environ_sizes_get---errno-size-size
+	FunctionEnvironSizesGet = "environ_sizes_get"
 
 	// ImportEnvironSizesGet is the WebAssembly 1.0 (MVP) Text format import of FunctionEnvironSizesGet
 	ImportEnvironSizesGet = `
 (import "wasi_snapshot_preview1" "environ_sizes_get"
     (func $wasi.environ_sizes_get (param $result.environc i32) (param $result.environBufSize i32) (result (;errno;) i32)))`
 
+	// FunctionClockResGet returns the resolution of a clock.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
+	FunctionClockResGet = "clock_res_get"
+
 	// ImportClockResGet is the WebAssembly 1.0 (MVP) Text format import of FunctionClockResGet
 	ImportClockResGet = `
 (import "wasi_snapshot_preview1" "clock_res_get"
     (func $wasi.clock_res_get (param $id i32) (param $result.resolution i32) (result (;errno;) i32)))`
 
+	// FunctionClockTimeGet returns the time value of a clock.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
+	FunctionClockTimeGet = "clock_time_get"
+
 	// ImportClockTimeGet is the WebAssembly 1.0 (MVP) Text format import of FunctionClockTimeGet
 	ImportClockTimeGet = `(import "wasi_snapshot_preview1" "clock_time_get"
     (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))`
 
+	FunctionFdAdvise             = "fd_advise"
+	FunctionFdAllocate           = "fd_allocate"
+	FunctionFdClose              = "fd_close"
+	FunctionFdDataSync           = "fd_datasync"
+	FunctionFdFdstatGet          = "fd_fdstat_get"
+	FunctionFdFdstatSetFlags     = "fd_fdstat_set_flags"
+	FunctionFdFdstatSetRights    = "fd_fdstat_set_rights"
+	FunctionFdFilestatGet        = "fd_filestat_get"
+	FunctionFdFilestatSetSize    = "fd_filestat_set_size"
+	FunctionFdFilestatSetTimes   = "fd_filestat_set_times"
+	FunctionFdPread              = "fd_pread"
+	FunctionFdPrestatGet         = "fd_prestat_get"
+	FunctionFdPrestatDirName     = "fd_prestat_dir_name"
+	FunctionFdPwrite             = "fd_pwrite"
+	FunctionFdRead               = "fd_read"
+	FunctionFdReaddir            = "fd_readdir"
+	FunctionFdRenumber           = "fd_renumber"
+	FunctionFdSeek               = "fd_seek"
+	FunctionFdSync               = "fd_sync"
+	FunctionFdTell               = "fd_tell"
+	FunctionFdWrite              = "fd_write"
+	FunctionPathCreateDirectory  = "path_create_directory"
+	FunctionPathFilestatGet      = "path_filestat_get"
+	FunctionPathFilestatSetTimes = "path_filestat_set_times"
+	FunctionPathLink             = "path_link"
+	FunctionPathOpen             = "path_open"
+	FunctionPathReadlink         = "path_readlink"
+	FunctionPathRemoveDirectory  = "path_remove_directory"
+	FunctionPathRename           = "path_rename"
+	FunctionPathSymlink          = "path_symlink"
+	FunctionPathUnlinkFile       = "path_unlink_file"
+	FunctionPollOneoff           = "poll_oneoff"
+	FunctionProcExit             = "proc_exit"
+	FunctionProcRaise            = "proc_raise"
+	FunctionSchedYield           = "sched_yield"
+
+	// FunctionRandomGet write random data in buffer
+	// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-buf_len-size---errno
+	FunctionRandomGet = "random_get"
+
 	// ImportRandomGet is the WebAssembly 1.0 (MVP) Text format import of FunctionRandomGet
 	ImportRandomGet = `(import "wasi_snapshot_preview1" "random_get"
     (func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))`
+
+	FunctionSockRecv     = "sock_recv"
+	FunctionSockSend     = "sock_send"
+	FunctionSockShutdown = "sock_shutdown"
 )
 
 // SnapshotPreview1 includes all host functions to export for WASI version wasi.ModuleSnapshotPreview1.
@@ -105,7 +173,7 @@ type SnapshotPreview1 interface {
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32) wasi.Errno
 
-	// ArgsSizesGet is the WASI function named wasi.FunctionArgsSizesGet that reads command-line argument data (Args)
+	// ArgsSizesGet is the WASI function named FunctionArgsSizesGet that reads command-line argument data (Args)
 	// sizes.
 	//
 	// There are two result parameters: these are offsets in the wasm.HostFunctionCallContext Memory to write
@@ -133,7 +201,7 @@ type SnapshotPreview1 interface {
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) wasi.Errno
 
-	// EnvironGet is the WASI function named wasi.FunctionEnvironGet that reads environment variables. (Environ)
+	// EnvironGet is the WASI function named FunctionEnvironGet that reads environment variables. (Environ)
 	//
 	// There are two parameters. Both are offsets in wasm.HostFunctionCallContext Memory. If either are invalid due to
 	// memory constraints, this returns ErrnoFault.
@@ -161,7 +229,7 @@ type SnapshotPreview1 interface {
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
 	EnvironGet(ctx wasm.HostFunctionCallContext, environ, environBuf uint32) wasi.Errno
 
-	// EnvironSizesGet is the WASI function named wasi.FunctionEnvironSizesGet that reads environment variable
+	// EnvironSizesGet is the WASI function named FunctionEnvironSizesGet that reads environment variable
 	// (Environ) sizes.
 	//
 	// There are two result parameters: these are offsets in the wasi.HostFunctionCallContext Memory to write
@@ -192,7 +260,7 @@ type SnapshotPreview1 interface {
 
 	// TODO: ClockResGet(ctx wasm.HostFunctionCallContext, id, resultResolution uint32) wasi.Errno
 
-	// ClockTimeGet is the WASI function named wasi.FunctionClockTimeGet that returns the time value of a clock (time.Now).
+	// ClockTimeGet is the WASI function named FunctionClockTimeGet that returns the time value of a clock (time.Now).
 	//
 	// * id - The clock id for which to return the time.
 	// * precision - The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
@@ -250,7 +318,7 @@ type SnapshotPreview1 interface {
 	// TODO: ProcRaise
 	// TODO: SchedYield
 
-	// RandomGet is the WASI function named wasi.FunctionRandomGet that write random data in buffer (rand.Read()).
+	// RandomGet is the WASI function named FunctionRandomGet that write random data in buffer (rand.Read()).
 	//
 	// * buf - is the wasm.Memory offset to write random values
 	// * bufLen - size of random data in bytes
@@ -295,51 +363,51 @@ func SnapshotPreview1Functions(opts ...Option) (a *wasiAPI, nameToGoFunc map[str
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
-		wasi.FunctionArgsGet:         a.ArgsGet,
-		wasi.FunctionArgsSizesGet:    a.ArgsSizesGet,
-		wasi.FunctionEnvironGet:      a.EnvironGet,
-		wasi.FunctionEnvironSizesGet: a.EnvironSizesGet,
-		// TODO: wasi.FunctionClockResGet
-		wasi.FunctionClockTimeGet: a.ClockTimeGet,
-		// TODO: wasi.FunctionFdAdvise
-		// TODO: wasi.FunctionFdAllocate
-		wasi.FunctionFdClose: a.fd_close,
-		// TODO: wasi.FunctionFdDataSync
-		wasi.FunctionFdFdstatGet: a.fd_fdstat_get,
-		// TODO: wasi.FunctionFdFdstatSetFlags
-		// TODO: wasi.FunctionFdFdstatSetRights
-		// TODO: wasi.FunctionFdFilestatGet
-		// TODO: wasi.FunctionFdFilestatSetSize
-		// TODO: wasi.FunctionFdFilestatSetTimes
-		// TODO: wasi.FunctionFdPread
-		wasi.FunctionFdPrestatGet:     a.fd_prestat_get,
-		wasi.FunctionFdPrestatDirName: a.fd_prestat_dir_name,
-		// TODO: wasi.FunctionFdPwrite
-		wasi.FunctionFdRead: a.fd_read,
-		// TODO: wasi.FunctionFdReaddir
-		// TODO: wasi.FunctionFdRenumber
-		wasi.FunctionFdSeek: a.fd_seek,
-		// TODO: wasi.FunctionFdSync
-		// TODO: wasi.FunctionFdTell
-		wasi.FunctionFdWrite: a.fd_write,
-		// TODO: wasi.FunctionPathCreateDirectory
-		// TODO: wasi.FunctionPathFilestatGet
-		// TODO: wasi.FunctionPathFilestatSetTimes
-		// TODO: wasi.FunctionPathLink
-		wasi.FunctionPathOpen: a.path_open,
-		// TODO: wasi.FunctionPathReadlink
-		// TODO: wasi.FunctionPathRemoveDirectory
-		// TODO: wasi.FunctionPathRename
-		// TODO: wasi.FunctionPathSymlink
-		// TODO: wasi.FunctionPathUnlinkFile
-		// TODO: wasi.FunctionPollOneoff
-		wasi.FunctionProcExit: proc_exit,
-		// TODO: wasi.FunctionProcRaise
-		// TODO: wasi.FunctionSchedYield
-		wasi.FunctionRandomGet: a.RandomGet,
-		// TODO: wasi.FunctionSockRecv
-		// TODO: wasi.FunctionSockSend
-		// TODO: wasi.FunctionSockShutdown
+		FunctionArgsGet:         a.ArgsGet,
+		FunctionArgsSizesGet:    a.ArgsSizesGet,
+		FunctionEnvironGet:      a.EnvironGet,
+		FunctionEnvironSizesGet: a.EnvironSizesGet,
+		// TODO: FunctionClockResGet
+		FunctionClockTimeGet: a.ClockTimeGet,
+		// TODO: FunctionFdAdvise
+		// TODO: FunctionFdAllocate
+		FunctionFdClose: a.fd_close,
+		// TODO: FunctionFdDataSync
+		FunctionFdFdstatGet: a.fd_fdstat_get,
+		// TODO: FunctionFdFdstatSetFlags
+		// TODO: FunctionFdFdstatSetRights
+		// TODO: FunctionFdFilestatGet
+		// TODO: FunctionFdFilestatSetSize
+		// TODO: FunctionFdFilestatSetTimes
+		// TODO: FunctionFdPread
+		FunctionFdPrestatGet:     a.fd_prestat_get,
+		FunctionFdPrestatDirName: a.fd_prestat_dir_name,
+		// TODO: FunctionFdPwrite
+		FunctionFdRead: a.fd_read,
+		// TODO: FunctionFdReaddir
+		// TODO: FunctionFdRenumber
+		FunctionFdSeek: a.fd_seek,
+		// TODO: FunctionFdSync
+		// TODO: FunctionFdTell
+		FunctionFdWrite: a.fd_write,
+		// TODO: FunctionPathCreateDirectory
+		// TODO: FunctionPathFilestatGet
+		// TODO: FunctionPathFilestatSetTimes
+		// TODO: FunctionPathLink
+		FunctionPathOpen: a.path_open,
+		// TODO: FunctionPathReadlink
+		// TODO: FunctionPathRemoveDirectory
+		// TODO: FunctionPathRename
+		// TODO: FunctionPathSymlink
+		// TODO: FunctionPathUnlinkFile
+		// TODO: FunctionPollOneoff
+		FunctionProcExit: proc_exit,
+		// TODO: FunctionProcRaise
+		// TODO: FunctionSchedYield
+		FunctionRandomGet: a.RandomGet,
+		// TODO: FunctionSockRecv
+		// TODO: FunctionSockSend
+		// TODO: FunctionSockShutdown
 	}
 	return
 }
@@ -400,7 +468,7 @@ func (a *wasiAPI) EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnviro
 	return wasi.ErrnoSuccess
 }
 
-// TODO: wasi.Func (a *wasiAPI) FunctionClockResGet
+// TODO: Func (a *wasiAPI) FunctionClockResGet
 
 // ClockTimeGet implements SnapshotPreview1.ClockTimeGet
 func (a *wasiAPI) ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno {

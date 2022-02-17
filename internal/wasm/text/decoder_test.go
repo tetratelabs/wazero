@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	wasi "github.com/tetratelabs/wazero/internal/wasi"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasi"
 )
 
 func TestDecodeModule(t *testing.T) {

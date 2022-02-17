@@ -1,3 +1,4 @@
+// Package wasm includes constants and interfaces used by both public and internal APIs.
 package wasm
 
 import (
