@@ -85,6 +85,7 @@ func jitcall(codeSegment, engine uintptr)
 // archContext is embedded in Engine in order to store architecture-specific data.
 // For amd64, this is empty.
 type archContext struct{}
+
 func newArchContext() (ret archContext) { return }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
