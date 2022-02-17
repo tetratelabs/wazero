@@ -1398,6 +1398,8 @@ func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	}
 
 	if isZeroRegister(v.register) {
+		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
+		// so we allocate a register and put the const on it.
 		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
@@ -1430,6 +1432,8 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 
 	reg := v.register
 	if isZeroRegister(reg) {
+		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
+		// so we allocate a register and put the const on it.
 		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
 			return err
@@ -1547,6 +1551,9 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 	return nil
 }
 
+// compileIntegerDivPrecheck adds instructions to check if the divisor and dividend are sound for division operation.
+// First, this adds instrucitons to check if the divisor equals zero, and if so, exits the function.
+// Plus, for signed divisions, check if the result might result in overflow or not.
 func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, dividend, divisor int16) error {
 	// We check the divisor value equals zero.
 	var cmpInst, movInst obj.As
