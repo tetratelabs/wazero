@@ -300,7 +300,7 @@ var errnoToString = [...]string{
 // In wazero, if ProcExit is called, the calling function returns immediately, returning the given exit code as the error.
 // You can get the exit code by casting the error as follows.
 //
-//   wasmFunction := m.GetFunctionVoidReturn(/ * omitted */)  // Some function which may call proc_exit
+//   wasmFunction := m.GetFunctionVoidReturn(/* omitted */)  // Some function which may call proc_exit
 //   err := wasmFunction()
 //   var exitCode wasi.ExitCode
 //   if errors.As(err, &exitCode) {
