@@ -53,8 +53,9 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 
 func TestArchContextOffsetInEngine(t *testing.T) {
 	var eng engine
-	// If this fails, we have to fix jit_arm64.s as well.
-	require.Equal(t, int(unsafe.Offsetof(eng.jitCallReturnAddress)), engineArchContextJITCallReturnAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.jitCallReturnAddress)), engineArchContextJITCallReturnAddressOffset) // If this fails, we have to fix jit_arm64.s as well.
+	require.Equal(t, int(unsafe.Offsetof(eng.minimum32BitSignedInt)), engineArchContextMinimum32BitSignedIntOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.minimum64BitSignedInt)), engineArchContextMinimum64BitSignedIntOffset)
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {
@@ -519,8 +520,6 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							compiler.compileLoadConditionalRegisterToGeneralPurposeRegister(resultLocation)
 							require.True(t, resultLocation.onRegister())
 
-							// Release the value to the memory stack again to verify the operation.
-							compiler.compileReleaseRegisterToStack(resultLocation)
 							compiler.compileReturnFunction()
 
 							// Compile and execute the code under test.
@@ -2609,4 +2608,287 @@ func TestArm64Compiler_compileHostFunction(t *testing.T) {
 
 	// After that, the code must exit with returned status.
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+}
+
+func TestArm64Compiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindClz,
+		wazeroir.OperationKindCtz,
+		wazeroir.OperationKindPopcnt,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, tp := range []wazeroir.UnsignedInt{wazeroir.UnsignedInt32, wazeroir.UnsignedInt64} {
+				tp := tp
+				is32bit := tp == wazeroir.UnsignedInt32
+				t.Run(tp.String(), func(t *testing.T) {
+					for _, v := range []uint64{
+						0, 1, 1 << 4, 1 << 6, 1 << 31,
+						0b11111111110000, 0b010101010, 0b1111111111111, math.MaxUint64,
+					} {
+						name := fmt.Sprintf("%064b", v)
+						if is32bit {
+							name = fmt.Sprintf("%032b", v)
+						}
+						t.Run(name, func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							if is32bit {
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+							} else {
+								err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+							}
+							require.NoError(t, err)
+
+							switch kind {
+							case wazeroir.OperationKindClz:
+								err = compiler.compileClz(&wazeroir.OperationClz{Type: tp})
+							case wazeroir.OperationKindCtz:
+								err = compiler.compileCtz(&wazeroir.OperationCtz{Type: tp})
+							case wazeroir.OperationKindPopcnt:
+								err = compiler.compilePopcnt(&wazeroir.OperationPopcnt{Type: tp})
+							}
+							require.NoError(t, err)
+
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							// Generate and run the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// One value must be pushed as a result.
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindClz:
+								if is32bit {
+									require.Equal(t, bits.LeadingZeros32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.LeadingZeros64(v), int(env.stackTopAsUint32()))
+								}
+							case wazeroir.OperationKindCtz:
+								if is32bit {
+									require.Equal(t, bits.TrailingZeros32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.TrailingZeros64(v), int(env.stackTopAsUint32()))
+								}
+							case wazeroir.OperationKindPopcnt:
+								if is32bit {
+									require.Equal(t, bits.OnesCount32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.OnesCount64(v), int(env.stackTopAsUint32()))
+								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindDiv,
+		wazeroir.OperationKindRem,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, signedType := range []wazeroir.SignedType{
+				wazeroir.SignedTypeUint32,
+				wazeroir.SignedTypeUint64,
+				wazeroir.SignedTypeInt32,
+				wazeroir.SignedTypeInt64,
+				wazeroir.SignedTypeFloat32,
+				wazeroir.SignedTypeFloat64,
+			} {
+				signedType := signedType
+				t.Run(signedType.String(), func(t *testing.T) {
+					for _, values := range [][2]uint64{
+						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1}, {math.MaxInt16, math.MaxInt32},
+						{1234, 5}, {5, 1234}, {4, 2}, {40, 4}, {123456, 4},
+						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
+						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
+						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{0x80000000, 0xffffffff},                 // This is equivalent to (-2^31 / -1) and results in overflow for 32-bit signed div.
+						{0x8000000000000000, 0xffffffffffffffff}, // This is equivalent to (-2^63 / -1) and results in overflow for 64-bit signed div.
+						{0xffffffff /* -1 in signed 32bit */, 0xfffffffe /* -2 in signed 32bit */},
+						{0xffffffffffffffff /* -1 in signed 64bit */, 0xfffffffffffffffe /* -2 in signed 64bit */},
+						{1, 0xffff_ffff_ffff_ffff},
+						{math.Float64bits(1.11231), math.Float64bits(12312312.12312)},
+						{math.Float64bits(1.11231), math.Float64bits(-12312312.12312)},
+						{math.Float64bits(-1.11231), math.Float64bits(12312312.12312)},
+						{math.Float64bits(-1.11231), math.Float64bits(-12312312.12312)},
+						{math.Float64bits(1.11231), math.Float64bits(12312312.12312)},
+						{math.Float64bits(-12312312.12312), math.Float64bits(1.11231)},
+						{math.Float64bits(12312312.12312), math.Float64bits(-1.11231)},
+						{math.Float64bits(-12312312.12312), math.Float64bits(-1.11231)},
+						{1, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 1},
+						{0xffff_ffff_ffff_ffff, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 0xffff_ffff_ffff_ffff},
+						{math.Float64bits(math.MaxFloat32), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat32), 1},
+						{math.Float64bits(math.MaxFloat64), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat64), 1},
+						{0, math.Float64bits(math.Inf(1))},
+						{0, math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), 0},
+						{math.Float64bits(math.Inf(-1)), 0},
+						{math.Float64bits(math.Inf(1)), 1},
+						{math.Float64bits(math.Inf(-1)), 1},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(-1))},
+					} {
+						x1, x2 := values[0], values[1]
+						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							// Emit consts operands.
+							for _, v := range []uint64{x1, x2} {
+								switch signedType {
+								case wazeroir.SignedTypeUint32:
+									// In order to test zero value on non-zero register, we directly assign an register.
+									reg, err := compiler.allocateRegister(generalPurposeRegisterTypeInt)
+									require.NoError(t, err)
+									compiler.locationStack.pushValueLocationOnRegister(reg)
+									compiler.compileConstToRegisterInstruction(arm64.AMOVD, int64(v), reg)
+								case wazeroir.SignedTypeInt32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(int32(v))})
+								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+								case wazeroir.SignedTypeFloat32:
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+								case wazeroir.SignedTypeFloat64:
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+								}
+								require.NoError(t, err)
+							}
+
+							// At this point, two values exist for comparison.
+							require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+							switch kind {
+							case wazeroir.OperationKindDiv:
+								err = compiler.compileDiv(&wazeroir.OperationDiv{Type: signedType})
+							case wazeroir.OperationKindRem:
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									err = compiler.compileRem(&wazeroir.OperationRem{Type: wazeroir.SignedInt32})
+								case wazeroir.SignedTypeInt64:
+									err = compiler.compileRem(&wazeroir.OperationRem{Type: wazeroir.SignedInt64})
+								case wazeroir.SignedTypeUint32:
+									err = compiler.compileRem(&wazeroir.OperationRem{Type: wazeroir.SignedUint32})
+								case wazeroir.SignedTypeUint64:
+									err = compiler.compileRem(&wazeroir.OperationRem{Type: wazeroir.SignedUint64})
+								case wazeroir.SignedTypeFloat32:
+									// Rem undefined for float32.
+									t.Skip()
+								case wazeroir.SignedTypeFloat64:
+									// Rem undefined for float64.
+									t.Skip()
+								}
+							}
+							require.NoError(t, err)
+
+							compiler.compileReturnFunction()
+
+							// Compile and execute the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							switch kind {
+							case wazeroir.OperationKindDiv:
+								switch signedType {
+								case wazeroir.SignedTypeUint32:
+									if uint32(x2) == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, uint32(x1)/uint32(x2), env.stackTopAsUint32())
+									}
+								case wazeroir.SignedTypeInt32:
+									v1, v2 := int32(x1), int32(x2)
+									if v2 == 0 || (v1 == math.MinInt32 && v2 == -1) {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, v1/v2, env.stackTopAsInt32())
+									}
+								case wazeroir.SignedTypeUint64:
+									if x2 == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, x1/x2, env.stackTopAsUint64())
+									}
+								case wazeroir.SignedTypeInt64:
+									v1, v2 := int64(x1), int64(x2)
+									if v2 == 0 || (v1 == math.MinInt64 && v2 == -1) {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, v1/v2, env.stackTopAsInt64())
+									}
+								case wazeroir.SignedTypeFloat32:
+									exp := math.Float32frombits(uint32(x1)) / math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
+								case wazeroir.SignedTypeFloat64:
+									exp := math.Float64frombits(x1) / math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
+								}
+							case wazeroir.OperationKindRem:
+								switch signedType {
+								case wazeroir.SignedTypeInt32:
+									v1, v2 := int32(x1), int32(x2)
+									if v2 == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, v1%v2, env.stackTopAsInt32())
+									}
+								case wazeroir.SignedTypeInt64:
+									v1, v2 := int64(x1), int64(x2)
+									if v2 == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, v1%v2, env.stackTopAsInt64())
+									}
+								case wazeroir.SignedTypeUint32:
+									v1, v2 := uint32(x1), uint32(x2)
+									if v2 == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, v1%v2, env.stackTopAsUint32())
+									}
+								case wazeroir.SignedTypeUint64:
+									if x2 == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, x1%x2, env.stackTopAsUint64())
+									}
+
+								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
 }

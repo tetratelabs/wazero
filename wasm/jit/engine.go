@@ -422,6 +422,7 @@ func newEngine() *engine {
 		valueStack:        make([]uint64, initialValueStackSize),
 		callFrameStack:    make([]callFrame, initialCallStackSize),
 		compiledFunctions: make([]*compiledFunction, initialCompiledFunctionsSliceSize),
+		archContext:       newArchContext(),
 	}
 	e.initializeGlobalContext()
 	return e

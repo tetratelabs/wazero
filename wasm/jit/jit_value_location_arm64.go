@@ -39,6 +39,12 @@ var (
 	}
 )
 
+// simdRegisterForScalarFloatRegister returns SIMD register which corresponds to the given scalar float register.
+// In other words, this returns: REG_F0 -> REG_V0, REG_F1 -> REG_V1, ...., REG_F31 -> REG_V31.
+func simdRegisterForScalarFloatRegister(freg int16) int16 {
+	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
+}
+
 func isIntRegister(r int16) bool {
 	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
 }

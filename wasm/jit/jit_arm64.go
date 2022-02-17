@@ -25,6 +25,13 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
+func newArchContext() archContext {
+	return archContext{
+		minimum32BitSignedInt: math.MinInt32,
+		minimum64BitSignedInt: math.MinInt64,
+	}
+}
+
 // archContext is embedded in Engine in order to store architecture-specific data.
 type archContext struct {
 	// jitCallReturnAddress holds the absolute return address for jitcall.
@@ -32,10 +39,28 @@ type archContext struct {
 	// Native code can return back to the engine.exec's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
 	jitCallReturnAddress uint64
+
+	// Loading large constants in arm64 is a bit costly so we place the following
+	// consts on engine struct so that we can quickly access them during various operations.
+
+	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
+	// Note: this can be obtained by moving $1 and doing left-shift with 32, but it is
+	// slower than directly loading fron this location.
+	minimum32BitSignedInt int32
+	// Note: this can be obtained by moving $1 and doing left-shift with 64, but it is
+	// slower than directly loading fron this location.
+	// minimum64BitSignedInt is used for overflow check for 64-bit signed division.
+	minimum64BitSignedInt int64
 }
 
-// engineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress
-const engineArchContextJITCallReturnAddressOffset = 136
+const (
+	// engineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in engine.
+	engineArchContextJITCallReturnAddressOffset = 136
+	// engineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in engine.
+	engineArchContextMinimum32BitSignedIntOffset = 144
+	// engineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in engine.
+	engineArchContextMinimum64BitSignedIntOffset = 152
+)
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
 // This is used by engine.exec and the entrypoint to enter the JITed native code.
@@ -269,6 +294,19 @@ func (c *arm64Compiler) compileTwoRegistersToRegisterInstruction(instruction obj
 	inst.From.Type = obj.TYPE_REG
 	inst.From.Reg = src1
 	inst.Reg = src2
+	c.addInstruction(inst)
+}
+
+// compileTwoRegistersToRegisterInstruction adds an instruction which takes two source and destination register operands.
+func (c *arm64Compiler) compileTwoRegistersInstruction(instruction obj.As, src1, src2, dst1, dst2 int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = dst1
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = src1
+	inst.Reg = src2
+	inst.RestArgs = append(inst.RestArgs, obj.Addr{Type: obj.TYPE_REG, Reg: dst2})
 	c.addInstruction(inst)
 }
 
@@ -1356,24 +1394,292 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 	return nil
 }
 
+// compileClz implements compiler.compileClz for the arm64 architecture.
 func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(v.register) {
+		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
+		// so we allocate a register and put the const on it.
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		if o.Type == wazeroir.UnsignedInt32 {
+			c.compileConstToRegisterInstruction(arm64.AMOVW, 32, reg)
+		} else {
+			c.compileConstToRegisterInstruction(arm64.AMOVD, 64, reg)
+		}
+		c.locationStack.pushValueLocationOnRegister(reg)
+		return nil
+	}
+
+	reg := v.register
+	if o.Type == wazeroir.UnsignedInt32 {
+		c.compileRegisterToRegisterInstruction(arm64.ACLZW, reg, reg)
+	} else {
+		c.compileRegisterToRegisterInstruction(arm64.ACLZ, reg, reg)
+	}
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
+// compileCtz implements compiler.compileCtz for the arm64 architecture.
 func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	reg := v.register
+	if isZeroRegister(reg) {
+		// If the target is zero register, the result is always 32 (or 64 for 64-bits),
+		// so we allocate a register and put the const on it.
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		if o.Type == wazeroir.UnsignedInt32 {
+			c.compileConstToRegisterInstruction(arm64.AMOVW, 32, reg)
+		} else {
+			c.compileConstToRegisterInstruction(arm64.AMOVD, 64, reg)
+		}
+		c.locationStack.pushValueLocationOnRegister(reg)
+		return nil
+	}
+
+	// Since arm64 doesn't have an instruction directly counting trailing zeros,
+	// we reverse the bits first, and then do CLZ, which is exactly the same as
+	// gcc implements __builtin_ctz for arm64.
+	if o.Type == wazeroir.UnsignedInt32 {
+		c.compileRegisterToRegisterInstruction(arm64.ARBITW, reg, reg)
+		c.compileRegisterToRegisterInstruction(arm64.ACLZW, reg, reg)
+	} else {
+		c.compileRegisterToRegisterInstruction(arm64.ARBIT, reg, reg)
+		c.compileRegisterToRegisterInstruction(arm64.ACLZ, reg, reg)
+	}
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
+// compilePopcnt implements compiler.compilePopcnt for the arm64 architecture.
 func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	reg := v.register
+	if isZeroRegister(reg) {
+		c.locationStack.pushValueLocationOnRegister(reg)
+		return nil
+	}
+
+	freg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	// arm64 doesn't have an instruction for population count on scalar register,
+	// so we use the vector one (VCNT).
+	// This exactly what the official Go implements bits.OneCount.
+	// For example, "func () int { return bits.OneCount(10) }" is compiled as
+	//
+	//    MOVD    $10, R0
+	//    FMOVD   R0, F0
+	//    VCNT    V0.B8, V0.B8
+	//    VUADDLV V0.B8, V0
+	//
+	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, reg, freg)
+	vreg := simdRegisterForScalarFloatRegister(freg)
+	// For how to specify "V0.B8" (SIMD register arrangement), see
+	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
+	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
+	c.compileRegisterToRegisterInstruction(arm64.AVCNT, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5)
+	c.compileRegisterToRegisterInstruction(arm64.AVUADDLV, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg)
+	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, freg, reg)
+
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
+// compileDiv implements compiler.compileDiv for the arm64 architecture.
 func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	dividend, divisor, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	// If the divisor is on the zero register, exit from the function deterministically.
+	if isZeroRegister(divisor.register) {
+		// Push any value so that the subsequent instruction can have a consistent location stack state.
+		c.locationStack.pushValueLocationOnStack()
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.AUDIVW
+		if err := c.compileIntegerDivPrecheck(true, false, dividend.register, divisor.register); err != nil {
+			return err
+		}
+	case wazeroir.SignedTypeUint64:
+		if err := c.compileIntegerDivPrecheck(false, false, dividend.register, divisor.register); err != nil {
+			return err
+		}
+		inst = arm64.AUDIV
+	case wazeroir.SignedTypeInt32:
+		if err := c.compileIntegerDivPrecheck(true, true, dividend.register, divisor.register); err != nil {
+			return err
+		}
+		inst = arm64.ASDIVW
+	case wazeroir.SignedTypeInt64:
+		if err := c.compileIntegerDivPrecheck(false, true, dividend.register, divisor.register); err != nil {
+			return err
+		}
+		inst = arm64.ASDIV
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFDIVS
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFDIVD
+	}
+
+	c.compileRegisterToRegisterInstruction(inst, divisor.register, dividend.register)
+
+	c.locationStack.pushValueLocationOnRegister(dividend.register)
+	return nil
 }
 
+// compileIntegerDivPrecheck adds instructions to check if the divisor and dividend are sound for division operation.
+// First, this adds instrucitons to check if the divisor equals zero, and if so, exits the function.
+// Plus, for signed divisions, check if the result might result in overflow or not.
+func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, dividend, divisor int16) error {
+	// We check the divisor value equals zero.
+	var cmpInst, movInst obj.As
+	var minValueOffsetInEngine int64
+	if is32Bit {
+		cmpInst = arm64.ACMPW
+		movInst = arm64.AMOVW
+		minValueOffsetInEngine = engineArchContextMinimum32BitSignedIntOffset
+	} else {
+		cmpInst = arm64.ACMP
+		movInst = arm64.AMOVD
+		minValueOffsetInEngine = engineArchContextMinimum64BitSignedIntOffset
+	}
+	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisor)
+
+	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
+	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
+	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+
+	// Otherwise, we proceed.
+	c.setBranchTargetOnNext(brIfDivisorNonZero)
+
+	// If the operation is a signed integer div, we have to do an additional check on overflow.
+	if isSigned {
+		// For sigined division, we have to have branches for "math.MinInt{32,64} / -1"
+		// case which results in the overflow.
+
+		// First, we compare the divisor with -1.
+		c.compileConstToRegisterInstruction(movInst, -1, reservedRegisterForTemporary)
+		c.compileTwoRegistersToNoneInstruction(cmpInst, reservedRegisterForTemporary, divisor)
+
+		// If they not equal, we skip the following check.
+		brIfDivisorNonMinusOne := c.compilelBranchInstruction(arm64.ABNE)
+
+		// Otherwise, we further check if the dividend equals math.MinInt32 or MinInt64.
+		c.compileMemoryToRegisterInstruction(
+			movInst,
+			reservedRegisterForEngine, minValueOffsetInEngine,
+			reservedRegisterForTemporary,
+		)
+		c.compileTwoRegistersToNoneInstruction(cmpInst, reservedRegisterForTemporary, dividend)
+
+		// If they not equal, we are safe to execute the division.
+		brIfDividendNotMinInt := c.compilelBranchInstruction(arm64.ABNE)
+
+		// Otherwise, we raise overflow error.
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+
+		c.setBranchTargetOnNext(brIfDivisorNonMinusOne, brIfDividendNotMinInt)
+	}
+	return nil
+}
+
+// compileRem implements compiler.compileRem for the arm64 architecture.
 func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	dividend, divisor, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	dividendReg := dividend.register
+	divisorReg := divisor.register
+
+	// If the divisor is on the zero register, exit from the function deterministically.
+	if isZeroRegister(divisor.register) {
+		// Push any value so that the subsequent instruction can have a consistent location stack state.
+		c.locationStack.pushValueLocationOnStack()
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		return nil
+	}
+
+	var divInst, msubInst, cmpInst obj.As
+	switch o.Type {
+	case wazeroir.SignedUint32:
+		divInst = arm64.AUDIVW
+		msubInst = arm64.AMSUBW
+		cmpInst = arm64.ACMPW
+	case wazeroir.SignedUint64:
+		divInst = arm64.AUDIV
+		msubInst = arm64.AMSUB
+		cmpInst = arm64.ACMP
+	case wazeroir.SignedInt32:
+		divInst = arm64.ASDIVW
+		msubInst = arm64.AMSUBW
+		cmpInst = arm64.ACMPW
+	case wazeroir.SignedInt64:
+		divInst = arm64.ASDIV
+		msubInst = arm64.AMSUB
+		cmpInst = arm64.ACMP
+	}
+
+	// We check the divisor value equals zero.
+	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisorReg)
+
+	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
+	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
+	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+
+	// Othrewise, we proceed.
+	c.setBranchTargetOnNext(brIfDivisorNonZero)
+
+	// Temporarily mark them used to allocate a result register while keeping these values.
+	c.markRegisterUsed(dividend.register, divisor.register)
+
+	resultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// arm64 doesn't have an instruction for rem, we use calculate it by two instructions: UDIV (SDIV for signed) and MSUB.
+	// This exactly the same code that Clang emits.
+	// [input: x0=dividend, x1=divisor]
+	// >> UDIV x2, x0, x1
+	// >> MSUB x3, x2, x1, x0
+	// [result: x2=quotient, x3=remainder]
+	//
+	c.compileTwoRegistersToRegisterInstruction(divInst, divisorReg, dividendReg, resultReg)
+	c.compileTwoRegistersInstruction(msubInst, divisorReg, dividendReg, resultReg, resultReg)
+
+	c.markRegisterUnused(dividend.register, divisor.register)
+	c.locationStack.pushValueLocationOnRegister(resultReg)
+	return nil
 }
 
 // compileAnd implements compiler.compileAnd for the arm64 architecture.

@@ -86,6 +86,8 @@ func jitcall(codeSegment, engine uintptr)
 // For amd64, this is empty.
 type archContext struct{}
 
+func newArchContext() (ret archContext) { return }
+
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {

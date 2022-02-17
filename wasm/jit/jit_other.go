@@ -10,6 +10,8 @@ import (
 
 type archContext struct{}
 
+func newArchContext() (ret archContext) { return }
+
 func jitcall(codeSegment, engine uintptr) {
 	panic("unsupported GOARCH")
 }
