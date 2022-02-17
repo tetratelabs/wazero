@@ -88,7 +88,8 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostFunctions {
 // * "_start" is an exported nullary function and does not export "_initialize"
 // * "memory" is an exported memory.
 //
-// Note: Exporting "__indirect_function_table" is mentioned as required, but not enforced.
+// Note: Exporting "__indirect_function_table" is mentioned as required, but not enforced here.
+// Note: The wasm.ModuleFunctions return value does not restrict exports after "_start" as allowed in the specification.
 // Note: All TinyGo Wasm are WASI commands. They initialize memory on "_start" and import "fd_write" to implement panic.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
 func StartWASICommand(store *Store, module *Module) (wasm.ModuleFunctions, error) {
@@ -102,9 +103,9 @@ func StartWASICommand(store *Store, module *Module) (wasm.ModuleFunctions, error
 	}
 
 	ctx := store.s.HostFunctionCallContexts[module.name]
-	start, _ := ctx.GetFunctionVoidReturn(wasi.FunctionStart)
+	start, _ := ctx.GetFunctionVoidReturn(internalwasi.FunctionStart)
 	if err = start(ctx.Context()); err != nil {
-		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, wasi.FunctionStart, err)
+		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
 	}
 	return ret, nil
 }

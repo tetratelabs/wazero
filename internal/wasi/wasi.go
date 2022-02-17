@@ -17,6 +17,50 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+const (
+	// FunctionStart is the name of the nullary function a module must export if it is a WASI Command Module.
+	//
+	// Note: When this is exported FunctionInitialize must not be.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
+	FunctionStart = "_start"
+
+	// FunctionInitialize is the name of the nullary function a module must export if it is a WASI Reactor Module.
+	//
+	// Note: When this is exported FunctionStart must not be.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
+	FunctionInitialize = "_initialize"
+
+	// ImportArgsGet is the WebAssembly 1.0 (MVP) Text format import of wasi.FunctionArgsGet
+	ImportArgsGet = `(import "wasi_snapshot_preview1" "args_get"
+    (func $wasi.args_get (param $argv i32) (param $argv_buf i32) (result (;errno;) i32)))`
+
+	// ImportArgsSizesGet is the WebAssembly 1.0 (MVP) Text format import of FunctionArgsSizesGet
+	ImportArgsSizesGet = `(import "wasi_snapshot_preview1" "args_sizes_get"
+    (func $wasi.args_sizes_get (param $result.argc i32) (param $result.argv_buf_size i32) (result (;errno;) i32)))`
+
+	// ImportEnvironGet is the WebAssembly 1.0 (MVP) Text format import of FunctionEnvironGet
+	ImportEnvironGet = `(import "wasi_snapshot_preview1" "environ_get"
+    (func $wasi.environ_get (param $environ i32) (param $environ_buf i32) (result (;errno;) i32)))`
+
+	// ImportEnvironSizesGet is the WebAssembly 1.0 (MVP) Text format import of FunctionEnvironSizesGet
+	ImportEnvironSizesGet = `
+(import "wasi_snapshot_preview1" "environ_sizes_get"
+    (func $wasi.environ_sizes_get (param $result.environc i32) (param $result.environBufSize i32) (result (;errno;) i32)))`
+
+	// ImportClockResGet is the WebAssembly 1.0 (MVP) Text format import of FunctionClockResGet
+	ImportClockResGet = `
+(import "wasi_snapshot_preview1" "clock_res_get"
+    (func $wasi.clock_res_get (param $id i32) (param $result.resolution i32) (result (;errno;) i32)))`
+
+	// ImportClockTimeGet is the WebAssembly 1.0 (MVP) Text format import of FunctionClockTimeGet
+	ImportClockTimeGet = `(import "wasi_snapshot_preview1" "clock_time_get"
+    (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))`
+
+	// ImportRandomGet is the WebAssembly 1.0 (MVP) Text format import of FunctionRandomGet
+	ImportRandomGet = `(import "wasi_snapshot_preview1" "random_get"
+    (func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))`
+)
+
 // SnapshotPreview1 includes all host functions to export for WASI version wasi.ModuleSnapshotPreview1.
 //
 // Note: When translating WASI functions, each result besides Errno is always an uint32 parameter. WebAssembly 1.0 (MVP)
@@ -24,7 +68,7 @@ import (
 // parameter is a memory offset to write the result to. As memory offsets are uint32, each parameter representing a
 // result is uint32.
 //
-// Note: wasi.Errno mappings are not defined in WASI, yet, so these mappings are best efforts by maintainers.
+// Note: Errno mappings are not defined in WASI, yet, so these mappings are best efforts by maintainers.
 //
 // Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means wasm.Memory is always the
 // wasm.Store Memories index zero: `store.Memories[0].Buffer`
@@ -55,7 +99,7 @@ type SnapshotPreview1 interface {
 	//          offset that begins "a" --+           |
 	//                     offset that begins "bc" --+
 	//
-	// Note: wasi.ImportArgsGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportArgsGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -83,7 +127,7 @@ type SnapshotPreview1 interface {
 	//             resultArgvBufSize --|
 	//   len([]byte{'a',0,'b',c',0}) --+
 	//
-	// Note: wasi.ImportArgsSizesGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportArgsSizesGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -111,7 +155,7 @@ type SnapshotPreview1 interface {
 	//                              environ offset for "a=b" --+           |
 	//                                         environ offset for "b=cd" --+
 	//
-	// Note: wasi.ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See EnvironSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -140,7 +184,7 @@ type SnapshotPreview1 interface {
 	//    len([]byte{'a','=','b',0,    |
 	//           'b','=','c','d',0}) --+
 	//
-	// Note: wasi.ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See EnvironGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -164,7 +208,7 @@ type SnapshotPreview1 interface {
 	//          []byte{?, 0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, ?}
 	//  resultTimestamp --^
 	//
-	// Note: wasi.ImportClockTimeGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportClockTimeGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// Note: This is similar to `clock_gettime` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 	// See https://linux.die.net/man/3/clock_gettime
@@ -219,7 +263,7 @@ type SnapshotPreview1 interface {
 	//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
 	//              buf --^
 	//
-	// Note: wasi.ImportRandomGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportRandomGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
 	RandomGet(ctx wasm.HostFunctionCallContext, buf, bufLen uint32) wasi.Errno
 
@@ -667,20 +711,20 @@ func proc_exit(wasm.HostFunctionCallContext, uint32) {
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
-	if start, err := requireExport(module, moduleName, wasi.FunctionStart, internalwasm.ExportKindFunc); err != nil {
+	if start, err := requireExport(module, moduleName, FunctionStart, internalwasm.ExportKindFunc); err != nil {
 		return err
 	} else {
 		// TODO: this should be verified during decode so that errors have the correct source positions
 		ft := module.TypeOfFunction(start.Index)
 		if ft == nil {
-			return fmt.Errorf("module[%s] function[%s] has an invalid type", moduleName, wasi.FunctionStart)
+			return fmt.Errorf("module[%s] function[%s] has an invalid type", moduleName, FunctionStart)
 		}
 		if len(ft.Params) > 0 || len(ft.Results) > 0 {
-			return fmt.Errorf("module[%s] function[%s] must have an empty (nullary) signature: %s", moduleName, wasi.FunctionStart, ft.String())
+			return fmt.Errorf("module[%s] function[%s] must have an empty (nullary) signature: %s", moduleName, FunctionStart, ft.String())
 		}
 	}
-	if _, err := requireExport(module, moduleName, wasi.FunctionInitialize, internalwasm.ExportKindFunc); err == nil {
-		return fmt.Errorf("module[%s] must not export func[%s]", moduleName, wasi.FunctionInitialize)
+	if _, err := requireExport(module, moduleName, FunctionInitialize, internalwasm.ExportKindFunc); err == nil {
+		return fmt.Errorf("module[%s] must not export func[%s]", moduleName, FunctionInitialize)
 	}
 	if _, err := requireExport(module, moduleName, "memory", internalwasm.ExportKindMemory); err != nil {
 		return err

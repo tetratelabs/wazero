@@ -49,7 +49,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 		3, 0, 0, 0, // little endian-encoded offset of "bc"
 		'?', // stopped after encoding
 	} // tr
-	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionArgsGet, wasi.ImportArgsGet, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionArgsGet, ImportArgsGet, "test", args)
 
 	t.Run("SnapshotPreview1.ArgsGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -71,7 +71,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 func TestAPI_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, api := instantiateWasmStore(t, wasi.FunctionArgsGet, wasi.ImportArgsGet, "test", args)
+	store, api := instantiateWasmStore(t, wasi.FunctionArgsGet, ImportArgsGet, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -128,7 +128,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 		0x5, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
 		'?', // stopped after encoding
 	} // tr
-	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionArgsSizesGet, wasi.ImportArgsSizesGet, "test", args)
+	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
 
 	t.Run("SnapshotPreview1.ArgsSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -151,7 +151,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, _ := instantiateWasmStore(t, wasi.FunctionArgsSizesGet, wasi.ImportArgsSizesGet, "test", args)
+	store, _ := instantiateWasmStore(t, wasi.FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -245,7 +245,7 @@ func TestAPI_EnvironGet(t *testing.T) {
 		5, 0, 0, 0, // little endian-encoded offset of "b=cd"
 		'?', // stopped after encoding
 	}
-	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionEnvironGet, wasi.ImportEnvironGet, "test", envOpt)
+	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
 
 	t.Run("API.EnvironGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -268,7 +268,7 @@ func TestAPI_EnvironGet(t *testing.T) {
 func TestAPI_EnvironGet_Errors(t *testing.T) {
 	envOpt, err := Environ("a=bc", "b=cd")
 	require.NoError(t, err)
-	store, api := instantiateWasmStore(t, wasi.FunctionEnvironGet, wasi.ImportEnvironGet, "test", envOpt)
+	store, api := instantiateWasmStore(t, wasi.FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
@@ -325,7 +325,7 @@ func TestAPI_EnvironSizesGet(t *testing.T) {
 		0x9, 0x0, 0x0, 0x0, // little endian-encoded size of null terminated strings
 		'?', // stopped after encoding
 	}
-	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionEnvironSizesGet, wasi.ImportEnvironSizesGet, "test", envOpt)
+	store, wasiAPI := instantiateWasmStore(t, wasi.FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
 
 	t.Run("API.EnvironSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -349,7 +349,7 @@ func TestAPI_EnvironSizesGet_Errors(t *testing.T) {
 	ctx := context.Background()
 	envOpt, err := Environ("a=b", "b=cd")
 	require.NoError(t, err)
-	store, _ := instantiateWasmStore(t, wasi.FunctionEnvironSizesGet, wasi.ImportEnvironSizesGet, "test", envOpt)
+	store, _ := instantiateWasmStore(t, wasi.FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_sizes_get. We chose 0 here.
@@ -404,7 +404,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 		'?', // stopped after encoding
 	} // tr
 
-	store, api := instantiateWasmStore(t, wasi.FunctionClockTimeGet, wasi.ImportClockTimeGet, "test")
+	store, api := instantiateWasmStore(t, wasi.FunctionClockTimeGet, ImportClockTimeGet, "test")
 	api.(*wasiAPI).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	t.Run("SnapshotPreview1.ClockTimeGet", func(t *testing.T) {
@@ -427,7 +427,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 
 func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
-	store, api := instantiateWasmStore(t, wasi.FunctionClockTimeGet, wasi.ImportClockTimeGet, "test")
+	store, api := instantiateWasmStore(t, wasi.FunctionClockTimeGet, ImportClockTimeGet, "test")
 	api.(*wasiAPI).timeNowUnixNano = func() uint64 { return epochNanos }
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
@@ -496,7 +496,7 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_SchedYield TestAPI_SchedYield_Errors
 
 func TestAPI_RandomGet(t *testing.T) {
-	store, api := instantiateWasmStore(t, wasi.FunctionRandomGet, wasi.ImportRandomGet, "test")
+	store, api := instantiateWasmStore(t, wasi.FunctionRandomGet, ImportRandomGet, "test")
 	maskLength := 7 // number of bytes to write '?' to tell what we've written
 	expectedMemory := []byte{
 		'?',                          // random bytes in `buf` is after this
@@ -526,7 +526,7 @@ func TestAPI_RandomGet(t *testing.T) {
 }
 
 func TestAPI_RandomGet_Errors(t *testing.T) {
-	store, api := instantiateWasmStore(t, wasi.FunctionRandomGet, wasi.ImportRandomGet, "test")
+	store, api := instantiateWasmStore(t, wasi.FunctionRandomGet, ImportRandomGet, "test")
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address
