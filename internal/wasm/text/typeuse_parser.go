@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func newTypeUseParser(module *wasm.Module, typeNamespace *indexNamespace) *typeUseParser {
@@ -38,7 +37,7 @@ type typeUseParser struct {
 
 	typeNamespace *indexNamespace
 
-	section wasm2.SectionID
+	section wasm.SectionID
 	idx     wasm.Index
 
 	// inlinedTypes are anonymous types defined by signature, which at the time of definition didn't match a
@@ -102,7 +101,7 @@ type typeUseParser struct {
 //      beginTypeParamOrResult starts here --^             ^
 //                                onTypeUse resumes here --+
 //
-func (p *typeUseParser) begin(section wasm2.SectionID, idx wasm.Index, onTypeUse onTypeUse, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *typeUseParser) begin(section wasm.SectionID, idx wasm.Index, onTypeUse onTypeUse, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	pos := callbackPositionUnhandledToken
 	p.pos = positionInitial // to ensure errorContext reports properly
 	switch tok {
@@ -121,7 +120,7 @@ func (p *typeUseParser) begin(section wasm2.SectionID, idx wasm.Index, onTypeUse
 var v_v = &wasm.FunctionType{}
 
 // inlinedTypeIndex searches for any existing empty type to re-use
-func (p *typeUseParser) emptyTypeIndex(section wasm2.SectionID, idx wasm.Index) wasm.Index {
+func (p *typeUseParser) emptyTypeIndex(section wasm.SectionID, idx wasm.Index) wasm.Index {
 	for i, t := range p.module.TypeSection {
 		if t == v_v {
 			return wasm.Index(i)
@@ -292,7 +291,7 @@ func (p *typeUseParser) parseParam(tok tokenType, tokenBytes []byte, _, _ uint32
 			return nil, errors.New("cannot assign IDs to parameters in abbreviated form")
 		}
 		if p.currentInlinedType == nil {
-			p.currentInlinedType = &wasm.FunctionType{Params: []wasm2.ValueType{vt}}
+			p.currentInlinedType = &wasm.FunctionType{Params: []wasm.ValueType{vt}}
 		} else {
 			p.currentInlinedType.Params = append(p.currentInlinedType.Params, vt)
 		}
@@ -438,7 +437,7 @@ func (p *typeUseParser) maybeAddInlinedType(it *wasm.FunctionType) {
 }
 
 type inlinedTypeIndex struct {
-	section    wasm2.SectionID
+	section    wasm.SectionID
 	idx        wasm.Index
 	inlinedIdx wasm.Index
 	typePos    *lineCol
@@ -452,13 +451,13 @@ func (p *typeUseParser) recordInlinedType(inlinedIdx wasm.Index) {
 // requireInlinedMatchesReferencedType satisfies the following rule:
 //	>> If inline declarations are given, then their types must match the referenced function type.
 // See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
-func requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, index wasm.Index, params, results []wasm2.ValueType) error {
+func requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, index wasm.Index, params, results []wasm.ValueType) error {
 	if !funcTypeEquals(typeSection[index], params, results) {
 		return fmt.Errorf("inlined type doesn't match module.type[%d].func", index)
 	}
 	return nil
 }
 
-func funcTypeEquals(f *wasm.FunctionType, params []wasm2.ValueType, results []wasm2.ValueType) bool {
+func funcTypeEquals(f *wasm.FunctionType, params []wasm.ValueType, results []wasm.ValueType) bool {
 	return bytes.Equal(f.Params, params) && bytes.Equal(f.Results, results)
 }

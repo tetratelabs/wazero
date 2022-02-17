@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestEncodeValTypes(t *testing.T) {

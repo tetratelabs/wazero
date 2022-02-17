@@ -6,13 +6,12 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (MVP) Binary Format
 // See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
-func DecodeModule(binary []byte) (*internalwasm.Module, error) {
+func DecodeModule(binary []byte) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
 
 	// Magic number.
@@ -26,7 +25,7 @@ func DecodeModule(binary []byte) (*internalwasm.Module, error) {
 		return nil, ErrInvalidVersion
 	}
 
-	m := &internalwasm.Module{}
+	m := &wasm.Module{}
 	for {
 		// TODO: except custom sections, all others are required to be in order, but we aren't checking yet.
 		// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%93%AA

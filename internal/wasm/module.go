@@ -2,8 +2,6 @@ package internalwasm
 
 import (
 	"fmt"
-
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 // DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or
@@ -148,7 +146,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	}
 	funcImportCount := Index(0)
 	for i, im := range m.ImportSection {
-		if im.Kind == wasm.ImportKindFunc {
+		if im.Kind == ImportKindFunc {
 			if funcIdx == Index(i) {
 				if im.DescFunc >= typeSectionLength {
 					return nil
@@ -183,25 +181,25 @@ type Index = uint32
 // See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A0
 type FunctionType struct {
 	// Params are the possibly empty sequence of value types accepted by a function with this signature.
-	Params []wasm.ValueType
+	Params []ValueType
 
 	// Results are the possibly empty sequence of value types returned by a function with this signature.
 	//
 	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
 	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
-	Results []wasm.ValueType
+	Results []ValueType
 }
 
 func (t *FunctionType) String() (ret string) {
 	for _, b := range t.Params {
-		ret += wasm.ValueTypeName(b)
+		ret += ValueTypeName(b)
 	}
 	if len(t.Params) == 0 {
 		ret += "null"
 	}
 	ret += "_"
 	for _, b := range t.Results {
-		ret += wasm.ValueTypeName(b)
+		ret += ValueTypeName(b)
 	}
 	if len(t.Results) == 0 {
 		ret += "null"
@@ -212,7 +210,7 @@ func (t *FunctionType) String() (ret string) {
 // Import is the binary representation of an import indicated by Kind
 // See https://www.w3.org/TR/wasm-core-1/#binary-import
 type Import struct {
-	Kind wasm.ImportKind
+	Kind ImportKind
 	// Module is the possibly empty primary namespace of this import
 	Module string
 	// Module is the possibly empty secondary namespace of this import
@@ -240,7 +238,7 @@ type TableType struct {
 type MemoryType = LimitsType
 
 type GlobalType struct {
-	ValType wasm.ValueType
+	ValType ValueType
 	Mutable bool
 }
 
@@ -257,7 +255,7 @@ type ConstantExpression struct {
 // Export is the binary representation of an export indicated by Kind
 // See https://www.w3.org/TR/wasm-core-1/#binary-export
 type Export struct {
-	Kind wasm.ExportKind
+	Kind ExportKind
 	// Name is what the host refers to this definition as.
 	Name string
 	// Index is the index of the definition to export, the index namespace is by Kind
@@ -276,7 +274,7 @@ type ElementSegment struct {
 type Code struct {
 	// LocalTypes are any function-scoped variables in insertion order.
 	// See https://www.w3.org/TR/wasm-core-1/#binary-local
-	LocalTypes []wasm.ValueType
+	LocalTypes []ValueType
 	// Body is a sequence of expressions ending in OpcodeEnd
 	// See https://www.w3.org/TR/wasm-core-1/#binary-expr
 	Body []byte
@@ -353,13 +351,13 @@ type NameMapAssoc struct {
 func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) {
 	for _, imp := range m.ImportSection {
 		switch imp.Kind {
-		case wasm.ImportKindFunc:
+		case ImportKindFunc:
 			functions = append(functions, imp.DescFunc)
-		case wasm.ImportKindGlobal:
+		case ImportKindGlobal:
 			globals = append(globals, imp.DescGlobal)
-		case wasm.ImportKindMemory:
+		case ImportKindMemory:
 			memories = append(memories, imp.DescMem)
-		case wasm.ImportKindTable:
+		case ImportKindTable:
 			tables = append(tables, imp.DescTable)
 		}
 	}
@@ -379,39 +377,163 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 // * SectionIDType returns the count of FunctionType
 // * SectionIDCustom returns one if the NameSection is present
 // * SectionIDExport returns the count of unique export names
-func (m *Module) SectionElementCount(sectionID wasm.SectionID) uint32 { // element as in vector elements!
+func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as in vector elements!
 	switch sectionID {
-	case wasm.SectionIDCustom:
+	case SectionIDCustom:
 		if m.NameSection != nil {
 			return 1
 		}
 		return 0
-	case wasm.SectionIDType:
+	case SectionIDType:
 		return uint32(len(m.TypeSection))
-	case wasm.SectionIDImport:
+	case SectionIDImport:
 		return uint32(len(m.ImportSection))
-	case wasm.SectionIDFunction:
+	case SectionIDFunction:
 		return uint32(len(m.FunctionSection))
-	case wasm.SectionIDTable:
+	case SectionIDTable:
 		return uint32(len(m.TableSection))
-	case wasm.SectionIDMemory:
+	case SectionIDMemory:
 		return uint32(len(m.MemorySection))
-	case wasm.SectionIDGlobal:
+	case SectionIDGlobal:
 		return uint32(len(m.GlobalSection))
-	case wasm.SectionIDExport:
+	case SectionIDExport:
 		return uint32(len(m.ExportSection))
-	case wasm.SectionIDStart:
+	case SectionIDStart:
 		if m.StartSection != nil {
 			return 1
 		}
 		return 0
-	case wasm.SectionIDElement:
+	case SectionIDElement:
 		return uint32(len(m.ElementSection))
-	case wasm.SectionIDCode:
+	case SectionIDCode:
 		return uint32(len(m.CodeSection))
-	case wasm.SectionIDData:
+	case SectionIDData:
 		return uint32(len(m.DataSection))
 	default:
 		panic(fmt.Errorf("BUG: unknown section: %d", sectionID))
 	}
+}
+
+// SectionID identifies the sections of a Module in the WebAssembly 1.0 (MVP) Binary Format.
+//
+// Note: these are defined in the wasm package, instead of the binary package, as a key per section is needed regardless
+// of format, and deferring to the binary type avoids confusion.
+//
+// See https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
+type SectionID = byte
+
+const (
+	// SectionIDCustom includes the standard defined NameSection and possibly others not defined in the standard.
+	SectionIDCustom SectionID = iota // don't add anything not in https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
+	SectionIDType
+	SectionIDImport
+	SectionIDFunction
+	SectionIDTable
+	SectionIDMemory
+	SectionIDGlobal
+	SectionIDExport
+	SectionIDStart
+	SectionIDElement
+	SectionIDCode
+	SectionIDData
+)
+
+// SectionIDName returns the canonical name of a module section.
+// https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
+func SectionIDName(sectionID SectionID) string {
+	switch sectionID {
+	case SectionIDCustom:
+		return "custom"
+	case SectionIDType:
+		return "type"
+	case SectionIDImport:
+		return "import"
+	case SectionIDFunction:
+		return "function"
+	case SectionIDTable:
+		return "table"
+	case SectionIDMemory:
+		return "memory"
+	case SectionIDGlobal:
+		return "global"
+	case SectionIDExport:
+		return "export"
+	case SectionIDStart:
+		return "start"
+	case SectionIDElement:
+		return "element"
+	case SectionIDCode:
+		return "code"
+	case SectionIDData:
+		return "data"
+	}
+	return "unknown"
+}
+
+// ValueType is the binary encoding of a type such as i32
+// See https://www.w3.org/TR/wasm-core-1/#binary-valtype
+//
+// Note: This is a type alias as it is easier to encode and decode in the binary format.
+type ValueType = byte
+
+const (
+	ValueTypeI32 ValueType = 0x7f
+	ValueTypeI64 ValueType = 0x7e
+	ValueTypeF32 ValueType = 0x7d
+	ValueTypeF64 ValueType = 0x7c
+)
+
+// ValueTypeName returns the type name of the given ValueType as a string.
+// These type names match the names used in the WebAssembly text format.
+// Note that ValueTypeName returns "unknown", if an undefined ValueType value is passed.
+func ValueTypeName(t ValueType) string {
+	switch t {
+	case ValueTypeI32:
+		return "i32"
+	case ValueTypeI64:
+		return "i64"
+	case ValueTypeF32:
+		return "f32"
+	case ValueTypeF64:
+		return "f64"
+	}
+	return "unknown"
+}
+
+// ImportKind indicates which import description is present
+// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
+type ImportKind = byte
+
+const (
+	ImportKindFunc   ImportKind = 0x00
+	ImportKindTable  ImportKind = 0x01
+	ImportKindMemory ImportKind = 0x02
+	ImportKindGlobal ImportKind = 0x03
+)
+
+// ExportKind indicates which index Export.Index points to
+// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
+type ExportKind = byte
+
+const (
+	ExportKindFunc   ExportKind = 0x00
+	ExportKindTable  ExportKind = 0x01
+	ExportKindMemory ExportKind = 0x02
+	ExportKindGlobal ExportKind = 0x03
+)
+
+// ExportKindName returns the canonical name of the exportdesc.
+// https://www.w3.org/TR/wasm-core-1/#syntax-exportdesc
+func ExportKindName(ek ExportKind) string {
+	switch ek {
+	case ExportKindFunc:
+		return "func"
+	case ExportKindTable:
+		return "table"
+	case ExportKindMemory:
+		return "mem"
+	case ExportKindGlobal:
+		return "global"
+	}
+	return "unknown"
 }

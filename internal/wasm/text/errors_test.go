@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	wasm2 "github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestFormatError_Error(t *testing.T) {
@@ -74,7 +74,7 @@ func TestUnexpectedToken(t *testing.T) {
 }
 
 func TestUnhandledSection(t *testing.T) {
-	require.Equal(t, "BUG: unhandled function", unhandledSection(wasm2.SectionIDFunction).Error())
+	require.Equal(t, "BUG: unhandled function", unhandledSection(wasm.SectionIDFunction).Error())
 }
 
 func TestUnexpectedFieldName(t *testing.T) {

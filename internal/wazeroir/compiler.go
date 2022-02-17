@@ -11,7 +11,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 type controlFrameKind byte
@@ -1488,18 +1487,18 @@ func (c *compiler) emit(ops ...Operation) {
 }
 
 // Emit const expression with default values of the given type.
-func (c *compiler) emitDefaultValue(t wasm2.ValueType) {
+func (c *compiler) emitDefaultValue(t wasm.ValueType) {
 	switch t {
-	case wasm2.ValueTypeI32:
+	case wasm.ValueTypeI32:
 		c.stackPush(UnsignedTypeI32)
 		c.emit(&OperationConstI32{Value: 0})
-	case wasm2.ValueTypeI64:
+	case wasm.ValueTypeI64:
 		c.stackPush(UnsignedTypeI64)
 		c.emit(&OperationConstI64{Value: 0})
-	case wasm2.ValueTypeF32:
+	case wasm.ValueTypeF32:
 		c.stackPush(UnsignedTypeF32)
 		c.emit(&OperationConstF32{Value: 0})
-	case wasm2.ValueTypeF64:
+	case wasm.ValueTypeF64:
 		c.stackPush(UnsignedTypeF64)
 		c.emit(&OperationConstF64{Value: 0})
 	}

@@ -7,21 +7,21 @@ import (
 	"unicode/utf8"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
 var noValType = []byte{0}
 
 // encodedValTypes is a cache of size prefixed binary encoding of known val types.
-var encodedValTypes = map[wasm2.ValueType][]byte{
-	wasm2.ValueTypeI32: {1, wasm2.ValueTypeI32},
-	wasm2.ValueTypeI64: {1, wasm2.ValueTypeI64},
-	wasm2.ValueTypeF32: {1, wasm2.ValueTypeF32},
-	wasm2.ValueTypeF64: {1, wasm2.ValueTypeF64},
+var encodedValTypes = map[wasm.ValueType][]byte{
+	wasm.ValueTypeI32: {1, wasm.ValueTypeI32},
+	wasm.ValueTypeI64: {1, wasm.ValueTypeI64},
+	wasm.ValueTypeF32: {1, wasm.ValueTypeF32},
+	wasm.ValueTypeF64: {1, wasm.ValueTypeF64},
 }
 
 // encodeValTypes fast paths binary encoding of common value type lengths
-func encodeValTypes(vt []wasm2.ValueType) []byte {
+func encodeValTypes(vt []wasm.ValueType) []byte {
 	// Special case nullary and parameter lengths of wasi_snapshot_preview1 to avoid excess allocations
 	switch uint32(len(vt)) {
 	case 0: // nullary
@@ -42,12 +42,12 @@ func encodeValTypes(vt []wasm2.ValueType) []byte {
 	return append(count, vt...)
 }
 
-func decodeValueTypes(r io.Reader, num uint32) ([]wasm2.ValueType, error) {
+func decodeValueTypes(r io.Reader, num uint32) ([]wasm.ValueType, error) {
 	if num == 0 {
 		return nil, nil
 	}
-	ret := make([]wasm2.ValueType, num)
-	buf := make([]wasm2.ValueType, num)
+	ret := make([]wasm.ValueType, num)
+	buf := make([]wasm.ValueType, num)
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func decodeValueTypes(r io.Reader, num uint32) ([]wasm2.ValueType, error) {
 
 	for i, v := range buf {
 		switch v {
-		case wasm2.ValueTypeI32, wasm2.ValueTypeF32, wasm2.ValueTypeI64, wasm2.ValueTypeF64:
+		case wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeI64, wasm.ValueTypeF64:
 			ret[i] = v
 		default:
 			return nil, fmt.Errorf("invalid value type: %d", v)

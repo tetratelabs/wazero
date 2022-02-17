@@ -6,20 +6,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 var (
-	f32, i32, i64                   = wasm2.ValueTypeF32, wasm2.ValueTypeI32, wasm2.ValueTypeI64
-	i32_v                           = &wasm.FunctionType{Params: []wasm2.ValueType{i32}}
-	v_i32                           = &wasm.FunctionType{Results: []wasm2.ValueType{i32}}
-	i32i64_v                        = &wasm.FunctionType{Params: []wasm2.ValueType{i32, i64}}
-	i32i32_i32                      = &wasm.FunctionType{Params: []wasm2.ValueType{i32, i32}, Results: []wasm2.ValueType{i32}}
-	i32i64_i32                      = &wasm.FunctionType{Params: []wasm2.ValueType{i32, i64}, Results: []wasm2.ValueType{i32}}
-	i32i32i32i32_i32                = &wasm.FunctionType{Params: []wasm2.ValueType{i32, i32, i32, i32}, Results: []wasm2.ValueType{i32}}
+	f32, i32, i64                   = wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
+	i32_v                           = &wasm.FunctionType{Params: []wasm.ValueType{i32}}
+	v_i32                           = &wasm.FunctionType{Results: []wasm.ValueType{i32}}
+	i32i64_v                        = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}}
+	i32i32_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
+	i32i64_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}}
+	i32i32i32i32_i32                = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}}
 	i32i32i32i32i32i64i64i32i32_i32 = &wasm.FunctionType{
-		Params:  []wasm2.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
-		Results: []wasm2.ValueType{i32},
+		Params:  []wasm.ValueType{i32, i32, i32, i32, i32, i64, i64, i32, i32},
+		Results: []wasm.ValueType{i32},
 	}
 )
 
@@ -93,7 +92,7 @@ func TestTypeParser(t *testing.T) {
 		{
 			name:     "mixed param abbreviation", // Verifies we can handle less param fields than param types
 			input:    "(type (func (param i32 i32) (param i32) (param i64) (param f32)))",
-			expected: &wasm.FunctionType{Params: []wasm2.ValueType{i32, i32, i32, i64, f32}},
+			expected: &wasm.FunctionType{Params: []wasm.ValueType{i32, i32, i32, i64, f32}},
 		},
 	}
 
@@ -262,12 +261,12 @@ func parseFunctionType(typeNamespace *indexNamespace, input string) (*wasm.Funct
 func TestParseValueType(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected wasm2.ValueType
+		expected wasm.ValueType
 	}{
-		{input: "i32", expected: wasm2.ValueTypeI32},
-		{input: "i64", expected: wasm2.ValueTypeI64},
-		{input: "f32", expected: wasm2.ValueTypeF32},
-		{input: "f64", expected: wasm2.ValueTypeF64},
+		{input: "i32", expected: wasm.ValueTypeI32},
+		{input: "i64", expected: wasm.ValueTypeI64},
+		{input: "f32", expected: wasm.ValueTypeF32},
+		{input: "f64", expected: wasm.ValueTypeF64},
 	}
 
 	for _, tt := range tests {
@@ -289,13 +288,13 @@ func TestParseResultType(t *testing.T) {
 	tests := []struct {
 		name        string
 		tokenBytes  string
-		expected    []wasm2.ValueType
+		expected    []wasm.ValueType
 		expectedErr string
 	}{
 		{
 			name:       "no value",
 			tokenBytes: "i32",
-			expected:   []wasm2.ValueType{wasm2.ValueTypeI32},
+			expected:   []wasm.ValueType{wasm.ValueTypeI32},
 		},
 		{
 			name:        "invalid token",

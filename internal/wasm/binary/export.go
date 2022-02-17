@@ -7,7 +7,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func decodeExport(r *bytes.Reader) (i *wasm.Export, err error) {
@@ -24,7 +23,7 @@ func decodeExport(r *bytes.Reader) (i *wasm.Export, err error) {
 
 	i.Kind = b[0]
 	switch i.Kind {
-	case wasm2.ExportKindFunc, wasm2.ExportKindTable, wasm2.ExportKindMemory, wasm2.ExportKindGlobal:
+	case wasm.ExportKindFunc, wasm.ExportKindTable, wasm.ExportKindMemory, wasm.ExportKindGlobal:
 		if i.Index, _, err = leb128.DecodeUint32(r); err != nil {
 			return nil, fmt.Errorf("error decoding export index: %w", err)
 		}

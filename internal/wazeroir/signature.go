@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 // signature represents how a Wasm opcode
@@ -363,15 +362,15 @@ func funcTypeToSignature(tps *wasm.FunctionType) *signature {
 	return ret
 }
 
-func wasmValueTypeToUnsignedType(vt wasm2.ValueType) UnsignedType {
+func wasmValueTypeToUnsignedType(vt wasm.ValueType) UnsignedType {
 	switch vt {
-	case wasm2.ValueTypeI32:
+	case wasm.ValueTypeI32:
 		return UnsignedTypeI32
-	case wasm2.ValueTypeI64:
+	case wasm.ValueTypeI64:
 		return UnsignedTypeI64
-	case wasm2.ValueTypeF32:
+	case wasm.ValueTypeF32:
 		return UnsignedTypeF32
-	case wasm2.ValueTypeF64:
+	case wasm.ValueTypeF64:
 		return UnsignedTypeF64
 	}
 	panic("unreachable")

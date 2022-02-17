@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
-	"github.com/tetratelabs/wazero/wasm"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 func TestInterpreter_PushFrame(t *testing.T) {
@@ -44,16 +44,16 @@ func TestInterpreter_PushFrame_StackOverflow(t *testing.T) {
 
 func TestInterpreter_CallHostFunc(t *testing.T) {
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
-		memory := &internalwasm.MemoryInstance{}
-		var ctxMemory wasm.Memory
-		hostFn := reflect.ValueOf(func(ctx wasm.HostFunctionCallContext) {
+		memory := &wasm.MemoryInstance{}
+		var ctxMemory publicwasm.Memory
+		hostFn := reflect.ValueOf(func(ctx publicwasm.HostFunctionCallContext) {
 			ctxMemory = ctx.Memory()
 		})
-		module := &internalwasm.ModuleInstance{Memory: memory}
-		it := interpreter{functions: map[internalwasm.FunctionAddress]*interpreterFunction{
-			0: {hostFn: &hostFn, funcInstance: &internalwasm.FunctionInstance{
-				FunctionType: &internalwasm.TypeInstance{
-					Type: &internalwasm.FunctionType{
+		module := &wasm.ModuleInstance{Memory: memory}
+		it := interpreter{functions: map[wasm.FunctionAddress]*interpreterFunction{
+			0: {hostFn: &hostFn, funcInstance: &wasm.FunctionInstance{
+				FunctionType: &wasm.TypeInstance{
+					Type: &wasm.FunctionType{
 						Params:  []wasm.ValueType{},
 						Results: []wasm.ValueType{},
 					},
@@ -69,10 +69,10 @@ func TestInterpreter_CallHostFunc(t *testing.T) {
 	})
 }
 
-func newHostFunctionCallContext(engine internalwasm.Engine, module *internalwasm.ModuleInstance) *internalwasm.HostFunctionCallContext {
-	ctx := internalwasm.NewHostFunctionCallContext(&internalwasm.Store{
+func newHostFunctionCallContext(engine wasm.Engine, module *wasm.ModuleInstance) *wasm.HostFunctionCallContext {
+	ctx := wasm.NewHostFunctionCallContext(&wasm.Store{
 		Engine:          engine,
-		ModuleInstances: map[string]*internalwasm.ModuleInstance{"test": module},
+		ModuleInstances: map[string]*wasm.ModuleInstance{"test": module},
 	}, module)
 	return ctx
 }

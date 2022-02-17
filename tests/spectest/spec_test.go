@@ -14,11 +14,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
-	"github.com/tetratelabs/wazero/wasm"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 //go:embed testdata/*.wasm
@@ -165,35 +165,35 @@ func (c command) expectedError() (err error) {
 	}
 	switch c.Text {
 	case "out of bounds memory access":
-		err = internalwasm.ErrRuntimeOutOfBoundsMemoryAccess
+		err = wasm.ErrRuntimeOutOfBoundsMemoryAccess
 	case "indirect call type mismatch", "indirect call":
-		err = internalwasm.ErrRuntimeIndirectCallTypeMismatch
+		err = wasm.ErrRuntimeIndirectCallTypeMismatch
 	case "undefined element", "undefined":
-		err = internalwasm.ErrRuntimeInvalidTableAccess
+		err = wasm.ErrRuntimeInvalidTableAccess
 	case "integer overflow":
-		err = internalwasm.ErrRuntimeIntegerOverflow
+		err = wasm.ErrRuntimeIntegerOverflow
 	case "invalid conversion to integer":
-		err = internalwasm.ErrRuntimeInvalidConversionToInteger
+		err = wasm.ErrRuntimeInvalidConversionToInteger
 	case "integer divide by zero":
-		err = internalwasm.ErrRuntimeIntegerDivideByZero
+		err = wasm.ErrRuntimeIntegerDivideByZero
 	case "unreachable":
-		err = internalwasm.ErrRuntimeUnreachable
+		err = wasm.ErrRuntimeUnreachable
 	default:
 		if strings.HasPrefix(c.Text, "uninitialized") {
-			err = internalwasm.ErrRuntimeInvalidTableAccess
+			err = wasm.ErrRuntimeInvalidTableAccess
 		}
 	}
 	return
 }
 
-func addSpectestModule(t *testing.T, store *internalwasm.Store) {
-	var printV = func(wasm.HostFunctionCallContext) {}
-	var printI32 = func(wasm.HostFunctionCallContext, uint32) {}
-	var printF32 = func(wasm.HostFunctionCallContext, float32) {}
-	var printI64 = func(wasm.HostFunctionCallContext, uint64) {}
-	var printF64 = func(wasm.HostFunctionCallContext, float64) {}
-	var printI32F32 = func(wasm.HostFunctionCallContext, uint32, float32) {}
-	var printF64F64 = func(wasm.HostFunctionCallContext, float64, float64) {}
+func addSpectestModule(t *testing.T, store *wasm.Store) {
+	var printV = func(publicwasm.HostFunctionCallContext) {}
+	var printI32 = func(publicwasm.HostFunctionCallContext, uint32) {}
+	var printF32 = func(publicwasm.HostFunctionCallContext, float32) {}
+	var printI64 = func(publicwasm.HostFunctionCallContext, uint64) {}
+	var printF64 = func(publicwasm.HostFunctionCallContext, float64) {}
+	var printI32F32 = func(publicwasm.HostFunctionCallContext, uint32, float32) {}
+	var printF64F64 = func(publicwasm.HostFunctionCallContext, float64, float64) {}
 
 	for n, v := range map[string]interface{}{
 		"print":         printV,
@@ -204,7 +204,7 @@ func addSpectestModule(t *testing.T, store *internalwasm.Store) {
 		"print_i32_f32": printI32F32,
 		"print_f64_f64": printF64F64,
 	} {
-		fn, err := internalwasm.NewHostFunction(n, v)
+		fn, err := wasm.NewHostFunction(n, v)
 		require.NoError(t, err)
 		require.NoError(t, store.AddHostFunction("spectest", fn), "AddHostFunction(%s)", n)
 	}
@@ -240,7 +240,7 @@ func TestInterpreter(t *testing.T) {
 	runTest(t, interpreter.NewEngine)
 }
 
-func runTest(t *testing.T, newEngine func() internalwasm.Engine) {
+func runTest(t *testing.T, newEngine func() wasm.Engine) {
 	ctx := context.Background()
 	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)
@@ -268,7 +268,7 @@ func runTest(t *testing.T, newEngine func() internalwasm.Engine) {
 		wastName := filepath.Base(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			store := internalwasm.NewStore(newEngine())
+			store := wasm.NewStore(newEngine())
 			addSpectestModule(t, store)
 
 			var lastInstanceName string
@@ -397,7 +397,7 @@ func runTest(t *testing.T, newEngine func() internalwasm.Engine) {
 								msg += " in module " + c.Action.Module
 							}
 							_, _, err := store.CallFunction(ctx, moduleName, c.Action.Field, args...)
-							require.ErrorIs(t, err, internalwasm.ErrRuntimeCallStackOverflow, msg)
+							require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

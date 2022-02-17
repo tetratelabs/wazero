@@ -3,7 +3,7 @@ package text
 import (
 	"fmt"
 
-	wasm2 "github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // FormatError allows control over the format of errors parsing the WebAssembly Text Format.
@@ -52,8 +52,8 @@ func unexpectedToken(tok tokenType, tokenBytes []byte) error {
 // `(func) (import "" "" (func))` which is the same as  `(func) (import "" "" (func))`
 //
 // See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
-func importAfterModuleDefined(section wasm2.SectionID) error {
-	return fmt.Errorf("import after module-defined %s", wasm2.SectionIDName(section))
+func importAfterModuleDefined(section wasm.SectionID) error {
+	return fmt.Errorf("import after module-defined %s", wasm.SectionIDName(section))
 }
 
 // moreThanOneInvalidInSection allows enforcement of section size limits.
@@ -66,8 +66,8 @@ func importAfterModuleDefined(section wasm2.SectionID) error {
 //
 // See https://www.w3.org/TR/wasm-core-1/#tables%E2%91%A0
 // See https://www.w3.org/TR/wasm-core-1/#memories%E2%91%A0
-func moreThanOneInvalidInSection(section wasm2.SectionID) error {
-	return moreThanOneInvalid(wasm2.SectionIDName(section))
+func moreThanOneInvalidInSection(section wasm.SectionID) error {
+	return moreThanOneInvalid(wasm.SectionIDName(section))
 }
 
 // moreThanOneInvalid is the failure when a declaration that can result in more than one item.
@@ -75,6 +75,6 @@ func moreThanOneInvalid(context string) error {
 	return fmt.Errorf("at most one %s allowed", context)
 }
 
-func unhandledSection(section wasm2.SectionID) error {
-	return fmt.Errorf("BUG: unhandled %s", wasm2.SectionIDName(section))
+func unhandledSection(section wasm.SectionID) error {
+	return fmt.Errorf("BUG: unhandled %s", wasm.SectionIDName(section))
 }

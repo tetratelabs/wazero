@@ -21,9 +21,8 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 func newArchContext() archContext {
@@ -71,7 +70,7 @@ func jitcall(codeSegment, engine uintptr)
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *internalwasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("arm64", 1024)
@@ -91,7 +90,7 @@ func newCompiler(f *internalwasm.FunctionInstance, ir *wazeroir.CompilationResul
 
 type arm64Compiler struct {
 	builder *asm.Builder
-	f       *internalwasm.FunctionInstance
+	f       *wasm.FunctionInstance
 	ir      *wazeroir.CompilationResult
 	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
 	// where we want to set the next coming instruction as the destination of these BR instructions.
@@ -577,7 +576,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 }
 
 // compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
-func (c *arm64Compiler) compileHostFunction(address internalwasm.FunctionAddress) error {
+func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 
@@ -900,7 +899,7 @@ func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 }
 
 // compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect (TODO) for the arm64 architecture.
-func (c *arm64Compiler) compileCallImpl(addr internalwasm.FunctionAddress, functype *internalwasm.FunctionType) error {
+func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *wasm.FunctionType) error {
 	// TODO: the following code can be generalized for CallIndirect.
 
 	// Release all the registers as our calling convention requires the caller-save.
@@ -2414,10 +2413,10 @@ func (c *arm64Compiler) compileMemorySize() error {
 	)
 
 	// memory.size loads the page size of memory, so we have to divide by the page size.
-	// "reg = reg >> internalwasm.MemoryPageSizeInBits (== reg / internalwasm.MemoryPageSize) "
+	// "reg = reg >> wasm.MemoryPageSizeInBits (== reg / wasm.MemoryPageSize) "
 	c.compileConstToRegisterInstruction(
 		arm64.ALSR,
-		internalwasm.MemoryPageSizeInBits,
+		wasm.MemoryPageSizeInBits,
 		reg,
 	)
 
@@ -2428,7 +2427,7 @@ func (c *arm64Compiler) compileMemorySize() error {
 // compileCallGoFunction adds instructions to call a Go function whose address equals the addr parameter.
 // jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
 // jitCallStatusCodeCallHostFunction.
-func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr internalwasm.FunctionAddress) error {
+func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err

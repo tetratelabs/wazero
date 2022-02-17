@@ -38,12 +38,12 @@ func TestStore_CallFunction(t *testing.T) {
 		Name: name,
 		Exports: map[string]*ExportInstance{
 			fn: {
-				Kind: wasm.ExportKindFunc,
+				Kind: ExportKindFunc,
 				Function: &FunctionInstance{
 					FunctionType: &TypeInstance{
 						Type: &FunctionType{
-							Params:  []wasm.ValueType{},
-							Results: []wasm.ValueType{},
+							Params:  []ValueType{},
+							Results: []ValueType{},
 						},
 					},
 				},
@@ -136,13 +136,13 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
 		_, err = s.Instantiate(&Module{
 			TypeSection:   []*FunctionType{{}},
-			ImportSection: []*Import{{Kind: wasm.ImportKindFunc, Name: "host_fn", DescFunc: 0}},
+			ImportSection: []*Import{{Kind: ImportKindFunc, Name: "host_fn", DescFunc: 0}},
 			MemorySection: []*MemoryType{{1, nil}},
-			ExportSection: map[string]*Export{"host.fn": {Kind: wasm.ExportKindFunc, Name: "host.fn", Index: 0}},
+			ExportSection: map[string]*Export{"host.fn": {Kind: ExportKindFunc, Name: "host.fn", Index: 0}},
 		}, "test")
 		require.NoError(t, err)
 
-		ei, err := s.getExport("test", "host.fn", wasm.ExportKindFunc)
+		ei, err := s.getExport("test", "host.fn", ExportKindFunc)
 		require.NoError(t, err)
 		os.Environ()
 		// We expect the host function to be called in context of the importing module.
@@ -241,10 +241,10 @@ func TestStore_getTypeInstance(t *testing.T) {
 	})
 	t.Run("ok", func(t *testing.T) {
 		for _, tc := range []*FunctionType{
-			{Params: []wasm.ValueType{}},
-			{Params: []wasm.ValueType{wasm.ValueTypeF32}},
-			{Results: []wasm.ValueType{wasm.ValueTypeF64}},
-			{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI64}},
+			{Params: []ValueType{}},
+			{Params: []ValueType{ValueTypeF32}},
+			{Results: []ValueType{ValueTypeF64}},
+			{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI64}},
 		} {
 			tc := tc
 			t.Run(tc.String(), func(t *testing.T) {
@@ -286,7 +286,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 		m := &Module{GlobalSection: []*Global{{
 			// Global with i32.const initial value, but with type specified as f64 must be error.
 			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0}},
-			Type: &GlobalType{ValType: wasm.ValueTypeF64},
+			Type: &GlobalType{ValType: ValueTypeF64},
 		}}}
 		_, err := s.buildGlobalInstances(m, &ModuleInstance{})
 		require.Error(t, err)
@@ -294,7 +294,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		global := &Global{
 			Init: &ConstantExpression{Opcode: OpcodeI64Const, Data: []byte{0x11}},
-			Type: &GlobalType{ValType: wasm.ValueTypeI64},
+			Type: &GlobalType{ValType: ValueTypeI64},
 		}
 		expectedValue, _, err := leb128.DecodeUint64(bytes.NewReader(global.Init.Data))
 		require.NoError(t, err)
@@ -323,22 +323,22 @@ func TestStore_executeConstExpression(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("non global expr", func(t *testing.T) {
-		for _, vt := range []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64} {
-			t.Run(wasm.ValueTypeName(vt), func(t *testing.T) {
+		for _, vt := range []ValueType{ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64} {
+			t.Run(ValueTypeName(vt), func(t *testing.T) {
 				t.Run("valid", func(t *testing.T) {
 					// Allocate bytes with enough size for all types.
 					expr := &ConstantExpression{Data: make([]byte, 8)}
 					switch vt {
-					case wasm.ValueTypeI32:
+					case ValueTypeI32:
 						expr.Data[0] = 1
 						expr.Opcode = OpcodeI32Const
-					case wasm.ValueTypeI64:
+					case ValueTypeI64:
 						expr.Data[0] = 2
 						expr.Opcode = OpcodeI64Const
-					case wasm.ValueTypeF32:
+					case ValueTypeF32:
 						binary.LittleEndian.PutUint32(expr.Data, math.Float32bits(math.MaxFloat32))
 						expr.Opcode = OpcodeF32Const
-					case wasm.ValueTypeF64:
+					case ValueTypeF64:
 						binary.LittleEndian.PutUint64(expr.Data, math.Float64bits(math.MaxFloat64))
 						expr.Opcode = OpcodeF64Const
 					}
@@ -349,19 +349,19 @@ func TestStore_executeConstExpression(t *testing.T) {
 					require.NotNil(t, raw)
 
 					switch vt {
-					case wasm.ValueTypeI32:
+					case ValueTypeI32:
 						actual, ok := raw.(int32)
 						require.True(t, ok)
 						require.Equal(t, int32(1), actual)
-					case wasm.ValueTypeI64:
+					case ValueTypeI64:
 						actual, ok := raw.(int64)
 						require.True(t, ok)
 						require.Equal(t, int64(2), actual)
-					case wasm.ValueTypeF32:
+					case ValueTypeF32:
 						actual, ok := raw.(float32)
 						require.True(t, ok)
 						require.Equal(t, float32(math.MaxFloat32), actual)
-					case wasm.ValueTypeF64:
+					case ValueTypeF64:
 						actual, ok := raw.(float64)
 						require.True(t, ok)
 						require.Equal(t, float64(math.MaxFloat64), actual)
@@ -371,13 +371,13 @@ func TestStore_executeConstExpression(t *testing.T) {
 					// Empty data must be failure.
 					expr := &ConstantExpression{Data: make([]byte, 0)}
 					switch vt {
-					case wasm.ValueTypeI32:
+					case ValueTypeI32:
 						expr.Opcode = OpcodeI32Const
-					case wasm.ValueTypeI64:
+					case ValueTypeI64:
 						expr.Opcode = OpcodeI64Const
-					case wasm.ValueTypeF32:
+					case ValueTypeF32:
 						expr.Opcode = OpcodeF32Const
-					case wasm.ValueTypeF64:
+					case ValueTypeF64:
 						expr.Opcode = OpcodeF64Const
 					}
 					_, _, err := executeConstExpression(nil, expr)
@@ -403,15 +403,15 @@ func TestStore_executeConstExpression(t *testing.T) {
 
 		t.Run("ok", func(t *testing.T) {
 			for _, tc := range []struct {
-				valueType wasm.ValueType
+				valueType ValueType
 				val       uint64
 			}{
-				{valueType: wasm.ValueTypeI32, val: 10},
-				{valueType: wasm.ValueTypeI64, val: 20},
-				{valueType: wasm.ValueTypeF32, val: uint64(math.Float32bits(634634432.12311))},
-				{valueType: wasm.ValueTypeF64, val: math.Float64bits(1.12312311)},
+				{valueType: ValueTypeI32, val: 10},
+				{valueType: ValueTypeI64, val: 20},
+				{valueType: ValueTypeF32, val: uint64(math.Float32bits(634634432.12311))},
+				{valueType: ValueTypeF64, val: math.Float64bits(1.12312311)},
 			} {
-				t.Run(wasm.ValueTypeName(tc.valueType), func(t *testing.T) {
+				t.Run(ValueTypeName(tc.valueType), func(t *testing.T) {
 					// The index specified in Data equals zero.
 					expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
 					globals := []*GlobalInstance{{Val: tc.val, Type: &GlobalType{ValType: tc.valueType}}}
@@ -422,19 +422,19 @@ func TestStore_executeConstExpression(t *testing.T) {
 					require.NotNil(t, val)
 
 					switch tc.valueType {
-					case wasm.ValueTypeI32:
+					case ValueTypeI32:
 						actual, ok := val.(int32)
 						require.True(t, ok)
 						require.Equal(t, int32(tc.val), actual)
-					case wasm.ValueTypeI64:
+					case ValueTypeI64:
 						actual, ok := val.(int64)
 						require.True(t, ok)
 						require.Equal(t, int64(tc.val), actual)
-					case wasm.ValueTypeF32:
+					case ValueTypeF32:
 						actual, ok := val.(float32)
 						require.True(t, ok)
 						require.Equal(t, math.Float32frombits(uint32(tc.val)), actual)
-					case wasm.ValueTypeF64:
+					case ValueTypeF64:
 						actual, ok := val.(float64)
 						require.True(t, ok)
 						require.Equal(t, math.Float64frombits(tc.val), actual)

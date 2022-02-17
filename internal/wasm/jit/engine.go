@@ -464,7 +464,7 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 	in := make([]reflect.Value, tp.NumIn())
 
 	// We pop the value and pass them as arguments in a reverse order according to the
-	// stack machine convension.
+	// stack machine convention.
 	for i := len(in) - 1; i >= 1; i-- {
 		val := reflect.New(tp.In(i)).Elem()
 		raw := e.popValue()

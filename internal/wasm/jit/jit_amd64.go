@@ -20,10 +20,9 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 var (
@@ -91,7 +90,7 @@ func newArchContext() (ret archContext) { return }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *internalwasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("amd64", 1024)
@@ -116,7 +115,7 @@ func (c *amd64Compiler) String() string {
 
 type amd64Compiler struct {
 	builder *asm.Builder
-	f       *internalwasm.FunctionInstance
+	f       *wasm.FunctionInstance
 	ir      *wazeroir.CompilationResult
 	// setJmpOrigins sets jmp kind instructions where you want to set the next coming
 	// instruction as the destination of the jmp instruction.
@@ -171,7 +170,7 @@ func (c *amd64Compiler) label(labelKey string) *labelInfo {
 
 // compileHostFunction constructs the entire code to enter the host function implementation,
 // and return back to the caller.
-func (c *amd64Compiler) compileHostFunction(address internalwasm.FunctionAddress) error {
+func (c *amd64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 
@@ -981,8 +980,8 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
-	// by 16 as the offset is the "length" of table in Go's "[]internalwasm.TableElement",
-	// and size of internalwasm.TableInstance equals 128 bit (64-bit internalwasm.FunctionAddress and 64-bit internalwasm.TypeID).
+	// by 16 as the offset is the "length" of table in Go's "[]wasm.TableElement",
+	// and size of wasm.TableInstance equals 128 bit (64-bit wasm.FunctionAddress and 64-bit wasm.TypeID).
 	getTypeInstanceAddress := c.newProg()
 	notLengthExceedJump.To.SetTarget(getTypeInstanceAddress)
 	getTypeInstanceAddress.As = x86.ASHLQ
@@ -992,7 +991,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	getTypeInstanceAddress.From.Offset = 4
 	c.addInstruction(getTypeInstanceAddress)
 
-	// Adds the address of internalwasm.TableInstance[0] stored as engine.tableSliceAddress to the offset.
+	// Adds the address of wasm.TableInstance[0] stored as engine.tableSliceAddress to the offset.
 	movTableSliceAddress := c.newProg()
 	movTableSliceAddress.As = x86.AADDQ
 	movTableSliceAddress.To.Type = obj.TYPE_REG
@@ -1002,16 +1001,16 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.From.Offset = engineModuleContextTableElement0AddressOffset
 	c.addInstruction(movTableSliceAddress)
 
-	// At this point offset.register holds the address of internalwasm.TableElement at internalwasm.TableInstance[offset]
+	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset]
 	// So the target type ID lives at offset+tableElementTypeIDOffset, and we compare it
-	// with internalwasm.UninitializedTableElementTypeID to check if the element is initialized.
+	// with wasm.UninitializedTableElementTypeID to check if the element is initialized.
 	checkIfInitialized := c.newProg()
 	checkIfInitialized.As = x86.ACMPL // 32-bit as FunctionTypeID is in 32-bit unsigned integer.
 	checkIfInitialized.From.Type = obj.TYPE_MEM
 	checkIfInitialized.From.Reg = offset.register
 	checkIfInitialized.From.Offset = tableElementFunctionTypeIDOffset
 	checkIfInitialized.To.Type = obj.TYPE_CONST
-	checkIfInitialized.To.Offset = int64(internalwasm.UninitializedTableElementTypeID)
+	checkIfInitialized.To.Offset = int64(wasm.UninitializedTableElementTypeID)
 	c.addInstruction(checkIfInitialized)
 
 	// Jump if the target is initialized element.
@@ -4228,7 +4227,7 @@ func (c *amd64Compiler) compileMemorySize() error {
 	getMemorySizeInPageUnit.To.Type = obj.TYPE_REG
 	getMemorySizeInPageUnit.To.Reg = loc.register
 	getMemorySizeInPageUnit.From.Type = obj.TYPE_CONST
-	getMemorySizeInPageUnit.From.Offset = internalwasm.MemoryPageSizeInBits
+	getMemorySizeInPageUnit.From.Offset = wasm.MemoryPageSizeInBits
 	c.addInstruction(getMemorySizeInPageUnit)
 	return nil
 }
@@ -4532,13 +4531,13 @@ func (c *amd64Compiler) getCallFrameStackPointer(destinationRegister int16) {
 }
 
 // callFunctionFromRegister adds instructions to call a function whose address equals the value on register.
-func (c *amd64Compiler) callFunctionFromRegister(register int16, functype *internalwasm.FunctionType) error {
+func (c *amd64Compiler) callFunctionFromRegister(register int16, functype *wasm.FunctionType) error {
 	return c.callFunction(0, register, functype)
 
 }
 
 // callFunctionFromAddress adds instructions to call a function whose address equals addr constant.
-func (c *amd64Compiler) callFunctionFromAddress(addr internalwasm.FunctionAddress, functype *internalwasm.FunctionType) error {
+func (c *amd64Compiler) callFunctionFromAddress(addr wasm.FunctionAddress, functype *wasm.FunctionType) error {
 	return c.callFunction(addr, nilRegister, functype)
 }
 
@@ -4548,7 +4547,7 @@ func (c *amd64Compiler) callFunctionFromAddress(addr internalwasm.FunctionAddres
 //
 // Note: this is the counter part for returnFunction, and see the comments there as well
 // to understand how the function calls are achieved.
-func (c *amd64Compiler) callFunction(addr internalwasm.FunctionAddress, addrReg int16, functype *internalwasm.FunctionType) error {
+func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.releaseAllRegistersToStack(); err != nil {
 		return err
@@ -4994,7 +4993,7 @@ func (c *amd64Compiler) returnFunction() error {
 // callGoFunction adds instructions to call a Go function whose address equals the addr parameter.
 // jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
 // jitCallStatusCodeCallHostFunction.
-func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr internalwasm.FunctionAddress) error {
+func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
 	// Set the functionAddress to the engine.exitContext functionCallAddress.
 	setFunctionCallAddress := c.newProg()
 	setFunctionCallAddress.As = x86.AMOVQ
@@ -5430,7 +5429,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		getTablesCount.From.Offset = moduleInstanceTablesOffset + 8
 		c.addInstruction(getTablesCount)
 
-		// First, we need to read the *internalwasm.TableInstance.
+		// First, we need to read the *wasm.TableInstance.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
 		readTableInstancePointer.To.Type = obj.TYPE_REG

@@ -7,7 +7,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func decodeImport(r *bytes.Reader) (i *wasm.Import, err error) {
@@ -27,19 +26,19 @@ func decodeImport(r *bytes.Reader) (i *wasm.Import, err error) {
 
 	i.Kind = b[0]
 	switch i.Kind {
-	case wasm2.ImportKindFunc:
+	case wasm.ImportKindFunc:
 		if i.DescFunc, _, err = leb128.DecodeUint32(r); err != nil {
 			return nil, fmt.Errorf("error decoding import func typeindex: %w", err)
 		}
-	case wasm2.ImportKindTable:
+	case wasm.ImportKindTable:
 		if i.DescTable, err = decodeTableType(r); err != nil {
 			return nil, fmt.Errorf("error decoding import table desc: %w", err)
 		}
-	case wasm2.ImportKindMemory:
+	case wasm.ImportKindMemory:
 		if i.DescMem, err = decodeMemoryType(r); err != nil {
 			return nil, fmt.Errorf("error decoding import mem desc: %w", err)
 		}
-	case wasm2.ImportKindGlobal:
+	case wasm.ImportKindGlobal:
 		if i.DescGlobal, err = decodeGlobalType(r); err != nil {
 			return nil, fmt.Errorf("error decoding import global desc: %w", err)
 		}
@@ -57,13 +56,13 @@ func encodeImport(i *wasm.Import) []byte {
 	data = append(data, encodeSizePrefixed([]byte(i.Name))...)
 	data = append(data, i.Kind)
 	switch i.Kind {
-	case wasm2.ImportKindFunc:
+	case wasm.ImportKindFunc:
 		data = append(data, leb128.EncodeUint32(i.DescFunc)...)
-	case wasm2.ImportKindTable:
+	case wasm.ImportKindTable:
 		panic("TODO: encodeImportKindTable")
-	case wasm2.ImportKindMemory:
+	case wasm.ImportKindMemory:
 		panic("TODO: encodeImportKindMemory")
-	case wasm2.ImportKindGlobal:
+	case wasm.ImportKindGlobal:
 		panic("TODO: encodeImportKindGlobal")
 	default:
 		panic(fmt.Errorf("invalid kind: %#x", i.Kind))

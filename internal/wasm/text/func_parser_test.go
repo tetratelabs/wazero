@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func TestFuncParser(t *testing.T) {
@@ -69,7 +68,7 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 			source:       "(func call 0)",
 			expectedCode: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x00, wasm.OpcodeEnd}},
 			expectedUnresolvedIndex: &unresolvedIndex{
-				section:    wasm2.SectionIDCode,
+				section:    wasm.SectionIDCode,
 				bodyOffset: 1, // second byte is the position Code.Body
 				targetIdx:  0, // zero is literally the intended index. because targetID isn't set, this will be read
 				line:       1, col: 12,
@@ -80,7 +79,7 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 			source:       "(func call 2)",
 			expectedCode: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x02, wasm.OpcodeEnd}},
 			expectedUnresolvedIndex: &unresolvedIndex{
-				section:    wasm2.SectionIDCode,
+				section:    wasm.SectionIDCode,
 				bodyOffset: 1, // second byte is the position Code.Body
 				targetIdx:  2,
 				line:       1, col: 12,
@@ -91,7 +90,7 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 			source:       "(func call $main)",
 			expectedCode: &wasm.Code{Body: []byte{wasm.OpcodeCall, 0x00, wasm.OpcodeEnd}},
 			expectedUnresolvedIndex: &unresolvedIndex{
-				section:    wasm2.SectionIDCode,
+				section:    wasm.SectionIDCode,
 				bodyOffset: 1, // second byte is the position Code.Body
 				targetID:   "main",
 				line:       1, col: 12,

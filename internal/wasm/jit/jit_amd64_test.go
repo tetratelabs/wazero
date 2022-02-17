@@ -21,7 +21,6 @@ import (
 	internal "github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *amd64Compiler {
@@ -508,7 +507,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 	f := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{
-		Params: []wasm2.ValueType{wasm2.ValueTypeF64, wasm2.ValueTypeI32},
+		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
 	}}}
 	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
 	compiler.pushFunctionParams()
@@ -5853,8 +5852,8 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 
 func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 	const globalValue uint64 = 12345
-	for i, tp := range []wasm2.ValueType{
-		wasm2.ValueTypeF32, wasm2.ValueTypeF64, wasm2.ValueTypeI32, wasm2.ValueTypeI64,
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -5880,9 +5879,9 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			require.True(t, global.onRegister())
 			require.Len(t, compiler.locationStack.usedRegisters, 1)
 			switch tp {
-			case wasm2.ValueTypeF32, wasm2.ValueTypeF64:
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				require.True(t, isFloatRegister(global.register))
-			case wasm2.ValueTypeI32, wasm2.ValueTypeI64:
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
 				require.True(t, isIntRegister(global.register))
 			}
 			err = compiler.releaseAllRegistersToStack()
@@ -5906,8 +5905,8 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 
 func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 	const valueToSet uint64 = 12345
-	for i, tp := range []wasm2.ValueType{
-		wasm2.ValueTypeF32, wasm2.ValueTypeF64, wasm2.ValueTypeI32, wasm2.ValueTypeI64,
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -5990,8 +5989,8 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				// Emit the call target function.
 				const numCalls = 10
 				targetFunctionType := &wasm.FunctionType{
-					Params:  []wasm2.ValueType{wasm2.ValueTypeI32},
-					Results: []wasm2.ValueType{wasm2.ValueTypeI32},
+					Params:  []wasm.ValueType{wasm.ValueTypeI32},
+					Results: []wasm.ValueType{wasm.ValueTypeI32},
 				}
 
 				expectedValue := uint32(0)
@@ -6103,8 +6102,8 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 
 	const targetFunctionAddress wasm.FunctionAddress = 5 // arbitrary value for testing
 	targetFunctionType := &wasm.FunctionType{
-		Params:  []wasm2.ValueType{wasm2.ValueTypeI32, wasm2.ValueTypeI32, wasm2.ValueTypeI32},
-		Results: []wasm2.ValueType{wasm2.ValueTypeI32},
+		Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32},
+		Results: []wasm.ValueType{wasm.ValueTypeI32},
 	}
 
 	{
@@ -6272,8 +6271,8 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		targetType := &wasm.FunctionType{
-			Params:  []wasm2.ValueType{},
-			Results: []wasm2.ValueType{wasm2.ValueTypeI32}}
+			Params:  []wasm.ValueType{},
+			Results: []wasm.ValueType{wasm.ValueTypeI32}}
 		targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
 		operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
 		moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}

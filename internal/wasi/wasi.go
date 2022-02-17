@@ -27,7 +27,7 @@ import (
 // Note: wasi.Errno mappings are not defined in WASI, yet, so these mappings are best efforts by maintainers.
 //
 // Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means wasm.Memory is always the
-// internalwasm.Store Memories index zero: `store.Memories[0].Buffer`
+// wasm.Store Memories index zero: `store.Memories[0].Buffer`
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 // See https://github.com/WebAssembly/WASI/issues/215
@@ -244,7 +244,7 @@ type wasiAPI struct {
 
 // SnapshotPreview1Functions returns all go functions that implement SnapshotPreview1.
 // These should be exported in the module named wasi.ModuleSnapshotPreview1.
-// See internalwasm.NewHostFunction
+// See wasm.NewHostFunction
 // TODO: we can't export a return with SnapshotPreview1 until we figure out how to give users a wasm.HostFunctionCallContext
 func SnapshotPreview1Functions(opts ...Option) (a *wasiAPI, nameToGoFunc map[string]interface{}) {
 	a = newAPI(opts...)
@@ -667,7 +667,7 @@ func proc_exit(wasm.HostFunctionCallContext, uint32) {
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
-	if start, err := requireExport(module, moduleName, wasi.FunctionStart, wasm.ExportKindFunc); err != nil {
+	if start, err := requireExport(module, moduleName, wasi.FunctionStart, internalwasm.ExportKindFunc); err != nil {
 		return err
 	} else {
 		// TODO: this should be verified during decode so that errors have the correct source positions
@@ -679,10 +679,10 @@ func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
 			return fmt.Errorf("module[%s] function[%s] must have an empty (nullary) signature: %s", moduleName, wasi.FunctionStart, ft.String())
 		}
 	}
-	if _, err := requireExport(module, moduleName, wasi.FunctionInitialize, wasm.ExportKindFunc); err == nil {
+	if _, err := requireExport(module, moduleName, wasi.FunctionInitialize, internalwasm.ExportKindFunc); err == nil {
 		return fmt.Errorf("module[%s] must not export func[%s]", moduleName, wasi.FunctionInitialize)
 	}
-	if _, err := requireExport(module, moduleName, "memory", wasm.ExportKindMemory); err != nil {
+	if _, err := requireExport(module, moduleName, "memory", internalwasm.ExportKindMemory); err != nil {
 		return err
 	}
 	// TODO: the spec also requires export of "__indirect_function_table", but we aren't enforcing it, and doing so
@@ -690,10 +690,10 @@ func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
 	return nil
 }
 
-func requireExport(module *internalwasm.Module, moduleName string, exportName string, kind wasm.ExportKind) (*internalwasm.Export, error) {
+func requireExport(module *internalwasm.Module, moduleName string, exportName string, kind internalwasm.ExportKind) (*internalwasm.Export, error) {
 	exp, ok := module.ExportSection[exportName]
 	if !ok || exp.Kind != kind {
-		return nil, fmt.Errorf("module[%s] does not export %s[%s]", moduleName, wasm.ExportKindName(kind), exportName)
+		return nil, fmt.Errorf("module[%s] does not export %s[%s]", moduleName, internalwasm.ExportKindName(kind), exportName)
 	}
 	return exp, nil
 }

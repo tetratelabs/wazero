@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func newIndexNamespace() *indexNamespace {
@@ -58,7 +57,7 @@ func (i *indexNamespace) requireNoID(idToken []byte) (string, error) {
 }
 
 // parseIndex is a tokenParser called in a field that can only contain a symbolic identifier or raw numeric index.
-func (i *indexNamespace) parseIndex(section wasm2.SectionID, idx wasm.Index, bodyOffset uint32, tok tokenType, tokenBytes []byte, line, col uint32) (targetIdx wasm.Index, resolved bool, err error) {
+func (i *indexNamespace) parseIndex(section wasm.SectionID, idx wasm.Index, bodyOffset uint32, tok tokenType, tokenBytes []byte, line, col uint32) (targetIdx wasm.Index, resolved bool, err error) {
 	switch tok {
 	case tokenUN: // Ex. 2
 		if i, overflow := decodeUint32(tokenBytes); overflow {
@@ -89,14 +88,14 @@ func (i *indexNamespace) parseIndex(section wasm2.SectionID, idx wasm.Index, bod
 // recordUnresolved records an ID, such as "main", is not yet resolvable.
 //
 // See unresolvedIndex for parameter descriptions
-func (i *indexNamespace) recordUnresolved(section wasm2.SectionID, idx wasm.Index, bodyOffset uint32, targetID string, line, col uint32) {
+func (i *indexNamespace) recordUnresolved(section wasm.SectionID, idx wasm.Index, bodyOffset uint32, targetID string, line, col uint32) {
 	i.unresolvedIndices = append(i.unresolvedIndices, &unresolvedIndex{section: section, idx: idx, bodyOffset: bodyOffset, targetID: targetID, line: line, col: col})
 }
 
 // recordUnresolved records numeric index is currently out of bounds.
 //
 // See unresolvedIndex for parameter descriptions
-func (i *indexNamespace) recordOutOfRange(section wasm2.SectionID, idx wasm.Index, bodyOffset uint32, targetIdx wasm.Index, line, col uint32) {
+func (i *indexNamespace) recordOutOfRange(section wasm.SectionID, idx wasm.Index, bodyOffset uint32, targetIdx wasm.Index, line, col uint32) {
 	i.unresolvedIndices = append(i.unresolvedIndices, &unresolvedIndex{section: section, idx: idx, bodyOffset: bodyOffset, targetIdx: targetIdx, line: line, col: col})
 }
 
@@ -108,7 +107,7 @@ func (i *indexNamespace) recordOutOfRange(section wasm2.SectionID, idx wasm.Inde
 // See https://www.w3.org/TR/wasm-core-1/#indices%E2%91%A4
 type unresolvedIndex struct {
 	// section is the primary index of what's targeting this index (in the wasm.Module)
-	section wasm2.SectionID
+	section wasm.SectionID
 
 	// idx is slice position in the section
 	idx wasm.Index
@@ -178,11 +177,11 @@ func (d *unresolvedIndex) formatErr(err error) error {
 	// This check allows us to defer Sprintf until there's an error, and reuse the same logic for non-indexed types.
 	var context string
 	switch d.section {
-	case wasm2.SectionIDCode:
+	case wasm.SectionIDCode:
 		context = fmt.Sprintf("module.code[%d].body[%d]", d.idx, d.bodyOffset)
-	case wasm2.SectionIDExport:
+	case wasm.SectionIDExport:
 		context = fmt.Sprintf("module.exports[%d].func", d.idx)
-	case wasm2.SectionIDStart:
+	case wasm.SectionIDStart:
 		context = "module.start"
 	}
 	return &FormatError{d.line, d.col, context, err}

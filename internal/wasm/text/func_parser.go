@@ -6,7 +6,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func newFuncParser(typeUseParser *typeUseParser, funcNamespace *indexNamespace, onFunc onFunc) *funcParser {
@@ -89,7 +88,7 @@ func (p *funcParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
 	}
 
-	return p.typeUseParser.begin(wasm2.SectionIDFunction, p.currentIdx, p.afterTypeUse, tok, tokenBytes, line, col)
+	return p.typeUseParser.begin(wasm.SectionIDFunction, p.currentIdx, p.afterTypeUse, tok, tokenBytes, line, col)
 }
 
 // afterTypeUse is a tokenParser that starts after a type use.
@@ -175,7 +174,7 @@ func (p *funcParser) end() (tokenParser, error) {
 // placeholder byte(0) is added instead and will be resolved later.
 func (p *funcParser) parseFuncIndex(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	bodyOffset := uint32(len(p.currentBody))
-	idx, resolved, err := p.funcNamespace.parseIndex(wasm2.SectionIDCode, p.currentIdx, bodyOffset, tok, tokenBytes, line, col)
+	idx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDCode, p.currentIdx, bodyOffset, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}

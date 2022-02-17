@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 // validateFunctionInstance validates the instruction sequence of a function instance.
@@ -59,170 +58,170 @@ func validateFunctionInstance(
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeF32Load:
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 			case OpcodeI32Store:
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeF32Store:
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeI64Load:
 				if 1<<align > 64/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeF64Load:
 				if 1<<align > 64/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI64Store:
 				if 1<<align > 64/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeF64Store:
 				if 1<<align > 64/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeI32Load8S:
 				if 1<<align > 1 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32Load8U:
 				if 1<<align > 1 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Load8S, OpcodeI64Load8U:
 				if 1<<align > 1 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI32Store8:
 				if 1<<align > 1 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeI64Store8:
 				if 1<<align > 1 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeI32Load16S, OpcodeI32Load16U:
 				if 1<<align > 16/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Load16S, OpcodeI64Load16U:
 				if 1<<align > 16/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI32Store16:
 				if 1<<align > 16/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeI64Store16:
 				if 1<<align > 16/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			case OpcodeI64Load32S, OpcodeI64Load32U:
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI64Store32:
 				if 1<<align > 32/8 {
 					return fmt.Errorf("invalid memory alignment")
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return err
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
 			}
@@ -247,12 +246,12 @@ func validateFunctionInstance(
 			}
 			switch Opcode(op) {
 			case OpcodeMemoryGrow:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return err
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeMemorySize:
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			}
 			pc += num - 1
 		} else if OpcodeI32Const <= op && op <= OpcodeF64Const {
@@ -264,19 +263,19 @@ func validateFunctionInstance(
 					return fmt.Errorf("read i32 immediate: %s", err)
 				}
 				pc += num - 1
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Const:
 				_, num, err := leb128.DecodeInt64(bytes.NewBuffer(f.Body[pc:]))
 				if err != nil {
 					return fmt.Errorf("read i64 immediate: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 				pc += num - 1
 			case OpcodeF32Const:
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 				pc += 3
 			case OpcodeF64Const:
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 				pc += 7
 			}
 		} else if OpcodeLocalGet <= op && op <= OpcodeGlobalSet {
@@ -302,7 +301,7 @@ func validateFunctionInstance(
 				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
-				var expType wasm.ValueType
+				var expType ValueType
 				if index < inputLen {
 					expType = f.FunctionType.Type.Params[index]
 				} else {
@@ -316,7 +315,7 @@ func validateFunctionInstance(
 				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
-				var expType wasm.ValueType
+				var expType ValueType
 				if index < inputLen {
 					expType = f.FunctionType.Type.Params[index]
 				} else {
@@ -356,7 +355,7 @@ func validateFunctionInstance(
 			if target.isLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
-				targetResultType = []wasm.ValueType{}
+				targetResultType = []ValueType{}
 			}
 			if err := valueTypeStack.popResults(targetResultType, false); err != nil {
 				return fmt.Errorf("type mismatch on the br operation: %v", err)
@@ -374,7 +373,7 @@ func validateFunctionInstance(
 					index, len(controlBloclStack))
 			}
 			pc += num - 1
-			if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the required operand for br_if")
 			}
 			// Check type soundness.
@@ -383,7 +382,7 @@ func validateFunctionInstance(
 			if target.isLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
-				targetResultType = []wasm.ValueType{}
+				targetResultType = []ValueType{}
 			}
 			if err := valueTypeStack.popResults(targetResultType, false); err != nil {
 				return fmt.Errorf("type mismatch on the br_if operation: %v", err)
@@ -419,7 +418,7 @@ func validateFunctionInstance(
 			}
 			pc += n + num - 1
 			// Check type soundness.
-			if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the required operand for br_table")
 			}
 			lnLabel := controlBloclStack[len(controlBloclStack)-1-int(ln)]
@@ -427,7 +426,7 @@ func validateFunctionInstance(
 			if lnLabel.isLoop {
 				// Loop operation doesn't require results since the continuation is
 				// the beginning of the loop.
-				expType = []wasm.ValueType{}
+				expType = []ValueType{}
 			}
 			for _, l := range list {
 				if int(l) >= len(controlBloclStack) {
@@ -438,7 +437,7 @@ func validateFunctionInstance(
 				if label.isLoop {
 					// Loop operation doesn't require results since the continuation is
 					// the beginning of the loop.
-					expType2 = []wasm.ValueType{}
+					expType2 = []ValueType{}
 				}
 				if len(expType) != len(expType2) {
 					return fmt.Errorf("incosistent block type length for br_table at %d; %v (ln=%d) != %v (l=%d)", l, expType, ln, expType2, l)
@@ -487,7 +486,7 @@ func validateFunctionInstance(
 			if !hasTable {
 				return fmt.Errorf("table not given while having call_indirect")
 			}
-			if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the in table index's type for call_indirect")
 			}
 			if int(typeIndex) >= len(types) {
@@ -505,197 +504,197 @@ func validateFunctionInstance(
 		} else if OpcodeI32Eqz <= op && op <= OpcodeF64ReinterpretI64 {
 			switch Opcode(op) {
 			case OpcodeI32Eqz:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the operand for i32.eqz: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32Eq, OpcodeI32Ne, OpcodeI32LtS,
 				OpcodeI32LtU, OpcodeI32GtS, OpcodeI32GtU, OpcodeI32LeS,
 				OpcodeI32LeU, OpcodeI32GeS, OpcodeI32GeU:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Eqz:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the operand for i64.eqz: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Eq, OpcodeI64Ne, OpcodeI64LtS,
 				OpcodeI64LtU, OpcodeI64GtS, OpcodeI64GtU,
 				OpcodeI64LeS, OpcodeI64LeU, OpcodeI64GeS, OpcodeI64GeU:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeF32Eq, OpcodeF32Ne, OpcodeF32Lt, OpcodeF32Gt, OpcodeF32Le, OpcodeF32Ge:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeF64Eq, OpcodeF64Ne, OpcodeF64Lt, OpcodeF64Gt, OpcodeF64Le, OpcodeF64Ge:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32Clz, OpcodeI32Ctz, OpcodeI32Popcnt:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32Add, OpcodeI32Sub, OpcodeI32Mul, OpcodeI32DivS,
 				OpcodeI32DivU, OpcodeI32RemS, OpcodeI32RemU, OpcodeI32And,
 				OpcodeI32Or, OpcodeI32Xor, OpcodeI32Shl, OpcodeI32ShrS,
 				OpcodeI32ShrU, OpcodeI32Rotl, OpcodeI32Rotr:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the 1st i32 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the 2nd i32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Clz, OpcodeI64Ctz, OpcodeI64Popcnt:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI64Add, OpcodeI64Sub, OpcodeI64Mul, OpcodeI64DivS,
 				OpcodeI64DivU, OpcodeI64RemS, OpcodeI64RemU, OpcodeI64And,
 				OpcodeI64Or, OpcodeI64Xor, OpcodeI64Shl, OpcodeI64ShrS,
 				OpcodeI64ShrU, OpcodeI64Rotl, OpcodeI64Rotr:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the 1st i64 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the 2nd i64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeF32Abs, OpcodeF32Neg, OpcodeF32Ceil,
 				OpcodeF32Floor, OpcodeF32Trunc, OpcodeF32Nearest,
 				OpcodeF32Sqrt:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF32Add, OpcodeF32Sub, OpcodeF32Mul,
 				OpcodeF32Div, OpcodeF32Min, OpcodeF32Max,
 				OpcodeF32Copysign:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the 1st f32 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the 2nd f32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF64Abs, OpcodeF64Neg, OpcodeF64Ceil,
 				OpcodeF64Floor, OpcodeF64Trunc, OpcodeF64Nearest,
 				OpcodeF64Sqrt:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 			case OpcodeF64Add, OpcodeF64Sub, OpcodeF64Mul,
 				OpcodeF64Div, OpcodeF64Min, OpcodeF64Max,
 				OpcodeF64Copysign:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the 1st f64 operand for 0x%x: %v", op, err)
 				}
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the 2nd f64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI32WrapI64:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the operand for i32.wrap_i64: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32TruncF32S, OpcodeI32TruncF32U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI32TruncF64S, OpcodeI32TruncF64U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64ExtendI32S, OpcodeI64ExtendI32U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI64TruncF32S, OpcodeI64TruncF32U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the f32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeI64TruncF64S, OpcodeI64TruncF64U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the f64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeF32ConvertI32s, OpcodeF32ConvertI32U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF32ConvertI64S, OpcodeF32ConvertI64U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF32DemoteF64:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the operand for f32.demote_f64: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF64ConvertI32S, OpcodeF64ConvertI32U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the i32 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 			case OpcodeF64ConvertI64S, OpcodeF64ConvertI64U:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the i64 operand for 0x%x: %v", op, err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 			case OpcodeF64PromoteF32:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the operand for f64.promote_f32: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI32ReinterpretF32:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF32); err != nil {
 					return fmt.Errorf("cannot pop the operand for i32.reinterpret_f32: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI32)
+				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64ReinterpretF64:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeF64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeF64); err != nil {
 					return fmt.Errorf("cannot pop the operand for i64.reinterpret_f64: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeI64)
+				valueTypeStack.push(ValueTypeI64)
 			case OpcodeF32ReinterpretI32:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the operand for f32.reinterpret_i32: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF32)
+				valueTypeStack.push(ValueTypeF32)
 			case OpcodeF64ReinterpretI64:
-				if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI64); err != nil {
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
 					return fmt.Errorf("cannot pop the operand for f64.reinterpret_i64: %v", err)
 				}
-				valueTypeStack.push(wasm.ValueTypeF64)
+				valueTypeStack.push(ValueTypeF64)
 			default:
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
@@ -735,7 +734,7 @@ func validateFunctionInstance(
 				blockTypeBytes: num,
 				isIf:           true,
 			})
-			if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the operand for 'if': %v", err)
 			}
 			valueTypeStack.pushStackLimit()
@@ -790,7 +789,7 @@ func validateFunctionInstance(
 				return fmt.Errorf("invalid drop: %v", err)
 			}
 		} else if op == OpcodeSelect {
-			if err := valueTypeStack.popAndVerifyType(wasm.ValueTypeI32); err != nil {
+			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("type mismatch on 3rd select operand: %v", err)
 			}
 			v1, err := valueTypeStack.pop()
@@ -828,17 +827,17 @@ func validateFunctionInstance(
 }
 
 type valueTypeStack struct {
-	stack               []wasm.ValueType
+	stack               []ValueType
 	stackLimits         []int
 	maximumStackPointer int
 }
 
 const (
 	// Only used in the anlyzeFunction below.
-	valueTypeUnknown = wasm.ValueType(0xFF)
+	valueTypeUnknown = ValueType(0xFF)
 )
 
-func (s *valueTypeStack) pop() (wasm.ValueType, error) {
+func (s *valueTypeStack) pop() (ValueType, error) {
 	limit := 0
 	if len(s.stackLimits) > 0 {
 		limit = s.stackLimits[len(s.stackLimits)-1]
@@ -855,7 +854,7 @@ func (s *valueTypeStack) pop() (wasm.ValueType, error) {
 	}
 }
 
-func (s *valueTypeStack) popAndVerifyType(expected wasm.ValueType) error {
+func (s *valueTypeStack) popAndVerifyType(expected ValueType) error {
 	actual, err := s.pop()
 	if err != nil {
 		return err
@@ -866,7 +865,7 @@ func (s *valueTypeStack) popAndVerifyType(expected wasm.ValueType) error {
 	return nil
 }
 
-func (s *valueTypeStack) push(v wasm.ValueType) {
+func (s *valueTypeStack) push(v ValueType) {
 	s.stack = append(s.stack, v)
 	if sp := len(s.stack); sp > s.maximumStackPointer {
 		s.maximumStackPointer = sp
@@ -882,7 +881,7 @@ func (s *valueTypeStack) resetAtStackLimit() {
 	if len(s.stackLimits) != 0 {
 		s.stack = s.stack[:s.stackLimits[len(s.stackLimits)-1]]
 	} else {
-		s.stack = []wasm.ValueType{}
+		s.stack = []ValueType{}
 	}
 }
 
@@ -896,7 +895,7 @@ func (s *valueTypeStack) pushStackLimit() {
 	s.stackLimits = append(s.stackLimits, len(s.stack))
 }
 
-func (s *valueTypeStack) popResults(expResults []wasm.ValueType, checkAboveLimit bool) error {
+func (s *valueTypeStack) popResults(expResults []ValueType, checkAboveLimit bool) error {
 	limit := 0
 	if len(s.stackLimits) > 0 {
 		limit = s.stackLimits[len(s.stackLimits)-1]
@@ -920,13 +919,13 @@ func (s *valueTypeStack) String() string {
 		var str string
 		if v == valueTypeUnknown {
 			str = "unknown"
-		} else if v == wasm.ValueTypeI32 {
+		} else if v == ValueTypeI32 {
 			str = "i32"
-		} else if v == wasm.ValueTypeI64 {
+		} else if v == ValueTypeI64 {
 			str = "i64"
-		} else if v == wasm.ValueTypeF32 {
+		} else if v == ValueTypeF32 {
 			str = "f32"
-		} else if v == wasm.ValueTypeF64 {
+		} else if v == ValueTypeF64 {
 			str = "f64"
 		}
 		typeStrs = append(typeStrs, str)

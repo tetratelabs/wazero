@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestFunctionType_String(t *testing.T) {
@@ -15,15 +13,15 @@ func TestFunctionType_String(t *testing.T) {
 		exp      string
 	}{
 		{functype: &FunctionType{}, exp: "null_null"},
-		{functype: &FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}}, exp: "i32_null"},
-		{functype: &FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeF64}}, exp: "i32f64_null"},
-		{functype: &FunctionType{Params: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeF64}}, exp: "f32i32f64_null"},
-		{functype: &FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}}, exp: "null_i64"},
-		{functype: &FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeF32}}, exp: "null_i64f32"},
-		{functype: &FunctionType{Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeF64}}, exp: "null_f32i32f64"},
-		{functype: &FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI32}, Results: []wasm.ValueType{wasm.ValueTypeI64}}, exp: "i32_i64"},
-		{functype: &FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeF32}, Results: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeF32}}, exp: "i64f32_i64f32"},
-		{functype: &FunctionType{Params: []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeF32, wasm.ValueTypeF64}, Results: []wasm.ValueType{wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeF64}}, exp: "i64f32f64_f32i32f64"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeI32}}, exp: "i32_null"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeI32, ValueTypeF64}}, exp: "i32f64_null"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "f32i32f64_null"},
+		{functype: &FunctionType{Results: []ValueType{ValueTypeI64}}, exp: "null_i64"},
+		{functype: &FunctionType{Results: []ValueType{ValueTypeI64, ValueTypeF32}}, exp: "null_i64f32"},
+		{functype: &FunctionType{Results: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "null_f32i32f64"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI64}}, exp: "i32_i64"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeI64, ValueTypeF32}, Results: []ValueType{ValueTypeI64, ValueTypeF32}}, exp: "i64f32_i64f32"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeI64, ValueTypeF32, ValueTypeF64}, Results: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "i64f32f64_f32i32f64"},
 	} {
 		tc := tc
 		t.Run(tc.functype.String(), func(t *testing.T) {
@@ -35,21 +33,21 @@ func TestFunctionType_String(t *testing.T) {
 func TestSectionIDName(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    wasm.SectionID
+		input    SectionID
 		expected string
 	}{
-		{"custom", wasm.SectionIDCustom, "custom"},
-		{"type", wasm.SectionIDType, "type"},
-		{"import", wasm.SectionIDImport, "import"},
-		{"function", wasm.SectionIDFunction, "function"},
-		{"table", wasm.SectionIDTable, "table"},
-		{"memory", wasm.SectionIDMemory, "memory"},
-		{"global", wasm.SectionIDGlobal, "global"},
-		{"export", wasm.SectionIDExport, "export"},
-		{"start", wasm.SectionIDStart, "start"},
-		{"element", wasm.SectionIDElement, "element"},
-		{"code", wasm.SectionIDCode, "code"},
-		{"data", wasm.SectionIDData, "data"},
+		{"custom", SectionIDCustom, "custom"},
+		{"type", SectionIDType, "type"},
+		{"import", SectionIDImport, "import"},
+		{"function", SectionIDFunction, "function"},
+		{"table", SectionIDTable, "table"},
+		{"memory", SectionIDMemory, "memory"},
+		{"global", SectionIDGlobal, "global"},
+		{"export", SectionIDExport, "export"},
+		{"start", SectionIDStart, "start"},
+		{"element", SectionIDElement, "element"},
+		{"code", SectionIDCode, "code"},
+		{"data", SectionIDData, "data"},
 		{"unknown", 100, "unknown"},
 	}
 
@@ -57,7 +55,7 @@ func TestSectionIDName(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, wasm.SectionIDName(tc.input))
+			require.Equal(t, tc.expected, SectionIDName(tc.input))
 		})
 	}
 }
@@ -65,13 +63,13 @@ func TestSectionIDName(t *testing.T) {
 func TestExportKindName(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    wasm.ExportKind
+		input    ExportKind
 		expected string
 	}{
-		{"func", wasm.ExportKindFunc, "func"},
-		{"table", wasm.ExportKindTable, "table"},
-		{"mem", wasm.ExportKindMemory, "mem"},
-		{"global", wasm.ExportKindGlobal, "global"},
+		{"func", ExportKindFunc, "func"},
+		{"table", ExportKindTable, "table"},
+		{"mem", ExportKindMemory, "mem"},
+		{"global", ExportKindGlobal, "global"},
 		{"unknown", 100, "unknown"},
 	}
 
@@ -79,7 +77,7 @@ func TestExportKindName(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, wasm.ExportKindName(tc.input))
+			require.Equal(t, tc.expected, ExportKindName(tc.input))
 		})
 	}
 }
@@ -87,13 +85,13 @@ func TestExportKindName(t *testing.T) {
 func TestValueTypeName(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    wasm.ValueType
+		input    ValueType
 		expected string
 	}{
-		{"i32", wasm.ValueTypeI32, "i32"},
-		{"i64", wasm.ValueTypeI64, "i64"},
-		{"f32", wasm.ValueTypeF32, "f32"},
-		{"f64", wasm.ValueTypeF64, "f64"},
+		{"i32", ValueTypeI32, "i32"},
+		{"i64", ValueTypeI64, "i64"},
+		{"f32", ValueTypeF32, "f32"},
+		{"f64", ValueTypeF64, "f64"},
 		{"unknown", 100, "unknown"},
 	}
 
@@ -101,7 +99,7 @@ func TestValueTypeName(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, wasm.ValueTypeName(tc.input))
+			require.Equal(t, tc.expected, ValueTypeName(tc.input))
 		})
 	}
 }
@@ -117,7 +115,7 @@ func TestModule_allDeclarations(t *testing.T) {
 		// Functions.
 		{
 			module: &Module{
-				ImportSection:   []*Import{{Kind: wasm.ImportKindFunc, DescFunc: 10000}},
+				ImportSection:   []*Import{{Kind: ImportKindFunc, DescFunc: 10000}},
 				FunctionSection: []Index{10, 20, 30},
 			},
 			expectedFunctions: []Index{10000, 10, 20, 30},
@@ -130,14 +128,14 @@ func TestModule_allDeclarations(t *testing.T) {
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: wasm.ImportKindFunc, DescFunc: 10000}},
+				ImportSection: []*Import{{Kind: ImportKindFunc, DescFunc: 10000}},
 			},
 			expectedFunctions: []Index{10000},
 		},
 		// Globals.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: wasm.ImportKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
+				ImportSection: []*Import{{Kind: ImportKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
 				GlobalSection: []*Global{{Type: &GlobalType{Mutable: true}}},
 			},
 			expectedGlobals: []*GlobalType{{Mutable: false}, {Mutable: true}},
@@ -150,21 +148,21 @@ func TestModule_allDeclarations(t *testing.T) {
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: wasm.ImportKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
+				ImportSection: []*Import{{Kind: ImportKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
 			},
 			expectedGlobals: []*GlobalType{{Mutable: false}},
 		},
 		// Memories.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: wasm.ImportKindMemory, DescMem: &LimitsType{Min: 1}}},
+				ImportSection: []*Import{{Kind: ImportKindMemory, DescMem: &LimitsType{Min: 1}}},
 				MemorySection: []*MemoryType{{Min: 100}},
 			},
 			expectedMemories: []*MemoryType{{Min: 1}, {Min: 100}},
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: wasm.ImportKindMemory, DescMem: &LimitsType{Min: 1}}},
+				ImportSection: []*Import{{Kind: ImportKindMemory, DescMem: &LimitsType{Min: 1}}},
 			},
 			expectedMemories: []*MemoryType{{Min: 1}},
 		},
@@ -177,14 +175,14 @@ func TestModule_allDeclarations(t *testing.T) {
 		// Tables.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: wasm.ImportKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
+				ImportSection: []*Import{{Kind: ImportKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
 				TableSection:  []*TableType{{Limit: &LimitsType{Min: 10}}},
 			},
 			expectedTables: []*TableType{{Limit: &LimitsType{Min: 1}}, {Limit: &LimitsType{Min: 10}}},
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: wasm.ImportKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
+				ImportSection: []*Import{{Kind: ImportKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
 			},
 			expectedTables: []*TableType{{Limit: &LimitsType{Min: 1}}},
 		},
@@ -207,7 +205,7 @@ func TestModule_allDeclarations(t *testing.T) {
 }
 
 func TestModule_SectionSize(t *testing.T) {
-	i32, f32 := wasm.ValueTypeI32, wasm.ValueTypeF32
+	i32, f32 := ValueTypeI32, ValueTypeF32
 	zero := uint32(0)
 	empty := &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x00}}
 
@@ -231,8 +229,8 @@ func TestModule_SectionSize(t *testing.T) {
 			input: &Module{
 				TypeSection: []*FunctionType{
 					{},
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
 				},
 			},
 			expected: map[string]uint32{"type": 3},
@@ -241,17 +239,17 @@ func TestModule_SectionSize(t *testing.T) {
 			name: "type and import section",
 			input: &Module{
 				TypeSection: []*FunctionType{
-					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
-					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{f32, f32}, Results: []ValueType{f32}},
 				},
 				ImportSection: []*Import{
 					{
 						Module: "Math", Name: "Mul",
-						Kind:     wasm.ImportKindFunc,
+						Kind:     ImportKindFunc,
 						DescFunc: 1,
 					}, {
 						Module: "Math", Name: "Add",
-						Kind:     wasm.ImportKindFunc,
+						Kind:     ImportKindFunc,
 						DescFunc: 0,
 					},
 				},
@@ -267,7 +265,7 @@ func TestModule_SectionSize(t *testing.T) {
 					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},
 				},
 				ExportSection: map[string]*Export{
-					"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: Index(0)},
+					"AddInt": {Name: "AddInt", Kind: ExportKindFunc, Index: Index(0)},
 				},
 				StartSection: &zero,
 			},
@@ -296,9 +294,9 @@ func TestModule_SectionSize(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			actual := map[string]uint32{}
-			for i := wasm.SectionID(0); i <= wasm.SectionIDData; i++ {
+			for i := SectionID(0); i <= SectionIDData; i++ {
 				if size := tc.input.SectionElementCount(i); size > 0 {
-					actual[wasm.SectionIDName(i)] = size
+					actual[SectionIDName(i)] = size
 				}
 			}
 			require.Equal(t, tc.expected, actual)

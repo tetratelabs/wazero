@@ -14,11 +14,10 @@ import (
 	"github.com/wasmerio/wasmer-go/wasmer"
 
 	"github.com/tetratelabs/wazero"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
 	"github.com/tetratelabs/wazero/wasi"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 // example holds the latest supported features as described in the comments of exampleText
@@ -31,16 +30,16 @@ var exampleText []byte
 // exampleBinary is the exampleText encoded in the WebAssembly 1.0 binary format.
 var exampleBinary = binary.EncodeModule(example)
 
-func newExample() *internalwasm.Module {
-	three := internalwasm.Index(3)
+func newExample() *wasm.Module {
+	three := wasm.Index(3)
 	i32 := wasm.ValueTypeI32
-	return &internalwasm.Module{
-		TypeSection: []*internalwasm.FunctionType{
+	return &wasm.Module{
+		TypeSection: []*wasm.FunctionType{
 			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 			{},
 			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 		},
-		ImportSection: []*internalwasm.Import{
+		ImportSection: []*wasm.Import{
 			{
 				Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
 				Kind:     wasm.ImportKindFunc,
@@ -51,38 +50,38 @@ func newExample() *internalwasm.Module {
 				DescFunc: 2,
 			},
 		},
-		FunctionSection: []internalwasm.Index{internalwasm.Index(1), internalwasm.Index(1), internalwasm.Index(0)},
-		CodeSection: []*internalwasm.Code{
-			{Body: []byte{internalwasm.OpcodeCall, 3, internalwasm.OpcodeEnd}},
-			{Body: []byte{internalwasm.OpcodeEnd}},
-			{Body: []byte{internalwasm.OpcodeLocalGet, 0, internalwasm.OpcodeLocalGet, 1, internalwasm.OpcodeI32Add, internalwasm.OpcodeEnd}},
+		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(1), wasm.Index(0)},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeCall, 3, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 		},
-		MemorySection: []*internalwasm.MemoryType{{Min: 1, Max: &three}},
-		ExportSection: map[string]*internalwasm.Export{
-			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: internalwasm.Index(4)},
-			"":       {Name: "", Kind: wasm.ExportKindFunc, Index: internalwasm.Index(3)},
-			"mem":    {Name: "mem", Kind: wasm.ExportKindMemory, Index: internalwasm.Index(0)},
+		MemorySection: []*wasm.MemoryType{{Min: 1, Max: &three}},
+		ExportSection: map[string]*wasm.Export{
+			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(4)},
+			"":       {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
+			"mem":    {Name: "mem", Kind: wasm.ExportKindMemory, Index: wasm.Index(0)},
 		},
 		StartSection: &three,
-		NameSection: &internalwasm.NameSection{
+		NameSection: &wasm.NameSection{
 			ModuleName: "example",
-			FunctionNames: internalwasm.NameMap{
-				{Index: internalwasm.Index(0), Name: "wasi.args_sizes_get"},
-				{Index: internalwasm.Index(1), Name: "wasi.fd_write"},
-				{Index: internalwasm.Index(2), Name: "call_hello"},
-				{Index: internalwasm.Index(3), Name: "hello"},
-				{Index: internalwasm.Index(4), Name: "addInt"},
+			FunctionNames: wasm.NameMap{
+				{Index: wasm.Index(0), Name: "wasi.args_sizes_get"},
+				{Index: wasm.Index(1), Name: "wasi.fd_write"},
+				{Index: wasm.Index(2), Name: "call_hello"},
+				{Index: wasm.Index(3), Name: "hello"},
+				{Index: wasm.Index(4), Name: "addInt"},
 			},
-			LocalNames: internalwasm.IndirectNameMap{
-				{Index: internalwasm.Index(1), NameMap: internalwasm.NameMap{
-					{Index: internalwasm.Index(0), Name: "fd"},
-					{Index: internalwasm.Index(1), Name: "iovs_ptr"},
-					{Index: internalwasm.Index(2), Name: "iovs_len"},
-					{Index: internalwasm.Index(3), Name: "nwritten_ptr"},
+			LocalNames: wasm.IndirectNameMap{
+				{Index: wasm.Index(1), NameMap: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "fd"},
+					{Index: wasm.Index(1), Name: "iovs_ptr"},
+					{Index: wasm.Index(2), Name: "iovs_len"},
+					{Index: wasm.Index(3), Name: "nwritten_ptr"},
 				}},
-				{Index: internalwasm.Index(4), NameMap: internalwasm.NameMap{
-					{Index: internalwasm.Index(0), Name: "value_1"},
-					{Index: internalwasm.Index(1), Name: "value_2"},
+				{Index: wasm.Index(4), NameMap: wasm.NameMap{
+					{Index: wasm.Index(0), Name: "value_1"},
+					{Index: wasm.Index(1), Name: "value_2"},
 				}},
 			},
 		},
@@ -173,7 +172,7 @@ func BenchmarkCodecExample(b *testing.B) {
 		}
 	})
 	// Note: We don't know if wasmtime.Wat2Wasm encodes the custom name section or not.
-	// Note: wasmer.Wat2Wasm calls wasmer via CGO which is eventually implemented by wasm-tools
+	// Note: wasmtime.Wat2Wasm calls wasmtime via CGO which is eventually implemented by wasm-tools
 	b.Run("wat2wasm vs wasmtime.Wat2Wasm", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {

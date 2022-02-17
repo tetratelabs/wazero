@@ -6,13 +6,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 // TestDecodeModule relies on unit tests for Module.Encode, specifically that the encoding is both known and correct.
 // This avoids having to copy/paste or share variables to assert against byte arrays.
 func TestDecodeModule(t *testing.T) {
-	i32, f32 := wasm2.ValueTypeI32, wasm2.ValueTypeF32
+	i32, f32 := wasm.ValueTypeI32, wasm.ValueTypeF32
 	zero := uint32(0)
 
 	tests := []struct {
@@ -32,8 +31,8 @@ func TestDecodeModule(t *testing.T) {
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
 					{},
-					{Params: []wasm2.ValueType{i32, i32}, Results: []wasm2.ValueType{i32}},
-					{Params: []wasm2.ValueType{i32, i32, i32, i32}, Results: []wasm2.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
 			},
 		},
@@ -41,17 +40,17 @@ func TestDecodeModule(t *testing.T) {
 			name: "type and import section",
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{
-					{Params: []wasm2.ValueType{i32, i32}, Results: []wasm2.ValueType{i32}},
-					{Params: []wasm2.ValueType{f32, f32}, Results: []wasm2.ValueType{f32}},
+					{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
+					{Params: []wasm.ValueType{f32, f32}, Results: []wasm.ValueType{f32}},
 				},
 				ImportSection: []*wasm.Import{
 					{
 						Module: "Math", Name: "Mul",
-						Kind:     wasm2.ImportKindFunc,
+						Kind:     wasm.ImportKindFunc,
 						DescFunc: 1,
 					}, {
 						Module: "Math", Name: "Add",
-						Kind:     wasm2.ImportKindFunc,
+						Kind:     wasm.ImportKindFunc,
 						DescFunc: 0,
 					},
 				},
@@ -64,7 +63,7 @@ func TestDecodeModule(t *testing.T) {
 				ExportSection: map[string]*wasm.Export{
 					"mem": {
 						Name:  "mem",
-						Kind:  wasm2.ExportKindMemory,
+						Kind:  wasm.ExportKindMemory,
 						Index: 0,
 					},
 				},
@@ -76,7 +75,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{{}},
 				ImportSection: []*wasm.Import{{
 					Module: "", Name: "hello",
-					Kind:     wasm2.ImportKindFunc,
+					Kind:     wasm.ImportKindFunc,
 					DescFunc: 0,
 				}},
 				StartSection: &zero,
@@ -95,7 +94,7 @@ func TestDecodeModule(t *testing.T) {
 	}
 	t.Run("skips custom section", func(t *testing.T) {
 		input := append(append(magic, version...),
-			wasm2.SectionIDCustom, 0xf, // 15 bytes in this section
+			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 			0x04, 'm', 'e', 'm', 'e',
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
 		m, e := DecodeModule(input)
@@ -104,10 +103,10 @@ func TestDecodeModule(t *testing.T) {
 	})
 	t.Run("skips custom section, but not name", func(t *testing.T) {
 		input := append(append(magic, version...),
-			wasm2.SectionIDCustom, 0xf, // 15 bytes in this section
+			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 			0x04, 'm', 'e', 'm', 'e',
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 0,
-			wasm2.SectionIDCustom, 0x0e, // 14 bytes in this section
+			wasm.SectionIDCustom, 0x0e, // 14 bytes in this section
 			0x04, 'n', 'a', 'm', 'e',
 			subsectionIDModuleName, 0x07, // 7 bytes in this subsection
 			0x06, // the Module name simple is 6 bytes long
@@ -137,10 +136,10 @@ func TestDecodeModule_Errors(t *testing.T) {
 		{
 			name: "redundant name section",
 			input: append(append(magic, version...),
-				wasm2.SectionIDCustom, 0x09, // 9 bytes in this section
+				wasm.SectionIDCustom, 0x09, // 9 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x02, 0x01, 'x',
-				wasm2.SectionIDCustom, 0x09, // 9 bytes in this section
+				wasm.SectionIDCustom, 0x09, // 9 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x02, 0x01, 'x'),
 			expectedErr: "section custom: redundant custom section name",

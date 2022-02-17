@@ -1,8 +1,7 @@
 package binary
 
 import (
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
 var sizePrefixedName = []byte{4, 'n', 'a', 'm', 'e'}
@@ -10,7 +9,7 @@ var sizePrefixedName = []byte{4, 'n', 'a', 'm', 'e'}
 // EncodeModule implements wasm.EncodeModule for the WebAssembly 1.0 (MVP) Binary Format.
 // Note: If saving to a file, the conventional extension is wasm
 // See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
-func EncodeModule(m *internalwasm.Module) (bytes []byte) {
+func EncodeModule(m *wasm.Module) (bytes []byte) {
 	bytes = append(magic, version...)
 	if m.SectionElementCount(wasm.SectionIDType) > 0 {
 		bytes = append(bytes, encodeTypeSection(m.TypeSection)...)

@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"io"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeTableType(r io.Reader) (*internalwasm.TableType, error) {
+func decodeTableType(r io.Reader) (*wasm.TableType, error) {
 	b := make([]byte, 1)
 	if _, err := io.ReadFull(r, b); err != nil {
 		return nil, fmt.Errorf("read leading byte: %v", err)
@@ -23,19 +22,19 @@ func decodeTableType(r io.Reader) (*internalwasm.TableType, error) {
 		return nil, fmt.Errorf("read limits: %v", err)
 	}
 
-	return &internalwasm.TableType{
+	return &wasm.TableType{
 		ElemType: 0x70, // funcref
 		Limit:    lm,
 	}, nil
 }
 
-func decodeGlobalType(r io.Reader) (*internalwasm.GlobalType, error) {
+func decodeGlobalType(r io.Reader) (*wasm.GlobalType, error) {
 	vt, err := decodeValueTypes(r, 1)
 	if err != nil {
 		return nil, fmt.Errorf("read value type: %w", err)
 	}
 
-	ret := &internalwasm.GlobalType{
+	ret := &wasm.GlobalType{
 		ValType: vt[0],
 	}
 
@@ -72,11 +71,11 @@ var encodedOneResult = map[wasm.ValueType][]byte{
 	wasm.ValueTypeF64: {0x60, 0, 1, wasm.ValueTypeF64},
 }
 
-// encodeFunctionType returns the internalwasm.FunctionType encoded in WebAssembly 1.0 (MVP) Binary Format.
+// encodeFunctionType returns the wasm.FunctionType encoded in WebAssembly 1.0 (MVP) Binary Format.
 //
 // Note: Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
 // See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
-func encodeFunctionType(t *internalwasm.FunctionType) []byte {
+func encodeFunctionType(t *wasm.FunctionType) []byte {
 	paramCount, resultCount := len(t.Params), len(t.Results)
 	if paramCount == 0 && resultCount == 0 {
 		return nullary

@@ -7,7 +7,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func decodeTypeSection(r io.Reader) ([]*wasm.FunctionType, error) {
@@ -213,7 +212,7 @@ func decodeDataSection(r *bytes.Reader) ([]*wasm.DataSegment, error) {
 
 // encodeSection encodes the sectionID, the size of its contents in bytes, followed by the contents.
 // See https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
-func encodeSection(sectionID wasm2.SectionID, contents []byte) []byte {
+func encodeSection(sectionID wasm.SectionID, contents []byte) []byte {
 	return append([]byte{sectionID}, encodeSizePrefixed(contents)...)
 }
 
@@ -226,7 +225,7 @@ func encodeTypeSection(types []*wasm.FunctionType) []byte {
 	for _, t := range types {
 		contents = append(contents, encodeFunctionType(t)...)
 	}
-	return encodeSection(wasm2.SectionIDType, contents)
+	return encodeSection(wasm.SectionIDType, contents)
 }
 
 // encodeImportSection encodes a SectionIDImport for the given imports in WebAssembly 1.0 (MVP) Binary Format.
@@ -238,7 +237,7 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 	for _, i := range imports {
 		contents = append(contents, encodeImport(i)...)
 	}
-	return encodeSection(wasm2.SectionIDImport, contents)
+	return encodeSection(wasm.SectionIDImport, contents)
 }
 
 // encodeFunctionSection encodes a SectionIDFunction for the type indices associated with module-defined functions in
@@ -250,7 +249,7 @@ func encodeFunctionSection(typeIndices []wasm.Index) []byte {
 	for _, index := range typeIndices {
 		contents = append(contents, leb128.EncodeUint32(index)...)
 	}
-	return encodeSection(wasm2.SectionIDFunction, contents)
+	return encodeSection(wasm.SectionIDFunction, contents)
 }
 
 // encodeCodeSection encodes a SectionIDCode for the module-defined function in WebAssembly 1.0 (MVP) Binary Format.
@@ -262,7 +261,7 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 	for _, i := range code {
 		contents = append(contents, encodeCode(i)...)
 	}
-	return encodeSection(wasm2.SectionIDCode, contents)
+	return encodeSection(wasm.SectionIDCode, contents)
 }
 
 // encodeMemorySection encodes a SectionIDMemory for the module-defined function in WebAssembly 1.0 (MVP) Binary Format.
@@ -274,7 +273,7 @@ func encodeMemorySection(memories []*wasm.MemoryType) []byte {
 	for _, i := range memories {
 		contents = append(contents, encodeMemoryType(i)...)
 	}
-	return encodeSection(wasm2.SectionIDMemory, contents)
+	return encodeSection(wasm.SectionIDMemory, contents)
 }
 
 // encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (MVP) Binary Format.
@@ -286,12 +285,12 @@ func encodeExportSection(exports map[string]*wasm.Export) []byte {
 	for _, e := range exports {
 		contents = append(contents, encodeExport(e)...)
 	}
-	return encodeSection(wasm2.SectionIDExport, contents)
+	return encodeSection(wasm.SectionIDExport, contents)
 }
 
 // encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
 func encodeStartSection(funcidx wasm.Index) []byte {
-	return encodeSection(wasm2.SectionIDStart, leb128.EncodeUint32(funcidx))
+	return encodeSection(wasm.SectionIDStart, leb128.EncodeUint32(funcidx))
 }

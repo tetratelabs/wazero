@@ -16,9 +16,8 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 func requireAddLabel(t *testing.T, compiler *arm64Compiler, label *wazeroir.Label) {
@@ -43,7 +42,7 @@ func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler *arm64Co
 }
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
-	cmp, err := newCompiler(&internalwasm.FunctionInstance{ModuleInstance: j.moduleInstance}, nil)
+	cmp, err := newCompiler(&wasm.FunctionInstance{ModuleInstance: j.moduleInstance}, nil)
 	require.NoError(t, err)
 	ret, ok := cmp.(*arm64Compiler)
 	require.True(t, ok)
@@ -86,7 +85,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 		// Push the call frames.
 		const callFrameNums = 10
 		stackPointerToExpectedValue := map[uint64]uint32{}
-		for funcaddr := internalwasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
+		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
 			//	Each function pushes its funcaddr and soon returns.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.compilePreamble()
@@ -1682,7 +1681,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 			// Emit the call target function.
 			const numCalls = 10
-			targetFunctionType := &internalwasm.FunctionType{
+			targetFunctionType := &wasm.FunctionType{
 				Params:  []wasm.ValueType{wasm.ValueTypeI32},
 				Results: []wasm.ValueType{wasm.ValueTypeI32},
 			}
@@ -1692,8 +1691,8 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				expectedValue += addTargetValue
 
 				compiler := env.requireNewCompiler(t)
-				compiler.f = &internalwasm.FunctionInstance{FunctionType: &internalwasm.TypeInstance{Type: targetFunctionType},
-					ModuleInstance: &internalwasm.ModuleInstance{}}
+				compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType},
+					ModuleInstance: &wasm.ModuleInstance{}}
 
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
@@ -1707,7 +1706,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
-				engine.addCompiledFunction(internalwasm.FunctionAddress(i), &compiledFunction{
+				engine.addCompiledFunction(wasm.FunctionAddress(i), &compiledFunction{
 					codeSegment:        code,
 					codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 				})
@@ -1727,7 +1726,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 			// Call all the built functions.
 			for i := 0; i < numCalls; i++ {
-				err = compiler.compileCallImpl(internalwasm.FunctionAddress(i), targetFunctionType)
+				err = compiler.compileCallImpl(wasm.FunctionAddress(i), targetFunctionType)
 				require.NoError(t, err)
 			}
 
@@ -1869,40 +1868,40 @@ func TestArm64Compiler_compileSwap(t *testing.T) {
 func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
-		moduleInstance *internalwasm.ModuleInstance
+		moduleInstance *wasm.ModuleInstance
 	}{
 		{
 			name: "no nil",
-			moduleInstance: &internalwasm.ModuleInstance{
-				Globals: []*internalwasm.GlobalInstance{{Val: 100}},
-				Memory:  &internalwasm.MemoryInstance{Buffer: make([]byte, 10)},
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				// TODO: Add  table
 			},
 		},
 		{
 			name: "globals nil",
-			moduleInstance: &internalwasm.ModuleInstance{
-				Memory: &internalwasm.MemoryInstance{Buffer: make([]byte, 10)},
+			moduleInstance: &wasm.ModuleInstance{
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				// TODO: Add  table
 			},
 		},
 		{
 			name: "memory nil",
-			moduleInstance: &internalwasm.ModuleInstance{
-				Globals: []*internalwasm.GlobalInstance{{Val: 100}},
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				// TODO: Add  table
 			},
 		},
 		{
 			name: "memory zero length",
-			moduleInstance: &internalwasm.ModuleInstance{
-				Globals: []*internalwasm.GlobalInstance{{Val: 100}},
-				Memory:  &internalwasm.MemoryInstance{Buffer: make([]byte, 0)},
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
 		{
 			name:           "nil",
-			moduleInstance: &internalwasm.ModuleInstance{},
+			moduleInstance: &wasm.ModuleInstance{},
 		},
 	} {
 		tc := tc
@@ -1965,7 +1964,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-			globals := []*internalwasm.GlobalInstance{nil, {Val: globalValue, Type: &internalwasm.GlobalType{ValType: tp}}}
+			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}}
 			env.addGlobals(globals...)
 
 			// Emit the code.
@@ -2017,7 +2016,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-			env.addGlobals(nil, &internalwasm.GlobalInstance{Val: 40, Type: &internalwasm.GlobalType{ValType: tp}})
+			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -2059,7 +2058,7 @@ func TestArm64Compiler_compileMemoryAccessOffsetSetup(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
 	offsets := []uint32{
 		0, 1 << 10, 1 << 31,
-		defaultMemoryPageNumInTest*internalwasm.MemoryPageSize - 1, defaultMemoryPageNumInTest * internalwasm.MemoryPageSize,
+		defaultMemoryPageNumInTest*wasm.MemoryPageSize - 1, defaultMemoryPageNumInTest * wasm.MemoryPageSize,
 		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
 		math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9, math.MaxInt32, math.MaxUint32,
 	}
@@ -2591,7 +2590,7 @@ func TestArm64Compiler_compileHostFunction(t *testing.T) {
 	// TODO: delete after #233
 	compiler.compileNOP()
 
-	addr := internalwasm.FunctionAddress(100)
+	addr := wasm.FunctionAddress(100)
 	err := compiler.compileHostFunction(addr)
 	require.NoError(t, err)
 

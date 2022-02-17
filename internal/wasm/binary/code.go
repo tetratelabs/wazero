@@ -6,11 +6,10 @@ import (
 	"math"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeCode(r io.Reader) (*internalwasm.Code, error) {
+func decodeCode(r io.Reader) (*wasm.Code, error) {
 	ss, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get the size of code: %w", err)
@@ -65,17 +64,17 @@ func decodeCode(r io.Reader) (*internalwasm.Code, error) {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
 
-	if body[len(body)-1] != internalwasm.OpcodeEnd {
+	if body[len(body)-1] != wasm.OpcodeEnd {
 		return nil, fmt.Errorf("expr not end with OpcodeEnd")
 	}
 
-	return &internalwasm.Code{Body: body, LocalTypes: localTypes}, nil
+	return &wasm.Code{Body: body, LocalTypes: localTypes}, nil
 }
 
 // encodeCode returns the wasm.Code encoded in WebAssembly 1.0 (MVP) Binary Format.
 //
 // See https://www.w3.org/TR/wasm-core-1/#binary-code
-func encodeCode(c *internalwasm.Code) []byte {
+func encodeCode(c *wasm.Code) []byte {
 	// local blocks compress locals while preserving index order by grouping locals of the same type.
 	// https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
 	localBlockCount := uint32(0) // how many blocks of locals with the same type (types can repeat!)

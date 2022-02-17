@@ -7,7 +7,7 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/tetratelabs/wazero/wasm"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 type HostFunction struct {
@@ -26,7 +26,7 @@ func GetFunctionType(name string, fn *reflect.Value) (*FunctionType, error) {
 		return nil, fmt.Errorf("%s must accept wasm.HostFunctionCallContext as the first param", name)
 	}
 
-	paramTypes := make([]wasm.ValueType, p.NumIn()-1)
+	paramTypes := make([]ValueType, p.NumIn()-1)
 	for i := range paramTypes {
 		kind := p.In(i + 1).Kind()
 		if t, ok := getTypeOf(kind); !ok {
@@ -36,7 +36,7 @@ func GetFunctionType(name string, fn *reflect.Value) (*FunctionType, error) {
 		}
 	}
 
-	resultTypes := make([]wasm.ValueType, p.NumOut())
+	resultTypes := make([]ValueType, p.NumOut())
 	for i := range resultTypes {
 		kind := p.Out(i).Kind()
 		if t, ok := getTypeOf(kind); !ok {
@@ -48,23 +48,23 @@ func GetFunctionType(name string, fn *reflect.Value) (*FunctionType, error) {
 	return &FunctionType{Params: paramTypes, Results: resultTypes}, nil
 }
 
-func getTypeOf(kind reflect.Kind) (wasm.ValueType, bool) {
+func getTypeOf(kind reflect.Kind) (ValueType, bool) {
 	switch kind {
 	case reflect.Float64:
-		return wasm.ValueTypeF64, true
+		return ValueTypeF64, true
 	case reflect.Float32:
-		return wasm.ValueTypeF32, true
+		return ValueTypeF32, true
 	case reflect.Int32, reflect.Uint32:
-		return wasm.ValueTypeI32, true
+		return ValueTypeI32, true
 	case reflect.Int64, reflect.Uint64:
-		return wasm.ValueTypeI64, true
+		return ValueTypeI64, true
 	default:
 		return 0x00, false
 	}
 }
 
-// compile time check to ensure HostFunctionCallContext implements wasm.HostFunctionCallContext
-var _ wasm.HostFunctionCallContext = &HostFunctionCallContext{}
+// compile time check to ensure HostFunctionCallContext implements publicwasm.HostFunctionCallContext
+var _ publicwasm.HostFunctionCallContext = &HostFunctionCallContext{}
 
 func NewHostFunctionCallContext(s *Store, instance *ModuleInstance) *HostFunctionCallContext {
 	return &HostFunctionCallContext{
@@ -80,7 +80,7 @@ type HostFunctionCallContext struct {
 	// ctx is exposed as wasm.HostFunctionCallContext Context
 	ctx context.Context
 	// memory is exposed as wasm.HostFunctionCallContext Memory
-	memory wasm.Memory
+	memory publicwasm.Memory
 	// module is the current module
 	module *ModuleInstance
 	// store is a reference to Store.Engine and Store.HostFunctionCallContexts
@@ -110,17 +110,17 @@ func (c *HostFunctionCallContext) Context() context.Context {
 }
 
 // Memory implements wasm.Module Memory
-func (c *HostFunctionCallContext) Memory() wasm.Memory {
+func (c *HostFunctionCallContext) Memory() publicwasm.Memory {
 	return c.memory
 }
 
 // Functions implements wasm.HostFunctionCallContext Functions
-func (c *HostFunctionCallContext) Functions() wasm.ModuleFunctions {
+func (c *HostFunctionCallContext) Functions() publicwasm.ModuleFunctions {
 	return c
 }
 
 // FunctionsForModule implements wasm.HostFunctionCallContext FunctionsForModule
-func (c *HostFunctionCallContext) FunctionsForModule(moduleName string) (wasm.ModuleFunctions, bool) {
+func (c *HostFunctionCallContext) FunctionsForModule(moduleName string) (publicwasm.ModuleFunctions, bool) {
 	c, ok := c.store.HostFunctionCallContexts[moduleName]
 	if !ok {
 		return nil, false
@@ -128,7 +128,7 @@ func (c *HostFunctionCallContext) FunctionsForModule(moduleName string) (wasm.Mo
 	return c, true
 }
 
-func (c *HostFunctionCallContext) GetFunctionVoidReturn(name string) (wasm.FunctionVoidReturn, bool) {
+func (c *HostFunctionCallContext) GetFunctionVoidReturn(name string) (publicwasm.FunctionVoidReturn, bool) {
 	f, err := c.module.GetFunctionVoidReturn(name)
 	if err != nil {
 		return nil, false
@@ -136,32 +136,32 @@ func (c *HostFunctionCallContext) GetFunctionVoidReturn(name string) (wasm.Funct
 	return (&functionVoidReturn{c: c, f: f}).Call, true
 }
 
-func (c *HostFunctionCallContext) GetFunctionI32Return(name string) (wasm.FunctionI32Return, bool) {
-	f, err := c.module.GetFunction(name, wasm.ValueTypeI32)
+func (c *HostFunctionCallContext) GetFunctionI32Return(name string) (publicwasm.FunctionI32Return, bool) {
+	f, err := c.module.GetFunction(name, ValueTypeI32)
 	if err != nil {
 		return nil, false
 	}
 	return (&functionI32Return{c: c, f: f}).Call, true
 }
 
-func (c *HostFunctionCallContext) GetFunctionI64Return(name string) (wasm.FunctionI64Return, bool) {
-	f, err := c.module.GetFunction(name, wasm.ValueTypeI64)
+func (c *HostFunctionCallContext) GetFunctionI64Return(name string) (publicwasm.FunctionI64Return, bool) {
+	f, err := c.module.GetFunction(name, ValueTypeI64)
 	if err != nil {
 		return nil, false
 	}
 	return (&functionI64Return{c: c, f: f}).Call, true
 }
 
-func (c *HostFunctionCallContext) GetFunctionF32Return(name string) (wasm.FunctionF32Return, bool) {
-	f, err := c.module.GetFunction(name, wasm.ValueTypeF32)
+func (c *HostFunctionCallContext) GetFunctionF32Return(name string) (publicwasm.FunctionF32Return, bool) {
+	f, err := c.module.GetFunction(name, ValueTypeF32)
 	if err != nil {
 		return nil, false
 	}
 	return (&functionF32Return{c: c, f: f}).Call, true
 }
 
-func (c *HostFunctionCallContext) GetFunctionF64Return(name string) (wasm.FunctionF64Return, bool) {
-	f, err := c.module.GetFunction(name, wasm.ValueTypeF64)
+func (c *HostFunctionCallContext) GetFunctionF64Return(name string) (publicwasm.FunctionF64Return, bool) {
+	f, err := c.module.GetFunction(name, ValueTypeF64)
 	if err != nil {
 		return nil, false
 	}

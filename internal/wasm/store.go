@@ -10,7 +10,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 type (
@@ -92,7 +91,7 @@ type (
 	//
 	// See https://www.w3.org/TR/wasm-core-1/#syntax-exportinst
 	ExportInstance struct {
-		Kind     wasm.ExportKind
+		Kind     ExportKind
 		Function *FunctionInstance
 		Global   *GlobalInstance
 		Memory   *MemoryInstance
@@ -109,7 +108,7 @@ type (
 		// FunctionType holds the pointer to TypeInstance whose functionType field equals that of this function.
 		FunctionType *TypeInstance
 		// LocalTypes holds types of locals.
-		LocalTypes []wasm.ValueType
+		LocalTypes []ValueType
 		// HostFunction holds the runtime representation of host functions.
 		// If this is not nil, all the above fields are ignored as they are specific to non-host functions.
 		HostFunction *reflect.Value
@@ -215,19 +214,19 @@ func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
 }
 
 // GetExport returns an export of the given name and kind or errs if not exported or the wrong kind.
-func (m *ModuleInstance) GetExport(name string, kind wasm.ExportKind) (*ExportInstance, error) {
+func (m *ModuleInstance) GetExport(name string, kind ExportKind) (*ExportInstance, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
 		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
 	}
 	if exp.Kind != kind {
-		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, wasm.ExportKindName(exp.Kind), wasm.ExportKindName(kind))
+		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExportKindName(exp.Kind), ExportKindName(kind))
 	}
 	return exp, nil
 }
 
 func (m *ModuleInstance) GetFunctionVoidReturn(name string) (*FunctionInstance, error) {
-	exp, err := m.GetExport(name, wasm.ExportKindFunc)
+	exp, err := m.GetExport(name, ExportKindFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -238,14 +237,14 @@ func (m *ModuleInstance) GetFunctionVoidReturn(name string) (*FunctionInstance, 
 	return exp.Function, nil
 }
 
-func (m *ModuleInstance) GetFunction(name string, rv wasm.ValueType) (*FunctionInstance, error) {
-	exp, err := m.GetExport(name, wasm.ExportKindFunc)
+func (m *ModuleInstance) GetFunction(name string, rv ValueType) (*FunctionInstance, error) {
+	exp, err := m.GetExport(name, ExportKindFunc)
 	if err != nil {
 		return nil, err
 	}
 	funcType := exp.Function.FunctionType.Type
 	if len(funcType.Results) != 1 || funcType.Results[0] != rv {
-		return nil, fmt.Errorf("%s is not a %s return function", name, wasm.ValueTypeName(rv))
+		return nil, fmt.Errorf("%s is not a %s return function", name, ValueTypeName(rv))
 	}
 	return exp.Function, nil
 }
@@ -331,7 +330,7 @@ func (s *Store) Instantiate(module *Module, name string) (*HostFunctionCallConte
 
 	for i, f := range instance.Functions {
 		if err := s.Engine.Compile(f); err != nil {
-			idx := module.SectionElementCount(wasm.SectionIDFunction) - 1
+			idx := module.SectionElementCount(SectionIDFunction) - 1
 			return nil, fmt.Errorf("compilation failed at index %d/%d: %v", i, idx, err)
 		}
 	}
@@ -361,9 +360,9 @@ func (s *Store) Instantiate(module *Module, name string) (*HostFunctionCallConte
 // Note: The ctx parameter will be the outer-most ancestor of wasm.HostFunctionCallContext Context.
 // ctx will default to context.Background() is nil is passed.
 // Note: this API is unstable. See tetratelabs/wazero#170
-func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []wasm.ValueType, err error) {
+func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
 	var exp *ExportInstance
-	if exp, err = s.getExport(moduleName, funcName, wasm.ExportKindFunc); err != nil {
+	if exp, err = s.getExport(moduleName, funcName, ExportKindFunc); err != nil {
 		return
 	}
 
@@ -379,7 +378,7 @@ func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, p
 	return
 }
 
-func (s *Store) getExport(moduleName string, name string, kind wasm.ExportKind) (exp *ExportInstance, err error) {
+func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp *ExportInstance, err error) {
 	if m, ok := s.ModuleInstances[moduleName]; !ok {
 		return nil, fmt.Errorf("module %s not instantiated", moduleName)
 	} else if exp, err = m.GetExport(name, kind); err != nil {
@@ -414,19 +413,19 @@ func (s *Store) resolveImport(target *ModuleInstance, is *Import) error {
 	}
 
 	switch is.Kind {
-	case wasm.ImportKindFunc:
+	case ImportKindFunc:
 		if err = s.applyFunctionImport(target, is.DescFunc, exp); err != nil {
 			return fmt.Errorf("applyFunctionImport: %w", err)
 		}
-	case wasm.ImportKindTable:
+	case ImportKindTable:
 		if err = s.applyTableImport(target, is.DescTable, exp); err != nil {
 			return fmt.Errorf("applyTableImport: %w", err)
 		}
-	case wasm.ImportKindMemory:
+	case ImportKindMemory:
 		if err = s.applyMemoryImport(target, is.DescMem, exp); err != nil {
 			return fmt.Errorf("applyMemoryImport: %w", err)
 		}
-	case wasm.ImportKindGlobal:
+	case ImportKindGlobal:
 		if err = s.applyGlobalImport(target, is.DescGlobal, exp); err != nil {
 			return fmt.Errorf("applyGlobalImport: %w", err)
 		}
@@ -511,7 +510,7 @@ func (s *Store) applyGlobalImport(target *ModuleInstance, globalTypePtr *GlobalT
 	return nil
 }
 
-func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}, valueType wasm.ValueType, err error) {
+func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}, valueType ValueType, err error) {
 	r := bytes.NewBuffer(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
@@ -519,25 +518,25 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read i32: %w", err)
 		}
-		return v, wasm.ValueTypeI32, nil
+		return v, ValueTypeI32, nil
 	case OpcodeI64Const:
 		v, _, err = leb128.DecodeInt64(r)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read i64: %w", err)
 		}
-		return v, wasm.ValueTypeI64, nil
+		return v, ValueTypeI64, nil
 	case OpcodeF32Const:
 		v, err = ieee754.DecodeFloat32(r)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read f32: %w", err)
 		}
-		return v, wasm.ValueTypeF32, nil
+		return v, ValueTypeF32, nil
 	case OpcodeF64Const:
 		v, err = ieee754.DecodeFloat64(r)
 		if err != nil {
 			return nil, 0, fmt.Errorf("read f64: %w", err)
 		}
-		return v, wasm.ValueTypeF64, nil
+		return v, ValueTypeF64, nil
 	case OpcodeGlobalGet:
 		id, _, err := leb128.DecodeUint32(r)
 		if err != nil {
@@ -548,18 +547,18 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 		}
 		g := globals[id]
 		switch g.Type.ValType {
-		case wasm.ValueTypeI32:
+		case ValueTypeI32:
 			v = int32(g.Val)
-			return v, wasm.ValueTypeI32, nil
-		case wasm.ValueTypeI64:
+			return v, ValueTypeI32, nil
+		case ValueTypeI64:
 			v = int64(g.Val)
-			return v, wasm.ValueTypeI64, nil
-		case wasm.ValueTypeF32:
+			return v, ValueTypeI64, nil
+		case ValueTypeF32:
 			v = math.Float32frombits(uint32(g.Val))
-			return v, wasm.ValueTypeF32, nil
-		case wasm.ValueTypeF64:
+			return v, ValueTypeF32, nil
+		case ValueTypeF64:
 			v = math.Float64frombits(g.Val)
-			return v, wasm.ValueTypeF64, nil
+			return v, ValueTypeF64, nil
 		}
 	}
 	return nil, 0, fmt.Errorf("invalid opt code: %#x", expr.Opcode)
@@ -574,7 +573,7 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (ro
 	// We limit the number of globals in a moudle to 2^27.
 	globalDecls := len(module.GlobalSection)
 	for _, imp := range module.ImportSection {
-		if imp.Kind == wasm.ImportKindGlobal {
+		if imp.Kind == ImportKindGlobal {
 			globalDecls++
 		}
 	}
@@ -627,9 +626,9 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 	n, nLen := 0, len(functionNames)
 
 	for codeIndex, typeIndex := range module.FunctionSection {
-		if typeIndex >= module.SectionElementCount(wasm.SectionIDType) {
+		if typeIndex >= module.SectionElementCount(SectionIDType) {
 			return rollbackFuncs, fmt.Errorf("function type index out of range")
-		} else if uint32(codeIndex) >= module.SectionElementCount(wasm.SectionIDCode) {
+		} else if uint32(codeIndex) >= module.SectionElementCount(SectionIDCode) {
 			return rollbackFuncs, fmt.Errorf("code index out of range")
 		}
 
@@ -660,7 +659,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 		}
 
 		if err := validateFunctionInstance(f, funcs, globals, mems, tables, module.TypeSection, maximumValuesOnStack); err != nil {
-			idx := module.SectionElementCount(wasm.SectionIDFunction) - 1
+			idx := module.SectionElementCount(SectionIDFunction) - 1
 			return rollbackFuncs, fmt.Errorf("invalid function '%s' (%d/%d): %v", f.Name, codeIndex, idx, err)
 		}
 
@@ -700,7 +699,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 		rawOffset, offsetType, err := executeConstExpression(target.Globals, d.OffsetExpression)
 		if err != nil {
 			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
-		} else if offsetType != wasm.ValueTypeI32 {
+		} else if offsetType != ValueTypeI32 {
 			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
 		}
 
@@ -713,7 +712,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 
 		size := uint64(offset) + uint64(len(d.Init))
 		maxPage := MemoryMaxPages
-		if d.MemoryIndex < module.SectionElementCount(wasm.SectionIDMemory) && module.MemorySection[d.MemoryIndex].Max != nil {
+		if d.MemoryIndex < module.SectionElementCount(SectionIDMemory) && module.MemorySection[d.MemoryIndex].Max != nil {
 			maxPage = *module.MemorySection[d.MemoryIndex].Max
 		}
 		if size > memoryPagesToBytesNum(maxPage) {
@@ -751,7 +750,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 		rawOffset, offsetType, err := executeConstExpression(target.Globals, elem.OffsetExpr)
 		if err != nil {
 			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
-		} else if offsetType != wasm.ValueTypeI32 {
+		} else if offsetType != ValueTypeI32 {
 			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
 		}
 
@@ -766,7 +765,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 		size := offset + len(elem.Init)
 
 		max := uint32(math.MaxUint32)
-		if elem.TableIndex < module.SectionElementCount(wasm.SectionIDTable) && module.TableSection[elem.TableIndex].Limit.Max != nil {
+		if elem.TableIndex < module.SectionElementCount(SectionIDTable) && module.TableSection[elem.TableIndex].Limit.Max != nil {
 			max = *module.TableSection[elem.TableIndex].Limit.Max
 		}
 
@@ -804,12 +803,12 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 }
 
 func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	target.Exports = make(map[string]*ExportInstance, module.SectionElementCount(wasm.SectionIDExport))
+	target.Exports = make(map[string]*ExportInstance, module.SectionElementCount(SectionIDExport))
 	for name, exp := range module.ExportSection {
 		index := exp.Index
 		var ei *ExportInstance
 		switch exp.Kind {
-		case wasm.ExportKindFunc:
+		case ExportKindFunc:
 			if index >= uint32(len(target.Functions)) {
 				return nil, fmt.Errorf("unknown function for export[%s]", name)
 			}
@@ -820,17 +819,17 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			if ei.Function.HostFunction != nil {
 				ei.Function.ModuleInstance = target
 			}
-		case wasm.ExportKindGlobal:
+		case ExportKindGlobal:
 			if index >= uint32(len(target.Globals)) {
 				return nil, fmt.Errorf("unknown global for export[%s]", name)
 			}
 			ei = &ExportInstance{Kind: exp.Kind, Global: target.Globals[index]}
-		case wasm.ExportKindMemory:
+		case ExportKindMemory:
 			if index != 0 || target.Memory == nil {
 				return nil, fmt.Errorf("unknown memory for export[%s]", name)
 			}
 			ei = &ExportInstance{Kind: exp.Kind, Memory: target.Memory}
-		case wasm.ExportKindTable:
+		case ExportKindTable:
 			if index >= uint32(len(target.Tables)) {
 				return nil, fmt.Errorf("unknown table for export[%s]", name)
 			}
@@ -855,13 +854,13 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 	case -64: // 0x40 in original byte = nil
 		ret = &FunctionType{}
 	case -1: // 0x7f in original byte = i32
-		ret = &FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI32}}
 	case -2: // 0x7e in original byte = i64
-		ret = &FunctionType{Results: []wasm.ValueType{wasm.ValueTypeI64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeI64}}
 	case -3: // 0x7d in original byte = f32
-		ret = &FunctionType{Results: []wasm.ValueType{wasm.ValueTypeF32}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
 	case -4: // 0x7c in original byte = f64
-		ret = &FunctionType{Results: []wasm.ValueType{wasm.ValueTypeF64}}
+		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
 	default:
 		if raw < 0 || (raw >= int64(len(types))) {
 			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
@@ -898,7 +897,7 @@ func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
 	}
 	// TODO: This races on adding export. A future design may be able to eliminate this race, possibly via a HostModule
 	// type.
-	if err = m.addExport(hf.Name, &ExportInstance{Kind: wasm.ExportKindFunc, Function: f}); err != nil {
+	if err = m.addExport(hf.Name, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
 		s.Functions = s.Functions[:len(s.Functions)-1] // lost race: revert the add on conflict
 		return err
 	}
@@ -917,7 +916,7 @@ func NewHostFunction(funcName string, goFunc interface{}) (*HostFunction, error)
 	return hf, nil
 }
 
-func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType wasm.ValueType, mutable bool) error {
+func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType ValueType, mutable bool) error {
 	g := &GlobalInstance{
 		Val:  value,
 		Type: &GlobalType{Mutable: mutable, ValType: valueType},
@@ -925,7 +924,7 @@ func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType wasm.
 	s.Globals = append(s.Globals, g)
 
 	m := s.getModuleInstance(moduleName)
-	return m.addExport(name, &ExportInstance{Kind: wasm.ExportKindGlobal, Global: g})
+	return m.addExport(name, &ExportInstance{Kind: ExportKindGlobal, Global: g})
 }
 
 func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint32) error {
@@ -933,7 +932,7 @@ func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint3
 	s.Tables = append(s.Tables, t)
 
 	m := s.getModuleInstance(moduleName)
-	return m.addExport(name, &ExportInstance{Kind: wasm.ExportKindTable, Table: t})
+	return m.addExport(name, &ExportInstance{Kind: ExportKindTable, Table: t})
 }
 
 func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint32) error {
@@ -944,7 +943,7 @@ func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint
 	}
 	s.Memories = append(s.Memories, memory)
 	m := s.getModuleInstance(moduleName)
-	return m.addExport(name, &ExportInstance{Kind: wasm.ExportKindMemory, Memory: memory})
+	return m.addExport(name, &ExportInstance{Kind: ExportKindMemory, Memory: memory})
 }
 
 func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {

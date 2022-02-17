@@ -6,8 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
 func TestMemorySection(t *testing.T) {
@@ -15,7 +14,7 @@ func TestMemorySection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected []*internalwasm.MemoryType
+		expected []*wasm.MemoryType
 	}{
 		{
 			name: "min and min with max",
@@ -24,7 +23,7 @@ func TestMemorySection(t *testing.T) {
 				0x00, 1, // (memory 1)
 				0x01, 2, 3, // (memory 2, 3)
 			},
-			expected: []*internalwasm.MemoryType{{Min: 1}, {Min: 2, Max: &three}},
+			expected: []*wasm.MemoryType{{Min: 1}, {Min: 2, Max: &three}},
 		},
 	}
 
@@ -43,7 +42,7 @@ func TestDecodeExportSection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected map[string]*internalwasm.Export
+		expected map[string]*wasm.Export
 	}{
 		{
 			name: "empty and non-empty name",
@@ -54,9 +53,9 @@ func TestDecodeExportSection(t *testing.T) {
 				0x01, 'a', // Size of name, name
 				wasm.ExportKindFunc, 0x01, // func[1]
 			},
-			expected: map[string]*internalwasm.Export{
-				"":  {Name: "", Kind: wasm.ExportKindFunc, Index: internalwasm.Index(2)},
-				"a": {Name: "a", Kind: wasm.ExportKindFunc, Index: internalwasm.Index(1)},
+			expected: map[string]*wasm.Export{
+				"":  {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(2)},
+				"a": {Name: "a", Kind: wasm.ExportKindFunc, Index: wasm.Index(1)},
 			},
 		},
 	}
@@ -113,7 +112,7 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 }
 
 func TestEncodeFunctionSection(t *testing.T) {
-	require.Equal(t, []byte{wasm.SectionIDFunction, 0x2, 0x01, 0x05}, encodeFunctionSection([]internalwasm.Index{5}))
+	require.Equal(t, []byte{wasm.SectionIDFunction, 0x2, 0x01, 0x05}, encodeFunctionSection([]wasm.Index{5}))
 }
 
 // TestEncodeStartSection uses the same index as TestEncodeFunctionSection to highlight the encoding is different.

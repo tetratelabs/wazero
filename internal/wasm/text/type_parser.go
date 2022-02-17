@@ -6,7 +6,6 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func newTypeParser(typeNamespace *indexNamespace, onType onType) *typeParser {
@@ -245,7 +244,7 @@ func (p *typeParser) parseResult(tok tokenType, tokenBytes []byte, _, _ uint32) 
 	}
 }
 
-func parseResultType(tokenBytes []byte) ([]wasm2.ValueType, error) {
+func parseResultType(tokenBytes []byte) ([]wasm.ValueType, error) {
 	vt, err := parseValueType(tokenBytes)
 	if err != nil {
 		return nil, err
@@ -265,17 +264,17 @@ func (p *typeParser) errorContext() string {
 	return ""
 }
 
-func parseValueType(tokenBytes []byte) (wasm2.ValueType, error) {
+func parseValueType(tokenBytes []byte) (wasm.ValueType, error) {
 	t := string(tokenBytes)
 	switch t {
 	case "i32":
-		return wasm2.ValueTypeI32, nil
+		return wasm.ValueTypeI32, nil
 	case "i64":
-		return wasm2.ValueTypeI64, nil
+		return wasm.ValueTypeI64, nil
 	case "f32":
-		return wasm2.ValueTypeF32, nil
+		return wasm.ValueTypeF32, nil
 	case "f64":
-		return wasm2.ValueTypeF64, nil
+		return wasm.ValueTypeF64, nil
 	default:
 		return 0, fmt.Errorf("unknown type: %s", t)
 	}

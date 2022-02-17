@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 func TestJIT(t *testing.T) {
@@ -117,7 +117,7 @@ func fac(t *testing.T, newEngine func() *wazero.Engine) {
 	fac, ok := m.GetFunctionI64Return("fac-rec")
 	require.True(t, ok)
 	_, err = fac(ctx, 1073741824)
-	require.ErrorIs(t, err, internalwasm.ErrRuntimeCallStackOverflow)
+	require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow)
 }
 
 func unreachable(t *testing.T, newEngine func() *wazero.Engine) {
@@ -125,7 +125,7 @@ func unreachable(t *testing.T, newEngine func() *wazero.Engine) {
 	mod, err := wazero.DecodeModuleBinary(unreachableWasm)
 	require.NoError(t, err)
 
-	callUnreachable := func(ctx wasm.HostFunctionCallContext) {
+	callUnreachable := func(ctx publicwasm.HostFunctionCallContext) {
 		fn, ok := ctx.Functions().GetFunctionVoidReturn("unreachable_func")
 		require.True(t, ok)
 		require.NoError(t, fn(ctx.Context()))
@@ -153,7 +153,7 @@ wasm backtrace:
 	2: two
 	3: one
 	4: main`
-	require.ErrorIs(t, err, internalwasm.ErrRuntimeUnreachable)
+	require.ErrorIs(t, err, wasm.ErrRuntimeUnreachable)
 	require.Equal(t, exp, err.Error())
 }
 
@@ -199,7 +199,7 @@ func recursiveEntry(t *testing.T, newEngine func() *wazero.Engine) {
 	mod, err := wazero.DecodeModuleBinary(recursiveWasm)
 	require.NoError(t, err)
 
-	hostfunc := func(ctx wasm.HostFunctionCallContext) {
+	hostfunc := func(ctx publicwasm.HostFunctionCallContext) {
 		fn, ok := ctx.Functions().GetFunctionI32Return("called_by_host_func")
 		require.True(t, ok)
 		_, err := fn(ctx.Context())
@@ -239,13 +239,13 @@ func importedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) {
 		)`))
 	require.NoError(t, err)
 
-	var memory *internalwasm.MemoryInstance
-	storeInt := func(ctx wasm.HostFunctionCallContext, offset uint32, val uint64) uint32 {
+	var memory *wasm.MemoryInstance
+	storeInt := func(ctx publicwasm.HostFunctionCallContext, offset uint32, val uint64) uint32 {
 		if !ctx.Memory().WriteUint64Le(offset, val) {
 			return 1
 		}
 		// sneak a reference to the memory so we can check it later
-		memory = ctx.Memory().(*internalwasm.MemoryInstance)
+		memory = ctx.Memory().(*wasm.MemoryInstance)
 		return 0
 	}
 
@@ -296,10 +296,10 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() *wazero.Engine) {
 	require.NoError(t, err)
 
 	hostFuncs, err := wazero.NewHostFunctions(map[string]interface{}{
-		"identity_f32": func(ctx wasm.HostFunctionCallContext, value float32) float32 {
+		"identity_f32": func(ctx publicwasm.HostFunctionCallContext, value float32) float32 {
 			return value
 		},
-		"identity_f64": func(ctx wasm.HostFunctionCallContext, value float64) float64 {
+		"identity_f64": func(ctx publicwasm.HostFunctionCallContext, value float64) float64 {
 			return value
 		}})
 	require.NoError(t, err)

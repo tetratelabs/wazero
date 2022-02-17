@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func TestIndexNamespace_SetId(t *testing.T) {
@@ -75,7 +74,7 @@ func TestIndexNamespace_Resolve(t *testing.T) {
 	} {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			ui := &unresolvedIndex{section: wasm2.SectionIDFunction, idx: 1, targetID: tc.id, targetIdx: tc.numeric, line: 3, col: 4}
+			ui := &unresolvedIndex{section: wasm.SectionIDFunction, idx: 1, targetID: tc.id, targetIdx: tc.numeric, line: 3, col: 4}
 			index, err := tc.namespace.resolve(ui)
 			if tc.expectedErr == "" {
 				require.NoError(t, err)
@@ -114,15 +113,15 @@ func TestIndexNamespace_RequireIndex(t *testing.T) {
 
 func TestUnresolvedIndex_FormatError(t *testing.T) {
 	for _, tt := range []struct {
-		section     wasm2.SectionID
+		section     wasm.SectionID
 		expectedErr string
 	}{
-		{section: wasm2.SectionIDCode, expectedErr: "3:4: bomb in module.code[1].body[2]"},
-		{section: wasm2.SectionIDExport, expectedErr: "3:4: bomb in module.exports[1].func"},
-		{section: wasm2.SectionIDStart, expectedErr: "3:4: bomb in module.start"},
+		{section: wasm.SectionIDCode, expectedErr: "3:4: bomb in module.code[1].body[2]"},
+		{section: wasm.SectionIDExport, expectedErr: "3:4: bomb in module.exports[1].func"},
+		{section: wasm.SectionIDStart, expectedErr: "3:4: bomb in module.start"},
 	} {
 		tc := tt
-		t.Run(wasm2.SectionIDName(tc.section), func(t *testing.T) {
+		t.Run(wasm.SectionIDName(tc.section), func(t *testing.T) {
 			ui := &unresolvedIndex{section: tc.section, idx: 1, bodyOffset: 2, targetID: "X", targetIdx: 2, line: 3, col: 4}
 			require.EqualError(t, ui.formatErr(errors.New("bomb")), tc.expectedErr)
 		})
