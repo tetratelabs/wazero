@@ -2661,7 +2661,7 @@ func TestArm64Compiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 							require.NoError(t, err)
 							env.exec(code)
 
-							// One value must be pushed as aresult.
+							// One value must be pushed as a result.
 							require.Equal(t, uint64(1), env.stackPointer())
 
 							switch kind {
@@ -2716,6 +2716,7 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
 						{0x80000000, 0xffffffff},                 // This is equivalent to (-2^31 / -1) and results in overflow for 32-bit signed div.
 						{0x8000000000000000, 0xffffffffffffffff}, // This is equivalent to (-2^63 / -1) and results in overflow for 64-bit signed div.
+						{0xffffffff /* -1 in signed 32bit */, 0xfffffffe /* -2 in signed 32bit */},
 						{0xffffffffffffffff /* -1 in signed 64bit */, 0xfffffffffffffffe /* -2 in signed 64bit */},
 						{1, 0xffff_ffff_ffff_ffff},
 						{math.Float64bits(1.11231), math.Float64bits(12312312.12312)},
