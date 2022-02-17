@@ -1556,7 +1556,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
 	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
 
-	// Othewise, we proceed.
+	// Otherwise, we proceed.
 	c.setBranchTargetOnNext(brIfDivisorNonZero)
 
 	// If the operation is a signed integer div, we have to do an additional check on overflow.
@@ -1599,9 +1599,6 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	dividendReg := dividend.register
 	divisorReg := divisor.register
 
-	fmt.Println("dividend: ", dividendReg)
-	fmt.Println("divisor: ", divisorReg)
-
 	// If the divisor is on the zero register, exit from the function deterministically.
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
@@ -1610,80 +1607,56 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 		return nil
 	}
 
-	var divInst obj.As
-	var msubInst obj.As
+	var divInst, msubInst, cmpInst obj.As
 	switch o.Type {
 	case wazeroir.SignedUint32:
-		if err := c.compileIntegerRemPrecheck(true, false, dividendReg, divisorReg); err != nil {
-			return err
-		}
 		divInst = arm64.AUDIVW
 		msubInst = arm64.AMSUBW
+		cmpInst = arm64.ACMPW
 	case wazeroir.SignedUint64:
-		if err := c.compileIntegerRemPrecheck(false, false, dividendReg, divisorReg); err != nil {
-			return err
-		}
 		divInst = arm64.AUDIV
 		msubInst = arm64.AMSUB
+		cmpInst = arm64.ACMP
 	case wazeroir.SignedInt32:
-		if err := c.compileIntegerRemPrecheck(true, false, dividendReg, divisorReg); err != nil {
-			return err
-		}
 		divInst = arm64.ASDIVW
 		msubInst = arm64.AMSUBW
+		cmpInst = arm64.ACMPW
 	case wazeroir.SignedInt64:
-		if err := c.compileIntegerRemPrecheck(false, false, dividendReg, divisorReg); err != nil {
-			return err
-		}
 		divInst = arm64.ASDIV
 		msubInst = arm64.AMSUB
-	}
-
-	c.markRegisterUsed(dividend.register, divisor.register)
-	resultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
-	if err != nil {
-		return err
-	}
-
-	// input: x0=dividend, x1=divisor
-	// udiv x2, x0, x1
-	// msub x3, x2, x1, x0
-	// result: x2=quotient, x3=remainder
-	// https://stackoverflow.com/questions/35351470/obtaining-remainder-using-single-aarch64-instruction
-	c.compileTwoRegistersToRegisterInstruction(divInst, divisorReg, dividendReg, resultReg)
-	c.compileTwoRegistersToTwoRegisterInstruction(msubInst, divisorReg, dividendReg, resultReg, resultReg)
-
-	c.locationStack.pushValueLocationOnRegister(resultReg)
-	c.markRegisterUnused(dividend.register, divisor.register)
-	return nil
-}
-
-func (c *arm64Compiler) compileIntegerRemPrecheck(is32Bit, isSigned bool, dividend, divisor int16) error {
-	// We check the divisor value equals zero.
-	var cmpInst obj.As
-	// var cmpInst, movInst obj.As
-	// var minValueOffsetInEngine int64
-	if is32Bit {
-		cmpInst = arm64.ACMPW
-		// movInst = arm64.AMOVW
-		// minValueOffsetInEngine = engineArchContextMinimum32BitSignedIntOffset
-	} else {
 		cmpInst = arm64.ACMP
-		// movInst = arm64.AMOVD
-		// minValueOffsetInEngine = engineArchContextMinimum64BitSignedIntOffset
 	}
-	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisor)
+
+	// We check the divisor value equals zero.
+	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisorReg)
 
 	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
 	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
 
-	// Othewise, we proceed.
+	// Othrewise, we proceed.
 	c.setBranchTargetOnNext(brIfDivisorNonZero)
 
-	// If the operation is a signed integer div, we have to do an additional check on overflow.
-	if isSigned {
+	// Temporarily mark them used to allocate a result register while keeping these values.
+	c.markRegisterUsed(dividend.register, divisor.register)
+
+	resultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
 	}
+
+	// arm64 doesn't have an instruction for rem, we use calculate it by two instructions: UDIV (SDIV for signed) and MSUB.
+	// This exactly the same code that Clang emits.
+	// [input: x0=dividend, x1=divisor]
+	// >> UDIV x2, x0, x1
+	// >> MSUB x3, x2, x1, x0
+	// [result: x2=quotient, x3=remainder]
+	//
+	c.compileTwoRegistersToRegisterInstruction(divInst, divisorReg, dividendReg, resultReg)
+	c.compileTwoRegistersToTwoRegisterInstruction(msubInst, divisorReg, dividendReg, resultReg, resultReg)
+
+	c.markRegisterUnused(dividend.register, divisor.register)
+	c.locationStack.pushValueLocationOnRegister(resultReg)
 	return nil
 }
 

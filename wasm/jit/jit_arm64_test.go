@@ -2691,21 +2691,20 @@ func TestArm64Compiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 		})
 	}
 }
-
 func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
-		// wazeroir.OperationKindDiv,
+		wazeroir.OperationKindDiv,
 		wazeroir.OperationKindRem,
 	} {
 		kind := kind
 		t.Run(kind.String(), func(t *testing.T) {
 			for _, signedType := range []wazeroir.SignedType{
 				wazeroir.SignedTypeUint32,
-				// wazeroir.SignedTypeUint64,
-				// wazeroir.SignedTypeInt32,
-				// wazeroir.SignedTypeInt64,
-				// wazeroir.SignedTypeFloat32,
-				// wazeroir.SignedTypeFloat64,
+				wazeroir.SignedTypeUint64,
+				wazeroir.SignedTypeInt32,
+				wazeroir.SignedTypeInt64,
+				wazeroir.SignedTypeFloat32,
+				wazeroir.SignedTypeFloat64,
 			} {
 				signedType := signedType
 				t.Run(signedType.String(), func(t *testing.T) {
