@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -15,16 +14,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/interpreter"
-	"github.com/tetratelabs/wazero/wasm/jit"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
+	"github.com/tetratelabs/wazero/internal/wasm/jit"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 //go:embed testdata/*.wasm
 //go:embed testdata/*.json
 var testcases embed.FS
 
+// TODO: complete porting this to wazero API
 type (
 	testbase struct {
 		SourceFile string    `json:"source_filename"`
@@ -168,7 +169,7 @@ func (c command) expectedError() (err error) {
 	case "indirect call type mismatch", "indirect call":
 		err = wasm.ErrRuntimeIndirectCallTypeMismatch
 	case "undefined element", "undefined":
-		err = wasm.ErrRuntimeInvalidTableAcces
+		err = wasm.ErrRuntimeInvalidTableAccess
 	case "integer overflow":
 		err = wasm.ErrRuntimeIntegerOverflow
 	case "invalid conversion to integer":
@@ -179,23 +180,33 @@ func (c command) expectedError() (err error) {
 		err = wasm.ErrRuntimeUnreachable
 	default:
 		if strings.HasPrefix(c.Text, "uninitialized") {
-			err = wasm.ErrRuntimeInvalidTableAcces
+			err = wasm.ErrRuntimeInvalidTableAccess
 		}
 	}
 	return
 }
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
-	for n, v := range map[string]reflect.Value{
-		"print":         reflect.ValueOf(func(wasm.HostFunctionCallContext) {}),
-		"print_i32":     reflect.ValueOf(func(wasm.HostFunctionCallContext, uint32) {}),
-		"print_f32":     reflect.ValueOf(func(wasm.HostFunctionCallContext, float32) {}),
-		"print_i64":     reflect.ValueOf(func(wasm.HostFunctionCallContext, uint64) {}),
-		"print_f64":     reflect.ValueOf(func(wasm.HostFunctionCallContext, float64) {}),
-		"print_i32_f32": reflect.ValueOf(func(wasm.HostFunctionCallContext, uint32, float32) {}),
-		"print_f64_f64": reflect.ValueOf(func(wasm.HostFunctionCallContext, float64, float64) {}),
+	var printV = func(publicwasm.HostFunctionCallContext) {}
+	var printI32 = func(publicwasm.HostFunctionCallContext, uint32) {}
+	var printF32 = func(publicwasm.HostFunctionCallContext, float32) {}
+	var printI64 = func(publicwasm.HostFunctionCallContext, uint64) {}
+	var printF64 = func(publicwasm.HostFunctionCallContext, float64) {}
+	var printI32F32 = func(publicwasm.HostFunctionCallContext, uint32, float32) {}
+	var printF64F64 = func(publicwasm.HostFunctionCallContext, float64, float64) {}
+
+	for n, v := range map[string]interface{}{
+		"print":         printV,
+		"print_i32":     printI32,
+		"print_f32":     printF32,
+		"print_i64":     printI64,
+		"print_f64":     printF64,
+		"print_i32_f32": printI32F32,
+		"print_f64_f64": printF64F64,
 	} {
-		require.NoError(t, store.AddHostFunction("spectest", n, v), "AddHostFunction(%s)", n)
+		fn, err := wasm.NewHostFunction(n, v)
+		require.NoError(t, err)
+		require.NoError(t, store.AddHostFunction("spectest", fn), "AddHostFunction(%s)", n)
 	}
 
 	for _, g := range []struct {
@@ -276,7 +287,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						if lastInstanceName == "" {
 							lastInstanceName = c.Filename
 						}
-						err = store.Instantiate(mod, lastInstanceName)
+						_, err = store.Instantiate(mod, lastInstanceName)
 						require.NoError(t, err)
 					case "register":
 						name := lastInstanceName
@@ -341,7 +352,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
-							err = store.Instantiate(mod, "")
+							_, err = store.Instantiate(mod, "")
 						}
 						require.Error(t, err, msg)
 					case "assert_trap":
@@ -370,7 +381,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
-							err = store.Instantiate(mod, "")
+							_, err = store.Instantiate(mod, "")
 						}
 						require.Error(t, err, msg)
 					case "assert_exhaustion":
@@ -399,7 +410,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
-							err = store.Instantiate(mod, "")
+							_, err = store.Instantiate(mod, "")
 						}
 						require.Error(t, err, msg)
 					case "assert_uninstantiable":
@@ -409,7 +420,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						mod, err := binary.DecodeModule(buf)
 						require.NoError(t, err, msg)
 
-						err = store.Instantiate(mod, "")
+						_, err = store.Instantiate(mod, "")
 						require.Error(t, err, msg)
 					default:
 						t.Fatalf("unsupported command type: %s", c)

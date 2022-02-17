@@ -5,7 +5,6 @@
 package example
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"testing"
@@ -14,11 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wasmerio/wasmer-go/wasmer"
 
-	"github.com/tetratelabs/wazero/wasi"
-	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/interpreter"
-	"github.com/tetratelabs/wazero/wasm/text"
+	"github.com/tetratelabs/wazero"
+	wasi "github.com/tetratelabs/wazero/internal/wasi"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/internal/wasm/text"
+	publicwasi "github.com/tetratelabs/wazero/wasi"
 )
 
 // example holds the latest supported features as described in the comments of exampleText
@@ -105,28 +105,26 @@ func TestExampleUpToDate(t *testing.T) {
 	})
 
 	t.Run("Executable", func(t *testing.T) {
-		// Use the interpreter, as this is a unit test and will run on all archs.
-		store := wasm.NewStore(interpreter.NewEngine())
-
 		// Add WASI to satisfy import tests
-		buf := &bytes.Buffer{} // fake stdio
-		err := wasi.RegisterAPI(store,
-			wasi.Stdin(buf),
-			wasi.Stdout(buf),
-			wasi.Stderr(buf),
-		)
+		store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
+			ModuleToHostFunctions: map[string]*wazero.HostFunctions{
+				publicwasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1(),
+			},
+		})
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
-		m, err := binary.DecodeModule(exampleBinary)
+		mod, err := wazero.DecodeModuleBinary(exampleBinary)
 		require.NoError(t, err)
-		err = store.Instantiate(m, "example")
+		m, err := store.Instantiate(mod)
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		res, _, err := store.CallFunction(ctx, "example", "AddInt", 1, 2)
+		addInt, ok := m.GetFunctionI32Return("AddInt")
+		require.True(t, ok)
+		res, err := addInt(ctx, 1, 2)
 		require.NoError(t, err)
-		require.Equal(t, []uint64{3}, res)
+		require.Equal(t, uint32(3), res)
 	})
 }
 

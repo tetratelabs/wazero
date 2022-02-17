@@ -18,6 +18,7 @@ func allocateBuffer(size uint32) *byte {
 	return &buf[0]
 }
 
+// Note: Export on a function without an implementation is a Wasm import that defaults to the module "env".
 //export get_random_string
 func getRandomStringRaw(retBufPtr **byte, retBufSize *int)
 

@@ -2,19 +2,17 @@ package examples
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/wasi"
-	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
+// filesystemWasm was compiled from TinyGo testdata/file_system.go
 //go:embed testdata/file_system.wasm
 var filesystemWasm []byte
 
@@ -47,22 +45,25 @@ func readFile(fs wasi.FS, path string) ([]byte, error) {
 }
 
 func Test_file_system(t *testing.T) {
-	ctx := context.Background()
-	mod, err := binary.DecodeModule(filesystemWasm)
+	mod, err := wazero.DecodeModuleBinary(filesystemWasm)
 	require.NoError(t, err)
 
-	memFS := wasi.MemFS()
+	memFS := wazero.WASIMemFS()
 	err = writeFile(memFS, "input.txt", []byte("Hello, file system!"))
 	require.NoError(t, err)
 
-	store := wasm.NewStore(interpreter.NewEngine())
-	err = wasi.RegisterAPI(store, wasi.Preopen(".", memFS))
+	// Configure WASI host functions with the memory filesystem
+	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
+		ModuleToHostFunctions: map[string]*wazero.HostFunctions{
+			wasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1WithConfig(
+				&wazero.WASIConfig{Preopens: map[string]wasi.FS{".": memFS}},
+			),
+		},
+	})
 	require.NoError(t, err)
 
-	err = store.Instantiate(mod, "test")
-	require.NoError(t, err)
-
-	_, _, err = store.CallFunction(ctx, "test", "_start")
+	// Note: TinyGo binaries must be treated as WASI Commands to initialize memory.
+	_, err = wazero.StartWASICommand(store, mod)
 	require.NoError(t, err)
 
 	out, err := readFile(memFS, "output.txt")

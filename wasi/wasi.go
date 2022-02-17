@@ -1,687 +1,295 @@
+// Package wasi includes constants and interfaces used by both public and internal APIs.
 package wasi
 
-import (
-	crand "crypto/rand"
-	"errors"
-	"fmt"
-	"io"
-	"io/fs"
-	"math"
-	mrand "math/rand"
-	"os"
-	"reflect"
-	"strings"
-	"time"
-
-	"github.com/tetratelabs/wazero/wasm"
-)
-
-// API includes all host functions to export for WASI version "wasi_snapshot_preview1"
-//
-// Note: When translating WASI functions, each result besides Errno is always an uint32 parameter. WebAssembly 1.0 (MVP)
-// can have up to one result, which is already used by Errno. This forces other results to be parameters. A result
-// parameter is a memory offset to write the result to. As memory offsets are uint32, each parameter representing a
-// result is uint32.
-//
-// Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means api.Memory is always the
-// wasm.Store Memories index zero: `store.Memories[0].Buffer`
-//
-// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-// See https://wwa.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
-type API interface {
-	// ArgsGet is the WASI function that reads command-line argument data (Args).
-	//
-	// There are two parameters. Both are offsets in api.HostFunctionCallContext Memory. If either are invalid due to
-	// memory constraints, this returns ErrnoFault.
-	//
-	// * argv - is the offset to begin writing argument offsets in uint32 little-endian encoding.
-	//   * ArgsSizesGet result argc * 4 bytes are written to this offset
-	// * argvBuf - is the offset to write the null terminated arguments to wasm.MemoryInstance
-	//   * ArgsSizesGet result argv_buf_size bytes are written to this offset
-	//
-	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
-	//   and ArgsGet results argv=7 and argvBuf=1, we expect `ctx.Memory.Buffer` to contain:
-	//
-	//               argvBufSize          uint32le    uint32le
-	//            +----------------+     +--------+  +--------+
-	//            |                |     |        |  |        |
-	// []byte{?, 'a', 0, 'b', 'c', 0, ?, 1, 0, 0, 0, 3, 0, 0, 0, ?}
-	//  argvBuf --^                      ^           ^
-	//                            argv --|           |
-	//          offset that begins "a" --+           |
-	//                     offset that begins "bc" --+
-	//
-	// Note: FunctionArgsGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
-	// See ArgsSizesGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno
-
-	// ArgsSizesGet is a WASI function that reads command-line argument data (Args) sizes.
-	//
-	// There are two result parameters: these are offsets in the api.HostFunctionCallContext Memory to write
-	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
-	// returns ErrnoFault.
-	//
-	// * resultArgc - is the offset to write the argument count to wasm.MemoryInstance Buffer
-	// * resultArgvBufSize - is the offset to write the null-terminated argument length to wasm.MemoryInstance Buffer
-	//
-	// For example, if Args are []string{"a","bc"} and
-	//   ArgsSizesGet parameters resultArgc=1 and resultArgvBufSize=6, we expect `ctx.Memory.Buffer` to contain:
-	//
-	//                   uint32le       uint32le
-	//                  +--------+     +--------+
-	//                  |        |     |        |
-	//        []byte{?, 2, 0, 0, 0, ?, 5, 0, 0, 0, ?}
-	//     resultArgc --^              ^
-	//         2 args --+              |
-	//             resultArgvBufSize --|
-	//   len([]byte{'a',0,'b',c',0}) --+
-	//
-	// Note: FunctionArgsSizesGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
-	// See ArgsGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno
-
-	// EnvironGet is the WASI function that reads environment variables. (Environ)
-	//
-	// There are two parameters. Both are offsets in wasm.HostFunctionCallContext Memory. If either are invalid due to
-	// memory constraints, this returns ErrnoFault.
-	//
-	// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
-	//   * EnvironSizesGet result environc * 4 bytes are written to this offset
-	// * environBuf - is the offset to write the null terminated environment variables in the form of "key=val", the same format as os.Environ(), to wasm.MemoryInstance.
-	//   * EnvironSizesGet result environBufSize bytes are written to this offset
-	//
-	// For example, if EnvironSizesGet wrote environc=2 and environBufSize=9 for environment variables: "a=b", "b=cd"
-	//   and EnvironGet parameters environ=11 and environBuf=1, we expect `ctx.Memory.Buffer` to contain:
-	//
-	//                           environBufSize                 uint32le    uint32le
-	//              +------------------------------------+     +--------+  +--------+
-	//              |                                    |     |        |  |        |
-	//   []byte{?, 'a', '=', 'b', 0, 'b', '=', 'c', 'd', 0, ?, 1, 0, 0, 0, 5, 0, 0, 0, ?}
-	// environBuf --^                                          ^           ^
-	//                              environ offset for "a=b" --+           |
-	//                                         environ offset for "b=cd" --+
-	//
-	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
-	// See EnvironSizesGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironGet(ctx wasm.HostFunctionCallContext, environ, environBuf uint32) Errno
-
-	// EnvironSizesGet is a WASI function that reads environment variable (Environ) sizes.
-	//
-	// There are two result parameters: these are offsets in the wasi.HostFunctionCallContext Memory to write
-	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
-	// returns ErrnoFault.
-	//
-	// * resultEnvironc - is the offset to write the environment variable count to wasm.MemoryInstance Buffer
-	// * resultEnvironBufSize - is the offset to write the null-terminated environment variable length to wasm.MemoryInstance Buffer
-	//
-	// For example, if Environ is []string{"a=b","b=cd"} and
-	//   EnvironSizesGet parameters are resultEnvironc=1 and resultEncironBufSize=6, we expect `ctx.Memory.Buffer` to contain:
-	//
-	//                   uint32le       uint32le
-	//                  +--------+     +--------+
-	//                  |        |     |        |
-	//        []byte{?, 2, 0, 0, 0, ?, 9, 0, 0, 0, ?}
-	// resultEnvironc --^              ^
-	//    2 variables --+              |
-	//          resultEnvironBufSize --|
-	//    len([]byte{'a','=','b',0,    |
-	//           'b','=','c','d',0}) --+
-	//
-	// Note: EnvironSizesGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
-	// See EnvironGet
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
-	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnvironc, resultEnvironBufSize uint32) Errno
-
-	// TODO: ClockResGet(ctx api.hostFunctionCallContext, id, resultResolution uint32) Errno
-
-	// ClockTimeGet is a WASI function that returns the time value of a clock (time.Now).
-	//
-	// * id - The clock id for which to return the time.
-	// * precision - The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
-	// * resultTimestamp - the offset to write the timestamp to wasm.MemoryInstance Buffer
-	//   * the timestamp is epoch nanoseconds encoded as a uint64 little-endian encoding.
-	//
-	// For example, if time.Now returned exactly midnight UTC 2022-01-01 (1640995200000000000), and
-	//   ClockTimeGet resultTimestamp=1, we expect `ctx.Memory.Buffer` to contain:
-	//
-	//                                      uint64le
-	//                    +------------------------------------------+
-	//                    |                                          |
-	//          []byte{?, 0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, ?}
-	//  resultTimestamp --^
-	//
-	// Note: FunctionClockTimeGet documentation shows this signature in the WebAssembly 1.0 (MVP) Text Format.
-	// Note: This is similar to `clock_gettime` in POSIX.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
-	// See https://linux.die.net/man/3/clock_gettime
-	ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno
-
-	// TODO: FdAdvise
-	// TODO: FdAllocate
-	// TODO: FdClose
-	// TODO: FdDataSync
-	// TODO: FdFdstatGet
-	// TODO: FdFdstatSetFlags
-	// TODO: FdFdstatSetRights
-	// TODO: FdFilestatGet
-	// TODO: FdFilestatSetSize
-	// TODO: FdFilestatSetTimes
-	// TODO: FdPread
-	// TODO: FdPrestatGet
-	// TODO: FdPrestatDirName
-	// TODO: FdPwrite
-	// TODO: FdRead
-	// TODO: FdReaddir
-	// TODO: FdRenumber
-	// TODO: FdSeek
-	// TODO: FdSync
-	// TODO: FdTell
-	// TODO: FdWrite
-	// TODO: PathCreateDirectory
-	// TODO: PathFilestatGet
-	// TODO: PathFilestatSetTimes
-	// TODO: PathLink
-	// TODO: PathOpen
-	// TODO: PathReadlink
-	// TODO: PathRemoveDirectory
-	// TODO: PathRename
-	// TODO: PathSymlink
-	// TODO: PathUnlinkFile
-	// TODO: PollOneoff
-	// TODO: ProcExit
-	// TODO: ProcRaise
-	// TODO: SchedYield
-
-	// RandomGet is a WASI function that write random data in buffer (rand.Read()).
-	//
-	// * buf - is a offset to write random values
-	// * bufLen - size of random data in bytes
-	//
-	// For example, if `HostFunctionCallContext.Randomizer` initialized
-	// with random seed `rand.NewSource(42)`, we expect `ctx.Memory.Buffer` to contain:
-	//
-	//                             bufLen (5)
-	//                    +--------------------------+
-	//                    |                        	 |
-	//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
-	//              buf --^
-	//
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-	RandomGet(ctx wasm.HostFunctionCallContext, buf, bufLen uint32) Errno
-
-	// TODO: SockRecv
-	// TODO: SockSend
-	// TODO: SockShutdown
-}
+import "fmt"
 
 const (
-	wasiUnstableName         = "wasi_unstable"
-	wasiSnapshotPreview1Name = "wasi_snapshot_preview1"
+	// ModuleSnapshotPreview1 is the module name WASI functions are exported into
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
+	ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 )
 
-type wasiAPI struct {
-	args *nullTerminatedStrings
-	// environ stores each environment variable in the form of "key=value",
-	// which is both convenient for the implementation of environ_get and matches os.Environ
-	environ *nullTerminatedStrings
-	stdin   io.Reader
-	stdout,
-	stderr io.Writer
-	opened map[uint32]fileEntry
-	// timeNowUnixNano is mutable for testing
-	timeNowUnixNano func() uint64
-	randSource      func([]byte) error
+// TODO: rename these according to other naming conventions
+const (
+	// WASI open flags
+	O_CREATE = 1 << iota
+	O_DIR
+	O_EXCL
+	O_TRUNC
+
+	// WASI fs rights
+	R_FD_READ = 1 << iota
+	R_FD_SEEK
+	R_FD_FDSTAT_SET_FLAGS
+	R_FD_SYNC
+	R_FD_TELL
+	R_FD_WRITE
+)
+
+type File interface {
+	Read([]byte) (int, error)
+	Write([]byte) (int, error)
+	Close() error
 }
 
-func (a *wasiAPI) register(store *wasm.Store) (err error) {
-	// Note: these are ordered per spec for consistency
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
-	nameToFunction := []struct {
-		funcName string
-		fn       interface{}
-	}{
-		{FunctionArgsGet, a.ArgsGet},
-		{FunctionArgsSizesGet, a.ArgsSizesGet},
-		{FunctionEnvironGet, a.EnvironGet},
-		{FunctionEnvironSizesGet, a.EnvironSizesGet},
-		// TODO: FunctionClockResGet
-		{FunctionClockTimeGet, a.ClockTimeGet},
-		// TODO: FunctionFdAdvise
-		// TODO: FunctionFdAllocate
-		{FunctionFdClose, a.fd_close},
-		// TODO: FunctionFdDataSync
-		{FunctionFdFdstatGet, a.fd_fdstat_get},
-		// TODO: FunctionFdFdstatSetFlags
-		// TODO: FunctionFdFdstatSetRights
-		// TODO: FunctionFdFilestatGet
-		// TODO: FunctionFdFilestatSetSize
-		// TODO: FunctionFdFilestatSetTimes
-		// TODO: FunctionFdPread
-		{FunctionFdPrestatGet, a.fd_prestat_get},
-		{FunctionFdPrestatDirName, a.fd_prestat_dir_name},
-		// TODO: FunctionFdPwrite
-		{FunctionFdRead, a.fd_read},
-		// TODO: FunctionFdReaddir
-		// TODO: FunctionFdRenumber
-		{FunctionFdSeek, a.fd_seek},
-		// TODO: FunctionFdSync
-		// TODO: FunctionFdTell
-		{FunctionFdWrite, a.fd_write},
-		// TODO: FunctionPathCreateDirectory
-		// TODO: FunctionPathFilestatGet
-		// TODO: FunctionPathFilestatSetTimes
-		// TODO: FunctionPathLink
-		{FunctionPathOpen, a.path_open},
-		// TODO: FunctionPathReadlink
-		// TODO: FunctionPathRemoveDirectory
-		// TODO: FunctionPathRename
-		// TODO: FunctionPathSymlink
-		// TODO: FunctionPathUnlinkFile
-		// TODO: FunctionPollOneoff
-		{FunctionProcExit, proc_exit},
-		// TODO: FunctionProcRaise
-		// TODO: FunctionSchedYield
-		{FunctionRandomGet, a.RandomGet},
-		// TODO: FunctionSockRecv
-		// TODO: FunctionSockSend
-		// TODO: FunctionSockShutdown
-	}
-	for _, wasiName := range []string{
-		wasiUnstableName, // TODO: check if there are any signature incompatibility between stable and preview 1
-		wasiSnapshotPreview1Name,
-	} {
-		for _, pair := range nameToFunction {
-			err = store.AddHostFunction(wasiName, pair.funcName, reflect.ValueOf(pair.fn))
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+// FS is an interface for a preopened directory.
+type FS interface {
+	// OpenWASI is a general method to open a file, similar to
+	// os.OpenFile, but with WASI flags and rights instead of POSIX.
+	OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, fsRightsInheriting uint64, fdFlags uint32) (File, error)
 }
 
-// ArgsGet implements API.ArgsGet
-func (a *wasiAPI) ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32) Errno {
-	for _, arg := range a.args.nullTerminatedValues {
-		if !ctx.Memory().WriteUint32Le(argv, argvBuf) {
-			return ErrnoFault
-		}
-		argv += 4 // size of uint32
-		if !ctx.Memory().Write(argvBuf, arg) {
-			return ErrnoFault
-		}
-		argvBuf += uint32(len(arg))
-	}
-
-	return ErrnoSuccess
-}
-
-// ArgsSizesGet implements API.ArgsSizesGet
-func (a *wasiAPI) ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) Errno {
-	if !ctx.Memory().WriteUint32Le(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
-		return ErrnoFault
-	}
-	if !ctx.Memory().WriteUint32Le(resultArgvBufSize, a.args.totalBufSize) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
-
-// EnvironGet implements API.EnvironGet
-func (w *wasiAPI) EnvironGet(ctx wasm.HostFunctionCallContext, environ uint32, environBuf uint32) (err Errno) {
-	// w.environ holds the environment variables in the form of "key=val\x00", so just copies it to the linear memory.
-	for _, env := range w.environ.nullTerminatedValues {
-		if !ctx.Memory().WriteUint32Le(environ, environBuf) {
-			return ErrnoFault
-		}
-		environ += 4 // size of uint32
-		if !ctx.Memory().Write(environBuf, env) {
-			return ErrnoFault
-		}
-		environBuf += uint32(len(env))
-	}
-
-	return ErrnoSuccess
-}
-
-// EnvironSizesGet implements API.EnvironSizesGet
-func (w *wasiAPI) EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnvironc uint32, resultEnvironBufSize uint32) (err Errno) {
-	if !ctx.Memory().WriteUint32Le(resultEnvironc, uint32(len(w.environ.nullTerminatedValues))) {
-		return ErrnoFault
-	}
-	if !ctx.Memory().WriteUint32Le(resultEnvironBufSize, w.environ.totalBufSize) {
-		return ErrnoFault
-	}
-
-	return ErrnoSuccess
-}
-
-// TODO: func (a *wasiAPI) FunctionClockResGet
-
-// ClockTimeGet implements API.ClockTimeGet
-func (a *wasiAPI) ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) Errno {
-	// TODO: id and precision are currently ignored.
-	if !ctx.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
-
-type fileEntry struct {
-	path    string
-	fileSys FS
-	file    File
-}
-
-type Option func(*wasiAPI)
-
-func Stdin(reader io.Reader) Option {
-	return func(a *wasiAPI) {
-		a.stdin = reader
-	}
-}
-
-func Stdout(writer io.Writer) Option {
-	return func(a *wasiAPI) {
-		a.stdout = writer
-	}
-}
-
-func Stderr(writer io.Writer) Option {
-	return func(a *wasiAPI) {
-		a.stderr = writer
-	}
-}
-
-// Args returns an option to give a command-line arguments to the API or errs if the inputs are too large.
+// Errno are the error codes returned by WASI functions.
 //
-// Note: The only reason to set this is to control what's written by API.ArgsSizesGet and API.ArgsGet
-// Note: While similar in structure to os.Args, this controls what's visible in Wasm (ex the WASI function "_start").
-func Args(args ...string) (Option, error) {
-	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "arg", args...) // TODO: this is crazy high even if spec allows it
-	if err != nil {
-		return nil, err
+// Note: Codes are defined even when not relevant to WASI for use in higher-level libraries or alignment with POSIX.
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16
+// See https://linux.die.net/man/3/errno
+type Errno uint32
+
+// Error returns the POSIX error code name, except ErrnoSuccess, which isn't defined. Ex. Errno2big -> "E2BIG"
+func (err Errno) Error() string {
+	if int(err) < len(errnoToString) {
+		return errnoToString[err]
 	}
-	return func(a *wasiAPI) {
-		a.args = wasiStrings
-	}, nil
+	return fmt.Sprintf("errno(%d)", uint32(err))
 }
 
-// Environ returns an option to set environment variables to the API.
-// Environ returns an error if the input contains a string not joined with `=`, or if the inputs are too large.
-//  * environ: environment variables in the same format as that of `os.Environ`, where key/value pairs are joined with `=`.
-// See os.Environ
-//
-// Note: Implicit environment variable propagation into WASI is intentionally not done.
-// Note: The only reason to set this is to control what's written by API.EnvironSizesGet and API.EnvironGet
-// Note: While similar in structure to os.Environ, this controls what's visible in Wasm (ex the WASI function "_start").
-func Environ(environ ...string) (Option, error) {
-	for i, env := range environ {
-		if !strings.Contains(env, "=") {
-			return nil, fmt.Errorf("environ[%d] is not joined with '='", i)
-		}
-	}
-	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "environ", environ...) // TODO: this is crazy high even if spec allows it
-	if err != nil {
-		return nil, err
-	}
-	return func(w *wasiAPI) {
-		w.environ = wasiStrings
-	}, nil
-}
+// Note: Below prefers POSIX symbol names over WASI ones, even if the docs are from WASI.
+// See https://linux.die.net/man/3/errno
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#variants-1
+const (
+	// ErrnoSuccess No error occurred. System call completed successfully.
+	ErrnoSuccess Errno = iota
+	// Errno2big Argument list too long.
+	Errno2big
+	// ErrnoAcces Permission denied.
+	ErrnoAcces
+	// ErrnoAddrinuse Address in use.
+	ErrnoAddrinuse
+	// ErrnoAddrnotavail Address not available.
+	ErrnoAddrnotavail
+	// ErrnoAfnosupport Address family not supported.
+	ErrnoAfnosupport
+	// ErrnoAgain Resource unavailable, or operation would block.
+	ErrnoAgain
+	// ErrnoAlready Connection already in progress.
+	ErrnoAlready
+	// ErrnoBadf Bad file descriptor.
+	ErrnoBadf
+	// ErrnoBadmsg Bad message.
+	ErrnoBadmsg
+	// ErrnoBusy Device or resource busy.
+	ErrnoBusy
+	// ErrnoCanceled Operation canceled.
+	ErrnoCanceled
+	// ErrnoChild No child processes.
+	ErrnoChild
+	// ErrnoConnaborted Connection aborted.
+	ErrnoConnaborted
+	// ErrnoConnrefused Connection refused.
+	ErrnoConnrefused
+	// ErrnoConnreset Connection reset.
+	ErrnoConnreset
+	// ErrnoDeadlk Resource deadlock would occur.
+	ErrnoDeadlk
+	// ErrnoDestaddrreq Destination address required.
+	ErrnoDestaddrreq
+	// ErrnoDom Mathematics argument out of domain of function.
+	ErrnoDom
+	// ErrnoDquot Reserved.
+	ErrnoDquot
+	// ErrnoExist File exists.
+	ErrnoExist
+	// ErrnoFault Bad address.
+	ErrnoFault
+	// ErrnoFbig File too large.
+	ErrnoFbig
+	// ErrnoHostunreach Host is unreachable.
+	ErrnoHostunreach
+	// ErrnoIdrm Identifier removed.
+	ErrnoIdrm
+	// ErrnoIlseq Illegal byte sequence.
+	ErrnoIlseq
+	// ErrnoInprogress Operation in progress.
+	ErrnoInprogress
+	// ErrnoIntr Interrupted function.
+	ErrnoIntr
+	// ErrnoInval Invalid argument.
+	ErrnoInval
+	// ErrnoIo I/O error.
+	ErrnoIo
+	// ErrnoIsconn Socket is connected.
+	ErrnoIsconn
+	// ErrnoIsdir Is a directory.
+	ErrnoIsdir
+	// ErrnoLoop Too many levels of symbolic links.
+	ErrnoLoop
+	// ErrnoMfile File descriptor value too large.
+	ErrnoMfile
+	// ErrnoMlink Too many links.
+	ErrnoMlink
+	// ErrnoMsgsize Message too large.
+	ErrnoMsgsize
+	// ErrnoMultihop Reserved.
+	ErrnoMultihop
+	// ErrnoNametoolong Filename too long.
+	ErrnoNametoolong
+	// ErrnoNetdown Network is down.
+	ErrnoNetdown
+	// ErrnoNetreset Connection aborted by network.
+	ErrnoNetreset
+	// ErrnoNetunreach Network unreachable.
+	ErrnoNetunreach
+	// ErrnoNfile Too many files open in system.
+	ErrnoNfile
+	// ErrnoNobufs No buffer space available.
+	ErrnoNobufs
+	// ErrnoNodev No such device.
+	ErrnoNodev
+	// ErrnoNoent No such file or directory.
+	ErrnoNoent
+	// ErrnoNoexec Executable file format error.
+	ErrnoNoexec
+	// ErrnoNolck No locks available.
+	ErrnoNolck
+	// ErrnoNolink Reserved.
+	ErrnoNolink
+	// ErrnoNomem Not enough space.
+	ErrnoNomem
+	// ErrnoNomsg No message of the desired type.
+	ErrnoNomsg
+	// ErrnoNoprotoopt No message of the desired type.
+	ErrnoNoprotoopt
+	// ErrnoNospc No space left on device.
+	ErrnoNospc
+	// ErrnoNosys Function not supported.
+	ErrnoNosys
+	// ErrnoNotconn The socket is not connected.
+	ErrnoNotconn
+	// ErrnoNotdir Not a directory or a symbolic link to a directory.
+	ErrnoNotdir
+	// ErrnoNotempty Directory not empty.
+	ErrnoNotempty
+	// ErrnoNotrecoverable State not recoverable.
+	ErrnoNotrecoverable
+	// ErrnoNotsock Not a socket.
+	ErrnoNotsock
+	// ErrnoNotsup Not supported, or operation not supported on socket.
+	ErrnoNotsup
+	// ErrnoNotty Inappropriate I/O control operation.
+	ErrnoNotty
+	// ErrnoNxio No such device or address.
+	ErrnoNxio
+	// ErrnoOverflow Value too large to be stored in data type.
+	ErrnoOverflow
+	// ErrnoOwnerdead Previous owner died.
+	ErrnoOwnerdead
+	// ErrnoPerm Operation not permitted.
+	ErrnoPerm
+	// ErrnoPipe Broken pipe.
+	ErrnoPipe
+	// ErrnoProto Protocol error.
+	ErrnoProto
+	// ErrnoProtonosupport Protocol error.
+	ErrnoProtonosupport
+	// ErrnoPrototype Protocol wrong type for socket.
+	ErrnoPrototype
+	// ErrnoRange Result too large.
+	ErrnoRange
+	// ErrnoRofs Read-only file system.
+	ErrnoRofs
+	// ErrnoSpipe Invalid seek.
+	ErrnoSpipe
+	// ErrnoSrch No such process.
+	ErrnoSrch
+	// ErrnoStale Reserved.
+	ErrnoStale
+	// ErrnoTimedout Connection timed out.
+	ErrnoTimedout
+	// ErrnoTxtbsy Text file busy.
+	ErrnoTxtbsy
+	// ErrnoXdev Cross-device link.
+	ErrnoXdev
+	// ErrnoNotcapable Extension: Capabilities insufficient.
+	ErrnoNotcapable
+)
 
-func Preopen(dir string, fileSys FS) Option {
-	return func(a *wasiAPI) {
-		a.opened[uint32(len(a.opened))+3] = fileEntry{
-			path:    dir,
-			fileSys: fileSys,
-		}
-	}
-}
-
-// RegisterAPI adds each function API to the wasm.Store via AddHostFunction.
-func RegisterAPI(store *wasm.Store, opts ...Option) error {
-	_, err := registerAPI(store, opts...)
-	return err
-}
-
-// TODO: we can't export a return with API until we figure out how to give users a api.HostFunctionCallContext
-func registerAPI(store *wasm.Store, opts ...Option) (API, error) {
-	ret := newAPI(opts...)
-	err := ret.register(store)
-	return ret, err
-}
-
-func newAPI(opts ...Option) *wasiAPI {
-	ret := &wasiAPI{
-		args:    &nullTerminatedStrings{},
-		environ: &nullTerminatedStrings{},
-		stdin:   os.Stdin,
-		stdout:  os.Stdout,
-		stderr:  os.Stderr,
-		opened:  map[uint32]fileEntry{},
-		timeNowUnixNano: func() uint64 {
-			return uint64(time.Now().UnixNano())
-		},
-		randSource: func(p []byte) error {
-			_, err := crand.Read(p)
-			return err
-		},
-	}
-
-	// apply functional options
-	for _, f := range opts {
-		f(ret)
-	}
-	return ret
-}
-
-func (a *wasiAPI) randUnusedFD() uint32 {
-	fd := uint32(mrand.Int31())
-	for {
-		if _, ok := a.opened[fd]; !ok {
-			return fd
-		}
-		fd = (fd + 1) % (1 << 31)
-	}
-}
-
-func (a *wasiAPI) fd_prestat_get(ctx wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
-	if _, ok := a.opened[fd]; !ok {
-		return ErrnoBadf
-	}
-	return ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err Errno) {
-	f, ok := a.opened[fd]
-	if !ok {
-		return ErrnoInval
-	}
-
-	if uint32(len(f.path)) < pathLen {
-		return ErrnoNametoolong
-	}
-
-	if !ctx.Memory().Write(pathPtr, []byte(f.path)) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_fdstat_get(ctx wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err Errno) {
-	if _, ok := a.opened[fd]; !ok {
-		return ErrnoBadf
-	}
-	if !ctx.Memory().WriteUint64Le(bufPtr+16, R_FD_READ|R_FD_WRITE) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
-
-func (a *wasiAPI) path_open(ctx wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
-	fsRightsBase, fsRightsInheriting uint64,
-	fdFlags, fdPtr uint32) (errno Errno) {
-	dir, ok := a.opened[fd]
-	if !ok || dir.fileSys == nil {
-		return ErrnoInval
-	}
-
-	b, ok := ctx.Memory().Read(pathPtr, pathLen)
-	if !ok {
-		return ErrnoFault
-	}
-	path := string(b)
-	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
-	if err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return ErrnoNoent
-		default:
-			return ErrnoInval
-		}
-	}
-
-	newFD := a.randUnusedFD()
-
-	a.opened[newFD] = fileEntry{
-		file: f,
-	}
-
-	if !ctx.Memory().WriteUint32Le(fdPtr, newFD) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_seek(ctx wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err Errno) {
-	return ErrnoNosys // TODO: implement
-}
-
-func (a *wasiAPI) fd_write(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err Errno) {
-	var writer io.Writer
-
-	switch fd {
-	case 1:
-		writer = a.stdout
-	case 2:
-		writer = a.stderr
-	default:
-		f, ok := a.opened[fd]
-		if !ok || f.file == nil {
-			return ErrnoBadf
-		}
-		writer = f.file
-	}
-
-	var nwritten uint32
-	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
-		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
-		if !ok {
-			return ErrnoFault
-		}
-		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
-		if !ok {
-			return ErrnoFault
-		}
-		b, ok := ctx.Memory().Read(offset, l)
-		if !ok {
-			return ErrnoFault
-		}
-		n, err := writer.Write(b)
-		if err != nil {
-			panic(err)
-		}
-		nwritten += uint32(n)
-	}
-	if !ctx.Memory().WriteUint32Le(nwrittenPtr, nwritten) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_read(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err Errno) {
-	var reader io.Reader
-
-	switch fd {
-	case 0:
-		reader = a.stdin
-	default:
-		f, ok := a.opened[fd]
-		if !ok || f.file == nil {
-			return ErrnoBadf
-		}
-		reader = f.file
-	}
-
-	var nread uint32
-	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
-		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
-		if !ok {
-			return ErrnoFault
-		}
-		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
-		if !ok {
-			return ErrnoFault
-		}
-		b, ok := ctx.Memory().Read(offset, l)
-		if !ok {
-			return ErrnoFault
-		}
-		n, err := reader.Read(b)
-		nread += uint32(n)
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return ErrnoIo
-		}
-	}
-	if !ctx.Memory().WriteUint32Le(nreadPtr, nread) {
-		return ErrnoFault
-	}
-	return ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_close(ctx wasm.HostFunctionCallContext, fd uint32) (err Errno) {
-	f, ok := a.opened[fd]
-	if !ok {
-		return ErrnoBadf
-	}
-
-	if f.file != nil {
-		f.file.Close()
-	}
-
-	delete(a.opened, fd)
-
-	return ErrnoSuccess
-}
-
-// RandomGet implements API.RandomGet
-func (a *wasiAPI) RandomGet(ctx wasm.HostFunctionCallContext, buf uint32, bufLen uint32) (errno Errno) {
-	randomBytes := make([]byte, bufLen)
-	err := a.randSource(randomBytes)
-	if err != nil {
-		// TODO: handle different errors that syscal to entropy source can return
-		return ErrnoIo
-	}
-
-	if !ctx.Memory().Write(buf, randomBytes) {
-		return ErrnoFault
-	}
-
-	return ErrnoSuccess
-}
-
-func proc_exit(wasm.HostFunctionCallContext, uint32) {
-	// TODO: implement
+var errnoToString = [...]string{
+	ErrnoSuccess:        "ESUCCESS",
+	Errno2big:           "E2BIG",
+	ErrnoAcces:          "EACCES",
+	ErrnoAddrinuse:      "EADDRINUSE",
+	ErrnoAddrnotavail:   "EADDRNOTAVAIL",
+	ErrnoAfnosupport:    "EAFNOSUPPORT",
+	ErrnoAgain:          "EAGAIN",
+	ErrnoAlready:        "EALREADY",
+	ErrnoBadf:           "EBADF",
+	ErrnoBadmsg:         "EBADMSG",
+	ErrnoBusy:           "EBUSY",
+	ErrnoCanceled:       "ECANCELED",
+	ErrnoChild:          "ECHILD",
+	ErrnoConnaborted:    "ECONNABORTED",
+	ErrnoConnrefused:    "ECONNREFUSED",
+	ErrnoConnreset:      "ECONNRESET",
+	ErrnoDeadlk:         "EDEADLK",
+	ErrnoDestaddrreq:    "EDESTADDRREQ",
+	ErrnoDom:            "EDOM",
+	ErrnoDquot:          "EDQUOT",
+	ErrnoExist:          "EEXIST",
+	ErrnoFault:          "EFAULT",
+	ErrnoFbig:           "EFBIG",
+	ErrnoHostunreach:    "EHOSTUNREACH",
+	ErrnoIdrm:           "EIDRM",
+	ErrnoIlseq:          "EILSEQ",
+	ErrnoInprogress:     "EINPROGRESS",
+	ErrnoIntr:           "EINTR",
+	ErrnoInval:          "EINVAL",
+	ErrnoIo:             "EIO",
+	ErrnoIsconn:         "EISCONN",
+	ErrnoIsdir:          "EISDIR",
+	ErrnoLoop:           "ELOOP",
+	ErrnoMfile:          "EMFILE",
+	ErrnoMlink:          "EMLINK",
+	ErrnoMsgsize:        "EMSGSIZE",
+	ErrnoMultihop:       "EMULTIHOP",
+	ErrnoNametoolong:    "ENAMETOOLONG",
+	ErrnoNetdown:        "ENETDOWN",
+	ErrnoNetreset:       "ENETRESET",
+	ErrnoNetunreach:     "ENETUNREACH",
+	ErrnoNfile:          "ENFILE",
+	ErrnoNobufs:         "ENOBUFS",
+	ErrnoNodev:          "ENODEV",
+	ErrnoNoent:          "ENOENT",
+	ErrnoNoexec:         "ENOEXEC",
+	ErrnoNolck:          "ENOLCK",
+	ErrnoNolink:         "ENOLINK",
+	ErrnoNomem:          "ENOMEM",
+	ErrnoNomsg:          "ENOMSG",
+	ErrnoNoprotoopt:     "ENOPROTOOPT",
+	ErrnoNospc:          "ENOSPC",
+	ErrnoNosys:          "ENOSYS",
+	ErrnoNotconn:        "ENOTCONN",
+	ErrnoNotdir:         "ENOTDIR",
+	ErrnoNotempty:       "ENOTEMPTY",
+	ErrnoNotrecoverable: "ENOTRECOVERABLE",
+	ErrnoNotsock:        "ENOTSOCK",
+	ErrnoNotsup:         "ENOTSUP",
+	ErrnoNotty:          "ENOTTY",
+	ErrnoNxio:           "ENXIO",
+	ErrnoOverflow:       "EOVERFLOW",
+	ErrnoOwnerdead:      "EOWNERDEAD",
+	ErrnoPerm:           "EPERM",
+	ErrnoPipe:           "EPIPE",
+	ErrnoProto:          "EPROTO",
+	ErrnoProtonosupport: "EPROTONOSUPPORT",
+	ErrnoPrototype:      "EPROTOTYPE",
+	ErrnoRange:          "ERANGE",
+	ErrnoRofs:           "EROFS",
+	ErrnoSpipe:          "ESPIPE",
+	ErrnoSrch:           "ESRCH",
+	ErrnoStale:          "ESTALE",
+	ErrnoTimedout:       "ETIMEDOUT",
+	ErrnoTxtbsy:         "ETXTBSY",
+	ErrnoXdev:           "EXDEV",
+	ErrnoNotcapable:     "ENOTCAPABLE",
 }
