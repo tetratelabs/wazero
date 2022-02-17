@@ -311,7 +311,6 @@ var errnoToString = [...]string{
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 type ExitCode uint32
 
-// Error returns the string representation of ExitCode.
 func (err ExitCode) Error() string {
 	return fmt.Sprintf("terminated by proc_exit(%d)", uint32(err))
 }
