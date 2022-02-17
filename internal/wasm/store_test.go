@@ -117,12 +117,12 @@ func TestStore_AddHostFunction(t *testing.T) {
 }
 
 func newHostFunction(t *testing.T, name string, hostFunction interface{}) *HostFunction {
-	hf := &HostFunction{Name: name}
+	hf := &HostFunction{name: name}
 	goFn := reflect.ValueOf(hostFunction)
-	hf.GoFunc = &goFn
-	ft, err := GetFunctionType(hf.Name, hf.GoFunc)
+	hf.goFunc = &goFn
+	ft, err := GetFunctionType(hf.name, hf.goFunc)
 	require.NoError(t, err)
-	hf.FunctionType = ft
+	hf.functionType = ft
 	return hf
 }
 

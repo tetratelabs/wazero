@@ -11,9 +11,9 @@ import (
 )
 
 type HostFunction struct {
-	Name         string
-	FunctionType *FunctionType
-	GoFunc       *reflect.Value
+	name         string
+	functionType *FunctionType
+	goFunc       *reflect.Value
 }
 
 // GetFunctionType returns the function type corresponding to the function signature or errs if invalid.

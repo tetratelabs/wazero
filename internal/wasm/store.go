@@ -877,14 +877,14 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 // Note: The ModuleInstance of this host function is lazy created and only includes exported functions and their types.
 func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
 	m := s.getModuleInstance(moduleName)
-	typeInstance, err := s.getTypeInstance(hf.FunctionType)
+	typeInstance, err := s.getTypeInstance(hf.functionType)
 	if err != nil {
 		return err
 	}
 
 	f := &FunctionInstance{
-		Name:           fmt.Sprintf("%s.%s", moduleName, hf.Name),
-		HostFunction:   hf.GoFunc,
+		Name:           fmt.Sprintf("%s.%s", moduleName, hf.name),
+		HostFunction:   hf.goFunc,
 		FunctionType:   typeInstance,
 		ModuleInstance: m,
 	}
@@ -897,7 +897,7 @@ func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
 	}
 	// TODO: This races on adding export. A future design may be able to eliminate this race, possibly via a HostModule
 	// type.
-	if err = m.addExport(hf.Name, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
+	if err = m.addExport(hf.name, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
 		s.Functions = s.Functions[:len(s.Functions)-1] // lost race: revert the add on conflict
 		return err
 	}
@@ -905,14 +905,14 @@ func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
 }
 
 func NewHostFunction(funcName string, goFunc interface{}) (*HostFunction, error) {
-	hf := &HostFunction{Name: funcName}
+	hf := &HostFunction{name: funcName}
 	fn := reflect.ValueOf(goFunc)
-	hf.GoFunc = &fn
-	ft, err := GetFunctionType(hf.Name, hf.GoFunc)
+	hf.goFunc = &fn
+	ft, err := GetFunctionType(hf.name, hf.goFunc)
 	if err != nil {
 		return nil, err
 	}
-	hf.FunctionType = ft
+	hf.functionType = ft
 	return hf, nil
 }
 
