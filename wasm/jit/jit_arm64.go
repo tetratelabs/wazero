@@ -1477,9 +1477,19 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 
 	// arm64 doesn't have an instruction for population count on scalar register,
 	// so we use the vector one (VCNT).
-	// This exactly what gcc does for __builtin_popcountll.
+	// This exactly what the official Go implements bits.OneCount.
+	// For example, "func () int { return bits.OneCount(10) }" is compiled as
+	//
+	//    MOVD    $10, R0
+	//    FMOVD   R0, F0
+	//    VCNT    V0.B8, V0.B8
+	//    VUADDLV V0.B8, V0
+	//
 	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, reg, freg)
 	vreg := simdRegisterForScalarFloatRegister(freg)
+	// For how to specify "V0.B8" (SIMD register arrangement), see
+	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
+	// * https://github.com/golang/go/blob/master/src/cmd/compile/internal/arm64/ssa.go#L966
 	c.compileRegisterToRegisterInstruction(arm64.AVCNT, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5)
 	c.compileRegisterToRegisterInstruction(arm64.AVUADDLV, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg)
 	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, freg, reg)
