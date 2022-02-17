@@ -8,16 +8,16 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 type typeUseParserTest struct {
 	name                string
 	source              string
-	expectedInlinedType *wasm.FunctionType
-	expectedTypeIdx     wasm.Index
-	expectedParamNames  wasm.NameMap
+	expectedInlinedType *internalwasm.FunctionType
+	expectedTypeIdx     internalwasm.Index
+	expectedParamNames  internalwasm.NameMap
 
 	expectedOnTypeUsePosition callbackPosition
 	expectedOnTypeUseToken    tokenType
@@ -40,7 +40,7 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 			name:                "param no result - ID",
 			source:              "((param $x i32))",
 			expectedInlinedType: i32_v,
-			expectedParamNames:  wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "x"}},
+			expectedParamNames:  internalwasm.NameMap{&internalwasm.NameAssoc{Index: 0, Name: "x"}},
 		},
 		{
 			name:                "result no param",
@@ -56,7 +56,7 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 			name:                "mixed param no result - ID",
 			source:              "((param $x i32) (param $y i64))",
 			expectedInlinedType: i32i64_v,
-			expectedParamNames:  wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "x"}, &wasm.NameAssoc{Index: 1, Name: "y"}},
+			expectedParamNames:  internalwasm.NameMap{&internalwasm.NameAssoc{Index: 0, Name: "x"}, &internalwasm.NameAssoc{Index: 1, Name: "y"}},
 		},
 		{
 			name:                "mixed param result",
@@ -67,7 +67,7 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 			name:                "mixed param result - ID",
 			source:              "((param $x i32) (param $y i64) (result i32))",
 			expectedInlinedType: i32i64_i32,
-			expectedParamNames:  wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "x"}, &wasm.NameAssoc{Index: 1, Name: "y"}},
+			expectedParamNames:  internalwasm.NameMap{&internalwasm.NameAssoc{Index: 0, Name: "x"}, &internalwasm.NameAssoc{Index: 1, Name: "y"}},
 		},
 		{
 			name:                "abbreviated param result",
@@ -77,16 +77,16 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 		{
 			name:                "mixed param abbreviation", // Verifies we can handle less param fields than param types
 			source:              "((param i32 i32) (param i32) (param i64) (param f32))",
-			expectedInlinedType: &wasm.FunctionType{Params: []wasm2.ValueType{i32, i32, i32, i64, f32}},
+			expectedInlinedType: &internalwasm.FunctionType{Params: []wasm2.ValueType{i32, i32, i32, i64, f32}},
 		},
 	}
 
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&internalwasm.Module{}, newIndexNamespace())
 		return tp, func(t *testing.T) {
 			// We should have inlined the type, and it is the first type use, which means the inlined index is zero
 			require.Zero(t, tp.inlinedTypeIndices[0].inlinedIdx)
-			require.Equal(t, []*wasm.FunctionType{tc.expectedInlinedType}, tp.inlinedTypes)
+			require.Equal(t, []*internalwasm.FunctionType{tc.expectedInlinedType}, tp.inlinedTypes)
 		}
 	})
 }
@@ -117,7 +117,7 @@ func TestTypeUseParser_UnresolvedType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&internalwasm.Module{}, newIndexNamespace())
 		return tp, func(t *testing.T) {
 			require.NotNil(t, tp.typeNamespace.unresolvedIndices)
 			if tc.expectedInlinedType == nil {
@@ -211,7 +211,7 @@ func TestTypeUseParser_ReuseExistingType(t *testing.T) {
 		typeNamespace := newIndexNamespace()
 
 		// Add types to cover the main ways types uses are declared
-		module := &wasm.Module{TypeSection: []*wasm.FunctionType{v_i32, v_v, i32_v, i32i64_i32}}
+		module := &internalwasm.Module{TypeSection: []*internalwasm.FunctionType{v_i32, v_v, i32_v, i32i64_i32}}
 		_, err := typeNamespace.setID([]byte("$v_i32"))
 		require.NoError(t, err)
 		typeNamespace.count++
@@ -261,7 +261,7 @@ func TestTypeUseParser_ReuseExistingInlinedType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&internalwasm.Module{}, newIndexNamespace())
 		// inline a type that doesn't match the test
 		require.NoError(t, parseTypeUse(tp, "((param i32 i64))", ignoreTypeUse))
 		// inline the test type
@@ -269,7 +269,7 @@ func TestTypeUseParser_ReuseExistingInlinedType(t *testing.T) {
 
 		return tp, func(t *testing.T) {
 			// verify it wasn't duplicated
-			require.Equal(t, []*wasm.FunctionType{i32i64_v, tc.expectedInlinedType}, tp.inlinedTypes)
+			require.Equal(t, []*internalwasm.FunctionType{i32i64_v, tc.expectedInlinedType}, tp.inlinedTypes)
 			// last two inlined types are the same
 			require.Equal(t, tp.inlinedTypeIndices[1].inlinedIdx, tp.inlinedTypeIndices[2].inlinedIdx)
 		}
@@ -302,18 +302,18 @@ func TestTypeUseParser_BeginResets(t *testing.T) {
 			name:                "param and result - with IDs",
 			source:              "((param $l i32) (param $r i32) (result i32))",
 			expectedInlinedType: i32i32_i32,
-			expectedParamNames:  wasm.NameMap{&wasm.NameAssoc{Index: 0, Name: "l"}, &wasm.NameAssoc{Index: 1, Name: "r"}},
+			expectedParamNames:  internalwasm.NameMap{&internalwasm.NameAssoc{Index: 0, Name: "l"}, &internalwasm.NameAssoc{Index: 1, Name: "r"}},
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		tp := newTypeUseParser(&internalwasm.Module{}, newIndexNamespace())
 		// inline a type that uses all fields
 		require.NoError(t, parseTypeUse(tp, "((type $i32i64_i32) (param $x i32) (param $y i64) (result i32))", ignoreTypeUse))
 		require.NoError(t, parseTypeUse(tp, tc.source, ignoreTypeUse))
 
 		return tp, func(t *testing.T) {
 			// this is the second inlined type
-			require.Equal(t, []*wasm.FunctionType{i32i64_i32, tc.expectedInlinedType}, tp.inlinedTypes)
+			require.Equal(t, []*internalwasm.FunctionType{i32i64_i32, tc.expectedInlinedType}, tp.inlinedTypes)
 		}
 	})
 }
@@ -358,10 +358,10 @@ func runTypeUseParserTests(t *testing.T, tests []*typeUseParserTest, tf typeUseT
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			var parsedTypeIdx wasm.Index
-			var parsedParamNames wasm.NameMap
+			var parsedTypeIdx internalwasm.Index
+			var parsedParamNames internalwasm.NameMap
 			p := &collectTokenTypeParser{}
-			var setTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+			var setTypeUse onTypeUse = func(typeIdx internalwasm.Index, paramNames internalwasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 				parsedTypeIdx = typeIdx
 				parsedParamNames = paramNames
 				require.Equal(t, tc.expectedOnTypeUsePosition, pos)
@@ -483,7 +483,7 @@ func TestTypeUseParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := parseTypeUse(newTypeUseParser(&wasm.Module{}, newIndexNamespace()), tc.source, failOnTypeUse)
+			err := parseTypeUse(newTypeUseParser(&internalwasm.Module{}, newIndexNamespace()), tc.source, failOnTypeUse)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -493,7 +493,7 @@ func TestTypeUseParser_FailsMatch(t *testing.T) {
 	typeNamespace := newIndexNamespace()
 
 	// Add types to cover the main ways types uses are declared
-	module := &wasm.Module{TypeSection: []*wasm.FunctionType{v_v, i32i64_i32}}
+	module := &internalwasm.Module{TypeSection: []*internalwasm.FunctionType{v_v, i32i64_i32}}
 	_, err := typeNamespace.setID([]byte("$v_v"))
 	require.NoError(t, err)
 	typeNamespace.count++
@@ -535,11 +535,11 @@ func TestTypeUseParser_FailsMatch(t *testing.T) {
 	}
 }
 
-var ignoreTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+var ignoreTypeUse onTypeUse = func(typeIdx internalwasm.Index, paramNames internalwasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	return parseNoop, nil
 }
 
-var failOnTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+var failOnTypeUse onTypeUse = func(typeIdx internalwasm.Index, paramNames internalwasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	return nil, errors.New("unexpected to call onTypeUse on error")
 }
 

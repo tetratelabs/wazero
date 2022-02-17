@@ -5,33 +5,33 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/wasm"
 )
 
-var addLocalZeroLocalTwo = []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 2, wasm.OpcodeI32Add, wasm.OpcodeEnd}
+var addLocalZeroLocalTwo = []byte{internalwasm.OpcodeLocalGet, 0, internalwasm.OpcodeLocalGet, 2, internalwasm.OpcodeI32Add, internalwasm.OpcodeEnd}
 
 func TestEncodeCode(t *testing.T) {
-	addLocalZeroLocalOne := []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}
+	addLocalZeroLocalOne := []byte{internalwasm.OpcodeLocalGet, 0, internalwasm.OpcodeLocalGet, 1, internalwasm.OpcodeI32Add, internalwasm.OpcodeEnd}
 	tests := []struct {
 		name     string
-		input    *wasm.Code
+		input    *internalwasm.Code
 		expected []byte
 	}{
 		{
 			name: "smallest function body",
-			input: &wasm.Code{ // Ex. (func)
-				Body: []byte{wasm.OpcodeEnd},
+			input: &internalwasm.Code{ // Ex. (func)
+				Body: []byte{internalwasm.OpcodeEnd},
 			},
 			expected: []byte{
-				0x02,           // 2 bytes to encode locals and the body
-				0x00,           // no local blocks
-				wasm.OpcodeEnd, // Body
+				0x02,                   // 2 bytes to encode locals and the body
+				0x00,                   // no local blocks
+				internalwasm.OpcodeEnd, // Body
 			},
 		},
 		{
 			name: "params and instructions", // local.get index space is params, then locals
-			input: &wasm.Code{ // Ex. (func (type 3) local.get 0 local.get 1 i32.add)
+			input: &internalwasm.Code{ // Ex. (func (type 3) local.get 0 local.get 1 i32.add)
 				Body: addLocalZeroLocalOne,
 			},
 			expected: append([]byte{
@@ -43,30 +43,30 @@ func TestEncodeCode(t *testing.T) {
 		},
 		{
 			name: "locals and instructions",
-			input: &wasm.Code{ // Ex. (func (result i32) (local i32, i32) local.get 0 local.get 1 i32.add)
-				LocalTypes: []wasm2.ValueType{wasm2.ValueTypeI32, wasm2.ValueTypeI32},
+			input: &internalwasm.Code{ // Ex. (func (result i32) (local i32, i32) local.get 0 local.get 1 i32.add)
+				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32},
 				Body:       addLocalZeroLocalOne,
 			},
 			expected: append([]byte{
-				0x09,                     // 9 bytes to encode locals and the body
-				0x01,                     // 1 local block
-				0x02, wasm2.ValueTypeI32, // local block 1
+				0x09,                    // 9 bytes to encode locals and the body
+				0x01,                    // 1 local block
+				0x02, wasm.ValueTypeI32, // local block 1
 			},
 				addLocalZeroLocalOne..., // Body
 			),
 		},
 		{
 			name: "mixed locals and instructions",
-			input: &wasm.Code{ // Ex. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
-				LocalTypes: []wasm2.ValueType{wasm2.ValueTypeI32, wasm2.ValueTypeI64, wasm2.ValueTypeI32},
+			input: &internalwasm.Code{ // Ex. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
+				LocalTypes: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeI32},
 				Body:       addLocalZeroLocalTwo,
 			},
 			expected: append([]byte{
-				0x0d,                     // 13 bytes to encode locals and the body
-				0x03,                     // 3 local blocks
-				0x01, wasm2.ValueTypeI32, // local block 1
-				0x01, wasm2.ValueTypeI64, // local block 2
-				0x01, wasm2.ValueTypeI32, // local block 3
+				0x0d,                    // 13 bytes to encode locals and the body
+				0x03,                    // 3 local blocks
+				0x01, wasm.ValueTypeI32, // local block 1
+				0x01, wasm.ValueTypeI64, // local block 2
+				0x01, wasm.ValueTypeI32, // local block 3
 			},
 				addLocalZeroLocalTwo..., // Body
 			),
@@ -84,8 +84,8 @@ func TestEncodeCode(t *testing.T) {
 }
 
 func BenchmarkEncodeCode(b *testing.B) {
-	input := &wasm.Code{ // Ex. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
-		LocalTypes: []wasm2.ValueType{wasm2.ValueTypeI32, wasm2.ValueTypeI64, wasm2.ValueTypeI32},
+	input := &internalwasm.Code{ // Ex. (func (result i32) (local i32) (local i64) (local i32) local.get 0 local.get 2 i32.add)
+		LocalTypes: []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI64, wasm.ValueTypeI32},
 		Body:       addLocalZeroLocalTwo,
 	}
 

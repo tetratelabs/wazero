@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestMemorySection(t *testing.T) {
@@ -15,7 +15,7 @@ func TestMemorySection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected []*wasm.MemoryType
+		expected []*internalwasm.MemoryType
 	}{
 		{
 			name: "min and min with max",
@@ -24,7 +24,7 @@ func TestMemorySection(t *testing.T) {
 				0x00, 1, // (memory 1)
 				0x01, 2, 3, // (memory 2, 3)
 			},
-			expected: []*wasm.MemoryType{{Min: 1}, {Min: 2, Max: &three}},
+			expected: []*internalwasm.MemoryType{{Min: 1}, {Min: 2, Max: &three}},
 		},
 	}
 
@@ -43,20 +43,20 @@ func TestDecodeExportSection(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
-		expected map[string]*wasm.Export
+		expected map[string]*internalwasm.Export
 	}{
 		{
 			name: "empty and non-empty name",
 			input: []byte{
-				0x02,                       // 2 exports
-				0x00,                       // Size of empty name
-				wasm2.ExportKindFunc, 0x02, // func[2]
+				0x02,                      // 2 exports
+				0x00,                      // Size of empty name
+				wasm.ExportKindFunc, 0x02, // func[2]
 				0x01, 'a', // Size of name, name
-				wasm2.ExportKindFunc, 0x01, // func[1]
+				wasm.ExportKindFunc, 0x01, // func[1]
 			},
-			expected: map[string]*wasm.Export{
-				"":  {Name: "", Kind: wasm2.ExportKindFunc, Index: wasm.Index(2)},
-				"a": {Name: "a", Kind: wasm2.ExportKindFunc, Index: wasm.Index(1)},
+			expected: map[string]*internalwasm.Export{
+				"":  {Name: "", Kind: wasm.ExportKindFunc, Index: internalwasm.Index(2)},
+				"a": {Name: "a", Kind: wasm.ExportKindFunc, Index: internalwasm.Index(1)},
 			},
 		},
 	}
@@ -81,11 +81,11 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 		{
 			name: "duplicates empty name",
 			input: []byte{
-				0x02,                       // 2 exports
-				0x00,                       // Size of empty name
-				wasm2.ExportKindFunc, 0x00, // func[0]
-				0x00,                       // Size of empty name
-				wasm2.ExportKindFunc, 0x00, // func[0]
+				0x02,                      // 2 exports
+				0x00,                      // Size of empty name
+				wasm.ExportKindFunc, 0x00, // func[0]
+				0x00,                      // Size of empty name
+				wasm.ExportKindFunc, 0x00, // func[0]
 			},
 			expectedErr: "export[1] duplicates name \"\"",
 		},
@@ -94,9 +94,9 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 			input: []byte{
 				0x02,      // 2 exports
 				0x01, 'a', // Size of name, name
-				wasm2.ExportKindFunc, 0x00, // func[0]
+				wasm.ExportKindFunc, 0x00, // func[0]
 				0x01, 'a', // Size of name, name
-				wasm2.ExportKindFunc, 0x00, // func[0]
+				wasm.ExportKindFunc, 0x00, // func[0]
 			},
 			expectedErr: "export[1] duplicates name \"a\"",
 		},
@@ -113,10 +113,10 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 }
 
 func TestEncodeFunctionSection(t *testing.T) {
-	require.Equal(t, []byte{wasm2.SectionIDFunction, 0x2, 0x01, 0x05}, encodeFunctionSection([]wasm.Index{5}))
+	require.Equal(t, []byte{wasm.SectionIDFunction, 0x2, 0x01, 0x05}, encodeFunctionSection([]internalwasm.Index{5}))
 }
 
 // TestEncodeStartSection uses the same index as TestEncodeFunctionSection to highlight the encoding is different.
 func TestEncodeStartSection(t *testing.T) {
-	require.Equal(t, []byte{wasm2.SectionIDStart, 0x01, 0x05}, encodeStartSection(5))
+	require.Equal(t, []byte{wasm.SectionIDStart, 0x01, 0x05}, encodeStartSection(5))
 }

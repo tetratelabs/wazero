@@ -6,13 +6,13 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (MVP) Binary Format
 // See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
-func DecodeModule(binary []byte) (*wasm.Module, error) {
+func DecodeModule(binary []byte) (*internalwasm.Module, error) {
 	r := bytes.NewReader(binary)
 
 	// Magic number.
@@ -26,7 +26,7 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		return nil, ErrInvalidVersion
 	}
 
-	m := &wasm.Module{}
+	m := &internalwasm.Module{}
 	for {
 		// TODO: except custom sections, all others are required to be in order, but we aren't checking yet.
 		// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%93%AA
@@ -39,12 +39,12 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 
 		sectionSize, _, err := leb128.DecodeUint32(r)
 		if err != nil {
-			return nil, fmt.Errorf("get size of section %s: %v", wasm2.SectionIDName(sectionID), err)
+			return nil, fmt.Errorf("get size of section %s: %v", wasm.SectionIDName(sectionID), err)
 		}
 
 		sectionContentStart := r.Len()
 		switch sectionID {
-		case wasm2.SectionIDCustom:
+		case wasm.SectionIDCustom:
 			// First, validate the section and determine if the section for this name has already been set
 			name, nameSize, decodeErr := decodeUTF8(r, "custom section name")
 			if decodeErr != nil {
@@ -69,27 +69,27 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 				}
 			}
 
-		case wasm2.SectionIDType:
+		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(r)
-		case wasm2.SectionIDImport:
+		case wasm.SectionIDImport:
 			m.ImportSection, err = decodeImportSection(r)
-		case wasm2.SectionIDFunction:
+		case wasm.SectionIDFunction:
 			m.FunctionSection, err = decodeFunctionSection(r)
-		case wasm2.SectionIDTable:
+		case wasm.SectionIDTable:
 			m.TableSection, err = decodeTableSection(r)
-		case wasm2.SectionIDMemory:
+		case wasm.SectionIDMemory:
 			m.MemorySection, err = decodeMemorySection(r)
-		case wasm2.SectionIDGlobal:
+		case wasm.SectionIDGlobal:
 			m.GlobalSection, err = decodeGlobalSection(r)
-		case wasm2.SectionIDExport:
+		case wasm.SectionIDExport:
 			m.ExportSection, err = decodeExportSection(r)
-		case wasm2.SectionIDStart:
+		case wasm.SectionIDStart:
 			m.StartSection, err = decodeStartSection(r)
-		case wasm2.SectionIDElement:
+		case wasm.SectionIDElement:
 			m.ElementSection, err = decodeElementSection(r)
-		case wasm2.SectionIDCode:
+		case wasm.SectionIDCode:
 			m.CodeSection, err = decodeCodeSection(r)
-		case wasm2.SectionIDData:
+		case wasm.SectionIDData:
 			m.DataSection, err = decodeDataSection(r)
 		default:
 			err = ErrInvalidSectionID
@@ -101,11 +101,11 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("section %s: %v", wasm2.SectionIDName(sectionID), err)
+			return nil, fmt.Errorf("section %s: %v", wasm.SectionIDName(sectionID), err)
 		}
 	}
 
-	functionCount, codeCount := m.SectionElementCount(wasm2.SectionIDFunction), m.SectionElementCount(wasm2.SectionIDCode)
+	functionCount, codeCount := m.SectionElementCount(wasm.SectionIDFunction), m.SectionElementCount(wasm.SectionIDCode)
 	if functionCount != codeCount {
 		return nil, fmt.Errorf("function and code section have inconsistent lengths: %d != %d", functionCount, codeCount)
 	}

@@ -19,7 +19,6 @@ import (
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 	"github.com/tetratelabs/wazero/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
 )
 
 func requireAddLabel(t *testing.T, compiler *arm64Compiler, label *wazeroir.Label) {
@@ -1955,8 +1954,8 @@ func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
 
 func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 	const globalValue uint64 = 12345
-	for i, tp := range []wasm2.ValueType{
-		wasm2.ValueTypeF32, wasm2.ValueTypeF64, wasm2.ValueTypeI32, wasm2.ValueTypeI64,
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -1981,9 +1980,9 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			require.True(t, global.onRegister())
 			require.Len(t, compiler.locationStack.usedRegisters, 1)
 			switch tp {
-			case wasm2.ValueTypeF32, wasm2.ValueTypeF64:
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				require.True(t, isFloatRegister(global.register))
-			case wasm2.ValueTypeI32, wasm2.ValueTypeI64:
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
 				require.True(t, isIntRegister(global.register))
 			}
 			err = compiler.compileReturnFunction()
@@ -2006,9 +2005,9 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 
 func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 	const valueToSet uint64 = 12345
-	for i, tp := range []wasm2.ValueType{
-		wasm2.ValueTypeF32, wasm2.ValueTypeF64,
-		wasm2.ValueTypeI32, wasm2.ValueTypeI64,
+	for i, tp := range []wasm.ValueType{
+		wasm.ValueTypeF32, wasm.ValueTypeF64,
+		wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
 		tp := tp
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -2026,9 +2025,9 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			// Place the set target value.
 			loc := compiler.locationStack.pushValueLocationOnStack()
 			switch tp {
-			case wasm2.ValueTypeI32, wasm2.ValueTypeI64:
+			case wasm.ValueTypeI32, wasm.ValueTypeI64:
 				loc.setRegisterType(generalPurposeRegisterTypeInt)
-			case wasm2.ValueTypeF32, wasm2.ValueTypeF64:
+			case wasm.ValueTypeF32, wasm.ValueTypeF64:
 				loc.setRegisterType(generalPurposeRegisterTypeFloat)
 			}
 			env.stack()[loc.stackPointer] = valueToSet

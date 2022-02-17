@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	wasm2 "github.com/tetratelabs/wazero/wasm"
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/wasm"
 )
 
-func decodeTableType(r io.Reader) (*wasm.TableType, error) {
+func decodeTableType(r io.Reader) (*internalwasm.TableType, error) {
 	b := make([]byte, 1)
 	if _, err := io.ReadFull(r, b); err != nil {
 		return nil, fmt.Errorf("read leading byte: %v", err)
@@ -23,19 +23,19 @@ func decodeTableType(r io.Reader) (*wasm.TableType, error) {
 		return nil, fmt.Errorf("read limits: %v", err)
 	}
 
-	return &wasm.TableType{
+	return &internalwasm.TableType{
 		ElemType: 0x70, // funcref
 		Limit:    lm,
 	}, nil
 }
 
-func decodeGlobalType(r io.Reader) (*wasm.GlobalType, error) {
+func decodeGlobalType(r io.Reader) (*internalwasm.GlobalType, error) {
 	vt, err := decodeValueTypes(r, 1)
 	if err != nil {
 		return nil, fmt.Errorf("read value type: %w", err)
 	}
 
-	ret := &wasm.GlobalType{
+	ret := &internalwasm.GlobalType{
 		ValType: vt[0],
 	}
 
@@ -57,26 +57,26 @@ func decodeGlobalType(r io.Reader) (*wasm.GlobalType, error) {
 var nullary = []byte{0x60, 0, 0}
 
 // encodedOneParam is a cache of FunctionType.encode values for param length 1 and result length 0
-var encodedOneParam = map[wasm2.ValueType][]byte{
-	wasm2.ValueTypeI32: {0x60, 1, wasm2.ValueTypeI32, 0},
-	wasm2.ValueTypeI64: {0x60, 1, wasm2.ValueTypeI64, 0},
-	wasm2.ValueTypeF32: {0x60, 1, wasm2.ValueTypeF32, 0},
-	wasm2.ValueTypeF64: {0x60, 1, wasm2.ValueTypeF64, 0},
+var encodedOneParam = map[wasm.ValueType][]byte{
+	wasm.ValueTypeI32: {0x60, 1, wasm.ValueTypeI32, 0},
+	wasm.ValueTypeI64: {0x60, 1, wasm.ValueTypeI64, 0},
+	wasm.ValueTypeF32: {0x60, 1, wasm.ValueTypeF32, 0},
+	wasm.ValueTypeF64: {0x60, 1, wasm.ValueTypeF64, 0},
 }
 
 // encodedOneResult is a cache of FunctionType.encode values for param length 0 and result length 1
-var encodedOneResult = map[wasm2.ValueType][]byte{
-	wasm2.ValueTypeI32: {0x60, 0, 1, wasm2.ValueTypeI32},
-	wasm2.ValueTypeI64: {0x60, 0, 1, wasm2.ValueTypeI64},
-	wasm2.ValueTypeF32: {0x60, 0, 1, wasm2.ValueTypeF32},
-	wasm2.ValueTypeF64: {0x60, 0, 1, wasm2.ValueTypeF64},
+var encodedOneResult = map[wasm.ValueType][]byte{
+	wasm.ValueTypeI32: {0x60, 0, 1, wasm.ValueTypeI32},
+	wasm.ValueTypeI64: {0x60, 0, 1, wasm.ValueTypeI64},
+	wasm.ValueTypeF32: {0x60, 0, 1, wasm.ValueTypeF32},
+	wasm.ValueTypeF64: {0x60, 0, 1, wasm.ValueTypeF64},
 }
 
-// encodeFunctionType returns the wasm.FunctionType encoded in WebAssembly 1.0 (MVP) Binary Format.
+// encodeFunctionType returns the internalwasm.FunctionType encoded in WebAssembly 1.0 (MVP) Binary Format.
 //
 // Note: Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
 // See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
-func encodeFunctionType(t *wasm.FunctionType) []byte {
+func encodeFunctionType(t *internalwasm.FunctionType) []byte {
 	paramCount, resultCount := len(t.Params), len(t.Results)
 	if paramCount == 0 && resultCount == 0 {
 		return nullary
