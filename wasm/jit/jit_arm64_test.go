@@ -55,6 +55,8 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 	var eng engine
 	// If this fails, we have to fix jit_arm64.s as well.
 	require.Equal(t, int(unsafe.Offsetof(eng.jitCallReturnAddress)), engineArchContextJITCallReturnAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.minimum32BitSignedInt)), engineArchContextMinimum32BitSignedIntOffset)
+	require.Equal(t, int(unsafe.Offsetof(eng.minimum64BitSignedInt)), engineArchContextMinimum64BitSignedIntOffset)
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {
@@ -2714,6 +2716,10 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
 						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
 						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{0x80000000, 0xffffffff},                 // This is equivalent to (-2^31 / -1) and results in overflow for 32-bit signed div.
+						{0x8000000000000000, 0xffffffffffffffff}, // This is equivalent to (-2^63 / -1) and results in overflow for 64-bit signed div.
+						{0xffffffffffffffff /* -1 in signed 64bit */, 0xfffffffffffffffe /* -2 in signed 64bit */},
+						{1, 0xffff_ffff_ffff_ffff},
 						{math.Float64bits(1.11231), math.Float64bits(12312312.12312)},
 						{math.Float64bits(1.11231), math.Float64bits(-12312312.12312)},
 						{math.Float64bits(-1.11231), math.Float64bits(12312312.12312)},
@@ -2754,7 +2760,11 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 							for _, v := range []uint64{x1, x2} {
 								switch signedType {
 								case wazeroir.SignedTypeUint32:
-									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+									// In order to test zero value on non-zero register, we directly assign an register.
+									reg, err := compiler.allocateRegister(generalPurposeRegisterTypeInt)
+									require.NoError(t, err)
+									compiler.locationStack.pushValueLocationOnRegister(reg)
+									compiler.compileConstToRegisterInstruction(arm64.AMOVD, int64(v), reg)
 								case wazeroir.SignedTypeInt32:
 									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(int32(v))})
 								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
@@ -2785,9 +2795,6 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 							require.NoError(t, err)
 							env.exec(code)
 
-							// There should only be one value on the stack
-							require.Equal(t, uint64(1), env.stackPointer())
-
 							switch kind {
 							case wazeroir.OperationKindDiv:
 								switch signedType {
@@ -2798,6 +2805,7 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 										require.Equal(t, uint32(x1)/uint32(x2), env.stackTopAsUint32())
 									}
 								case wazeroir.SignedTypeInt32:
+									// TOOD: add overflow assertion for math.MinInt32 / -1
 									if uint32(x2) == 0 {
 										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
 									} else {
@@ -2810,6 +2818,7 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 										require.Equal(t, x1/x2, env.stackTopAsUint64())
 									}
 								case wazeroir.SignedTypeInt64:
+									// TOOD: add overflow assertion for math.MinInt64 / -1
 									if x2 == 0 {
 										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
 									} else {

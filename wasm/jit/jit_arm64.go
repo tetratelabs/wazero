@@ -25,6 +25,13 @@ import (
 	"github.com/tetratelabs/wazero/wasm/internal/wazeroir"
 )
 
+func newArchContext() archContext {
+	return archContext{
+		minimum32BitSignedInt: math.MinInt32,
+		minimum64BitSignedInt: math.MinInt64,
+	}
+}
+
 // archContext is embedded in Engine in order to store architecture-specific data.
 type archContext struct {
 	// jitCallReturnAddress holds the absolute return address for jitcall.
@@ -32,10 +39,20 @@ type archContext struct {
 	// Native code can return back to the engine.exec's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
 	jitCallReturnAddress uint64
+
+	// Used for overflow checks on division operations.
+	minimum32BitSignedInt int32
+	minimum64BitSignedInt int64
 }
 
-// engineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress
-const engineArchContextJITCallReturnAddressOffset = 136
+const (
+	// engineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in engine.
+	engineArchContextJITCallReturnAddressOffset = 136
+	// engineArchContextMinimum32BitSignedIntAddressOffset is the offset of archContext.minimum32BitSignedIntAddress in engine.
+	engineArchContextMinimum32BitSignedIntOffset = 144
+	// engineArchContextMinimum64BitSignedIntAddressOffset is the offset of archContext.minimum64BitSignedIntAddress in engine.
+	engineArchContextMinimum64BitSignedIntOffset = 152
+)
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
 // This is used by engine.exec and the entrypoint to enter the JITed native code.
@@ -1456,17 +1473,16 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 
 // compileDiv implements compiler.compileDiv for the arm64 architecture.
 func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
-	v1, v2, err := c.popTwoValuesOnRegisters()
+	dividend, divisor, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
 	}
 
-	if isZeroRegister(v2.register) {
-		c.locationStack.pushValueLocationOnRegister(v2.register)
+	// If the divisor is on the zero register, exit from the function deterministically.
+	if isZeroRegister(divisor.register) {
+		// Push any value so that the subsequent instruction can have a consistent location stack state.
+		c.locationStack.pushValueLocationOnStack()
 		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
-		return nil
-	} else if isZeroRegister(v1.register) {
-		c.locationStack.pushValueLocationOnRegister(v1.register)
 		return nil
 	}
 
@@ -1474,11 +1490,23 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.AUDIVW
+		if err := c.compileIntegerDivPrecheck(true, false, dividend.register, divisor.register); err != nil {
+			return err
+		}
 	case wazeroir.SignedTypeUint64:
+		if err := c.compileIntegerDivPrecheck(false, false, dividend.register, divisor.register); err != nil {
+			return err
+		}
 		inst = arm64.AUDIV
 	case wazeroir.SignedTypeInt32:
+		if err := c.compileIntegerDivPrecheck(true, true, dividend.register, divisor.register); err != nil {
+			return err
+		}
 		inst = arm64.ASDIVW
 	case wazeroir.SignedTypeInt64:
+		if err := c.compileIntegerDivPrecheck(false, true, dividend.register, divisor.register); err != nil {
+			return err
+		}
 		inst = arm64.ASDIV
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.AFDIVS
@@ -1486,9 +1514,62 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 		inst = arm64.AFDIVD
 	}
 
-	c.compileRegisterToRegisterInstruction(inst, v2.register, v1.register)
+	c.compileRegisterToRegisterInstruction(inst, divisor.register, dividend.register)
 
-	c.locationStack.pushValueLocationOnRegister(v1.register)
+	c.locationStack.pushValueLocationOnRegister(dividend.register)
+	return nil
+}
+
+func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, dividend, divisor int16) error {
+	// We check the divisor value equals zero.
+	var cmpInst, movInst obj.As
+	var minValueOffsetInEngine int64
+	if is32Bit {
+		cmpInst = arm64.ACMPW
+		movInst = arm64.AMOVW
+		minValueOffsetInEngine = engineArchContextMinimum32BitSignedIntOffset
+	} else {
+		cmpInst = arm64.ACMP
+		movInst = arm64.AMOVD
+		minValueOffsetInEngine = engineArchContextMinimum64BitSignedIntOffset
+	}
+	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisor)
+
+	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
+	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
+	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+
+	// Othewise, we proceed.
+	c.setBranchTargetOnNext(brIfDivisorNonZero)
+
+	// If the operation is a signed integer div, we have to do an additional check on overflow.
+	if isSigned {
+		// For sigined division, we have to have branches for "math.MinInt{32,64} / -1"
+		// case which results in the overflow.
+
+		// First, we compare the divisor with -1.
+		c.compileConstToRegisterInstruction(movInst, -1, reservedRegisterForTemporary)
+		c.compileTwoRegistersToNoneInstruction(cmpInst, reservedRegisterForTemporary, divisor)
+
+		// If they not equal, we skip the following check.
+		brIfDivisorNonMinusOne := c.compilelBranchInstruction(arm64.ABNE)
+
+		// Otherwise, we further check if the dividend equals math.MinInt32 or MinInt64.
+		c.compileMemoryToRegisterInstruction(
+			movInst,
+			reservedRegisterForEngine, minValueOffsetInEngine,
+			reservedRegisterForTemporary,
+		)
+		c.compileTwoRegistersToNoneInstruction(cmpInst, reservedRegisterForTemporary, dividend)
+
+		// If they not equal, we are safe to execute the division.
+		brIfDividendNotMinInt := c.compilelBranchInstruction(arm64.ABNE)
+
+		// Otherwise, we raise overflow error.
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+
+		c.setBranchTargetOnNext(brIfDivisorNonMinusOne, brIfDividendNotMinInt)
+	}
 	return nil
 }
 
