@@ -2805,11 +2805,11 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 										require.Equal(t, uint32(x1)/uint32(x2), env.stackTopAsUint32())
 									}
 								case wazeroir.SignedTypeInt32:
-									// TOOD: add overflow assertion for math.MinInt32 / -1
-									if uint32(x2) == 0 {
+									v1, v2 := int32(x1), int32(x2)
+									if v2 == 0 || (v1 == math.MinInt32 && v2 == -1) {
 										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
 									} else {
-										require.Equal(t, int32(x1)/int32(x2), env.stackTopAsInt32())
+										require.Equal(t, v1/v2, env.stackTopAsInt32())
 									}
 								case wazeroir.SignedTypeUint64:
 									if x2 == 0 {
@@ -2818,11 +2818,11 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 										require.Equal(t, x1/x2, env.stackTopAsUint64())
 									}
 								case wazeroir.SignedTypeInt64:
-									// TOOD: add overflow assertion for math.MinInt64 / -1
-									if x2 == 0 {
+									v1, v2 := int64(x1), int64(x2)
+									if v2 == 0 || (v1 == math.MinInt64 && v2 == -1) {
 										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
 									} else {
-										require.Equal(t, int64(x1)/int64(x2), env.stackTopAsInt64())
+										require.Equal(t, v1/v2, env.stackTopAsInt64())
 									}
 								case wazeroir.SignedTypeFloat32:
 									exp := math.Float32frombits(uint32(x1)) / math.Float32frombits(uint32(x2))
