@@ -2,40 +2,41 @@ package examples
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/wasi"
-	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/interpreter"
 )
 
+// stdioWasm was compiled from TinyGo testdata/stdio.go
 //go:embed testdata/stdio.wasm
 var stdioWasm []byte
 
 func Test_stdio(t *testing.T) {
-	ctx := context.Background()
-	mod, err := binary.DecodeModule(stdioWasm)
+	mod, err := wazero.DecodeModuleBinary(stdioWasm)
 	require.NoError(t, err)
+
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
 	stdoutBuf := bytes.NewBuffer(nil)
 	stderrBuf := bytes.NewBuffer(nil)
-	store := wasm.NewStore(interpreter.NewEngine())
-	err = wasi.RegisterAPI(store,
-		wasi.Stdin(stdinBuf),
-		wasi.Stdout(stdoutBuf),
-		wasi.Stderr(stderrBuf),
-	)
+
+	// Configure WASI host functions with the IO buffers
+	wasiConfig := &wazero.WASIConfig{Stdin: stdinBuf, Stdout: stdoutBuf, Stderr: stderrBuf}
+	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
+		ModuleToHostFunctions: map[string]*wazero.HostFunctions{
+			wasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1WithConfig(wasiConfig),
+		},
+	})
 	require.NoError(t, err)
-	err = store.Instantiate(mod, "test")
+
+	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to
+	_, err = wazero.StartWASICommand(store, mod)
 	require.NoError(t, err)
-	_, _, err = store.CallFunction(ctx, "test", "_start")
-	require.NoError(t, err)
+
 	require.Equal(t, "Hello, WASI!", strings.TrimSpace(stdoutBuf.String()))
 	require.Equal(t, "Error Message", strings.TrimSpace(stderrBuf.String()))
 }

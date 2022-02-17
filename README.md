@@ -6,41 +6,30 @@ language!
 
 ## Example
 
-Here's an example of using wazero to invoke a Fibonacci function included in a Wasm binary.
+Here's an example of using wazero to invoke a factorial included in a Wasm binary.
 
-While our [source for this](examples/testdata/fibonacci.go) is [TinyGo](https://tinygo.org/), it could have been written in another language that targets Wasm, such as AssemblyScript/C/C++/Rust/Zig.
+While our [source for this](tests/engine/testdata/fac.wat) is the WebAssembly 1.0 (MVP) Text Format,
+it could have been written in another language that targets Wasm, such as AssemblyScript/C/C++/Rust/TinyGo/Zig.
 
 ```golang
-package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-
-	"github.com/tetratelabs/wazero/wasi"
-	"github.com/tetratelabs/wazero/wasm"
-	"github.com/tetratelabs/wazero/wasm/binary"
-	"github.com/tetratelabs/wazero/wasm/interpreter"
-)
-
 func main() {
-	// Default context impl. by Go
-	ctx := context.Background()
-	// Read WebAssembly binary.
-	source, _ := os.ReadFile("examples/testdata/fibonacci.wasm")
+	// Read WebAssembly binary containing an exported "fac" function.
+	source, _ := os.ReadFile("./tests/engine/testdata/fac.wasm")
+
 	// Decode the binary as WebAssembly module.
-	mod, _ := binary.DecodeModule(source)
+	mod, _ := wazero.DecodeModuleBinary(source)
+
 	// Initialize the execution environment called "store" with Interpreter-based engine.
-	store := wasm.NewStore(interpreter.NewEngine())
-	// To resolve WASI specific methods, such as `fd_write`
-	wasi.RegisterAPI(store)
-	// Instantiate the decoded module.
-	store.Instantiate(mod, "test")
-	// Execute the exported "fibonacci" function from the instantiated module.
-	ret, _, _ := store.CallFunction(ctx, "test", "fibonacci", 20)
-	// Give us the fibonacci number for 20, namely 6765!
-	fmt.Println(ret[0])
+	store := wazero.NewStore()
+
+	// Instantiate the module, which returns its exported functions
+	functions, _ := store.Instantiate(mod)
+
+	// Get the factorial function
+	fac, _ := functions.GetFunctionI64Return("fac")
+
+	// Discover 7! is 5040
+	fmt.Println(fac(context.Background(), 7))
 }
 ```
 
@@ -56,9 +45,9 @@ There are two types of engines are available for wazero, and you have to choose 
 
 Both of engines passes 100% of [WebAssembly spec test suites]((https://github.com/WebAssembly/spec/tree/wg-1.0/test/core)) (on supported platforms).
 
-| Engine     | Usage|GOARCH=amd64 | GOARCH=others | 
+| Engine     | Usage|GOARCH=amd64 | GOARCH=others |
 |:----------:|:---:|:-------------:|:------:|
-| Interpreter|`interpreter.NewEngine()`| ✅    | ✅ | 
+| Interpreter|`interpreter.NewEngine()`| ✅    | ✅ |
 | JIT engine |`jit.NewEngine()`|   ✅   | ❌  |
 
 
