@@ -173,7 +173,7 @@ func BenchmarkCodecExample(b *testing.B) {
 		}
 	})
 	// Note: We don't know if wasmtime.Wat2Wasm encodes the custom name section or not.
-	// Note: wasmtime.Wat2Wasm calls wasmtime via CGO which is eventually implemented by internalwasm-tools
+	// Note: wasmer.Wat2Wasm calls wasmer via CGO which is eventually implemented by wasm-tools
 	b.Run("wat2wasm vs wasmtime.Wat2Wasm", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
