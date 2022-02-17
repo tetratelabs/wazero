@@ -1600,6 +1600,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	return nil
 }
 
+// compileRem implements compiler.compileRem for the arm64 architecture.
 func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	dividend, divisor, err := c.popTwoValuesOnRegisters()
 	if err != nil {
