@@ -2710,9 +2710,18 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 				t.Run(signedType.String(), func(t *testing.T) {
 					for _, values := range [][2]uint64{
 						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1}, {math.MaxInt16, math.MaxInt32},
+						{1234, 5}, {5, 1234}, {4, 2}, {40, 4}, {123456, 4},
 						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
 						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
 						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{math.Float64bits(1.11231), math.Float64bits(12312312.12312)},
+						{math.Float64bits(1.11231), math.Float64bits(-12312312.12312)},
+						{math.Float64bits(-1.11231), math.Float64bits(12312312.12312)},
+						{math.Float64bits(-1.11231), math.Float64bits(-12312312.12312)},
+						{math.Float64bits(1.11231), math.Float64bits(12312312.12312)},
+						{math.Float64bits(-12312312.12312), math.Float64bits(1.11231)},
+						{math.Float64bits(12312312.12312), math.Float64bits(-1.11231)},
+						{math.Float64bits(-12312312.12312), math.Float64bits(-1.11231)},
 						{1, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 1},
 						{0xffff_ffff_ffff_ffff, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 0xffff_ffff_ffff_ffff},
 						{math.Float64bits(math.MaxFloat32), 1},
