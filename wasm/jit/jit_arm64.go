@@ -40,17 +40,21 @@ type archContext struct {
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
 	jitCallReturnAddress uint64
 
-	// Used for overflow checks on division operations.
+	// Loading large constants in arm64 is a bit costly so we place the following
+	// consts on engine struct so that we can quickly access them during various operations.
+
+	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
 	minimum32BitSignedInt int32
+	// minimum64BitSignedInt is used for overflow check for 32-bit signed division.
 	minimum64BitSignedInt int64
 }
 
 const (
 	// engineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in engine.
 	engineArchContextJITCallReturnAddressOffset = 136
-	// engineArchContextMinimum32BitSignedIntAddressOffset is the offset of archContext.minimum32BitSignedIntAddress in engine.
+	// engineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in engine.
 	engineArchContextMinimum32BitSignedIntOffset = 144
-	// engineArchContextMinimum64BitSignedIntAddressOffset is the offset of archContext.minimum64BitSignedIntAddress in engine.
+	// engineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in engine.
 	engineArchContextMinimum64BitSignedIntOffset = 152
 )
 
@@ -286,6 +290,19 @@ func (c *arm64Compiler) compileTwoRegistersToRegisterInstruction(instruction obj
 	inst.From.Type = obj.TYPE_REG
 	inst.From.Reg = src1
 	inst.Reg = src2
+	c.addInstruction(inst)
+}
+
+// compileTwoRegistersToRegisterInstruction adds an instruction which takes two source and destination register operands.
+func (c *arm64Compiler) compileTwoRegistersToTwoRegisterInstruction(instruction obj.As, src1, src2, dst1, dst2 int16) {
+	inst := c.newProg()
+	inst.As = instruction
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = dst1
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = src1
+	inst.Reg = src2
+	inst.RestArgs = append(inst.RestArgs, obj.Addr{Type: obj.TYPE_REG, Reg: dst2})
 	c.addInstruction(inst)
 }
 
@@ -1574,8 +1591,100 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 }
 
 func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
+	dividend, divisor, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	dividendReg := dividend.register
+	divisorReg := divisor.register
+
+	fmt.Println("dividend: ", dividendReg)
+	fmt.Println("divisor: ", divisorReg)
+
+	// If the divisor is on the zero register, exit from the function deterministically.
+	if isZeroRegister(divisor.register) {
+		// Push any value so that the subsequent instruction can have a consistent location stack state.
+		c.locationStack.pushValueLocationOnStack()
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		return nil
+	}
+
+	var divInst obj.As
+	var msubInst obj.As
+	switch o.Type {
+	case wazeroir.SignedUint32:
+		if err := c.compileIntegerRemPrecheck(true, false, dividendReg, divisorReg); err != nil {
+			return err
+		}
+		divInst = arm64.AUDIVW
+		msubInst = arm64.AMSUBW
+	case wazeroir.SignedUint64:
+		if err := c.compileIntegerRemPrecheck(false, false, dividendReg, divisorReg); err != nil {
+			return err
+		}
+		divInst = arm64.AUDIV
+		msubInst = arm64.AMSUB
+	case wazeroir.SignedInt32:
+		if err := c.compileIntegerRemPrecheck(true, false, dividendReg, divisorReg); err != nil {
+			return err
+		}
+		divInst = arm64.ASDIVW
+		msubInst = arm64.AMSUBW
+	case wazeroir.SignedInt64:
+		if err := c.compileIntegerRemPrecheck(false, false, dividendReg, divisorReg); err != nil {
+			return err
+		}
+		divInst = arm64.ASDIV
+		msubInst = arm64.AMSUB
+	}
+
+	c.markRegisterUsed(dividend.register, divisor.register)
+	resultReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// input: x0=dividend, x1=divisor
+	// udiv x2, x0, x1
+	// msub x3, x2, x1, x0
+	// result: x2=quotient, x3=remainder
 	// https://stackoverflow.com/questions/35351470/obtaining-remainder-using-single-aarch64-instruction
-	return fmt.Errorf("TODO: unsupported on arm64")
+	c.compileTwoRegistersToRegisterInstruction(divInst, divisorReg, dividendReg, resultReg)
+	c.compileTwoRegistersToTwoRegisterInstruction(msubInst, divisorReg, dividendReg, resultReg, resultReg)
+
+	c.locationStack.pushValueLocationOnRegister(resultReg)
+	c.markRegisterUnused(dividend.register, divisor.register)
+	return nil
+}
+
+func (c *arm64Compiler) compileIntegerRemPrecheck(is32Bit, isSigned bool, dividend, divisor int16) error {
+	// We check the divisor value equals zero.
+	var cmpInst obj.As
+	// var cmpInst, movInst obj.As
+	// var minValueOffsetInEngine int64
+	if is32Bit {
+		cmpInst = arm64.ACMPW
+		// movInst = arm64.AMOVW
+		// minValueOffsetInEngine = engineArchContextMinimum32BitSignedIntOffset
+	} else {
+		cmpInst = arm64.ACMP
+		// movInst = arm64.AMOVD
+		// minValueOffsetInEngine = engineArchContextMinimum64BitSignedIntOffset
+	}
+	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisor)
+
+	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
+	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
+	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+
+	// Othewise, we proceed.
+	c.setBranchTargetOnNext(brIfDivisorNonZero)
+
+	// If the operation is a signed integer div, we have to do an additional check on overflow.
+	if isSigned {
+	}
+	return nil
 }
 
 // compileAnd implements compiler.compileAnd for the arm64 architecture.
