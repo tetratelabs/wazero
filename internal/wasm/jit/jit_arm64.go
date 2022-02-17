@@ -71,7 +71,7 @@ func jitcall(codeSegment, engine uintptr)
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *internalinternalwasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(f *internalwasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("arm64", 1024)
@@ -91,7 +91,7 @@ func newCompiler(f *internalinternalwasm.FunctionInstance, ir *wazeroir.Compilat
 
 type arm64Compiler struct {
 	builder *asm.Builder
-	f       *internalinternalwasm.FunctionInstance
+	f       *internalwasm.FunctionInstance
 	ir      *wazeroir.CompilationResult
 	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
 	// where we want to set the next coming instruction as the destination of these BR instructions.
