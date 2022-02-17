@@ -298,7 +298,7 @@ func (c *arm64Compiler) compileTwoRegistersToRegisterInstruction(instruction obj
 }
 
 // compileTwoRegistersToRegisterInstruction adds an instruction which takes two source and destination register operands.
-func (c *arm64Compiler) compileTwoRegistersToTwoRegisterInstruction(instruction obj.As, src1, src2, dst1, dst2 int16) {
+func (c *arm64Compiler) compileTwoRegistersInstruction(instruction obj.As, src1, src2, dst1, dst2 int16) {
 	inst := c.newProg()
 	inst.As = instruction
 	inst.To.Type = obj.TYPE_REG
@@ -1675,7 +1675,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	// [result: x2=quotient, x3=remainder]
 	//
 	c.compileTwoRegistersToRegisterInstruction(divInst, divisorReg, dividendReg, resultReg)
-	c.compileTwoRegistersToTwoRegisterInstruction(msubInst, divisorReg, dividendReg, resultReg, resultReg)
+	c.compileTwoRegistersInstruction(msubInst, divisorReg, dividendReg, resultReg, resultReg)
 
 	c.markRegisterUnused(dividend.register, divisor.register)
 	c.locationStack.pushValueLocationOnRegister(resultReg)
