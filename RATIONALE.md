@@ -111,4 +111,4 @@ means that we have 1 GiB size of slice which seems large enough for most applica
 
 ## JIT engine implementation
 
-See [wasm/jit/RATIONALE.md](wasm/jit/RATIONALE.md).
+See [wasm/jit/RATIONALE.md](internal/wasm/jit/RATIONALE.md).
