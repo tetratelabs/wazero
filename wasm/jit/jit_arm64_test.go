@@ -2613,8 +2613,8 @@ func TestArm64Compiler_compileHostFunction(t *testing.T) {
 
 func TestArm64Compiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 	for _, kind := range []wazeroir.OperationKind{
-		// wazeroir.OperationKindClz,
-		// wazeroir.OperationKindCtz,
+		wazeroir.OperationKindClz,
+		wazeroir.OperationKindCtz,
 		wazeroir.OperationKindPopcnt,
 	} {
 		kind := kind

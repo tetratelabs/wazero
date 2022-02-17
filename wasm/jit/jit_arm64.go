@@ -1438,6 +1438,9 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 		return err
 	}
 
+	// arm64 doesn't have an instruction for population count on scalar register,
+	// so we use the vector one (VCNT).
+	// This exactly what gcc does for __builtin_popcountll.
 	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, reg, freg)
 	vreg := simdRegisterForScalarFloatRegister(freg)
 	c.compileRegisterToRegisterInstruction(arm64.AVCNT, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5)
@@ -1448,10 +1451,12 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 }
 
 func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
+	// https://stackoverflow.com/questions/35351470/obtaining-remainder-using-single-aarch64-instruction
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
 func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
+	// https://stackoverflow.com/questions/35351470/obtaining-remainder-using-single-aarch64-instruction
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
