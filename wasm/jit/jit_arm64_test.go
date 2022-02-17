@@ -519,8 +519,6 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							compiler.compileLoadConditionalRegisterToGeneralPurposeRegister(resultLocation)
 							require.True(t, resultLocation.onRegister())
 
-							// Release the value to the memory stack again to verify the operation.
-							compiler.compileReleaseRegisterToStack(resultLocation)
 							compiler.compileReturnFunction()
 
 							// Compile and execute the code under test.
@@ -2684,6 +2682,147 @@ func TestArm64Compiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
 								} else {
 									require.Equal(t, bits.OnesCount64(v), int(env.stackTopAsUint32()))
 								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindDiv,
+		wazeroir.OperationKindRem,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, signedType := range []wazeroir.SignedType{
+				wazeroir.SignedTypeUint32,
+				wazeroir.SignedTypeUint64,
+				wazeroir.SignedTypeInt32,
+				wazeroir.SignedTypeInt64,
+				wazeroir.SignedTypeFloat32,
+				wazeroir.SignedTypeFloat64,
+			} {
+				signedType := signedType
+				t.Run(signedType.String(), func(t *testing.T) {
+					for _, values := range [][2]uint64{
+						{0, 0}, {1, 1}, {2, 1}, {100, 1}, {1, 0}, {0, 1}, {math.MaxInt16, math.MaxInt32},
+						{1 << 14, 1 << 21}, {1 << 14, 1 << 21},
+						{0xffff_ffff_ffff_ffff, 0}, {0xffff_ffff_ffff_ffff, 1},
+						{0, 0xffff_ffff_ffff_ffff}, {1, 0xffff_ffff_ffff_ffff},
+						{1, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 1},
+						{0xffff_ffff_ffff_ffff, math.Float64bits(math.NaN())}, {math.Float64bits(math.NaN()), 0xffff_ffff_ffff_ffff},
+						{math.Float64bits(math.MaxFloat32), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat32), 1},
+						{math.Float64bits(math.MaxFloat64), 1},
+						{math.Float64bits(math.SmallestNonzeroFloat64), 1},
+						{0, math.Float64bits(math.Inf(1))},
+						{0, math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), 0},
+						{math.Float64bits(math.Inf(-1)), 0},
+						{math.Float64bits(math.Inf(1)), 1},
+						{math.Float64bits(math.Inf(-1)), 1},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(1.11231), math.Float64bits(math.Inf(-1))},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(1.11231)},
+						{math.Float64bits(math.Inf(1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.Inf(-1)), math.Float64bits(math.NaN())},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(1))},
+						{math.Float64bits(math.NaN()), math.Float64bits(math.Inf(-1))},
+					} {
+						x1, x2 := values[0], values[1]
+						t.Run(fmt.Sprintf("x1=0x%x,x2=0x%x", x1, x2), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							// Emit consts operands.
+							for _, v := range []uint64{x1, x2} {
+								switch signedType {
+								case wazeroir.SignedTypeUint32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+								case wazeroir.SignedTypeInt32:
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(int32(v))})
+								case wazeroir.SignedTypeInt64, wazeroir.SignedTypeUint64:
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+								case wazeroir.SignedTypeFloat32:
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+								case wazeroir.SignedTypeFloat64:
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+								}
+								require.NoError(t, err)
+							}
+
+							// At this point, two values exist for comparison.
+							require.Equal(t, uint64(2), compiler.locationStack.sp)
+
+							switch kind {
+							case wazeroir.OperationKindDiv:
+								err = compiler.compileDiv(&wazeroir.OperationDiv{Type: signedType})
+							case wazeroir.OperationKindRem:
+								t.Skip()
+							}
+							require.NoError(t, err)
+
+							compiler.compileReturnFunction()
+
+							// Compile and execute the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// There should only be one value on the stack
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindDiv:
+								switch signedType {
+								case wazeroir.SignedTypeUint32:
+									if uint32(x2) == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, uint32(x1)/uint32(x2), env.stackTopAsUint32())
+									}
+								case wazeroir.SignedTypeInt32:
+									if uint32(x2) == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, int32(x1)/int32(x2), env.stackTopAsInt32())
+									}
+								case wazeroir.SignedTypeUint64:
+									if x2 == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, x1/x2, env.stackTopAsUint64())
+									}
+								case wazeroir.SignedTypeInt64:
+									if x2 == 0 {
+										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else {
+										require.Equal(t, int64(x1)/int64(x2), env.stackTopAsInt64())
+									}
+								case wazeroir.SignedTypeFloat32:
+									exp := math.Float32frombits(uint32(x1)) / math.Float32frombits(uint32(x2))
+									if math.IsNaN(float64(exp)) {
+										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat32())
+									}
+								case wazeroir.SignedTypeFloat64:
+									exp := math.Float64frombits(x1) / math.Float64frombits(x2)
+									if math.IsNaN(exp) {
+										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+									} else {
+										require.Equal(t, exp, env.stackTopAsFloat64())
+									}
+								}
+							case wazeroir.OperationKindRem:
+								t.Skip()
 							}
 						})
 					}

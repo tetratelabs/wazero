@@ -1356,6 +1356,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 	return nil
 }
 
+// compileClz implements compiler.compileClz for the arm64 architecture.
 func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
@@ -1386,6 +1387,7 @@ func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	return nil
 }
 
+// compileCtz implements compiler.compileCtz for the arm64 architecture.
 func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
@@ -1421,6 +1423,7 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 	return nil
 }
 
+// compilePopcnt implements compiler.compilePopcnt for the arm64 architecture.
 func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
@@ -1446,13 +1449,47 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	c.compileRegisterToRegisterInstruction(arm64.AVCNT, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5)
 	c.compileRegisterToRegisterInstruction(arm64.AVUADDLV, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg)
 	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, freg, reg)
+
 	c.locationStack.pushValueLocationOnRegister(reg)
 	return nil
 }
 
+// compileDiv implements compiler.compileDiv for the arm64 architecture.
 func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
-	// https://stackoverflow.com/questions/35351470/obtaining-remainder-using-single-aarch64-instruction
-	return fmt.Errorf("TODO: unsupported on arm64")
+	v1, v2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	if isZeroRegister(v2.register) {
+		c.locationStack.pushValueLocationOnRegister(v2.register)
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		return nil
+	} else if isZeroRegister(v1.register) {
+		c.locationStack.pushValueLocationOnRegister(v1.register)
+		return nil
+	}
+
+	var inst obj.As
+	switch o.Type {
+	case wazeroir.SignedTypeUint32:
+		inst = arm64.AUDIVW
+	case wazeroir.SignedTypeUint64:
+		inst = arm64.AUDIV
+	case wazeroir.SignedTypeInt32:
+		inst = arm64.ASDIVW
+	case wazeroir.SignedTypeInt64:
+		inst = arm64.ASDIV
+	case wazeroir.SignedTypeFloat32:
+		inst = arm64.AFDIVS
+	case wazeroir.SignedTypeFloat64:
+		inst = arm64.AFDIVD
+	}
+
+	c.compileRegisterToRegisterInstruction(inst, v2.register, v1.register)
+
+	c.locationStack.pushValueLocationOnRegister(v1.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
