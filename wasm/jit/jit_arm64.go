@@ -1489,7 +1489,7 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	vreg := simdRegisterForScalarFloatRegister(freg)
 	// For how to specify "V0.B8" (SIMD register arrangement), see
 	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
-	// * https://github.com/golang/go/blob/master/src/cmd/compile/internal/arm64/ssa.go#L966
+	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
 	c.compileRegisterToRegisterInstruction(arm64.AVCNT, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5)
 	c.compileRegisterToRegisterInstruction(arm64.AVUADDLV, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg)
 	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, freg, reg)
