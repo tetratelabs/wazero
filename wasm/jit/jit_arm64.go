@@ -45,7 +45,7 @@ type archContext struct {
 
 	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
 	minimum32BitSignedInt int32
-	// minimum64BitSignedInt is used for overflow check for 32-bit signed division.
+	// minimum64BitSignedInt is used for overflow check for 64-bit signed division.
 	minimum64BitSignedInt int64
 }
 
