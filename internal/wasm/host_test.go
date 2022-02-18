@@ -1,10 +1,14 @@
 package internalwasm
 
 import (
+	"context"
 	"math"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 func TestMemoryInstance_HasLen(t *testing.T) {
@@ -445,6 +449,125 @@ func TestMemoryInstance_WriteFloat64Le(t *testing.T) {
 			if tc.expectedOk {
 				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+8]) // 8 is the size of float64
 			}
+		})
+	}
+}
+
+func TestGetFunctionType(t *testing.T) {
+	i32, i64, f32, f64 := ValueTypeI32, ValueTypeI64, ValueTypeF32, ValueTypeF64
+
+	tests := []struct {
+		name         string
+		inputFunc    interface{}
+		expectedKind FunctionKind
+		expectedType *FunctionType
+	}{
+		{
+			name:         "nullary",
+			inputFunc:    func() {},
+			expectedKind: FunctionKindHostNoContext,
+			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+		},
+		{
+			name:         "wasm.HostFunctionCallContext void return",
+			inputFunc:    func(publicwasm.HostFunctionCallContext) {},
+			expectedKind: FunctionKindHostFunctionCallContext,
+			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+		},
+		{
+			name:         "context.Context void return",
+			inputFunc:    func(context.Context) {},
+			expectedKind: FunctionKindHostGoContext,
+			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
+		},
+		{
+			name:         "all supported params and i32 result",
+			inputFunc:    func(uint32, uint64, float32, float64) uint32 { return 0 },
+			expectedKind: FunctionKindHostNoContext,
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
+		},
+		{
+			name:         "all supported params and i32 result - wasm.HostFunctionCallContext",
+			inputFunc:    func(publicwasm.HostFunctionCallContext, uint32, uint64, float32, float64) uint32 { return 0 },
+			expectedKind: FunctionKindHostFunctionCallContext,
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
+		},
+		{
+			name:         "all supported params and i32 result - context.Context",
+			inputFunc:    func(context.Context, uint32, uint64, float32, float64) uint32 { return 0 },
+			expectedKind: FunctionKindHostGoContext,
+			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			rVal := reflect.ValueOf(tc.inputFunc)
+			fk, ft, err := GetFunctionType("fn", &rVal)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedKind, fk)
+			require.Equal(t, tc.expectedType, ft)
+		})
+	}
+}
+
+func TestGetFunctionTypeErrors(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       interface{}
+		expectedErr string
+	}{
+		{
+			name:        "not a func",
+			input:       struct{}{},
+			expectedErr: "fn is a struct, but should be a Func",
+		},
+		{
+			name:        "unsupported param",
+			input:       func(uint32, string) {},
+			expectedErr: "fn param[1] is unsupported: string",
+		},
+		{
+			name:        "unsupported result",
+			input:       func() string { return "" },
+			expectedErr: "fn result[0] is unsupported: string",
+		},
+		{
+			name:        "error result",
+			input:       func() error { return nil },
+			expectedErr: "fn result[0] is an error, which is unsupported",
+		},
+		{
+			name:        "multiple results",
+			input:       func() (uint64, uint32) { return 0, 0 },
+			expectedErr: "fn has more than one result",
+		},
+		{
+			name:        "multiple context types",
+			input:       func(publicwasm.HostFunctionCallContext, context.Context) error { return nil },
+			expectedErr: "fn param[1] is a context.Context, which may be defined only once as param[0]",
+		},
+		{
+			name:        "multiple context.Context",
+			input:       func(context.Context, uint64, context.Context) error { return nil },
+			expectedErr: "fn param[2] is a context.Context, which may be defined only once as param[0]",
+		},
+		{
+			name:        "multiple wasm.HostFunctionCallContext",
+			input:       func(publicwasm.HostFunctionCallContext, uint64, publicwasm.HostFunctionCallContext) error { return nil },
+			expectedErr: "fn param[2] is a wasm.HostFunctionCallContext, which may be defined only once as param[0]",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			rVal := reflect.ValueOf(tc.input)
+			_, _, err := GetFunctionType("fn", &rVal)
+			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }

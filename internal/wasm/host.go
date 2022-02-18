@@ -10,42 +10,131 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
+// FunctionKind identifies the type of function that can be called.
+type FunctionKind byte
+
+const (
+	// FunctionKindWasm is not a host function: it is implemented in Wasm.
+	FunctionKindWasm FunctionKind = iota
+	// FunctionKindHostNoContext is a function implemented in Go, with a signature matching FunctionType.
+	FunctionKindHostNoContext
+	// FunctionKindHostGoContext is a function implemented in Go, with a signature matching FunctionType, except arg zero is
+	// a context.Context.
+	FunctionKindHostGoContext
+	// FunctionKindHostFunctionCallContext is a function implemented in Go, with a signature matching FunctionType, except arg zero is
+	// a HostFunctionCallContext.
+	FunctionKindHostFunctionCallContext
+)
+
 type HostFunction struct {
-	name         string
+	name string
+	// functionKind is never FunctionKindWasm
+	functionKind FunctionKind
 	functionType *FunctionType
 	goFunc       *reflect.Value
 }
 
+func NewHostFunction(funcName string, goFunc interface{}) (hf *HostFunction, err error) {
+	hf = &HostFunction{name: funcName}
+	fn := reflect.ValueOf(goFunc)
+	hf.goFunc = &fn
+	hf.functionKind, hf.functionType, err = GetFunctionType(hf.name, hf.goFunc)
+	return
+}
+
+// Below are reflection code to get the interface type used to parse functions and set values.
+
+var hostFunctionCallContextType = reflect.TypeOf((*publicwasm.HostFunctionCallContext)(nil)).Elem()
+var goContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
+var errorType = reflect.TypeOf((*error)(nil)).Elem()
+
+// GetHostFunctionCallContextValue returns a reflect.Value for a context param[0], or nil if there isn't one.
+func GetHostFunctionCallContextValue(fk FunctionKind, ctx *HostFunctionCallContext) *reflect.Value {
+	switch fk {
+	case FunctionKindHostNoContext: // no special param zero
+	case FunctionKindHostGoContext:
+		val := reflect.New(goContextType).Elem()
+		val.Set(reflect.ValueOf(ctx.Context()))
+		return &val
+	case FunctionKindHostFunctionCallContext:
+		val := reflect.New(hostFunctionCallContextType).Elem()
+		val.Set(reflect.ValueOf(ctx))
+		return &val
+	}
+	return nil
+}
+
 // GetFunctionType returns the function type corresponding to the function signature or errs if invalid.
-func GetFunctionType(name string, fn *reflect.Value) (*FunctionType, error) {
+func GetFunctionType(name string, fn *reflect.Value) (fk FunctionKind, ft *FunctionType, err error) {
 	if fn.Kind() != reflect.Func {
-		return nil, fmt.Errorf("%s value is not a reflect.Func: %s", name, fn.String())
+		err = fmt.Errorf("%s is a %s, but should be a Func", name, fn.Kind().String())
+		return
 	}
 	p := fn.Type()
-	if p.NumIn() == 0 { // TODO: actually check the type
-		return nil, fmt.Errorf("%s must accept wasm.HostFunctionCallContext as the first param", name)
-	}
 
-	paramTypes := make([]ValueType, p.NumIn()-1)
-	for i := range paramTypes {
-		kind := p.In(i + 1).Kind()
-		if t, ok := getTypeOf(kind); !ok {
-			return nil, fmt.Errorf("%s param[%d] is unsupported: %s", name, i, kind.String())
-		} else {
-			paramTypes[i] = t
+	pOffset := 0
+	pCount := p.NumIn()
+	fk = FunctionKindHostNoContext
+	if pCount > 0 && p.In(0).Kind() == reflect.Interface {
+		p0 := p.In(0)
+		if p0.Implements(hostFunctionCallContextType) {
+			fk = FunctionKindHostFunctionCallContext
+			pOffset = 1
+			pCount--
+		} else if p0.Implements(goContextType) {
+			fk = FunctionKindHostGoContext
+			pOffset = 1
+			pCount--
 		}
 	}
-
-	resultTypes := make([]ValueType, p.NumOut())
-	for i := range resultTypes {
-		kind := p.Out(i).Kind()
-		if t, ok := getTypeOf(kind); !ok {
-			return nil, fmt.Errorf("%s result[%d] is unsupported: %s", name, i, kind.String())
-		} else {
-			resultTypes[i] = t
-		}
+	rCount := p.NumOut()
+	switch rCount {
+	case 0, 1: // ok
+	default:
+		err = fmt.Errorf("%s has more than one result", name)
+		return
 	}
-	return &FunctionType{Params: paramTypes, Results: resultTypes}, nil
+
+	ft = &FunctionType{Params: make([]ValueType, pCount), Results: make([]ValueType, rCount)}
+
+	for i := 0; i < len(ft.Params); i++ {
+		pI := p.In(i + pOffset)
+		if t, ok := getTypeOf(pI.Kind()); ok {
+			ft.Params[i] = t
+			continue
+		}
+
+		// Now, we will definitely err, decide which message is best
+		var arg0Type reflect.Type
+		if hc := pI.Implements(hostFunctionCallContextType); hc {
+			arg0Type = hostFunctionCallContextType
+		} else if gc := pI.Implements(goContextType); gc {
+			arg0Type = goContextType
+		}
+
+		if arg0Type != nil {
+			err = fmt.Errorf("%s param[%d] is a %s, which may be defined only once as param[0]", name, i+pOffset, arg0Type)
+		} else {
+			err = fmt.Errorf("%s param[%d] is unsupported: %s", name, i+pOffset, pI.Kind())
+		}
+		return
+	}
+
+	if rCount == 0 {
+		return
+	}
+	result := p.Out(0)
+	if t, ok := getTypeOf(result.Kind()); ok {
+		ft.Results[0] = t
+		return
+	}
+
+	if e := result.Implements(errorType); e {
+		err = fmt.Errorf("%s result[0] is an error, which is unsupported", name)
+	} else {
+		err = fmt.Errorf("%s result[0] is unsupported: %s", name, result.Kind())
+	}
+	return
 }
 
 func getTypeOf(kind reflect.Kind) (ValueType, bool) {

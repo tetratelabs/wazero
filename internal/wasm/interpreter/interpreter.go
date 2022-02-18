@@ -117,13 +117,7 @@ type interpreterOp struct {
 func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 	funcaddr := f.Address
 
-	if f.IsHostFunction() {
-		ret := &interpreterFunction{
-			hostFn: f.HostFunction, funcInstance: f,
-		}
-		it.functions[funcaddr] = ret
-		return nil
-	} else {
+	if f.FunctionKind == wasm.FunctionKindWasm {
 		ir, err := wazeroir.Compile(f)
 		if err != nil {
 			return fmt.Errorf("failed to compile Wasm to wazeroir: %w", err)
@@ -138,6 +132,12 @@ func (it *interpreter) Compile(f *wasm.FunctionInstance) error {
 			cb(fn)
 		}
 		delete(it.onCompilationDoneCallbacks, funcaddr)
+	} else {
+		ret := &interpreterFunction{
+			hostFn: f.HostFunction, funcInstance: f,
+		}
+		it.functions[funcaddr] = ret
+		return nil
 	}
 	return nil
 }
@@ -495,7 +495,12 @@ func (it *interpreter) Call(ctx *wasm.HostFunctionCallContext, f *wasm.FunctionI
 func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interpreterFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
-	for i := len(in) - 1; i >= 1; i-- {
+
+	wasmParamOffset := 0
+	if f.funcInstance.FunctionKind != wasm.FunctionKindHostNoContext {
+		wasmParamOffset = 1
+	}
+	for i := len(in) - 1; i >= wasmParamOffset; i-- {
 		val := reflect.New(tp.In(i)).Elem()
 		raw := it.pop()
 		kind := tp.In(i).Kind()
@@ -512,12 +517,14 @@ func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interp
 		in[i] = val
 	}
 
-	val := reflect.New(tp.In(0)).Elem()
 	if len(it.frames) > 0 {
 		ctx = ctx.WithMemory(it.frames[len(it.frames)-1].f.funcInstance.ModuleInstance.Memory)
 	}
-	val.Set(reflect.ValueOf(ctx))
-	in[0] = val
+
+	// Handle any special parameter zero
+	if val := wasm.GetHostFunctionCallContextValue(f.funcInstance.FunctionKind, ctx); val != nil {
+		in[0] = *val
+	}
 
 	frame := &interpreterFrame{f: f}
 	it.pushFrame(frame)

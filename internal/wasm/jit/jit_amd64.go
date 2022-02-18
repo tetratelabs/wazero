@@ -4829,7 +4829,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 }
 
 // returnFunction adds instructions to return from the current callframe back to the caller's frame.
-// If this is the current one is the origin, we return back to the engine.execFunction with the Returned status.
+// If this is the current one is the origin, we return back to the engine.execWasmFunction with the Returned status.
 // Otherwise, we jump into the callers' return address stored in callFrame.returnAddress while setting
 // up all the necessary change on the engine's state.
 //

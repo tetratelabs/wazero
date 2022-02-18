@@ -66,7 +66,7 @@ type (
 		// when making function calls or returning from them.
 		callFrameStackPointer uint64
 		// previousCallFrameStackPointer is to support re-entrant execution.
-		// This is updated whenever exntering engine.execFunction.
+		// This is updated whenever exntering engine.execWasmFunction.
 		// If this is the initial call into Wasm, the value equals zero,
 		// but if this is the recursive function call from the host function, the value becomes non-zero.
 		previousCallFrameStackPointer uint64
@@ -138,7 +138,7 @@ type (
 	// That is, callFrameTop().returnAddress or returnStackBasePointer are not set
 	// until it makes a function call.
 	callFrame struct {
-		// Set when making function call from this function frame, or for the initial function frame to call from engine.execFunction.
+		// Set when making function call from this function frame, or for the initial function frame to call from engine.execWasmFunction.
 		returnAddress uintptr
 		// Set when making function call from this function frame.
 		returnStackBasePointer uint64
@@ -388,10 +388,10 @@ func (e *engine) Call(ctx *wasm.HostFunctionCallContext, f *wasm.FunctionInstanc
 		return
 	}
 
-	if compiled.source.IsHostFunction() {
-		e.execHostFunction(compiled.source.HostFunction, ctx)
+	if f.FunctionKind == wasm.FunctionKindWasm {
+		e.execWasmFunction(ctx, compiled)
 	} else {
-		e.execFunction(ctx, compiled)
+		e.execHostFunction(f.FunctionKind, compiled.source.HostFunction, ctx)
 	}
 
 	// Note the top value is the tail of the results,
@@ -450,8 +450,7 @@ const (
 
 // execHostFunction executes the given host function represented as *reflect.Value.
 //
-// The arguments to the function are popped from the stack stack following the convension of
-// Wasm stack machine.
+// The arguments to the function are popped from the stack following the convention of the Wasm stack machine.
 // For example, if the host function F requires the (x1 uint32, x2 float32) parameters, and
 // the stack is [..., A, B], then the function is called as F(A, B) where A and B are interpreted
 // as uint32 and float32 respectively.
@@ -459,13 +458,20 @@ const (
 // After the execution, the result of host function is pushed onto the stack.
 //
 // ctx parameter is passed to the host function as a first argument.
-func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallContext) {
+func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *wasm.HostFunctionCallContext) {
+	// TODO: the signature won't ever change for a host function once instantiated. For this reason, we should be able
+	// to optimize below based on known possible outcomes. This includes knowledge about if it has a context param[0]
+	// and which type (if any) it returns.
 	tp := f.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
 	// We pop the value and pass them as arguments in a reverse order according to the
 	// stack machine convention.
-	for i := len(in) - 1; i >= 1; i-- {
+	wasmParamOffset := 0
+	if fk != wasm.FunctionKindHostNoContext {
+		wasmParamOffset = 1
+	}
+	for i := len(in) - 1; i >= wasmParamOffset; i-- {
 		val := reflect.New(tp.In(i)).Elem()
 		raw := e.popValue()
 		kind := tp.In(i).Kind()
@@ -482,12 +488,12 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 		in[i] = val
 	}
 
-	// Host function must receive wasm.HostFunctionCallContext as a first argument.
-	val := reflect.New(tp.In(0)).Elem()
-	val.Set(reflect.ValueOf(ctx))
-	in[0] = val
+	// Handle any special parameter zero
+	if val := wasm.GetHostFunctionCallContextValue(fk, ctx); val != nil {
+		in[0] = *val
+	}
 
-	// Excute the host function and push back the call result onto the stack.
+	// Execute the host function and push back the call result onto the stack.
 	for _, ret := range f.Call(in) {
 		switch ret.Kind() {
 		case reflect.Float64, reflect.Float32:
@@ -502,7 +508,7 @@ func (e *engine) execHostFunction(f *reflect.Value, ctx *wasm.HostFunctionCallCo
 	}
 }
 
-func (e *engine) execFunction(ctx *wasm.HostFunctionCallContext, f *compiledFunction) {
+func (e *engine) execWasmFunction(ctx *wasm.HostFunctionCallContext, f *compiledFunction) {
 	// We continuously execute functions until we reach the previous top frame
 	// to support recursive Wasm function executions.
 	e.globalContext.previousCallFrameStackPointer = e.globalContext.callFrameStackPointer
@@ -533,12 +539,12 @@ jitentry:
 			fn := e.compiledFunctions[e.exitContext.functionCallAddress]
 			callerCompiledFunction := e.callFrameAt(1).compiledFunction
 			if buildoptions.IsDebugMode {
-				if !fn.source.IsHostFunction() {
+				if fn.source.FunctionKind == wasm.FunctionKindWasm {
 					panic("jitCallStatusCodeCallHostFunction is only for host functions")
 				}
 			}
 			saved := e.globalContext.previousCallFrameStackPointer
-			e.execHostFunction(fn.source.HostFunction,
+			e.execHostFunction(fn.source.FunctionKind, fn.source.HostFunction,
 				ctx.WithMemory(callerCompiledFunction.source.ModuleInstance.Memory),
 			)
 			e.globalContext.previousCallFrameStackPointer = saved
@@ -636,10 +642,10 @@ func (e *engine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 
 func (e *engine) Compile(f *wasm.FunctionInstance) (err error) {
 	var compiled *compiledFunction
-	if f.IsHostFunction() {
-		compiled, err = compileHostFunction(f)
-	} else {
+	if f.FunctionKind == wasm.FunctionKindWasm {
 		compiled, err = compileWasmFunction(f)
+	} else {
+		compiled, err = compileHostFunction(f)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to compile function: %w", err)

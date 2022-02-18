@@ -19,11 +19,8 @@ func main() {
 	// Decode the binary as WebAssembly module.
 	mod, _ := wazero.DecodeModuleBinary(source)
 
-	// Initialize the execution environment called "store" with Interpreter-based engine.
-	store := wazero.NewStore()
-
-	// Instantiate the module, which returns its exported functions
-	functions, _ := store.Instantiate(mod)
+	// Instantiate the module with a Wasm Interpreter, to return its exported functions
+	functions, _ := wazero.NewStore().Instantiate(mod)
 
 	// Get the factorial function
 	fac, _ := functions.GetFunctionI64Return("fac")
