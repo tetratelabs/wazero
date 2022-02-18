@@ -2130,31 +2130,45 @@ func (c *arm64Compiler) compileF64PromoteFromF32() error {
 
 // compileI32ReinterpretFromF32 implements compiler.compileI32ReinterpretFromF32 for the arm64 architecture.
 func (c *arm64Compiler) compileI32ReinterpretFromF32() error {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		return nil
+	}
 	return c.compileSimpleConversion(arm64.AFMOVS, generalPurposeRegisterTypeInt)
 }
 
 // compileI64ReinterpretFromF64 implements compiler.compileI64ReinterpretFromF64 for the arm64 architecture.
 func (c *arm64Compiler) compileI64ReinterpretFromF64() error {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		return nil
+	}
 	return c.compileSimpleConversion(arm64.AFMOVD, generalPurposeRegisterTypeInt)
 }
 
 // compileF32ReinterpretFromI32 implements compiler.compileF32ReinterpretFromI32 for the arm64 architecture.
 func (c *arm64Compiler) compileF32ReinterpretFromI32() error {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		return nil
+	}
 	return c.compileSimpleConversion(arm64.AFMOVS, generalPurposeRegisterTypeFloat)
 }
 
 // compileF64ReinterpretFromI64 implements compiler.compileF64ReinterpretFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileF64ReinterpretFromI64() error {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		return nil
+	}
 	return c.compileSimpleConversion(arm64.AFMOVD, generalPurposeRegisterTypeFloat)
 }
 
 func (c *arm64Compiler) compileSimpleConversion(inst obj.As, destinationRegType generalPurposeRegisterType) error {
-	if peek := c.locationStack.peek(); peek.onStack() {
-		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
-		peek.setRegisterType(destinationRegType)
-		return nil
-	}
-
 	source, err := c.popValueOnRegister()
 	if err != nil {
 		return err
