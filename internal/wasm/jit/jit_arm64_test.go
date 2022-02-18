@@ -1866,7 +1866,7 @@ func TestArm64Compiler_compileSwap(t *testing.T) {
 	require.Equal(t, x, env.stack()[0])
 }
 
-func Testarm64Compiler_compileModuleContextInitialization(t *testing.T) {
+func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -1952,7 +1952,7 @@ func Testarm64Compiler_compileModuleContextInitialization(t *testing.T) {
 	}
 }
 
-func Testarm64Compiler_compileGlobalGet(t *testing.T) {
+func TestArm64Compiler_compileGlobalGet(t *testing.T) {
 	const globalValue uint64 = 12345
 	for i, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
@@ -2003,7 +2003,7 @@ func Testarm64Compiler_compileGlobalGet(t *testing.T) {
 	}
 }
 
-func Testarm64Compiler_compileGlobalSet(t *testing.T) {
+func TestArm64Compiler_compileGlobalSet(t *testing.T) {
 	const valueToSet uint64 = 12345
 	for i, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64,
@@ -2484,7 +2484,7 @@ func TestArm64Compiler_compileMemoryGrow(t *testing.T) {
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 }
 
-func Testarm64Compiler_compileMemorySize(t *testing.T) {
+func TestArm64Compiler_compileMemorySize(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
 	compiler.f.ModuleInstance = env.moduleInstance
@@ -2511,7 +2511,7 @@ func Testarm64Compiler_compileMemorySize(t *testing.T) {
 	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
 }
 
-func Testarm64Compiler_compileMaybeGrowValueStack(t *testing.T) {
+func TestArm64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 	t.Run("not grow", func(t *testing.T) {
 		const stackPointerCeil = 5
 		for _, baseOffset := range []uint64{5, 10, 20} {
@@ -2894,7 +2894,7 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 	}
 }
 
-func Testarm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
+func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		is32bit    bool
@@ -3164,7 +3164,15 @@ func Testarm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 						require.NoError(t, err)
 					}
 
+					// At this point two values are pushed.
+					require.Equal(t, uint64(1), compiler.locationStack.sp)
+					require.Len(t, compiler.locationStack.usedRegisters, 1)
+
 					tc.setupFunc(t, compiler)
+
+					// We consumed one value, but push the result after operation.
+					require.Equal(t, uint64(1), compiler.locationStack.sp)
+					require.Len(t, compiler.locationStack.usedRegisters, 1)
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
@@ -3174,6 +3182,9 @@ func Testarm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 					require.NoError(t, err)
 					env.exec(code)
 
+					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
+
 					tc.verifyFunc(t, v, env.stackTopAsUint64())
 				})
 			}
@@ -3181,7 +3192,7 @@ func Testarm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 	}
 }
 
-func Testarm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
+func TestArm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		is32bit    bool
@@ -3329,7 +3340,15 @@ func Testarm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 						require.NoError(t, err)
 					}
 
+					// At this point two values are pushed.
+					require.Equal(t, uint64(2), compiler.locationStack.sp)
+					require.Len(t, compiler.locationStack.usedRegisters, 2)
+
 					tc.setupFunc(t, compiler)
+
+					// We consumed two values, but push one value after operation.
+					require.Equal(t, uint64(1), compiler.locationStack.sp)
+					require.Len(t, compiler.locationStack.usedRegisters, 1)
 
 					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
@@ -3338,6 +3357,9 @@ func Testarm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					env.exec(code)
+
+					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+					require.Equal(t, uint64(1), env.stackPointer()) // Result must be pushed!
 
 					tc.verifyFunc(t, x1, x2, env.stackTopAsUint64())
 				})
