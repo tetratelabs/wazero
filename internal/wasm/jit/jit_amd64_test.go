@@ -4552,40 +4552,10 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 							require.NoError(t, err)
 						}
 						is32Bit = o.Type == wazeroir.Float32
-						// The same algorithm as in wazeroir/interpreter.go.
 						if is32Bit {
-							expFloat32 = math.Float32frombits(uint32(v))
-							f64 := float64(expFloat32)
-							if expFloat32 != -0 && expFloat32 != 0 {
-								ceil := float32(math.Ceil(f64))
-								floor := float32(math.Floor(f64))
-								distToCeil := math.Abs(float64(expFloat32 - ceil))
-								distToFloor := math.Abs(float64(expFloat32 - floor))
-								h := ceil / 2.0
-								if distToCeil < distToFloor {
-									expFloat32 = ceil
-								} else if distToCeil == distToFloor && float32(math.Floor(float64(h))) == h {
-									expFloat32 = ceil
-								} else {
-									expFloat32 = floor
-								}
-							}
+							expFloat32 = moremath.WasmCompatNearestF32(math.Float32frombits(uint32(v)))
 						} else {
-							expFloat64 = math.Float64frombits(v)
-							if expFloat64 != -0 && expFloat64 != 0 {
-								ceil := math.Ceil(expFloat64)
-								floor := math.Floor(expFloat64)
-								distToCeil := math.Abs(expFloat64 - ceil)
-								distToFloor := math.Abs(expFloat64 - floor)
-								h := ceil / 2.0
-								if distToCeil < distToFloor {
-									expFloat64 = ceil
-								} else if distToCeil == distToFloor && math.Floor(h) == h {
-									expFloat64 = ceil
-								} else {
-									expFloat64 = floor
-								}
-							}
+							expFloat64 = moremath.WasmCompatNearestF64(math.Float64frombits(v))
 						}
 					}
 

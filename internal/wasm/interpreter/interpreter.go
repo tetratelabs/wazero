@@ -1233,43 +1233,14 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 			}
 		case wazeroir.OperationKindNearest:
 			{
-				// TODO: look at https://github.com/bytecodealliance/wasmtime/pull/2171 and reconsider this algorithm
 				if op.b1 == 0 {
 					// Float32
 					f := math.Float32frombits(uint32(it.pop()))
-					if f != -0 && f != 0 {
-						ceil := float32(math.Ceil(float64(f)))
-						floor := float32(math.Floor(float64(f)))
-						distToCeil := math.Abs(float64(f - ceil))
-						distToFloor := math.Abs(float64(f - floor))
-						h := ceil / 2.0
-						if distToCeil < distToFloor {
-							f = ceil
-						} else if distToCeil == distToFloor && float32(math.Floor(float64(h))) == h {
-							f = ceil
-						} else {
-							f = floor
-						}
-					}
-					it.push(uint64(math.Float32bits(f)))
+					it.push(uint64(math.Float32bits(moremath.WasmCompatNearestF32(f))))
 				} else {
 					// Float64
 					f := math.Float64frombits(it.pop())
-					if f != -0 && f != 0 {
-						ceil := math.Ceil(f)
-						floor := math.Floor(f)
-						distToCeil := math.Abs(f - ceil)
-						distToFloor := math.Abs(f - floor)
-						h := ceil / 2.0
-						if distToCeil < distToFloor {
-							f = ceil
-						} else if distToCeil == distToFloor && math.Floor(float64(h)) == h {
-							f = ceil
-						} else {
-							f = floor
-						}
-					}
-					it.push(math.Float64bits(f))
+					it.push(math.Float64bits(moremath.WasmCompatNearestF64(f)))
 				}
 				frame.pc++
 			}

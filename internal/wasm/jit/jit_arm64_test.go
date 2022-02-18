@@ -3071,7 +3071,40 @@ func TestAmd64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 				}
 			},
 		},
-		// TODO: Nearest
+		{
+			name:    "nearest-32-bit",
+			is32bit: true,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileNearest(&wazeroir.OperationNearest{Type: wazeroir.Float32})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := moremath.WasmCompatNearestF32(float32(v))
+				actual := math.Float32frombits(uint32(raw))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "nearest-64-bit",
+			is32bit: false,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileNearest(&wazeroir.OperationNearest{Type: wazeroir.Float64})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := moremath.WasmCompatNearestF64(v)
+				actual := math.Float64frombits(raw)
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
 		{
 			name:    "sqrt-32-bit",
 			is32bit: true,
