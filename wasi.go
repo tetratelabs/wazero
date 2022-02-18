@@ -57,7 +57,7 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostFunctions {
 		opts = append(opts, opt)
 	}
 	if len(c.Environ) > 0 {
-		environ := make([]string, 0)
+		environ := make([]string, 0, len(c.Environ))
 		for k, v := range c.Environ {
 			environ = append(environ, fmt.Sprintf("%s=%s", k, v))
 		}
