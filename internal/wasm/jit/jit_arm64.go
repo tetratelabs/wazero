@@ -1931,7 +1931,24 @@ func (c *arm64Compiler) compileI32WrapFromI64() error {
 }
 
 func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
+		return c.compileSimpleConversion(arm64.AFCVTZSSW, generalPurposeRegisterTypeInt)
+	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
+		return c.compileSimpleConversion(arm64.AFCVTZSS, generalPurposeRegisterTypeInt)
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt32 {
+		return c.compileSimpleConversion(arm64.AFCVTZSDW, generalPurposeRegisterTypeInt)
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt64 {
+		return c.compileSimpleConversion(arm64.AFCVTZSD, generalPurposeRegisterTypeInt)
+	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
+		return c.compileSimpleConversion(arm64.AFCVTZUSW, generalPurposeRegisterTypeInt)
+	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
+		return c.compileSimpleConversion(arm64.AFCVTZUS, generalPurposeRegisterTypeInt)
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint32 {
+		return c.compileSimpleConversion(arm64.AFCVTZUDW, generalPurposeRegisterTypeInt)
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint64 {
+		return c.compileSimpleConversion(arm64.AFCVTZUD, generalPurposeRegisterTypeInt)
+	}
+	return nil
 }
 
 func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) error {
