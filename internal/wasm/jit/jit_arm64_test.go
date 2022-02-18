@@ -43,7 +43,10 @@ func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler *arm64Co
 }
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
-	cmp, err := newCompiler(&wasm.FunctionInstance{ModuleInstance: j.moduleInstance}, nil)
+	cmp, err := newCompiler(&wasm.FunctionInstance{
+		ModuleInstance: j.moduleInstance,
+		FunctionKind:   wasm.FunctionKindWasm,
+	}, nil)
 	require.NoError(t, err)
 	ret, ok := cmp.(*arm64Compiler)
 	require.True(t, ok)
@@ -1692,8 +1695,11 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				expectedValue += addTargetValue
 
 				compiler := env.requireNewCompiler(t)
-				compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType},
-					ModuleInstance: &wasm.ModuleInstance{}}
+				compiler.f = &wasm.FunctionInstance{
+					FunctionKind:   wasm.FunctionKindWasm,
+					FunctionType:   &wasm.TypeInstance{Type: targetFunctionType},
+					ModuleInstance: &wasm.ModuleInstance{},
+				}
 
 				err := compiler.compilePreamble()
 				require.NoError(t, err)

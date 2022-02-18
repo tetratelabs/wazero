@@ -113,7 +113,7 @@ const (
 	FunctionPathUnlinkFile       = "path_unlink_file"
 	FunctionPollOneoff           = "poll_oneoff"
 
-	// ProcExit terminates the execution of the module with an exit code.
+	// FunctionProcExit terminates the execution of the module with an exit code.
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 	FunctionProcExit = "proc_exit"
 
@@ -339,7 +339,7 @@ type SnapshotPreview1 interface {
 	//
 	// Note: ImportProcExit shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
-	ProcExit(ctx wasm.HostFunctionCallContext, rval uint32)
+	ProcExit(rval uint32)
 
 	// TODO: ProcRaise
 	// TODO: SchedYield
@@ -505,8 +505,8 @@ func (a *wasiAPI) ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, prec
 	return wasi.ErrnoSuccess
 }
 
-// ProcExit implements API.ProcExit
-func (a *wasiAPI) ProcExit(ctx wasm.HostFunctionCallContext, exitCode uint32) {
+// ProcExit implements SnapshotPreview1.ProcExit
+func (a *wasiAPI) ProcExit(exitCode uint32) {
 	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
 	// See the document of API.ProcExit.
 	panic(wasi.ExitCode(exitCode))

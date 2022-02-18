@@ -20,10 +20,44 @@ func NewEngineJIT() *Engine { // TODO: compiler?
 }
 
 // HostFunctions are functions written in Go, which a WebAssembly Module can import.
+//
+// Noting a context exception described later, all parameters or result types must match WebAssembly 1.0 (MVP) value
+// types. This means uint32, uint64, float32 or float64. Up to one result can be returned.
+//
+// Ex. This is a valid host function:
+//
+//	addInts := func(x uint32, uint32) uint32 {
+//		return x + y
+//	}
+//
+// Host functions may also have an initial parameter (param[0]) of type context.Context or wasm.HostFunctionCallContext.
+//
+// Ex. This uses a Go Context:
+//
+//	addInts := func(ctx context.Context, x uint32, uint32) uint32 {
+//		// add a little extra if we put some in the context!
+//		return x + y + ctx.Value(extraKey).(uint32)
+//	}
+//
+// The most sophisticated context is wasm.HostFunctionCallContext, which allows access to the Go context, but also
+// allows writing to memory. This is important because there are only numeric types in Wasm. The only way to share other
+// data is via writing memory and sharing offsets.
+//
+// Ex. This reads the parameters from!
+//
+//	addInts := func(ctx wasm.HostFunctionCallContext, offset uint32) uint32 {
+//		x, _ := ctx.Memory().ReadUint32Le(offset)
+//		y, _ := ctx.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
+//		return x + y
+//	}
+//
+// See https://www.w3.org/TR/wasm-core-1/#value-types%E2%91%A0
 type HostFunctions struct {
 	nameToHostFunction map[string]*internalwasm.HostFunction
 }
 
+// NewHostFunctions returns host functions to export. The map key is the name to export and the value is the function.
+// See HostFunctions documentation for notes on writing host functions.
 func NewHostFunctions(nameToGoFunc map[string]interface{}) (ret *HostFunctions, err error) {
 	ret = &HostFunctions{make(map[string]*internalwasm.HostFunction, len(nameToGoFunc))}
 	for name, goFunc := range nameToGoFunc {

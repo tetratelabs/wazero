@@ -52,6 +52,7 @@ func TestInterpreter_CallHostFunc(t *testing.T) {
 		module := &wasm.ModuleInstance{Memory: memory}
 		it := interpreter{functions: map[wasm.FunctionAddress]*interpreterFunction{
 			0: {hostFn: &hostFn, funcInstance: &wasm.FunctionInstance{
+				FunctionKind: wasm.FunctionKindHostFunctionCallContext,
 				FunctionType: &wasm.TypeInstance{
 					Type: &wasm.FunctionType{
 						Params:  []wasm.ValueType{},

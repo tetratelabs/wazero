@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"math"
 	"os"
-	"reflect"
 	"strconv"
 	"testing"
 
@@ -40,6 +39,7 @@ func TestStore_CallFunction(t *testing.T) {
 			fn: {
 				Kind: ExportKindFunc,
 				Function: &FunctionInstance{
+					FunctionKind: FunctionKindWasm,
 					FunctionType: &TypeInstance{
 						Type: &FunctionType{
 							Params:  []ValueType{},
@@ -89,11 +89,11 @@ func TestStore_CallFunction(t *testing.T) {
 
 func TestStore_AddHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
-	hostFunction := func(wasm.HostFunctionCallContext) {
-	}
 
-	hf := newHostFunction(t, "fn", hostFunction)
-	err := s.AddHostFunction("test", hf)
+	hf, err := NewHostFunction("fn", func(wasm.HostFunctionCallContext) {
+	})
+	require.NoError(t, err)
+	err = s.AddHostFunction("test", hf)
 	require.NoError(t, err)
 
 	// The function was added to the store, prefixed by the owning module name
@@ -116,21 +116,13 @@ func TestStore_AddHostFunction(t *testing.T) {
 	require.Equal(t, map[string]*ExportInstance{"fn": exp}, m.Exports)
 }
 
-func newHostFunction(t *testing.T, name string, hostFunction interface{}) *HostFunction {
-	hf := &HostFunction{name: name}
-	goFn := reflect.ValueOf(hostFunction)
-	hf.goFunc = &goFn
-	ft, err := GetFunctionType(hf.name, hf.goFunc)
-	require.NoError(t, err)
-	hf.functionType = ft
-	return hf
-}
-
 func TestStore_ExportImportedHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
-	hostFunction := func(wasm.HostFunctionCallContext) {
-	}
-	err := s.AddHostFunction("", newHostFunction(t, "host_fn", hostFunction))
+
+	hf, err := NewHostFunction("host_fn", func(wasm.HostFunctionCallContext) {
+	})
+	require.NoError(t, err)
+	err = s.AddHostFunction("", hf)
 	require.NoError(t, err)
 
 	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
@@ -212,7 +204,7 @@ func TestStore_addHostFunction(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		s := NewStore(nopEngineInstance)
 		for i := 0; i < 10; i++ {
-			f := &FunctionInstance{}
+			f := &FunctionInstance{FunctionKind: FunctionKindHost}
 			require.Len(t, s.Functions, i)
 
 			err := s.addFunctionInstance(f)

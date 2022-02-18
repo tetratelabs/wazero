@@ -3,6 +3,7 @@ package adhoc
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"math"
 	"runtime"
 	"sync"
@@ -59,7 +60,7 @@ func runTests(t *testing.T, newEngine func() *wazero.Engine) {
 		importedAndExportedFunc(t, newEngine)
 	})
 	t.Run("host function with float32 type", func(t *testing.T) {
-		hostFuncWithFloatParam(t, newEngine)
+		hostFunctions(t, newEngine)
 	})
 }
 
@@ -273,8 +274,8 @@ func importedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) {
 	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, memory.Buffer[0:10])
 }
 
-//  hostFuncWithFloatParam fails if a float parameter corrupts a host function value
-func hostFuncWithFloatParam(t *testing.T, newEngine func() *wazero.Engine) {
+//  hostFunctions ensures arg0 is optionally a context, and fails if a float parameter corrupts a host function value
+func hostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
 	ctx := context.Background()
 	mod, err := wazero.DecodeModuleText([]byte(`(module $test
 	;; these imports return the input param
@@ -295,41 +296,69 @@ func hostFuncWithFloatParam(t *testing.T, newEngine func() *wazero.Engine) {
 )`))
 	require.NoError(t, err)
 
-	hostFuncs, err := wazero.NewHostFunctions(map[string]interface{}{
-		"identity_f32": func(ctx publicwasm.HostFunctionCallContext, value float32) float32 {
+	floatFuncs, err := wazero.NewHostFunctions(map[string]interface{}{
+		"identity_f32": func(value float32) float32 {
 			return value
 		},
-		"identity_f64": func(ctx publicwasm.HostFunctionCallContext, value float64) float64 {
+		"identity_f64": func(value float64) float64 {
 			return value
 		}})
 	require.NoError(t, err)
 
-	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
-		Engine:                newEngine(),
-		ModuleToHostFunctions: map[string]*wazero.HostFunctions{"host": hostFuncs},
-	})
+	floatFuncsGoContext, err := wazero.NewHostFunctions(map[string]interface{}{
+		"identity_f32": func(funcCtx context.Context, value float32) float32 {
+			require.Equal(t, ctx, funcCtx)
+			return value
+		},
+		"identity_f64": func(funcCtx context.Context, value float64) float64 {
+			require.Equal(t, ctx, funcCtx)
+			return value
+		}})
 	require.NoError(t, err)
 
-	m, err := store.Instantiate(mod)
+	floatFuncsHostFunctionCallContext, err := wazero.NewHostFunctions(map[string]interface{}{
+		"identity_f32": func(funcCtx publicwasm.HostFunctionCallContext, value float32) float32 {
+			require.Equal(t, ctx, funcCtx.Context())
+			return value
+		},
+		"identity_f64": func(funcCtx publicwasm.HostFunctionCallContext, value float64) float64 {
+			require.Equal(t, ctx, funcCtx.Context())
+			return value
+		}})
 	require.NoError(t, err)
 
-	t.Run("host function with f32 param", func(t *testing.T) {
-		fn, ok := m.GetFunctionF32Return("call->test.identity_f32")
-		require.True(t, ok)
-
-		f32 := float32(math.MaxFloat32)
-		result, err := fn(ctx, uint64(math.Float32bits(f32))) // float bits are a uint32 value, call requires uint64
+	for k, v := range map[string]*wazero.HostFunctions{
+		"":                                floatFuncs,
+		" - context.Context":              floatFuncsGoContext,
+		" - wasm.HostFunctionCallContext": floatFuncsHostFunctionCallContext,
+	} {
+		store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
+			Engine:                newEngine(),
+			ModuleToHostFunctions: map[string]*wazero.HostFunctions{"host": v},
+		})
 		require.NoError(t, err)
-		require.Equal(t, f32, result)
-	})
 
-	t.Run("host function with f64 param", func(t *testing.T) {
-		fn, ok := m.GetFunctionF64Return("call->test.identity_f64")
-		require.True(t, ok)
-
-		f64 := math.MaxFloat64
-		result, err := fn(ctx, math.Float64bits(f64))
+		m, err := store.Instantiate(mod)
 		require.NoError(t, err)
-		require.Equal(t, f64, result)
-	})
+
+		t.Run(fmt.Sprintf("host function with f32 param%s", k), func(t *testing.T) {
+			fn, ok := m.GetFunctionF32Return("call->test.identity_f32")
+			require.True(t, ok)
+
+			f32 := float32(math.MaxFloat32)
+			result, err := fn(ctx, uint64(math.Float32bits(f32))) // float bits are a uint32 value, call requires uint64
+			require.NoError(t, err)
+			require.Equal(t, f32, result)
+		})
+
+		t.Run(fmt.Sprintf("host function with f64 param%s", k), func(t *testing.T) {
+			fn, ok := m.GetFunctionF64Return("call->test.identity_f64")
+			require.True(t, ok)
+
+			f64 := math.MaxFloat64
+			result, err := fn(ctx, math.Float64bits(f64))
+			require.NoError(t, err)
+			require.Equal(t, f64, result)
+		})
+	}
 }

@@ -29,7 +29,7 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *amd64Compiler {
 	return &amd64Compiler{builder: b,
 		locationStack: newValueLocationStack(),
 		labels:        map[string]*labelInfo{},
-		f:             &wasm.FunctionInstance{ModuleInstance: j.moduleInstance},
+		f:             &wasm.FunctionInstance{ModuleInstance: j.moduleInstance, FunctionKind: wasm.FunctionKindWasm},
 	}
 }
 
@@ -506,9 +506,9 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 }
 
 func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
-	f := &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{
-		Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32},
-	}}}
+	f := &wasm.FunctionInstance{
+		FunctionKind: wasm.FunctionKindWasm,
+		FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32}}}}
 	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
 	compiler.pushFunctionParams()
 	require.Equal(t, uint64(len(f.FunctionType.Type.Params)), compiler.locationStack.sp)
@@ -5835,7 +5835,10 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}, nil}
 			env.addGlobals(globals...)
 			// Compiler needs global type information at compilation time.
-			compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Globals: globals}}
+			compiler.f = &wasm.FunctionInstance{
+				ModuleInstance: &wasm.ModuleInstance{Globals: globals},
+				FunctionKind:   wasm.FunctionKindWasm,
+			}
 
 			// Emit the code.
 			err := compiler.compilePreamble()
@@ -5966,7 +5969,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				expectedValue := uint32(0)
 				moduleInstanceToExpectedValueInMemory := map[*wasm.ModuleInstance]uint32{}
 				for i := 0; i < numCalls; i++ {
-					// Each function takes one arguments, adds the value with 100 + i and returns the result.
+					// Each function takes one argument, adds the value with 100 + i and returns the result.
 					addTargetValue := uint32(100 + i)
 					moduleInstance := &wasm.ModuleInstance{
 						Memory: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
@@ -5974,13 +5977,17 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 					moduleInstanceToExpectedValueInMemory[moduleInstance] = addTargetValue
 
 					compiler := env.requireNewCompiler(t)
-					compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, ModuleInstance: moduleInstance}
+					compiler.f = &wasm.FunctionInstance{
+						FunctionKind:   wasm.FunctionKindWasm,
+						FunctionType:   &wasm.TypeInstance{Type: targetFunctionType},
+						ModuleInstance: moduleInstance,
+					}
 
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
 					expectedValue += addTargetValue
-					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: addTargetValue})
 					require.NoError(t, err)
 
 					err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
@@ -6079,7 +6086,11 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	{
 		// Call target function takes three i32 arguments and does ADD 2 times.
 		compiler := env.requireNewCompiler(t)
-		compiler.f = &wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, ModuleInstance: &wasm.ModuleInstance{}}
+		compiler.f = &wasm.FunctionInstance{
+			ModuleInstance: &wasm.ModuleInstance{},
+			FunctionKind:   wasm.FunctionKindWasm,
+			FunctionType:   &wasm.TypeInstance{Type: targetFunctionType},
+		}
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 		for i := 0; i < 2; i++ {
@@ -6102,7 +6113,11 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	compiler := env.requireNewCompiler(t)
 	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
 		Functions: []*wasm.FunctionInstance{
-			{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: targetFunctionAddress},
+			{
+				FunctionKind: wasm.FunctionKindWasm,
+				FunctionType: &wasm.TypeInstance{Type: targetFunctionType},
+				Address:      targetFunctionAddress,
+			},
 		},
 	}}
 
@@ -6149,7 +6164,10 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}}}
+		compiler.f = &wasm.FunctionInstance{
+			FunctionKind:   wasm.FunctionKindWasm,
+			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
+		}
 
 		// Place the offfset value.
 		loc := compiler.locationStack.pushValueLocationOnStack()
@@ -6180,8 +6198,10 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-		compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{
-			Type: &wasm.FunctionType{}, TypeID: 1000}}}}
+		compiler.f = &wasm.FunctionInstance{
+			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}},
+			FunctionKind:   wasm.FunctionKindWasm,
+		}
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
 		table[0] = wasm.TableElement{FunctionTypeID: wasm.UninitializedTableElementTypeID}
 
@@ -6285,7 +6305,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				require.NoError(t, err)
 
 				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance}
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
 				// and the typeID  matches the table[targetOffset]'s type ID.
 
 				// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.

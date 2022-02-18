@@ -109,10 +109,13 @@ type (
 		FunctionType *TypeInstance
 		// LocalTypes holds types of locals.
 		LocalTypes []ValueType
+		// FunctionKind describes how this function should be called.
+		FunctionKind FunctionKind
 		// HostFunction holds the runtime representation of host functions.
-		// If this is not nil, all the above fields are ignored as they are specific to non-host functions.
+		// This is nil when FunctionKind == FunctionKindWasm. Otherwise, all the above fields are ignored as they are
+		// specific to Wasm functions.
 		HostFunction *reflect.Value
-		// Address is the funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) of this function insntance.
+		// Address is the funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) of this function instance.
 		// More precisely, this equals the index of this function instance in store.FunctionInstances.
 		// All function calls are made via funcaddr at runtime, not the index (scoped to a module).
 		//
@@ -190,7 +193,7 @@ type (
 	// and the index to Store.Functions.
 	FunctionAddress uint64
 
-	// FunctionTypeID is an uniquely assigned integer for a function type.
+	// FunctionTypeID is a uniquely assigned integer for a function type.
 	// This is wazero specific runtime object and specific to a store,
 	// and used at runtime to do type-checks on indirect function calls.
 	FunctionTypeID uint32
@@ -247,10 +250,6 @@ func (m *ModuleInstance) GetFunction(name string, rv ValueType) (*FunctionInstan
 		return nil, fmt.Errorf("%s is not a %s return function", name, ValueTypeName(rv))
 	}
 	return exp.Function, nil
-}
-
-func (f *FunctionInstance) IsHostFunction() bool {
-	return f.HostFunction != nil
 }
 
 func NewStore(engine Engine) *Store {
@@ -652,6 +651,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 
 		f := &FunctionInstance{
 			Name:           name,
+			FunctionKind:   FunctionKindWasm,
 			FunctionType:   typeInstance,
 			Body:           module.CodeSection[codeIndex].Body,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
@@ -885,6 +885,7 @@ func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
 	f := &FunctionInstance{
 		Name:           fmt.Sprintf("%s.%s", moduleName, hf.name),
 		HostFunction:   hf.goFunc,
+		FunctionKind:   hf.functionKind,
 		FunctionType:   typeInstance,
 		ModuleInstance: m,
 	}
@@ -902,18 +903,6 @@ func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
 		return err
 	}
 	return nil
-}
-
-func NewHostFunction(funcName string, goFunc interface{}) (*HostFunction, error) {
-	hf := &HostFunction{name: funcName}
-	fn := reflect.ValueOf(goFunc)
-	hf.goFunc = &fn
-	ft, err := GetFunctionType(hf.name, hf.goFunc)
-	if err != nil {
-		return nil, err
-	}
-	hf.functionType = ft
-	return hf, nil
 }
 
 func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType ValueType, mutable bool) error {

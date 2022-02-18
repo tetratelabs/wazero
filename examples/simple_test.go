@@ -2,13 +2,14 @@ package examples
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"github.com/tetratelabs/wazero/wasm"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasm"
 )
 
 // Test_Simple implements a basic function in go: hello. This is imported as the Wasm name "$hello" and run on start.
@@ -20,9 +21,12 @@ func Test_Simple(t *testing.T) {
 	require.NoError(t, err)
 
 	stdout := new(bytes.Buffer)
-	goFunc := func(wasm.HostFunctionCallContext) {
-		_, _ = fmt.Fprintln(stdout, "hello!")
-	}
+		addInts := func(ctx wasm.HostFunctionCallContext, offset uint32) uint32 {
+			x, _ := ctx.Memory().ReadUint32Le(offset)
+			, _ := ctx.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
+			// add a little extra if we put some in the context!
+			return x + y + ctx.Value(extraKey).(uint32)
+		}
 
 	// Assign the Go function as a host function. This could error if the signature was invalid for Wasm.
 	hostFuncs, err := wazero.NewHostFunctions(map[string]interface{}{"hello": goFunc})
