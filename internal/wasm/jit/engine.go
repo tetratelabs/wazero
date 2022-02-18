@@ -459,6 +459,9 @@ const (
 //
 // ctx parameter is passed to the host function as a first argument.
 func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *wasm.HostFunctionCallContext) {
+	// TODO: the signature won't ever change for a host function once instantiated. For this reason, we should be able
+	// to optimize below based on known possible outcomes. This includes knowledge about if it has a context param[0]
+	// and which type (if any) it returns.
 	tp := f.Type()
 	in := make([]reflect.Value, tp.NumIn())
 

@@ -77,11 +77,11 @@ func GetFunctionType(name string, fn *reflect.Value) (fk FunctionKind, ft *Funct
 	fk = FunctionKindHost
 	if pCount > 0 && p.In(0).Kind() == reflect.Interface {
 		p0 := p.In(0)
-		if hc := p0.Implements(hostFunctionCallContextType); hc {
+		if p0.Implements(hostFunctionCallContextType) {
 			fk = FunctionKindHostFunctionCallContext
 			pOffset = 1
 			pCount--
-		} else if gc := p0.Implements(goContextType); gc {
+		} else if p0.Implements(goContextType) {
 			fk = FunctionKindHostGoContext
 			pOffset = 1
 			pCount--
