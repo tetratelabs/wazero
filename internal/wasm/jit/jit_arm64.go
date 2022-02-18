@@ -1886,6 +1886,7 @@ func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
 	return nil
 }
 
+// compileAbs implements compiler.compileAbs for the arm64 architecture.
 func (c *arm64Compiler) compileAbs(o *wazeroir.OperationAbs) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatUniop(arm64.AFABSS)
@@ -1894,6 +1895,7 @@ func (c *arm64Compiler) compileAbs(o *wazeroir.OperationAbs) error {
 	}
 }
 
+// compileNeg implements compiler.compileNeg for the arm64 architecture.
 func (c *arm64Compiler) compileNeg(o *wazeroir.OperationNeg) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatUniop(arm64.AFNEGS)
@@ -1902,6 +1904,7 @@ func (c *arm64Compiler) compileNeg(o *wazeroir.OperationNeg) error {
 	}
 }
 
+// compileCeil implements compiler.compileCeil for the arm64 architecture.
 func (c *arm64Compiler) compileCeil(o *wazeroir.OperationCeil) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatUniop(arm64.AFRINTPS)
@@ -1910,6 +1913,7 @@ func (c *arm64Compiler) compileCeil(o *wazeroir.OperationCeil) error {
 	}
 }
 
+// compileFloor implements compiler.compileFloor for the arm64 architecture.
 func (c *arm64Compiler) compileFloor(o *wazeroir.OperationFloor) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatUniop(arm64.AFRINTMS)
@@ -1918,6 +1922,7 @@ func (c *arm64Compiler) compileFloor(o *wazeroir.OperationFloor) error {
 	}
 }
 
+// compileTrunc implements compiler.compileTrunc for the arm64 architecture.
 func (c *arm64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatUniop(arm64.AFRINTZS)
@@ -1926,6 +1931,7 @@ func (c *arm64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	}
 }
 
+// compileNearest implements compiler.compileNearest for the arm64 architecture.
 func (c *arm64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatUniop(arm64.AFRINTNS)
@@ -1934,6 +1940,7 @@ func (c *arm64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	}
 }
 
+// compileSqrt implements compiler.compileSqrt for the arm64 architecture.
 func (c *arm64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatUniop(arm64.AFSQRTS)
@@ -1953,6 +1960,7 @@ func (c *arm64Compiler) compileSimpleFloatUniop(inst obj.As) error {
 	return nil
 }
 
+// compileMin implements compiler.compileMin for the arm64 architecture.
 func (c *arm64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatBinop(arm64.AFMINS)
@@ -1961,6 +1969,7 @@ func (c *arm64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	}
 }
 
+// compileMax implements compiler.compileMax for the arm64 architecture.
 func (c *arm64Compiler) compileMax(o *wazeroir.OperationMax) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatBinop(arm64.AFMAXS)
@@ -1979,6 +1988,7 @@ func (c *arm64Compiler) compileSimpleFloatBinop(inst obj.As) error {
 	return nil
 }
 
+// compileCopysign implements compiler.compileCopysign for the arm64 architecture.
 func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
