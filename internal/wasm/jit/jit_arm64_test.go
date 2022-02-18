@@ -2894,7 +2894,263 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
+func TestAmd64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		is32bit    bool
+		setupFunc  func(t *testing.T, compiler *arm64Compiler)
+		verifyFunc func(t *testing.T, v float64, raw uint64)
+	}{
+		{
+			name:    "abs-32-bit",
+			is32bit: true,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileAbs(&wazeroir.OperationAbs{Type: wazeroir.Float32})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := float32(math.Abs(float64(v)))
+				actual := math.Float32frombits(uint32(raw))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "abs-64-bit",
+			is32bit: false,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileAbs(&wazeroir.OperationAbs{Type: wazeroir.Float64})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := math.Abs(v)
+				actual := math.Float64frombits(raw)
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "neg-32-bit",
+			is32bit: true,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileNeg(&wazeroir.OperationNeg{Type: wazeroir.Float32})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := -float32(v)
+				actual := math.Float32frombits(uint32(raw))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "neg-64-bit",
+			is32bit: false,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileNeg(&wazeroir.OperationNeg{Type: wazeroir.Float64})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := -v
+				actual := math.Float64frombits(raw)
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "ceil-32-bit",
+			is32bit: true,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileCeil(&wazeroir.OperationCeil{Type: wazeroir.Float32})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := float32(math.Ceil(float64(v)))
+				actual := math.Float32frombits(uint32(raw))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "ceil-64-bit",
+			is32bit: false,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileCeil(&wazeroir.OperationCeil{Type: wazeroir.Float64})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := math.Ceil(v)
+				actual := math.Float64frombits(raw)
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "floor-32-bit",
+			is32bit: true,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileFloor(&wazeroir.OperationFloor{Type: wazeroir.Float32})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := float32(math.Floor(float64(v)))
+				actual := math.Float32frombits(uint32(raw))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "floor-64-bit",
+			is32bit: false,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileFloor(&wazeroir.OperationFloor{Type: wazeroir.Float64})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := math.Floor(v)
+				actual := math.Float64frombits(raw)
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "trunc-32-bit",
+			is32bit: true,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileTrunc(&wazeroir.OperationTrunc{Type: wazeroir.Float32})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := float32(math.Trunc(float64(v)))
+				actual := math.Float32frombits(uint32(raw))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "trunc-64-bit",
+			is32bit: false,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileTrunc(&wazeroir.OperationTrunc{Type: wazeroir.Float64})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := math.Trunc(v)
+				actual := math.Float64frombits(raw)
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		// TODO: Nearest
+		{
+			name:    "sqrt-32-bit",
+			is32bit: true,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileSqrt(&wazeroir.OperationSqrt{Type: wazeroir.Float32})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := float32(math.Sqrt(float64(v)))
+				actual := math.Float32frombits(uint32(raw))
+				if math.IsNaN(float64(exp)) {
+					require.True(t, math.IsNaN(float64(actual)))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+		{
+			name:    "sqrt-64-bit",
+			is32bit: false,
+			setupFunc: func(t *testing.T, compiler *arm64Compiler) {
+				err := compiler.compileSqrt(&wazeroir.OperationSqrt{Type: wazeroir.Float64})
+				require.NoError(t, err)
+			},
+			verifyFunc: func(t *testing.T, v float64, raw uint64) {
+				exp := math.Sqrt(v)
+				actual := math.Float64frombits(raw)
+				if math.IsNaN(exp) {
+					require.True(t, math.IsNaN(actual))
+				} else {
+					require.Equal(t, exp, actual)
+				}
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			for _, v := range []float64{
+				0, 1 << 63, 1<<63 | 12345, 1 << 31,
+				1<<31 | 123455, 6.8719476736e+10,
+				-4.5, // This produces the different result between math.Round and ROUND with 0x00 mode.
+				1.37438953472e+11, -1.3,
+				-1231.123, 1.3, 100.3, -100.3, 1231.123,
+				math.Inf(1), math.Inf(-1), math.NaN(),
+			} {
+				v := v
+				t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+
+					// Setup the target values.
+					if tc.is32bit {
+						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: float32(v)})
+						require.NoError(t, err)
+					} else {
+						err := compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
+						require.NoError(t, err)
+					}
+
+					tc.setupFunc(t, compiler)
+
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
+
+					// Generate and run the code under test.
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+					env.exec(code)
+
+					tc.verifyFunc(t, v, env.stackTopAsUint64())
+				})
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		is32bit    bool
