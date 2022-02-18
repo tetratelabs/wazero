@@ -1994,7 +1994,7 @@ func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	if o.Signed {
 		return c.compileSimpleUniop(arm64.ASXTW)
 	} else {
-		return c.compileSimpleUniop(arm64.AMOVD)
+		return c.compileSimpleUniop(arm64.AUXTW)
 	}
 }
 

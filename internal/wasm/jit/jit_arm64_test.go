@@ -2892,3 +2892,223 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 		})
 	}
 }
+
+func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
+	for _, v := range []float64{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		math.MaxFloat64,
+		math.SmallestNonzeroFloat64,
+		6.8719476736e+10,  /* = 1 << 36 */
+		1.37438953472e+11, /* = 1 << 37 */
+		math.Inf(1), math.Inf(-1), math.NaN(),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Setup the demote target.
+			err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF32DemoteFromF64()
+			require.NoError(t, err)
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+
+			// Run code.
+			env.exec(code)
+
+			// Check the result.
+			require.Equal(t, uint64(1), env.stackPointer())
+			if math.IsNaN(v) {
+				require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+			} else {
+				exp := float32(v)
+				actual := env.stackTopAsFloat32()
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
+	for _, v := range []float32{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN()),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Setup the promote target.
+			err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF64PromoteFromF32()
+			require.NoError(t, err)
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			// Check the result.
+			require.Equal(t, uint64(1), env.stackPointer())
+			if math.IsNaN(float64(v)) {
+				require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+			} else {
+				exp := float64(v)
+				actual := env.stackTopAsFloat64()
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileReinterpret(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindF32ReinterpretFromI32,
+		wazeroir.OperationKindF64ReinterpretFromI64,
+		wazeroir.OperationKindI32ReinterpretFromF32,
+		wazeroir.OperationKindI64ReinterpretFromF64,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, originOnStack := range []bool{false, true} {
+				originOnStack := originOnStack
+				t.Run(fmt.Sprintf("%v", originOnStack), func(t *testing.T) {
+					for _, v := range []uint64{
+						0, 1, 1 << 16, 1 << 31, 1 << 32, 1 << 63,
+						math.MaxInt32, math.MaxUint32, math.MaxUint64,
+					} {
+						v := v
+						t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							if originOnStack {
+								loc := compiler.locationStack.pushValueLocationOnStack()
+								env.stack()[loc.stackPointer] = v
+								env.setStackPointer(1)
+							}
+
+							var is32Bit bool
+							switch kind {
+							case wazeroir.OperationKindF32ReinterpretFromI32:
+								is32Bit = true
+								if !originOnStack {
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+									require.NoError(t, err)
+								}
+								err = compiler.compileF32ReinterpretFromI32()
+								require.NoError(t, err)
+							case wazeroir.OperationKindF64ReinterpretFromI64:
+								if !originOnStack {
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+									require.NoError(t, err)
+								}
+								err = compiler.compileF64ReinterpretFromI64()
+								require.NoError(t, err)
+							case wazeroir.OperationKindI32ReinterpretFromF32:
+								is32Bit = true
+								if !originOnStack {
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+									require.NoError(t, err)
+								}
+								err = compiler.compileI32ReinterpretFromF32()
+								require.NoError(t, err)
+							case wazeroir.OperationKindI64ReinterpretFromF64:
+								if !originOnStack {
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+									require.NoError(t, err)
+								}
+								err = compiler.compileI64ReinterpretFromF64()
+								require.NoError(t, err)
+							default:
+								t.Fail()
+							}
+
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							// Generate and run the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// Reinterpret must preserve the bit-pattern.
+							if is32Bit {
+								require.Equal(t, uint32(v), env.stackTopAsUint32())
+							} else {
+								require.Equal(t, v, env.stackTopAsUint64())
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileExtend(t *testing.T) {
+	for _, signed := range []bool{false, true} {
+		signed := signed
+		t.Run(fmt.Sprintf("signed=%v", signed), func(t *testing.T) {
+			for _, v := range []uint32{
+				0, 1, 1 << 14, 1 << 31, math.MaxUint32, 0xFFFFFFFF, math.MaxInt32,
+			} {
+				v := v
+				t.Run(fmt.Sprintf("%v", v), func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t)
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+
+					// Setup the promote target.
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: v})
+					require.NoError(t, err)
+
+					err = compiler.compileExtend(&wazeroir.OperationExtend{Signed: signed})
+					require.NoError(t, err)
+
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
+
+					// Generate and run the code under test.
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+					env.exec(code)
+
+					require.Equal(t, uint64(1), env.stackPointer())
+					if signed {
+						expected := int64(int32(v))
+						require.Equal(t, expected, env.stackTopAsInt64())
+					} else {
+						expected := uint64(uint32(v))
+						require.Equal(t, expected, env.stackTopAsUint64())
+					}
+				})
+			}
+		})
+	}
+}
