@@ -1927,7 +1927,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 }
 
 func (c *arm64Compiler) compileI32WrapFromI64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleUniop(arm64.AMOVW)
 }
 
 func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
@@ -1938,32 +1938,75 @@ func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 	return fmt.Errorf("TODO: unsupported on arm64")
 }
 
+// compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the arm64 architecture.
 func (c *arm64Compiler) compileF32DemoteFromF64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleUniop(arm64.AFCVTDS)
 }
 
+// compileF64PromoteFromF32 implements compiler.compileF64PromoteFromF32 for the arm64 architecture.
 func (c *arm64Compiler) compileF64PromoteFromF32() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleUniop(arm64.AFCVTSD)
 }
 
+// compileI32ReinterpretFromF32 implements compiler.compileI32ReinterpretFromF32 for the arm64 architecture.
 func (c *arm64Compiler) compileI32ReinterpretFromF32() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleConversion(arm64.AFMOVS, generalPurposeRegisterTypeInt)
 }
 
+// compileI64ReinterpretFromF64 implements compiler.compileI64ReinterpretFromF64 for the arm64 architecture.
 func (c *arm64Compiler) compileI64ReinterpretFromF64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleConversion(arm64.AFMOVD, generalPurposeRegisterTypeInt)
 }
 
+// compileF32ReinterpretFromI32 implements compiler.compileF32ReinterpretFromI32 for the arm64 architecture.
 func (c *arm64Compiler) compileF32ReinterpretFromI32() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleConversion(arm64.AFMOVS, generalPurposeRegisterTypeFloat)
 }
 
+// compileF64ReinterpretFromI64 implements compiler.compileF64ReinterpretFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileF64ReinterpretFromI64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleConversion(arm64.AFMOVD, generalPurposeRegisterTypeFloat)
+}
+
+func (c *arm64Compiler) compileSimpleConversion(inst obj.As, destinationRegType generalPurposeRegisterType) error {
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(destinationRegType)
+		return nil
+	}
+
+	source, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	destinationReg, err := c.allocateRegister(destinationRegType)
+	if err != nil {
+		return err
+	}
+
+	c.compileRegisterToRegisterInstruction(inst, source.register, destinationReg)
+	c.locationStack.pushValueLocationOnRegister(destinationReg)
+	return nil
 }
 
 func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Signed {
+		return c.compileSimpleUniop(arm64.ASXTW)
+	} else {
+		return c.compileSimpleUniop(arm64.AMOVD)
+	}
+}
+
+func (c *arm64Compiler) compileSimpleUniop(inst obj.As) error {
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+	reg := v.register
+	c.compileRegisterToRegisterInstruction(inst, reg, reg)
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
 // compileEq implements compiler.compileEq for the arm64 architecture.
