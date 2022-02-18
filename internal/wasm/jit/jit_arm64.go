@@ -44,10 +44,10 @@ type archContext struct {
 	// consts on engine struct so that we can quickly access them during various operations.
 
 	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
-	// Note: this can be obtained by moving $1 and doing left-shift with 32, but it is
+	// Note: this can be obtained by moving $1 and doing left-shift with 31, but it is
 	// slower than directly loading fron this location.
 	minimum32BitSignedInt int32
-	// Note: this can be obtained by moving $1 and doing left-shift with 64, but it is
+	// Note: this can be obtained by moving $1 and doing left-shift with 63, but it is
 	// slower than directly loading fron this location.
 	// minimum64BitSignedInt is used for overflow check for 64-bit signed division.
 	minimum64BitSignedInt int64
@@ -1886,44 +1886,166 @@ func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
 	return nil
 }
 
+// compileAbs implements compiler.compileAbs for the arm64 architecture.
 func (c *arm64Compiler) compileAbs(o *wazeroir.OperationAbs) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFABSS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFABSD)
+	}
 }
 
+// compileNeg implements compiler.compileNeg for the arm64 architecture.
 func (c *arm64Compiler) compileNeg(o *wazeroir.OperationNeg) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFNEGS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFNEGD)
+	}
 }
 
+// compileCeil implements compiler.compileCeil for the arm64 architecture.
 func (c *arm64Compiler) compileCeil(o *wazeroir.OperationCeil) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTPS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTPD)
+	}
 }
 
+// compileFloor implements compiler.compileFloor for the arm64 architecture.
 func (c *arm64Compiler) compileFloor(o *wazeroir.OperationFloor) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTMS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTMD)
+	}
 }
 
+// compileTrunc implements compiler.compileTrunc for the arm64 architecture.
 func (c *arm64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTZS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTZD)
+	}
 }
 
+// compileNearest implements compiler.compileNearest for the arm64 architecture.
 func (c *arm64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTNS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTND)
+	}
 }
 
+// compileSqrt implements compiler.compileSqrt for the arm64 architecture.
 func (c *arm64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFSQRTS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFSQRTD)
+	}
 }
 
+func (c *arm64Compiler) compileSimpleFloatUniop(inst obj.As) error {
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+	reg := v.register
+	c.compileRegisterToRegisterInstruction(inst, reg, reg)
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
+}
+
+// compileMin implements compiler.compileMin for the arm64 architecture.
 func (c *arm64Compiler) compileMin(o *wazeroir.OperationMin) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatBinop(arm64.AFMINS)
+	} else {
+		return c.compileSimpleFloatBinop(arm64.AFMIND)
+	}
 }
 
+// compileMax implements compiler.compileMax for the arm64 architecture.
 func (c *arm64Compiler) compileMax(o *wazeroir.OperationMax) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatBinop(arm64.AFMAXS)
+	} else {
+		return c.compileSimpleFloatBinop(arm64.AFMAXD)
+	}
 }
 
+func (c *arm64Compiler) compileSimpleFloatBinop(inst obj.As) error {
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+	c.compileRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
+}
+
+// compileCopysign implements compiler.compileCopysign for the arm64 architecture.
 func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+
+	var fmov obj.As
+	var minValueOffsetInEngine int64
+	if o.Type == wazeroir.Float32 {
+		fmov = arm64.AFMOVS
+		minValueOffsetInEngine = engineArchContextMinimum32BitSignedIntOffset
+	} else {
+		fmov = arm64.AFMOVD
+		minValueOffsetInEngine = engineArchContextMinimum64BitSignedIntOffset
+	}
+
+	c.markRegisterUsed(x1.register, x2.register)
+	freg, err := c.allocateRegister(generalPurposeRegisterTypeFloat)
+	if err != nil {
+		return err
+	}
+
+	x1vreg := simdRegisterForScalarFloatRegister(x1.register)
+	x2vreg := simdRegisterForScalarFloatRegister(x2.register)
+	vreg := simdRegisterForScalarFloatRegister(freg)
+
+	// This is exactly the same code emitted by GCC for "__builtin_copysign":
+	//
+	//    mov     x0, -9223372036854775808
+	//    fmov    d2, x0
+	//    vbit     v0.8b, v1.8b, v2.8b
+	//
+	// "mov freg, -9223372036854775808 (stored at engine.minimum64BitSignedInt)"
+	c.compileMemoryToRegisterInstruction(
+		fmov,
+		reservedRegisterForEngine, minValueOffsetInEngine,
+		freg,
+	)
+
+	// VBIT inserts each bit from the first operand into the destination if the corresponding bit of the second operand is 1,
+	// otherwise it leaves the destination bit unchanged.
+	// See https://developer.arm.com/documentation/dui0801/g/Advanced-SIMD-Instructions--32-bit-/VBIT
+	//
+	// For how to specify "V0.B8" (SIMD register arrangement), see
+	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
+	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
+	//
+	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b" == "inserting 64th bit of x2 into x1".
+	c.compileTwoRegistersToRegisterInstruction(arm64.AVBIT,
+		vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5,
+		x2vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5,
+		x1vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5,
+	)
+
+	c.markRegisterUnused(x2.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileI32WrapFromI64() error {
