@@ -3401,8 +3401,6 @@ func TestArm64Compiler_compileF32DemoteFromF64(t *testing.T) {
 			// Generate and run the code under test.
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
-			// Run code.
 			env.exec(code)
 
 			// Check the result.
