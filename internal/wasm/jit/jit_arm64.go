@@ -2053,6 +2053,7 @@ func (c *arm64Compiler) compileI32WrapFromI64() error {
 	return c.compileSimpleUniop(arm64.AMOVW)
 }
 
+// compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
 func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
 	// Clear the floating point status register (FPSR).
 	c.compileRegisterToRegisterInstruction(arm64.AMSR, zeroRegister, arm64.REG_FPSR)
@@ -2093,8 +2094,28 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	return nil
 }
 
+// compileFConvertFromI implements compiler.compileFConvertFromI for the arm64 architecture.
 func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	var convinst obj.As
+	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
+		convinst = arm64.ASCVTFWS
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
+		convinst = arm64.ASCVTFS
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
+		convinst = arm64.ASCVTFWD
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
+		convinst = arm64.ASCVTFD
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
+		convinst = arm64.AUCVTFWS
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
+		convinst = arm64.AUCVTFS
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+		convinst = arm64.AUCVTFWD
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
+		convinst = arm64.AUCVTFD
+	}
+	c.compileSimpleConversion(convinst, generalPurposeRegisterTypeFloat)
+	return nil
 }
 
 // compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the arm64 architecture.
