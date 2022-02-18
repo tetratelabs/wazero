@@ -9,7 +9,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	internal "github.com/tetratelabs/wazero/internal/moremath"
+	"github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -1233,43 +1233,14 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 			}
 		case wazeroir.OperationKindNearest:
 			{
-				// TODO: look at https://github.com/bytecodealliance/wasmtime/pull/2171 and reconsider this algorithm
 				if op.b1 == 0 {
 					// Float32
 					f := math.Float32frombits(uint32(it.pop()))
-					if f != -0 && f != 0 {
-						ceil := float32(math.Ceil(float64(f)))
-						floor := float32(math.Floor(float64(f)))
-						distToCeil := math.Abs(float64(f - ceil))
-						distToFloor := math.Abs(float64(f - floor))
-						h := ceil / 2.0
-						if distToCeil < distToFloor {
-							f = ceil
-						} else if distToCeil == distToFloor && float32(math.Floor(float64(h))) == h {
-							f = ceil
-						} else {
-							f = floor
-						}
-					}
-					it.push(uint64(math.Float32bits(f)))
+					it.push(uint64(math.Float32bits(moremath.WasmCompatNearestF32(f))))
 				} else {
 					// Float64
 					f := math.Float64frombits(it.pop())
-					if f != -0 && f != 0 {
-						ceil := math.Ceil(f)
-						floor := math.Floor(f)
-						distToCeil := math.Abs(f - ceil)
-						distToFloor := math.Abs(f - floor)
-						h := ceil / 2.0
-						if distToCeil < distToFloor {
-							f = ceil
-						} else if distToCeil == distToFloor && math.Floor(float64(h)) == h {
-							f = ceil
-						} else {
-							f = floor
-						}
-					}
-					it.push(math.Float64bits(f))
+					it.push(math.Float64bits(moremath.WasmCompatNearestF64(f)))
 				}
 				frame.pc++
 			}
@@ -1292,11 +1263,11 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					// Float32
 					v2 := math.Float32frombits(uint32(it.pop()))
 					v1 := math.Float32frombits(uint32(it.pop()))
-					it.push(uint64(math.Float32bits(float32(internal.WasmCompatMin(float64(v1), float64(v2))))))
+					it.push(uint64(math.Float32bits(float32(moremath.WasmCompatMin(float64(v1), float64(v2))))))
 				} else {
 					v2 := math.Float64frombits(it.pop())
 					v1 := math.Float64frombits(it.pop())
-					it.push(math.Float64bits(internal.WasmCompatMin(v1, v2)))
+					it.push(math.Float64bits(moremath.WasmCompatMin(v1, v2)))
 				}
 				frame.pc++
 			}
@@ -1307,12 +1278,12 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					// Float32
 					v2 := math.Float32frombits(uint32(it.pop()))
 					v1 := math.Float32frombits(uint32(it.pop()))
-					it.push(uint64(math.Float32bits(float32(internal.WasmCompatMax(float64(v1), float64(v2))))))
+					it.push(uint64(math.Float32bits(float32(moremath.WasmCompatMax(float64(v1), float64(v2))))))
 				} else {
 					// Float64
 					v2 := math.Float64frombits(it.pop())
 					v1 := math.Float64frombits(it.pop())
-					it.push(math.Float64bits(internal.WasmCompatMax(v1, v2)))
+					it.push(math.Float64bits(moremath.WasmCompatMax(v1, v2)))
 				}
 				frame.pc++
 			}

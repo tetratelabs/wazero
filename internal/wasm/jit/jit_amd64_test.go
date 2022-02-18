@@ -18,7 +18,7 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
-	internal "github.com/tetratelabs/wazero/internal/moremath"
+	"github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -4552,40 +4552,10 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 							require.NoError(t, err)
 						}
 						is32Bit = o.Type == wazeroir.Float32
-						// The same algorithm as in wazeroir/interpreter.go.
 						if is32Bit {
-							expFloat32 = math.Float32frombits(uint32(v))
-							f64 := float64(expFloat32)
-							if expFloat32 != -0 && expFloat32 != 0 {
-								ceil := float32(math.Ceil(f64))
-								floor := float32(math.Floor(f64))
-								distToCeil := math.Abs(float64(expFloat32 - ceil))
-								distToFloor := math.Abs(float64(expFloat32 - floor))
-								h := ceil / 2.0
-								if distToCeil < distToFloor {
-									expFloat32 = ceil
-								} else if distToCeil == distToFloor && float32(math.Floor(float64(h))) == h {
-									expFloat32 = ceil
-								} else {
-									expFloat32 = floor
-								}
-							}
+							expFloat32 = moremath.WasmCompatNearestF32(math.Float32frombits(uint32(v)))
 						} else {
-							expFloat64 = math.Float64frombits(v)
-							if expFloat64 != -0 && expFloat64 != 0 {
-								ceil := math.Ceil(expFloat64)
-								floor := math.Floor(expFloat64)
-								distToCeil := math.Abs(expFloat64 - ceil)
-								distToFloor := math.Abs(expFloat64 - floor)
-								h := ceil / 2.0
-								if distToCeil < distToFloor {
-									expFloat64 = ceil
-								} else if distToCeil == distToFloor && math.Floor(h) == h {
-									expFloat64 = ceil
-								} else {
-									expFloat64 = floor
-								}
-							}
+							expFloat64 = moremath.WasmCompatNearestF64(math.Float64frombits(v))
 						}
 					}
 
@@ -4696,9 +4666,9 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 						}
 						is32Bit = o.Type == wazeroir.Float32
 						if is32Bit {
-							expFloat32 = float32(internal.WasmCompatMin(float64(float32(vs.x1)), float64(float32(vs.x2))))
+							expFloat32 = float32(moremath.WasmCompatMin(float64(float32(vs.x1)), float64(float32(vs.x2))))
 						} else {
-							expFloat64 = internal.WasmCompatMin(vs.x1, vs.x2)
+							expFloat64 = moremath.WasmCompatMin(vs.x1, vs.x2)
 						}
 					case *wazeroir.OperationMax:
 						compileOperationFunc = func() {
@@ -4707,9 +4677,9 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 						}
 						is32Bit = o.Type == wazeroir.Float32
 						if is32Bit {
-							expFloat32 = float32(internal.WasmCompatMax(float64(float32(vs.x1)), float64(float32(vs.x2))))
+							expFloat32 = float32(moremath.WasmCompatMax(float64(float32(vs.x1)), float64(float32(vs.x2))))
 						} else {
-							expFloat64 = internal.WasmCompatMax(vs.x1, vs.x2)
+							expFloat64 = moremath.WasmCompatMax(vs.x1, vs.x2)
 						}
 					case *wazeroir.OperationCopysign:
 						compileOperationFunc = func() {
