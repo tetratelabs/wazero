@@ -1957,7 +1957,7 @@ func (c *arm64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	if o.Type == wazeroir.Float32 {
 		return c.compileSimpleFloatBinop(arm64.AFMINS)
 	} else {
-		return c.compileSimpleFloatBinop(arm64.AFMINS)
+		return c.compileSimpleFloatBinop(arm64.AFMIND)
 	}
 }
 
@@ -2026,10 +2026,10 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
 	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
 	//
-	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b"
+	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b" == "inserting 64th bit of x2 into x1".
 	c.compileTwoRegistersToRegisterInstruction(arm64.AVBIT,
-		x2vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5,
 		vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5,
+		x2vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5,
 		x1vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5,
 	)
 

@@ -9,7 +9,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	internal "github.com/tetratelabs/wazero/internal/moremath"
+	"github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -1292,11 +1292,11 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					// Float32
 					v2 := math.Float32frombits(uint32(it.pop()))
 					v1 := math.Float32frombits(uint32(it.pop()))
-					it.push(uint64(math.Float32bits(float32(internal.WasmCompatMin(float64(v1), float64(v2))))))
+					it.push(uint64(math.Float32bits(float32(moremath.WasmCompatMin(float64(v1), float64(v2))))))
 				} else {
 					v2 := math.Float64frombits(it.pop())
 					v1 := math.Float64frombits(it.pop())
-					it.push(math.Float64bits(internal.WasmCompatMin(v1, v2)))
+					it.push(math.Float64bits(moremath.WasmCompatMin(v1, v2)))
 				}
 				frame.pc++
 			}
@@ -1307,12 +1307,12 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					// Float32
 					v2 := math.Float32frombits(uint32(it.pop()))
 					v1 := math.Float32frombits(uint32(it.pop()))
-					it.push(uint64(math.Float32bits(float32(internal.WasmCompatMax(float64(v1), float64(v2))))))
+					it.push(uint64(math.Float32bits(float32(moremath.WasmCompatMax(float64(v1), float64(v2))))))
 				} else {
 					// Float64
 					v2 := math.Float64frombits(it.pop())
 					v1 := math.Float64frombits(it.pop())
-					it.push(math.Float64bits(internal.WasmCompatMax(v1, v2)))
+					it.push(math.Float64bits(moremath.WasmCompatMax(v1, v2)))
 				}
 				frame.pc++
 			}

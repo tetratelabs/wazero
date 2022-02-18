@@ -18,7 +18,7 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
-	internal "github.com/tetratelabs/wazero/internal/moremath"
+	"github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -4696,9 +4696,9 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 						}
 						is32Bit = o.Type == wazeroir.Float32
 						if is32Bit {
-							expFloat32 = float32(internal.WasmCompatMin(float64(float32(vs.x1)), float64(float32(vs.x2))))
+							expFloat32 = float32(moremath.WasmCompatMin(float64(float32(vs.x1)), float64(float32(vs.x2))))
 						} else {
-							expFloat64 = internal.WasmCompatMin(vs.x1, vs.x2)
+							expFloat64 = moremath.WasmCompatMin(vs.x1, vs.x2)
 						}
 					case *wazeroir.OperationMax:
 						compileOperationFunc = func() {
@@ -4707,9 +4707,9 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 						}
 						is32Bit = o.Type == wazeroir.Float32
 						if is32Bit {
-							expFloat32 = float32(internal.WasmCompatMax(float64(float32(vs.x1)), float64(float32(vs.x2))))
+							expFloat32 = float32(moremath.WasmCompatMax(float64(float32(vs.x1)), float64(float32(vs.x2))))
 						} else {
-							expFloat64 = internal.WasmCompatMax(vs.x1, vs.x2)
+							expFloat64 = moremath.WasmCompatMax(vs.x1, vs.x2)
 						}
 					case *wazeroir.OperationCopysign:
 						compileOperationFunc = func() {
