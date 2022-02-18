@@ -1866,7 +1866,7 @@ func TestArm64Compiler_compileSwap(t *testing.T) {
 	require.Equal(t, x, env.stack()[0])
 }
 
-func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
+func Testarm64Compiler_compileModuleContextInitialization(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -1952,7 +1952,7 @@ func TestAmd64Compiler_compileModuleContextInitialization(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
+func Testarm64Compiler_compileGlobalGet(t *testing.T) {
 	const globalValue uint64 = 12345
 	for i, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
@@ -2003,7 +2003,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
+func Testarm64Compiler_compileGlobalSet(t *testing.T) {
 	const valueToSet uint64 = 12345
 	for i, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64,
@@ -2484,7 +2484,7 @@ func TestArm64Compiler_compileMemoryGrow(t *testing.T) {
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 }
 
-func TestAmd64Compiler_compileMemorySize(t *testing.T) {
+func Testarm64Compiler_compileMemorySize(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
 	compiler.f.ModuleInstance = env.moduleInstance
@@ -2511,7 +2511,7 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
 }
 
-func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
+func Testarm64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 	t.Run("not grow", func(t *testing.T) {
 		const stackPointerCeil = 5
 		for _, baseOffset := range []uint64{5, 10, 20} {
@@ -2894,7 +2894,7 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
+func Testarm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		is32bit    bool
@@ -3144,8 +3144,7 @@ func TestAmd64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			for _, v := range []float64{
 				0, 1 << 63, 1<<63 | 12345, 1 << 31,
-				1<<31 | 123455, 6.8719476736e+10,
-				-4.5, // This produces the different result between math.Round and ROUND with 0x00 mode.
+				1<<31 | 123455, 6.8719476736e+10, -4.5,
 				1.37438953472e+11, -1.3,
 				-1231.123, 1.3, 100.3, -100.3, 1231.123,
 				math.Inf(1), math.Inf(-1), math.NaN(),
@@ -3157,7 +3156,6 @@ func TestAmd64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
 
-					// Setup the target values.
 					if tc.is32bit {
 						err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: float32(v)})
 						require.NoError(t, err)
@@ -3183,7 +3181,7 @@ func TestAmd64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 	}
 }
 
-func TestAmd64Compiler_compile_Min_Max_Copysign(t *testing.T) {
+func Testarm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		is32bit    bool
