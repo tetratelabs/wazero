@@ -3591,6 +3591,7 @@ func TestArm64Compiler_compileExtend(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
+	t.Skip()
 	for _, tc := range []struct {
 		outputType wazeroir.SignedInt
 		inputType  wazeroir.Float
