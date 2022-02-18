@@ -1887,39 +1887,96 @@ func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
 }
 
 func (c *arm64Compiler) compileAbs(o *wazeroir.OperationAbs) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFABSS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFABSD)
+	}
 }
 
 func (c *arm64Compiler) compileNeg(o *wazeroir.OperationNeg) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFNEGS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFNEGD)
+	}
 }
 
 func (c *arm64Compiler) compileCeil(o *wazeroir.OperationCeil) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTPS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTPD)
+	}
 }
 
 func (c *arm64Compiler) compileFloor(o *wazeroir.OperationFloor) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTMS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTMD)
+	}
 }
 
 func (c *arm64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTZS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTZD)
+	}
 }
 
 func (c *arm64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFRINTNS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFRINTND)
+	}
 }
 
 func (c *arm64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatUniop(arm64.AFSQRTS)
+	} else {
+		return c.compileSimpleFloatUniop(arm64.AFSQRTD)
+	}
+}
+
+func (c *arm64Compiler) compileSimpleFloatUniop(inst obj.As) error {
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+	reg := v.register
+	c.compileRegisterToRegisterInstruction(inst, reg, reg)
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
 func (c *arm64Compiler) compileMin(o *wazeroir.OperationMin) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatBinop(arm64.AFMINS)
+	} else {
+		return c.compileSimpleFloatBinop(arm64.AFMINS)
+	}
 }
 
 func (c *arm64Compiler) compileMax(o *wazeroir.OperationMax) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Type == wazeroir.Float32 {
+		return c.compileSimpleFloatBinop(arm64.AFMAXS)
+	} else {
+		return c.compileSimpleFloatBinop(arm64.AFMAXD)
+	}
+}
+
+func (c *arm64Compiler) compileSimpleFloatBinop(inst obj.As) error {
+	x1, x2, err := c.popTwoValuesOnRegisters()
+	if err != nil {
+		return err
+	}
+	c.compileRegisterToRegisterInstruction(inst, x2.register, x1.register)
+	c.locationStack.pushValueLocationOnRegister(x1.register)
+	return nil
 }
 
 func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
