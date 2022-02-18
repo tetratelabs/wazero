@@ -3144,7 +3144,10 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			for _, v := range []float64{
 				0, 1 << 63, 1<<63 | 12345, 1 << 31,
-				1<<31 | 123455, 6.8719476736e+10, -4.5,
+				1<<31 | 123455, 6.8719476736e+10,
+				// This verifies that the impl is Wasm compatible in nearest, rather than being equivalent of math.Round.
+				// See moremath.WasmCompatNearestF32 and moremath.WasmCompatNearestF64
+				-4.5,
 				1.37438953472e+11, -1.3,
 				-1231.123, 1.3, 100.3, -100.3, 1231.123,
 				math.Inf(1), math.Inf(-1), math.NaN(),
