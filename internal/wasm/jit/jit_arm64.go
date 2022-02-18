@@ -323,6 +323,18 @@ func (c *arm64Compiler) compileTwoRegistersToNoneInstruction(instruction obj.As,
 	c.addInstruction(inst)
 }
 
+func (c *arm64Compiler) compileRegisterAndConstSourceToNoneInstruction(instruction obj.As, src int16, srcConst int64) {
+	inst := c.newProg()
+	inst.As = instruction
+	// TYPE_NONE indicates that this instruction doesn't have a destination.
+	// Note: this line is deletable as the value equals zero in anyway.
+	inst.To.Type = obj.TYPE_NONE
+	inst.From.Type = obj.TYPE_CONST
+	inst.From.Offset = srcConst
+	inst.Reg = src
+	c.addInstruction(inst)
+}
+
 func (c *arm64Compiler) compilelBranchInstruction(inst obj.As) (br *obj.Prog) {
 	br = c.newProg()
 	br.As = inst
@@ -2042,23 +2054,42 @@ func (c *arm64Compiler) compileI32WrapFromI64() error {
 }
 
 func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
+	// Clear the floating point status register (FPSR).
+	c.compileRegisterToRegisterInstruction(arm64.AMSR, zeroRegister, arm64.REG_FPSR)
+
+	var convinst obj.As
 	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
-		return c.compileSimpleConversion(arm64.AFCVTZSSW, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZSSW
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
-		return c.compileSimpleConversion(arm64.AFCVTZSS, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZSS
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt32 {
-		return c.compileSimpleConversion(arm64.AFCVTZSDW, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZSDW
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt64 {
-		return c.compileSimpleConversion(arm64.AFCVTZSD, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZSD
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
-		return c.compileSimpleConversion(arm64.AFCVTZUSW, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZUSW
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
-		return c.compileSimpleConversion(arm64.AFCVTZUS, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZUS
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint32 {
-		return c.compileSimpleConversion(arm64.AFCVTZUDW, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZUDW
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint64 {
-		return c.compileSimpleConversion(arm64.AFCVTZUD, generalPurposeRegisterTypeInt)
+		convinst = arm64.AFCVTZUD
 	}
+	c.compileSimpleConversion(convinst, generalPurposeRegisterTypeInt)
+
+	// Obtain the floating point status register value into the general purpose register,
+	// so that we can check if the conversion resulted in undefined behavior.
+	c.compileRegisterToRegisterInstruction(arm64.AMRS, arm64.REG_FPSR, reservedRegisterForTemporary)
+	// Check if the conversion was undefined by comparing the status with 1.
+	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
+	c.compileRegisterAndConstSourceToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, 1)
+
+	// If so, exit the execution with jitCallStatusCodeInvalidFloatToIntConversion.
+	br := c.compilelBranchInstruction(arm64.ABNE)
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+
+	// Otherwise, we branch into the next instruction.
+	c.setBranchTargetOnNext(br)
 	return nil
 }
 
