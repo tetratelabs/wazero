@@ -497,7 +497,7 @@ func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interp
 	in := make([]reflect.Value, tp.NumIn())
 
 	wasmParamOffset := 0
-	if f.funcInstance.FunctionKind != wasm.FunctionKindHost {
+	if f.funcInstance.FunctionKind != wasm.FunctionKindHostNoContext {
 		wasmParamOffset = 1
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {

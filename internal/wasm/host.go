@@ -16,8 +16,8 @@ type FunctionKind byte
 const (
 	// FunctionKindWasm is not a host function: it is implemented in Wasm.
 	FunctionKindWasm FunctionKind = iota
-	// FunctionKindHost is a function implemented in Go, with a signature matching FunctionType.
-	FunctionKindHost
+	// FunctionKindHostNoContext is a function implemented in Go, with a signature matching FunctionType.
+	FunctionKindHostNoContext
 	// FunctionKindHostGoContext is a function implemented in Go, with a signature matching FunctionType, except arg zero is
 	// a context.Context.
 	FunctionKindHostGoContext
@@ -51,7 +51,7 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 // GetHostFunctionCallContextValue returns a reflect.Value for a context param[0], or nil if there isn't one.
 func GetHostFunctionCallContextValue(fk FunctionKind, ctx *HostFunctionCallContext) *reflect.Value {
 	switch fk {
-	case FunctionKindHost: // no special param zero
+	case FunctionKindHostNoContext: // no special param zero
 	case FunctionKindHostGoContext:
 		val := reflect.New(goContextType).Elem()
 		val.Set(reflect.ValueOf(ctx.Context()))
@@ -74,7 +74,7 @@ func GetFunctionType(name string, fn *reflect.Value) (fk FunctionKind, ft *Funct
 
 	pOffset := 0
 	pCount := p.NumIn()
-	fk = FunctionKindHost
+	fk = FunctionKindHostNoContext
 	if pCount > 0 && p.In(0).Kind() == reflect.Interface {
 		p0 := p.In(0)
 		if p0.Implements(hostFunctionCallContextType) {

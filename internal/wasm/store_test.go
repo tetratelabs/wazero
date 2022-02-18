@@ -204,7 +204,7 @@ func TestStore_addHostFunction(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		s := NewStore(nopEngineInstance)
 		for i := 0; i < 10; i++ {
-			f := &FunctionInstance{FunctionKind: FunctionKindHost}
+			f := &FunctionInstance{FunctionKind: FunctionKindHostNoContext}
 			require.Len(t, s.Functions, i)
 
 			err := s.addFunctionInstance(f)

@@ -468,7 +468,7 @@ func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *w
 	// We pop the value and pass them as arguments in a reverse order according to the
 	// stack machine convention.
 	wasmParamOffset := 0
-	if fk != wasm.FunctionKindHost {
+	if fk != wasm.FunctionKindHostNoContext {
 		wasmParamOffset = 1
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {

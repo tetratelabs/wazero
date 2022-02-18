@@ -465,7 +465,7 @@ func TestGetFunctionType(t *testing.T) {
 		{
 			name:         "nullary",
 			inputFunc:    func() {},
-			expectedKind: FunctionKindHost,
+			expectedKind: FunctionKindHostNoContext,
 			expectedType: &FunctionType{Params: []ValueType{}, Results: []ValueType{}},
 		},
 		{
@@ -483,7 +483,7 @@ func TestGetFunctionType(t *testing.T) {
 		{
 			name:         "all supported params and i32 result",
 			inputFunc:    func(uint32, uint64, float32, float64) uint32 { return 0 },
-			expectedKind: FunctionKindHost,
+			expectedKind: FunctionKindHostNoContext,
 			expectedType: &FunctionType{Params: []ValueType{i32, i64, f32, f64}, Results: []ValueType{i32}},
 		},
 		{
