@@ -4273,7 +4273,6 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 							require.Equal(t, int64(math.Trunc(float64(f32))), env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
-						// ???????
 						if v < math.MinInt32 || v > math.MaxInt32 {
 							expStatus = jitCallStatusIntegerOverflow
 						}
@@ -4321,7 +4320,6 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 						t.Fatal()
 					}
 
-					// Check the jit status code if necessary.
 					require.Equal(t, expStatus, env.jitStatus())
 				})
 			}

@@ -323,6 +323,18 @@ func (c *arm64Compiler) compileTwoRegistersToNoneInstruction(instruction obj.As,
 	c.addInstruction(inst)
 }
 
+func (c *arm64Compiler) compileRegisterAndConstSourceToNoneInstruction(instruction obj.As, src int16, srcConst int64) {
+	inst := c.newProg()
+	inst.As = instruction
+	// TYPE_NONE indicates that this instruction doesn't have a destination.
+	// Note: this line is deletable as the value equals zero in anyway.
+	inst.To.Type = obj.TYPE_NONE
+	inst.From.Type = obj.TYPE_CONST
+	inst.From.Offset = srcConst
+	inst.Reg = src
+	c.addInstruction(inst)
+}
+
 func (c *arm64Compiler) compilelBranchInstruction(inst obj.As) (br *obj.Prog) {
 	br = c.newProg()
 	br.As = inst
@@ -1889,75 +1901,64 @@ func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
 // compileAbs implements compiler.compileAbs for the arm64 architecture.
 func (c *arm64Compiler) compileAbs(o *wazeroir.OperationAbs) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleFloatUniop(arm64.AFABSS)
+		return c.compileSimpleUnop(arm64.AFABSS)
 	} else {
-		return c.compileSimpleFloatUniop(arm64.AFABSD)
+		return c.compileSimpleUnop(arm64.AFABSD)
 	}
 }
 
 // compileNeg implements compiler.compileNeg for the arm64 architecture.
 func (c *arm64Compiler) compileNeg(o *wazeroir.OperationNeg) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleFloatUniop(arm64.AFNEGS)
+		return c.compileSimpleUnop(arm64.AFNEGS)
 	} else {
-		return c.compileSimpleFloatUniop(arm64.AFNEGD)
+		return c.compileSimpleUnop(arm64.AFNEGD)
 	}
 }
 
 // compileCeil implements compiler.compileCeil for the arm64 architecture.
 func (c *arm64Compiler) compileCeil(o *wazeroir.OperationCeil) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleFloatUniop(arm64.AFRINTPS)
+		return c.compileSimpleUnop(arm64.AFRINTPS)
 	} else {
-		return c.compileSimpleFloatUniop(arm64.AFRINTPD)
+		return c.compileSimpleUnop(arm64.AFRINTPD)
 	}
 }
 
 // compileFloor implements compiler.compileFloor for the arm64 architecture.
 func (c *arm64Compiler) compileFloor(o *wazeroir.OperationFloor) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleFloatUniop(arm64.AFRINTMS)
+		return c.compileSimpleUnop(arm64.AFRINTMS)
 	} else {
-		return c.compileSimpleFloatUniop(arm64.AFRINTMD)
+		return c.compileSimpleUnop(arm64.AFRINTMD)
 	}
 }
 
 // compileTrunc implements compiler.compileTrunc for the arm64 architecture.
 func (c *arm64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleFloatUniop(arm64.AFRINTZS)
+		return c.compileSimpleUnop(arm64.AFRINTZS)
 	} else {
-		return c.compileSimpleFloatUniop(arm64.AFRINTZD)
+		return c.compileSimpleUnop(arm64.AFRINTZD)
 	}
 }
 
 // compileNearest implements compiler.compileNearest for the arm64 architecture.
 func (c *arm64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleFloatUniop(arm64.AFRINTNS)
+		return c.compileSimpleUnop(arm64.AFRINTNS)
 	} else {
-		return c.compileSimpleFloatUniop(arm64.AFRINTND)
+		return c.compileSimpleUnop(arm64.AFRINTND)
 	}
 }
 
 // compileSqrt implements compiler.compileSqrt for the arm64 architecture.
 func (c *arm64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleFloatUniop(arm64.AFSQRTS)
+		return c.compileSimpleUnop(arm64.AFSQRTS)
 	} else {
-		return c.compileSimpleFloatUniop(arm64.AFSQRTD)
+		return c.compileSimpleUnop(arm64.AFSQRTD)
 	}
-}
-
-func (c *arm64Compiler) compileSimpleFloatUniop(inst obj.As) error {
-	v, err := c.popValueOnRegister()
-	if err != nil {
-		return err
-	}
-	reg := v.register
-	c.compileRegisterToRegisterInstruction(inst, reg, reg)
-	c.locationStack.pushValueLocationOnRegister(reg)
-	return nil
 }
 
 // compileMin implements compiler.compileMin for the arm64 architecture.
@@ -2048,44 +2049,160 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	return nil
 }
 
+// compileI32WrapFromI64 implements compiler.compileI32WrapFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileI32WrapFromI64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleUnop(arm64.AMOVW)
 }
 
+// compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
 func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	// Clear the floating point status register (FPSR).
+	c.compileRegisterToRegisterInstruction(arm64.AMSR, zeroRegister, arm64.REG_FPSR)
+
+	var convinst obj.As
+	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
+		convinst = arm64.AFCVTZSSW
+	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
+		convinst = arm64.AFCVTZSS
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt32 {
+		convinst = arm64.AFCVTZSDW
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt64 {
+		convinst = arm64.AFCVTZSD
+	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
+		convinst = arm64.AFCVTZUSW
+	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
+		convinst = arm64.AFCVTZUS
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint32 {
+		convinst = arm64.AFCVTZUDW
+	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint64 {
+		convinst = arm64.AFCVTZUD
+	}
+	c.compileSimpleConversion(convinst, generalPurposeRegisterTypeInt)
+
+	// Obtain the floating point status register value into the general purpose register,
+	// so that we can check if the conversion resulted in undefined behavior.
+	c.compileRegisterToRegisterInstruction(arm64.AMRS, arm64.REG_FPSR, reservedRegisterForTemporary)
+	// Check if the conversion was undefined by comparing the status with 1.
+	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
+	c.compileRegisterAndConstSourceToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, 1)
+
+	// If so, exit the execution with jitCallStatusCodeInvalidFloatToIntConversion.
+	br := c.compilelBranchInstruction(arm64.ABNE)
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+
+	// Otherwise, we branch into the next instruction.
+	c.setBranchTargetOnNext(br)
+	return nil
 }
 
+// compileFConvertFromI implements compiler.compileFConvertFromI for the arm64 architecture.
 func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	var convinst obj.As
+	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
+		convinst = arm64.ASCVTFWS
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
+		convinst = arm64.ASCVTFS
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
+		convinst = arm64.ASCVTFWD
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
+		convinst = arm64.ASCVTFD
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
+		convinst = arm64.AUCVTFWS
+	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
+		convinst = arm64.AUCVTFS
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
+		convinst = arm64.AUCVTFWD
+	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
+		convinst = arm64.AUCVTFD
+	}
+	c.compileSimpleConversion(convinst, generalPurposeRegisterTypeFloat)
+	return nil
 }
 
+// compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the arm64 architecture.
 func (c *arm64Compiler) compileF32DemoteFromF64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleUnop(arm64.AFCVTDS)
 }
 
+// compileF64PromoteFromF32 implements compiler.compileF64PromoteFromF32 for the arm64 architecture.
 func (c *arm64Compiler) compileF64PromoteFromF32() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	return c.compileSimpleUnop(arm64.AFCVTSD)
 }
 
+// compileI32ReinterpretFromF32 implements compiler.compileI32ReinterpretFromF32 for the arm64 architecture.
 func (c *arm64Compiler) compileI32ReinterpretFromF32() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		return nil
+	}
+	return c.compileSimpleConversion(arm64.AFMOVS, generalPurposeRegisterTypeInt)
 }
 
+// compileI64ReinterpretFromF64 implements compiler.compileI64ReinterpretFromF64 for the arm64 architecture.
 func (c *arm64Compiler) compileI64ReinterpretFromF64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeInt)
+		return nil
+	}
+	return c.compileSimpleConversion(arm64.AFMOVD, generalPurposeRegisterTypeInt)
 }
 
+// compileF32ReinterpretFromI32 implements compiler.compileF32ReinterpretFromI32 for the arm64 architecture.
 func (c *arm64Compiler) compileF32ReinterpretFromI32() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		return nil
+	}
+	return c.compileSimpleConversion(arm64.AFMOVS, generalPurposeRegisterTypeFloat)
 }
 
+// compileF64ReinterpretFromI64 implements compiler.compileF64ReinterpretFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileF64ReinterpretFromI64() error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if peek := c.locationStack.peek(); peek.onStack() {
+		// If the value is on the stack, this is no-op as there is nothing to do for converting type.
+		peek.setRegisterType(generalPurposeRegisterTypeFloat)
+		return nil
+	}
+	return c.compileSimpleConversion(arm64.AFMOVD, generalPurposeRegisterTypeFloat)
 }
 
+func (c *arm64Compiler) compileSimpleConversion(inst obj.As, destinationRegType generalPurposeRegisterType) error {
+	source, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	destinationReg, err := c.allocateRegister(destinationRegType)
+	if err != nil {
+		return err
+	}
+
+	c.compileRegisterToRegisterInstruction(inst, source.register, destinationReg)
+	c.locationStack.pushValueLocationOnRegister(destinationReg)
+	return nil
+}
+
+// compileExtend implements compiler.compileExtend for the arm64 architecture.
 func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	if o.Signed {
+		return c.compileSimpleUnop(arm64.ASXTW)
+	} else {
+		return c.compileSimpleUnop(arm64.AUXTW)
+	}
+}
+
+func (c *arm64Compiler) compileSimpleUnop(inst obj.As) error {
+	v, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+	reg := v.register
+	c.compileRegisterToRegisterInstruction(inst, reg, reg)
+	c.locationStack.pushValueLocationOnRegister(reg)
+	return nil
 }
 
 // compileEq implements compiler.compileEq for the arm64 architecture.
