@@ -2049,6 +2049,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	return nil
 }
 
+// compileI32WrapFromI64 implements compiler.compileI32WrapFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileI32WrapFromI64() error {
 	return c.compileSimpleUniop(arm64.AMOVW)
 }
@@ -2184,6 +2185,7 @@ func (c *arm64Compiler) compileSimpleConversion(inst obj.As, destinationRegType 
 	return nil
 }
 
+// compileExtend implements compiler.compileExtend for the arm64 architecture.
 func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	if o.Signed {
 		return c.compileSimpleUniop(arm64.ASXTW)
