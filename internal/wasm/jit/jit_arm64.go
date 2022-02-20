@@ -1901,63 +1901,63 @@ func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
 // compileAbs implements compiler.compileAbs for the arm64 architecture.
 func (c *arm64Compiler) compileAbs(o *wazeroir.OperationAbs) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleUniop(arm64.AFABSS)
+		return c.compileSimpleUnop(arm64.AFABSS)
 	} else {
-		return c.compileSimpleUniop(arm64.AFABSD)
+		return c.compileSimpleUnop(arm64.AFABSD)
 	}
 }
 
 // compileNeg implements compiler.compileNeg for the arm64 architecture.
 func (c *arm64Compiler) compileNeg(o *wazeroir.OperationNeg) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleUniop(arm64.AFNEGS)
+		return c.compileSimpleUnop(arm64.AFNEGS)
 	} else {
-		return c.compileSimpleUniop(arm64.AFNEGD)
+		return c.compileSimpleUnop(arm64.AFNEGD)
 	}
 }
 
 // compileCeil implements compiler.compileCeil for the arm64 architecture.
 func (c *arm64Compiler) compileCeil(o *wazeroir.OperationCeil) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleUniop(arm64.AFRINTPS)
+		return c.compileSimpleUnop(arm64.AFRINTPS)
 	} else {
-		return c.compileSimpleUniop(arm64.AFRINTPD)
+		return c.compileSimpleUnop(arm64.AFRINTPD)
 	}
 }
 
 // compileFloor implements compiler.compileFloor for the arm64 architecture.
 func (c *arm64Compiler) compileFloor(o *wazeroir.OperationFloor) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleUniop(arm64.AFRINTMS)
+		return c.compileSimpleUnop(arm64.AFRINTMS)
 	} else {
-		return c.compileSimpleUniop(arm64.AFRINTMD)
+		return c.compileSimpleUnop(arm64.AFRINTMD)
 	}
 }
 
 // compileTrunc implements compiler.compileTrunc for the arm64 architecture.
 func (c *arm64Compiler) compileTrunc(o *wazeroir.OperationTrunc) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleUniop(arm64.AFRINTZS)
+		return c.compileSimpleUnop(arm64.AFRINTZS)
 	} else {
-		return c.compileSimpleUniop(arm64.AFRINTZD)
+		return c.compileSimpleUnop(arm64.AFRINTZD)
 	}
 }
 
 // compileNearest implements compiler.compileNearest for the arm64 architecture.
 func (c *arm64Compiler) compileNearest(o *wazeroir.OperationNearest) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleUniop(arm64.AFRINTNS)
+		return c.compileSimpleUnop(arm64.AFRINTNS)
 	} else {
-		return c.compileSimpleUniop(arm64.AFRINTND)
+		return c.compileSimpleUnop(arm64.AFRINTND)
 	}
 }
 
 // compileSqrt implements compiler.compileSqrt for the arm64 architecture.
 func (c *arm64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 	if o.Type == wazeroir.Float32 {
-		return c.compileSimpleUniop(arm64.AFSQRTS)
+		return c.compileSimpleUnop(arm64.AFSQRTS)
 	} else {
-		return c.compileSimpleUniop(arm64.AFSQRTD)
+		return c.compileSimpleUnop(arm64.AFSQRTD)
 	}
 }
 
@@ -2051,7 +2051,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 
 // compileI32WrapFromI64 implements compiler.compileI32WrapFromI64 for the arm64 architecture.
 func (c *arm64Compiler) compileI32WrapFromI64() error {
-	return c.compileSimpleUniop(arm64.AMOVW)
+	return c.compileSimpleUnop(arm64.AMOVW)
 }
 
 // compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
@@ -2121,12 +2121,12 @@ func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 
 // compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the arm64 architecture.
 func (c *arm64Compiler) compileF32DemoteFromF64() error {
-	return c.compileSimpleUniop(arm64.AFCVTDS)
+	return c.compileSimpleUnop(arm64.AFCVTDS)
 }
 
 // compileF64PromoteFromF32 implements compiler.compileF64PromoteFromF32 for the arm64 architecture.
 func (c *arm64Compiler) compileF64PromoteFromF32() error {
-	return c.compileSimpleUniop(arm64.AFCVTSD)
+	return c.compileSimpleUnop(arm64.AFCVTSD)
 }
 
 // compileI32ReinterpretFromF32 implements compiler.compileI32ReinterpretFromF32 for the arm64 architecture.
@@ -2188,13 +2188,13 @@ func (c *arm64Compiler) compileSimpleConversion(inst obj.As, destinationRegType 
 // compileExtend implements compiler.compileExtend for the arm64 architecture.
 func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	if o.Signed {
-		return c.compileSimpleUniop(arm64.ASXTW)
+		return c.compileSimpleUnop(arm64.ASXTW)
 	} else {
-		return c.compileSimpleUniop(arm64.AUXTW)
+		return c.compileSimpleUnop(arm64.AUXTW)
 	}
 }
 
-func (c *arm64Compiler) compileSimpleUniop(inst obj.As) error {
+func (c *arm64Compiler) compileSimpleUnop(inst obj.As) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {
 		return err
