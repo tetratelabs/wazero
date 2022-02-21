@@ -106,7 +106,13 @@ const (
 	ImportFdPrestatGet = `(import "wasi_snapshot_preview1" "fd_prestat_get"
     (func $wasi.fd_prestat_get (param $fd i32) (param $result.prestat i32) (result (;errno;) i32)))`
 
-	FunctionFdPrestatDirName     = "fd_prestat_dir_name"
+	// FunctionFdPrestatDirName returns the path of the prestat directory of a file descriptor.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
+	FunctionFdPrestatDirName = "fd_prestat_dir_name"
+	// ImportFdPrestatDirName is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	ImportFdPrestatDirName = `(import "wasi_snapshot_preview1" "fd_prestat_dir_name"
+    (func $wasi.fd_prestat_dir_name (param $fd i32) (param $path i32) (param $path_len i32) (result (;errno;) i32)))`
+
 	FunctionFdPwrite             = "fd_pwrite"
 	FunctionFdRead               = "fd_read"
 	FunctionFdReaddir            = "fd_readdir"
@@ -358,7 +364,35 @@ type SnapshotPreview1 interface {
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
 	FdPrestatGet(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
 
-	// TODO: wasi.FdPrestatDirName
+	// FdPrestatDirName is the WASI function to return the path of the prestat directory of a file descriptor.
+	//
+	// * fd - the file decriptor to get the path of the prestat directory
+	// * path - the offset in `ctx.Memory` to write the result path
+	// * pathLen - FdPrestatDirName writes the result path string to `path` offset for the length of `pathLen`.
+	// Note: The semantics of pathLen may vary depending on wasm runtimes. The semantics in wazero follows that of wasmtime.
+	//       Some runtimes, such as wasmer, consider pathLen to be the maximum length instead of the exact length that should be written.
+	//
+	// FdPrestatDirName returns the following errors.
+	// * ErrnoBadf - if `fd` is invalid
+	// * ErrnoFault - if `path` is an invalid offset due to the memory constraint
+	// * ErrnoNametoolong - if `pathLen` is longer than the actual length of the result path
+	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
+	//
+	// For example, if fd 3 is a file with path = "test",
+	// and FdPrestatDirName parameters fd = 3, path = 1, and pathLen = 3, we expect `ctx.Memory` to contain:
+	//
+	//                pathLen
+	//              +---------+
+	//              |         |
+	//   []byte{?, 't', 'e', 's', ?, ?, ?}
+	//       path --^
+	//
+	// Note: `PrNameLen` field of the result of FdPrestatGet has the exact length of the actual path.
+	// See FdPrestatGet
+	// Note: ImportFdPrestatDirName shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
+	FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
+
 	// TODO: wasi.FdPwrite
 	// TODO: wasi.FdRead
 	// TODO: wasi.FdReaddir
@@ -457,7 +491,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		// TODO: FunctionFdFilestatSetTimes
 		// TODO: FunctionFdPread
 		FunctionFdPrestatGet:     a.FdPrestatGet,
-		FunctionFdPrestatDirName: a.fd_prestat_dir_name,
+		FunctionFdPrestatDirName: a.FdPrestatDirName,
 		// TODO: FunctionFdPwrite
 		FunctionFdRead: a.fd_read,
 		// TODO: FunctionFdReaddir
@@ -580,6 +614,28 @@ func (a *wasiAPI) FdPrestatGet(ctx wasm.ModuleContext, fd uint32, bufPtr uint32)
 	return wasi.ErrnoSuccess
 }
 
+// FdPrestatDirName implements SnahpshotPreview1.FdPrestatDirName
+func (a *wasiAPI) FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
+	f, ok := a.opened[fd]
+	if !ok {
+		return wasi.ErrnoBadf
+	}
+
+	// The semantics of pathLen in wazero follows that of wasmtime.
+	// See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6ab543e8c3f3b238/crates/wasi-common/src/snapshots/preview_1.rs#L578-L582
+	// Some runtimes such as wasmer may have another semantics, where they consider pathLen as the maximum length to write, instead of the exact length to write.
+	// See https://github.com/wasmerio/wasmer/blob/3463c51268ed551933392a4063bd4f8e7498b0f6/lib/wasi/src/syscalls/mod.rs#L764
+	if uint32(len(f.path)) < pathLen {
+		return wasi.ErrnoNametoolong
+	}
+
+	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
+	if !ctx.Memory().Write(pathPtr, []byte(f.path)[:pathLen]) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
 // ProcExit implements SnapshotPreview1.ProcExit
 func (a *wasiAPI) ProcExit(exitCode uint32) {
 	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
@@ -691,22 +747,6 @@ func (a *wasiAPI) randUnusedFD() uint32 {
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
-}
-
-func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.ModuleContext, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
-	f, ok := a.opened[fd]
-	if !ok {
-		return wasi.ErrnoInval
-	}
-
-	if uint32(len(f.path)) < pathLen {
-		return wasi.ErrnoNametoolong
-	}
-
-	if !ctx.Memory().Write(pathPtr, []byte(f.path)) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
 }
 
 func (a *wasiAPI) fd_fdstat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {

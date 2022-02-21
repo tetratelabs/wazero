@@ -520,7 +520,110 @@ func TestAPI_FdClose(t *testing.T) {
 // TODO: TestAPI_FdFilestatSetTimes TestAPI_FdFilestatSetTimes_Errors
 // TODO: TestAPI_FdPread TestAPI_FdPread_Errors
 // TODO: TestAPI_FdPrestatGet TestAPI_FdPrestatGet_Errors
-// TODO: TestAPI_FdPrestatDirName TestAPI_FdPrestatDirName_Errors
+
+func TestAPI_FdPrestatDirName(t *testing.T) {
+	opt := Preopen("test", &MemFS{})
+	store, ctx, fn, api := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, "test", opt)
+	fd := uint32(0)
+	for opened := range api.opened {
+		if opened > 2 /* if fd is not a stdin/out/err */ {
+			fd = opened // Found the opened fd.
+			break
+		}
+	}
+	require.NotEqual(t, 0, fd, "A new fd should be opened by Preopen.")
+
+	path := uint32(1)    // arbitrary offset
+	pathLen := uint32(3) // arbitrary length
+	maskLength := 7      // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',
+		't', 'e', 's',
+		'?', '?', '?',
+	}
+
+	t.Run("SnapshotPreview1.FdPrestatDirName", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		errno := api.FdPrestatDirName(ctx, fd, path, pathLen)
+		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run(FunctionFdPrestatDirName, func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, err := store.Engine.Call(ctx, fn, uint64(fd), uint64(path), uint64(pathLen))
+		require.NoError(t, err)
+		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_FdPrestatDirName_Errors(t *testing.T) {
+	dirName := "test"
+	opt := Preopen(dirName, &MemFS{})
+	store, ctx, fn, api := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, "test", opt)
+
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0)     // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
+	actualPathLen := len(dirName) // Actual length of the dirName as a valid pathLen.
+	fd := uint32(0)               // Valid fd of the directory. Updated to the actual value below.
+	for opened := range api.opened {
+		if opened > 2 /* if fd is not a stdin/out/err */ {
+			fd = opened // Found the opened fd.
+			break
+		}
+	}
+	require.NotEqual(t, 0, fd, "A new fd should be opened by Preopen.")
+
+	tests := []struct {
+		name          string
+		fd            uint32
+		path          uint32
+		pathLen       uint32
+		expectedErrno wasi.Errno
+	}{
+		{
+			name:          "out-of-memory path",
+			fd:            fd,
+			path:          memorySize,
+			pathLen:       uint32(actualPathLen),
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "path exceeds the maximum valid address by 1",
+			fd:            fd,
+			path:          memorySize - uint32(actualPathLen) + 1,
+			pathLen:       uint32(actualPathLen),
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "pathLen exceeds the actual length of the dir name",
+			fd:            fd,
+			path:          validAddress,
+			pathLen:       uint32(actualPathLen) + 1,
+			expectedErrno: wasi.ErrnoNametoolong,
+		},
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			path:          validAddress,
+			pathLen:       uint32(actualPathLen) + 1,
+			expectedErrno: wasi.ErrnoBadf,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := store.Engine.Call(ctx, fn, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+}
+
 // TODO: TestAPI_FdPwrite TestAPI_FdPwrite_Errors
 // TODO: TestAPI_FdRead TestAPI_FdRead_Errors
 // TODO: TestAPI_FdReaddir TestAPI_FdReaddir_Errors
