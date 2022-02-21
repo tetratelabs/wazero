@@ -496,7 +496,9 @@ func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *w
 	// Execute the host function and push back the call result onto the stack.
 	for _, ret := range f.Call(in) {
 		switch ret.Kind() {
-		case reflect.Float64, reflect.Float32:
+		case reflect.Float32:
+			e.pushValue(uint64(math.Float32bits(float32(ret.Float()))))
+		case reflect.Float64:
 			e.pushValue(math.Float64bits(ret.Float()))
 		case reflect.Uint32, reflect.Uint64:
 			e.pushValue(ret.Uint())

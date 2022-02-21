@@ -530,7 +530,9 @@ func (it *interpreter) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunct
 	it.pushFrame(frame)
 	for _, ret := range f.hostFn.Call(in) {
 		switch ret.Kind() {
-		case reflect.Float64, reflect.Float32:
+		case reflect.Float32:
+			it.push(uint64(math.Float32bits(float32(ret.Float()))))
+		case reflect.Float64:
 			it.push(math.Float64bits(ret.Float()))
 		case reflect.Uint32, reflect.Uint64:
 			it.push(ret.Uint())

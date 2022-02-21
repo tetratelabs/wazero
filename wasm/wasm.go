@@ -144,7 +144,7 @@ func EncodeF32(input float32) uint64 {
 // DecodeF32 converts the Function F32 parameter or result to a float32.
 // See DecodeF32
 func DecodeF32(input uint64) float32 {
-	return float32(math.Float64frombits(input))
+	return math.Float32frombits(uint32(input))
 }
 
 // EncodeF64 converts the input so that it can be used as a Function F64 parameter or result.
