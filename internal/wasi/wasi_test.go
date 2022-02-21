@@ -49,7 +49,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
 
 	t.Run("ArgsGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -73,7 +73,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 func TestAPI_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -132,7 +132,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
 
 	t.Run("ArgsSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -157,7 +157,7 @@ func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
@@ -251,7 +251,7 @@ func TestAPI_EnvironGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
 
 	t.Run("EnvironGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -276,7 +276,7 @@ func TestAPI_EnvironGet_Errors(t *testing.T) {
 	envOpt, err := Environ("a=bc", "b=cd")
 	require.NoError(t, err)
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
 
@@ -334,7 +334,7 @@ func TestAPI_EnvironSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
 
 	t.Run("EnvironSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -359,7 +359,7 @@ func TestAPI_EnvironSizesGet_Errors(t *testing.T) {
 	envOpt, err := Environ("a=b", "b=cd")
 	require.NoError(t, err)
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
 	memorySize := uint32(len(store.Memories[0].Buffer))
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_sizes_get. We chose 0 here.
 
@@ -416,7 +416,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 	clockOpt := func(api *wasiAPI) {
 		api.timeNowUnixNano = func() uint64 { return epochNanos }
 	}
-	store, ctx, fn := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test", clockOpt)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test", clockOpt)
 
 	t.Run("ClockTimeGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -440,7 +440,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test", func(api *wasiAPI) {
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test", func(api *wasiAPI) {
 		api.timeNowUnixNano = func() uint64 { return epochNanos }
 	})
 	memorySize := uint32(len(store.Memories[0].Buffer))
@@ -474,7 +474,43 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 
 // TODO: TestAPI_FdAdvise TestAPI_FdAdvise_Errors
 // TODO: TestAPI_FdAllocate TestAPI_FdAllocate_Errors
-// TODO: TestAPI_FdClose TestAPI_FdClose_Errors
+
+func TestAPI_FdClose(t *testing.T) {
+	// setupFD returns an opened fd to close with store and api
+	setupFD := func() (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI, uint32) {
+		opt := Preopen(".", &MemFS{})
+		store, ctx, fn, api := instantiateWasmStore(t, FunctionFdClose, ImportFdClose, "test", opt)
+		openedFd := uint32(0)
+		for fd := range api.opened {
+			if fd > 2 /* if fd is not a stdin/out/err */ {
+				openedFd = fd // Found the opened fd.
+				break
+			}
+		}
+		require.NotEqual(t, 0, openedFd, "A new fd should be opened by Preopen.")
+		return store, ctx, fn, api, openedFd
+	}
+
+	t.Run("SnapshotPreview1.FdClose", func(t *testing.T) {
+		_, ctx, _, api, fd := setupFD()
+		errno := api.FdClose(ctx, fd)
+		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.NotContains(t, api.opened, fd) // Fd is closed and removed from the opned FDs.
+	})
+	t.Run(FunctionFdClose, func(t *testing.T) {
+		store, ctx, closeFd, api, fd := setupFD()
+		ret, err := store.Engine.Call(ctx, closeFd, uint64(fd))
+		require.NoError(t, err)
+		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		require.NotContains(t, api.opened, fd)                  // Fd is closed and removed from the opned FDs.
+	})
+	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
+		_, ctx, _, api, _ := setupFD()
+		errno := api.FdClose(ctx, 42) // 42 is an arbitrary invalid FD
+		require.Equal(t, wasi.ErrnoBadf, errno)
+	})
+}
+
 // TODO: TestAPI_FdDataSync TestAPI_FdDataSync_Errors
 // TODO: TestAPI_FdFdstatGet TestAPI_FdFdstatGet_Errors
 // TODO: TestAPI_FdFdstatSetFlags TestAPI_FdFdstatSetFlags_Errors
@@ -521,7 +557,7 @@ func TestAPI_ProcExit(t *testing.T) {
 		},
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionProcExit, ImportProcExit, "test")
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionProcExit, ImportProcExit, "test")
 
 	for _, tt := range tests {
 		tc := tt
@@ -561,7 +597,7 @@ func TestAPI_RandomGet(t *testing.T) {
 		}
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test", randOpt)
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test", randOpt)
 
 	t.Run("RandomGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
@@ -585,7 +621,7 @@ func TestAPI_RandomGet(t *testing.T) {
 func TestAPI_RandomGet_Errors(t *testing.T) {
 	validAddress := uint32(0) // arbitrary valid address
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test")
 	memorySize := uint32(len(store.Memories[0].Buffer))
 
 	tests := []struct {
@@ -618,7 +654,7 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 }
 
 func TestAPI_RandomGet_SourceError(t *testing.T) {
-	store, ctx, fn := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test", func(api *wasiAPI) {
+	store, ctx, fn, _ := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test", func(api *wasiAPI) {
 		api.randSource = func(p []byte) error {
 			return errors.New("random source error")
 		}
@@ -633,7 +669,7 @@ func TestAPI_RandomGet_SourceError(t *testing.T) {
 // TODO: TestAPI_SockSend TestAPI_SockSend_Errors
 // TODO: TestAPI_SockShutdown TestAPI_SockShutdown_Errors
 
-func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName string, opts ...Option) (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance) {
+func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName string, opts ...Option) (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI) {
 	mod, err := text.DecodeModule([]byte(fmt.Sprintf(`(module
   %[2]s
   (memory 1)  ;; just an arbitrary size big enough for tests
@@ -643,6 +679,12 @@ func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName str
 	require.NoError(t, err)
 
 	store := wasm.NewStore(interpreter.NewEngine())
+
+	var api *wasiAPI
+	getWasiAPIInstance := func(w *wasiAPI) {
+		api = w
+	}
+	opts = append(opts, getWasiAPIInstance)
 
 	snapshotPreview1Functions := SnapshotPreview1Functions(opts...)
 	goFunc := snapshotPreview1Functions[wasiFunction]
@@ -655,7 +697,7 @@ func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName str
 	ctx, err := store.Instantiate(mod, moduleName)
 	require.NoError(t, err)
 
-	return store, ctx, wasiFn
+	return store, ctx, wasiFn, api
 }
 
 // maskMemory overwrites the first memory in the store with '?', so tests can see what's written.

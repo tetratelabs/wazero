@@ -80,9 +80,16 @@ const (
 	ImportClockTimeGet = `(import "wasi_snapshot_preview1" "clock_time_get"
     (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))`
 
-	FunctionFdAdvise             = "fd_advise"
-	FunctionFdAllocate           = "fd_allocate"
-	FunctionFdClose              = "fd_close"
+	FunctionFdAdvise   = "fd_advise"
+	FunctionFdAllocate = "fd_allocate"
+
+	// FunctionFdClose closes a file descriptor.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_close
+	FunctionFdClose = "fd_close"
+	// ImportFdClose is the WebAssembly 1.0 (MVP) Text format import of FunctionFdClose
+	ImportFdClose = `(import "wasi_snapshot_preview1" "fd_close"
+    (func $wasi.fd_close (param $fd i32) (result (;errno;) i32)))`
+
 	FunctionFdDataSync           = "fd_datasync"
 	FunctionFdFdstatGet          = "fd_fdstat_get"
 	FunctionFdFdstatSetFlags     = "fd_fdstat_set_flags"
@@ -297,7 +304,17 @@ type SnapshotPreview1 interface {
 
 	// TODO: wasi.FdAdvise
 	// TODO: wasi.FdAllocate
-	// TODO: wasi.FdClose
+
+	// FdClose is the WASI function to close a file descriptor. This returns ErrnoBadf if the fd is invalid.
+	//
+	// * fd - the file decriptor to close
+	//
+	// Note: ImportFdClose shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: This is similar to `close` in POSIX.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
+	// See https://linux.die.net/man/3/close
+	FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno
+
 	// TODO: wasi.FdDataSync
 	// TODO: wasi.FdFdstatGet
 	// TODO: wasi.FdFdstatSetFlags
@@ -396,7 +413,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		FunctionClockTimeGet: a.ClockTimeGet,
 		// TODO: FunctionFdAdvise
 		// TODO: FunctionFdAllocate
-		FunctionFdClose: a.fd_close,
+		FunctionFdClose: a.FdClose,
 		// TODO: FunctionFdDataSync
 		FunctionFdFdstatGet: a.fd_fdstat_get,
 		// TODO: FunctionFdFdstatSetFlags
@@ -501,6 +518,22 @@ func (a *wasiAPI) ClockTimeGet(ctx wasm.ModuleContext, id uint32, precision uint
 	if !ctx.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
 		return wasi.ErrnoFault
 	}
+	return wasi.ErrnoSuccess
+}
+
+// FdClose implements SnaphotPreview1.FdClose
+func (a *wasiAPI) FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
+	f, ok := a.opened[fd]
+	if !ok {
+		return wasi.ErrnoBadf
+	}
+
+	if f.file != nil {
+		f.file.Close()
+	}
+
+	delete(a.opened, fd)
+
 	return wasi.ErrnoSuccess
 }
 
@@ -772,21 +805,6 @@ func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iov
 	if !ctx.Memory().WriteUint32Le(nreadPtr, nread) {
 		return wasi.ErrnoFault
 	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_close(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
-	f, ok := a.opened[fd]
-	if !ok {
-		return wasi.ErrnoBadf
-	}
-
-	if f.file != nil {
-		f.file.Close()
-	}
-
-	delete(a.opened, fd)
-
 	return wasi.ErrnoSuccess
 }
 
