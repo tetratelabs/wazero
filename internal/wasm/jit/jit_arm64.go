@@ -107,7 +107,9 @@ type arm64Compiler struct {
 	afterAssembleCallback []func(code []byte) error
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	staticData                           compiledFunctionStaticData
+	// compiledFunctionStaticData holds br_table offset tables.
+	// See compiledFunctionStaticData and arm64Compiler.compileBrTable.
+	staticData compiledFunctionStaticData
 }
 
 func (c *arm64Compiler) addStaticData(d []byte) {
@@ -908,8 +910,7 @@ func (c *arm64Compiler) assignBranchTarget(labelKey string, br *obj.Prog) {
 
 // compileBrTable implements compiler.compileBrTable for the arm64 architecture.
 func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
-	// If the operation doesn't have target but default,
-	// branch into the default label and return early.
+	// If the operation only consists of the default target, we branch into it and return early.
 	if len(o.Targets) == 0 {
 		loc := c.locationStack.pop()
 		if loc.onRegister() {
@@ -974,7 +975,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// "jmp offsetData[index]+0x123001" and "0x123001" can be acquired by "LEA"
 	// instruction.
 	//
-	// Note: We store each offset of 32-bite unsigned integer as 4 consecutive bytes. So more precisely,
+	// Note: We store each offset of 32-bit unsigned integer as 4 consecutive bytes. So more precisely,
 	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
 	//
 	// Note: this is similar to how GCC implements Switch statements in C.
@@ -1011,13 +1012,10 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	labelInitialInstructions := make([]*obj.Prog, len(o.Targets)+1)
 	saved := c.locationStack
 	for i := range labelInitialInstructions {
-		// Emit the initial instruction of each target.
-		init := c.newProg()
-		// We use NOP as we don't yet know the next instruction in each label.
-		// Assembler would optimize out this NOP during code generation, so this is harmless.
-		init.As = obj.ANOP
+		// Emit the initial instruction of each target where
+		// we use NOP as we don't yet know the next instruction in each label.
+		init := c.compileNOP()
 		labelInitialInstructions[i] = init
-		c.addInstruction(init)
 
 		var locationStack *valueLocationStack
 		var target *wazeroir.BranchTargetDrop
@@ -1028,7 +1026,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved.clone()
 		} else {
 			target = o.Default
-			// If this is the deafult branch, we just use the original one
+			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
 			locationStack = saved
 		}
@@ -1041,7 +1039,6 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		}
 	}
 
-	// Set up the callbacks to do tasks which cannot be done at the compilation phase.
 	c.afterAssembleCallback = append(c.afterAssembleCallback, func(code []byte) error {
 		// Build the offset table for each target including default one.
 		base := labelInitialInstructions[0].Pc // This corresponds to the L0's address in the example.
@@ -1049,7 +1046,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
 				// TODO: this happens when users try loading an extremely large webassembly binary
 				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
-				// We would like to support that binary, but realistically speacking, that kind of binary
+				// We would like to support that binary, but realistically speaking, that kind of binary
 				// could result in more than ten giga bytes of native JITed code where we have to care about
 				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
 				// current implementation.

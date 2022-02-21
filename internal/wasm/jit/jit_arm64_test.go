@@ -1897,7 +1897,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 						env.setTable(table)
 						engine := env.engine()
 
-						// First we creat the call target function with function address = i,
+						// First we create the call target function with function address = i,
 						// and it returns one value.
 						expectedReturnValue := uint32(i * 1000)
 						{
@@ -2107,7 +2107,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			},
 		},
 		{
-			name: "table length zero",
+			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables:  []*wasm.TableInstance{{Table: nil}},
@@ -2115,7 +2115,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			},
 		},
 		{
-			name: "table length zero part2",
+			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},

@@ -674,8 +674,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
 
-	// If the operation doesn't have target but default,
-	// branch into the default label and return early.
+	// If the operation only consists of the default target, we branch into it and return early.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
 		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
@@ -818,7 +817,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved.clone()
 		} else {
 			target = o.Default
-			// If this is the deafult branch, we just use the original one
+			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
 			locationStack = saved
 		}
@@ -839,7 +838,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
 				// TODO: this happens when users try loading an extremely large webassembly binary
 				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
-				// We would like to support that binary, but realistically speacking, that kind of binary
+				// We would like to support that binary, but realistically speaking, that kind of binary
 				// could result in more than ten giga bytes of native JITed code where we have to care about
 				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
 				// current implementation.
