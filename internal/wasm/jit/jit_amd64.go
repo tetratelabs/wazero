@@ -1001,9 +1001,23 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.From.Offset = engineModuleContextTableElement0AddressOffset
 	c.addInstruction(movTableSliceAddress)
 
-	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset]
-	// So the target type ID lives at offset+tableElementTypeIDOffset, and we compare it
-	// with wasm.UninitializedTableElementTypeID to check if the element is initialized.
+	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset].
+	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
+	checkIfTypeMatch := c.newProg()
+	checkIfTypeMatch.As = x86.ACMPL // 32-bit as FunctionTypeID is in 32-bit unsigned integer.
+	checkIfTypeMatch.From.Type = obj.TYPE_MEM
+	checkIfTypeMatch.From.Reg = offset.register
+	checkIfTypeMatch.From.Offset = tableElementFunctionTypeIDOffset
+	checkIfTypeMatch.To.Type = obj.TYPE_CONST
+	checkIfTypeMatch.To.Offset = int64(targetFunctionType.TypeID)
+	c.addInstruction(checkIfTypeMatch)
+
+	// Jump if the type matches.
+	jumpIfTypeMatch := c.newProg()
+	jumpIfTypeMatch.To.Type = obj.TYPE_BRANCH
+	jumpIfTypeMatch.As = x86.AJEQ
+	c.addInstruction(jumpIfTypeMatch)
+
 	checkIfInitialized := c.newProg()
 	checkIfInitialized.As = x86.ACMPL // 32-bit as FunctionTypeID is in 32-bit unsigned integer.
 	checkIfInitialized.From.Type = obj.TYPE_MEM
@@ -1019,27 +1033,11 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	jumpIfInitialized.As = x86.AJNE
 	c.addInstruction(jumpIfInitialized)
 
-	// Otherwise, we return the function with jitCallStatusCodeInvalidTableAccess.
+	// If not initialized, we return the function with jitCallStatusCodeInvalidTableAccess.
 	c.exit(jitCallStatusCodeInvalidTableAccess)
 
-	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
-	checkIfTypeMatch := c.newProg()
-	jumpIfInitialized.To.SetTarget(checkIfTypeMatch)
-	checkIfTypeMatch.As = x86.ACMPL // 32-bit as FunctionTypeID is in 32-bit unsigned integer.
-	checkIfTypeMatch.From.Type = obj.TYPE_MEM
-	checkIfTypeMatch.From.Reg = offset.register
-	checkIfTypeMatch.From.Offset = tableElementFunctionTypeIDOffset
-	checkIfTypeMatch.To.Type = obj.TYPE_CONST
-	checkIfTypeMatch.To.Offset = int64(targetFunctionType.TypeID)
-	c.addInstruction(checkIfTypeMatch)
-
-	// Jump if the type matches.
-	jumpIfTypeMatch := c.newProg()
-	jumpIfTypeMatch.To.Type = obj.TYPE_BRANCH
-	jumpIfTypeMatch.As = x86.AJEQ
-	c.addInstruction(jumpIfTypeMatch)
-
 	// Otherwise, we return the function with jitCallStatusCodeTypeMismatchOnIndirectCall.
+	c.addSetJmpOrigins(jumpIfInitialized)
 	c.exit(jitCallStatusCodeTypeMismatchOnIndirectCall)
 
 	// Now all checks passeed, so we start making function call.
@@ -4702,7 +4700,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	}
 
 	// 2) Set engine.valueStackContext.stackBasePointer for the next function.
-	{
+	if offset := (int64(c.locationStack.sp) - int64(len(functype.Params))); offset > 0 {
 		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
 		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 		// See the comments in engine.pushCallFrame which does exactly the same calculation in Go.
@@ -4711,7 +4709,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		calculateNextStackBasePointer.To.Type = obj.TYPE_REG
 		calculateNextStackBasePointer.To.Reg = tmpRegister
 		calculateNextStackBasePointer.From.Type = obj.TYPE_CONST
-		calculateNextStackBasePointer.From.Offset = (int64(c.locationStack.sp) - int64(len(functype.Params)))
+		calculateNextStackBasePointer.From.Offset = offset
 		c.addInstruction(calculateNextStackBasePointer)
 
 		// Write the calculated value to engine.valueStackContext.stackBasePointer.
