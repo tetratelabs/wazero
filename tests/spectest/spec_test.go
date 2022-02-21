@@ -18,7 +18,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 //go:embed testdata/*.wasm
@@ -187,13 +186,13 @@ func (c command) expectedError() (err error) {
 }
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
-	var printV = func(publicwasm.HostFunctionCallContext) {}
-	var printI32 = func(publicwasm.HostFunctionCallContext, uint32) {}
-	var printF32 = func(publicwasm.HostFunctionCallContext, float32) {}
-	var printI64 = func(publicwasm.HostFunctionCallContext, uint64) {}
-	var printF64 = func(publicwasm.HostFunctionCallContext, float64) {}
-	var printI32F32 = func(publicwasm.HostFunctionCallContext, uint32, float32) {}
-	var printF64F64 = func(publicwasm.HostFunctionCallContext, float64, float64) {}
+	var printV = func() {}
+	var printI32 = func(uint32) {}
+	var printF32 = func(float32) {}
+	var printI64 = func(uint64) {}
+	var printF64 = func(float64) {}
+	var printI32F32 = func(uint32, float32) {}
+	var printF64F64 = func(float64, float64) {}
 
 	for n, v := range map[string]interface{}{
 		"print":         printV,
@@ -204,9 +203,10 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 		"print_i32_f32": printI32F32,
 		"print_f64_f64": printF64F64,
 	} {
-		fn, err := wasm.NewHostFunction(n, v)
+		fn, err := wasm.NewGoFunc(n, v)
 		require.NoError(t, err)
-		require.NoError(t, store.AddHostFunction("spectest", fn), "AddHostFunction(%s)", n)
+		_, err = store.AddHostFunction("spectest", fn)
+		require.NoError(t, err, "AddHostFunction(%s)", n)
 	}
 
 	for _, g := range []struct {
@@ -307,7 +307,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							vals, types, err := store.CallFunction(ctx, moduleName, c.Action.Field, args...)
+							vals, types, err := callFunction(store, ctx, moduleName, c.Action.Field, args...)
 							require.NoError(t, err, msg)
 							require.Equal(t, len(exps), len(vals), msg)
 							require.Equal(t, len(exps), len(types), msg)
@@ -367,7 +367,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := store.CallFunction(ctx, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(store, ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, c.expectedError(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -396,7 +396,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := store.CallFunction(ctx, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(store, ctx, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -456,4 +456,24 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 	default:
 		t.Fail()
 	}
+}
+
+// callFunction is inlined here as the spectest needs to validate the signature was correct
+// TODO: This is likely already covered with unit tests!
+func callFunction(s *wasm.Store, ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []wasm.ValueType, err error) {
+	var exp *wasm.ExportInstance
+	if exp, err = s.ModuleContexts[moduleName].Module.GetExport(funcName, wasm.ExportKindFunc); err != nil {
+		return
+	}
+
+	f := exp.Function
+	if len(f.FunctionType.Type.Params) != len(params) {
+		err = fmt.Errorf("invalid number of parameters")
+		return
+	}
+
+	hostCtx := s.ModuleContexts[moduleName].WithContext(ctx)
+	results, err = s.Engine.Call(hostCtx, f, params...)
+	resultTypes = f.FunctionType.Type.Results
+	return
 }

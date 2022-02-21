@@ -22,7 +22,7 @@ func allocateBuffer(size uint32) *byte {
 //export get_random_string
 func getRandomStringRaw(retBufPtr **byte, retBufSize *int)
 
-// Get randm string from the hosts.
+// Get random string from the hosts.
 func getRandmString() string {
 	var bufPtr *byte
 	var bufSize int

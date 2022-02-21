@@ -2,7 +2,6 @@ package internalwasm
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"math"
 	"os"
@@ -28,72 +27,13 @@ func TestStore_GetModuleInstance(t *testing.T) {
 	require.Equal(t, m1, m2)
 }
 
-func TestStore_CallFunction(t *testing.T) {
-	name := "test"
-	fn := "fn"
-	engine := &nopEngine{}
-	s := NewStore(engine)
-	m := &ModuleInstance{
-		Name: name,
-		Exports: map[string]*ExportInstance{
-			fn: {
-				Kind: ExportKindFunc,
-				Function: &FunctionInstance{
-					FunctionKind: FunctionKindWasm,
-					FunctionType: &TypeInstance{
-						Type: &FunctionType{
-							Params:  []ValueType{},
-							Results: []ValueType{},
-						},
-					},
-				},
-			},
-		},
-	}
-	ctx := NewHostFunctionCallContext(s, m)
-	s.ModuleInstances[name] = m
-	s.HostFunctionCallContexts[name] = ctx
-
-	type testKey struct{}
-	ctxVal := context.WithValue(context.Background(), testKey{}, "test")
-
-	tests := []struct {
-		name      string
-		ctx       context.Context
-		actualCtx context.Context
-	}{
-		{
-			name:      "nil context",
-			ctx:       nil,
-			actualCtx: context.Background(),
-		},
-		{
-			name:      "background context",
-			ctx:       context.Background(),
-			actualCtx: context.Background(),
-		},
-		{
-			name:      "context with value",
-			ctx:       ctxVal,
-			actualCtx: ctxVal,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := s.CallFunction(tt.ctx, name, fn)
-			require.NoError(t, err)
-			require.Equal(t, tt.actualCtx, engine.ctx.ctx)
-		})
-	}
-}
-
 func TestStore_AddHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
 
-	hf, err := NewHostFunction("fn", func(wasm.HostFunctionCallContext) {
+	hf, err := NewGoFunc("fn", func(wasm.ModuleContext) {
 	})
 	require.NoError(t, err)
-	err = s.AddHostFunction("test", hf)
+	_, err = s.AddHostFunction("test", hf)
 	require.NoError(t, err)
 
 	// The function was added to the store, prefixed by the owning module name
@@ -108,7 +48,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 	require.True(t, ok)
 
 	// Trying to register it again should fail
-	err = s.AddHostFunction("test", hf)
+	_, err = s.AddHostFunction("test", hf)
 	require.EqualError(t, err, `"fn" is already exported in module "test"`)
 
 	// Any side effects should be reverted
@@ -119,10 +59,10 @@ func TestStore_AddHostFunction(t *testing.T) {
 func TestStore_ExportImportedHostFunction(t *testing.T) {
 	s := NewStore(nopEngineInstance)
 
-	hf, err := NewHostFunction("host_fn", func(wasm.HostFunctionCallContext) {
+	hf, err := NewGoFunc("host_fn", func(wasm.ModuleContext) {
 	})
 	require.NoError(t, err)
-	err = s.AddHostFunction("", hf)
+	_, err = s.AddHostFunction("", hf)
 	require.NoError(t, err)
 
 	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
@@ -180,10 +120,10 @@ func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 var nopEngineInstance Engine = &nopEngine{}
 
 type nopEngine struct {
-	ctx *HostFunctionCallContext
+	ctx *ModuleContext
 }
 
-func (e *nopEngine) Call(ctx *HostFunctionCallContext, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+func (e *nopEngine) Call(ctx *ModuleContext, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	e.ctx = ctx
 	return nil, nil
 }
@@ -204,7 +144,7 @@ func TestStore_addHostFunction(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		s := NewStore(nopEngineInstance)
 		for i := 0; i < 10; i++ {
-			f := &FunctionInstance{FunctionKind: FunctionKindHostNoContext}
+			f := &FunctionInstance{FunctionKind: FunctionKindGoNoContext}
 			require.Len(t, s.Functions, i)
 
 			err := s.addFunctionInstance(f)
@@ -425,11 +365,11 @@ func TestStore_executeConstExpression(t *testing.T) {
 					case ValueTypeF32:
 						actual, ok := val.(float32)
 						require.True(t, ok)
-						require.Equal(t, math.Float32frombits(uint32(tc.val)), actual)
+						require.Equal(t, wasm.DecodeF32(tc.val), actual)
 					case ValueTypeF64:
 						actual, ok := val.(float64)
 						require.True(t, ok)
-						require.Equal(t, math.Float64frombits(tc.val), actual)
+						require.Equal(t, wasm.DecodeF64(tc.val), actual)
 					}
 				})
 			}

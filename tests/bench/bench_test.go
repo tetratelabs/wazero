@@ -18,19 +18,19 @@ import (
 var caseWasm []byte
 
 func BenchmarkEngines(b *testing.B) {
-	b.Run("wazeroir", func(b *testing.B) {
-		m := instantiateModule(b, wazero.NewEngineInterpreter())
+	b.Run("interpreter", func(b *testing.B) {
+		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewEngineInterpreter())
 		runAllBenches(b, m)
 	})
 	if runtime.GOARCH == "amd64" {
 		b.Run("jit", func(b *testing.B) {
-			m := instantiateModule(b, wazero.NewEngineJIT())
+			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewEngineJIT())
 			runAllBenches(b, m)
 		})
 	}
 }
 
-func runAllBenches(b *testing.B, m wasm.ModuleFunctions) {
+func runAllBenches(b *testing.B, m wasm.ModuleExports) {
 	runBase64Benches(b, m)
 	runFibBenches(b, m)
 	runStringsManipulationBenches(b, m)
@@ -38,8 +38,8 @@ func runAllBenches(b *testing.B, m wasm.ModuleFunctions) {
 	runRandomMatMul(b, m)
 }
 
-func runBase64Benches(b *testing.B, m wasm.ModuleFunctions) {
-	fn, ok := m.GetFunctionVoidReturn("base64")
+func runBase64Benches(b *testing.B, m wasm.ModuleExports) {
+	fn, ok := m.Function("base64")
 	if !ok {
 		b.Fatal("function base64 not exported")
 	}
@@ -48,15 +48,15 @@ func runBase64Benches(b *testing.B, m wasm.ModuleFunctions) {
 		numPerExec := numPerExec
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("base64_%d_per_exec", numPerExec), func(b *testing.B) {
-			if err := fn(ctx, uint64(numPerExec)); err != nil {
+			if _, err := fn(ctx, uint64(numPerExec)); err != nil {
 				b.Fatal(err)
 			}
 		})
 	}
 }
 
-func runFibBenches(b *testing.B, m wasm.ModuleFunctions) {
-	fn, ok := m.GetFunctionI32Return("fibonacci")
+func runFibBenches(b *testing.B, m wasm.ModuleExports) {
+	fn, ok := m.Function("fibonacci")
 	if !ok {
 		b.Fatal("function base64 not exported")
 	}
@@ -74,8 +74,8 @@ func runFibBenches(b *testing.B, m wasm.ModuleFunctions) {
 	}
 }
 
-func runStringsManipulationBenches(b *testing.B, m wasm.ModuleFunctions) {
-	fn, ok := m.GetFunctionVoidReturn("string_manipulation")
+func runStringsManipulationBenches(b *testing.B, m wasm.ModuleExports) {
+	fn, ok := m.Function("string_manipulation")
 	if !ok {
 		b.Fatal("function string_manipulation not exported")
 	}
@@ -85,7 +85,7 @@ func runStringsManipulationBenches(b *testing.B, m wasm.ModuleFunctions) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("string_manipulation_size_%d", initialSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if err := fn(ctx, uint64(initialSize)); err != nil {
+				if _, err := fn(ctx, uint64(initialSize)); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -93,8 +93,8 @@ func runStringsManipulationBenches(b *testing.B, m wasm.ModuleFunctions) {
 	}
 }
 
-func runReverseArrayBenches(b *testing.B, m wasm.ModuleFunctions) {
-	fn, ok := m.GetFunctionVoidReturn("reverse_array")
+func runReverseArrayBenches(b *testing.B, m wasm.ModuleExports) {
+	fn, ok := m.Function("reverse_array")
 	if !ok {
 		b.Fatal("function reverse_array not exported")
 	}
@@ -104,7 +104,7 @@ func runReverseArrayBenches(b *testing.B, m wasm.ModuleFunctions) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("reverse_array_size_%d", arraySize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if err := fn(ctx, uint64(arraySize)); err != nil {
+				if _, err := fn(ctx, uint64(arraySize)); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -112,8 +112,8 @@ func runReverseArrayBenches(b *testing.B, m wasm.ModuleFunctions) {
 	}
 }
 
-func runRandomMatMul(b *testing.B, m wasm.ModuleFunctions) {
-	fn, ok := m.GetFunctionVoidReturn("random_mat_mul")
+func runRandomMatMul(b *testing.B, m wasm.ModuleExports) {
+	fn, ok := m.Function("random_mat_mul")
 	if !ok {
 		b.Fatal("function random_mat_mul not exported")
 	}
@@ -123,7 +123,7 @@ func runRandomMatMul(b *testing.B, m wasm.ModuleFunctions) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("random_mat_mul_size_%d", matrixSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if err := fn(ctx, uint64(matrixSize)); err != nil {
+				if _, err := fn(ctx, uint64(matrixSize)); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -131,18 +131,19 @@ func runRandomMatMul(b *testing.B, m wasm.ModuleFunctions) {
 	}
 }
 
-func instantiateModule(b *testing.B, engine *wazero.Engine) wasm.ModuleFunctions {
-	getRandomString := func(ctx wasm.HostFunctionCallContext, retBufPtr uint32, retBufSize uint32) {
-		allocateBuffer, ok := ctx.Functions().GetFunctionI32Return("allocate_buffer")
+func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine) wasm.ModuleExports {
+	getRandomString := func(ctx wasm.ModuleContext, retBufPtr uint32, retBufSize uint32) {
+		allocateBuffer, ok := ctx.Function("allocate_buffer")
 		if !ok {
 			b.Fatal("couldn't find function allocate_buffer")
 		}
 
-		offset, err := allocateBuffer(ctx.Context(), 10)
+		results, err := allocateBuffer(ctx.Context(), 10)
 		if err != nil {
 			b.Fatal(err)
 		}
 
+		offset := uint32(results[0])
 		ctx.Memory().WriteUint32Le(retBufPtr, offset)
 		ctx.Memory().WriteUint32Le(retBufSize, 10)
 		b := make([]byte, 10)
@@ -150,18 +151,15 @@ func instantiateModule(b *testing.B, engine *wazero.Engine) wasm.ModuleFunctions
 		ctx.Memory().Write(offset, b)
 	}
 
-	hfs, err := wazero.NewHostFunctions(map[string]interface{}{"get_random_string": getRandomString})
+	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
+
+	_, err := wazero.ExportHostFunctions(store, "env", map[string]interface{}{"get_random_string": getRandomString})
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
-		Engine: engine,
-		ModuleToHostFunctions: map[string]*wazero.HostFunctions{
-			wasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1(),
-			"env":                       hfs,
-		},
-	})
+	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
+	_, err = wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
 	if err != nil {
 		b.Fatal(err)
 	}

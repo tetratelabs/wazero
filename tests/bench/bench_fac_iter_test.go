@@ -28,25 +28,26 @@ func TestFacIter(t *testing.T) {
 	ctx := context.Background()
 	const in = 30
 	expValue := uint64(0x865df5dd54000000)
-	t.Run("iter", func(t *testing.T) {
-		fn, err := newWazeroForFacIterBench(wazero.NewEngineInterpreter())
+
+	t.Run("Interpreter", func(t *testing.T) {
+		fn, err := newWazeroFacIterBench(wazero.NewEngineInterpreter())
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
 			res, err := fn(ctx, in)
 			require.NoError(t, err)
-			require.Equal(t, expValue, res)
+			require.Equal(t, expValue, res[0])
 		}
 	})
 
-	t.Run("jit", func(t *testing.T) {
-		fn, err := newWazeroForFacIterBench(wazero.NewEngineJIT())
+	t.Run("JIT", func(t *testing.T) {
+		fn, err := newWazeroFacIterBench(wazero.NewEngineJIT())
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
 			res, err := fn(ctx, in)
 			require.NoError(t, err)
-			require.Equal(t, expValue, res)
+			require.Equal(t, expValue, res[0])
 		}
 	})
 
@@ -78,22 +79,24 @@ func TestFacIter(t *testing.T) {
 
 // BenchmarkFacIter_Init tracks the time spent readying a function for use
 func BenchmarkFacIter_Init(b *testing.B) {
-	b.Run("interpreter", func(b *testing.B) {
+	b.Run("Interpreter", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err := newWazeroForFacIterBench(wazero.NewEngineInterpreter()); err != nil {
+			if _, err := newWazeroFacIterBench(wazero.NewEngineInterpreter()); err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
-	b.Run("jit", func(b *testing.B) {
+
+	b.Run("JIT", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err := newWazeroForFacIterBench(wazero.NewEngineJIT()); err != nil {
+			if _, err := newWazeroFacIterBench(wazero.NewEngineJIT()); err != nil {
 				b.Fatal(err)
 			}
 		}
 	})
+
 	b.Run("wasmer-go", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -105,6 +108,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 			instance.Close()
 		}
 	})
+
 	b.Run("wasmtime-go", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -119,8 +123,8 @@ func BenchmarkFacIter_Init(b *testing.B) {
 func BenchmarkFacIter_Invoke(b *testing.B) {
 	ctx := context.Background()
 	const in = 30
-	b.Run("interpreter", func(b *testing.B) {
-		fn, err := newWazeroForFacIterBench(wazero.NewEngineInterpreter())
+	b.Run("Interpreter", func(b *testing.B) {
+		fn, err := newWazeroFacIterBench(wazero.NewEngineInterpreter())
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -131,8 +135,8 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 			}
 		}
 	})
-	b.Run("jit", func(b *testing.B) {
-		fn, err := newWazeroForFacIterBench(wazero.NewEngineJIT())
+	b.Run("JIT", func(b *testing.B) {
+		fn, err := newWazeroFacIterBench(wazero.NewEngineJIT())
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -171,23 +175,20 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 	})
 }
 
-func newWazeroForFacIterBench(engine *wazero.Engine) (wasm.FunctionI64Return, error) {
+func newWazeroFacIterBench(engine *wazero.Engine) (wasm.Function, error) {
 	mod, err := wazero.DecodeModuleBinary(facWasm)
 	if err != nil {
 		return nil, err
 	}
 
-	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
+	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
+
+	m, err := wazero.InstantiateModule(store, mod)
 	if err != nil {
 		return nil, err
 	}
 
-	m, err := store.Instantiate(mod)
-	if err != nil {
-		return nil, err
-	}
-
-	fn, ok := m.GetFunctionI64Return("fac-iter")
+	fn, ok := m.Function("fac-iter")
 	if !ok {
 		return nil, fmt.Errorf("fac-iter is not an exported function")
 	}

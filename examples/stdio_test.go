@@ -19,6 +19,7 @@ var stdioWasm []byte
 func Test_stdio(t *testing.T) {
 	mod, err := wazero.DecodeModuleBinary(stdioWasm)
 	require.NoError(t, err)
+	store := wazero.NewStore()
 
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
 	stdoutBuf := bytes.NewBuffer(nil)
@@ -26,11 +27,7 @@ func Test_stdio(t *testing.T) {
 
 	// Configure WASI host functions with the IO buffers
 	wasiConfig := &wazero.WASIConfig{Stdin: stdinBuf, Stdout: stdoutBuf, Stderr: stderrBuf}
-	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
-		ModuleToHostFunctions: map[string]*wazero.HostFunctions{
-			wasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1WithConfig(wasiConfig),
-		},
-	})
+	_, err = wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1WithConfig(wasiConfig))
 	require.NoError(t, err)
 
 	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to

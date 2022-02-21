@@ -7,7 +7,7 @@ import (
 )
 
 // DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or
-// an error occurs. The result can be initialized for use via Store.Instantiate.
+// an error occurs. The result can be initialized for use via InstantiateModule.
 //
 // Here's a description of the return values:
 // * result is the module parsed or nil on error
@@ -32,7 +32,7 @@ func decodeModule(decoder internalwasm.DecodeModule, source []byte) (*Module, er
 	if m.NameSection != nil {
 		name = m.NameSection.ModuleName
 	}
-	return &Module{m: m, name: name}, nil
+	return &Module{wasm: m, name: name}, nil
 }
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
@@ -44,12 +44,13 @@ var EncodeModuleBinary EncodeModule = func(m *Module) []byte {
 }
 
 func encodeModule(encoder internalwasm.EncodeModule, m *Module) []byte {
-	return encoder(m.m)
+	return encoder(m.wasm)
 }
 
+// Module is a WebAssembly 1.0 (MVP) module decoded (DecodeModule) from a valid source.
 type Module struct {
-	m    *internalwasm.Module
 	name string
+	wasm *internalwasm.Module
 }
 
 // Name defaults to what's decoded from the custom name section and can be overridden WithName.

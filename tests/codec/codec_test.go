@@ -90,8 +90,6 @@ func newExample() *wasm.Module {
 }
 
 func TestExampleUpToDate(t *testing.T) {
-	ctx := context.Background()
-
 	t.Run("binary.DecodeModule", func(t *testing.T) {
 		m, err := binary.DecodeModule(exampleBinary)
 		require.NoError(t, err)
@@ -105,26 +103,25 @@ func TestExampleUpToDate(t *testing.T) {
 	})
 
 	t.Run("Executable", func(t *testing.T) {
+		store := wazero.NewStore()
+
 		// Add WASI to satisfy import tests
-		store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
-			ModuleToHostFunctions: map[string]*wazero.HostFunctions{
-				publicwasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1(),
-			},
-		})
+		_, err := wazero.ExportHostFunctions(store, publicwasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
 		mod, err := wazero.DecodeModuleBinary(exampleBinary)
 		require.NoError(t, err)
-		m, err := store.Instantiate(mod)
+		exports, err := wazero.InstantiateModule(store, mod)
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		addInt, ok := m.GetFunctionI32Return("AddInt")
+		addInt, ok := exports.Function("AddInt")
 		require.True(t, ok)
-		res, err := addInt(ctx, 1, 2)
+
+		results, err := addInt(context.Background(), uint64(1), uint64(2))
 		require.NoError(t, err)
-		require.Equal(t, uint32(3), res)
+		require.Equal(t, uint64(3), results[0])
 	})
 }
 

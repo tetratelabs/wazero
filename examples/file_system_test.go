@@ -48,18 +48,15 @@ func Test_file_system(t *testing.T) {
 	mod, err := wazero.DecodeModuleBinary(filesystemWasm)
 	require.NoError(t, err)
 
+	store := wazero.NewStore()
+
 	memFS := wazero.WASIMemFS()
 	err = writeFile(memFS, "input.txt", []byte("Hello, file system!"))
 	require.NoError(t, err)
 
-	// Configure WASI host functions with the memory filesystem
-	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
-		ModuleToHostFunctions: map[string]*wazero.HostFunctions{
-			wasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1WithConfig(
-				&wazero.WASIConfig{Preopens: map[string]wasi.FS{".": memFS}},
-			),
-		},
-	})
+	_, err = wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1WithConfig(
+		&wazero.WASIConfig{Preopens: map[string]wasi.FS{".": memFS}},
+	))
 	require.NoError(t, err)
 
 	// Note: TinyGo binaries must be treated as WASI Commands to initialize memory.

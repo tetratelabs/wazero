@@ -41,17 +41,18 @@ type FS interface {
 
 // Errno are the error codes returned by WASI functions.
 //
+// Note: This is not always an error, as ErrnoSuccess is a valid code.
 // Note: Codes are defined even when not relevant to WASI for use in higher-level libraries or alignment with POSIX.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-errno-enumu16
 // See https://linux.die.net/man/3/errno
-type Errno uint32
+type Errno = uint32 // alias for parity with internalwasm.ValueType
 
-// Error returns the POSIX error code name, except ErrnoSuccess, which isn't defined. Ex. Errno2big -> "E2BIG"
-func (err Errno) Error() string {
-	if int(err) < len(errnoToString) {
-		return errnoToString[err]
+// ErrnoName returns the POSIX error code name, except ErrnoSuccess, which is not an error. Ex. Errno2big -> "E2BIG"
+func ErrnoName(errno Errno) string {
+	if int(errno) < len(errnoToString) {
+		return errnoToString[errno]
 	}
-	return fmt.Sprintf("errno(%d)", uint32(err))
+	return fmt.Sprintf("errno(%d)", errno)
 }
 
 // Note: Below prefers POSIX symbol names over WASI ones, even if the docs are from WASI.
@@ -300,7 +301,7 @@ var errnoToString = [...]string{
 // In wazero, if ProcExit is called, the calling function returns immediately, returning the given exit code as the error.
 // You can get the exit code by casting the error as follows.
 //
-//   wasmFunction := m.GetFunctionVoidReturn(/* omitted */)  // Some function which may call proc_exit
+//   wasmFunction := m.Function(/* omitted */)  // Some function which may call proc_exit
 //   err := wasmFunction()
 //   var exitCode wasi.ExitCode
 //   if errors.As(err, &exitCode) {

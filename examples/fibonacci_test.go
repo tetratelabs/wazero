@@ -19,30 +19,27 @@ func Test_fibonacci(t *testing.T) {
 	mod, err := wazero.DecodeModuleBinary(fibWasm)
 	require.NoError(t, err)
 
-	// Note: the TinyGo function fibonacci doesn't directly use WASI.
-	// However, all TinyGo binaries must be treated as WASI Commands to initialize memory.
-	store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{
-		ModuleToHostFunctions: map[string]*wazero.HostFunctions{
-			wasi.ModuleSnapshotPreview1: wazero.WASISnapshotPreview1(),
-		},
-	})
+	store := wazero.NewStore()
+
+	// Note: fibonacci.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
+	_, err = wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 
-	m, err := wazero.StartWASICommand(store, mod)
+	exports, err := wazero.StartWASICommand(store, mod)
 	require.NoError(t, err)
 
-	fibonacci, ok := m.GetFunctionI32Return("fibonacci")
+	fibonacci, ok := exports.Function("fibonacci")
 	require.True(t, ok)
 
 	for _, c := range []struct {
-		in, exp uint32
+		input, expected uint64 // i32_i32 sig, but wasm.Function params and results are uint64
 	}{
-		{in: 20, exp: 6765},
-		{in: 10, exp: 55},
-		{in: 5, exp: 5},
+		{input: 20, expected: 6765},
+		{input: 10, expected: 55},
+		{input: 5, expected: 5},
 	} {
-		ret, err := fibonacci(context.Background(), uint64(c.in)) // Params are uint64, but evaluated per the signature.
+		results, err := fibonacci(context.Background(), c.input)
 		require.NoError(t, err)
-		require.Equal(t, c.exp, ret)
+		require.Equal(t, c.expected, results[0])
 	}
 }

@@ -425,7 +425,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 }
 
 // Call implements an interpreted wasm.Engine.
-func (it *interpreter) Call(ctx *wasm.HostFunctionCallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (it *interpreter) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	prevFrameLen := len(it.frames)
 
 	// shouldRecover is true when a panic at the origin of callstack should be recovered
@@ -492,12 +492,12 @@ func (it *interpreter) Call(ctx *wasm.HostFunctionCallContext, f *wasm.FunctionI
 	return
 }
 
-func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interpreterFunction) {
+func (it *interpreter) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
 	wasmParamOffset := 0
-	if f.funcInstance.FunctionKind != wasm.FunctionKindHostNoContext {
+	if f.funcInstance.FunctionKind != wasm.FunctionKindGoNoContext {
 		wasmParamOffset = 1
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {
@@ -543,7 +543,7 @@ func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interp
 	it.popFrame()
 }
 
-func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *interpreterFunction) {
+func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.Memory

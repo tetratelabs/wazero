@@ -2,7 +2,6 @@ package internalwasm
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"math"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 type (
@@ -30,11 +30,14 @@ type (
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
 		Engine Engine
 
-		// ModuleInstances holds the instantiated Wasm modules keyed on names given at Instantiate.
+		// ModuleInstances holds the instantiated Wasm modules by module name from Instantiate.
 		ModuleInstances map[string]*ModuleInstance
 
-		// HostFunctionCallContexts holds default host function call contexts keyed by module name.
-		HostFunctionCallContexts map[string]*HostFunctionCallContext
+		// hostExports holds host functions by module name from ExportHostFunctions.
+		hostExports map[string]*HostExports
+
+		// ModuleContexts holds default host function call contexts keyed by module name.
+		ModuleContexts map[string]*ModuleContext
 
 		// TypeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
 		// do type-checks on indirect function calls.
@@ -228,43 +231,23 @@ func (m *ModuleInstance) GetExport(name string, kind ExportKind) (*ExportInstanc
 	return exp, nil
 }
 
-func (m *ModuleInstance) GetFunctionVoidReturn(name string) (*FunctionInstance, error) {
-	exp, err := m.GetExport(name, ExportKindFunc)
-	if err != nil {
-		return nil, err
-	}
-	funcType := exp.Function.FunctionType.Type
-	if len(funcType.Results) != 0 {
-		return nil, fmt.Errorf("%s is not a void return function", name)
-	}
-	return exp.Function, nil
-}
-
-func (m *ModuleInstance) GetFunction(name string, rv ValueType) (*FunctionInstance, error) {
-	exp, err := m.GetExport(name, ExportKindFunc)
-	if err != nil {
-		return nil, err
-	}
-	funcType := exp.Function.FunctionType.Type
-	if len(funcType.Results) != 1 || funcType.Results[0] != rv {
-		return nil, fmt.Errorf("%s is not a %s return function", name, ValueTypeName(rv))
-	}
-	return exp.Function, nil
-}
-
 func NewStore(engine Engine) *Store {
 	return &Store{
-		ModuleInstances:          map[string]*ModuleInstance{},
-		HostFunctionCallContexts: map[string]*HostFunctionCallContext{},
-		TypeIDs:                  map[string]FunctionTypeID{},
-		Engine:                   engine,
-		maximumFunctionAddress:   maximumFunctionAddress,
-		maximumFunctionTypes:     maximumFunctionTypes,
-		maximumGlobals:           maximumGlobals,
+		ModuleInstances:        map[string]*ModuleInstance{},
+		ModuleContexts:         map[string]*ModuleContext{},
+		TypeIDs:                map[string]FunctionTypeID{},
+		Engine:                 engine,
+		maximumFunctionAddress: maximumFunctionAddress,
+		maximumFunctionTypes:   maximumFunctionTypes,
+		maximumGlobals:         maximumGlobals,
 	}
 }
 
-func (s *Store) Instantiate(module *Module, name string) (*HostFunctionCallContext, error) {
+func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
+	if err := s.requireModuleUnused(name); err != nil {
+		return nil, err
+	}
+
 	// Check the start function is valid.
 	// TODO: this should be verified during decode so that errors have the correct source positions
 	if module.StartSection != nil {
@@ -335,8 +318,8 @@ func (s *Store) Instantiate(module *Module, name string) (*HostFunctionCallConte
 	}
 
 	// Build the default context for calls to this module
-	ctx := NewHostFunctionCallContext(s, instance)
-	s.HostFunctionCallContexts[name] = ctx
+	ctx := NewModuleContext(s, instance)
+	s.ModuleContexts[name] = ctx
 
 	// Now we are safe to finalize the state.
 	rollbackFuncs = nil
@@ -351,30 +334,16 @@ func (s *Store) Instantiate(module *Module, name string) (*HostFunctionCallConte
 	return ctx, nil
 }
 
-// CallFunction looks up an exported function given its module and function name and calls it.
-// Any returned results and resultTypes are index-correlated, noting WebAssembly 1.0 (MVP) allows
-// up to one result. An error is returned for any failure looking up or invoking the function including
-// signature mismatch.
-//
-// Note: The ctx parameter will be the outer-most ancestor of wasm.HostFunctionCallContext Context.
-// ctx will default to context.Background() is nil is passed.
-// Note: this API is unstable. See tetratelabs/wazero#170
-func (s *Store) CallFunction(ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []ValueType, err error) {
-	var exp *ExportInstance
-	if exp, err = s.getExport(moduleName, funcName, ExportKindFunc); err != nil {
-		return
-	}
+// ModuleExports implements wasm.Store ModuleExports
+func (s *Store) ModuleExports(moduleName string) (publicwasm.ModuleExports, bool) {
+	e, ok := s.ModuleContexts[moduleName]
+	return e, ok
+}
 
-	f := exp.Function
-	if len(f.FunctionType.Type.Params) != len(params) {
-		err = fmt.Errorf("invalid number of parameters")
-		return
-	}
-
-	hostCtx := s.HostFunctionCallContexts[moduleName].WithContext(ctx)
-	results, err = s.Engine.Call(hostCtx, f, params...)
-	resultTypes = f.FunctionType.Type.Results
-	return
+// HostExports implements wasm.Store HostExports
+func (s *Store) HostExports(moduleName string) (publicwasm.HostExports, bool) {
+	e, ok := s.hostExports[moduleName]
+	return e, ok
 }
 
 func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp *ExportInstance, err error) {
@@ -553,10 +522,10 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 			v = int64(g.Val)
 			return v, ValueTypeI64, nil
 		case ValueTypeF32:
-			v = math.Float32frombits(uint32(g.Val))
+			v = publicwasm.DecodeF32(g.Val)
 			return v, ValueTypeF32, nil
 		case ValueTypeF64:
-			v = math.Float64frombits(g.Val)
+			v = publicwasm.DecodeF64(g.Val)
 			return v, ValueTypeF64, nil
 		}
 	}
@@ -595,9 +564,9 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (ro
 		case int64:
 			gv = uint64(v)
 		case float32:
-			gv = uint64(math.Float32bits(v))
+			gv = publicwasm.EncodeF32(v)
 		case float64:
-			gv = math.Float64bits(v)
+			gv = publicwasm.EncodeF64(v)
 		}
 		g := &GlobalInstance{
 			Type: gs.Type,
@@ -815,7 +784,7 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			ei = &ExportInstance{Kind: exp.Kind, Function: target.Functions[index]}
 			// The module instance of the host function is a fake that only includes the function and its types.
 			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
-			// available to the wasm.HostFunctionCallContext Memory.
+			// available to the wasm.ModuleContext Memory.
 			if ei.Function.HostFunction != nil {
 				ei.Function.ModuleInstance = target
 			}
@@ -875,15 +844,15 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 //
 // Note: The wasm.Memory of the fn will be from the importing module.
 // Note: The ModuleInstance of this host function is lazy created and only includes exported functions and their types.
-func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
+func (s *Store) AddHostFunction(moduleName string, hf *GoFunc) (*FunctionInstance, error) {
 	m := s.getModuleInstance(moduleName)
 	typeInstance, err := s.getTypeInstance(hf.functionType)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	f := &FunctionInstance{
-		Name:           fmt.Sprintf("%s.%s", moduleName, hf.name),
+		Name:           fmt.Sprintf("%s.%s", moduleName, hf.wasmFunctionName),
 		HostFunction:   hf.goFunc,
 		FunctionKind:   hf.functionKind,
 		FunctionType:   typeInstance,
@@ -891,18 +860,18 @@ func (s *Store) AddHostFunction(moduleName string, hf *HostFunction) error {
 	}
 
 	if err = s.Engine.Compile(f); err != nil {
-		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
+		return nil, fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
 	if err = s.addFunctionInstance(f); err != nil {
-		return err
+		return nil, err
 	}
 	// TODO: This races on adding export. A future design may be able to eliminate this race, possibly via a HostModule
 	// type.
-	if err = m.addExport(hf.name, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
+	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
 		s.Functions = s.Functions[:len(s.Functions)-1] // lost race: revert the add on conflict
-		return err
+		return nil, err
 	}
-	return nil
+	return f, nil
 }
 
 func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType ValueType, mutable bool) error {
