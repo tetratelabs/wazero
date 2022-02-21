@@ -1874,134 +1874,84 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall, env.jitStatus())
 	})
 
-	// t.Run("ok", func(t *testing.T) {
-	// 	targetType := &wasm.FunctionType{
-	// 		Params:  []wasm.ValueType{},
-	// 		Results: []wasm.ValueType{wasm.ValueTypeI32}}
-	// 	targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
-	// 	operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
-	// 	moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
-	// 	moduleInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
+	t.Run("ok", func(t *testing.T) {
+		targetType := &wasm.FunctionType{
+			Params:  []wasm.ValueType{},
+			Results: []wasm.ValueType{wasm.ValueTypeI32}}
+		targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
+		operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
+		moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
+		moduleInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
 
-	// 	table := make([]wasm.TableElement, 10)
-	// 	for i := 0; i < len(table); i++ {
-	// 		table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
-	// 	}
-
-	// 	for i := 0; i < len(table); i++ {
-	// 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-	// 			env := newJITEnvironment()
-	// 			env.setTable(table)
-	// 			engine := env.engine()
-
-	// 			// First we creat the call target function with function address = i,
-	// 			// and it returns one value.
-	// 			expectedReturnValue := uint32(i * 1000)
-	// 			{
-	// 				compiler := env.requireNewCompiler(t)
-	// 				err := compiler.compilePreamble()
-	// 				require.NoError(t, err)
-	// 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
-	// 				require.NoError(t, err)
-	// 				err = compiler.compileReturnFunction()
-	// 				require.NoError(t, err)
-
-	// 				code, _, _, err := compiler.compile()
-	// 				require.NoError(t, err)
-
-	// 				cf := &compiledFunction{
-	// 					codeSegment:        code,
-	// 					codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-	// 				}
-	// 				fmt.Printf("%p: initial code 0x%x\n", cf, cf.codeInitialAddress)
-	// 				engine.addCompiledFunction(table[i].FunctionAddress, cf)
-	// 			}
-
-	// 			compiler := env.requireNewCompiler(t)
-	// 			err := compiler.compilePreamble()
-	// 			require.NoError(t, err)
-
-	// 			// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-	// 			compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
-	// 			// and the typeID  matches the table[targetOffset]'s type ID.
-
-	// 			// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
-	// 			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
-	// 			require.NoError(t, err)
-
-	// 			// At this point, we should have one item (offset value) on the stack.
-	// 			require.Equal(t, uint64(1), compiler.locationStack.sp)
-
-	// 			require.NoError(t, compiler.compileCallIndirect(operation))
-
-	// 			// At this point, we consumed the offset value, but the function returns one value,
-	// 			// so the stack pointer results in the same.
-	// 			require.Equal(t, uint64(1), compiler.locationStack.sp)
-
-	// 			err = compiler.compileReturnFunction()
-	// 			require.NoError(t, err)
-
-	// 			// Generate the code under test and run.
-	// 			code, _, _, err := compiler.compile()
-	// 			require.NoError(t, err)
-	// 			env.exec(code)
-
-	// 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-	// 			require.Equal(t, uint64(1), env.stackPointer())
-	// 			require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
-	// 		})
-	// 	}
-	// })
-}
-
-func Test_a(t *testing.T) {
-	targetType := &wasm.FunctionType{
-		Params:  []wasm.ValueType{},
-		Results: []wasm.ValueType{wasm.ValueTypeI32}}
-	moduleInstance := &wasm.ModuleInstance{
-		Functions: []*wasm.FunctionInstance{{FunctionType: &wasm.TypeInstance{Type: targetType}}},
-	}
-
-	env := newJITEnvironment()
-	engine := env.engine()
-
-	{
-		compiler := env.requireNewCompiler(t)
-		err := compiler.compilePreamble()
-		require.NoError(t, err)
-
-		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
-		require.NoError(t, err)
-		err = compiler.compileReturnFunction()
-		require.NoError(t, err)
-
-		code, _, _, err := compiler.compile()
-		require.NoError(t, err)
-
-		cf := &compiledFunction{
-			codeSegment:        code,
-			codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+		table := make([]wasm.TableElement, 10)
+		for i := 0; i < len(table); i++ {
+			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
 		}
-		fmt.Printf("%p: initial code 0x%x\n", cf, cf.codeInitialAddress)
-		engine.addCompiledFunction(0, cf)
-	}
 
-	compiler := env.requireNewCompiler(t)
-	err := compiler.compilePreamble()
-	require.NoError(t, err)
+		for i := 0; i < len(table); i++ {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				env := newJITEnvironment()
+				env.setTable(table)
+				engine := env.engine()
 
-	compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
-	require.NoError(t, compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: uint32(0)}))
+				// First we creat the call target function with function address = i,
+				// and it returns one value.
+				expectedReturnValue := uint32(i * 1000)
+				{
+					compiler := env.requireNewCompiler(t)
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+					require.NoError(t, err)
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
 
-	err = compiler.compileReturnFunction()
-	require.NoError(t, err)
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
 
-	// Generate the code under test and run.
-	code, _, _, err := compiler.compile()
-	require.NoError(t, err)
-	env.exec(code)
+					cf := &compiledFunction{
+						codeSegment:        code,
+						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+					}
+					fmt.Printf("%p: initial code 0x%x\n", cf, cf.codeInitialAddress)
+					engine.addCompiledFunction(table[i].FunctionAddress, cf)
+				}
 
-	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				compiler := env.requireNewCompiler(t)
+				err := compiler.compilePreamble()
+				require.NoError(t, err)
+
+				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
+				// and the typeID  matches the table[targetOffset]'s type ID.
+
+				// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
+				require.NoError(t, err)
+
+				// At this point, we should have one item (offset value) on the stack.
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+				require.NoError(t, compiler.compileCallIndirect(operation))
+
+				// At this point, we consumed the offset value, but the function returns one value,
+				// so the stack pointer results in the same.
+				require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+				err = compiler.compileReturnFunction()
+				require.NoError(t, err)
+
+				// Generate the code under test and run.
+				code, _, _, err := compiler.compile()
+				require.NoError(t, err)
+				env.exec(code)
+
+				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+				require.Equal(t, uint64(1), env.stackPointer())
+				require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
+			})
+		}
+	})
 }
 
 func TestArm64Compiler_compileSelect(t *testing.T) {

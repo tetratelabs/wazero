@@ -1012,12 +1012,12 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 	// At this point, oldStackBasePointer holds the old stack base pointer. We could get the new frame's
 	// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 	// See the comments in engine.pushCallFrame which does exactly the same calculation in Go.
-	c.compileConstToRegisterInstruction(arm64.AADD,
-		int64(c.locationStack.sp)-int64(len(functype.Params)),
-		oldStackBasePointer)
-	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
-		oldStackBasePointer,
-		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset)
+	if offset := int64(c.locationStack.sp) - int64(len(functype.Params)); offset > 0 {
+		c.compileConstToRegisterInstruction(arm64.AADD, offset, oldStackBasePointer)
+		c.compileRegisterToMemoryInstruction(arm64.AMOVD,
+			oldStackBasePointer,
+			reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset)
+	}
 
 	// 3) Set rc.next to specify which function is executed on the current call frame.
 	//
@@ -1042,8 +1042,6 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 			compiledFunctionAddressRegister,
 		)
 	}
-
-	fmt.Println(addrRegister, compiledFunctionAddressRegister)
 
 	// Finally, we are ready to write the address of the target function's *compiledFunction into the new callframe.
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
@@ -1075,10 +1073,6 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
 		tmp)
-
-	// a := c.newProg()
-	// a.As = obj.AUNDEF
-	// c.addInstruction(a)
 
 	c.compileUnconditionalBranchToAddressOnRegister(tmp)
 
