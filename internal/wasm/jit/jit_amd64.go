@@ -5418,17 +5418,6 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
 	if len(c.f.ModuleInstance.Tables) > 0 {
-		getTablesCount := c.newProg()
-		getTablesCount.As = x86.AMOVQ
-		getTablesCount.To.Type = obj.TYPE_REG
-		getTablesCount.To.Reg = tmpRegister
-		getTablesCount.From.Type = obj.TYPE_MEM
-		getTablesCount.From.Reg = moduleInstanceAddressRegister
-		// We add "+8" to get the length of ModuleInstance.Tables
-		// since the slice header {Data uintptr, Len, int64, Cap int64} internally.
-		getTablesCount.From.Offset = moduleInstanceTablesOffset + 8
-		c.addInstruction(getTablesCount)
-
 		// First, we need to read the *wasm.TableInstance.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
@@ -5440,7 +5429,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		c.addInstruction(readTableInstancePointer)
 
 		resolveTableInstanceAddressFromPointer := c.newProg()
-		resolveTableInstanceAddressFromPointer.As = x86.AMOVQ // Note this is LEA instruction.
+		resolveTableInstanceAddressFromPointer.As = x86.AMOVQ
 		resolveTableInstanceAddressFromPointer.To.Type = obj.TYPE_REG
 		resolveTableInstanceAddressFromPointer.To.Reg = tmpRegister
 		resolveTableInstanceAddressFromPointer.From.Type = obj.TYPE_MEM
@@ -5475,9 +5464,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		readTableLength.To.Reg = tmpRegister2
 		readTableLength.From.Type = obj.TYPE_MEM
 		readTableLength.From.Reg = tmpRegister
-		// We add "+8" to get the length of Tables[0].Table
-		// since the slice header {Data uintptr, Len, int64, Cap int64} internally.
-		readTableLength.From.Offset = tableInstanceTableOffset + 8
+		readTableLength.From.Offset = tableInstanceTableLenOffset
 		c.addInstruction(readTableLength)
 
 		// And put the length into tableSliceLen.

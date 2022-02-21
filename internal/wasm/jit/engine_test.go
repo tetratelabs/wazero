@@ -67,6 +67,9 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Offsets for wasm.TableInstance.
 	var tableInstance wasm.TableInstance
 	require.Equal(t, int(unsafe.Offsetof(tableInstance.Table)), tableInstanceTableOffset)
+	// We add "+8" to get the length of Tables[0].Table
+	// since the slice header is laid out as {Data uintptr, Len, int64, Cap int64} on memory.
+	require.Equal(t, int(unsafe.Offsetof(tableInstance.Table)+8), tableInstanceTableLenOffset)
 
 	// Offsets for wasm.MemoryInstance
 	var memoryInstance wasm.MemoryInstance

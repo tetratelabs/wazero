@@ -225,7 +225,8 @@ const (
 	moduleInstanceTablesOffset  = 80
 
 	// Offsets for wasm.TableInstance.
-	tableInstanceTableOffset = 0
+	tableInstanceTableOffset    = 0
+	tableInstanceTableLenOffset = 8
 
 	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0

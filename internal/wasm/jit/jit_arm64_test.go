@@ -1713,10 +1713,13 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
-				engine.addCompiledFunction(wasm.FunctionAddress(i), &compiledFunction{
+				addr := wasm.FunctionAddress(i)
+				engine.addCompiledFunction(addr, &compiledFunction{
 					codeSegment:        code,
 					codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 				})
+				env.moduleInstance.Functions = append(env.moduleInstance.Functions,
+					&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: addr})
 			}
 
 			// Now we start building the caller's code.
@@ -1733,7 +1736,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 			// Call all the built functions.
 			for i := 0; i < numCalls; i++ {
-				err = compiler.compileCallImpl(wasm.FunctionAddress(i), targetFunctionType)
+				err = compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: uint32(i)})
 				require.NoError(t, err)
 			}
 
@@ -1763,6 +1766,80 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 			require.Equal(t, expectedValue, env.stackTopAsUint32())
 		})
 	}
+}
+
+func TestArm64Compiler_compileCallIndirect(t *testing.T) {
+	t.Run("out of bounds", func(t *testing.T) {
+		env := newJITEnvironment()
+		env.setTable(make([]wasm.TableElement, 10))
+		compiler := env.requireNewCompiler(t)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
+		compiler.f = &wasm.FunctionInstance{
+			FunctionKind:   wasm.FunctionKindWasm,
+			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
+		}
+
+		// Place the offfset value.
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+		require.NoError(t, err)
+
+		err = compiler.compileCallIndirect(targetOperation)
+		require.NoError(t, err)
+
+		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
+
+		// Generate the code under test.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+	})
+
+	t.Run("uninitialized", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+		compiler.f = &wasm.FunctionInstance{
+			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}},
+			FunctionKind:   wasm.FunctionKindWasm,
+		}
+		// and the typeID doesn't match the table[targetOffset]'s type ID.
+		table := make([]wasm.TableElement, 10)
+		env.setTable(table)
+		table[0] = wasm.TableElement{FunctionTypeID: wasm.UninitializedTableElementTypeID}
+
+		// Place the offfset value.
+		err = compiler.compileConstI32(targetOffset)
+		require.NoError(t, err)
+		err = compiler.compileCallIndirect(targetOperation)
+		require.NoError(t, err)
+
+		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// Run code.
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+	})
 }
 
 func TestArm64Compiler_compileSelect(t *testing.T) {
@@ -1882,27 +1959,44 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				// TODO: Add  table
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				// TODO: Add  table
+				Tables: []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				// TODO: Add  table
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+			},
+		},
+		{
+			name: "table length zero",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: nil}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "table length zero part2",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},

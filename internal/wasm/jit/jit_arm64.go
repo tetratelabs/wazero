@@ -907,13 +907,11 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	return c.compileCallImpl(target.Address, target.FunctionType.Type)
+	return c.compileCallImpl(target.Address, nilRegister, target.FunctionType.Type)
 }
 
-// compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect (TODO) for the arm64 architecture.
-func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *wasm.FunctionType) error {
-	// TODO: the following code can be generalized for CallIndirect.
-
+// compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect for the arm64 architecture.
+func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister int16, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err
@@ -946,8 +944,27 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 	brIfCallFrameStackOK := c.compilelBranchInstruction(arm64.ABNE)
 
 	// If these values equal, we need to grow the callFrame stack.
+	// For call_indirect, we need to push the value back to the register.
+	if !isNilRegister(addrRegister) {
+		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack,
+		// as the register is not saved across function calls.
+		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(addrRegister)
+		c.compileReleaseRegisterToStack(savedOffsetLocation)
+	}
+
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
 		return err
+	}
+
+	// For call_indirect, we need to push the value back to the register.
+	if !isNilRegister(addrRegister) {
+		// Since this is right after callGoFunction, we have to initialize the stack base pointer
+		// to properly load the value on memory stack.
+		c.compileReservedStackBasePointerRegisterInitialization()
+
+		savedOffsetLocation := c.locationStack.pop()
+		savedOffsetLocation.setRegister(addrRegister)
+		c.compileLoadValueOnStackToRegister(savedOffsetLocation)
 	}
 
 	// On the function return, we again have to set engine.callFrameStackPointer into callFrameStackPointerRegister.
@@ -1012,9 +1029,18 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 
 	// Next, read the address of the target function (= &engine.compiledFunctions[offset])
 	// into compiledFunctionAddressRegister.
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		tmp, int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
-		compiledFunctionAddressRegister)
+	if isNilRegister(addrRegister) {
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmp, int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
+			compiledFunctionAddressRegister)
+	} else {
+		c.compileMemoryWithRegisterOffsetToRegisterInstruction(
+			arm64.AMOVD,
+			tmp, addrRegister,
+			compiledFunctionAddressRegister,
+		)
+	}
 
 	// Finally, we are ready to write the address of the target function's *compiledFunction into the new callframe.
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
@@ -1158,7 +1184,94 @@ func (c *arm64Compiler) compileReadInstructionAddress(beforeTargetInst obj.As, d
 }
 
 func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	offset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
+		return err
+	}
+
+	if isZeroRegister(offset.register) {
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		offset.setRegister(reg)
+		c.markRegisterUsed(reg)
+
+		// Zero the value on a picked register.
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, reg)
+	}
+
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// First, we need to check if the offset doesn't exceed the length of table.
+	// "tmp = len(table)"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineModuleContextTableSliceLenOffset,
+		tmp,
+	)
+	// "cmp tmp, offset"
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, offset.register)
+
+	// If it exceeds len(table), we exit the execution.
+	brIfOffsetOK := c.compilelBranchInstruction(arm64.ABLS)
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+
+	// Otherwise, we proceed to do function type check.
+	c.setBranchTargetOnNext(brIfOffsetOK)
+
+	// We need to obtains the absolute address of table element.
+	// "tmp = &table[0]"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD,
+		reservedRegisterForEngine, engineModuleContextTableElement0AddressOffset,
+		tmp,
+	)
+	// "offset = tmp + (offset << 4) (== &table[offset])"
+	c.compileAddInstructionWithLeftShiftedRegister(
+		offset.register, 4,
+		tmp,
+		offset.register,
+	)
+
+	// Check if table[offset].TypeID == targetFunctionType.
+	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
+	// "tmp = table[offset].TypeID"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD, offset.register, tableElementFunctionTypeIDOffset,
+		tmp,
+	)
+	// "reservedRegisterForTemporary = targetFunctionType.TypeID"
+	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(targetFunctionType.TypeID), reservedRegisterForTemporary)
+	// Compare these two values, and if they equal, we are ready to make function call.
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, reservedRegisterForTemporary)
+	brTypeMatched := c.compilelBranchInstruction(arm64.ABEQ)
+
+	// Otherwise, we have to exit the execution with either jitCallStatusCodeTypeMismatchOnIndirectCall or jitCallStatusCodeInvalidTableAccess.
+	{
+		// We exit with jitCallStatusCodeInvalidTableAccess if the targetFunctionType.TypeID equals the uninitialized one (wasm.UninitializedTableElementTypeID).
+		c.compileConstToRegisterInstruction(arm64.AMOVD, int64(wasm.UninitializedTableElementTypeID), tmp)
+		c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, reservedRegisterForTemporary)
+
+		brIfInitizlied := c.compilelBranchInstruction(arm64.ABEQ)
+		c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+
+		// Otherwise exit with jitCallStatusCodeTypeMismatchOnIndirectCall.
+		c.setBranchTargetOnNext(brIfInitizlied)
+		c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
+	}
+
+	c.setBranchTargetOnNext(brTypeMatched)
+
+	if err := c.compileCallImpl(0, offset.register, targetFunctionType.Type); err != nil {
+		return err
+	}
+
+	// The offset register should be marked as un-used as we consumed in the function call.
+	c.markRegisterUnused(offset.register)
+	return nil
 }
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
@@ -3036,8 +3149,8 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// * engine.moduleContext.globalElement0Address
 	// * engine.moduleContext.memoryElement0Address
 	// * engine.moduleContext.memorySliceLen
-	// * (TODO) engine.moduleContext.tableElement0Address
-	// * (TODO) engine.moduleContext.tableSliceLen
+	// * engine.moduleContext.tableElement0Address
+	// * engine.moduleContext.tableSliceLen
 
 	// Update globalElement0Address.
 	//
@@ -3103,7 +3216,49 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		)
 	}
 
-	// TODO: Update tableElement0Address and tableSliceLen.
+	// Update tableElement0Address and tableSliceLen.
+	//
+	// Note: if there's table instruction in the function, the existence of the table
+	// is ensured by function validation at module instantiation phase, and that's
+	// why it is ok to skip the initialization if the module's table doesn't exist.
+	if len(c.f.ModuleInstance.Tables) > 0 {
+		// "tmpX = &tables[0] (type of **wasm.TableInstance)"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			moduleInstanceAddressRegister, moduleInstanceTablesOffset,
+			tmpX,
+		)
+		// "tmpX = *tmpX (tables[0])"
+		c.compileMemoryToRegisterInstruction(arm64.AMOVD, tmpX, 0, tmpX)
+
+		// Update engine.tableElement0Address.
+		// "tmpY = &tables[0].Table[0]"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmpX, tableInstanceTableOffset,
+			tmpY,
+		)
+		// "engine.tableElement0Address = tmpY".
+		c.compileRegisterToMemoryInstruction(
+			arm64.AMOVD,
+			tmpY,
+			reservedRegisterForEngine, engineModuleContextTableElement0AddressOffset,
+		)
+
+		// Update engine.tableSliceLen.
+		// "tmpY = len(tables[0].Table)"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmpX, tableInstanceTableLenOffset,
+			tmpY,
+		)
+		// "engine.tableSliceLen = tmpY".
+		c.compileRegisterToMemoryInstruction(
+			arm64.AMOVD,
+			tmpY,
+			reservedRegisterForEngine, engineModuleContextTableSliceLenOffset,
+		)
+	}
 
 	c.setBranchTargetOnNext(brIfModuleUnchanged)
 	c.locationStack.markRegisterUnused(regs...)
