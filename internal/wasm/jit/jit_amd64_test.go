@@ -6153,10 +6153,6 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
-	// Ensure that the offset of wasm.TableInstance doesn't drift.
-	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionAddress)), tableElementFunctionAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof((&wasm.TableElement{}).FunctionTypeID)), tableElementFunctionTypeIDOffset)
-
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
 		env.setTable(make([]wasm.TableElement, 10))

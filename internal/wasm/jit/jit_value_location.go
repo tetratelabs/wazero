@@ -17,6 +17,18 @@ func isNilRegister(r int16) bool {
 	return r == nilRegister
 }
 
+func isIntRegister(r int16) bool {
+	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
+}
+
+func isFloatRegister(r int16) bool {
+	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
+}
+
+func isZeroRegister(r int16) bool {
+	return r == zeroRegister
+}
+
 // conditionalRegisterState indicates a state of the conditional flag register.
 // In arm64, conditional registers are defined as arm64.COND_*.
 // In amd64, we define each flag value in value_locations_amd64.go
@@ -208,7 +220,9 @@ func (s *valueLocationStack) markRegisterUnused(regs ...int16) {
 
 func (s *valueLocationStack) markRegisterUsed(regs ...int16) {
 	for _, reg := range regs {
-		s.usedRegisters[reg] = struct{}{}
+		if !isZeroRegister(reg) {
+			s.usedRegisters[reg] = struct{}{}
+		}
 	}
 }
 

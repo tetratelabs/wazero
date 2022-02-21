@@ -13,6 +13,7 @@
 package jit
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"unsafe"
@@ -106,6 +107,13 @@ type arm64Compiler struct {
 	afterAssembleCallback []func(code []byte) error
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
+	// compiledFunctionStaticData holds br_table offset tables.
+	// See compiledFunctionStaticData and arm64Compiler.compileBrTable.
+	staticData compiledFunctionStaticData
+}
+
+func (c *arm64Compiler) addStaticData(d []byte) {
+	c.staticData = append(c.staticData, d)
 }
 
 // compile implements compiler.compile for the arm64 architecture.
@@ -900,20 +908,166 @@ func (c *arm64Compiler) assignBranchTarget(labelKey string, br *obj.Prog) {
 	}
 }
 
+// compileBrTable implements compiler.compileBrTable for the arm64 architecture.
 func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	// If the operation only consists of the default target, we branch into it and return early.
+	if len(o.Targets) == 0 {
+		loc := c.locationStack.pop()
+		if loc.onRegister() {
+			c.markRegisterUnused(loc.register)
+		}
+		if err := c.compileDropRange(o.Default.ToDrop); err != nil {
+			return err
+		}
+		return c.compileBranchInto(o.Default.Target)
+	}
+
+	index := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(index); err != nil {
+		return err
+	}
+
+	if isZeroRegister(index.register) {
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		index.setRegister(reg)
+		c.markRegisterUsed(reg)
+
+		// Zero the value on a picked register.
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, reg)
+	}
+
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// Load the branch table's length.
+	// "tmpReg = len(o.Targets)"
+	c.compileConstToRegisterInstruction(arm64.AMOVW, int64(len(o.Targets)), tmpReg)
+	// Compare the length with offest.
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, tmpReg, index.register)
+	// If the value exceeds the length, we will branch into the default target (corresponding to len(o.Targets) index).
+	brDefaultIndex := c.compilelBranchInstruction(arm64.ABLO)
+	c.compileRegisterToRegisterInstruction(arm64.AMOVW, tmpReg, index.register)
+	c.setBranchTargetOnNext(brDefaultIndex)
+
+	// We prepare the static data which holds the offset of
+	// each target's first instruction (incl. default)
+	// relative to the beginning of label tables.
+	//
+	// For example, if we have targets=[L0, L1] and default=L_DEFAULT,
+	// we emit the the code like this at [Emit the code for each targets and default branch] below.
+	//
+	// L0:
+	//  0x123001: XXXX, ...
+	//  .....
+	// L1:
+	//  0x123005: YYY, ...
+	//  .....
+	// L_DEFAULT:
+	//  0x123009: ZZZ, ...
+	//
+	// then offsetData becomes like [0x0, 0x5, 0x8].
+	// By using this offset list, we could jump into the label for the index by
+	// "jmp offsetData[index]+0x123001" and "0x123001" can be acquired by "LEA"
+	// instruction.
+	//
+	// Note: We store each offset of 32-bit unsigned integer as 4 consecutive bytes. So more precisely,
+	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
+	//
+	// Note: this is similar to how GCC implements Switch statements in C.
+	offsetData := make([]byte, 4*(len(o.Targets)+1))
+	c.addStaticData(offsetData)
+
+	// "tmpReg = &offsetData[0]"
+	c.compileConstToRegisterInstruction(
+		arm64.AMOVD,
+		int64(uintptr(unsafe.Pointer(&offsetData[0]))),
+		tmpReg,
+	)
+
+	// "index.register = tmpReg + (index.register << 2) (== &offsetData[offset])"
+	c.compileAddInstructionWithLeftShiftedRegister(index.register, 2, tmpReg, index.register)
+
+	// "index.regsetr = *index.reigier (== offsetData[offset])"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVW, index.register, 0, index.register)
+
+	// Now we read the address of the beginning of the jump table.
+	// In the above example, this corresponds to reading the address of 0x123001.
+	c.compileReadInstructionAddress(obj.AJMP, tmpReg)
+
+	// Now we have the address of L0 in tmp register, and the offset to the target label in the index.register.
+	// So we could achieve the br_table jump by adding them and jump into the resulting address.
+	c.compileRegisterToRegisterInstruction(arm64.AADD, tmpReg, index.register)
+
+	c.compileUnconditionalBranchToAddressOnRegister(index.register)
+
+	// We no longer need the index's register, so mark it unused.
+	c.markRegisterUnused(index.register)
+
+	// [Emit the code for each targets and default branch]
+	labelInitialInstructions := make([]*obj.Prog, len(o.Targets)+1)
+	saved := c.locationStack
+	for i := range labelInitialInstructions {
+		// Emit the initial instruction of each target where
+		// we use NOP as we don't yet know the next instruction in each label.
+		init := c.compileNOP()
+		labelInitialInstructions[i] = init
+
+		var locationStack *valueLocationStack
+		var target *wazeroir.BranchTargetDrop
+		if i < len(o.Targets) {
+			target = o.Targets[i]
+			// Clone the location stack so the branch-specific code doesn't
+			// affect others.
+			locationStack = saved.clone()
+		} else {
+			target = o.Default
+			// If this is the default branch, we use the original one
+			// as this is the last code in this block.
+			locationStack = saved
+		}
+		c.setLocationStack(locationStack)
+		if err := c.compileDropRange(target.ToDrop); err != nil {
+			return err
+		}
+		if err := c.compileBranchInto(target.Target); err != nil {
+			return err
+		}
+	}
+
+	c.afterAssembleCallback = append(c.afterAssembleCallback, func(code []byte) error {
+		// Build the offset table for each target including default one.
+		base := labelInitialInstructions[0].Pc // This corresponds to the L0's address in the example.
+		for i, nop := range labelInitialInstructions {
+			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
+				// TODO: this happens when users try loading an extremely large webassembly binary
+				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
+				// We would like to support that binary, but realistically speaking, that kind of binary
+				// could result in more than ten giga bytes of native JITed code where we have to care about
+				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
+				// current implementation.
+				return fmt.Errorf("too large br_table")
+			}
+			// We store the offset from the beiggning of the L0's initial instruction.
+			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
+		}
+		return nil
+	})
+	return nil
 }
 
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	return c.compileCallImpl(target.Address, target.FunctionType.Type)
+	return c.compileCallImpl(target.Address, nilRegister, target.FunctionType.Type)
 }
 
-// compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect (TODO) for the arm64 architecture.
-func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *wasm.FunctionType) error {
-	// TODO: the following code can be generalized for CallIndirect.
-
+// compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect for the arm64 architecture.
+func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister int16, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err
@@ -946,8 +1100,27 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 	brIfCallFrameStackOK := c.compilelBranchInstruction(arm64.ABNE)
 
 	// If these values equal, we need to grow the callFrame stack.
+	// For call_indirect, we need to push the value back to the register.
+	if !isNilRegister(addrRegister) {
+		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack,
+		// as the register is not saved across function calls.
+		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(addrRegister)
+		c.compileReleaseRegisterToStack(savedOffsetLocation)
+	}
+
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
 		return err
+	}
+
+	// For call_indirect, we need to push the value back to the register.
+	if !isNilRegister(addrRegister) {
+		// Since this is right after callGoFunction, we have to initialize the stack base pointer
+		// to properly load the value on memory stack.
+		c.compileReservedStackBasePointerRegisterInitialization()
+
+		savedOffsetLocation := c.locationStack.pop()
+		savedOffsetLocation.setRegister(addrRegister)
+		c.compileLoadValueOnStackToRegister(savedOffsetLocation)
 	}
 
 	// On the function return, we again have to set engine.callFrameStackPointer into callFrameStackPointerRegister.
@@ -995,12 +1168,12 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 	// At this point, oldStackBasePointer holds the old stack base pointer. We could get the new frame's
 	// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 	// See the comments in engine.pushCallFrame which does exactly the same calculation in Go.
-	c.compileConstToRegisterInstruction(arm64.AADD,
-		int64(c.locationStack.sp)-int64(len(functype.Params)),
-		oldStackBasePointer)
-	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
-		oldStackBasePointer,
-		reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset)
+	if offset := int64(c.locationStack.sp) - int64(len(functype.Params)); offset > 0 {
+		c.compileConstToRegisterInstruction(arm64.AADD, offset, oldStackBasePointer)
+		c.compileRegisterToMemoryInstruction(arm64.AMOVD,
+			oldStackBasePointer,
+			reservedRegisterForEngine, engineValueStackContextStackBasePointerOffset)
+	}
 
 	// 3) Set rc.next to specify which function is executed on the current call frame.
 	//
@@ -1012,9 +1185,20 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 
 	// Next, read the address of the target function (= &engine.compiledFunctions[offset])
 	// into compiledFunctionAddressRegister.
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		tmp, int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
-		compiledFunctionAddressRegister)
+	if isNilRegister(addrRegister) {
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmp, int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
+			compiledFunctionAddressRegister)
+	} else {
+		// Shift addrRegister by 3 because the size of *compiledFunction equals 8 bytes.
+		c.compileConstToRegisterInstruction(arm64.ALSL, 3, addrRegister)
+		c.compileMemoryWithRegisterOffsetToRegisterInstruction(
+			arm64.AMOVD,
+			tmp, addrRegister,
+			compiledFunctionAddressRegister,
+		)
+	}
 
 	// Finally, we are ready to write the address of the target function's *compiledFunction into the new callframe.
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
@@ -1046,6 +1230,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, functype *was
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
 		tmp)
+
 	c.compileUnconditionalBranchToAddressOnRegister(tmp)
 
 	// All the registers used are temporary so we mark them unused.
@@ -1157,8 +1342,103 @@ func (c *arm64Compiler) compileReadInstructionAddress(beforeTargetInst obj.As, d
 	})
 }
 
+// compileCallIndirect implements compiler.compileCallIndirect for the arm64 architecture.
 func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	offset := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
+		return err
+	}
+
+	if isZeroRegister(offset.register) {
+		reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+		if err != nil {
+			return err
+		}
+		offset.setRegister(reg)
+		c.markRegisterUsed(reg)
+
+		// Zero the value on a picked register.
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, reg)
+	}
+
+	tmp, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// First, we need to check if the offset doesn't exceed the length of table.
+	// "tmp = len(table)"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+		reservedRegisterForEngine, engineModuleContextTableSliceLenOffset,
+		tmp,
+	)
+	// "cmp tmp, offset"
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, offset.register)
+
+	// If it exceeds len(table), we exit the execution.
+	brIfOffsetOK := c.compilelBranchInstruction(arm64.ABLO)
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+
+	// Otherwise, we proceed to do function type check.
+	c.setBranchTargetOnNext(brIfOffsetOK)
+
+	// We need to obtains the absolute address of table element.
+	// "tmp = &table[0]"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD,
+		reservedRegisterForEngine, engineModuleContextTableElement0AddressOffset,
+		tmp,
+	)
+	// "offset = tmp + (offset << 4) (== &table[offset])"
+	c.compileAddInstructionWithLeftShiftedRegister(
+		offset.register, 4,
+		tmp,
+		offset.register,
+	)
+
+	// Check if table[offset].TypeID == targetFunctionType.
+	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
+	// "tmp = table[offset].TypeID"
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVD, offset.register, tableElementFunctionTypeIDOffset,
+		tmp,
+	)
+	// "reservedRegisterForTemporary = targetFunctionType.TypeID"
+	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(targetFunctionType.TypeID), reservedRegisterForTemporary)
+	// Compare these two values, and if they equal, we are ready to make function call.
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, reservedRegisterForTemporary)
+	brIfTypeMatched := c.compilelBranchInstruction(arm64.ABEQ)
+
+	// Otherwise, we have to exit the execution with either jitCallStatusCodeTypeMismatchOnIndirectCall or jitCallStatusCodeInvalidTableAccess.
+	{
+		// We exit with jitCallStatusCodeInvalidTableAccess if the targetFunctionType.TypeID equals the uninitialized one (wasm.UninitializedTableElementTypeID).
+		c.compileConstToRegisterInstruction(arm64.AMOVD, int64(wasm.UninitializedTableElementTypeID), reservedRegisterForTemporary)
+		c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, tmp, reservedRegisterForTemporary)
+
+		brIfInitizlied := c.compilelBranchInstruction(arm64.ABNE)
+		c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+
+		// Otherwise exit with jitCallStatusCodeTypeMismatchOnIndirectCall.
+		c.setBranchTargetOnNext(brIfInitizlied)
+		c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
+	}
+
+	c.setBranchTargetOnNext(brIfTypeMatched)
+
+	// Now all checks passed, so read the target's function address, and make call.
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVW,
+		offset.register, tableElementFunctionAddressOffset,
+		offset.register,
+	)
+
+	if err := c.compileCallImpl(0, offset.register, targetFunctionType.Type); err != nil {
+		return err
+	}
+
+	// The offset register should be marked as un-used as we consumed in the function call.
+	c.markRegisterUnused(offset.register)
+	return nil
 }
 
 // compileDrop implements compiler.compileDrop for the arm64 architecture.
@@ -3036,8 +3316,8 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// * engine.moduleContext.globalElement0Address
 	// * engine.moduleContext.memoryElement0Address
 	// * engine.moduleContext.memorySliceLen
-	// * (TODO) engine.moduleContext.tableElement0Address
-	// * (TODO) engine.moduleContext.tableSliceLen
+	// * engine.moduleContext.tableElement0Address
+	// * engine.moduleContext.tableSliceLen
 
 	// Update globalElement0Address.
 	//
@@ -3103,7 +3383,49 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		)
 	}
 
-	// TODO: Update tableElement0Address and tableSliceLen.
+	// Update tableElement0Address and tableSliceLen.
+	//
+	// Note: if there's table instruction in the function, the existence of the table
+	// is ensured by function validation at module instantiation phase, and that's
+	// why it is ok to skip the initialization if the module's table doesn't exist.
+	if len(c.f.ModuleInstance.Tables) > 0 {
+		// "tmpX = &tables[0] (type of **wasm.TableInstance)"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			moduleInstanceAddressRegister, moduleInstanceTablesOffset,
+			tmpX,
+		)
+		// "tmpX = *tmpX (tables[0])"
+		c.compileMemoryToRegisterInstruction(arm64.AMOVD, tmpX, 0, tmpX)
+
+		// Update engine.tableElement0Address.
+		// "tmpY = &tables[0].Table[0]"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmpX, tableInstanceTableOffset,
+			tmpY,
+		)
+		// "engine.tableElement0Address = tmpY".
+		c.compileRegisterToMemoryInstruction(
+			arm64.AMOVD,
+			tmpY,
+			reservedRegisterForEngine, engineModuleContextTableElement0AddressOffset,
+		)
+
+		// Update engine.tableSliceLen.
+		// "tmpY = len(tables[0].Table)"
+		c.compileMemoryToRegisterInstruction(
+			arm64.AMOVD,
+			tmpX, tableInstanceTableLenOffset,
+			tmpY,
+		)
+		// "engine.tableSliceLen = tmpY".
+		c.compileRegisterToMemoryInstruction(
+			arm64.AMOVD,
+			tmpY,
+			reservedRegisterForEngine, engineModuleContextTableSliceLenOffset,
+		)
+	}
 
 	c.setBranchTargetOnNext(brIfModuleUnchanged)
 	c.locationStack.markRegisterUnused(regs...)

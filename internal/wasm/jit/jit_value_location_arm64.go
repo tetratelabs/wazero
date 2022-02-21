@@ -44,15 +44,3 @@ var (
 func simdRegisterForScalarFloatRegister(freg int16) int16 {
 	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
 }
-
-func isIntRegister(r int16) bool {
-	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
-}
-
-func isFloatRegister(r int16) bool {
-	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
-}
-
-func isZeroRegister(r int16) bool {
-	return r == zeroRegister
-}

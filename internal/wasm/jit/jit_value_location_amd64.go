@@ -18,6 +18,8 @@ const (
 	reservedRegisterForTemporary = nilRegister
 )
 
+const zeroRegister int16 = nilRegister
+
 var (
 	generalPurposeFloatRegisters = []int16{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
@@ -36,14 +38,6 @@ var (
 		x86.REG_R10, x86.REG_R11, x86.REG_R12,
 	}
 )
-
-func isIntRegister(r int16) bool {
-	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
-}
-
-func isFloatRegister(r int16) bool {
-	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
-}
 
 const (
 	conditionalRegisterStateE  = conditionalRegisterStateUnset + 1 + iota // ZF equal to zero

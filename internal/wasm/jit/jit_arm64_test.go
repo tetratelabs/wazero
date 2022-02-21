@@ -1719,10 +1719,13 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 				code, _, _, err := compiler.compile()
 				require.NoError(t, err)
-				engine.addCompiledFunction(wasm.FunctionAddress(i), &compiledFunction{
+				addr := wasm.FunctionAddress(i)
+				engine.addCompiledFunction(addr, &compiledFunction{
 					codeSegment:        code,
 					codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 				})
+				env.moduleInstance.Functions = append(env.moduleInstance.Functions,
+					&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: addr})
 			}
 
 			// Now we start building the caller's code.
@@ -1739,7 +1742,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 			// Call all the built functions.
 			for i := 0; i < numCalls; i++ {
-				err = compiler.compileCallImpl(wasm.FunctionAddress(i), targetFunctionType)
+				err = compiler.compileCall(&wazeroir.OperationCall{FunctionIndex: uint32(i)})
 				require.NoError(t, err)
 			}
 
@@ -1748,7 +1751,6 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
 			env.exec(code)
 
 			if growCallFrameStack {
@@ -1769,6 +1771,211 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 			require.Equal(t, expectedValue, env.stackTopAsUint32())
 		})
 	}
+}
+
+func TestArm64Compiler_compileCallIndirect(t *testing.T) {
+	t.Run("out of bounds", func(t *testing.T) {
+		env := newJITEnvironment()
+		env.setTable(make([]wasm.TableElement, 10))
+		compiler := env.requireNewCompiler(t)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
+		compiler.f = &wasm.FunctionInstance{
+			FunctionKind:   wasm.FunctionKindWasm,
+			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
+		}
+
+		// Place the offfset value.
+		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+		require.NoError(t, err)
+
+		err = compiler.compileCallIndirect(targetOperation)
+		require.NoError(t, err)
+
+		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
+
+		// Generate the code under test and run.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+	})
+
+	t.Run("uninitialized", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+		compiler.f = &wasm.FunctionInstance{
+			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
+			FunctionKind:   wasm.FunctionKindWasm,
+		}
+		// and the typeID doesn't match the table[targetOffset]'s type ID.
+		table := make([]wasm.TableElement, 10)
+		env.setTable(table)
+		table[0] = wasm.TableElement{FunctionTypeID: wasm.UninitializedTableElementTypeID}
+
+		// Place the offset value.
+		err = compiler.compileConstI32(targetOffset)
+		require.NoError(t, err)
+		err = compiler.compileCallIndirect(targetOperation)
+		require.NoError(t, err)
+
+		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
+
+		// Generate the code under test and run.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+	})
+
+	t.Run("type not match", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		env.moduleInstance.Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+		// and the typeID doesn't match the table[targetOffset]'s type ID.
+		table := make([]wasm.TableElement, 10)
+		env.setTable(table)
+		table[0] = wasm.TableElement{FunctionTypeID: 50}
+
+		// Place the offfset value.
+		err = compiler.compileConstI32(targetOffset)
+		require.NoError(t, err)
+
+		// Now emit the code.
+		require.NoError(t, compiler.compileCallIndirect(targetOperation))
+
+		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
+
+		// Generate the code under test and run.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall, env.jitStatus())
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		for _, growCallFrameStack := range []bool{false, true} {
+			growCallFrameStack := growCallFrameStack
+			t.Run(fmt.Sprintf("grow=%v", growCallFrameStack), func(t *testing.T) {
+				targetType := &wasm.FunctionType{
+					Params:  []wasm.ValueType{},
+					Results: []wasm.ValueType{wasm.ValueTypeI32}}
+				targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
+				operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
+
+				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+				// and the typeID  matches the table[targetOffset]'s type ID.
+				moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
+				moduleInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
+
+				table := make([]wasm.TableElement, 10)
+				for i := 0; i < len(table); i++ {
+					table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
+				}
+
+				for i := 0; i < len(table); i++ {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						env := newJITEnvironment()
+						env.setTable(table)
+						engine := env.engine()
+
+						// First we create the call target function with function address = i,
+						// and it returns one value.
+						expectedReturnValue := uint32(i * 1000)
+						{
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+							err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+							require.NoError(t, err)
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+
+							cf := &compiledFunction{
+								codeSegment:        code,
+								codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+							}
+							engine.addCompiledFunction(table[i].FunctionAddress, cf)
+						}
+
+						if growCallFrameStack {
+							env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
+							env.setPreviousCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
+						}
+
+						compiler := env.requireNewCompiler(t)
+						err := compiler.compilePreamble()
+						require.NoError(t, err)
+
+						compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
+
+						// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
+						require.NoError(t, err)
+
+						// At this point, we should have one item (offset value) on the stack.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						require.NoError(t, compiler.compileCallIndirect(operation))
+
+						// At this point, we consumed the offset value, but the function returns one value,
+						// so the stack pointer results in the same.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						err = compiler.compileReturnFunction()
+						require.NoError(t, err)
+
+						// Generate the code under test and run.
+						code, _, _, err := compiler.compile()
+						require.NoError(t, err)
+						env.exec(code)
+
+						if growCallFrameStack {
+							// If the call frame stack pointer equals the length of call frame stack length,
+							// we have to call the builtin function to grow the slice.
+							require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+							require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
+
+							// Grow the callFrame stack, and exec again from the return address.
+							env.engine().builtinFunctionGrowCallFrameStack()
+							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
+						}
+
+						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+						require.Equal(t, uint64(1), env.stackPointer())
+						require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
+					})
+				}
+			})
+		}
+	})
 }
 
 func TestArm64Compiler_compileSelect(t *testing.T) {
@@ -1888,27 +2095,44 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				// TODO: Add  table
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				// TODO: Add  table
+				Tables: []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				// TODO: Add  table
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+			},
+		},
+		{
+			name: "table nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: nil}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+			},
+		},
+		{
+			name: "table empty",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
@@ -3830,6 +4054,170 @@ func TestArm64Compiler_compileFConvertFromI(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestAmd64Compiler_compileBrTable(t *testing.T) {
+	requireRunAndExpectedValueReturned := func(t *testing.T, c *arm64Compiler, expValue uint32) {
+		// Emit code for each label which returns the frame ID.
+		for returnValue := uint32(0); returnValue < 7; returnValue++ {
+			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
+			c.ir.LabelCallers[label.String()] = 1
+			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
+			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
+			err := c.compileReturnFunction()
+			require.NoError(t, err)
+		}
+
+		// Generate the code under test and run.
+		env := newJITEnvironment()
+		code, _, _, err := c.compile()
+		require.NoError(t, err)
+		// fmt.Println(hex.EncodeToString(code))
+		env.exec(code)
+
+		// Check the returned value.
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, expValue, env.stackTopAsUint32())
+	}
+
+	getBranchTargetDropFromFrameID := func(frameid uint32) *wazeroir.BranchTargetDrop {
+		return &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{
+			Label: &wazeroir.Label{FrameID: frameid, Kind: wazeroir.LabelKindHeader}},
+		}
+	}
+
+	for _, tc := range []struct {
+		name          string
+		index         int64
+		o             *wazeroir.OperationBrTable
+		expectedValue uint32
+	}{
+		{
+			name:          "only default with index 0",
+			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			index:         0,
+			expectedValue: 6,
+		},
+		{
+			name:          "only default with index 100",
+			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			index:         100,
+			expectedValue: 6,
+		},
+		{
+			name: "select default with targets and good index",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         3,
+			expectedValue: 6,
+		},
+		{
+			name: "select default with targets and huge index",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         100000,
+			expectedValue: 6,
+		},
+		{
+			name: "select first with two targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         0,
+			expectedValue: 1,
+		},
+		{
+			name: "select last with two targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         1,
+			expectedValue: 2,
+		},
+		{
+			name: "select first with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         0,
+			expectedValue: 1,
+		},
+		{
+			name: "select middle with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         2,
+			expectedValue: 3,
+		},
+		{
+			name: "select last with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         4,
+			expectedValue: 5,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			compiler.ir = &wazeroir.CompilationResult{LabelCallers: map[string]uint32{}}
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.index)})
+			require.NoError(t, err)
+
+			err = compiler.compileBrTable(tc.o)
+			require.NoError(t, err)
+
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
+
+			requireRunAndExpectedValueReturned(t, compiler, tc.expectedValue)
 		})
 	}
 }

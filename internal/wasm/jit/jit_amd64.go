@@ -674,8 +674,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	index := c.locationStack.pop()
 
-	// If the operation doesn't have target but default,
-	// branch into the default label and return early.
+	// If the operation only consists of the default target, we branch into it and return early.
 	if len(o.Targets) == 0 {
 		c.locationStack.releaseRegister(index)
 		if err := c.emitDropRange(o.Default.ToDrop); err != nil {
@@ -818,7 +817,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			locationStack = saved.clone()
 		} else {
 			target = o.Default
-			// If this is the deafult branch, we just use the original one
+			// If this is the default branch, we use the original one
 			// as this is the last code in this block.
 			locationStack = saved
 		}
@@ -839,7 +838,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
 				// TODO: this happens when users try loading an extremely large webassembly binary
 				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
-				// We would like to support that binary, but realistically speacking, that kind of binary
+				// We would like to support that binary, but realistically speaking, that kind of binary
 				// could result in more than ten giga bytes of native JITed code where we have to care about
 				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
 				// current implementation.
@@ -5416,17 +5415,6 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
 	if len(c.f.ModuleInstance.Tables) > 0 {
-		getTablesCount := c.newProg()
-		getTablesCount.As = x86.AMOVQ
-		getTablesCount.To.Type = obj.TYPE_REG
-		getTablesCount.To.Reg = tmpRegister
-		getTablesCount.From.Type = obj.TYPE_MEM
-		getTablesCount.From.Reg = moduleInstanceAddressRegister
-		// We add "+8" to get the length of ModuleInstance.Tables
-		// since the slice header {Data uintptr, Len, int64, Cap int64} internally.
-		getTablesCount.From.Offset = moduleInstanceTablesOffset + 8
-		c.addInstruction(getTablesCount)
-
 		// First, we need to read the *wasm.TableInstance.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
@@ -5438,7 +5426,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		c.addInstruction(readTableInstancePointer)
 
 		resolveTableInstanceAddressFromPointer := c.newProg()
-		resolveTableInstanceAddressFromPointer.As = x86.AMOVQ // Note this is LEA instruction.
+		resolveTableInstanceAddressFromPointer.As = x86.AMOVQ
 		resolveTableInstanceAddressFromPointer.To.Type = obj.TYPE_REG
 		resolveTableInstanceAddressFromPointer.To.Reg = tmpRegister
 		resolveTableInstanceAddressFromPointer.From.Type = obj.TYPE_MEM
@@ -5473,9 +5461,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		readTableLength.To.Reg = tmpRegister2
 		readTableLength.From.Type = obj.TYPE_MEM
 		readTableLength.From.Reg = tmpRegister
-		// We add "+8" to get the length of Tables[0].Table
-		// since the slice header {Data uintptr, Len, int64, Cap int64} internally.
-		readTableLength.From.Offset = tableInstanceTableOffset + 8
+		readTableLength.From.Offset = tableInstanceTableLenOffset
 		c.addInstruction(readTableLength)
 
 		// And put the length into tableSliceLen.
