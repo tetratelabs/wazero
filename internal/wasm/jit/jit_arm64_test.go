@@ -1868,9 +1868,6 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 		env.exec(code)
 
-		// Run code.
-		env.exec(code)
-
 		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall, env.jitStatus())
 	})
 
