@@ -90,15 +90,22 @@ const (
 	ImportFdClose = `(import "wasi_snapshot_preview1" "fd_close"
     (func $wasi.fd_close (param $fd i32) (result (;errno;) i32)))`
 
-	FunctionFdDataSync           = "fd_datasync"
-	FunctionFdFdstatGet          = "fd_fdstat_get"
-	FunctionFdFdstatSetFlags     = "fd_fdstat_set_flags"
-	FunctionFdFdstatSetRights    = "fd_fdstat_set_rights"
-	FunctionFdFilestatGet        = "fd_filestat_get"
-	FunctionFdFilestatSetSize    = "fd_filestat_set_size"
-	FunctionFdFilestatSetTimes   = "fd_filestat_set_times"
-	FunctionFdPread              = "fd_pread"
-	FunctionFdPrestatGet         = "fd_prestat_get"
+	FunctionFdDataSync         = "fd_datasync"
+	FunctionFdFdstatGet        = "fd_fdstat_get"
+	FunctionFdFdstatSetFlags   = "fd_fdstat_set_flags"
+	FunctionFdFdstatSetRights  = "fd_fdstat_set_rights"
+	FunctionFdFilestatGet      = "fd_filestat_get"
+	FunctionFdFilestatSetSize  = "fd_filestat_set_size"
+	FunctionFdFilestatSetTimes = "fd_filestat_set_times"
+	FunctionFdPread            = "fd_pread"
+
+	// FunctionFdPrestatGet returns the prestat data of a file descriptor.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_get
+	FunctionFdPrestatGet = "fd_prestat_get"
+	// ImportFdPrestatGet is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	ImportFdPrestatGet = `(import "wasi_snapshot_preview1" "fd_prestat_get"
+    (func $wasi.fd_prestat_get (param $fd i32) (param $result.prestat i32) (result (;errno;) i32)))`
+
 	FunctionFdPrestatDirName     = "fd_prestat_dir_name"
 	FunctionFdPwrite             = "fd_pwrite"
 	FunctionFdRead               = "fd_read"
@@ -323,7 +330,34 @@ type SnapshotPreview1 interface {
 	// TODO: wasi.FdFilestatSetSize
 	// TODO: wasi.FdFilestatSetTimes
 	// TODO: wasi.FdPread
-	// TODO: wasi.FdPrestatGet
+
+	// FdPrestatGet is the WASI function to return the prestat data of a file descriptor.
+	// This returns ErrnoBadf if the fd is invalid.
+	//
+	// * fd - the file decriptor to get the prestat
+	// * resultPrestat - the offset to write the result Prestat struct
+	//
+	// TODO: Define Prestat and PrestatDir, and update the example below.
+	// For example, if fd 3 is a file with a prestat
+	//   /* Note: Prestat is not defined in wazero yet. This is an example for explanation. */
+	//   Prestat {
+	//     Tag: PrestatDir /* 0 (type: uint8, offset: 0) */
+	//     PrNameLen: 3    /* 3 (type: uint32, offset: 4) */
+	//   }
+	// and FdPrestatGet parameters fd = 3, resultPrestat = 1, we expect `ctx.Memory` to contain:
+	//
+	//                     padding   uint32le
+	//          uint8 --+  +-----+  +--------+
+	//                  |  |     |  |        |
+	//        []byte{?, 0, 0, 0, 0, 3, 0, 0, 0, ?}
+	//  resultPrestat --^           ^
+	//            Tag --+           |
+	//                              +-- PrNameLen
+	//
+	// Note: ImportFdPrestatGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
+	FdPrestatGet(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
+
 	// TODO: wasi.FdPrestatDirName
 	// TODO: wasi.FdPwrite
 	// TODO: wasi.FdRead
@@ -422,7 +456,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		// TODO: FunctionFdFilestatSetSize
 		// TODO: FunctionFdFilestatSetTimes
 		// TODO: FunctionFdPread
-		FunctionFdPrestatGet:     a.fd_prestat_get,
+		FunctionFdPrestatGet:     a.FdPrestatGet,
 		FunctionFdPrestatDirName: a.fd_prestat_dir_name,
 		// TODO: FunctionFdPwrite
 		FunctionFdRead: a.fd_read,
@@ -537,6 +571,15 @@ func (a *wasiAPI) FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
 	return wasi.ErrnoSuccess
 }
 
+// FdPrestatGet implements SnahpshotPreview1.FdPrestatGet
+// TODO: Currently FdPrestatGet implements nothing except returning ErrnoBadf
+func (a *wasiAPI) FdPrestatGet(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
+	if _, ok := a.opened[fd]; !ok {
+		return wasi.ErrnoBadf
+	}
+	return wasi.ErrnoSuccess
+}
+
 // ProcExit implements SnapshotPreview1.ProcExit
 func (a *wasiAPI) ProcExit(exitCode uint32) {
 	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
@@ -648,13 +691,6 @@ func (a *wasiAPI) randUnusedFD() uint32 {
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
-}
-
-func (a *wasiAPI) fd_prestat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
-	if _, ok := a.opened[fd]; !ok {
-		return wasi.ErrnoBadf
-	}
-	return wasi.ErrnoSuccess
 }
 
 func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.ModuleContext, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
