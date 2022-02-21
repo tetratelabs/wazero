@@ -333,7 +333,7 @@ func (c *callFrame) String() string {
 	)
 }
 
-func (e *engine) Call(ctx *wasm.HostFunctionCallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside
@@ -458,7 +458,7 @@ const (
 // After the execution, the result of host function is pushed onto the stack.
 //
 // ctx parameter is passed to the host function as a first argument.
-func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *wasm.HostFunctionCallContext) {
+func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *wasm.ModuleContext) {
 	// TODO: the signature won't ever change for a host function once instantiated. For this reason, we should be able
 	// to optimize below based on known possible outcomes. This includes knowledge about if it has a context param[0]
 	// and which type (if any) it returns.
@@ -468,7 +468,7 @@ func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *w
 	// We pop the value and pass them as arguments in a reverse order according to the
 	// stack machine convention.
 	wasmParamOffset := 0
-	if fk != wasm.FunctionKindHostNoContext {
+	if fk != wasm.FunctionKindGoNoContext {
 		wasmParamOffset = 1
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {
@@ -496,7 +496,9 @@ func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *w
 	// Execute the host function and push back the call result onto the stack.
 	for _, ret := range f.Call(in) {
 		switch ret.Kind() {
-		case reflect.Float64, reflect.Float32:
+		case reflect.Float32:
+			e.pushValue(uint64(math.Float32bits(float32(ret.Float()))))
+		case reflect.Float64:
 			e.pushValue(math.Float64bits(ret.Float()))
 		case reflect.Uint32, reflect.Uint64:
 			e.pushValue(ret.Uint())
@@ -508,7 +510,7 @@ func (e *engine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *w
 	}
 }
 
-func (e *engine) execWasmFunction(ctx *wasm.HostFunctionCallContext, f *compiledFunction) {
+func (e *engine) execWasmFunction(ctx *wasm.ModuleContext, f *compiledFunction) {
 	// We continuously execute functions until we reach the previous top frame
 	// to support recursive Wasm function executions.
 	e.globalContext.previousCallFrameStackPointer = e.globalContext.callFrameStackPointer

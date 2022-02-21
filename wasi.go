@@ -5,6 +5,7 @@ import (
 	"io"
 
 	internalwasi "github.com/tetratelabs/wazero/internal/wasi"
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
@@ -32,12 +33,12 @@ type WASIConfig struct {
 }
 
 // WASISnapshotPreview1 are functions to export as wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1() *HostFunctions {
+func WASISnapshotPreview1() map[string]interface{} {
 	return WASISnapshotPreview1WithConfig(&WASIConfig{})
 }
 
 // WASISnapshotPreview1WithConfig are functions to export as wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostFunctions {
+func WASISnapshotPreview1WithConfig(c *WASIConfig) map[string]interface{} {
 	// TODO: delete the internalwasi.Option types as they are not accessible as they are internal!
 	var opts []internalwasi.Option
 	if c.Stdin != nil {
@@ -72,12 +73,7 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostFunctions {
 			opts = append(opts, internalwasi.Preopen(k, v))
 		}
 	}
-	_, nameToGoFunc := internalwasi.SnapshotPreview1Functions(opts...)
-	hostFunctions, err := NewHostFunctions(nameToGoFunc)
-	if err != nil {
-		panic(fmt.Errorf("BUG: %w", err)) // panic for ease of API as SnapshotPreview1Functions are tested
-	}
-	return hostFunctions
+	return internalwasi.SnapshotPreview1Functions(opts...)
 }
 
 // StartWASICommand instantiates the module and starts its WASI Command function ("_start"). The return value are all
@@ -89,22 +85,26 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostFunctions {
 // * "memory" is an exported memory.
 //
 // Note: Exporting "__indirect_function_table" is mentioned as required, but not enforced here.
-// Note: The wasm.ModuleFunctions return value does not restrict exports after "_start" as allowed in the specification.
+// Note: The wasm.Functions return value does not restrict exports after "_start" as allowed in the specification.
 // Note: All TinyGo Wasm are WASI commands. They initialize memory on "_start" and import "fd_write" to implement panic.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-func StartWASICommand(store *Store, module *Module) (wasm.ModuleFunctions, error) {
-	if err := internalwasi.ValidateWASICommand(module.m, module.name); err != nil {
+func StartWASICommand(store wasm.Store, module *Module) (wasm.ModuleExports, error) {
+	internal, ok := store.(*internalwasm.Store)
+	if !ok {
+		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
+	}
+	if err := internalwasi.ValidateWASICommand(module.wasm, module.name); err != nil {
 		return nil, err
 	}
 
-	ret, err := store.Instantiate(module)
+	ret, err := InstantiateModule(store, module)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx := store.s.HostFunctionCallContexts[module.name]
-	start, _ := ctx.GetFunctionVoidReturn(internalwasi.FunctionStart)
-	if err = start(ctx.Context()); err != nil {
+	ctx := internal.ModuleContexts[module.name]
+	start, _ := ctx.Function(internalwasi.FunctionStart)
+	if _, err = start(ctx.Context()); err != nil {
 		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
 	}
 	return ret, nil

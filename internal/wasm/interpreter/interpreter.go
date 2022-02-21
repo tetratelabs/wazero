@@ -425,7 +425,7 @@ func (it *interpreter) lowerIROps(f *wasm.FunctionInstance,
 }
 
 // Call implements an interpreted wasm.Engine.
-func (it *interpreter) Call(ctx *wasm.HostFunctionCallContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+func (it *interpreter) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	prevFrameLen := len(it.frames)
 
 	// shouldRecover is true when a panic at the origin of callstack should be recovered
@@ -492,12 +492,12 @@ func (it *interpreter) Call(ctx *wasm.HostFunctionCallContext, f *wasm.FunctionI
 	return
 }
 
-func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interpreterFunction) {
+func (it *interpreter) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
 	wasmParamOffset := 0
-	if f.funcInstance.FunctionKind != wasm.FunctionKindHostNoContext {
+	if f.funcInstance.FunctionKind != wasm.FunctionKindGoNoContext {
 		wasmParamOffset = 1
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {
@@ -530,7 +530,9 @@ func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interp
 	it.pushFrame(frame)
 	for _, ret := range f.hostFn.Call(in) {
 		switch ret.Kind() {
-		case reflect.Float64, reflect.Float32:
+		case reflect.Float32:
+			it.push(uint64(math.Float32bits(float32(ret.Float()))))
+		case reflect.Float64:
 			it.push(math.Float64bits(ret.Float()))
 		case reflect.Uint32, reflect.Uint64:
 			it.push(ret.Uint())
@@ -543,7 +545,7 @@ func (it *interpreter) callHostFunc(ctx *wasm.HostFunctionCallContext, f *interp
 	it.popFrame()
 }
 
-func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *interpreterFunction) {
+func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.Memory
@@ -1323,7 +1325,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1332,7 +1334,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					case wazeroir.SignedInt64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := int64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
@@ -1342,7 +1344,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 						it.push(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1351,7 +1353,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					case wazeroir.SignedUint64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := uint64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
@@ -1365,7 +1367,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1374,7 +1376,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					case wazeroir.SignedInt64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := int64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
@@ -1384,7 +1386,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 						it.push(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1393,7 +1395,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.HostFunctionCallContext, f *inte
 					case wazeroir.SignedUint64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := uint64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,

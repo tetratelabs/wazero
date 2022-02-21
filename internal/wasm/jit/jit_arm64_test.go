@@ -738,6 +738,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 									require.Equal(t, x1+x2, env.stackTopAsUint64())
 								case wazeroir.UnsignedTypeF32:
 									exp := math.Float32frombits(uint32(x1)) + math.Float32frombits(uint32(x2))
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(float64(exp)) {
 										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
 									} else {
@@ -745,6 +746,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 									}
 								case wazeroir.UnsignedTypeF64:
 									exp := math.Float64frombits(x1) + math.Float64frombits(x2)
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(exp) {
 										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
 									} else {
@@ -759,6 +761,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 									require.Equal(t, x1-x2, env.stackTopAsUint64())
 								case wazeroir.UnsignedTypeF32:
 									exp := math.Float32frombits(uint32(x1)) - math.Float32frombits(uint32(x2))
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(float64(exp)) {
 										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
 									} else {
@@ -766,6 +769,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 									}
 								case wazeroir.UnsignedTypeF64:
 									exp := math.Float64frombits(x1) - math.Float64frombits(x2)
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(exp) {
 										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
 									} else {
@@ -780,6 +784,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 									require.Equal(t, x1*x2, env.stackTopAsUint64())
 								case wazeroir.UnsignedTypeF32:
 									exp := math.Float32frombits(uint32(x1)) * math.Float32frombits(uint32(x2))
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(float64(exp)) {
 										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
 									} else {
@@ -787,6 +792,7 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 									}
 								case wazeroir.UnsignedTypeF64:
 									exp := math.Float64frombits(x1) * math.Float64frombits(x2)
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(exp) {
 										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
 									} else {
@@ -2847,6 +2853,7 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 									}
 								case wazeroir.SignedTypeFloat32:
 									exp := math.Float32frombits(uint32(x1)) / math.Float32frombits(uint32(x2))
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(float64(exp)) {
 										require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
 									} else {
@@ -2854,6 +2861,7 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 									}
 								case wazeroir.SignedTypeFloat64:
 									exp := math.Float64frombits(x1) / math.Float64frombits(x2)
+									// NaN cannot be compared with themselves, so we have to use IsNaN
 									if math.IsNaN(exp) {
 										require.True(t, math.IsNaN(env.stackTopAsFloat64()))
 									} else {
@@ -2916,7 +2924,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := float32(math.Abs(float64(v)))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -2933,7 +2941,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := math.Abs(v)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -2950,7 +2958,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := -float32(v)
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -2967,7 +2975,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := -v
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -2984,7 +2992,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := float32(math.Ceil(float64(v)))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3001,7 +3009,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := math.Ceil(v)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3018,7 +3026,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := float32(math.Floor(float64(v)))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3035,7 +3043,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := math.Floor(v)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3052,7 +3060,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := float32(math.Trunc(float64(v)))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3069,7 +3077,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := math.Trunc(v)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3086,7 +3094,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := moremath.WasmCompatNearestF32(float32(v))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3103,7 +3111,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := moremath.WasmCompatNearestF64(v)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3120,7 +3128,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := float32(math.Sqrt(float64(v)))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3137,7 +3145,7 @@ func TestArm64Compiler_compile_Abs_Neg_Ceil_Floor_Trunc_Nearest_Sqrt(t *testing.
 			verifyFunc: func(t *testing.T, v float64, raw uint64) {
 				exp := math.Sqrt(v)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3217,7 +3225,7 @@ func TestArm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
 				exp := float32(moremath.WasmCompatMin(float64(float32(x1)), float64(float32(x2))))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3234,7 +3242,7 @@ func TestArm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
 				exp := moremath.WasmCompatMin(x1, x2)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3251,7 +3259,7 @@ func TestArm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
 				exp := float32(moremath.WasmCompatMax(float64(float32(x1)), float64(float32(x2))))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3268,7 +3276,7 @@ func TestArm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
 				exp := moremath.WasmCompatMax(x1, x2)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3285,7 +3293,7 @@ func TestArm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
 				exp := float32(math.Copysign(float64(float32(x1)), float64(float32(x2))))
 				actual := math.Float32frombits(uint32(raw))
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, exp, actual)
@@ -3302,7 +3310,7 @@ func TestArm64Compiler_compile_Min_Max_Copysign(t *testing.T) {
 			verifyFunc: func(t *testing.T, x1, x2 float64, raw uint64) {
 				exp := math.Copysign(x1, x2)
 				actual := math.Float64frombits(raw)
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, exp, actual)

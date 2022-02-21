@@ -160,7 +160,7 @@ const (
 type SnapshotPreview1 interface {
 	// ArgsGet is the WASI function that reads command-line argument data (Args).
 	//
-	// There are two parameters. Both are offsets in wasm.HostFunctionCallContext Memory. If either are invalid due to
+	// There are two parameters. Both are offsets in wasm.ModuleContext Memory. If either are invalid due to
 	// memory constraints, this returns ErrnoFault.
 	//
 	// * argv - is the offset to begin writing argument offsets in uint32 little-endian encoding.
@@ -184,12 +184,12 @@ type SnapshotPreview1 interface {
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32) wasi.Errno
+	ArgsGet(ctx wasm.ModuleContext, argv, argvBuf uint32) wasi.Errno
 
 	// ArgsSizesGet is the WASI function named FunctionArgsSizesGet that reads command-line argument data (Args)
 	// sizes.
 	//
-	// There are two result parameters: these are offsets in the wasm.HostFunctionCallContext Memory to write
+	// There are two result parameters: these are offsets in the wasm.ModuleContext Memory to write
 	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
 	// returns ErrnoFault.
 	//
@@ -212,11 +212,11 @@ type SnapshotPreview1 interface {
 	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) wasi.Errno
+	ArgsSizesGet(ctx wasm.ModuleContext, resultArgc, resultArgvBufSize uint32) wasi.Errno
 
 	// EnvironGet is the WASI function named FunctionEnvironGet that reads environment variables. (Environ)
 	//
-	// There are two parameters. Both are offsets in wasm.HostFunctionCallContext Memory. If either are invalid due to
+	// There are two parameters. Both are offsets in wasm.ModuleContext Memory. If either are invalid due to
 	// memory constraints, this returns ErrnoFault.
 	//
 	// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
@@ -240,12 +240,12 @@ type SnapshotPreview1 interface {
 	// See EnvironSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironGet(ctx wasm.HostFunctionCallContext, environ, environBuf uint32) wasi.Errno
+	EnvironGet(ctx wasm.ModuleContext, environ, environBuf uint32) wasi.Errno
 
 	// EnvironSizesGet is the WASI function named FunctionEnvironSizesGet that reads environment variable
 	// (Environ) sizes.
 	//
-	// There are two result parameters: these are offsets in the wasi.HostFunctionCallContext Memory to write
+	// There are two result parameters: these are offsets in the wasi.ModuleContext Memory to write
 	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
 	// returns ErrnoFault.
 	//
@@ -253,7 +253,7 @@ type SnapshotPreview1 interface {
 	// * resultEnvironBufSize - is the offset to write the null-terminated environment variable length to wasm.Memory
 	//
 	// For example, if Environ is []string{"a=b","b=cd"} and
-	//   EnvironSizesGet parameters are resultEnvironc=1 and resultEncironBufSize=6, we expect `ctx.Memory` to contain:
+	//   EnvironSizesGet parameters are resultEnvironc=1 and resultEnvironBufSize=6, we expect `ctx.Memory` to contain:
 	//
 	//                   uint32le       uint32le
 	//                  +--------+     +--------+
@@ -269,9 +269,9 @@ type SnapshotPreview1 interface {
 	// See EnvironGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnvironc, resultEnvironBufSize uint32) wasi.Errno
+	EnvironSizesGet(ctx wasm.ModuleContext, resultEnvironc, resultEnvironBufSize uint32) wasi.Errno
 
-	// TODO: ClockResGet(ctx wasm.HostFunctionCallContext, id, resultResolution uint32) wasi.Errno
+	// TODO: ClockResGet(ctx wasm.ModuleContext, id, resultResolution uint32) wasi.Errno
 
 	// ClockTimeGet is the WASI function named FunctionClockTimeGet that returns the time value of a clock (time.Now).
 	//
@@ -293,7 +293,7 @@ type SnapshotPreview1 interface {
 	// Note: This is similar to `clock_gettime` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 	// See https://linux.die.net/man/3/clock_gettime
-	ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno
+	ClockTimeGet(ctx wasm.ModuleContext, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno
 
 	// TODO: wasi.FdAdvise
 	// TODO: wasi.FdAllocate
@@ -359,7 +359,7 @@ type SnapshotPreview1 interface {
 	//
 	// Note: ImportRandomGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-	RandomGet(ctx wasm.HostFunctionCallContext, buf, bufLen uint32) wasi.Errno
+	RandomGet(ctx wasm.ModuleContext, buf, bufLen uint32) wasi.Errno
 
 	// TODO: SockRecv
 	// TODO: SockSend
@@ -382,10 +382,9 @@ type wasiAPI struct {
 
 // SnapshotPreview1Functions returns all go functions that implement SnapshotPreview1.
 // These should be exported in the module named wasi.ModuleSnapshotPreview1.
-// See wasm.NewHostFunction
-// TODO: we can't export a return with SnapshotPreview1 until we figure out how to give users a wasm.HostFunctionCallContext
-func SnapshotPreview1Functions(opts ...Option) (a *wasiAPI, nameToGoFunc map[string]interface{}) {
-	a = newAPI(opts...)
+// See internalwasm.NewGoFunc
+func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interface{}) {
+	a := newAPI(opts...)
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
@@ -439,7 +438,7 @@ func SnapshotPreview1Functions(opts ...Option) (a *wasiAPI, nameToGoFunc map[str
 }
 
 // ArgsGet implements SnapshotPreview1.ArgsGet
-func (a *wasiAPI) ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32) wasi.Errno {
+func (a *wasiAPI) ArgsGet(ctx wasm.ModuleContext, argv, argvBuf uint32) wasi.Errno {
 	for _, arg := range a.args.nullTerminatedValues {
 		if !ctx.Memory().WriteUint32Le(argv, argvBuf) {
 			return wasi.ErrnoFault
@@ -455,7 +454,7 @@ func (a *wasiAPI) ArgsGet(ctx wasm.HostFunctionCallContext, argv, argvBuf uint32
 }
 
 // ArgsSizesGet implements SnapshotPreview1.ArgsSizesGet
-func (a *wasiAPI) ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, resultArgvBufSize uint32) wasi.Errno {
+func (a *wasiAPI) ArgsSizesGet(ctx wasm.ModuleContext, resultArgc, resultArgvBufSize uint32) wasi.Errno {
 	if !ctx.Memory().WriteUint32Le(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
 		return wasi.ErrnoFault
 	}
@@ -466,7 +465,7 @@ func (a *wasiAPI) ArgsSizesGet(ctx wasm.HostFunctionCallContext, resultArgc, res
 }
 
 // EnvironGet implements SnapshotPreview1.EnvironGet
-func (a *wasiAPI) EnvironGet(ctx wasm.HostFunctionCallContext, environ uint32, environBuf uint32) (err wasi.Errno) {
+func (a *wasiAPI) EnvironGet(ctx wasm.ModuleContext, environ uint32, environBuf uint32) wasi.Errno {
 	// w.environ holds the environment variables in the form of "key=val\x00", so just copies it to the linear memory.
 	for _, env := range a.environ.nullTerminatedValues {
 		if !ctx.Memory().WriteUint32Le(environ, environBuf) {
@@ -483,7 +482,7 @@ func (a *wasiAPI) EnvironGet(ctx wasm.HostFunctionCallContext, environ uint32, e
 }
 
 // EnvironSizesGet implements SnapshotPreview1.EnvironSizesGet
-func (a *wasiAPI) EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnvironc uint32, resultEnvironBufSize uint32) (err wasi.Errno) {
+func (a *wasiAPI) EnvironSizesGet(ctx wasm.ModuleContext, resultEnvironc uint32, resultEnvironBufSize uint32) wasi.Errno {
 	if !ctx.Memory().WriteUint32Le(resultEnvironc, uint32(len(a.environ.nullTerminatedValues))) {
 		return wasi.ErrnoFault
 	}
@@ -497,7 +496,7 @@ func (a *wasiAPI) EnvironSizesGet(ctx wasm.HostFunctionCallContext, resultEnviro
 // TODO: Func (a *wasiAPI) FunctionClockResGet
 
 // ClockTimeGet implements SnapshotPreview1.ClockTimeGet
-func (a *wasiAPI) ClockTimeGet(ctx wasm.HostFunctionCallContext, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno {
+func (a *wasiAPI) ClockTimeGet(ctx wasm.ModuleContext, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno {
 	// TODO: id and precision are currently ignored.
 	if !ctx.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
 		return wasi.ErrnoFault
@@ -618,14 +617,14 @@ func (a *wasiAPI) randUnusedFD() uint32 {
 	}
 }
 
-func (a *wasiAPI) fd_prestat_get(ctx wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err wasi.Errno) {
+func (a *wasiAPI) fd_prestat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
 	if _, ok := a.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.HostFunctionCallContext, fd uint32, pathPtr uint32, pathLen uint32) (err wasi.Errno) {
+func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.ModuleContext, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
 	f, ok := a.opened[fd]
 	if !ok {
 		return wasi.ErrnoInval
@@ -641,7 +640,7 @@ func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.HostFunctionCallContext, fd uint3
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_fdstat_get(ctx wasm.HostFunctionCallContext, fd uint32, bufPtr uint32) (err wasi.Errno) {
+func (a *wasiAPI) fd_fdstat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
 	if _, ok := a.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
@@ -651,7 +650,7 @@ func (a *wasiAPI) fd_fdstat_get(ctx wasm.HostFunctionCallContext, fd uint32, buf
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) path_open(ctx wasm.HostFunctionCallContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+func (a *wasiAPI) path_open(ctx wasm.ModuleContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
 	fsRightsBase, fsRightsInheriting uint64,
 	fdFlags, fdPtr uint32) (errno wasi.Errno) {
 	dir, ok := a.opened[fd]
@@ -686,11 +685,11 @@ func (a *wasiAPI) path_open(ctx wasm.HostFunctionCallContext, fd, dirFlags, path
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_seek(ctx wasm.HostFunctionCallContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) (err wasi.Errno) {
+func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) wasi.Errno {
 	return wasi.ErrnoNosys // TODO: implement
 }
 
-func (a *wasiAPI) fd_write(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) (err wasi.Errno) {
+func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) wasi.Errno {
 	var writer io.Writer
 
 	switch fd {
@@ -733,7 +732,7 @@ func (a *wasiAPI) fd_write(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr 
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_read(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) (err wasi.Errno) {
+func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) wasi.Errno {
 	var reader io.Reader
 
 	switch fd {
@@ -776,7 +775,7 @@ func (a *wasiAPI) fd_read(ctx wasm.HostFunctionCallContext, fd uint32, iovsPtr u
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_close(ctx wasm.HostFunctionCallContext, fd uint32) (err wasi.Errno) {
+func (a *wasiAPI) fd_close(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
 	f, ok := a.opened[fd]
 	if !ok {
 		return wasi.ErrnoBadf
@@ -792,7 +791,7 @@ func (a *wasiAPI) fd_close(ctx wasm.HostFunctionCallContext, fd uint32) (err was
 }
 
 // RandomGet implements SnapshotPreview1.RandomGet
-func (a *wasiAPI) RandomGet(ctx wasm.HostFunctionCallContext, buf uint32, bufLen uint32) (errno wasi.Errno) {
+func (a *wasiAPI) RandomGet(ctx wasm.ModuleContext, buf uint32, bufLen uint32) (errno wasi.Errno) {
 	randomBytes := make([]byte, bufLen)
 	err := a.randSource(randomBytes)
 	if err != nil {

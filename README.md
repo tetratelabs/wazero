@@ -14,16 +14,17 @@ it could have been written in another language that targets Wasm, such as Assemb
 ```golang
 func main() {
 	// Read WebAssembly binary containing an exported "fac" function.
+	// * Ex. (func (export "fac") (param i64) (result i64) ...
 	source, _ := os.ReadFile("./tests/engine/testdata/fac.wasm")
 
 	// Decode the binary as WebAssembly module.
 	mod, _ := wazero.DecodeModuleBinary(source)
 
 	// Instantiate the module with a Wasm Interpreter, to return its exported functions
-	functions, _ := wazero.NewStore().Instantiate(mod)
+	exports, _ := wazero.InstantiateModule(wazero.NewStore(), mod)
 
 	// Get the factorial function
-	fac, _ := functions.GetFunctionI64Return("fac")
+	fac, _ := exports.Function("fac")
 
 	// Discover 7! is 5040
 	fmt.Println(fac(context.Background(), 7))
