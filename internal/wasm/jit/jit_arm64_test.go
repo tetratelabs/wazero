@@ -1819,7 +1819,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		env.setTable(table)
 		table[0] = wasm.TableElement{FunctionTypeID: wasm.UninitializedTableElementTypeID}
 
-		// Place the offfset value.
+		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
 		require.NoError(t, err)
 		err = compiler.compileCallIndirect(targetOperation)

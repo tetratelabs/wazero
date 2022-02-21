@@ -1247,15 +1247,15 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(targetFunctionType.TypeID), reservedRegisterForTemporary)
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, reservedRegisterForTemporary)
-	brTypeMatched := c.compilelBranchInstruction(arm64.ABEQ)
+	brIfTypeMatched := c.compilelBranchInstruction(arm64.ABEQ)
 
 	// Otherwise, we have to exit the execution with either jitCallStatusCodeTypeMismatchOnIndirectCall or jitCallStatusCodeInvalidTableAccess.
 	{
 		// We exit with jitCallStatusCodeInvalidTableAccess if the targetFunctionType.TypeID equals the uninitialized one (wasm.UninitializedTableElementTypeID).
-		c.compileConstToRegisterInstruction(arm64.AMOVD, int64(wasm.UninitializedTableElementTypeID), tmp)
-		c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, reservedRegisterForTemporary)
+		c.compileConstToRegisterInstruction(arm64.AMOVD, int64(wasm.UninitializedTableElementTypeID), reservedRegisterForTemporary)
+		c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, tmp, reservedRegisterForTemporary)
 
-		brIfInitizlied := c.compilelBranchInstruction(arm64.ABEQ)
+		brIfInitizlied := c.compilelBranchInstruction(arm64.ABNE)
 		c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
 
 		// Otherwise exit with jitCallStatusCodeTypeMismatchOnIndirectCall.
@@ -1263,7 +1263,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
 	}
 
-	c.setBranchTargetOnNext(brTypeMatched)
+	c.setBranchTargetOnNext(brIfTypeMatched)
 
 	if err := c.compileCallImpl(0, offset.register, targetFunctionType.Type); err != nil {
 		return err
