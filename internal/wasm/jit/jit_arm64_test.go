@@ -4056,7 +4056,7 @@ func TestArm64Compiler_compileFConvertFromI(t *testing.T) {
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
 	requireRunAndExpectedValueReturned := func(t *testing.T, c *arm64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
-		for returnValue := uint32(0); returnValue < 10; returnValue++ {
+		for returnValue := uint32(0); returnValue < 7; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
 			c.ir.LabelCallers[label.String()] = 1
 			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
@@ -4065,12 +4065,11 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Generate the code under test.
+		// Generate the code under test and run.
+		env := newJITEnvironment()
 		code, _, _, err := c.compile()
 		require.NoError(t, err)
-
-		// Run codes
-		env := newJITEnvironment()
+		// fmt.Println(hex.EncodeToString(code))
 		env.exec(code)
 
 		// Check the returned value.
