@@ -1875,80 +1875,101 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 	})
 
 	t.Run("ok", func(t *testing.T) {
-		targetType := &wasm.FunctionType{
-			Params:  []wasm.ValueType{},
-			Results: []wasm.ValueType{wasm.ValueTypeI32}}
-		targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
-		operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
-		moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
-		moduleInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
-
-		table := make([]wasm.TableElement, 10)
-		for i := 0; i < len(table); i++ {
-			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
-		}
-
-		for i := 0; i < len(table); i++ {
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				env := newJITEnvironment()
-				env.setTable(table)
-				engine := env.engine()
-
-				// First we creat the call target function with function address = i,
-				// and it returns one value.
-				expectedReturnValue := uint32(i * 1000)
-				{
-					compiler := env.requireNewCompiler(t)
-					err := compiler.compilePreamble()
-					require.NoError(t, err)
-					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
-					require.NoError(t, err)
-					err = compiler.compileReturnFunction()
-					require.NoError(t, err)
-
-					code, _, _, err := compiler.compile()
-					require.NoError(t, err)
-
-					cf := &compiledFunction{
-						codeSegment:        code,
-						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-					}
-					fmt.Printf("%p: initial code 0x%x\n", cf, cf.codeInitialAddress)
-					engine.addCompiledFunction(table[i].FunctionAddress, cf)
-				}
-
-				compiler := env.requireNewCompiler(t)
-				err := compiler.compilePreamble()
-				require.NoError(t, err)
+		for _, growCallFrameStack := range []bool{false, true} {
+			growCallFrameStack := growCallFrameStack
+			t.Run(fmt.Sprintf("grow=%v", growCallFrameStack), func(t *testing.T) {
+				targetType := &wasm.FunctionType{
+					Params:  []wasm.ValueType{},
+					Results: []wasm.ValueType{wasm.ValueTypeI32}}
+				targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
+				operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
 
 				// Ensure that the module instance has the type information for targetOperation.TypeIndex,
-				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
 				// and the typeID  matches the table[targetOffset]'s type ID.
+				moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100)}
+				moduleInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
 
-				// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
-				require.NoError(t, err)
+				table := make([]wasm.TableElement, 10)
+				for i := 0; i < len(table); i++ {
+					table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
+				}
 
-				// At this point, we should have one item (offset value) on the stack.
-				require.Equal(t, uint64(1), compiler.locationStack.sp)
+				for i := 0; i < len(table); i++ {
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+						env := newJITEnvironment()
+						env.setTable(table)
+						engine := env.engine()
 
-				require.NoError(t, compiler.compileCallIndirect(operation))
+						// First we creat the call target function with function address = i,
+						// and it returns one value.
+						expectedReturnValue := uint32(i * 1000)
+						{
+							compiler := env.requireNewCompiler(t)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+							err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+							require.NoError(t, err)
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
 
-				// At this point, we consumed the offset value, but the function returns one value,
-				// so the stack pointer results in the same.
-				require.Equal(t, uint64(1), compiler.locationStack.sp)
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
 
-				err = compiler.compileReturnFunction()
-				require.NoError(t, err)
+							cf := &compiledFunction{
+								codeSegment:        code,
+								codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+							}
+							engine.addCompiledFunction(table[i].FunctionAddress, cf)
+						}
 
-				// Generate the code under test and run.
-				code, _, _, err := compiler.compile()
-				require.NoError(t, err)
-				env.exec(code)
+						if growCallFrameStack {
+							env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
+							env.setPreviousCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
+						}
 
-				require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-				require.Equal(t, uint64(1), env.stackPointer())
-				require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
+						compiler := env.requireNewCompiler(t)
+						err := compiler.compilePreamble()
+						require.NoError(t, err)
+
+						compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
+
+						// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
+						require.NoError(t, err)
+
+						// At this point, we should have one item (offset value) on the stack.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						require.NoError(t, compiler.compileCallIndirect(operation))
+
+						// At this point, we consumed the offset value, but the function returns one value,
+						// so the stack pointer results in the same.
+						require.Equal(t, uint64(1), compiler.locationStack.sp)
+
+						err = compiler.compileReturnFunction()
+						require.NoError(t, err)
+
+						// Generate the code under test and run.
+						code, _, _, err := compiler.compile()
+						require.NoError(t, err)
+						env.exec(code)
+
+						if growCallFrameStack {
+							// If the call frame stack pointer equals the length of call frame stack length,
+							// we have to call the builtin function to grow the slice.
+							require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+							require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
+
+							// Grow the callFrame stack, and exec again from the return address.
+							env.engine().builtinFunctionGrowCallFrameStack()
+							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
+						}
+
+						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+						require.Equal(t, uint64(1), env.stackPointer())
+						require.Equal(t, expectedReturnValue, env.stackTopAsUint32())
+					})
+				}
 			})
 		}
 	})
