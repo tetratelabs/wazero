@@ -1194,6 +1194,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 			tmp, int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
 			compiledFunctionAddressRegister)
 	} else {
+		// Shift addrRegister by 3 because the size of *compiledFunction equals 8 bytes.
 		c.compileConstToRegisterInstruction(arm64.ALSL, 3, addrRegister)
 		c.compileMemoryWithRegisterOffsetToRegisterInstruction(
 			arm64.AMOVD,
