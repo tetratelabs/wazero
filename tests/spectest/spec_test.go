@@ -440,7 +440,7 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 	case wasm.ValueTypeF32:
 		expF := math.Float32frombits(uint32(expected))
 		actualF := math.Float32frombits(uint32(actual))
-		if math.IsNaN(float64(expF)) {
+		if math.IsNaN(float64(expF)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 			require.True(t, math.IsNaN(float64(actualF)), msg)
 		} else {
 			require.Equal(t, expF, actualF, msg)
@@ -448,7 +448,7 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 	case wasm.ValueTypeF64:
 		expF := math.Float64frombits(expected)
 		actualF := math.Float64frombits(actual)
-		if math.IsNaN(expF) {
+		if math.IsNaN(expF) { // NaN cannot be compared with themselves, so we have to use IsNaN
 			require.True(t, math.IsNaN(actualF), msg)
 		} else {
 			require.Equal(t, expF, actualF, msg)

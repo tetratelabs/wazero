@@ -3539,7 +3539,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				require.Equal(t, uint64(1), env.stackPointer())
 				exp := tc.x1 / tc.x2
 				actual := env.stackTopAsFloat32()
-				if math.IsNaN(float64(exp)) {
+				if math.IsNaN(float64(exp)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(float64(actual)))
 				} else {
 					require.Equal(t, tc.x1/tc.x2, actual)
@@ -3614,7 +3614,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 				require.Equal(t, uint64(1), env.stackPointer())
 				exp := tc.x1 / tc.x2
 				actual := env.stackTopAsFloat64()
-				if math.IsNaN(exp) {
+				if math.IsNaN(exp) { // NaN cannot be compared with themselves, so we have to use IsNaN
 					require.True(t, math.IsNaN(actual))
 				} else {
 					require.Equal(t, tc.x1/tc.x2, actual)
@@ -3976,7 +3976,7 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 
 			// Check the result.
 			require.Equal(t, uint64(1), env.stackPointer())
-			if math.IsNaN(v) {
+			if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 				require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
 			} else {
 				exp := float32(v)
@@ -4021,7 +4021,7 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 
 			// Check the result.
 			require.Equal(t, uint64(1), env.stackPointer())
-			if math.IsNaN(float64(v)) {
+			if math.IsNaN(float64(v)) { // NaN cannot be compared with themselves, so we have to use IsNaN
 				require.True(t, math.IsNaN(env.stackTopAsFloat64()))
 			} else {
 				exp := float64(v)
@@ -4253,7 +4253,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 
 					// Check the result.
 					expStatus := jitCallStatusCodeReturned
-					if math.IsNaN(v) {
+					if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 						expStatus = jitCallStatusCodeInvalidFloatToIntConversion
 					}
 					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
@@ -4585,6 +4585,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					require.Equal(t, uint64(1), env.stackPointer())
 					if is32Bit {
 						actual := env.stackTopAsFloat32()
+						// NaN cannot be compared with themselves, so we have to use IsNaN
 						if math.IsNaN(float64(expFloat32)) {
 							require.True(t, math.IsNaN(float64(actual)))
 						} else {
@@ -4592,7 +4593,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 						}
 					} else {
 						actual := env.stackTopAsFloat64()
-						if math.IsNaN(expFloat64) {
+						if math.IsNaN(expFloat64) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							require.True(t, math.IsNaN(actual))
 						} else {
 							require.Equal(t, expFloat64, actual)
@@ -4725,6 +4726,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 					require.Equal(t, uint64(1), env.stackPointer())
 					if is32Bit {
 						actual := env.stackTopAsFloat32()
+						// NaN cannot be compared with themselves, so we have to use IsNaN
 						if math.IsNaN(float64(expFloat32)) {
 							require.True(t, math.IsNaN(float64(actual)), actual)
 						} else {
@@ -4732,7 +4734,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 						}
 					} else {
 						actual := env.stackTopAsFloat64()
-						if math.IsNaN(expFloat64) {
+						if math.IsNaN(expFloat64) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							require.True(t, math.IsNaN(actual), actual)
 						} else {
 							require.Equal(t, expFloat64, actual)

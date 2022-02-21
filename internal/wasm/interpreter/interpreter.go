@@ -1325,7 +1325,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1334,7 +1334,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 					case wazeroir.SignedInt64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := int64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
@@ -1344,7 +1344,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 						it.push(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1353,7 +1353,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 					case wazeroir.SignedUint64:
 						v := math.Trunc(float64(math.Float32frombits(uint32(it.pop()))))
 						res := uint64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,
@@ -1367,7 +1367,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1376,7 +1376,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 					case wazeroir.SignedInt64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := int64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt64 || v >= math.MaxInt64 {
 							// Note: math.MaxInt64 is rounded up to math.MaxInt64+1 in 64-bit float representation,
@@ -1386,7 +1386,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 						it.push(uint64(res))
 					case wazeroir.SignedUint32:
 						v := math.Trunc(math.Float64frombits(it.pop()))
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
@@ -1395,7 +1395,7 @@ func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFun
 					case wazeroir.SignedUint64:
 						v := math.Trunc(math.Float64frombits(it.pop()))
 						res := uint64(v)
-						if math.IsNaN(v) {
+						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v >= math.MaxUint64 {
 							// Note: math.MaxUint64 is rounded up to math.MaxUint64+1 in 64-bit float representation,

@@ -154,7 +154,7 @@ func EncodeF64(input float64) uint64 {
 }
 
 // DecodeF64 converts the Function F64 parameter or result to a float64.
-// See DecodeF64
-func DecodeF64(res uint64) float64 {
-	return math.Float64frombits(res)
+// See EncodeF64
+func DecodeF64(input uint64) float64 {
+	return math.Float64frombits(input)
 }

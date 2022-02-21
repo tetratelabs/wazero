@@ -268,10 +268,6 @@ func testImportedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) 
 	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, memory.Buffer[0:10])
 }
 
-func TestHostFunctions(t *testing.T) {
-	testHostFunctions(t, wazero.NewEngineInterpreter)
-}
-
 //  testHostFunctions ensures arg0 is optionally a context, and fails if a float parameter corrupts a host function value
 func testHostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
 	ctx := context.Background()
