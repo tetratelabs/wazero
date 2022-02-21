@@ -1035,12 +1035,15 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 			tmp, int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
 			compiledFunctionAddressRegister)
 	} else {
+		c.compileConstToRegisterInstruction(arm64.ALSL, 3, addrRegister)
 		c.compileMemoryWithRegisterOffsetToRegisterInstruction(
 			arm64.AMOVD,
 			tmp, addrRegister,
 			compiledFunctionAddressRegister,
 		)
 	}
+
+	fmt.Println(addrRegister, compiledFunctionAddressRegister)
 
 	// Finally, we are ready to write the address of the target function's *compiledFunction into the new callframe.
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
@@ -1072,6 +1075,11 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
 		tmp)
+
+	// a := c.newProg()
+	// a.As = obj.AUNDEF
+	// c.addInstruction(a)
+
 	c.compileUnconditionalBranchToAddressOnRegister(tmp)
 
 	// All the registers used are temporary so we mark them unused.
@@ -1264,6 +1272,13 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	}
 
 	c.setBranchTargetOnNext(brIfTypeMatched)
+
+	// Now all checks passed, so read the target's function address, and make call.
+	c.compileMemoryToRegisterInstruction(
+		arm64.AMOVW,
+		offset.register, tableElementFunctionAddressOffset,
+		offset.register,
+	)
 
 	if err := c.compileCallImpl(0, offset.register, targetFunctionType.Type); err != nil {
 		return err
