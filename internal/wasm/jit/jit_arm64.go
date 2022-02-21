@@ -906,6 +906,7 @@ func (c *arm64Compiler) assignBranchTarget(labelKey string, br *obj.Prog) {
 	}
 }
 
+// compileBrTable implements compiler.compileBrTable for the arm64 architecture.
 func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// If the operation doesn't have target but default,
 	// branch into the default label and return early.
@@ -1343,6 +1344,7 @@ func (c *arm64Compiler) compileReadInstructionAddress(beforeTargetInst obj.As, d
 	})
 }
 
+// compileCallIndirect implements compiler.compileCallIndirect for the arm64 architecture.
 func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) error {
 	offset := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(offset); err != nil {
