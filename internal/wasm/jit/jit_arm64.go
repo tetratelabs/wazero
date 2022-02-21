@@ -1216,7 +1216,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, offset.register)
 
 	// If it exceeds len(table), we exit the execution.
-	brIfOffsetOK := c.compilelBranchInstruction(arm64.ABLS)
+	brIfOffsetOK := c.compilelBranchInstruction(arm64.ABLO)
 	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
 
 	// Otherwise, we proceed to do function type check.

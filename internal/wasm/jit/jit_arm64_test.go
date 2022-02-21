@@ -1745,7 +1745,6 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
 			env.exec(code)
 
 			if growCallFrameStack {
@@ -1794,11 +1793,9 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
-		// Generate the code under test.
+		// Generate the code under test and run.
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
-
-		// Run code.
 		env.exec(code)
 
 		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
@@ -1814,7 +1811,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		compiler.f = &wasm.FunctionInstance{
-			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}},
+			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
 			FunctionKind:   wasm.FunctionKindWasm,
 		}
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
@@ -1832,13 +1829,49 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
+		// Generate the code under test and run.
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+	})
+
+	t.Run("type not match", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		targetOperation := &wazeroir.OperationCallIndirect{}
+		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
+		env.moduleInstance.Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}
+		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
+		// and the typeID doesn't match the table[targetOffset]'s type ID.
+		table := make([]wasm.TableElement, 10)
+		env.setTable(table)
+		table[0] = wasm.TableElement{FunctionTypeID: 50}
+
+		// Place the offfset value.
+		err = compiler.compileConstI32(targetOffset)
+		require.NoError(t, err)
+
+		// Now emit the code.
+		require.NoError(t, compiler.compileCallIndirect(targetOperation))
+
+		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
+
+		// Generate the code under test and run.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
 
 		// Run code.
 		env.exec(code)
 
-		require.Equal(t, jitCallStatusCodeInvalidTableAccess, env.jitStatus())
+		require.Equal(t, jitCallStatusCodeTypeMismatchOnIndirectCall, env.jitStatus())
 	})
 }
 
