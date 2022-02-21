@@ -394,7 +394,67 @@ type SnapshotPreview1 interface {
 	FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
 
 	// TODO: wasi.FdPwrite
+
 	// TODO: wasi.FdRead
+	// FdRead is the WASI function to read from a file descriptor.
+	//
+	// * fd - the file decriptor to read from
+	// * iovs - the offset in `ctx.Memory` that contains a series of `IOVec` struct, which indicates where to write the bytes read. See the example below.
+	// * iovsLen - the number of `IOVec`s in `iovs`
+	// * resultSize - the offset in `ctx.Memory` to write the number of bytes read
+	//
+	// FdRead returns the following errors.
+	// * ErrnoBadf - if `fd` is invalid
+	// * ErrnoFault - if `iovs` or `resultSize` contain an invalid offset due to the memory constraint
+	// * ErrnoIo - if an IO related error happens during the operation
+	//
+	// For example, suppose fd 3 is a file with the contents "test",
+	// and FdRead parameters fd = 3, iovs = 1, and iovsLen = 2, resultSize = 24
+	// and two `IOVec`s are located at the offset 1.
+	// Those two `IOVec`s are as follows.
+	//   []IOVec {
+	//     {
+	//       buf: 18    /* type: uint32 */,
+	//       bufLen: 2  /* type: uint32 */,
+	//     },
+	//     {
+	//       buf: 21    /* type: uint32 */,
+	//       bufLen: 2  /* type: uint32 */,
+	//     },
+	//   }
+	// Note: Wazero does not export nor define IOVec struct explicitly. These are examples.
+	// Now, `ctx.Memory` contains
+	//
+	//                       IOVec                    IOVec
+	//              +--------------------+   +--------------------+
+	//              |uint32le    uint32le|   |uint32le    uint32le|
+	//              +--------+  +--------+   +--------+  +--------+
+	//              |        |  |        |   |        |  |        |
+	//   []byte{?, 18, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 2, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? }
+	//       iovs --^           ^            ^           ^                   resultSize --^
+	//              | iovs[0].  |  iovs[1].  | iovs[1].  |                     (= 24th)
+	//    iovs[0].  |  bufLen --+      buf --+  bufLen --+
+	//        buf --+
+	//
+	// After FdRead completes, we expect `ctx.Memory` to contain:
+	//
+	//                       IOVec                    IOVec
+	//              +--------------------+   +--------------------+      iovs[0]      iovs[1]
+	//              |uint32le    uint32le|   |uint32le    uint32le|      bufLen       bufLen       uint32le
+	//              +--------+  +--------+   +--------+  +--------+      +----+       +----+      +--------+
+	//              |        |  |        |   |        |  |        |      |    |       |    |      |        |
+	//   []byte{?, 18, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 2, 0, 0, 0, ?, 't', 'e', ?, 's', 't', ?, 4, 0, 0, 0 }
+	//       iovs --^                                      iovs[0].buf --^            ^           ^
+	//                                                        (= 18th)  iovs[1].buf --+           |
+	//                                                                     (= 21st)  resultSize --+
+	//                                                                                 (= 24th)
+	//
+	// Note: ImportFdRead shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
+	// Note: This is similar to `readv` in POSIX.
+	// See https://linux.die.net/man/3/readv
+	// FdRead(ctx wasm.ModuleContext, fd uint32, iovs uint32, iovsLen uint32, resultSize uint32) wasi.Errno
+
 	// TODO: wasi.FdReaddir
 	// TODO: wasi.FdRenumber
 	// TODO: wasi.FdSeek
