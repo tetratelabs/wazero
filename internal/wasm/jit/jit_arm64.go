@@ -932,14 +932,15 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		}
 		index.setRegister(reg)
 		c.markRegisterUsed(reg)
+
+		// Zero the value on a picked register.
+		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, reg)
 	}
 
 	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(len(o.Targets))
 
 	// Load the branch table's length.
 	// "tmpReg = len(o.Targets)"
@@ -986,10 +987,6 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		tmpReg,
 	)
 
-	// a := c.newProg()
-	// a.As = obj.AUNDEF
-	// c.addInstruction(a)
-
 	// "index.register = tmpReg + (index.register << 2) (== &offsetData[offset])"
 	c.compileAddInstructionWithLeftShiftedRegister(index.register, 2, tmpReg, index.register)
 
@@ -1005,10 +1002,6 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	c.compileRegisterToRegisterInstruction(arm64.AADD, tmpReg, index.register)
 
 	c.compileUnconditionalBranchToAddressOnRegister(index.register)
-
-	fmt.Printf("offsetdata=0x%x\n", int64(uintptr(unsafe.Pointer(&offsetData[0]))))
-	fmt.Printf("offsetdata=0x%x\n", int64(uintptr(unsafe.Pointer(&offsetData[8]))))
-	fmt.Println(index.register, tmpReg)
 
 	// We no longer need the index's register, so mark it unused.
 	c.markRegisterUnused(index.register)
@@ -1062,8 +1055,6 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 				return fmt.Errorf("too large br_table")
 			}
 			// We store the offset from the beiggning of the L0's initial instruction.
-			fmt.Println(uint32(nop.Pc) - uint32(base))
-
 			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
 		}
 		return nil
