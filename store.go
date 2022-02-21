@@ -3,6 +3,7 @@ package wazero
 import (
 	"fmt"
 
+	"github.com/tetratelabs/wazero/internal/makefunc"
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
@@ -92,4 +93,51 @@ func ExportHostFunctions(store wasm.Store, moduleName string, nameToGoFunc map[s
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
 	}
 	return internal.ExportHostFunctions(moduleName, nameToGoFunc)
+}
+
+// MakeWasmFunc implements the goFuncPtr so that it calls an exported function or errs if the function isn't in the
+// module or there's a signature mismatch.
+//
+// * functions is the module's exported functions
+// * name is the exported function name in the current Wasm module
+// * goFuncPtr is a pointer to a func and will have its value replaced on success
+//
+// Ex. Given the below the export and type use of the function in WebAssembly 1.0 (MVP) Text Format:
+//	(func (export "AddInt") (param i32 i32) (result i32) ...
+//
+// The following would bind that to the Go func named addInt:
+//
+//	var addInt func(uint32, uint32) uint32
+//	err = MakeWasmFunc(exports, "AddInt", &addInt)
+//	ret, err := addInt(1, 2) // ret == 3, err == nil
+//
+// Notes on func signature:
+// * Parameters may begin with a context.Context and if not defaults to context.Background.
+// * Results may end with an error, and if not, any error calling the function will panic.
+// * Otherwise, parameters and results must map to WebAssembly 1.0 (MVP) Value types.
+func MakeWasmFunc(exports wasm.ModuleExports, name string, goFuncPtr interface{}) (err error) {
+	internal, ok := exports.(*internalwasm.ModuleContext)
+	if !ok {
+		return fmt.Errorf("unsupported ModuleExports implementation: %s", exports)
+	}
+	exp, err := internal.Module.GetExport(name, internalwasm.ExportKindFunc)
+	if err != nil {
+		return err
+	}
+
+	// TODO: consider how caching could work. Be careful to not explode cardinality as the goFuncPtr would change in
+	// each host function call, and the signature can also be different (ex with and w/o context, with and w/o error).
+	return makefunc.MakeWasmFunc(internal, name, exp.Function, goFuncPtr)
+}
+
+func MakeHostFunc(exports wasm.HostExports, name string, goFuncPtr interface{}) (err error) {
+	internal, ok := exports.(*internalwasm.HostExports)
+	if !ok {
+		return fmt.Errorf("unsupported HostExports implementation: %s", exports)
+	}
+	fn, ok := internal.NameToFunctionInstance[name]
+	if !ok {
+		return fmt.Errorf("%s is not a HostFunction", name)
+	}
+	return makefunc.MakeWasmFunc(nil, name, fn, goFuncPtr)
 }
