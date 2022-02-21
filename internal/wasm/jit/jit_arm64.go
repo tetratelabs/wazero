@@ -13,6 +13,7 @@
 package jit
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"unsafe"
@@ -106,6 +107,11 @@ type arm64Compiler struct {
 	afterAssembleCallback []func(code []byte) error
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the ceil of stack pointer is determined before generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
+	staticData                           compiledFunctionStaticData
+}
+
+func (c *arm64Compiler) addStaticData(d []byte) {
+	c.staticData = append(c.staticData, d)
 }
 
 // compile implements compiler.compile for the arm64 architecture.
@@ -901,7 +907,142 @@ func (c *arm64Compiler) assignBranchTarget(labelKey string, br *obj.Prog) {
 }
 
 func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
-	return fmt.Errorf("TODO: unsupported on arm64")
+	// If the operation doesn't have target but default,
+	// branch into the default label and return early.
+	if len(o.Targets) == 0 {
+		loc := c.locationStack.pop()
+		if loc.onRegister() {
+			c.markRegisterUnused(loc.register)
+		}
+		if err := c.compileDropRange(o.Default.ToDrop); err != nil {
+			return err
+		}
+		return c.compileBranchInto(o.Default.Target)
+	}
+
+	index := c.locationStack.pop()
+	if err := c.compileEnsureOnGeneralPurposeRegister(index); err != nil {
+		return err
+	}
+
+	tmpReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	// Load the branch table's length.
+	// "tmpReg = len(o.Targets)"
+	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(len(o.Targets)), tmpReg)
+	// Compare the length with offest.
+	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, index.register, tmpReg)
+	// If the value exceeds the length, we will branch into the default target (corresponding to len(o.Targets) index).
+	// "index.register = tmpReg"
+	c.compileRegisterToRegisterInstruction(arm64.AMOVD, tmpReg, index.register)
+
+	// We prepare the static data which holds the offset of
+	// each target's first instruction (incl. default)
+	// relative to the beginning of label tables.
+	//
+	// For example, if we have targets=[L0, L1] and default=L_DEFAULT,
+	// we emit the the code like this at [Emit the code for each targets and default branch] below.
+	//
+	// L0:
+	//  0x123001: XXXX, ...
+	//  .....
+	// L1:
+	//  0x123005: YYY, ...
+	//  .....
+	// L_DEFAULT:
+	//  0x123009: ZZZ, ...
+	//
+	// then offsetData becomes like [0x0, 0x5, 0x8].
+	// By using this offset list, we could jump into the label for the index by
+	// "jmp offsetData[index]+0x123001" and "0x123001" can be acquired by "LEA"
+	// instruction.
+	//
+	// Note: We store each offset of 32-bite unsigned integer as 4 consecutive bytes. So more precisely,
+	// the above example's offsetData would be [0x0, 0x0, 0x0, 0x0, 0x5, 0x0, 0x0, 0x0, 0x8, 0x0, 0x0, 0x0].
+	//
+	// Note: this is similar to how GCC implements Switch statements in C.
+	offsetData := make([]byte, 4*(len(o.Targets)+1))
+	c.addStaticData(offsetData)
+
+	// "index.register = &offsetData[offset]"
+	c.compileConstToRegisterInstruction(
+		arm64.AMOVD,
+		int64(uintptr(unsafe.Pointer(&offsetData[0]))),
+		tmpReg,
+	)
+	c.compileAddInstructionWithLeftShiftedRegister(index.register, 2, tmpReg, index.register)
+
+	// Now we read the address of the beginning of the jump table.
+	// In the above example, this corresponds to reading the address of 0x123001.
+	c.compileReadInstructionAddress(obj.AJMP, tmpReg)
+
+	// Now we have the address of L0 in tmp register, and the offset to the target label in the index.register.
+	// So we could achieve the br_table jump by adding them and jump into the resulting address.
+	c.compileRegisterToRegisterInstruction(arm64.AADD, tmpReg, index.register)
+	c.compileUnconditionalBranchToAddressOnRegister(index.register)
+
+	// We no longer need the index's register, so mark it unused.
+	c.markRegisterUnused(index.register)
+
+	fmt.Println(index.register)
+
+	// [Emit the code for each targets and default branch]
+	labelInitialInstructions := make([]*obj.Prog, len(o.Targets)+1)
+	saved := c.locationStack
+	for i := range labelInitialInstructions {
+		// Emit the initial instruction of each target.
+		init := c.newProg()
+		// We use NOP as we don't yet know the next instruction in each label.
+		// Assembler would optimize out this NOP during code generation, so this is harmless.
+		init.As = obj.ANOP
+		labelInitialInstructions[i] = init
+		c.addInstruction(init)
+
+		var locationStack *valueLocationStack
+		var target *wazeroir.BranchTargetDrop
+		if i < len(o.Targets) {
+			target = o.Targets[i]
+			// Clone the location stack so the branch-specific code doesn't
+			// affect others.
+			locationStack = saved.clone()
+		} else {
+			target = o.Default
+			// If this is the deafult branch, we just use the original one
+			// as this is the last code in this block.
+			locationStack = saved
+		}
+		c.setLocationStack(locationStack)
+		if err := c.compileDropRange(target.ToDrop); err != nil {
+			return err
+		}
+		if err := c.compileBranchInto(target.Target); err != nil {
+			return err
+		}
+	}
+
+	// Set up the callbacks to do tasks which cannot be done at the compilation phase.
+	c.afterAssembleCallback = append(c.afterAssembleCallback, func(code []byte) error {
+		// Build the offset table for each target including default one.
+		base := labelInitialInstructions[0].Pc // This corresponds to the L0's address in the example.
+		for i, nop := range labelInitialInstructions {
+			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
+				// TODO: this happens when users try loading an extremely large webassembly binary
+				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
+				// We would like to support that binary, but realistically speacking, that kind of binary
+				// could result in more than ten giga bytes of native JITed code where we have to care about
+				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
+				// current implementation.
+				return fmt.Errorf("too large br_table")
+			}
+			// We store the offset from the beiggning of the L0's initial instruction.
+			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
+		}
+		return nil
+	})
+	return nil
 }
 
 // compileCall implements compiler.compileCall for the arm64 architecture.
