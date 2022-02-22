@@ -28,8 +28,7 @@ func Test_fibonacci(t *testing.T) {
 	exports, err := wazero.StartWASICommand(store, mod)
 	require.NoError(t, err)
 
-	fibonacci, ok := exports.Function("fibonacci")
-	require.True(t, ok)
+	fibonacci := exports.Function("fibonacci")
 
 	for _, c := range []struct {
 		input, expected uint64 // i32_i32 sig, but wasm.Function params and results are uint64

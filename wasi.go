@@ -104,7 +104,7 @@ func StartWASICommand(store wasm.Store, module *Module) (wasm.ModuleExports, err
 	}
 
 	exports := internal.ModuleContexts[module.name]
-	start, _ := exports.Function(internalwasi.FunctionStart)
+	start := exports.Function(internalwasi.FunctionStart)
 	if _, err = start(exports.Context()); err != nil {
 		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
 	}
