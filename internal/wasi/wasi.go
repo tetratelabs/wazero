@@ -106,7 +106,7 @@ const (
 	ImportFdPrestatGet = `(import "wasi_snapshot_preview1" "fd_prestat_get"
     (func $wasi.fd_prestat_get (param $fd i32) (param $result.prestat i32) (result (;errno;) i32)))`
 
-	// FunctionFdPrestatDirName returns the path of the prestat directory of a file descriptor.
+	// FunctionFdPrestatDirName returns the path of the pre-opened directory of a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 	FunctionFdPrestatDirName = "fd_prestat_dir_name"
 	// ImportFdPrestatDirName is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
@@ -343,32 +343,33 @@ type SnapshotPreview1 interface {
 	// This returns ErrnoBadf if the fd is invalid.
 	//
 	// * fd - the file decriptor to get the prestat
-	// * resultPrestat - the offset to write the result Prestat struct
+	// * resultPrestat - the offset to write the result prestat data
 	//
-	// TODO: Define Prestat and PrestatDir, and update the example below.
-	// For example, if fd 3 is a file with a prestat
-	//   /* Note: Prestat is not defined in wazero yet. This is an example for explanation. */
-	//   Prestat {
-	//     Tag: PrestatDir /* 0 (type: uint8, offset: 0) */
-	//     PrNameLen: 3    /* 3 (type: uint32, offset: 4) */
-	//   }
-	// and FdPrestatGet parameters fd = 3, resultPrestat = 1, we expect `ctx.Memory` to contain:
+	// A prestat is a union data which consists of two fields, uint8 `tag` indicating the type of the prestat data,
+	// and uint32 contents data that varies according to `tag`. They have the following memory layout.
+	// * tag - uint8. offset 0
+	// * contents - uint32. offset 4
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
+	//
+	// For example, suppose fd 3 is a file descriptor with a prestat data of tag = `prestat_dir` (value: 0).
+	// For this tag, the contents is prNameLen. Suppose it has value 3 in this example.
+	// Now, if FdPrestatGet parameters fd = 3 and resultPrestat = 1, we expect `ctx.Memory` to contain:
 	//
 	//                     padding   uint32le
 	//          uint8 --+  +-----+  +--------+
 	//                  |  |     |  |        |
 	//        []byte{?, 0, 0, 0, 0, 3, 0, 0, 0, ?}
 	//  resultPrestat --^           ^
-	//            Tag --+           |
-	//                              +-- PrNameLen
+	//            tag --+           |
+	//                              +-- prNameLen
 	//
 	// Note: ImportFdPrestatGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
 	FdPrestatGet(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
 
-	// FdPrestatDirName is the WASI function to return the path of the prestat directory of a file descriptor.
+	// FdPrestatDirName is the WASI function to return the path of the pre-opened directory of a file descriptor.
 	//
-	// * fd - the file decriptor to get the path of the prestat directory
+	// * fd - the file decriptor to get the path of the pre-opened directory
 	// * path - the offset in `ctx.Memory` to write the result path
 	// * pathLen - FdPrestatDirName writes the result path string to `path` offset for the length of `pathLen`.
 	//
@@ -387,12 +388,12 @@ type SnapshotPreview1 interface {
 	//   []byte{?, 't', 'e', 's', ?, ?, ?}
 	//       path --^
 	//
-	// Note: `PrNameLen` field of the result of FdPrestatGet has the exact length of the actual path.
+	// Note: `prNameLen` field of the result of FdPrestatGet has the exact length of the actual path.
 	// See FdPrestatGet
 	// Note: Some runtimes may have another semantics. See internal/wasi/RATIONALE.md#FdPrestatDirName
 	// Note: ImportFdPrestatDirName shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
-	FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
+	FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, path uint32, pathLen uint32) wasi.Errno
 
 	// TODO: wasi.FdPwrite
 
@@ -400,9 +401,11 @@ type SnapshotPreview1 interface {
 	// FdRead is the WASI function to read from a file descriptor.
 	//
 	// * fd - the file decriptor to read from
-	// * iovs - the offset in `ctx.Memory` that contains a series of `IOVec` struct, which indicates where to write the bytes read. See the example below.
-	// * iovsLen - the number of `IOVec`s in `iovs`
+	// * iovs - the offset in `ctx.Memory` that contains a series of `iovec`, which indicates where to write the bytes read.
+	// * iovsLen - the number of `ioveC`s in `iovs`
 	// * resultSize - the offset in `ctx.Memory` to write the number of bytes read
+	// `iovec` is a memory offset / length pair, which are named buf/bufLen, encoded sequentially as uint32le.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
 	//
 	// FdRead returns the following errors.
 	// * ErrnoBadf - if `fd` is invalid
@@ -411,44 +414,30 @@ type SnapshotPreview1 interface {
 	//
 	// For example, suppose fd 3 is a file with the contents "test",
 	// and FdRead parameters fd = 3, iovs = 1, and iovsLen = 2, resultSize = 24
-	// and two `IOVec`s are located at the offset 1.
-	// Those two `IOVec`s are as follows.
-	//   []IOVec {
-	//     {
-	//       buf: 18    /* type: uint32 */,
-	//       bufLen: 2  /* type: uint32 */,
-	//     },
-	//     {
-	//       buf: 21    /* type: uint32 */,
-	//       bufLen: 2  /* type: uint32 */,
-	//     },
-	//   }
-	// Note: Wazero does not export nor define IOVec struct explicitly. These are examples.
+	// and two `iovec`s are {buf: 18, bufLen: 2} and {buf: 21, bufLen: 2}.
 	// Now, `ctx.Memory` contains
 	//
-	//                       IOVec                    IOVec
+	//                      iovs[0]                  iovs[1]
 	//              +--------------------+   +--------------------+
 	//              |uint32le    uint32le|   |uint32le    uint32le|
 	//              +--------+  +--------+   +--------+  +--------+
 	//              |        |  |        |   |        |  |        |
-	//   []byte{?, 18, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 2, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? }
-	//       iovs --^           ^            ^           ^                   resultSize --^
-	//              | iovs[0].  |  iovs[1].  | iovs[1].  |                     (= 24th)
-	//    iovs[0].  |  bufLen --+      buf --+  bufLen --+
-	//        buf --+
+	//   []byte{?, 18, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 2, 0, 0, 0, ?... }
+	//       iovs --^           ^            ^           ^    17th --^
+	//              |           |            |           |
+	//        buf --+  bufLen --+      buf --+  bufLen --+
 	//
 	// After FdRead completes, we expect `ctx.Memory` to contain:
 	//
-	//                       IOVec                    IOVec
-	//              +--------------------+   +--------------------+      iovs[0]      iovs[1]
-	//              |uint32le    uint32le|   |uint32le    uint32le|      bufLen       bufLen       uint32le
-	//              +--------+  +--------+   +--------+  +--------+      +----+       +----+      +--------+
-	//              |        |  |        |   |        |  |        |      |    |       |    |      |        |
-	//   []byte{?, 18, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 2, 0, 0, 0, ?, 't', 'e', ?, 's', 't', ?, 4, 0, 0, 0 }
-	//       iovs --^                                      iovs[0].buf --^            ^           ^
-	//                                                        (= 18th)  iovs[1].buf --+           |
-	//                                                                     (= 21st)  resultSize --+
-	//                                                                                 (= 24th)
+	//                             iovs[0]      iovs[1]
+	//                             bufLen       bufLen       uint32le
+	//                             +----+       +----+      +--------+
+	//                             |    |       |    |      |        |
+	//   []byte{ same as above.., 't', 'e', ?, 's', 't', ?, 4, 0, 0, 0 }
+	//               iovs[0] buf --^            ^           ^
+	//                  (= 18th)  iovs[1] buf --+           |
+	//                               (= 21st)  resultSize --+
+	//                                           (= 24th)
 	//
 	// Note: ImportFdRead shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read

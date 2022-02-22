@@ -484,7 +484,7 @@ func TestAPI_FdClose(t *testing.T) {
 		api := newAPI(opt)
 		errno := api.FdClose(ctx, fd)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.NotContains(t, api.opened, fd) // Fd is closed and removed from the opned FDs.
+		require.NotContains(t, api.opened, fd) // Fd is closed and removed from the opened FDs.
 	})
 	t.Run(FunctionFdClose, func(t *testing.T) {
 		ret, err := store.Engine.Call(ctx, fn, uint64(fd), uint64(fd))
