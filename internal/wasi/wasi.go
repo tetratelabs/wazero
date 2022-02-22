@@ -655,6 +655,16 @@ func (a *wasiAPI) FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
 	return wasi.ErrnoSuccess
 }
 
+func (a *wasiAPI) fd_fdstat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
+	if _, ok := a.opened[fd]; !ok {
+		return wasi.ErrnoBadf
+	}
+	if !ctx.Memory().WriteUint64Le(bufPtr+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
 // FdPrestatGet implements SnahpshotPreview1.FdPrestatGet
 // TODO: Currently FdPrestatGet implements nothing except returning ErrnoBadf
 func (a *wasiAPI) FdPrestatGet(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
@@ -683,11 +693,152 @@ func (a *wasiAPI) FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, pathPtr ui
 	return wasi.ErrnoSuccess
 }
 
+func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) wasi.Errno {
+	var reader io.Reader
+
+	switch fd {
+	case 0:
+		reader = a.stdin
+	default:
+		f, ok := a.opened[fd]
+		if !ok || f.file == nil {
+			return wasi.ErrnoBadf
+		}
+		reader = f.file
+	}
+
+	var nread uint32
+	for i := uint32(0); i < iovsLen; i++ {
+		iovPtr := iovsPtr + i*8
+		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		b, ok := ctx.Memory().Read(offset, l)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		n, err := reader.Read(b)
+		nread += uint32(n)
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return wasi.ErrnoIo
+		}
+	}
+	if !ctx.Memory().WriteUint32Le(nreadPtr, nread) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
+func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) wasi.Errno {
+	return wasi.ErrnoNosys // TODO: implement
+}
+
+func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) wasi.Errno {
+	var writer io.Writer
+
+	switch fd {
+	case 1:
+		writer = a.stdout
+	case 2:
+		writer = a.stderr
+	default:
+		f, ok := a.opened[fd]
+		if !ok || f.file == nil {
+			return wasi.ErrnoBadf
+		}
+		writer = f.file
+	}
+
+	var nwritten uint32
+	for i := uint32(0); i < iovsLen; i++ {
+		iovPtr := iovsPtr + i*8
+		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		b, ok := ctx.Memory().Read(offset, l)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		n, err := writer.Write(b)
+		if err != nil {
+			panic(err)
+		}
+		nwritten += uint32(n)
+	}
+	if !ctx.Memory().WriteUint32Le(nwrittenPtr, nwritten) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
+func (a *wasiAPI) path_open(ctx wasm.ModuleContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+	fsRightsBase, fsRightsInheriting uint64,
+	fdFlags, fdPtr uint32) (errno wasi.Errno) {
+	dir, ok := a.opened[fd]
+	if !ok || dir.fileSys == nil {
+		return wasi.ErrnoInval
+	}
+
+	b, ok := ctx.Memory().Read(pathPtr, pathLen)
+	if !ok {
+		return wasi.ErrnoFault
+	}
+	path := string(b)
+	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
+	if err != nil {
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return wasi.ErrnoNoent
+		default:
+			return wasi.ErrnoInval
+		}
+	}
+
+	newFD := a.randUnusedFD()
+
+	a.opened[newFD] = fileEntry{
+		file: f,
+	}
+
+	if !ctx.Memory().WriteUint32Le(fdPtr, newFD) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
 // ProcExit implements SnapshotPreview1.ProcExit
 func (a *wasiAPI) ProcExit(exitCode uint32) {
 	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
 	// See the document of API.ProcExit.
 	panic(wasi.ExitCode(exitCode))
+}
+
+// RandomGet implements SnapshotPreview1.RandomGet
+func (a *wasiAPI) RandomGet(ctx wasm.ModuleContext, buf uint32, bufLen uint32) (errno wasi.Errno) {
+	randomBytes := make([]byte, bufLen)
+	err := a.randSource(randomBytes)
+	if err != nil {
+		// TODO: handle different errors that syscal to entropy source can return
+		return wasi.ErrnoIo
+	}
+
+	if !ctx.Memory().Write(buf, randomBytes) {
+		return wasi.ErrnoFault
+	}
+
+	return wasi.ErrnoSuccess
 }
 
 type fileEntry struct {
@@ -794,157 +945,6 @@ func (a *wasiAPI) randUnusedFD() uint32 {
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
-}
-
-func (a *wasiAPI) fd_fdstat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
-	if _, ok := a.opened[fd]; !ok {
-		return wasi.ErrnoBadf
-	}
-	if !ctx.Memory().WriteUint64Le(bufPtr+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) path_open(ctx wasm.ModuleContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
-	fsRightsBase, fsRightsInheriting uint64,
-	fdFlags, fdPtr uint32) (errno wasi.Errno) {
-	dir, ok := a.opened[fd]
-	if !ok || dir.fileSys == nil {
-		return wasi.ErrnoInval
-	}
-
-	b, ok := ctx.Memory().Read(pathPtr, pathLen)
-	if !ok {
-		return wasi.ErrnoFault
-	}
-	path := string(b)
-	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
-	if err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return wasi.ErrnoNoent
-		default:
-			return wasi.ErrnoInval
-		}
-	}
-
-	newFD := a.randUnusedFD()
-
-	a.opened[newFD] = fileEntry{
-		file: f,
-	}
-
-	if !ctx.Memory().WriteUint32Le(fdPtr, newFD) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) wasi.Errno {
-	return wasi.ErrnoNosys // TODO: implement
-}
-
-func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) wasi.Errno {
-	var writer io.Writer
-
-	switch fd {
-	case 1:
-		writer = a.stdout
-	case 2:
-		writer = a.stderr
-	default:
-		f, ok := a.opened[fd]
-		if !ok || f.file == nil {
-			return wasi.ErrnoBadf
-		}
-		writer = f.file
-	}
-
-	var nwritten uint32
-	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
-		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		b, ok := ctx.Memory().Read(offset, l)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		n, err := writer.Write(b)
-		if err != nil {
-			panic(err)
-		}
-		nwritten += uint32(n)
-	}
-	if !ctx.Memory().WriteUint32Le(nwrittenPtr, nwritten) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) wasi.Errno {
-	var reader io.Reader
-
-	switch fd {
-	case 0:
-		reader = a.stdin
-	default:
-		f, ok := a.opened[fd]
-		if !ok || f.file == nil {
-			return wasi.ErrnoBadf
-		}
-		reader = f.file
-	}
-
-	var nread uint32
-	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
-		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		b, ok := ctx.Memory().Read(offset, l)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		n, err := reader.Read(b)
-		nread += uint32(n)
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return wasi.ErrnoIo
-		}
-	}
-	if !ctx.Memory().WriteUint32Le(nreadPtr, nread) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-// RandomGet implements SnapshotPreview1.RandomGet
-func (a *wasiAPI) RandomGet(ctx wasm.ModuleContext, buf uint32, bufLen uint32) (errno wasi.Errno) {
-	randomBytes := make([]byte, bufLen)
-	err := a.randSource(randomBytes)
-	if err != nil {
-		// TODO: handle different errors that syscal to entropy source can return
-		return wasi.ErrnoIo
-	}
-
-	if !ctx.Memory().Write(buf, randomBytes) {
-		return wasi.ErrnoFault
-	}
-
-	return wasi.ErrnoSuccess
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
