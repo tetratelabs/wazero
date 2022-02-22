@@ -87,9 +87,11 @@ type (
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
-		Memory    *MemoryInstance
-		Tables    []*TableInstance
-		Types     []*TypeInstance
+		// MemoryInstance is set when Module.MemorySection had a memory, regardless of whether it was exported.
+		// Note: This avoids the name "Memory" which is an interface method name.
+		MemoryInstance *MemoryInstance
+		Tables         []*TableInstance
+		Types          []*TypeInstance
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -248,7 +250,7 @@ func NewStore(ctx context.Context, engine Engine) *Store {
 	}
 }
 
-func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
+func (s *Store) Instantiate(module *Module, name string) (*ModuleExports, error) {
 	if err := s.requireModuleUnused(name); err != nil {
 		return nil, err
 	}
@@ -336,19 +338,46 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
-	return modCtx, nil
+	return &ModuleExports{s, modCtx}, nil
 }
 
 // ModuleExports implements wasm.Store ModuleExports
-func (s *Store) ModuleExports(moduleName string) (publicwasm.ModuleExports, bool) {
-	e, ok := s.ModuleContexts[moduleName]
-	return e, ok
+func (s *Store) ModuleExports(moduleName string) publicwasm.ModuleExports {
+	if m, ok := s.ModuleContexts[moduleName]; !ok {
+		return nil
+	} else {
+		return &ModuleExports{s, m}
+	}
+}
+
+// ModuleExports implements wasm.ModuleExports
+type ModuleExports struct {
+	s *Store
+	// Context is exported for /wasi.go
+	Context *ModuleContext
+}
+
+// Function implements wasm.ModuleExports Function
+func (m *ModuleExports) Function(name string) publicwasm.Function {
+	exp, err := m.Context.Module.GetExport(name, ExportKindFunc)
+	if err != nil {
+		return nil
+	}
+	return (&function{c: m.Context, f: exp.Function}).Call
+}
+
+// Memory implements wasm.ModuleExports Memory
+func (m *ModuleExports) Memory(name string) publicwasm.Memory {
+	exp, err := m.Context.Module.GetExport(name, ExportKindMemory)
+	if err != nil {
+		return nil
+	}
+	return exp.Memory
 }
 
 // HostExports implements wasm.Store HostExports
-func (s *Store) HostExports(moduleName string) (publicwasm.HostExports, bool) {
-	e, ok := s.hostExports[moduleName]
-	return e, ok
+func (s *Store) HostExports(moduleName string) publicwasm.HostExports {
+	return s.hostExports[moduleName]
 }
 
 func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp *ExportInstance, err error) {
@@ -450,7 +479,7 @@ func (s *Store) applyTableImport(target *ModuleInstance, tableTypePtr *TableType
 }
 
 func (s *Store) applyMemoryImport(target *ModuleInstance, memoryTypePtr *MemoryType, externModuleExportIsntance *ExportInstance) error {
-	if target.Memory != nil {
+	if target.MemoryInstance != nil {
 		// The current Wasm spec doesn't allow multiple memories.
 		return fmt.Errorf("multiple memories are not supported")
 	} else if memoryTypePtr == nil {
@@ -467,7 +496,7 @@ func (s *Store) applyMemoryImport(target *ModuleInstance, memoryTypePtr *MemoryT
 			return fmt.Errorf("incompatible memory imports: maximum size mismatch")
 		}
 	}
-	target.Memory = memory
+	target.MemoryInstance = memory
 	return nil
 }
 
@@ -652,22 +681,22 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
 	// Allocate memory instances.
 	for _, memSec := range module.MemorySection {
-		if target.Memory != nil {
+		if target.MemoryInstance != nil {
 			// This case the memory instance is already imported,
 			// and the current Wasm spec doesn't allow multiple memories.
 			return rollbackFuncs, fmt.Errorf("multiple memories not supported")
 		}
-		target.Memory = &MemoryInstance{
+		target.MemoryInstance = &MemoryInstance{
 			Buffer: make([]byte, memoryPagesToBytesNum(memSec.Min)),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
 		}
-		s.Memories = append(s.Memories, target.Memory)
+		s.Memories = append(s.Memories, target.MemoryInstance)
 	}
 
 	// Initialize the memory instance according to the Data section.
 	for _, d := range module.DataSection {
-		if target.Memory == nil {
+		if target.MemoryInstance == nil {
 			return rollbackFuncs, fmt.Errorf("unknown memory")
 		} else if d.MemoryIndex != 0 {
 			return rollbackFuncs, fmt.Errorf("memory index must be zero")
@@ -696,7 +725,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 			return rollbackFuncs, fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
 		}
 
-		memoryInst := target.Memory
+		memoryInst := target.MemoryInstance
 		if size > uint64(len(memoryInst.Buffer)) {
 			return rollbackFuncs, fmt.Errorf("out of bounds memory access")
 		}
@@ -802,10 +831,10 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			}
 			ei = &ExportInstance{Kind: exp.Kind, Global: target.Globals[index]}
 		case ExportKindMemory:
-			if index != 0 || target.Memory == nil {
+			if index != 0 || target.MemoryInstance == nil {
 				return nil, fmt.Errorf("unknown memory for export[%s]", name)
 			}
-			ei = &ExportInstance{Kind: exp.Kind, Memory: target.Memory}
+			ei = &ExportInstance{Kind: exp.Kind, Memory: target.MemoryInstance}
 		case ExportKindTable:
 			if index >= uint32(len(target.Tables)) {
 				return nil, fmt.Errorf("unknown table for export[%s]", name)
@@ -851,16 +880,14 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 // exists for this module and name it is ignored rather than overwritten.
 //
 // Note: The wasm.Memory of the fn will be from the importing module.
-// Note: The ModuleInstance of this host function is lazy created and only includes exported functions and their types.
-func (s *Store) AddHostFunction(moduleName string, hf *GoFunc) (*FunctionInstance, error) {
-	m := s.getModuleInstance(moduleName)
+func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
 	typeInstance, err := s.getTypeInstance(hf.functionType)
 	if err != nil {
 		return nil, err
 	}
 
 	f := &FunctionInstance{
-		Name:           fmt.Sprintf("%s.%s", moduleName, hf.wasmFunctionName),
+		Name:           fmt.Sprintf("%s.%s", m.Name, hf.wasmFunctionName),
 		HostFunction:   hf.goFunc,
 		FunctionKind:   hf.functionKind,
 		FunctionType:   typeInstance,
@@ -883,33 +910,31 @@ func (s *Store) AddHostFunction(moduleName string, hf *GoFunc) (*FunctionInstanc
 	return f, nil
 }
 
-func (s *Store) AddGlobal(moduleName, name string, value uint64, valueType ValueType, mutable bool) error {
+func (s *Store) AddGlobal(m *ModuleInstance, name string, value uint64, valueType ValueType, mutable bool) error {
 	g := &GlobalInstance{
 		Val:  value,
 		Type: &GlobalType{Mutable: mutable, ValType: valueType},
 	}
 	s.Globals = append(s.Globals, g)
 
-	m := s.getModuleInstance(moduleName)
 	return m.addExport(name, &ExportInstance{Kind: ExportKindGlobal, Global: g})
 }
 
-func (s *Store) AddTableInstance(moduleName, name string, min uint32, max *uint32) error {
+func (s *Store) AddTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	t := newTableInstance(min, max)
 	s.Tables = append(s.Tables, t)
 
-	m := s.getModuleInstance(moduleName)
 	return m.addExport(name, &ExportInstance{Kind: ExportKindTable, Table: t})
 }
 
-func (s *Store) AddMemoryInstance(moduleName, name string, min uint32, max *uint32) error {
+func (s *Store) AddMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
 		Buffer: make([]byte, memoryPagesToBytesNum(min)),
 		Min:    min,
 		Max:    max,
 	}
 	s.Memories = append(s.Memories, memory)
-	m := s.getModuleInstance(moduleName)
+
 	return m.addExport(name, &ExportInstance{Kind: ExportKindMemory, Memory: memory})
 }
 
@@ -925,16 +950,6 @@ func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
 		s.TypeIDs[key] = id
 	}
 	return &TypeInstance{Type: t, TypeID: id}, nil
-}
-
-// getModuleInstance returns an existing ModuleInstance if exists, or assigns a new one.
-func (s *Store) getModuleInstance(name string) *ModuleInstance {
-	m, ok := s.ModuleInstances[name]
-	if !ok {
-		m = &ModuleInstance{Name: name, Exports: map[string]*ExportInstance{}}
-		s.ModuleInstances[name] = m
-	}
-	return m
 }
 
 func newTableInstance(min uint32, max *uint32) *TableInstance {

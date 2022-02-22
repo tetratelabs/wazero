@@ -16,19 +16,20 @@ func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstan
 	return &ModuleContext{
 		ctx:    ctx,
 		engine: engine,
-		memory: instance.Memory,
+		memory: instance.MemoryInstance,
 		Module: instance,
 	}
 }
 
 // ModuleContext implements wasm.ModuleContext and wasm.Module
 type ModuleContext struct {
-	// ctx is the default context, exposed as wasm.ModuleContext Context
-	ctx    context.Context
+	// ctx is returned by Context and overridden WithContext
+	ctx context.Context
+	// engine is used to implement function.Call
 	engine Engine
-	// Module is exported for spectests.callFunction
+	// Module is exported for spectests
 	Module *ModuleInstance
-	// memory is exposed as wasm.ModuleContext Memory
+	// memory is returned by Memory and overridden WithMemory
 	memory publicwasm.Memory
 }
 
@@ -50,16 +51,17 @@ func (c *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	return c
 }
 
+// Context implements wasm.ModuleContext Context
 func (c *ModuleContext) Context() context.Context {
 	return c.ctx
 }
 
-// Memory implements wasm.ModuleExports Memory
+// Memory implements wasm.ModuleContext Memory
 func (c *ModuleContext) Memory() publicwasm.Memory {
 	return c.memory
 }
 
-// Function implements wasm.ModuleExports Function
+// Function implements wasm.ModuleContext Function
 func (c *ModuleContext) Function(name string) publicwasm.Function {
 	exp, err := c.Module.GetExport(name, ExportKindFunc)
 	if err != nil {
@@ -89,11 +91,15 @@ func (s *Store) ExportHostFunctions(moduleName string, nameToGoFunc map[string]i
 		return nil, err
 	}
 
-	ret := HostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, len(nameToGoFunc))}
+	exportCount := len(nameToGoFunc)
+
+	hostModule := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, exportCount)}
+	s.ModuleInstances[moduleName] = hostModule
+	ret := HostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
 	for name, goFunc := range nameToGoFunc {
 		if hf, err := NewGoFunc(name, goFunc); err != nil {
 			return nil, err
-		} else if function, err := s.AddHostFunction(moduleName, hf); err != nil {
+		} else if function, err := s.AddHostFunction(hostModule, hf); err != nil {
 			return nil, err
 		} else {
 			ret.NameToFunctionInstance[name] = function
@@ -135,19 +141,19 @@ func (g *HostExports) Function(name string) publicwasm.HostFunction {
 	return f.call
 }
 
-// Len implements wasm.ModuleContext Len
-func (m *MemoryInstance) Len() uint32 {
+// Size implements wasm.ModuleContext Size
+func (m *MemoryInstance) Size() uint32 {
 	return uint32(len(m.Buffer))
 }
 
-// hasLen returns true if Len is sufficient for sizeInBytes at the given offset.
-func (m *MemoryInstance) hasLen(offset uint32, sizeInBytes uint32) bool {
-	return uint64(offset+sizeInBytes) <= uint64(m.Len()) // uint64 prevents overflow on add
+// hasSize returns true if Len is sufficient for sizeInBytes at the given offset.
+func (m *MemoryInstance) hasSize(offset uint32, sizeInBytes uint32) bool {
+	return uint64(offset+sizeInBytes) <= uint64(m.Size()) // uint64 prevents overflow on add
 }
 
 // ReadUint32Le implements wasm.ModuleContext ReadUint32Le
 func (m *MemoryInstance) ReadUint32Le(offset uint32) (uint32, bool) {
-	if !m.hasLen(offset, 4) {
+	if !m.hasSize(offset, 4) {
 		return 0, false
 	}
 	return binary.LittleEndian.Uint32(m.Buffer[offset : offset+4]), true
@@ -164,7 +170,7 @@ func (m *MemoryInstance) ReadFloat32Le(offset uint32) (float32, bool) {
 
 // ReadUint64Le implements wasm.ModuleContext ReadUint64Le
 func (m *MemoryInstance) ReadUint64Le(offset uint32) (uint64, bool) {
-	if !m.hasLen(offset, 8) {
+	if !m.hasSize(offset, 8) {
 		return 0, false
 	}
 	return binary.LittleEndian.Uint64(m.Buffer[offset : offset+8]), true
@@ -181,7 +187,7 @@ func (m *MemoryInstance) ReadFloat64Le(offset uint32) (float64, bool) {
 
 // Read implements wasm.ModuleContext Read
 func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
-	if !m.hasLen(offset, byteCount) {
+	if !m.hasSize(offset, byteCount) {
 		return nil, false
 	}
 	return m.Buffer[offset : offset+byteCount], true
@@ -189,7 +195,7 @@ func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
 
 // WriteUint32Le implements wasm.ModuleContext WriteUint32Le
 func (m *MemoryInstance) WriteUint32Le(offset, v uint32) bool {
-	if !m.hasLen(offset, 4) {
+	if !m.hasSize(offset, 4) {
 		return false
 	}
 	binary.LittleEndian.PutUint32(m.Buffer[offset:], v)
@@ -203,7 +209,7 @@ func (m *MemoryInstance) WriteFloat32Le(offset uint32, v float32) bool {
 
 // WriteUint64Le implements wasm.ModuleContext WriteUint64Le
 func (m *MemoryInstance) WriteUint64Le(offset uint32, v uint64) bool {
-	if !m.hasLen(offset, 8) {
+	if !m.hasSize(offset, 8) {
 		return false
 	}
 	binary.LittleEndian.PutUint64(m.Buffer[offset:], v)
@@ -217,7 +223,7 @@ func (m *MemoryInstance) WriteFloat64Le(offset uint32, v float64) bool {
 
 // Write implements wasm.ModuleContext Write
 func (m *MemoryInstance) Write(offset uint32, val []byte) bool {
-	if !m.hasLen(offset, uint32(len(val))) {
+	if !m.hasSize(offset, uint32(len(val))) {
 		return false
 	}
 	copy(m.Buffer[offset:], val)
@@ -230,8 +236,8 @@ var NoopMemory = &noopMemory{}
 type noopMemory struct {
 }
 
-// Len implements wasm.ModuleContext Len
-func (m *noopMemory) Len() uint32 {
+// Size implements wasm.ModuleContext Size
+func (m *noopMemory) Size() uint32 {
 	return 0
 }
 

@@ -11,6 +11,47 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+// TestModuleExports_Memory only covers a couple cases to avoid duplication of internal/wasm/store_test.go
+func TestModuleExports_Memory(t *testing.T) {
+	tests := []struct {
+		name, wat   string
+		expected    bool
+		expectedLen uint32
+	}{
+		{
+			name: "no memory",
+			wat:  `(module)`,
+		},
+		{
+			name:        "memory exported, one page",
+			wat:         `(module (memory $mem 1) (export "memory" (memory $mem)))`,
+			expected:    true,
+			expectedLen: 65536,
+		},
+	}
+
+	for _, tt := range tests {
+
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			mod, err := DecodeModuleText([]byte(tc.wat))
+			require.NoError(t, err)
+
+			// Instantiate the module and get the export of the above hostFn
+			exports, err := InstantiateModule(NewStore(), mod)
+			require.NoError(t, err)
+
+			mem := exports.Memory("memory")
+			if tc.expected {
+				require.Equal(t, tc.expectedLen, mem.Size())
+			} else {
+				require.Nil(t, mem)
+			}
+		})
+	}
+}
+
 func TestFunction_Context(t *testing.T) {
 	type key string
 	storeCtx := context.WithValue(context.Background(), key("wa"), "zero")

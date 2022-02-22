@@ -186,6 +186,10 @@ func (c command) expectedError() (err error) {
 }
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
+	// Add the host module
+	spectest := &wasm.ModuleInstance{Name: "spectest", Exports: map[string]*wasm.ExportInstance{}}
+	store.ModuleInstances[spectest.Name] = spectest
+
 	var printV = func() {}
 	var printI32 = func(uint32) {}
 	var printF32 = func(float32) {}
@@ -205,7 +209,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	} {
 		fn, err := wasm.NewGoFunc(n, v)
 		require.NoError(t, err)
-		_, err = store.AddHostFunction("spectest", fn)
+		_, err = store.AddHostFunction(spectest, fn)
 		require.NoError(t, err, "AddHostFunction(%s)", n)
 	}
 
@@ -219,14 +223,14 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
 		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
 	} {
-		require.NoError(t, store.AddGlobal("spectest", g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
+		require.NoError(t, store.AddGlobal(spectest, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
 	}
 
 	tableLimitMax := uint32(20)
-	require.NoError(t, store.AddTableInstance("spectest", "table", 10, &tableLimitMax))
+	require.NoError(t, store.AddTableInstance(spectest, "table", 10, &tableLimitMax))
 
 	memoryLimitMax := uint32(2)
-	require.NoError(t, store.AddMemoryInstance("spectest", "memory", 1, &memoryLimitMax))
+	require.NoError(t, store.AddMemoryInstance(spectest, "memory", 1, &memoryLimitMax))
 }
 
 func TestJIT(t *testing.T) {
@@ -241,7 +245,6 @@ func TestInterpreter(t *testing.T) {
 }
 
 func runTest(t *testing.T, newEngine func() wasm.Engine) {
-	ctx := context.Background()
 	files, err := testcases.ReadDir("testdata")
 	require.NoError(t, err)
 
@@ -307,7 +310,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							vals, types, err := callFunction(store, ctx, moduleName, c.Action.Field, args...)
+							vals, types, err := callFunction(store, moduleName, c.Action.Field, args...)
 							require.NoError(t, err, msg)
 							require.Equal(t, len(exps), len(vals), msg)
 							require.Equal(t, len(exps), len(types), msg)
@@ -367,7 +370,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := callFunction(store, ctx, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(store, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, c.expectedError(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -396,7 +399,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							_, _, err := callFunction(store, ctx, moduleName, c.Action.Field, args...)
+							_, _, err := callFunction(store, moduleName, c.Action.Field, args...)
 							require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
@@ -460,9 +463,10 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
-func callFunction(s *wasm.Store, ctx context.Context, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []wasm.ValueType, err error) {
+func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []wasm.ValueType, err error) {
+	ctx := s.ModuleContexts[moduleName]
 	var exp *wasm.ExportInstance
-	if exp, err = s.ModuleContexts[moduleName].Module.GetExport(funcName, wasm.ExportKindFunc); err != nil {
+	if exp, err = ctx.Module.GetExport(funcName, wasm.ExportKindFunc); err != nil {
 		return
 	}
 
@@ -472,8 +476,7 @@ func callFunction(s *wasm.Store, ctx context.Context, moduleName, funcName strin
 		return
 	}
 
-	hostCtx := s.ModuleContexts[moduleName].WithContext(ctx)
-	results, err = s.Engine.Call(hostCtx, f, params...)
+	results, err = s.Engine.Call(ctx, f, params...)
 	resultTypes = f.FunctionType.Type.Results
 	return
 }

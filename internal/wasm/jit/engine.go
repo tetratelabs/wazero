@@ -83,15 +83,15 @@ type (
 		// This is only used by JIT code so mark this as nolint.
 		moduleInstanceAddress uintptr //nolint
 
-		// globalElement0Address is the address of the first element in the globa slice,
+		// globalElement0Address is the address of the first element in the global slice,
 		// i.e. &ModuleInstance.Globals[0] as uintptr.
 		globalElement0Address uintptr
-		// memoryElement0Address is the address of the first element in the globa slice,
-		// i.e. &ModuleInstance.Memory.Buffer[0] as uintptr.
+		// memoryElement0Address is the address of the first element in the global slice,
+		// i.e. &ModuleInstance.MemoryInstance.Buffer[0] as uintptr.
 		memoryElement0Address uintptr
-		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Memory.Buffer).
+		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.MemoryInstance.Buffer).
 		memorySliceLen uint64
-		// tableElement0Address is the address of the first item in the globa slice,
+		// tableElement0Address is the address of the first item in the global slice,
 		// i.e. &ModuleInstance.Tables[0].Table[0] as uintptr.
 		tableElement0Address uintptr
 		// tableSliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Tables[0].Table).
@@ -184,7 +184,7 @@ const (
 	engineGlobalContextCallFrameStackElement0AddressOffset    = 16
 	engineGlobalContextCallFrameStackLenOffset                = 24
 	engineGlobalContextCallFrameStackPointerOffset            = 32
-	engineGlobalContextPreviouscallFrameStackPointer          = 40
+	engineGlobalContextPreviousCallFrameStackPointer          = 40
 	engineGlobalContextCompiledFunctionsElement0AddressOffset = 48
 
 	// Offsets for engine.moduleContext.
@@ -538,8 +538,9 @@ jitentry:
 			fn := e.compiledFunctions[e.exitContext.functionCallAddress]
 			callerCompiledFunction := e.callFrameAt(1).compiledFunction
 			saved := e.globalContext.previousCallFrameStackPointer
+			// A host function is invoked with the calling frame's memory, which may be different if in another module.
 			e.execHostFunction(fn.source.FunctionKind, fn.source.HostFunction,
-				ctx.WithMemory(callerCompiledFunction.source.ModuleInstance.Memory),
+				ctx.WithMemory(callerCompiledFunction.source.ModuleInstance.MemoryInstance),
 			)
 			e.globalContext.previousCallFrameStackPointer = saved
 			goto jitentry
@@ -547,7 +548,7 @@ jitentry:
 			switch e.exitContext.functionCallAddress {
 			case builtinFunctionAddressMemoryGrow:
 				callerCompiledFunction := e.callFrameTop().compiledFunction
-				e.builtinFunctionMemoryGrow(callerCompiledFunction.source.ModuleInstance.Memory)
+				e.builtinFunctionMemoryGrow(callerCompiledFunction.source.ModuleInstance.MemoryInstance)
 			case builtinFunctionAddressGrowValueStack:
 				callerCompiledFunction := e.callFrameTop().compiledFunction
 				e.builtinFunctionGrowValueStack(callerCompiledFunction.stackPointerCeil)

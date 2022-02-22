@@ -215,9 +215,9 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 		{
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
@@ -230,47 +230,47 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Globals:        []*wasm.GlobalInstance{{Val: 100}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
 		{
 			name: "table length zero",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:  []*wasm.TableInstance{{Table: nil}},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:         []*wasm.TableInstance{{Table: nil}},
+				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "table length zero part2",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:  []*wasm.TableInstance{},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:         []*wasm.TableInstance{},
+				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "table nil part2",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables: []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
 			},
 		},
 	} {
@@ -306,8 +306,8 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
 			require.Equal(t, bufSliceHeader.Data, engine.moduleContext.globalElement0Address)
 
-			if tc.moduleInstance.Memory != nil {
-				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
+			if tc.moduleInstance.MemoryInstance != nil {
+				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.MemoryInstance.Buffer))
 				require.Equal(t, uint64(bufSliceHeader.Len), engine.moduleContext.memorySliceLen)
 				require.Equal(t, bufSliceHeader.Data, engine.moduleContext.memoryElement0Address)
 			}
@@ -5972,7 +5972,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 					// Each function takes one argument, adds the value with 100 + i and returns the result.
 					addTargetValue := uint32(100 + i)
 					moduleInstance := &wasm.ModuleInstance{
-						Memory: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
+						MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 1024)},
 					}
 					moduleInstanceToExpectedValueInMemory[moduleInstance] = addTargetValue
 
@@ -6066,7 +6066,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 
 				// Also, in the middle of function call, we write the added value into each memory instance.
 				for mod, expValue := range moduleInstanceToExpectedValueInMemory {
-					require.Equal(t, expValue, binary.LittleEndian.Uint32(mod.Memory.Buffer[0:]))
+					require.Equal(t, expValue, binary.LittleEndian.Uint32(mod.MemoryInstance.Buffer[0:]))
 				}
 			})
 		})

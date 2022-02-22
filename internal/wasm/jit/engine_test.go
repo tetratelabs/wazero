@@ -19,7 +19,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackElementZeroAddress)), engineGlobalContextCallFrameStackElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackLen)), engineGlobalContextCallFrameStackLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackPointer)), engineGlobalContextCallFrameStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.previousCallFrameStackPointer)), engineGlobalContextPreviouscallFrameStackPointer)
+	require.Equal(t, int(unsafe.Offsetof(eng.previousCallFrameStackPointer)), engineGlobalContextPreviousCallFrameStackPointer)
 	require.Equal(t, int(unsafe.Offsetof(eng.compiledFunctionsElement0Address)), engineGlobalContextCompiledFunctionsElement0AddressOffset)
 
 	// Offsets for engine.moduleContext.
@@ -61,7 +61,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.MemoryInstance)), moduleInstanceMemoryOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Tables)), moduleInstanceTablesOffset)
 
 	// Offsets for wasm.TableInstance.
