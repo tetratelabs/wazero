@@ -120,14 +120,21 @@ const (
 	FunctionFdRead = "fd_read"
 	// ImportFdRead is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
 	ImportFdRead = `(import "wasi_snapshot_preview1" "fd_read"
-    (func $wasi.fd_read (param $fd i32) (param $iovs i32) (param $iov_len i32) (param $result.size i32) (result (;errno;) i32)))`
+    (func $wasi.fd_read (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $result.size i32) (result (;errno;) i32)))`
 
-	FunctionFdReaddir            = "fd_readdir"
-	FunctionFdRenumber           = "fd_renumber"
-	FunctionFdSeek               = "fd_seek"
-	FunctionFdSync               = "fd_sync"
-	FunctionFdTell               = "fd_tell"
-	FunctionFdWrite              = "fd_write"
+	FunctionFdReaddir  = "fd_readdir"
+	FunctionFdRenumber = "fd_renumber"
+	FunctionFdSeek     = "fd_seek"
+	FunctionFdSync     = "fd_sync"
+	FunctionFdTell     = "fd_tell"
+
+	// FunctionFdWrite write bytes to a file descriptor
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
+	FunctionFdWrite = "fd_write"
+	// ImportFdWrite is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	ImportFdWrite = `(import "wasi_snapshot_preview1" "fd_write"
+    (func $wasi.fd_write (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $result.size i32) (result (;errno;) i32)))`
+
 	FunctionPathCreateDirectory  = "path_create_directory"
 	FunctionPathFilestatGet      = "path_filestat_get"
 	FunctionPathFilestatSetTimes = "path_filestat_set_times"
@@ -408,7 +415,7 @@ type SnapshotPreview1 interface {
 	//
 	// * fd - the file decriptor to read from
 	// * iovs - the offset in `ctx.Memory` that contains a series of `iovec`, which indicates where to write the bytes read.
-	// * iovsLen - the number of `ioveC`s in `iovs`
+	// * iovsLen - the number of `iovec`s in `iovs`
 	// * resultSize - the offset in `ctx.Memory` to write the number of bytes read
 	// `iovec` is a memory offset / length pair, which are named buf/bufLen, encoded sequentially as uint32le.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
@@ -456,7 +463,52 @@ type SnapshotPreview1 interface {
 	// TODO: wasi.FdSeek
 	// TODO: wasi.FdSync
 	// TODO: wasi.FdTell
+
 	// TODO: wasi.FdWrite
+	// FdWrite is the WASI function to write to a file descriptor.
+	//
+	// * fd - the file decriptor to write to
+	// * iovs - the offset in `ctx.Memory` that contains a series of `ciovec`, which indicates ranges of the bytes to write.
+	// * iovsLen - the number of `ciovec`s in `iovs`
+	// * resultSize - the offset in `ctx.Memory` to write the number of bytes written
+	// `ciovec` is a memory offset / length pair, which are named buf/bufLen, encoded sequentially as uint32le.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
+	// Note: ciovec` is an equivalent structure to `iovec` for `fd_read` with no difference other than the name.
+	//
+	// FdWrite returns the following errors.
+	// * ErrnoBadf - if `fd` is invalid
+	// * ErrnoFault - if `iovs` or `resultSize` contain an invalid offset due to the memory constraint
+	// * ErrnoIo - if an IO related error happens during the operation
+	//
+	// For example, suppose fd 3 is an empty opened file,
+	// and FdWrite parameters fd = 3, iovs = 1, and iovsLen = 2, resultSize = 22,
+	// and two `ciovec`s are {buf: 17, bufLen: 2} and {buf: 20, bufLen: 2}.
+	// Now, suppose `ctx.Memory` contains
+	//
+	//                     ciovs[0]                 ciovs[1]
+	//              +--------------------+   +--------------------+  ciovs[0]     ciovs[1]
+	//              |uint32le    uint32le|   |uint32le    uint32le|   bufLen       bufLen
+	//              +--------+  +--------+   +--------+  +--------+   +----+       +----+
+	//              |        |  |        |   |        |  |        |   |    |       |    |
+	//   []byte{?, 17, 0, 0, 0, 2, 0, 0, 0, 20, 0, 0, 0, 2, 0, 0, 0, 't', 'e', ?, 's', 't', ... }
+	//       iovs --^           ^            ^           ^            ^            ^
+	//              |           |            |           |   ciovs[0] |   ciovs[1] |
+	//        buf --+  bufLen --+      buf --+  bufLen --+     buf  --+     buf  --+
+	//
+	// After FdWrite completes, we expect `ctx.Memory` to contain:
+	//
+	//                              uint32le
+	//                             +--------+
+	//                             |        |
+	//   []byte{ same as above..., 4, 0, 0, 0, ? }
+	//                resultSize --^
+	//
+	// Note: ImportFdWrite shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
+	// Note: This is similar to `writev` in POSIX.
+	// See https://linux.die.net/man/3/writev
+	FdWrite(ctx wasm.ModuleContext, fd uint32, iovs uint32, iovsLen uint32, resultSize uint32) wasi.Errno
+
 	// TODO: PathCreateDirectory
 	// TODO: PathFilestatGet
 	// TODO: PathFilestatSetTimes
@@ -555,7 +607,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		FunctionFdSeek: a.fd_seek,
 		// TODO: FunctionFdSync
 		// TODO: FunctionFdTell
-		FunctionFdWrite: a.fd_write,
+		FunctionFdWrite: a.FdWrite,
 		// TODO: FunctionPathCreateDirectory
 		// TODO: FunctionPathFilestatGet
 		// TODO: FunctionPathFilestatSetTimes
@@ -747,7 +799,8 @@ func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, when
 	return wasi.ErrnoNosys // TODO: implement
 }
 
-func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) wasi.Errno {
+// FdWrite implements SnahpshotPreview1.FdWrite
+func (a *wasiAPI) FdWrite(ctx wasm.ModuleContext, fd uint32, iovs uint32, iovsLen uint32, resultSize uint32) wasi.Errno {
 	var writer io.Writer
 
 	switch fd {
@@ -765,7 +818,7 @@ func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, io
 
 	var nwritten uint32
 	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
+		iovPtr := iovs + i*8
 		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
 		if !ok {
 			return wasi.ErrnoFault
@@ -780,11 +833,11 @@ func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, io
 		}
 		n, err := writer.Write(b)
 		if err != nil {
-			panic(err)
+			return wasi.ErrnoIo
 		}
 		nwritten += uint32(n)
 	}
-	if !ctx.Memory().WriteUint32Le(nwrittenPtr, nwritten) {
+	if !ctx.Memory().WriteUint32Le(resultSize, nwritten) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess

@@ -687,10 +687,10 @@ func TestAPI_FdRead(t *testing.T) {
 }
 
 func TestAPI_FdRead_Errors(t *testing.T) {
-	fd := uint32(3)                                           // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	validFD := uint32(3)                                      // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, memFS := createFile(t, "test_path", []byte("test")) // file with contents "test"
 	store, ctx, fn := instantiateWasmStore(t, FunctionFdRead, ImportFdRead, "test", func(a *wasiAPI) {
-		a.opened[fd] = fileEntry{
+		a.opened[validFD] = fileEntry{
 			path:    "test_path",
 			fileSys: memFS,
 			file:    file,
@@ -698,59 +698,56 @@ func TestAPI_FdRead_Errors(t *testing.T) {
 	})
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
-	fileSize := uint32(len("test")) // Actual length of the contents fo the file
+	validIovs := uint32(0)            // arbitrary valid offset for iovec. tc.iovec will be placed at this offset.
+	validIov := iovecInBytes(0x10, 4) // arbitrary valid iovec
+	validResultSize := uint32(0x100)  // arbitrary valid offset for resultSize
 
 	tests := []struct {
 		name          string
 		fd            uint32
 		iovs          uint32
 		iovec         []byte
-		iovsLen       uint32
 		resultSize    uint32
 		expectedErrno wasi.Errno
 	}{
 		{
 			name:          "out-of-memory iovs",
-			fd:            fd,
+			fd:            validFD,
 			iovs:          memorySize,
-			iovec:         iovecInBytes(0, 4), // arbitrary valid iovec
-			iovsLen:       1,
-			resultSize:    0, // arbitrary valid offset in the memory
+			iovec:         validIov,
+			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory iovs[0].buf",
-			fd:            fd,
-			iovs:          0, // offset to the iovec below
-			iovec:         iovecInBytes(memorySize, fileSize),
-			iovsLen:       1,
-			resultSize:    0, // arbitrary valid offset in the memory
+			fd:            validFD,
+			iovs:          validIovs, // offset to the iovec below
+			iovec:         iovecInBytes(memorySize, 4),
+			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "too long iovs[0].bufLen",
-			fd:            fd,
-			iovs:          0, // offset to the iovec below
-			iovec:         iovecInBytes(0, memorySize+1),
-			iovsLen:       1,
-			resultSize:    0, // arbitrary valid offset in the memory
+			fd:            validFD,
+			iovs:          validIovs,                     // offset to the iovec below
+			iovec:         iovecInBytes(memorySize-3, 4), // last 1 byte exceeds the memory
+			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory resultSize",
-			fd:            fd,
-			iovs:          0,                  // offset to the iovec below
+			fd:            validFD,
+			iovs:          validIovs,          // offset to the iovec below
 			iovec:         iovecInBytes(0, 4), // arbitrary valid iovec
-			iovsLen:       1,
 			resultSize:    memorySize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "invalid fd",
 			fd:            42,                 // arbitrary invalid fd
-			iovs:          0,                  // offset to the iovec below
+			iovs:          validIovs,          // offset to the iovec below
 			iovec:         iovecInBytes(0, 4), // arbitrary valid iovec
-			iovsLen:       1,
+			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoBadf,
 		},
 	}
@@ -760,7 +757,152 @@ func TestAPI_FdRead_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			copy(store.Memories[0].Buffer[0:], tc.iovec)
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.fd), uint64(tc.iovs), uint64(tc.iovsLen), uint64(tc.resultSize))
+			results, err := store.Engine.Call(ctx, fn, uint64(tc.fd), uint64(tc.iovs), uint64(1), uint64(tc.resultSize))
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+}
+
+// TODO: TestAPI_FdReaddir TestAPI_FdReaddir_Errors
+// TODO: TestAPI_FdRenumber TestAPI_FdRenumber_Errors
+// TODO: TestAPI_FdSeek TestAPI_FdSeek_Errors
+// TODO: TestAPI_FdSync TestAPI_FdSync_Errors
+// TODO: TestAPI_FdTell TestAPI_FdTell_Errors
+
+func TestAPI_FdWrite(t *testing.T) {
+	// setupFD returns the instantiated store with a fresh empty file opened
+	setupFD := func(fd uint32) (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI, *memFile) {
+		file, memFS := createFile(t, "test_path", []byte{}) // file with empty content
+		var api *wasiAPI
+		store, ctx, fn := instantiateWasmStore(t, FunctionFdWrite, ImportFdWrite, "test", func(a *wasiAPI) {
+			a.opened[fd] = fileEntry{
+				path:    "test_path",
+				fileSys: memFS,
+				file:    file,
+			}
+			api = a // for later tests
+		})
+		return store, ctx, fn, api, file
+	}
+
+	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	iovs := uint32(1) // arbitrary offset
+	initialMemory := []byte{
+		'?',
+		// iovs[0] and iovs[1], respectively. See the comments of SnapshotPreview1.FdWrite for the detailed layout.
+		17, 0, 0, 0 /* buf = 17 */, 2, 0, 0, 0, // bufLen = 2
+		20, 0, 0, 0 /* buf = 20 */, 2, 0, 0, 0, // bufLen = 2
+		't', 'e', // 17th
+		'?',
+		's', 't', // 20th
+	}
+	iovsLen := uint32(2)     // The length of iovecs
+	resultSize := uint32(22) // arbitrary offset
+	maskLength := 27         // number of bytes to write '?' to tell what we've written
+	expectedMemory := append(
+		initialMemory,
+		[]byte{
+			4, 0, 0, 0,
+			'?',
+		}...,
+	)
+
+	t.Run("SnapshotPreview1.FdWrite", func(t *testing.T) {
+		store, ctx, _, api, file := setupFD(fd)
+		maskMemory(store, maskLength)
+		copy(store.Memories[0].Buffer[0:], initialMemory)
+
+		errno := api.FdWrite(ctx, fd, iovs, iovsLen, resultSize)
+		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+		require.Equal(t, []byte("test"), file.buf.Bytes())
+	})
+	t.Run(FunctionFdRead, func(t *testing.T) {
+		store, ctx, fn, _, file := setupFD(fd)
+		maskMemory(store, maskLength)
+		copy(store.Memories[0].Buffer[0:], initialMemory)
+
+		ret, err := store.Engine.Call(ctx, fn, uint64(fd), uint64(iovs), uint64(iovsLen), uint64(resultSize))
+		require.NoError(t, err)
+		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+		require.Equal(t, []byte("test"), file.buf.Bytes())
+	})
+}
+
+func TestAPI_FdWrite_Errors(t *testing.T) {
+	validFD := uint32(3)                                // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
+	file, memFS := createFile(t, "test_path", []byte{}) // file with empty contents
+	store, ctx, fn := instantiateWasmStore(t, FunctionFdWrite, ImportFdWrite, "test", func(a *wasiAPI) {
+		a.opened[validFD] = fileEntry{
+			path:    "test_path",
+			fileSys: memFS,
+			file:    file,
+		}
+	})
+
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validIovs := uint32(0)           // arbitrary valid offset for iovec. tc.iovec will be placed at this offset.
+	validIov := iovecInBytes(0, 4)   // arbitrary valid iovec. We don't care the contents of the memory as long as the range is valid.
+	validResultSize := uint32(0x100) // arbitrary valid offset for resultSize
+
+	tests := []struct {
+		name          string
+		fd            uint32
+		iovs          uint32
+		iovec         []byte
+		resultSize    uint32
+		expectedErrno wasi.Errno
+	}{
+		{
+			name:          "out-of-memory iovs",
+			fd:            validFD,
+			iovs:          memorySize,
+			iovec:         validIov,
+			resultSize:    validResultSize,
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "out-of-memory iovs[0].buf",
+			fd:            validFD,
+			iovs:          validIovs, // offset to the iovec below
+			iovec:         iovecInBytes(memorySize, 4),
+			resultSize:    validResultSize,
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "bytes to write exceeds the memory",
+			fd:            validFD,
+			iovs:          validIovs,                     // offset to the iovec below
+			iovec:         iovecInBytes(memorySize-1, 2), // last 1 byte will exceed the memory by 1
+			resultSize:    validResultSize,
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "out-of-memory resultSize",
+			fd:            validFD,
+			iovs:          validIovs, // offset to the iovec below
+			iovec:         validIov,
+			resultSize:    memorySize,
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "invalid fd",
+			fd:            42,        // arbitrary invalid fd
+			iovs:          validIovs, // offset to the iovec below
+			iovec:         validIov,
+			expectedErrno: wasi.ErrnoBadf,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			copy(store.Memories[0].Buffer[validIovs:], tc.iovec) // put the given iovec to a valid address for iovs
+
+			results, err := store.Engine.Call(ctx, fn, uint64(tc.fd), uint64(tc.iovs), uint64(1), uint64(tc.resultSize))
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
@@ -776,7 +918,7 @@ func iovecInBytes(buf uint32, bufLen uint32) []byte {
 	return append(bufInBytes, bufLenInBytes...)
 }
 
-func createFile(t *testing.T, path string, contents []byte) (wasi.File, *MemFS) {
+func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
 	memFS := &MemFS{}
 	f, err := memFS.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
 	require.NoError(t, err)
@@ -785,15 +927,9 @@ func createFile(t *testing.T, path string, contents []byte) (wasi.File, *MemFS) 
 		require.NoError(t, err)
 	}
 
-	return f, memFS
+	return f.(*memFile), memFS
 }
 
-// TODO: TestAPI_FdReaddir TestAPI_FdReaddir_Errors
-// TODO: TestAPI_FdRenumber TestAPI_FdRenumber_Errors
-// TODO: TestAPI_FdSeek TestAPI_FdSeek_Errors
-// TODO: TestAPI_FdSync TestAPI_FdSync_Errors
-// TODO: TestAPI_FdTell TestAPI_FdTell_Errors
-// TODO: TestAPI_FdWrite TestAPI_FdWrite_Errors
 // TODO: TestAPI_PathCreateDirectory TestAPI_PathCreateDirectory_Errors
 // TODO: TestAPI_PathFilestatGet TestAPI_PathFilestatGet_Errors
 // TODO: TestAPI_PathFilestatSetTimes TestAPI_PathFilestatSetTimes_Errors
