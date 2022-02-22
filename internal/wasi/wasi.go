@@ -113,8 +113,15 @@ const (
 	ImportFdPrestatDirName = `(import "wasi_snapshot_preview1" "fd_prestat_dir_name"
     (func $wasi.fd_prestat_dir_name (param $fd i32) (param $path i32) (param $path_len i32) (result (;errno;) i32)))`
 
-	FunctionFdPwrite             = "fd_pwrite"
-	FunctionFdRead               = "fd_read"
+	FunctionFdPwrite = "fd_pwrite"
+
+	// FunctionFdRead read bytes from a file descriptor
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
+	FunctionFdRead = "fd_read"
+	// ImportFdRead is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	ImportFdRead = `(import "wasi_snapshot_preview1" "fd_read"
+    (func $wasi.fd_read (param $fd i32) (param $iovs i32) (param $iov_len i32) (param $result.size i32) (result (;errno;) i32)))`
+
 	FunctionFdReaddir            = "fd_readdir"
 	FunctionFdRenumber           = "fd_renumber"
 	FunctionFdSeek               = "fd_seek"
@@ -397,7 +404,6 @@ type SnapshotPreview1 interface {
 
 	// TODO: wasi.FdPwrite
 
-	// TODO: wasi.FdRead
 	// FdRead is the WASI function to read from a file descriptor.
 	//
 	// * fd - the file decriptor to read from
@@ -443,7 +449,7 @@ type SnapshotPreview1 interface {
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
 	// Note: This is similar to `readv` in POSIX.
 	// See https://linux.die.net/man/3/readv
-	// FdRead(ctx wasm.ModuleContext, fd uint32, iovs uint32, iovsLen uint32, resultSize uint32) wasi.Errno
+	FdRead(ctx wasm.ModuleContext, fd uint32, iovs uint32, iovsLen uint32, resultSize uint32) wasi.Errno
 
 	// TODO: wasi.FdReaddir
 	// TODO: wasi.FdRenumber
@@ -543,7 +549,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		FunctionFdPrestatGet:     a.FdPrestatGet,
 		FunctionFdPrestatDirName: a.FdPrestatDirName,
 		// TODO: FunctionFdPwrite
-		FunctionFdRead: a.fd_read,
+		FunctionFdRead: a.FdRead,
 		// TODO: FunctionFdReaddir
 		// TODO: FunctionFdRenumber
 		FunctionFdSeek: a.fd_seek,
@@ -693,7 +699,8 @@ func (a *wasiAPI) FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, pathPtr ui
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) wasi.Errno {
+// FdRead implements SnahpshotPreview1.FdRead
+func (a *wasiAPI) FdRead(ctx wasm.ModuleContext, fd uint32, iovs uint32, iovsLen uint32, resultSize uint32) wasi.Errno {
 	var reader io.Reader
 
 	switch fd {
@@ -709,7 +716,7 @@ func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iov
 
 	var nread uint32
 	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
+		iovPtr := iovs + i*8
 		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
 		if !ok {
 			return wasi.ErrnoFault
@@ -730,7 +737,7 @@ func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iov
 			return wasi.ErrnoIo
 		}
 	}
-	if !ctx.Memory().WriteUint32Le(nreadPtr, nread) {
+	if !ctx.Memory().WriteUint32Le(resultSize, nread) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
