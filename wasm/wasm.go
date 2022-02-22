@@ -19,7 +19,7 @@ type Store interface {
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 type ModuleExports interface {
-	// Function returns a Wasm function exported from this module or nil if it wasn't.
+	// Function returns a function exported from this module or nil if it wasn't.
 	Function(name string) Function
 }
 
