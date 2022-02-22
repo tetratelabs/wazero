@@ -2,6 +2,7 @@ package internalwasm
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"math"
 	"os"
@@ -17,7 +18,7 @@ import (
 func TestStore_GetModuleInstance(t *testing.T) {
 	name := "test"
 
-	s := NewStore(nopEngineInstance)
+	s := NewStore(context.Background(), nopEngineInstance)
 
 	m1 := s.getModuleInstance(name)
 	require.Equal(t, m1, s.ModuleInstances[name])
@@ -28,7 +29,7 @@ func TestStore_GetModuleInstance(t *testing.T) {
 }
 
 func TestStore_AddHostFunction(t *testing.T) {
-	s := NewStore(nopEngineInstance)
+	s := NewStore(context.Background(), nopEngineInstance)
 
 	hf, err := NewGoFunc("fn", func(wasm.ModuleContext) {
 	})
@@ -57,7 +58,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
-	s := NewStore(nopEngineInstance)
+	s := NewStore(context.Background(), nopEngineInstance)
 
 	hf, err := NewGoFunc("host_fn", func(wasm.ModuleContext) {
 	})
@@ -87,7 +88,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 	name := "test"
 
-	s := NewStore(nopEngineInstance)
+	s := NewStore(context.Background(), nopEngineInstance)
 	mi := s.getModuleInstance(name)
 
 	zero := Index(0)
@@ -134,7 +135,7 @@ func (e *nopEngine) Compile(_ *FunctionInstance) error {
 
 func TestStore_addHostFunction(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
-		s := NewStore(nopEngineInstance)
+		s := NewStore(context.Background(), nopEngineInstance)
 		const max = 10
 		s.maximumFunctionAddress = max
 		s.Functions = make([]*FunctionInstance, max)
@@ -142,7 +143,7 @@ func TestStore_addHostFunction(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		s := NewStore(nopEngineInstance)
+		s := NewStore(context.Background(), nopEngineInstance)
 		for i := 0; i < 10; i++ {
 			f := &FunctionInstance{FunctionKind: FunctionKindGoNoContext}
 			require.Len(t, s.Functions, i)
@@ -161,7 +162,7 @@ func TestStore_addHostFunction(t *testing.T) {
 
 func TestStore_getTypeInstance(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
-		s := NewStore(nopEngineInstance)
+		s := NewStore(context.Background(), nopEngineInstance)
 		const max = 10
 		s.maximumFunctionTypes = max
 		s.TypeIDs = make(map[string]FunctionTypeID)
@@ -180,7 +181,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(tc.String(), func(t *testing.T) {
-				s := NewStore(nopEngineInstance)
+				s := NewStore(context.Background(), nopEngineInstance)
 				actual, err := s.getTypeInstance(tc)
 				require.NoError(t, err)
 
@@ -196,7 +197,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 func TestStore_buildGlobalInstances(t *testing.T) {
 	t.Run("too many globals", func(t *testing.T) {
 		// Setup a store to have the reasonably low max on globals for testing.
-		s := NewStore(nopEngineInstance)
+		s := NewStore(context.Background(), nopEngineInstance)
 		const max = 10
 		s.maximumGlobals = max
 
@@ -205,7 +206,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("invalid constant expression", func(t *testing.T) {
-		s := NewStore(nopEngineInstance)
+		s := NewStore(context.Background(), nopEngineInstance)
 
 		// Empty constant expression is invalid.
 		m := &Module{GlobalSection: []*Global{{Init: &ConstantExpression{}}}}
@@ -214,7 +215,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 	})
 
 	t.Run("global type mismatch", func(t *testing.T) {
-		s := NewStore(nopEngineInstance)
+		s := NewStore(context.Background(), nopEngineInstance)
 		m := &Module{GlobalSection: []*Global{{
 			// Global with i32.const initial value, but with type specified as f64 must be error.
 			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0}},
@@ -233,7 +234,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 
 		m := &Module{GlobalSection: []*Global{global}}
 
-		s := NewStore(nopEngineInstance)
+		s := NewStore(context.Background(), nopEngineInstance)
 		target := &ModuleInstance{}
 		_, err = s.buildGlobalInstances(m, target)
 		require.NoError(t, err)
@@ -328,7 +329,7 @@ func TestStore_executeConstExpression(t *testing.T) {
 		t.Run("global index out of range", func(t *testing.T) {
 			// Data holds the index in leb128 and this time the value exceeds len(globals) (=0).
 			expr := &ConstantExpression{Data: []byte{1}, Opcode: OpcodeGlobalGet}
-			globals := []*GlobalInstance{}
+			var globals []*GlobalInstance
 			_, _, err := executeConstExpression(globals, expr)
 			require.Error(t, err)
 		})

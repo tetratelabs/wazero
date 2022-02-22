@@ -1,6 +1,7 @@
 package internalwasi
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -642,7 +643,7 @@ func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName str
 )`, wasiFunction, wasiImport)))
 	require.NoError(t, err)
 
-	store := wasm.NewStore(interpreter.NewEngine())
+	store := wasm.NewStore(context.Background(), interpreter.NewEngine())
 
 	snapshotPreview1Functions := SnapshotPreview1Functions(opts...)
 	goFunc := snapshotPreview1Functions[wasiFunction]

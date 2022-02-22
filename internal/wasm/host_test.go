@@ -454,7 +454,7 @@ func TestFunction_Call(t *testing.T) {
 	name := "test"
 	fn := "fn"
 	engine := &nopEngine{}
-	s := NewStore(engine)
+	s := NewStore(context.Background(), engine)
 	m := &ModuleInstance{
 		Name: name,
 		Exports: map[string]*ExportInstance{
@@ -472,7 +472,7 @@ func TestFunction_Call(t *testing.T) {
 			},
 		},
 	}
-	ctx := NewModuleContext(s, m)
+	ctx := NewModuleContext(context.Background(), s.Engine, m)
 	s.ModuleInstances[name] = m
 	s.ModuleContexts[name] = ctx
 

@@ -2,6 +2,7 @@ package internalwasm
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -26,6 +27,9 @@ type (
 	// See https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0
 	Store struct {
 		// The following fields are wazero-specific fields of Store.
+
+		// ctx is the default context used for function calls
+		ctx context.Context
 
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
 		Engine Engine
@@ -231,8 +235,9 @@ func (m *ModuleInstance) GetExport(name string, kind ExportKind) (*ExportInstanc
 	return exp, nil
 }
 
-func NewStore(engine Engine) *Store {
+func NewStore(ctx context.Context, engine Engine) *Store {
 	return &Store{
+		ctx:                    ctx,
 		ModuleInstances:        map[string]*ModuleInstance{},
 		ModuleContexts:         map[string]*ModuleContext{},
 		TypeIDs:                map[string]FunctionTypeID{},
@@ -318,8 +323,8 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	}
 
 	// Build the default context for calls to this module
-	ctx := NewModuleContext(s, instance)
-	s.ModuleContexts[name] = ctx
+	modCtx := NewModuleContext(s.ctx, s.Engine, instance)
+	s.ModuleContexts[name] = modCtx
 
 	// Now we are safe to finalize the state.
 	rollbackFuncs = nil
@@ -327,11 +332,11 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		if _, err = s.Engine.Call(ctx, instance.Functions[funcIdx]); err != nil {
+		if _, err = s.Engine.Call(modCtx, instance.Functions[funcIdx]); err != nil {
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
-	return ctx, nil
+	return modCtx, nil
 }
 
 // ModuleExports implements wasm.Store ModuleExports

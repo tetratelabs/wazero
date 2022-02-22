@@ -268,7 +268,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 		wastName := filepath.Base(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			store := wasm.NewStore(newEngine())
+			store := wasm.NewStore(context.Background(), newEngine())
 			addSpectestModule(t, store)
 
 			var lastInstanceName string

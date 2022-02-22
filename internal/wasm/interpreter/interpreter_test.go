@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -65,15 +66,7 @@ func TestInterpreter_CallHostFunc(t *testing.T) {
 		}}
 
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		it.callHostFunc(newModuleContext(&it, module), it.functions[0])
+		it.callHostFunc(wasm.NewModuleContext(context.Background(), &it, module), it.functions[0])
 		require.Same(t, memory, ctxMemory)
 	})
-}
-
-func newModuleContext(engine wasm.Engine, module *wasm.ModuleInstance) *wasm.ModuleContext {
-	ctx := wasm.NewModuleContext(&wasm.Store{
-		Engine:          engine,
-		ModuleInstances: map[string]*wasm.ModuleInstance{"test": module},
-	}, module)
-	return ctx
 }
