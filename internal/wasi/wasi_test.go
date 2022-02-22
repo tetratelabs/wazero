@@ -698,10 +698,11 @@ func TestAPI_FdRead_Errors(t *testing.T) {
 	})
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
-	validIovs := uint32(0)            // arbitrary valid offset for iovec. tc.iovec will be placed at this offset.
+	validIovs := uint32(1)            // arbitrary valid offset for iovec. tc.iovec will be placed at this offset.
 	validIov := iovecInBytes(0x10, 4) // arbitrary valid iovec
 	validResultSize := uint32(0x100)  // arbitrary valid offset for resultSize
 
+	// Test parameters are filled with the valid values if they're not defined.
 	tests := []struct {
 		name          string
 		fd            uint32
@@ -712,48 +713,47 @@ func TestAPI_FdRead_Errors(t *testing.T) {
 	}{
 		{
 			name:          "out-of-memory iovs",
-			fd:            validFD,
 			iovs:          memorySize,
-			iovec:         validIov,
-			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory iovs[0].buf",
-			fd:            validFD,
-			iovs:          validIovs, // offset to the iovec below
 			iovec:         iovecInBytes(memorySize, 4),
-			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name:          "too long iovs[0].bufLen",
-			fd:            validFD,
-			iovs:          validIovs,                     // offset to the iovec below
-			iovec:         iovecInBytes(memorySize-3, 4), // last 1 byte exceeds the memory
-			resultSize:    validResultSize,
+			name:          "bytes to read exceeds the memory by 1",
+			iovec:         iovecInBytes(memorySize-1, 2),
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory resultSize",
-			fd:            validFD,
-			iovs:          validIovs,          // offset to the iovec below
-			iovec:         iovecInBytes(0, 4), // arbitrary valid iovec
 			resultSize:    memorySize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "invalid fd",
-			fd:            42,                 // arbitrary invalid fd
-			iovs:          validIovs,          // offset to the iovec below
-			iovec:         iovecInBytes(0, 4), // arbitrary valid iovec
-			resultSize:    validResultSize,
+			fd:            42, // arbitrary invalid fd
 			expectedErrno: wasi.ErrnoBadf,
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
+
+		// Fill the parameters with the default valid values if they're not defined.
+		if tc.fd == 0 {
+			tc.fd = validFD
+		}
+		if tc.iovs == 0 {
+			tc.iovs = validIovs
+		}
+		if tc.iovec == nil {
+			tc.iovec = validIov
+		}
+		if tc.resultSize == 0 {
+			tc.resultSize = validResultSize
+		}
 
 		t.Run(tc.name, func(t *testing.T) {
 			copy(store.Memories[0].Buffer[0:], tc.iovec)
@@ -843,10 +843,11 @@ func TestAPI_FdWrite_Errors(t *testing.T) {
 	})
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
-	validIovs := uint32(0)           // arbitrary valid offset for iovec. tc.iovec will be placed at this offset.
-	validIov := iovecInBytes(0, 4)   // arbitrary valid iovec. We don't care the contents of the memory as long as the range is valid.
-	validResultSize := uint32(0x100) // arbitrary valid offset for resultSize
+	validIovs := uint32(1)            // arbitrary valid offset for iovec. tc.iovec will be placed at this offset.
+	validIov := iovecInBytes(0x10, 4) // arbitrary valid iovec. We don't care the contents of the memory as long as the range is valid.
+	validResultSize := uint32(0x100)  // arbitrary valid offset for resultSize
 
+	// Test parameters are filled with the valid values if they're not defined.
 	tests := []struct {
 		name          string
 		fd            uint32
@@ -857,47 +858,47 @@ func TestAPI_FdWrite_Errors(t *testing.T) {
 	}{
 		{
 			name:          "out-of-memory iovs",
-			fd:            validFD,
 			iovs:          memorySize,
-			iovec:         validIov,
-			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory iovs[0].buf",
-			fd:            validFD,
-			iovs:          validIovs, // offset to the iovec below
 			iovec:         iovecInBytes(memorySize, 4),
-			resultSize:    validResultSize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name:          "bytes to write exceeds the memory",
-			fd:            validFD,
-			iovs:          validIovs,                     // offset to the iovec below
-			iovec:         iovecInBytes(memorySize-1, 2), // last 1 byte will exceed the memory by 1
-			resultSize:    validResultSize,
+			name:          "bytes to write exceeds the memory by 1",
+			iovec:         iovecInBytes(memorySize-1, 2),
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory resultSize",
-			fd:            validFD,
-			iovs:          validIovs, // offset to the iovec below
-			iovec:         validIov,
 			resultSize:    memorySize,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "invalid fd",
-			fd:            42,        // arbitrary invalid fd
-			iovs:          validIovs, // offset to the iovec below
-			iovec:         validIov,
+			fd:            42, // arbitrary invalid fd
 			expectedErrno: wasi.ErrnoBadf,
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
+
+		// Fill the parameters with the default valid values if they're not defined.
+		if tc.fd == 0 {
+			tc.fd = validFD
+		}
+		if tc.iovs == 0 {
+			tc.iovs = validIovs
+		}
+		if tc.iovec == nil {
+			tc.iovec = validIov
+		}
+		if tc.resultSize == 0 {
+			tc.resultSize = validResultSize
+		}
 
 		t.Run(tc.name, func(t *testing.T) {
 			copy(store.Memories[0].Buffer[validIovs:], tc.iovec) // put the given iovec to a valid address for iovs
