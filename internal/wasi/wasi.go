@@ -169,6 +169,8 @@ const (
 // parameter is a memory offset to write the result to. As memory offsets are uint32, each parameter representing a
 // result is uint32.
 //
+// Note: The WASI specification is sometimes ambiguous. Please see internal/wasi/RATIONALE.md for rationale on decisions that impact portability.
+//
 // Note: Errno mappings are not defined in WASI, yet, so these mappings are best efforts by maintainers.
 //
 // Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means wasm.Memory is always the
@@ -369,8 +371,6 @@ type SnapshotPreview1 interface {
 	// * fd - the file decriptor to get the path of the prestat directory
 	// * path - the offset in `ctx.Memory` to write the result path
 	// * pathLen - FdPrestatDirName writes the result path string to `path` offset for the length of `pathLen`.
-	// Note: The semantics of pathLen may vary depending on wasm runtimes. The semantics in wazero follows that of wasmtime.
-	//       Some runtimes, such as wasmer, consider pathLen to be the maximum length instead of the exact length that should be written.
 	//
 	// FdPrestatDirName returns the following errors.
 	// * ErrnoBadf - if `fd` is invalid
@@ -389,6 +389,7 @@ type SnapshotPreview1 interface {
 	//
 	// Note: `PrNameLen` field of the result of FdPrestatGet has the exact length of the actual path.
 	// See FdPrestatGet
+	// Note: Some runtimes may have another semantics. See internal/wasi/RATIONALE.md#FdPrestatDirName
 	// Note: ImportFdPrestatDirName shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 	FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
@@ -681,10 +682,7 @@ func (a *wasiAPI) FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, pathPtr ui
 		return wasi.ErrnoBadf
 	}
 
-	// The semantics of pathLen in wazero follows that of wasmtime.
-	// See https://github.com/bytecodealliance/wasmtime/blob/2ca01ae9478f199337cf743a6ab543e8c3f3b238/crates/wasi-common/src/snapshots/preview_1.rs#L578-L582
-	// Some runtimes such as wasmer may have another semantics, where they consider pathLen as the maximum length to write, instead of the exact length to write.
-	// See https://github.com/wasmerio/wasmer/blob/3463c51268ed551933392a4063bd4f8e7498b0f6/lib/wasi/src/syscalls/mod.rs#L764
+	// Some runtimes may have another semantics. See internal/wasi/RATIONALE.md
 	if uint32(len(f.path)) < pathLen {
 		return wasi.ErrnoNametoolong
 	}
