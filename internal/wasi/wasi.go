@@ -80,19 +80,39 @@ const (
 	ImportClockTimeGet = `(import "wasi_snapshot_preview1" "clock_time_get"
     (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))`
 
-	FunctionFdAdvise             = "fd_advise"
-	FunctionFdAllocate           = "fd_allocate"
-	FunctionFdClose              = "fd_close"
-	FunctionFdDataSync           = "fd_datasync"
-	FunctionFdFdstatGet          = "fd_fdstat_get"
-	FunctionFdFdstatSetFlags     = "fd_fdstat_set_flags"
-	FunctionFdFdstatSetRights    = "fd_fdstat_set_rights"
-	FunctionFdFilestatGet        = "fd_filestat_get"
-	FunctionFdFilestatSetSize    = "fd_filestat_set_size"
-	FunctionFdFilestatSetTimes   = "fd_filestat_set_times"
-	FunctionFdPread              = "fd_pread"
-	FunctionFdPrestatGet         = "fd_prestat_get"
-	FunctionFdPrestatDirName     = "fd_prestat_dir_name"
+	FunctionFdAdvise   = "fd_advise"
+	FunctionFdAllocate = "fd_allocate"
+
+	// FunctionFdClose closes a file descriptor.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_close
+	FunctionFdClose = "fd_close"
+	// ImportFdClose is the WebAssembly 1.0 (MVP) Text format import of FunctionFdClose
+	ImportFdClose = `(import "wasi_snapshot_preview1" "fd_close"
+    (func $wasi.fd_close (param $fd i32) (result (;errno;) i32)))`
+
+	FunctionFdDataSync         = "fd_datasync"
+	FunctionFdFdstatGet        = "fd_fdstat_get"
+	FunctionFdFdstatSetFlags   = "fd_fdstat_set_flags"
+	FunctionFdFdstatSetRights  = "fd_fdstat_set_rights"
+	FunctionFdFilestatGet      = "fd_filestat_get"
+	FunctionFdFilestatSetSize  = "fd_filestat_set_size"
+	FunctionFdFilestatSetTimes = "fd_filestat_set_times"
+	FunctionFdPread            = "fd_pread"
+
+	// FunctionFdPrestatGet returns the prestat data of a file descriptor.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_get
+	FunctionFdPrestatGet = "fd_prestat_get"
+	// ImportFdPrestatGet is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	ImportFdPrestatGet = `(import "wasi_snapshot_preview1" "fd_prestat_get"
+    (func $wasi.fd_prestat_get (param $fd i32) (param $result.prestat i32) (result (;errno;) i32)))`
+
+	// FunctionFdPrestatDirName returns the path of the pre-opened directory of a file descriptor.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
+	FunctionFdPrestatDirName = "fd_prestat_dir_name"
+	// ImportFdPrestatDirName is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	ImportFdPrestatDirName = `(import "wasi_snapshot_preview1" "fd_prestat_dir_name"
+    (func $wasi.fd_prestat_dir_name (param $fd i32) (param $path i32) (param $path_len i32) (result (;errno;) i32)))`
+
 	FunctionFdPwrite             = "fd_pwrite"
 	FunctionFdRead               = "fd_read"
 	FunctionFdReaddir            = "fd_readdir"
@@ -148,6 +168,8 @@ const (
 // can have up to one result, which is already used by Errno. This forces other results to be parameters. A result
 // parameter is a memory offset to write the result to. As memory offsets are uint32, each parameter representing a
 // result is uint32.
+//
+// Note: The WASI specification is sometimes ambiguous. Please see internal/wasi/RATIONALE.md for rationale on decisions that impact portability.
 //
 // Note: Errno mappings are not defined in WASI, yet, so these mappings are best efforts by maintainers.
 //
@@ -297,7 +319,17 @@ type SnapshotPreview1 interface {
 
 	// TODO: wasi.FdAdvise
 	// TODO: wasi.FdAllocate
-	// TODO: wasi.FdClose
+
+	// FdClose is the WASI function to close a file descriptor. This returns ErrnoBadf if the fd is invalid.
+	//
+	// * fd - the file decriptor to close
+	//
+	// Note: ImportFdClose shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: This is similar to `close` in POSIX.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
+	// See https://linux.die.net/man/3/close
+	FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno
+
 	// TODO: wasi.FdDataSync
 	// TODO: wasi.FdFdstatGet
 	// TODO: wasi.FdFdstatSetFlags
@@ -306,10 +338,113 @@ type SnapshotPreview1 interface {
 	// TODO: wasi.FdFilestatSetSize
 	// TODO: wasi.FdFilestatSetTimes
 	// TODO: wasi.FdPread
-	// TODO: wasi.FdPrestatGet
-	// TODO: wasi.FdPrestatDirName
+
+	// FdPrestatGet is the WASI function to return the prestat data of a file descriptor.
+	// This returns ErrnoBadf if the fd is invalid.
+	//
+	// * fd - the file decriptor to get the prestat
+	// * resultPrestat - the offset to write the result prestat data
+	//
+	// A prestat is a union data which consists of two fields, uint8 `tag` indicating the type of the prestat data,
+	// and uint32 contents data that varies according to `tag`. They have the following memory layout.
+	// * tag - uint8. offset 0
+	// * contents - uint32. offset 4
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
+	//
+	// For example, suppose fd 3 is a file descriptor with a prestat data of tag = `prestat_dir` (value: 0).
+	// For this tag, the contents is prNameLen. Suppose it has value 3 in this example.
+	// Now, if FdPrestatGet parameters fd = 3 and resultPrestat = 1, we expect `ctx.Memory` to contain:
+	//
+	//                     padding   uint32le
+	//          uint8 --+  +-----+  +--------+
+	//                  |  |     |  |        |
+	//        []byte{?, 0, 0, 0, 0, 3, 0, 0, 0, ?}
+	//  resultPrestat --^           ^
+	//            tag --+           |
+	//                              +-- prNameLen
+	//
+	// Note: ImportFdPrestatGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
+	FdPrestatGet(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
+
+	// FdPrestatDirName is the WASI function to return the path of the pre-opened directory of a file descriptor.
+	//
+	// * fd - the file decriptor to get the path of the pre-opened directory
+	// * path - the offset in `ctx.Memory` to write the result path
+	// * pathLen - FdPrestatDirName writes the result path string to `path` offset for the length of `pathLen`.
+	//
+	// FdPrestatDirName returns the following errors.
+	// * ErrnoBadf - if `fd` is invalid
+	// * ErrnoFault - if `path` is an invalid offset due to the memory constraint
+	// * ErrnoNametoolong - if `pathLen` is longer than the actual length of the result path
+	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
+	//
+	// For example, if fd 3 is a file with path = "test",
+	// and FdPrestatDirName parameters fd = 3, path = 1, and pathLen = 3, we expect `ctx.Memory` to contain:
+	//
+	//                pathLen
+	//              +---------+
+	//              |         |
+	//   []byte{?, 't', 'e', 's', ?, ?, ?}
+	//       path --^
+	//
+	// Note: `prNameLen` field of the result of FdPrestatGet has the exact length of the actual path.
+	// See FdPrestatGet
+	// Note: Some runtimes may have another semantics. See internal/wasi/RATIONALE.md#FdPrestatDirName
+	// Note: ImportFdPrestatDirName shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
+	FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, path uint32, pathLen uint32) wasi.Errno
+
 	// TODO: wasi.FdPwrite
+
 	// TODO: wasi.FdRead
+	// FdRead is the WASI function to read from a file descriptor.
+	//
+	// * fd - the file decriptor to read from
+	// * iovs - the offset in `ctx.Memory` that contains a series of `iovec`, which indicates where to write the bytes read.
+	// * iovsLen - the number of `ioveC`s in `iovs`
+	// * resultSize - the offset in `ctx.Memory` to write the number of bytes read
+	// `iovec` is a memory offset / length pair, which are named buf/bufLen, encoded sequentially as uint32le.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
+	//
+	// FdRead returns the following errors.
+	// * ErrnoBadf - if `fd` is invalid
+	// * ErrnoFault - if `iovs` or `resultSize` contain an invalid offset due to the memory constraint
+	// * ErrnoIo - if an IO related error happens during the operation
+	//
+	// For example, suppose fd 3 is a file with the contents "test",
+	// and FdRead parameters fd = 3, iovs = 1, and iovsLen = 2, resultSize = 24
+	// and two `iovec`s are {buf: 18, bufLen: 2} and {buf: 21, bufLen: 2}.
+	// Now, `ctx.Memory` contains
+	//
+	//                      iovs[0]                  iovs[1]
+	//              +--------------------+   +--------------------+
+	//              |uint32le    uint32le|   |uint32le    uint32le|
+	//              +--------+  +--------+   +--------+  +--------+
+	//              |        |  |        |   |        |  |        |
+	//   []byte{?, 18, 0, 0, 0, 2, 0, 0, 0, 21, 0, 0, 0, 2, 0, 0, 0, ?... }
+	//       iovs --^           ^            ^           ^    17th --^
+	//              |           |            |           |
+	//        buf --+  bufLen --+      buf --+  bufLen --+
+	//
+	// After FdRead completes, we expect `ctx.Memory` to contain:
+	//
+	//                             iovs[0]      iovs[1]
+	//                             bufLen       bufLen       uint32le
+	//                             +----+       +----+      +--------+
+	//                             |    |       |    |      |        |
+	//   []byte{ same as above.., 't', 'e', ?, 's', 't', ?, 4, 0, 0, 0 }
+	//               iovs[0] buf --^            ^           ^
+	//                  (= 18th)  iovs[1] buf --+           |
+	//                               (= 21st)  resultSize --+
+	//                                           (= 24th)
+	//
+	// Note: ImportFdRead shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
+	// Note: This is similar to `readv` in POSIX.
+	// See https://linux.die.net/man/3/readv
+	// FdRead(ctx wasm.ModuleContext, fd uint32, iovs uint32, iovsLen uint32, resultSize uint32) wasi.Errno
+
 	// TODO: wasi.FdReaddir
 	// TODO: wasi.FdRenumber
 	// TODO: wasi.FdSeek
@@ -396,7 +531,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		FunctionClockTimeGet: a.ClockTimeGet,
 		// TODO: FunctionFdAdvise
 		// TODO: FunctionFdAllocate
-		FunctionFdClose: a.fd_close,
+		FunctionFdClose: a.FdClose,
 		// TODO: FunctionFdDataSync
 		FunctionFdFdstatGet: a.fd_fdstat_get,
 		// TODO: FunctionFdFdstatSetFlags
@@ -405,8 +540,8 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		// TODO: FunctionFdFilestatSetSize
 		// TODO: FunctionFdFilestatSetTimes
 		// TODO: FunctionFdPread
-		FunctionFdPrestatGet:     a.fd_prestat_get,
-		FunctionFdPrestatDirName: a.fd_prestat_dir_name,
+		FunctionFdPrestatGet:     a.FdPrestatGet,
+		FunctionFdPrestatDirName: a.FdPrestatDirName,
 		// TODO: FunctionFdPwrite
 		FunctionFdRead: a.fd_read,
 		// TODO: FunctionFdReaddir
@@ -504,11 +639,206 @@ func (a *wasiAPI) ClockTimeGet(ctx wasm.ModuleContext, id uint32, precision uint
 	return wasi.ErrnoSuccess
 }
 
+// FdClose implements SnaphotPreview1.FdClose
+func (a *wasiAPI) FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
+	f, ok := a.opened[fd]
+	if !ok {
+		return wasi.ErrnoBadf
+	}
+
+	if f.file != nil {
+		f.file.Close()
+	}
+
+	delete(a.opened, fd)
+
+	return wasi.ErrnoSuccess
+}
+
+func (a *wasiAPI) fd_fdstat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
+	if _, ok := a.opened[fd]; !ok {
+		return wasi.ErrnoBadf
+	}
+	if !ctx.Memory().WriteUint64Le(bufPtr+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
+// FdPrestatGet implements SnahpshotPreview1.FdPrestatGet
+// TODO: Currently FdPrestatGet implements nothing except returning ErrnoBadf
+func (a *wasiAPI) FdPrestatGet(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
+	if _, ok := a.opened[fd]; !ok {
+		return wasi.ErrnoBadf
+	}
+	return wasi.ErrnoSuccess
+}
+
+// FdPrestatDirName implements SnahpshotPreview1.FdPrestatDirName
+func (a *wasiAPI) FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
+	f, ok := a.opened[fd]
+	if !ok {
+		return wasi.ErrnoBadf
+	}
+
+	// Some runtimes may have another semantics. See internal/wasi/RATIONALE.md
+	if uint32(len(f.path)) < pathLen {
+		return wasi.ErrnoNametoolong
+	}
+
+	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
+	if !ctx.Memory().Write(pathPtr, []byte(f.path)[:pathLen]) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
+func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) wasi.Errno {
+	var reader io.Reader
+
+	switch fd {
+	case 0:
+		reader = a.stdin
+	default:
+		f, ok := a.opened[fd]
+		if !ok || f.file == nil {
+			return wasi.ErrnoBadf
+		}
+		reader = f.file
+	}
+
+	var nread uint32
+	for i := uint32(0); i < iovsLen; i++ {
+		iovPtr := iovsPtr + i*8
+		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		b, ok := ctx.Memory().Read(offset, l)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		n, err := reader.Read(b)
+		nread += uint32(n)
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return wasi.ErrnoIo
+		}
+	}
+	if !ctx.Memory().WriteUint32Le(nreadPtr, nread) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
+func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) wasi.Errno {
+	return wasi.ErrnoNosys // TODO: implement
+}
+
+func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) wasi.Errno {
+	var writer io.Writer
+
+	switch fd {
+	case 1:
+		writer = a.stdout
+	case 2:
+		writer = a.stderr
+	default:
+		f, ok := a.opened[fd]
+		if !ok || f.file == nil {
+			return wasi.ErrnoBadf
+		}
+		writer = f.file
+	}
+
+	var nwritten uint32
+	for i := uint32(0); i < iovsLen; i++ {
+		iovPtr := iovsPtr + i*8
+		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		b, ok := ctx.Memory().Read(offset, l)
+		if !ok {
+			return wasi.ErrnoFault
+		}
+		n, err := writer.Write(b)
+		if err != nil {
+			panic(err)
+		}
+		nwritten += uint32(n)
+	}
+	if !ctx.Memory().WriteUint32Le(nwrittenPtr, nwritten) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
+func (a *wasiAPI) path_open(ctx wasm.ModuleContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
+	fsRightsBase, fsRightsInheriting uint64,
+	fdFlags, fdPtr uint32) (errno wasi.Errno) {
+	dir, ok := a.opened[fd]
+	if !ok || dir.fileSys == nil {
+		return wasi.ErrnoInval
+	}
+
+	b, ok := ctx.Memory().Read(pathPtr, pathLen)
+	if !ok {
+		return wasi.ErrnoFault
+	}
+	path := string(b)
+	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
+	if err != nil {
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return wasi.ErrnoNoent
+		default:
+			return wasi.ErrnoInval
+		}
+	}
+
+	newFD := a.randUnusedFD()
+
+	a.opened[newFD] = fileEntry{
+		file: f,
+	}
+
+	if !ctx.Memory().WriteUint32Le(fdPtr, newFD) {
+		return wasi.ErrnoFault
+	}
+	return wasi.ErrnoSuccess
+}
+
 // ProcExit implements SnapshotPreview1.ProcExit
 func (a *wasiAPI) ProcExit(exitCode uint32) {
 	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
 	// See the document of API.ProcExit.
 	panic(wasi.ExitCode(exitCode))
+}
+
+// RandomGet implements SnapshotPreview1.RandomGet
+func (a *wasiAPI) RandomGet(ctx wasm.ModuleContext, buf uint32, bufLen uint32) (errno wasi.Errno) {
+	randomBytes := make([]byte, bufLen)
+	err := a.randSource(randomBytes)
+	if err != nil {
+		// TODO: handle different errors that syscal to entropy source can return
+		return wasi.ErrnoIo
+	}
+
+	if !ctx.Memory().Write(buf, randomBytes) {
+		return wasi.ErrnoFault
+	}
+
+	return wasi.ErrnoSuccess
 }
 
 type fileEntry struct {
@@ -615,195 +945,6 @@ func (a *wasiAPI) randUnusedFD() uint32 {
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
-}
-
-func (a *wasiAPI) fd_prestat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
-	if _, ok := a.opened[fd]; !ok {
-		return wasi.ErrnoBadf
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_prestat_dir_name(ctx wasm.ModuleContext, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
-	f, ok := a.opened[fd]
-	if !ok {
-		return wasi.ErrnoInval
-	}
-
-	if uint32(len(f.path)) < pathLen {
-		return wasi.ErrnoNametoolong
-	}
-
-	if !ctx.Memory().Write(pathPtr, []byte(f.path)) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_fdstat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
-	if _, ok := a.opened[fd]; !ok {
-		return wasi.ErrnoBadf
-	}
-	if !ctx.Memory().WriteUint64Le(bufPtr+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) path_open(ctx wasm.ModuleContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
-	fsRightsBase, fsRightsInheriting uint64,
-	fdFlags, fdPtr uint32) (errno wasi.Errno) {
-	dir, ok := a.opened[fd]
-	if !ok || dir.fileSys == nil {
-		return wasi.ErrnoInval
-	}
-
-	b, ok := ctx.Memory().Read(pathPtr, pathLen)
-	if !ok {
-		return wasi.ErrnoFault
-	}
-	path := string(b)
-	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
-	if err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return wasi.ErrnoNoent
-		default:
-			return wasi.ErrnoInval
-		}
-	}
-
-	newFD := a.randUnusedFD()
-
-	a.opened[newFD] = fileEntry{
-		file: f,
-	}
-
-	if !ctx.Memory().WriteUint32Le(fdPtr, newFD) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) wasi.Errno {
-	return wasi.ErrnoNosys // TODO: implement
-}
-
-func (a *wasiAPI) fd_write(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nwrittenPtr uint32) wasi.Errno {
-	var writer io.Writer
-
-	switch fd {
-	case 1:
-		writer = a.stdout
-	case 2:
-		writer = a.stderr
-	default:
-		f, ok := a.opened[fd]
-		if !ok || f.file == nil {
-			return wasi.ErrnoBadf
-		}
-		writer = f.file
-	}
-
-	var nwritten uint32
-	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
-		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		b, ok := ctx.Memory().Read(offset, l)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		n, err := writer.Write(b)
-		if err != nil {
-			panic(err)
-		}
-		nwritten += uint32(n)
-	}
-	if !ctx.Memory().WriteUint32Le(nwrittenPtr, nwritten) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_read(ctx wasm.ModuleContext, fd uint32, iovsPtr uint32, iovsLen uint32, nreadPtr uint32) wasi.Errno {
-	var reader io.Reader
-
-	switch fd {
-	case 0:
-		reader = a.stdin
-	default:
-		f, ok := a.opened[fd]
-		if !ok || f.file == nil {
-			return wasi.ErrnoBadf
-		}
-		reader = f.file
-	}
-
-	var nread uint32
-	for i := uint32(0); i < iovsLen; i++ {
-		iovPtr := iovsPtr + i*8
-		offset, ok := ctx.Memory().ReadUint32Le(iovPtr)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		l, ok := ctx.Memory().ReadUint32Le(iovPtr + 4)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		b, ok := ctx.Memory().Read(offset, l)
-		if !ok {
-			return wasi.ErrnoFault
-		}
-		n, err := reader.Read(b)
-		nread += uint32(n)
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return wasi.ErrnoIo
-		}
-	}
-	if !ctx.Memory().WriteUint32Le(nreadPtr, nread) {
-		return wasi.ErrnoFault
-	}
-	return wasi.ErrnoSuccess
-}
-
-func (a *wasiAPI) fd_close(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
-	f, ok := a.opened[fd]
-	if !ok {
-		return wasi.ErrnoBadf
-	}
-
-	if f.file != nil {
-		f.file.Close()
-	}
-
-	delete(a.opened, fd)
-
-	return wasi.ErrnoSuccess
-}
-
-// RandomGet implements SnapshotPreview1.RandomGet
-func (a *wasiAPI) RandomGet(ctx wasm.ModuleContext, buf uint32, bufLen uint32) (errno wasi.Errno) {
-	randomBytes := make([]byte, bufLen)
-	err := a.randSource(randomBytes)
-	if err != nil {
-		// TODO: handle different errors that syscal to entropy source can return
-		return wasi.ErrnoIo
-	}
-
-	if !ctx.Memory().Write(buf, randomBytes) {
-		return wasi.ErrnoFault
-	}
-
-	return wasi.ErrnoSuccess
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {

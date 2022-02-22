@@ -475,7 +475,51 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 
 // TODO: TestAPI_FdAdvise TestAPI_FdAdvise_Errors
 // TODO: TestAPI_FdAllocate TestAPI_FdAllocate_Errors
-// TODO: TestAPI_FdClose TestAPI_FdClose_Errors
+
+func TestAPI_FdClose(t *testing.T) {
+	fdToClose := uint32(3) // arbitrary fd
+	fdToKeep := uint32(4)  // another arbitrary fd
+	setupFD := func() (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI) {
+		var api *wasiAPI
+		store, ctx, fn := instantiateWasmStore(t, FunctionFdClose, ImportFdClose, "test", func(a *wasiAPI) {
+			memFs := &MemFS{}
+			a.opened = map[uint32]fileEntry{
+				fdToClose: {
+					path:    "test",
+					fileSys: memFs,
+				},
+				fdToKeep: {
+					path:    "path to keep",
+					fileSys: memFs,
+				},
+			}
+			api = a // for later tests
+		})
+		return store, ctx, fn, api
+	}
+
+	t.Run("SnapshotPreview1.FdClose", func(t *testing.T) {
+		_, ctx, _, api := setupFD()
+		errno := api.FdClose(ctx, fdToClose)
+		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.NotContains(t, api.opened, fdToClose) // Fd is closed and removed from the opened FDs.
+		require.Contains(t, api.opened, fdToKeep)
+	})
+	t.Run(FunctionFdClose, func(t *testing.T) {
+		store, ctx, fn, api := setupFD()
+		ret, err := store.Engine.Call(ctx, fn, uint64(fdToClose), uint64(fdToClose))
+		require.NoError(t, err)
+		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		require.NotContains(t, api.opened, fdToClose)           // Fd is closed and removed from the opened FDs.
+		require.Contains(t, api.opened, fdToKeep)
+	})
+	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
+		_, ctx, _, api := setupFD()
+		errno := api.FdClose(ctx, 42) // 42 is an arbitrary invalid FD
+		require.Equal(t, wasi.ErrnoBadf, errno)
+	})
+}
+
 // TODO: TestAPI_FdDataSync TestAPI_FdDataSync_Errors
 // TODO: TestAPI_FdFdstatGet TestAPI_FdFdstatGet_Errors
 // TODO: TestAPI_FdFdstatSetFlags TestAPI_FdFdstatSetFlags_Errors
@@ -485,7 +529,102 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_FdFilestatSetTimes TestAPI_FdFilestatSetTimes_Errors
 // TODO: TestAPI_FdPread TestAPI_FdPread_Errors
 // TODO: TestAPI_FdPrestatGet TestAPI_FdPrestatGet_Errors
-// TODO: TestAPI_FdPrestatDirName TestAPI_FdPrestatDirName_Errors
+
+func TestAPI_FdPrestatDirName(t *testing.T) {
+	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	var api *wasiAPI
+	store, ctx, fn := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, "test", func(a *wasiAPI) {
+		a.opened[fd] = fileEntry{
+			path:    "test",
+			fileSys: &MemFS{},
+		}
+		api = a // for later tests
+	})
+
+	path := uint32(1)    // arbitrary offset
+	pathLen := uint32(3) // shorter than len("test") to test the path is written for the length of pathLen
+	maskLength := 7      // number of bytes to write '?' to tell what we've written
+	expectedMemory := []byte{
+		'?',
+		't', 'e', 's',
+		'?', '?', '?',
+	}
+
+	t.Run("SnapshotPreview1.FdPrestatDirName", func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		errno := api.FdPrestatDirName(ctx, fd, path, pathLen)
+		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+	t.Run(FunctionFdPrestatDirName, func(t *testing.T) {
+		maskMemory(store, maskLength)
+
+		ret, err := store.Engine.Call(ctx, fn, uint64(fd), uint64(path), uint64(pathLen))
+		require.NoError(t, err)
+		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+	})
+}
+
+func TestAPI_FdPrestatDirName_Errors(t *testing.T) {
+	dirName := "test"
+	opt := Preopen(dirName, &MemFS{})
+	store, ctx, fn := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, "test", opt)
+
+	memorySize := uint32(len(store.Memories[0].Buffer))
+	validAddress := uint32(0)     // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
+	actualPathLen := len(dirName) // Actual length of the dirName as a valid pathLen.
+	fd := uint32(3)               // fd 3 will be opened for the "test" directory after 0, 1, and 2, that are stdin/out/err
+
+	tests := []struct {
+		name          string
+		fd            uint32
+		path          uint32
+		pathLen       uint32
+		expectedErrno wasi.Errno
+	}{
+		{
+			name:          "out-of-memory path",
+			fd:            fd,
+			path:          memorySize,
+			pathLen:       uint32(actualPathLen),
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "path exceeds the maximum valid address by 1",
+			fd:            fd,
+			path:          memorySize - uint32(actualPathLen) + 1,
+			pathLen:       uint32(actualPathLen),
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "pathLen exceeds the actual length of the dir name",
+			fd:            fd,
+			path:          validAddress,
+			pathLen:       uint32(actualPathLen) + 1,
+			expectedErrno: wasi.ErrnoNametoolong,
+		},
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			path:          validAddress,
+			pathLen:       uint32(actualPathLen) + 1,
+			expectedErrno: wasi.ErrnoBadf,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := store.Engine.Call(ctx, fn, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+}
+
 // TODO: TestAPI_FdPwrite TestAPI_FdPwrite_Errors
 // TODO: TestAPI_FdRead TestAPI_FdRead_Errors
 // TODO: TestAPI_FdReaddir TestAPI_FdReaddir_Errors
