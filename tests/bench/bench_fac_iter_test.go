@@ -8,7 +8,6 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/bytecodealliance/wasmtime-go"
@@ -188,11 +187,7 @@ func newWazeroFacIterBench(engine *wazero.Engine) (wasm.Function, error) {
 		return nil, err
 	}
 
-	fn, ok := m.Function("fac-iter")
-	if !ok {
-		return nil, fmt.Errorf("fac-iter is not an exported function")
-	}
-	return fn, nil
+	return m.Function("fac-iter"), nil
 }
 
 // newWasmerForFacIterBench returns the store and instance that scope the factorial function.

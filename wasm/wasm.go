@@ -19,8 +19,8 @@ type Store interface {
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 type ModuleExports interface {
-	// Function returns a function exported from this module or false if it wasn't.
-	Function(name string) (Function, bool)
+	// Function returns a Wasm function exported from this module or nil if it wasn't.
+	Function(name string) Function
 }
 
 // Function is an advanced API allowing efficient invocation of WebAssembly 1.0 (MVP) functions, given predefined
@@ -60,8 +60,8 @@ type Function func(ctx context.Context, params ...uint64) ([]uint64, error)
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 // See https://www.w3.org/TR/wasm-core-1/#syntax-hostfunc
 type HostExports interface {
-	// Function returns a function in this module or false if it isn't available under that name.
-	Function(name string) (HostFunction, bool)
+	// Function returns a host function exported under this module name or nil if it wasn't.
+	Function(name string) HostFunction
 }
 
 // HostFunction is like a Function, except it is implemented in Go. This is a "Host Function" in WebAssembly 1.0 (MVP).
@@ -83,8 +83,8 @@ type ModuleContext interface {
 	// Memory returns a potentially zero memory of the importing module
 	Memory() Memory
 
-	// Function returns a function exported from this module or false if it wasn't.
-	Function(name string) (Function, bool)
+	// Function returns a function exported from this module or nil if it wasn't.
+	Function(name string) Function
 }
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.

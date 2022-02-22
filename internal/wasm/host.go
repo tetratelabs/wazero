@@ -9,13 +9,13 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
-// compile time check to ensure ModuleContext implements publicwasm.ModuleContext
+// compile time check to ensure ModuleContext implements wasm.ModuleContext
 var _ publicwasm.ModuleContext = &ModuleContext{}
 
 func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstance) *ModuleContext {
 	return &ModuleContext{
 		ctx:    ctx,
-		Engine: engine,
+		engine: engine,
 		memory: instance.Memory,
 		Module: instance,
 	}
@@ -24,10 +24,9 @@ func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstan
 // ModuleContext implements wasm.ModuleContext and wasm.Module
 type ModuleContext struct {
 	// ctx is the default context, exposed as wasm.ModuleContext Context
-	ctx context.Context
-	// Engine is exported for wazero.MakeWasmFunc
-	Engine Engine
-	// Module is exported for wazero.MakeWasmFunc
+	ctx    context.Context
+	engine Engine
+	// Module is exported for spectests.callFunction
 	Module *ModuleInstance
 	// memory is exposed as wasm.ModuleContext Memory
 	memory publicwasm.Memory
@@ -37,7 +36,7 @@ type ModuleContext struct {
 func (c *ModuleContext) WithContext(ctx context.Context) *ModuleContext {
 	// only re-allocate if it will change the effective context
 	if ctx != nil && ctx != c.ctx {
-		return &ModuleContext{Engine: c.Engine, Module: c.Module, memory: c.memory, ctx: ctx}
+		return &ModuleContext{engine: c.engine, Module: c.Module, memory: c.memory, ctx: ctx}
 	}
 	return c
 }
@@ -46,7 +45,7 @@ func (c *ModuleContext) WithContext(ctx context.Context) *ModuleContext {
 func (c *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	// only re-allocate if it will change the effective memory
 	if memory != nil && memory.Max != nil && *memory.Max > 0 && memory != c.memory {
-		return &ModuleContext{Engine: c.Engine, Module: c.Module, memory: memory, ctx: c.ctx}
+		return &ModuleContext{engine: c.engine, Module: c.Module, memory: memory, ctx: c.ctx}
 	}
 	return c
 }
@@ -55,18 +54,18 @@ func (c *ModuleContext) Context() context.Context {
 	return c.ctx
 }
 
-// Memory implements wasm.Module Memory
+// Memory implements wasm.ModuleExports Memory
 func (c *ModuleContext) Memory() publicwasm.Memory {
 	return c.memory
 }
 
-// Function implements wasm.Functions Function
-func (c *ModuleContext) Function(name string) (publicwasm.Function, bool) {
+// Function implements wasm.ModuleExports Function
+func (c *ModuleContext) Function(name string) publicwasm.Function {
 	exp, err := c.Module.GetExport(name, ExportKindFunc)
 	if err != nil {
-		return nil, false
+		return nil
 	}
-	return (&function{c: c, f: exp.Function}).Call, true
+	return (&function{c: c, f: exp.Function}).Call
 }
 
 type function struct {
@@ -81,7 +80,7 @@ func (f *function) Call(ctx context.Context, params ...uint64) ([]uint64, error)
 		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
 	}
 	hc := f.c.WithContext(ctx)
-	return hc.Engine.Call(hc, f.f, params...)
+	return hc.engine.Call(hc, f.f, params...)
 }
 
 // ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
@@ -124,13 +123,16 @@ func (f *FunctionInstance) call(ctx publicwasm.ModuleContext, params ...uint64) 
 	if !ok { // TODO: guard that hCtx.Module actually imported this!
 		return nil, fmt.Errorf("this function was not imported by %s", ctx)
 	}
-	return hCtx.Engine.Call(hCtx, f, params...)
+	return hCtx.engine.Call(hCtx, f, params...)
 }
 
 // Function implements wasm.HostExports Function
-func (g *HostExports) Function(name string) (publicwasm.HostFunction, bool) {
+func (g *HostExports) Function(name string) publicwasm.HostFunction {
 	f, ok := g.NameToFunctionInstance[name]
-	return f.call, ok
+	if !ok {
+		return nil
+	}
+	return f.call
 }
 
 // Len implements wasm.ModuleContext Len

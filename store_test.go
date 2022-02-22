@@ -53,11 +53,9 @@ func TestFunction_Context(t *testing.T) {
 			// Instantiate the module and get the export of the above hostFn
 			exports, err := InstantiateModule(store, mod)
 			require.NoError(t, err)
-			fn, ok := exports.Function(functionName)
-			require.True(t, ok)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
-			results, err := fn(tc.ctx)
+			results, err := exports.Function(functionName)(tc.ctx)
 			require.NoError(t, err)
 			require.Equal(t, expectedResult, results[0])
 		})

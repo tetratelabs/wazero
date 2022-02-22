@@ -47,8 +47,7 @@ func Test_WASI(t *testing.T) {
 	// Configure WASI and implement the function to use it
 	we, err := wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
-	randomGetFn, ok := we.Function("random_get")
-	require.True(t, ok)
+	randomGetFn := we.Function("random_get")
 
 	// Implement the function pointer. This mainly shows how you can decouple a host function dependency.
 	randomGet = func(ctx wasm.ModuleContext, buf, bufLen uint32) wasi.Errno {

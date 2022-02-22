@@ -65,8 +65,7 @@ func Test_hostFunc(t *testing.T) {
 	exports, err := wazero.StartWASICommand(store, mod)
 	require.NoError(t, err)
 
-	allocateBufferFn, ok := exports.Function("allocate_buffer")
-	require.True(t, ok)
+	allocateBufferFn := exports.Function("allocate_buffer")
 
 	// Implement the function pointer. This mainly shows how you can decouple a module function dependency.
 	allocateBuffer = func(ctx context.Context, size uint32) uint32 {
@@ -79,8 +78,6 @@ func Test_hostFunc(t *testing.T) {
 	ctx := context.WithValue(context.Background(), testKey{}, int64(12345))
 
 	// Invoke a module-defined function that depends on a host function import
-	base64, ok := exports.Function("base64")
-	require.True(t, ok)
-	_, err = base64(ctx, uint64(5))
+	_, err = exports.Function("base64")(ctx, uint64(5))
 	require.NoError(t, err)
 }

@@ -30,8 +30,7 @@ func Test_AddInt(t *testing.T) {
 	exports, err := wazero.InstantiateModule(store, mod)
 	require.NoError(t, err)
 
-	addInt, ok := exports.Function("AddInt")
-	require.True(t, ok)
+	addInt := exports.Function("AddInt")
 
 	for _, c := range []struct {
 		value1, value2, expected uint64 // i32i32_i32 sig, but wasm.Function params and results are uint64

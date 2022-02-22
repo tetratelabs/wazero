@@ -80,10 +80,7 @@ func testFibonacci(t *testing.T, newEngine func() *wazero.Engine) {
 			exports, err := wazero.InstantiateModule(store, mod)
 			require.NoError(t, err)
 
-			fib, ok := exports.Function("fib")
-			require.True(t, ok)
-
-			results, err := fib(context.Background(), 20)
+			results, err := exports.Function("fib")(nil, 20)
 			require.NoError(t, err)
 
 			require.Equal(t, uint64(10946), results[0])
@@ -107,21 +104,17 @@ func testFac(t *testing.T, newEngine func() *wazero.Engine) {
 	} {
 		name := name
 
-		fac, ok := exports.Function("fac")
-		require.True(t, ok)
+		fac := exports.Function("fac")
 
 		t.Run(name, func(t *testing.T) {
-			results, err := fac(context.Background(), 25)
+			results, err := fac(nil, 25)
 			require.NoError(t, err)
 			require.Equal(t, uint64(7034535277573963776), results[0])
 		})
 	}
 
 	t.Run("fac-rec - stack overflow", func(t *testing.T) {
-		fac, ok := exports.Function("fac-rec")
-		require.True(t, ok)
-
-		_, err := fac(context.Background(), 1073741824)
+		_, err := exports.Function("fac-rec")(nil, 1073741824)
 		require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow)
 	})
 }
@@ -131,10 +124,7 @@ func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
 	require.NoError(t, err)
 
 	callUnreachable := func(ctx publicwasm.ModuleContext) {
-		unreachable, ok := ctx.Function("unreachable_func")
-		require.True(t, ok)
-
-		_, err := unreachable(ctx.Context())
+		_, err := ctx.Function("unreachable_func")(ctx.Context())
 		require.NoError(t, err)
 	}
 
@@ -146,10 +136,7 @@ func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
 	exports, err := wazero.InstantiateModule(store, mod)
 	require.NoError(t, err)
 
-	main, ok := exports.Function("main")
-	require.True(t, ok)
-
-	_, err = main(context.Background())
+	_, err = exports.Function("main")(nil)
 	exp := `wasm runtime error: unreachable
 wasm backtrace:
 	0: unreachable_func
@@ -168,32 +155,30 @@ func testMemory(t *testing.T, newEngine func() *wazero.Engine) {
 	exports, err := wazero.InstantiateModule(store, mod)
 	require.NoError(t, err)
 
-	size, ok := exports.Function("size")
-	require.True(t, ok)
+	size := exports.Function("size")
 
 	// First, we have zero-length memory instance.
-	results, err := size(context.Background())
+	results, err := size(nil)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), results[0])
 
-	grow, ok := exports.Function("grow")
-	require.True(t, ok)
+	grow := exports.Function("grow")
 
 	// Then grow the memory.
 	newPages := uint64(10)
-	results, err = grow(context.Background(), newPages)
+	results, err = grow(nil, newPages)
 	require.NoError(t, err)
 
 	// Grow returns the previous number of memory pages, namely zero.
 	require.Equal(t, uint64(0), results[0])
 
 	// Now size should return the new pages -- 10.
-	results, err = size(context.Background())
+	results, err = size(nil)
 	require.NoError(t, err)
 	require.Equal(t, newPages, results[0])
 
 	// Growing memory with zero pages is valid but should be noop.
-	results, err = grow(context.Background(), 0)
+	results, err = grow(nil, 0)
 	require.NoError(t, err)
 	require.Equal(t, newPages, results[0])
 }
@@ -203,10 +188,7 @@ func testRecursiveEntry(t *testing.T, newEngine func() *wazero.Engine) {
 	require.NoError(t, err)
 
 	hostfunc := func(ctx publicwasm.ModuleContext) {
-		fn, ok := ctx.Function("called_by_host_func")
-		require.True(t, ok)
-
-		_, err = fn(ctx.Context())
+		_, err = ctx.Function("called_by_host_func")(nil)
 		require.NoError(t, err)
 	}
 
@@ -218,10 +200,7 @@ func testRecursiveEntry(t *testing.T, newEngine func() *wazero.Engine) {
 	exports, err := wazero.InstantiateModule(store, mod)
 	require.NoError(t, err)
 
-	main, ok := exports.Function("main")
-	require.True(t, ok)
-
-	_, err = main(context.Background(), 1)
+	_, err = exports.Function("main")(nil, 1)
 	require.NoError(t, err)
 }
 
@@ -257,10 +236,7 @@ func testImportedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) 
 	require.NoError(t, err)
 
 	// Call store_int and ensure it didn't return an error code.
-	storeIntFn, ok := exports.Function("store_int")
-	require.True(t, ok)
-
-	results, err := storeIntFn(context.Background(), 1, math.MaxUint64)
+	results, err := exports.Function("store_int")(nil, 1, math.MaxUint64)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), results[0])
 
@@ -335,10 +311,7 @@ func testHostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
 			name := "call->test.identity_f32"
 			input := float32(math.MaxFloat32)
 
-			fn, ok := m.Function(name)
-			require.True(t, ok)
-
-			results, err := fn(ctx, publicwasm.EncodeF32(input)) // float bits are a uint32 value, call requires uint64
+			results, err := m.Function(name)(ctx, publicwasm.EncodeF32(input)) // float bits are a uint32 value, call requires uint64
 			require.NoError(t, err)
 			require.Equal(t, input, publicwasm.DecodeF32(results[0]))
 		})
@@ -346,10 +319,8 @@ func testHostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
 		t.Run(fmt.Sprintf("host function with f64 param%s", k), func(t *testing.T) {
 			name := "call->test.identity_f64"
 			input := math.MaxFloat64
-			fn, ok := m.Function(name)
-			require.True(t, ok)
 
-			results, err := fn(ctx, publicwasm.EncodeF64(input))
+			results, err := m.Function(name)(ctx, publicwasm.EncodeF64(input))
 			require.NoError(t, err)
 			require.Equal(t, input, publicwasm.DecodeF64(results[0]))
 		})
