@@ -2369,26 +2369,22 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	c.compileRegisterToRegisterInstruction(arm64.AMSR, zeroRegister, arm64.REG_FPSR)
 
 	var convinst obj.As
-	var is32bitFloat bool
-	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
+	var is32bitFloat = o.InputType == wazeroir.Float32
+	if is32bitFloat && o.OutputType == wazeroir.SignedInt32 {
 		convinst = arm64.AFCVTZSSW
-		is32bitFloat = true
-	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
+	} else if is32bitFloat && o.OutputType == wazeroir.SignedInt64 {
 		convinst = arm64.AFCVTZSS
-		is32bitFloat = true
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt32 {
+	} else if !is32bitFloat && o.OutputType == wazeroir.SignedInt32 {
 		convinst = arm64.AFCVTZSDW
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt64 {
+	} else if !is32bitFloat && o.OutputType == wazeroir.SignedInt64 {
 		convinst = arm64.AFCVTZSD
-	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
+	} else if is32bitFloat && o.OutputType == wazeroir.SignedUint32 {
 		convinst = arm64.AFCVTZUSW
-		is32bitFloat = true
-	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
+	} else if is32bitFloat && o.OutputType == wazeroir.SignedUint64 {
 		convinst = arm64.AFCVTZUS
-		is32bitFloat = true
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint32 {
+	} else if !is32bitFloat && o.OutputType == wazeroir.SignedUint32 {
 		convinst = arm64.AFCVTZUDW
-	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint64 {
+	} else if !is32bitFloat && o.OutputType == wazeroir.SignedUint64 {
 		convinst = arm64.AFCVTZUD
 	}
 

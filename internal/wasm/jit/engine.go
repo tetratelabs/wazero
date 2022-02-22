@@ -662,12 +662,10 @@ func (e *engine) addCompiledFunction(addr wasm.FunctionAddress, compiled *compil
 
 func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	compiler, done, err := newCompiler(f, nil)
+	defer done()
+
 	if err != nil {
 		return nil, err
-	}
-
-	if done != nil {
-		defer done()
 	}
 
 	if err = compiler.compileHostFunction(f.Address); err != nil {
@@ -707,12 +705,9 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	}
 
 	compiler, done, err := newCompiler(f, ir)
+	defer done()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
-	}
-
-	if done != nil {
-		defer done()
 	}
 
 	if err := compiler.compilePreamble(); err != nil {

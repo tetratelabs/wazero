@@ -95,7 +95,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("amd64", 1024)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
+		return nil, func() {}, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
 
 	compiler := &amd64Compiler{
@@ -106,7 +106,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		ir:            ir,
 		labels:        map[string]*labelInfo{},
 	}
-	return compiler, nil, nil
+	return compiler, func() {}, nil
 }
 
 func (c *amd64Compiler) String() string {
