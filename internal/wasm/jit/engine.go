@@ -1,7 +1,6 @@
 package jit
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"reflect"
@@ -682,10 +681,6 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		stackPointerCeil = res
 	}
 
-	if buildoptions.IsDebugMode {
-		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
-	}
-
 	return &compiledFunction{
 		source:             f,
 		codeSegment:        code,
@@ -876,10 +871,6 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	code, staticData, stackPointerCeil, err := compiler.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
-	}
-
-	if buildoptions.IsDebugMode {
-		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
 	}
 
 	return &compiledFunction{

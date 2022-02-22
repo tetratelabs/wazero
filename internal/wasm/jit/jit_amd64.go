@@ -89,6 +89,7 @@ type archContext struct{}
 func newArchContext() (ret archContext) { return }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
+// The function returned must be invoked when finished compiling, so use `defer` to ensure this.
 // Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, func(), error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.

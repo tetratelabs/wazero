@@ -79,6 +79,7 @@ func unlockAssembler() {
 }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
+// The function returned must be invoked when finished compiling, so use `defer` to ensure this.
 // Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (c compiler, done func(), err error) {
 	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
