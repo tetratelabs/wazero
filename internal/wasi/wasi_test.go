@@ -476,28 +476,44 @@ func TestAPI_ClockTimeGet_Errors(t *testing.T) {
 // TODO: TestAPI_FdAllocate TestAPI_FdAllocate_Errors
 
 func TestAPI_FdClose(t *testing.T) {
-	opt := Preopen("test", &MemFS{})
-	fd := uint32(3) // fd 3 will be opened for the "test" directory after 0, 1, and 2, that are stdin/out/err
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdClose, ImportFdClose, "test", opt)
+	fdToClose := uint32(3) // arbitrary fd
+	fdToKeep := uint32(4)  // another arbitrary fd
+	setupFD := func() (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI) {
+		var api *wasiAPI
+		store, ctx, fn := instantiateWasmStore(t, FunctionFdClose, ImportFdClose, "test", func(a *wasiAPI) {
+			memFs := &MemFS{}
+			a.opened = map[uint32]fileEntry{
+				fdToClose: {
+					path:    "test",
+					fileSys: memFs,
+				},
+				fdToKeep: {
+					path:    "path to keep",
+					fileSys: memFs,
+				},
+			}
+			api = a // for later tests
+		})
+		return store, ctx, fn, api
+	}
 
 	t.Run("SnapshotPreview1.FdClose", func(t *testing.T) {
-		api := newAPI(opt)
-		errno := api.FdClose(ctx, fd)
+		_, ctx, _, api := setupFD()
+		errno := api.FdClose(ctx, fdToClose)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.NotContains(t, api.opened, fd) // Fd is closed and removed from the opened FDs.
+		require.NotContains(t, api.opened, fdToClose) // Fd is closed and removed from the opened FDs.
+		require.Contains(t, api.opened, fdToKeep)
 	})
 	t.Run(FunctionFdClose, func(t *testing.T) {
-		ret, err := store.Engine.Call(ctx, fn, uint64(fd), uint64(fd))
+		store, ctx, fn, api := setupFD()
+		ret, err := store.Engine.Call(ctx, fn, uint64(fdToClose), uint64(fdToClose))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
-
-		// Ensure that it's closed by checking that closing it again returns ErrnoBadf.
-		ret, err = store.Engine.Call(ctx, fn, uint64(fd), uint64(fd))
-		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoBadf, wasi.Errno(ret[0])) // cast because results are always uint64
+		require.NotContains(t, api.opened, fdToClose)           // Fd is closed and removed from the opened FDs.
+		require.Contains(t, api.opened, fdToKeep)
 	})
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
-		api := newAPI(opt)
+		_, ctx, _, api := setupFD()
 		errno := api.FdClose(ctx, 42) // 42 is an arbitrary invalid FD
 		require.Equal(t, wasi.ErrnoBadf, errno)
 	})
@@ -514,12 +530,18 @@ func TestAPI_FdClose(t *testing.T) {
 // TODO: TestAPI_FdPrestatGet TestAPI_FdPrestatGet_Errors
 
 func TestAPI_FdPrestatDirName(t *testing.T) {
-	opt := Preopen("test", &MemFS{})
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, "test", opt)
-	fd := uint32(3) // fd 3 will be opened for the "test" directory after 0, 1, and 2, that are stdin/out/err
+	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	var api *wasiAPI
+	store, ctx, fn := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, "test", func(a *wasiAPI) {
+		a.opened[fd] = fileEntry{
+			path:    "test",
+			fileSys: &MemFS{},
+		}
+		api = a // for later tests
+	})
 
 	path := uint32(1)    // arbitrary offset
-	pathLen := uint32(3) // arbitrary length
+	pathLen := uint32(3) // shorter than len("test") to test the path is written for the length of pathLen
 	maskLength := 7      // number of bytes to write '?' to tell what we've written
 	expectedMemory := []byte{
 		'?',
@@ -530,7 +552,7 @@ func TestAPI_FdPrestatDirName(t *testing.T) {
 	t.Run("SnapshotPreview1.FdPrestatDirName", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		errno := newAPI(opt).FdPrestatDirName(ctx, fd, path, pathLen)
+		errno := api.FdPrestatDirName(ctx, fd, path, pathLen)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
