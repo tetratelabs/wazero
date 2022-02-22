@@ -16,6 +16,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"sync"
 	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
@@ -69,14 +70,26 @@ const (
 // engine is the pointer to the "*engine" as uintptr.
 func jitcall(codeSegment, engine uintptr)
 
+// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
+// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+var assemblerMutex = &sync.Mutex{}
+
+func unlockAssembler() {
+	assemblerMutex.Unlock()
+}
+
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (c compiler, done func(), err error) {
+	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
+	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+	assemblerMutex.Lock()
+
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("arm64", 1024)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
+		return nil, unlockAssembler, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
 
 	compiler := &arm64Compiler{
@@ -86,7 +99,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		ir:            ir,
 		labels:        map[string]*labelInfo{},
 	}
-	return compiler, nil
+	return compiler, unlockAssembler, nil
 }
 
 type arm64Compiler struct {
@@ -145,6 +158,7 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 		return
 	}
 
+	staticData = c.staticData
 	return
 }
 
@@ -597,6 +611,10 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 
 // compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
 func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
+	// The assembler skips the first instruction so we intentionally add NOP here.
+	// TODO: delete after #233
+	c.compileNOP()
+
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
 
@@ -667,6 +685,15 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 	return nil
 }
 
+// Only used in test, but define this in the main file as sometimes
+// we need to call this from the main code when debugging.
+//nolint:unused
+func (c *arm64Compiler) undefined() {
+	ud := c.newProg()
+	ud.As = obj.AUNDEF
+	c.addInstruction(ud)
+}
+
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
 func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
@@ -687,7 +714,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 		intMov = arm64.AMOVWU
 		floatMov = arm64.AFMOVS
 	case wasm.ValueTypeF64:
-		intMov = arm64.AMOVW
+		intMov = arm64.AMOVD
 		floatMov = arm64.AFMOVD
 	}
 
@@ -763,7 +790,7 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 	c.compileConstToRegisterInstruction(
 		// globalIndex is an index to []*GlobalInstance, therefore
 		// we have to multiply it by the size of *GlobalInstance == the pointer size == 8.
-		arm64.AMOVW, int64(globalIndex)*8, destinationRegister,
+		arm64.AMOVD, int64(globalIndex)*8, destinationRegister,
 	)
 
 	// "reservedRegisterForTemporary = &globals[0]"
@@ -773,7 +800,7 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 		reservedRegisterForTemporary,
 	)
 
-	// "destinationRegister = [reservedRegisterForTemporary + destinationRegister] (== &globals[globalIndex])".
+	// "destinationRegister = [reservedRegisterForTemporary + destinationRegister] (== globals[globalIndex])".
 	c.compileMemoryWithRegisterOffsetToRegisterInstruction(
 		arm64.AMOVD,
 		reservedRegisterForTemporary, destinationRegister,
@@ -1192,7 +1219,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 			compiledFunctionAddressRegister)
 	} else {
 		// Shift addrRegister by 3 because the size of *compiledFunction equals 8 bytes.
-		c.compileConstToRegisterInstruction(arm64.ALSL, 3, addrRegister)
+		c.compileConstToRegisterInstruction(arm64.ALSLW, 3, addrRegister)
 		c.compileMemoryWithRegisterOffsetToRegisterInstruction(
 			arm64.AMOVD,
 			tmp, addrRegister,
@@ -1465,7 +1492,7 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
 	// Save the live values because we pop and release values in drop range below.
-	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start):]
+	liveValues := c.locationStack.stack[c.locationStack.sp-uint64(r.Start) : c.locationStack.sp]
 	c.locationStack.sp -= uint64(r.Start)
 
 	// Note: drop target range is inclusive.
@@ -1498,6 +1525,8 @@ func (c *arm64Compiler) compileSelect() error {
 		return err
 	}
 
+	c.markRegisterUsed(cv.register)
+
 	x1, x2, err := c.popTwoValuesOnRegisters()
 	if err != nil {
 		return err
@@ -1518,7 +1547,7 @@ func (c *arm64Compiler) compileSelect() error {
 	// So we explicitly assign a general purpuse register to x1 here.
 	if isZeroRegister(x1.register) {
 		// Mark x2 and cv's regiseters are used so they won't be chosen.
-		c.markRegisterUsed(x2.register, cv.register)
+		c.markRegisterUsed(x2.register)
 		// Pick the non-zero register for x1.
 		x1Reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 		if err != nil {
@@ -1896,7 +1925,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		brIfDividendNotMinInt := c.compilelBranchInstruction(arm64.ABNE)
 
 		// Otherwise, we raise overflow error.
-		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
 
 		c.setBranchTargetOnNext(brIfDivisorNonMinusOne, brIfDividendNotMinInt)
 	}
@@ -2340,24 +2369,41 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	c.compileRegisterToRegisterInstruction(arm64.AMSR, zeroRegister, arm64.REG_FPSR)
 
 	var convinst obj.As
+	var is32bitFloat bool
 	if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt32 {
 		convinst = arm64.AFCVTZSSW
+		is32bitFloat = true
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedInt64 {
 		convinst = arm64.AFCVTZSS
+		is32bitFloat = true
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt32 {
 		convinst = arm64.AFCVTZSDW
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedInt64 {
 		convinst = arm64.AFCVTZSD
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint32 {
 		convinst = arm64.AFCVTZUSW
+		is32bitFloat = true
 	} else if o.InputType == wazeroir.Float32 && o.OutputType == wazeroir.SignedUint64 {
 		convinst = arm64.AFCVTZUS
+		is32bitFloat = true
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint32 {
 		convinst = arm64.AFCVTZUDW
 	} else if o.InputType == wazeroir.Float64 && o.OutputType == wazeroir.SignedUint64 {
 		convinst = arm64.AFCVTZUD
 	}
-	c.compileSimpleConversion(convinst, generalPurposeRegisterTypeInt)
+
+	source, err := c.popValueOnRegister()
+	if err != nil {
+		return err
+	}
+
+	destinationReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
+	if err != nil {
+		return err
+	}
+
+	c.compileRegisterToRegisterInstruction(convinst, source.register, destinationReg)
+	c.locationStack.pushValueLocationOnRegister(destinationReg)
 
 	// Obtain the floating point status register value into the general purpose register,
 	// so that we can check if the conversion resulted in undefined behavior.
@@ -2366,12 +2412,30 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
 	c.compileRegisterAndConstSourceToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, 1)
 
-	// If so, exit the execution with jitCallStatusCodeInvalidFloatToIntConversion.
-	br := c.compilelBranchInstruction(arm64.ABNE)
-	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+	brOK := c.compilelBranchInstruction(arm64.ABNE)
+
+	// If so, exit the execution with errors depending on whether or not the source value is NaN.
+	{
+		var floatcmp obj.As
+		if is32bitFloat {
+			floatcmp = arm64.AFCMPS
+		} else {
+			floatcmp = arm64.AFCMPD
+		}
+		c.compileTwoRegistersToNoneInstruction(floatcmp, source.register, source.register)
+		// VS flag is set if at least one of values for FCMP is NaN.
+		// https://developer.arm.com/documentation/dui0801/g/Condition-Codes/Comparison-of-condition-code-meanings-in-integer-and-floating-point-code
+		brIfSourceNaN := c.compilelBranchInstruction(arm64.ABVS)
+
+		// If the source value is not NaN, the operation was overflow.
+		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
+		// Otherwise, the operation was invalid as this is trying to convert NaN to integer.
+		c.setBranchTargetOnNext(brIfSourceNaN)
+		c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+	}
 
 	// Otherwise, we branch into the next instruction.
-	c.setBranchTargetOnNext(br)
+	c.setBranchTargetOnNext(brOK)
 	return nil
 }
 
@@ -3336,7 +3400,6 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 			arm64.AMOVD, tmpX,
 			reservedRegisterForEngine, engineModuleContextGlobalElement0AddressOffset,
 		)
-
 	}
 
 	// Update memoryElement0Address and memorySliceLen.

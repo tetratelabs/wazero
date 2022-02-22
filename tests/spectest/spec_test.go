@@ -230,7 +230,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 }
 
 func TestJIT(t *testing.T) {
-	if runtime.GOARCH != "amd64" {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
 	runTest(t, jit.NewEngine)

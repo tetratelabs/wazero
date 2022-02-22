@@ -90,12 +90,12 @@ func newArchContext() (ret archContext) { return }
 
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, func(), error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("amd64", 1024)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
+		return nil, nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
 
 	compiler := &amd64Compiler{
@@ -106,7 +106,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		ir:            ir,
 		labels:        map[string]*labelInfo{},
 	}
-	return compiler, nil
+	return compiler, nil, nil
 }
 
 func (c *amd64Compiler) String() string {

@@ -16,6 +16,6 @@ func jitcall(codeSegment, engine uintptr) {
 	panic("unsupported GOARCH")
 }
 
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, func(), error) {
 	panic("unsupported GOARCH")
 }

@@ -43,11 +43,13 @@ func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler *arm64Co
 }
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
-	cmp, err := newCompiler(&wasm.FunctionInstance{
+	cmp, done, err := newCompiler(&wasm.FunctionInstance{
 		ModuleInstance: j.moduleInstance,
 		FunctionKind:   wasm.FunctionKindWasm,
 	}, nil)
 	require.NoError(t, err)
+	t.Cleanup(done)
+
 	ret, ok := cmp.(*arm64Compiler)
 	require.True(t, ok)
 	ret.labels = make(map[string]*labelInfo)
@@ -90,37 +92,42 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 		const callFrameNums = 10
 		stackPointerToExpectedValue := map[uint64]uint32{}
 		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
-			//	Each function pushes its funcaddr and soon returns.
-			compiler := env.requireNewCompiler(t)
-			err := compiler.compilePreamble()
-			require.NoError(t, err)
+			// We have to do compilation in a separate subtest since each compilation takes
+			// the mutext lock and must release on the cleanup of each subtest.
+			// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+			t.Run(fmt.Sprintf("compiling existing callframe %d", funcaddr), func(t *testing.T) {
+				// Each function pushes its funcaddr and soon returns.
+				compiler := env.requireNewCompiler(t)
+				err := compiler.compilePreamble()
+				require.NoError(t, err)
 
-			// Push its funcaddr.
-			expValue := uint32(funcaddr)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
-			require.NoError(t, err)
+				// Push its funcaddr.
+				expValue := uint32(funcaddr)
+				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+				require.NoError(t, err)
 
-			err = compiler.compileReturnFunction()
-			require.NoError(t, err)
+				err = compiler.compileReturnFunction()
+				require.NoError(t, err)
 
-			code, _, _, err := compiler.compile()
-			require.NoError(t, err)
+				code, _, _, err := compiler.compile()
+				require.NoError(t, err)
 
-			// Compiles and adds to the engine.
-			compiledFunction := &compiledFunction{codeSegment: code, codeInitialAddress: uintptr(unsafe.Pointer(&code[0]))}
-			engine.addCompiledFunction(funcaddr, compiledFunction)
+				// Compiles and adds to the engine.
+				compiledFunction := &compiledFunction{codeSegment: code, codeInitialAddress: uintptr(unsafe.Pointer(&code[0]))}
+				engine.addCompiledFunction(funcaddr, compiledFunction)
 
-			// Pushes the frame whose return address equals the beginning of the function just compiled.
-			frame := callFrame{
-				// Set the return address to the beginning of the function so that we can execute the constI32 above.
-				returnAddress: compiledFunction.codeInitialAddress,
-				// Note: return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
-				returnStackBasePointer: uint64(funcaddr) * 10,
-				compiledFunction:       compiledFunction,
-			}
-			engine.callFrameStack[engine.globalContext.callFrameStackPointer] = frame
-			engine.globalContext.callFrameStackPointer++
-			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
+				// Pushes the frame whose return address equals the beginning of the function just compiled.
+				frame := callFrame{
+					// Set the return address to the beginning of the function so that we can execute the constI32 above.
+					returnAddress: compiledFunction.codeInitialAddress,
+					// Note: return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
+					returnStackBasePointer: uint64(funcaddr) * 10,
+					compiledFunction:       compiledFunction,
+				}
+				engine.callFrameStack[engine.globalContext.callFrameStackPointer] = frame
+				engine.globalContext.callFrameStackPointer++
+				stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
+			})
 		}
 
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
@@ -1700,32 +1707,37 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				addTargetValue := uint32(100 + i)
 				expectedValue += addTargetValue
 
-				compiler := env.requireNewCompiler(t)
-				compiler.f = &wasm.FunctionInstance{
-					FunctionKind:   wasm.FunctionKindWasm,
-					FunctionType:   &wasm.TypeInstance{Type: targetFunctionType},
-					ModuleInstance: &wasm.ModuleInstance{},
-				}
+				// We have to do compilation in a separate subtest since each compilation takes
+				// the mutext lock and must release on the cleanup of each subtest.
+				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
+					compiler := env.requireNewCompiler(t)
+					compiler.f = &wasm.FunctionInstance{
+						FunctionKind:   wasm.FunctionKindWasm,
+						FunctionType:   &wasm.TypeInstance{Type: targetFunctionType},
+						ModuleInstance: &wasm.ModuleInstance{},
+					}
 
-				err := compiler.compilePreamble()
-				require.NoError(t, err)
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
 
-				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
-				require.NoError(t, err)
-				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
-				require.NoError(t, err)
-				err = compiler.compileReturnFunction()
-				require.NoError(t, err)
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(addTargetValue)})
+					require.NoError(t, err)
+					err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
+					require.NoError(t, err)
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
 
-				code, _, _, err := compiler.compile()
-				require.NoError(t, err)
-				addr := wasm.FunctionAddress(i)
-				engine.addCompiledFunction(addr, &compiledFunction{
-					codeSegment:        code,
-					codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+					addr := wasm.FunctionAddress(i)
+					engine.addCompiledFunction(addr, &compiledFunction{
+						codeSegment:        code,
+						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
+					})
+					env.moduleInstance.Functions = append(env.moduleInstance.Functions,
+						&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: addr})
 				})
-				env.moduleInstance.Functions = append(env.moduleInstance.Functions,
-					&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: addr})
 			}
 
 			// Now we start building the caller's code.
@@ -1898,33 +1910,37 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 				}
 
 				for i := 0; i < len(table); i++ {
-					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-						env := newJITEnvironment()
-						env.setTable(table)
-						engine := env.engine()
+					env := newJITEnvironment()
+					env.setTable(table)
+					engine := env.engine()
 
-						// First we create the call target function with function address = i,
-						// and it returns one value.
-						expectedReturnValue := uint32(i * 1000)
-						{
-							compiler := env.requireNewCompiler(t)
-							err := compiler.compilePreamble()
-							require.NoError(t, err)
-							err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
-							require.NoError(t, err)
-							err = compiler.compileReturnFunction()
-							require.NoError(t, err)
+					// First we create the call target function with function address = i,
+					// and it returns one value.
+					expectedReturnValue := uint32(i * 1000)
 
-							code, _, _, err := compiler.compile()
-							require.NoError(t, err)
+					// We have to do compilation in a separate subtest since each compilation takes
+					// the mutext lock and must release on the cleanup of each subtest.
+					// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+					t.Run(fmt.Sprintf("compiling call target for %d", i), func(t *testing.T) {
+						compiler := env.requireNewCompiler(t)
+						err := compiler.compilePreamble()
+						require.NoError(t, err)
+						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
+						require.NoError(t, err)
+						err = compiler.compileReturnFunction()
+						require.NoError(t, err)
 
-							cf := &compiledFunction{
-								codeSegment:        code,
-								codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
-							}
-							engine.addCompiledFunction(table[i].FunctionAddress, cf)
+						code, _, _, err := compiler.compile()
+						require.NoError(t, err)
+
+						cf := &compiledFunction{
+							codeSegment:        code,
+							codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 						}
+						engine.addCompiledFunction(table[i].FunctionAddress, cf)
+					})
 
+					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 						if growCallFrameStack {
 							env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
 							env.setPreviousCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
@@ -2071,11 +2087,9 @@ func TestArm64Compiler_compileSwap(t *testing.T) {
 	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
-	// Generate the code under test.
+	// Generate the code under test and run.
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
-
-	// Run code.
 	env.exec(code)
 
 	require.Equal(t, uint64(op.Depth+1), env.stackPointer())
@@ -2161,7 +2175,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
-			// Run codes
 			env.exec(code)
 
 			// Check the exit status.
@@ -2279,8 +2292,6 @@ func TestArm64Compiler_compileGlobalSet(t *testing.T) {
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
-
-			// Run code.
 			env.exec(code)
 
 			// The global value should be set to valueToSet.
@@ -3057,8 +3068,10 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 									}
 								case wazeroir.SignedTypeInt32:
 									v1, v2 := int32(x1), int32(x2)
-									if v2 == 0 || (v1 == math.MinInt32 && v2 == -1) {
+									if v2 == 0 {
 										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else if v1 == math.MinInt32 && v2 == -1 {
+										require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
 									} else {
 										require.Equal(t, v1/v2, env.stackTopAsInt32())
 									}
@@ -3070,8 +3083,10 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 									}
 								case wazeroir.SignedTypeInt64:
 									v1, v2 := int64(x1), int64(x2)
-									if v2 == 0 || (v1 == math.MinInt64 && v2 == -1) {
+									if v2 == 0 {
 										require.Equal(t, jitCallStatusIntegerDivisionByZero, env.jitStatus())
+									} else if v1 == math.MinInt64 && v2 == -1 {
+										require.Equal(t, jitCallStatusIntegerOverflow, env.jitStatus())
 									} else {
 										require.Equal(t, v1/v2, env.stackTopAsInt64())
 									}
@@ -3902,7 +3917,7 @@ func TestArm64Compiler_compileITruncFromF(t *testing.T) {
 					if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt32 {
 						f32 := float32(v)
 						if f32 < math.MinInt32 || f32 >= math.MaxInt32 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(float64(f32))), env.stackTopAsInt32())
@@ -3910,21 +3925,21 @@ func TestArm64Compiler_compileITruncFromF(t *testing.T) {
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedInt64 {
 						f32 := float32(v)
 						if f32 < math.MinInt64 || f32 >= math.MaxInt64 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int64(math.Trunc(float64(f32))), env.stackTopAsInt64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt32 {
 						if v < math.MinInt32 || v > math.MaxInt32 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int32(math.Trunc(v)), env.stackTopAsInt32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedInt64 {
 						if v < math.MinInt64 || v >= math.MaxInt64 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, int64(math.Trunc(v)), env.stackTopAsInt64())
@@ -3932,14 +3947,14 @@ func TestArm64Compiler_compileITruncFromF(t *testing.T) {
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint32 {
 						f32 := float32(v)
 						if f32 < 0 || f32 >= math.MaxUint32 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint32(math.Trunc(float64(f32))), env.stackTopAsUint32())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint32 {
 						if v < 0 || v > math.MaxUint32 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint32(math.Trunc(v)), env.stackTopAsUint32())
@@ -3947,14 +3962,14 @@ func TestArm64Compiler_compileITruncFromF(t *testing.T) {
 					} else if tc.inputType == wazeroir.Float32 && tc.outputType == wazeroir.SignedUint64 {
 						f32 := float32(v)
 						if f32 < 0 || f32 >= math.MaxUint64 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint64(math.Trunc(float64(f32))), env.stackTopAsUint64())
 						}
 					} else if tc.inputType == wazeroir.Float64 && tc.outputType == wazeroir.SignedUint64 {
 						if v < 0 || v >= math.MaxUint64 {
-							expStatus = jitCallStatusCodeInvalidFloatToIntConversion
+							expStatus = jitCallStatusIntegerOverflow
 						}
 						if expStatus == jitCallStatusCodeReturned {
 							require.Equal(t, uint64(math.Trunc(v)), env.stackTopAsUint64())
@@ -4074,7 +4089,6 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		env := newJITEnvironment()
 		code, _, _, err := c.compile()
 		require.NoError(t, err)
-		// fmt.Println(hex.EncodeToString(code))
 		env.exec(code)
 
 		// Check the returned value.
