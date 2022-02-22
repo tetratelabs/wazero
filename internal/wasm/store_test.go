@@ -138,8 +138,7 @@ func TestStore_addHostFunction(t *testing.T) {
 		s := NewStore(context.Background(), nopEngineInstance)
 		const max = 10
 		s.maximumFunctionAddress = max
-		s.Functions = make([]*FunctionInstance, max)
-		err := s.addFunctionInstance(nil)
+		err := s.addFunctionInstance(&FunctionInstance{Address: max + 1})
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
@@ -153,9 +152,6 @@ func TestStore_addHostFunction(t *testing.T) {
 
 			// After the addition, one instance is added.
 			require.Len(t, s.Functions, i+1)
-
-			// The added function instance must have i for its address.
-			require.Equal(t, FunctionAddress(i), f.Address)
 		}
 	})
 }

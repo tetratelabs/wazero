@@ -49,7 +49,7 @@ type (
 
 		// maximumFunctionAddress represents the limit on the number of function addresses (= function instances) in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
-		maximumFunctionAddress int
+		maximumFunctionAddress FunctionAddress
 		//  maximumFunctionTypes represents the limit on the number of function types in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionTypes int
@@ -361,13 +361,15 @@ func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp 
 }
 
 func (s *Store) addFunctionInstance(f *FunctionInstance) error {
-	l := len(s.Functions)
-	if l >= s.maximumFunctionAddress {
+	if f.Address >= s.maximumFunctionAddress {
 		return fmt.Errorf("too many functions in a store")
 	}
-	f.Address = FunctionAddress(len(s.Functions))
 	s.Functions = append(s.Functions, f)
 	return nil
+}
+
+func (s *Store) nextFunctionAddress() FunctionAddress {
+	return FunctionAddress(len(s.Functions))
 }
 
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
@@ -630,6 +632,7 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 			Body:           module.CodeSection[codeIndex].Body,
 			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
 			ModuleInstance: target,
+			Address:        s.nextFunctionAddress(),
 		}
 
 		if err := validateFunctionInstance(f, funcs, globals, mems, tables, module.TypeSection, maximumValuesOnStack); err != nil {
@@ -862,6 +865,7 @@ func (s *Store) AddHostFunction(moduleName string, hf *GoFunc) (*FunctionInstanc
 		FunctionKind:   hf.functionKind,
 		FunctionType:   typeInstance,
 		ModuleInstance: m,
+		Address:        s.nextFunctionAddress(),
 	}
 
 	if err = s.Engine.Compile(f); err != nil {

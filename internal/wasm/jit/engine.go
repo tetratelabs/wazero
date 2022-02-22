@@ -1,7 +1,6 @@
 package jit
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"reflect"
@@ -533,19 +532,11 @@ jitentry:
 		switch status := e.exitContext.statusCode; status {
 		case jitCallStatusCodeReturned:
 			// Meaning that all the function frames above the previous call frame stack pointer are executed.
-			if e.globalContext.previousCallFrameStackPointer != e.globalContext.callFrameStackPointer {
-				panic("bug in JIT compiler")
-			}
 		case jitCallStatusCodeCallHostFunction:
 			// Not "callFrameTop" but take the below of peek with "callFrameAt(1)" as the top frame is for host function,
 			// but when making host function calls, we need to pass the memory instance of host function caller.
 			fn := e.compiledFunctions[e.exitContext.functionCallAddress]
 			callerCompiledFunction := e.callFrameAt(1).compiledFunction
-			if buildoptions.IsDebugMode {
-				if fn.source.FunctionKind == wasm.FunctionKindWasm {
-					panic("jitCallStatusCodeCallHostFunction is only for host functions")
-				}
-			}
 			saved := e.globalContext.previousCallFrameStackPointer
 			e.execHostFunction(fn.source.FunctionKind, fn.source.HostFunction,
 				ctx.WithMemory(callerCompiledFunction.source.ModuleInstance.Memory),
@@ -669,7 +660,9 @@ func (e *engine) addCompiledFunction(addr wasm.FunctionAddress, compiled *compil
 }
 
 func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	compiler, err := newCompiler(f, nil)
+	compiler, done, err := newCompiler(f, nil)
+	defer done()
+
 	if err != nil {
 		return nil, err
 	}
@@ -706,7 +699,8 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		fmt.Printf("compilation target wazeroir:\n%s\n", wazeroir.Format(ir.Operations))
 	}
 
-	compiler, err := newCompiler(f, ir)
+	compiler, done, err := newCompiler(f, ir)
+	defer done()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
 	}
@@ -877,10 +871,6 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	code, staticData, stackPointerCeil, err := compiler.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
-	}
-
-	if buildoptions.IsDebugMode {
-		fmt.Printf("compiled code in hex: %s\n", hex.EncodeToString(code))
 	}
 
 	return &compiledFunction{
