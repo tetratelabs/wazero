@@ -12,10 +12,10 @@ import (
 // compile time check to ensure ModuleContext implements publicwasm.ModuleContext
 var _ publicwasm.ModuleContext = &ModuleContext{}
 
-func NewModuleContext(s *Store, instance *ModuleInstance) *ModuleContext {
+func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstance) *ModuleContext {
 	return &ModuleContext{
-		Engine: s.Engine,
-		ctx:    context.Background(),
+		ctx:    ctx,
+		Engine: engine,
 		memory: instance.Memory,
 		Module: instance,
 	}
@@ -23,14 +23,14 @@ func NewModuleContext(s *Store, instance *ModuleInstance) *ModuleContext {
 
 // ModuleContext implements wasm.ModuleContext and wasm.Module
 type ModuleContext struct {
+	// ctx is the default context, exposed as wasm.ModuleContext Context
+	ctx context.Context
 	// Engine is exported for wazero.MakeWasmFunc
 	Engine Engine
 	// Module is exported for wazero.MakeWasmFunc
 	Module *ModuleInstance
 	// memory is exposed as wasm.ModuleContext Memory
 	memory publicwasm.Memory
-	// ctx is exposed as wasm.ModuleContext Context
-	ctx context.Context
 }
 
 // WithContext allows overriding context without re-allocation when the result would be the same.

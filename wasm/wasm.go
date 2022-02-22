@@ -24,10 +24,19 @@ type ModuleExports interface {
 }
 
 // Function is an advanced API allowing efficient invocation of WebAssembly 1.0 (MVP) functions, given predefined
-// knowledge about the function signature. An error is returned for any failure looking up or invoking the function including
-// signature mismatch.
+// knowledge about the function signature. An error is returned for any failure looking up or invoking the function
+// including signature mismatch.
 //
-// Web Assembly 1.0 (MVP) Value Type Conversion:
+// If the `ctx` is nil, it defaults to the same context as the module was initialized with.
+//
+// To ensure context propagation in a HostFunction, use or derive `ctx` from ModuleContext.Context:
+//
+//	hostFunction := func(ctx wasm.ModuleContext, offset, byteCount uint32) uint32 {
+//		fn, _ = ctx.Function("__read")
+//		results, err := fn(ctx.Context(), offset, byteCount)
+//	--snip--
+//
+// The following describes how remaining parameters map to Web Assembly 1.0 (MVP) Value Types:
 //  * I32 - uint64(uint32,int32,int64)
 //  * I64 - uint64
 //  * F32 - EncodeF32 DecodeF32 from float32
@@ -43,8 +52,6 @@ type ModuleExports interface {
 //	results, _ := fn(ctx, wasm.EncodeF64(input))
 //	result := wasm.DecodeF64(result[0])
 //
-// Note: The ctx parameter will be the outer-most ancestor of ModuleContext.Context
-// ctx will default to context.Background() is nil is passed.
 // See https://www.w3.org/TR/wasm-core-1/#binary-valtype
 type Function func(ctx context.Context, params ...uint64) ([]uint64, error)
 

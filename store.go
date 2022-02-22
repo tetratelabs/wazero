@@ -1,6 +1,7 @@
 package wazero
 
 import (
+	"context"
 	"fmt"
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -23,24 +24,42 @@ func NewEngineJIT() *Engine { // TODO: compiler?
 
 // StoreConfig allows customization of a Store via NewStoreWithConfig
 type StoreConfig struct {
+	// Context is the default context used to initialize the module. Defaults to context.Background.
+	//
+	// Notes:
+	// * If the Module defines a start function, this is used to invoke it.
+	// * This is the outer-most ancestor of wasm.ModuleContext Context() during wasm.HostFunction invocations.
+	// * This is the default context of wasm.Function when callers pass nil.
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A0
+	Context context.Context
 	// Engine defaults to NewEngineInterpreter
 	Engine *Engine
 }
 
 func NewStore() wasm.Store {
-	return internalwasm.NewStore(interpreter.NewEngine())
+	return internalwasm.NewStore(context.Background(), interpreter.NewEngine())
 }
 
 // NewStoreWithConfig returns a store with the given configuration.
 func NewStoreWithConfig(config *StoreConfig) wasm.Store {
+	ctx := config.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	engine := config.Engine
 	if engine == nil {
 		engine = NewEngineInterpreter()
 	}
-	return internalwasm.NewStore(engine.e)
+	return internalwasm.NewStore(ctx, engine.e)
 }
 
 // InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
+//
+// Ex.
+//	exports, _ := wazero.InstantiateModule(wazero.NewStore(), mod)
+//
+// Note: StoreConfig.Context is used for any WebAssembly 1.0 (MVP) Start Function.
 func InstantiateModule(store wasm.Store, module *Module) (wasm.ModuleExports, error) {
 	internal, ok := store.(*internalwasm.Store)
 	if !ok {
