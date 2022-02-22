@@ -15,26 +15,91 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestStore_GetModuleInstance(t *testing.T) {
-	name := "test"
+func TestModuleInstance_Memory(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       *Module
+		expected    bool
+		expectedLen uint32
+	}{
+		{
+			name:  "no memory",
+			input: &Module{},
+		},
+		{
+			name:  "memory not exported",
+			input: &Module{MemorySection: []*MemoryType{{1, nil}}},
+		},
+		{
+			name:  "memory not exported, one page",
+			input: &Module{MemorySection: []*MemoryType{{1, nil}}},
+		},
+		{
+			name: "memory exported, different name",
+			input: &Module{
+				MemorySection: []*MemoryType{{1, nil}},
+				ExportSection: map[string]*Export{"momory": {Kind: ExportKindMemory, Name: "momory", Index: 0}},
+			},
+		},
+		{
+			name: "memory exported, but zero length",
+			input: &Module{
+				MemorySection: []*MemoryType{{0, nil}},
+				ExportSection: map[string]*Export{"memory": {Kind: ExportKindMemory, Name: "memory", Index: 0}},
+			},
+			expected: true,
+		},
+		{
+			name: "memory exported, one page",
+			input: &Module{
+				MemorySection: []*MemoryType{{1, nil}},
+				ExportSection: map[string]*Export{"memory": {Kind: ExportKindMemory, Name: "memory", Index: 0}},
+			},
+			expected:    true,
+			expectedLen: 65536,
+		},
+		{
+			name: "memory exported, two pages",
+			input: &Module{
+				MemorySection: []*MemoryType{{2, nil}},
+				ExportSection: map[string]*Export{"memory": {Kind: ExportKindMemory, Name: "memory", Index: 0}},
+			},
+			expected:    true,
+			expectedLen: 65536 * 2,
+		},
+	}
 
-	s := NewStore(context.Background(), nopEngineInstance)
+	for _, tt := range tests {
+		tc := tt
 
-	m1 := s.getModuleInstance(name)
-	require.Equal(t, m1, s.ModuleInstances[name])
-	require.NotNil(t, m1.Exports)
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewStore(context.Background(), &catchContext{})
 
-	m2 := s.getModuleInstance(name)
-	require.Equal(t, m1, m2)
+			instance, err := s.Instantiate(tc.input, "test")
+			require.NoError(t, err)
+
+			mem := instance.Memory("memory")
+			if tc.expected {
+				require.Equal(t, tc.expectedLen, mem.Size())
+			} else {
+				require.Nil(t, mem)
+			}
+		})
+	}
 }
 
 func TestStore_AddHostFunction(t *testing.T) {
-	s := NewStore(context.Background(), nopEngineInstance)
+	s := NewStore(context.Background(), &catchContext{})
 
 	hf, err := NewGoFunc("fn", func(wasm.ModuleContext) {
 	})
 	require.NoError(t, err)
-	_, err = s.AddHostFunction("test", hf)
+
+	// Add the host module
+	hostModule := &ModuleInstance{Name: "test", Exports: make(map[string]*ExportInstance, 1)}
+	s.ModuleInstances[hostModule.Name] = hostModule
+
+	_, err = s.AddHostFunction(hostModule, hf)
 	require.NoError(t, err)
 
 	// The function was added to the store, prefixed by the owning module name
@@ -43,27 +108,30 @@ func TestStore_AddHostFunction(t *testing.T) {
 	require.Equal(t, "test.fn", fn.Name)
 
 	// The function was exported in the module
-	m := s.getModuleInstance("test")
-	require.Equal(t, 1, len(m.Exports))
-	exp, ok := m.Exports["fn"]
+	require.Equal(t, 1, len(hostModule.Exports))
+	exp, ok := hostModule.Exports["fn"]
 	require.True(t, ok)
 
 	// Trying to register it again should fail
-	_, err = s.AddHostFunction("test", hf)
+	_, err = s.AddHostFunction(hostModule, hf)
 	require.EqualError(t, err, `"fn" is already exported in module "test"`)
 
 	// Any side effects should be reverted
 	require.Equal(t, []*FunctionInstance{fn}, s.Functions)
-	require.Equal(t, map[string]*ExportInstance{"fn": exp}, m.Exports)
+	require.Equal(t, map[string]*ExportInstance{"fn": exp}, hostModule.Exports)
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
-	s := NewStore(context.Background(), nopEngineInstance)
+	s := NewStore(context.Background(), &catchContext{})
 
 	hf, err := NewGoFunc("host_fn", func(wasm.ModuleContext) {
 	})
 	require.NoError(t, err)
-	_, err = s.AddHostFunction("", hf)
+
+	// Add the host module
+	hostModule := &ModuleInstance{Name: "", Exports: make(map[string]*ExportInstance, 1)}
+	s.ModuleInstances[hostModule.Name] = hostModule
+	_, err = s.AddHostFunction(hostModule, hf)
 	require.NoError(t, err)
 
 	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
@@ -85,11 +153,78 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 	})
 }
 
+func TestFunctionInstance_call(t *testing.T) {
+	type key string
+	storeCtx := context.WithValue(context.Background(), key("wa"), "zero")
+
+	notStoreCtx := context.WithValue(context.Background(), key("wazer"), "o")
+
+	tests := []struct {
+		name     string
+		ctx      context.Context
+		expected context.Context
+	}{
+		{
+			name:     "nil defaults to store context",
+			ctx:      nil,
+			expected: storeCtx,
+		},
+		{
+			name:     "set overrides store context",
+			ctx:      notStoreCtx,
+			expected: notStoreCtx,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			engine := &catchContext{}
+			store := NewStore(storeCtx, engine)
+
+			// Define a fake host function
+			functionName := "fn"
+			hostFn := func(ctx wasm.ModuleContext) {
+			}
+			fn, err := NewGoFunc(functionName, hostFn)
+			require.NoError(t, err)
+
+			// Add the host module
+			hostModule := &ModuleInstance{Name: "host", Exports: map[string]*ExportInstance{}}
+			store.ModuleInstances[hostModule.Name] = hostModule
+			_, err = store.AddHostFunction(hostModule, fn)
+			require.NoError(t, err)
+
+			// Make a module to import the function
+			instantiated, err := store.Instantiate(&Module{
+				TypeSection: []*FunctionType{{}},
+				ImportSection: []*Import{{
+					Kind:     ImportKindFunc,
+					Module:   hostModule.Name,
+					Name:     functionName,
+					DescFunc: 0,
+				}},
+				MemorySection: []*MemoryType{{1, nil}},
+				ExportSection: map[string]*Export{functionName: {Kind: ExportKindFunc, Name: functionName, Index: 0}},
+			}, "test")
+			require.NoError(t, err)
+
+			// This fails if the function wasn't invoked, or had an unexpected context.
+			_, err = instantiated.Function(functionName)(tc.ctx)
+			require.NoError(t, err)
+			if tc.expected == nil {
+				require.Nil(t, engine.ctx)
+			} else {
+				require.Equal(t, tc.expected, engine.ctx.Context())
+			}
+		})
+	}
+}
+
 func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 	name := "test"
-
-	s := NewStore(context.Background(), nopEngineInstance)
-	mi := s.getModuleInstance(name)
+	s := NewStore(context.Background(), &catchContext{})
 
 	zero := Index(0)
 	nopCode := &Code{nil, []byte{OpcodeEnd}}
@@ -106,6 +241,10 @@ func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 		CodeSection: []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 	}
 
+	// Make a fake module for test
+	mi := &ModuleInstance{Name: name}
+	s.ModuleInstances[mi.Name] = mi
+
 	_, err := s.buildFunctionInstances(m, mi)
 	require.NoError(t, err)
 
@@ -118,31 +257,29 @@ func TestStore_BuildFunctionInstances_FunctionNames(t *testing.T) {
 	require.Equal(t, []string{"unknown", "two", "unknown", "four", "five"}, names)
 }
 
-var nopEngineInstance Engine = &nopEngine{}
-
-type nopEngine struct {
+type catchContext struct {
 	ctx *ModuleContext
 }
 
-func (e *nopEngine) Call(ctx *ModuleContext, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+func (e *catchContext) Call(ctx *ModuleContext, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	e.ctx = ctx
-	return nil, nil
+	return
 }
 
-func (e *nopEngine) Compile(_ *FunctionInstance) error {
+func (e *catchContext) Compile(_ *FunctionInstance) error {
 	return nil
 }
 
 func TestStore_addHostFunction(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
-		s := NewStore(context.Background(), nopEngineInstance)
+		s := NewStore(context.Background(), &catchContext{})
 		const max = 10
 		s.maximumFunctionAddress = max
 		err := s.addFunctionInstance(&FunctionInstance{Address: max + 1})
 		require.Error(t, err)
 	})
 	t.Run("ok", func(t *testing.T) {
-		s := NewStore(context.Background(), nopEngineInstance)
+		s := NewStore(context.Background(), &catchContext{})
 		for i := 0; i < 10; i++ {
 			f := &FunctionInstance{FunctionKind: FunctionKindGoNoContext}
 			require.Len(t, s.Functions, i)
@@ -158,7 +295,7 @@ func TestStore_addHostFunction(t *testing.T) {
 
 func TestStore_getTypeInstance(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
-		s := NewStore(context.Background(), nopEngineInstance)
+		s := NewStore(context.Background(), &catchContext{})
 		const max = 10
 		s.maximumFunctionTypes = max
 		s.TypeIDs = make(map[string]FunctionTypeID)
@@ -177,7 +314,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 		} {
 			tc := tc
 			t.Run(tc.String(), func(t *testing.T) {
-				s := NewStore(context.Background(), nopEngineInstance)
+				s := NewStore(context.Background(), &catchContext{})
 				actual, err := s.getTypeInstance(tc)
 				require.NoError(t, err)
 
@@ -193,7 +330,7 @@ func TestStore_getTypeInstance(t *testing.T) {
 func TestStore_buildGlobalInstances(t *testing.T) {
 	t.Run("too many globals", func(t *testing.T) {
 		// Setup a store to have the reasonably low max on globals for testing.
-		s := NewStore(context.Background(), nopEngineInstance)
+		s := NewStore(context.Background(), &catchContext{})
 		const max = 10
 		s.maximumGlobals = max
 
@@ -202,7 +339,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("invalid constant expression", func(t *testing.T) {
-		s := NewStore(context.Background(), nopEngineInstance)
+		s := NewStore(context.Background(), &catchContext{})
 
 		// Empty constant expression is invalid.
 		m := &Module{GlobalSection: []*Global{{Init: &ConstantExpression{}}}}
@@ -211,7 +348,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 	})
 
 	t.Run("global type mismatch", func(t *testing.T) {
-		s := NewStore(context.Background(), nopEngineInstance)
+		s := NewStore(context.Background(), &catchContext{})
 		m := &Module{GlobalSection: []*Global{{
 			// Global with i32.const initial value, but with type specified as f64 must be error.
 			Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0}},
@@ -230,7 +367,7 @@ func TestStore_buildGlobalInstances(t *testing.T) {
 
 		m := &Module{GlobalSection: []*Global{global}}
 
-		s := NewStore(context.Background(), nopEngineInstance)
+		s := NewStore(context.Background(), &catchContext{})
 		target := &ModuleInstance{}
 		_, err = s.buildGlobalInstances(m, target)
 		require.NoError(t, err)

@@ -4874,7 +4874,7 @@ func (c *amd64Compiler) returnFunction() error {
 	cmpWithPreviousCallStackPointer.To.Reg = decrementedCallFrameStackPointerRegister
 	cmpWithPreviousCallStackPointer.From.Type = obj.TYPE_MEM
 	cmpWithPreviousCallStackPointer.From.Reg = reservedRegisterForEngine
-	cmpWithPreviousCallStackPointer.From.Offset = engineGlobalContextPreviouscallFrameStackPointer
+	cmpWithPreviousCallStackPointer.From.Offset = engineGlobalContextPreviousCallFrameStackPointer
 	c.addInstruction(cmpWithPreviousCallStackPointer)
 
 	jmpIfNotPreviousCallStackPointer := c.newProg()
@@ -5259,7 +5259,7 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 }
 
 func (c *amd64Compiler) initializeReservedMemoryPointer() {
-	if c.f.ModuleInstance.Memory != nil {
+	if c.f.ModuleInstance.MemoryInstance != nil {
 		setupMemoryRegister := c.newProg()
 		setupMemoryRegister.As = x86.AMOVQ
 		setupMemoryRegister.To.Type = obj.TYPE_REG
@@ -5481,7 +5481,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.f.ModuleInstance.Memory != nil {
+	if c.f.ModuleInstance.MemoryInstance != nil {
 		getMemoryInstanceAddress := c.newProg()
 		getMemoryInstanceAddress.As = x86.AMOVQ
 		getMemoryInstanceAddress.To.Type = obj.TYPE_REG

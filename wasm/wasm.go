@@ -8,17 +8,24 @@ import (
 
 // Store allows access to instantiated modules and host functions
 type Store interface {
-	// ModuleExports returns exports from an instantiated module or false if it wasn't.
-	ModuleExports(moduleName string) (ModuleExports, bool)
+	// ModuleExports returns exports from an instantiated module or nil if there aren't any.
+	ModuleExports(moduleName string) ModuleExports
 
-	// HostExports returns exported host functions for the moduleName or false there are none.
-	HostExports(moduleName string) (HostExports, bool)
+	// HostExports returns exported host functions for the moduleName or nil if there aren't any.
+	HostExports(moduleName string) HostExports
 }
 
 // ModuleExports return functions exported in a module, post-instantiation.
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 type ModuleExports interface {
+	// Memory returns a memory exported from this module or nil if it wasn't.
+	//
+	// Note: WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
+	// as a WASI Command or Reactor will never return nil for this name.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
+	Memory(name string) Memory
+
 	// Function returns a function exported from this module or nil if it wasn't.
 	Function(name string) Function
 }
@@ -93,11 +100,13 @@ type ModuleContext interface {
 // Note: This includes all value types available in WebAssembly 1.0 (MVP) and all are encoded little-endian.
 // See https://www.w3.org/TR/wasm-core-1/#storage%E2%91%A0
 type Memory interface {
-	// Len returns the size in bytes available. Ex. If the underlying memory has 1 page: 65536
+	// Size returns the size in bytes available. Ex. If the underlying memory has 1 page: 65536
 	//
 	// Note: this will not grow during a host function call, even if the underlying memory can.  Ex. If the underlying
 	// memory has min 0 and max 2 pages, this returns zero.
-	Len() uint32
+	//
+	// See https://www.w3.org/TR/wasm-core-1/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
+	Size() uint32
 
 	// ReadUint32Le reads a uint32 in little-endian encoding from the underlying buffer at the offset in or returns
 	// false if out of range.

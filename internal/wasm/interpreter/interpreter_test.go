@@ -50,7 +50,7 @@ func TestInterpreter_CallHostFunc(t *testing.T) {
 		hostFn := reflect.ValueOf(func(ctx publicwasm.ModuleContext) {
 			ctxMemory = ctx.Memory()
 		})
-		module := &wasm.ModuleInstance{Memory: memory}
+		module := &wasm.ModuleInstance{MemoryInstance: memory}
 		it := interpreter{functions: map[wasm.FunctionAddress]*interpreterFunction{
 			0: {hostFn: &hostFn, funcInstance: &wasm.FunctionInstance{
 				FunctionKind: wasm.FunctionKindGoModuleContext,

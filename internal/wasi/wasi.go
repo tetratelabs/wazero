@@ -187,7 +187,7 @@ type SnapshotPreview1 interface {
 	//
 	// * argv - is the offset to begin writing argument offsets in uint32 little-endian encoding.
 	//   * ArgsSizesGet result argc * 4 bytes are written to this offset
-	// * argvBuf - is the offset to write the null terminated arguments to wasm.MemoryInstance
+	// * argvBuf - is the offset to write the null terminated arguments to ctx.Memory
 	//   * ArgsSizesGet result argv_buf_size bytes are written to this offset
 	//
 	// For example, if ArgsSizesGet wrote argc=2 and argvBufSize=5 for arguments: "a" and "bc"
@@ -215,8 +215,8 @@ type SnapshotPreview1 interface {
 	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
 	// returns ErrnoFault.
 	//
-	// * resultArgc - is the offset to write the argument count to wasm.Memory
-	// * resultArgvBufSize - is the offset to write the null-terminated argument length to wasm.Memory
+	// * resultArgc - is the offset to write the argument count to ctx.Memory
+	// * resultArgvBufSize - is the offset to write the null-terminated argument length to ctx.Memory
 	//
 	// For example, if Args are []string{"a","bc"} and
 	//   ArgsSizesGet parameters resultArgc=1 and resultArgvBufSize=6, we expect `ctx.Memory` to contain:
@@ -243,7 +243,7 @@ type SnapshotPreview1 interface {
 	//
 	// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
 	//   * EnvironSizesGet result environc * 4 bytes are written to this offset
-	// * environBuf - is the offset to write the environment variables to wasm.Memory
+	// * environBuf - is the offset to write the environment variables to ctx.Memory
 	//   * the format is the same as os.Environ, null terminated "key=val" entries
 	//   * EnvironSizesGet result environBufSize bytes are written to this offset
 	//
@@ -271,8 +271,8 @@ type SnapshotPreview1 interface {
 	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
 	// returns ErrnoFault.
 	//
-	// * resultEnvironc - is the offset to write the environment variable count to wasm.Memory
-	// * resultEnvironBufSize - is the offset to write the null-terminated environment variable length to wasm.Memory
+	// * resultEnvironc - is the offset to write the environment variable count to ctx.Memory
+	// * resultEnvironBufSize - is the offset to write the null-terminated environment variable length to ctx.Memory
 	//
 	// For example, if Environ is []string{"a=b","b=cd"} and
 	//   EnvironSizesGet parameters are resultEnvironc=1 and resultEnvironBufSize=6, we expect `ctx.Memory` to contain:
@@ -299,7 +299,7 @@ type SnapshotPreview1 interface {
 	//
 	// * id - The clock id for which to return the time.
 	// * precision - The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
-	// * resultTimestamp - the offset to write the timestamp to wasm.Memory
+	// * resultTimestamp - the offset to write the timestamp to ctx.Memory
 	//   * the timestamp is epoch nanoseconds encoded as a uint64 little-endian encoding.
 	//
 	// For example, if time.Now returned exactly midnight UTC 2022-01-01 (1640995200000000000), and
@@ -481,7 +481,7 @@ type SnapshotPreview1 interface {
 
 	// RandomGet is the WASI function named FunctionRandomGet that write random data in buffer (rand.Read()).
 	//
-	// * buf - is the wasm.Memory offset to write random values
+	// * buf - is the ctx.Memory offset to write random values
 	// * bufLen - size of random data in bytes
 	//
 	// For example, if underlying random source was seeded like `rand.NewSource(42)`, we expect `ctx.Memory` to contain:

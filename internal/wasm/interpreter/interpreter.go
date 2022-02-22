@@ -517,8 +517,9 @@ func (it *interpreter) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunct
 		in[i] = val
 	}
 
+	// A host function is invoked with the calling frame's memory, which may be different if in another module.
 	if len(it.frames) > 0 {
-		ctx = ctx.WithMemory(it.frames[len(it.frames)-1].f.funcInstance.ModuleInstance.Memory)
+		ctx = ctx.WithMemory(it.frames[len(it.frames)-1].f.funcInstance.ModuleInstance.MemoryInstance)
 	}
 
 	// Handle any special parameter zero
@@ -548,7 +549,7 @@ func (it *interpreter) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunct
 func (it *interpreter) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
 	moduleInst := f.funcInstance.ModuleInstance
-	memoryInst := moduleInst.Memory
+	memoryInst := moduleInst.MemoryInstance
 	globals := moduleInst.Globals
 	var table *wasm.TableInstance
 	if len(moduleInst.Tables) > 0 {

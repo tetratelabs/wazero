@@ -517,7 +517,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	// Next we compare the decremented call frame stack pointer with the engine.precviousCallFrameStackPointer.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForEngine, engineGlobalContextPreviouscallFrameStackPointer,
+		reservedRegisterForEngine, engineGlobalContextPreviousCallFrameStackPointer,
 		tmpReg,
 	)
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, callFramePointerReg, tmpReg)
@@ -3338,7 +3338,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 }
 
 func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
-	if c.f.ModuleInstance.Memory != nil {
+	if c.f.ModuleInstance.MemoryInstance != nil {
 		// "reservedRegisterForMemory = engine.MemoryElement0Address"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
@@ -3404,7 +3404,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.f.ModuleInstance.Memory != nil {
+	if c.f.ModuleInstance.MemoryInstance != nil {
 		// "tmpX = moduleInstance.Memory"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
