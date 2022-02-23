@@ -94,15 +94,18 @@ func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.ModuleExport
 	if !ok {
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
 	}
-	m, name, err := decodeModule(module)
+	m, err := decodeModule(module)
 	if err != nil {
 		return nil, err
 	}
-	if err := internalwasi.ValidateWASICommand(m, name); err != nil {
+
+	moduleName := getModuleName(module.Name, m)
+
+	if err = internalwasi.ValidateWASICommand(m, moduleName); err != nil {
 		return nil, err
 	}
 
-	instantiated, err := internal.Instantiate(m, name)
+	instantiated, err := internal.Instantiate(m, moduleName)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +113,7 @@ func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.ModuleExport
 
 	start := ctx.Function(internalwasi.FunctionStart)
 	if _, err = start(ctx.Context()); err != nil {
-		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", name, internalwasi.FunctionStart, err)
+		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", moduleName, internalwasi.FunctionStart, err)
 	}
 	return instantiated, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
 	"github.com/tetratelabs/wazero/wasm"
@@ -35,13 +36,9 @@ func TestDecodeModule(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			config := &ModuleConfig{Name: tc.moduleName, Source: tc.source}
-			_, name, err := decodeModule(config)
+			_, err := decodeModule(config)
 			require.NoError(t, err)
-			if tc.moduleName == "" {
-				require.Equal(t, "test" /* from the text format */, name)
-			} else {
-				require.Equal(t, tc.moduleName, name)
-			}
+			require.Equal(t, tc.moduleName, config.Name)
 
 			// Avoid adding another test just to check Validate works
 			require.NoError(t, config.Validate())
@@ -50,35 +47,35 @@ func TestDecodeModule(t *testing.T) {
 
 	t.Run("caches repetitive decodes", func(t *testing.T) {
 		config := &ModuleConfig{Source: wat}
-		m, _, err := decodeModule(config)
+		m, err := decodeModule(config)
 		require.NoError(t, err)
 
-		again, _, err := decodeModule(config)
+		again, err := decodeModule(config)
 		require.NoError(t, err)
 		require.Same(t, m, again)
 
 		// Ensure config that only changes the name doesn't have to re-decode the source.
-		cloned, _, err := decodeModule(config.WithName("wazero"))
+		cloned, err := decodeModule(config.WithName("wazero"))
 		require.NoError(t, err)
 		require.Same(t, m, cloned)
 	})
 
 	t.Run("changing source invalidates decode cache", func(t *testing.T) {
 		config := &ModuleConfig{Source: wat}
-		m, _, err := decodeModule(config)
+		m, err := decodeModule(config)
 		require.NoError(t, err)
 
 		clonedConfig := config.WithName("wazero")
 
 		// When the source is changed, the module needs to be decoded again
 		config.Source = wasm
-		again, _, err := decodeModule(config)
+		again, err := decodeModule(config)
 		require.NoError(t, err)
 		require.Equal(t, m, again)
 		require.NotSame(t, m, again)
 
 		// Any copies of the config shouldn't be invalidated
-		cloned, _, err := decodeModule(clonedConfig)
+		cloned, err := decodeModule(clonedConfig)
 		require.NoError(t, err)
 		require.Same(t, m, cloned)
 	})
@@ -111,13 +108,29 @@ func TestDecodeModule_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			config := &ModuleConfig{Source: tc.source}
-			_, _, err := decodeModule(config)
+			_, err := decodeModule(config)
 			require.EqualError(t, err, tc.expectedErr)
 
 			// Avoid adding another test just to check Validate works
 			require.EqualError(t, config.Validate(), tc.expectedErr)
 		})
 	}
+}
+
+// TestInstantiateModule_Renamed tests that we can pre-validate (cache) a module and instantiate it under different
+// names. This pattern is used in wapc-go.
+func TestInstantiateModule_Renamed(t *testing.T) {
+	base := &ModuleConfig{Source: []byte(`(module (memory 1))`)}
+	require.NoError(t, base.Validate()) // cache
+
+	// Use the same store to instantiate multiple modules
+	store := NewStore()
+
+	_, err := InstantiateModule(store, base.WithName("1"))
+	require.NoError(t, err)
+
+	_, err = InstantiateModule(store, base.WithName("2"))
+	require.NoError(t, err)
 }
 
 // TestModuleExports_Memory only covers a couple cases to avoid duplication of internal/wasm/store_test.go
@@ -242,4 +255,53 @@ func requireImportAndExportFunction(t *testing.T, store wasm.Store, hostFn func(
 	return []byte(fmt.Sprintf(
 		`(module (import "host" "%[1]s" (func (result i64))) (export "%[1]s" (func 0)))`, functionName,
 	))
+}
+
+func TestGetModuleName(t *testing.T) {
+	tests := []struct {
+		name       string
+		moduleName string
+		module     *internalwasm.Module
+		expected   string
+	}{
+		{
+			name:   "empty on nil name section",
+			module: &internalwasm.Module{},
+		},
+		{
+			name:   "empty on empty NameSection.ModuleName",
+			module: &internalwasm.Module{NameSection: &internalwasm.NameSection{}},
+		},
+		{
+			name:     "NameSection.ModuleName",
+			module:   &internalwasm.Module{NameSection: &internalwasm.NameSection{ModuleName: "test"}},
+			expected: "test",
+		},
+		{
+			name:       "overrides nil name section",
+			moduleName: "wazero",
+			module:     &internalwasm.Module{},
+			expected:   "wazero",
+		},
+		{
+			name:       "overrides empty NameSection.ModuleName",
+			moduleName: "wazero",
+			module:     &internalwasm.Module{NameSection: &internalwasm.NameSection{}},
+			expected:   "wazero",
+		},
+		{
+			name:       "overrides NameSection.ModuleName",
+			moduleName: "wazero",
+			module:     &internalwasm.Module{NameSection: &internalwasm.NameSection{ModuleName: "test"}},
+			expected:   "wazero",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, getModuleName(tc.moduleName, tc.module))
+		})
+	}
 }
