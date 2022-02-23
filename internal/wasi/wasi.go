@@ -436,15 +436,15 @@ type SnapshotPreview1 interface {
 	//     offset --+   length --+   offset --+  length --+
 	//
 	// If the contents of the `fd` parameter was "wazero" (6 bytes) and
-	//    parameter resultSize=30, this function writes the below to `ctx.Memory`:
+	//    parameter resultSize=26, this function writes the below to `ctx.Memory`:
 	//
-	//                       iovs[0].length        iovs[1].length           uint32le
-	//                      +--------------+       +----+                  +--------+
-	//                      |              |       |    |                  |        |
-	//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ?, ?, ?, ?, ?, 6, 0, 0, 0 }
-	//     iovs[0].offset --^                      ^                       ^
-	//                            iovs[1].offset --+                       |
-	//                                                        resultSize --+
+	//                       iovs[0].length        iovs[1].length
+	//                      +--------------+       +----+       uint32le
+	//                      |              |       |    |      +--------+
+	//   []byte{ 0..16, ?, 'w', 'a', 'z', 'e', ?, 'r', 'o', ?, 6, 0, 0, 0 }
+	//     iovs[0].offset --^                      ^           ^
+	//                            iovs[1].offset --+           |
+	//                                            resultSize --+
 	//
 	// Note: ImportFdRead shows this signature in the WebAssembly 1.0 (MVP) Text Format.
 	// Note: This is similar to `readv` in POSIX.
@@ -495,12 +495,12 @@ type SnapshotPreview1 interface {
 	//     iovs[0].offset --^                      ^
 	//                            iovs[1].offset --+
 	//
-	// Since "wazero" was written, if parameter resultSize=30, this function writes the below to `ctx.Memory`:
+	// Since "wazero" was written, if parameter resultSize=26, this function writes the below to `ctx.Memory`:
 	//
 	//                      uint32le
 	//                     +--------+
 	//                     |        |
-	//   []byte{ 0..28, ?, 6, 0, 0, 0', ? }
+	//   []byte{ 0..24, ?, 6, 0, 0, 0', ? }
 	//        resultSize --^
 	//
 	// Note: ImportFdWrite shows this signature in the WebAssembly 1.0 (MVP) Text Format.
@@ -801,7 +801,7 @@ func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, when
 	return wasi.ErrnoNosys // TODO: implement
 }
 
-// FdWrite implements SnahpshotPreview1.FdWrite
+// FdWrite implements SnapshotPreview1.FdWrite
 func (a *wasiAPI) FdWrite(ctx wasm.ModuleContext, fd, iovs, iovsLen, resultSize uint32) wasi.Errno {
 	var writer io.Writer
 

@@ -55,7 +55,7 @@ func TestAPI_ArgsGet(t *testing.T) {
 
 	store, ctx, fn := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, "test", args)
 
-	t.Run("ArgsGet", func(t *testing.T) {
+	t.Run("SnapshotPreview1.ArgsGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// Invoke ArgsGet directly and check the memory side effects.
@@ -138,7 +138,7 @@ func TestAPI_ArgsSizesGet(t *testing.T) {
 
 	store, ctx, fn := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, "test", args)
 
-	t.Run("ArgsSizesGet", func(t *testing.T) {
+	t.Run("SnapshotPreview1.ArgsSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// Invoke ArgsSizesGet directly and check the memory side effects.
@@ -257,7 +257,7 @@ func TestAPI_EnvironGet(t *testing.T) {
 
 	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, "test", envOpt)
 
-	t.Run("EnvironGet", func(t *testing.T) {
+	t.Run("SnapshotPreview1.EnvironGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// Invoke EnvironGet directly and check the memory side effects.
@@ -340,7 +340,7 @@ func TestAPI_EnvironSizesGet(t *testing.T) {
 
 	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, "test", envOpt)
 
-	t.Run("EnvironSizesGet", func(t *testing.T) {
+	t.Run("SnapshotPreview1.EnvironSizesGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// Invoke EnvironSizesGet directly and check the memory side effects.
@@ -422,7 +422,7 @@ func TestAPI_ClockTimeGet(t *testing.T) {
 	}
 	store, ctx, fn := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, "test", clockOpt)
 
-	t.Run("ClockTimeGet", func(t *testing.T) {
+	t.Run("SnapshotPreview1.ClockTimeGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// invoke ClockTimeGet directly and check the memory side effects!
@@ -652,7 +652,7 @@ func TestAPI_FdRead(t *testing.T) {
 		18, 0, 0, 0 /* offset = 18 */, 2, 0, 0, 0, // length = 2
 		21, 0, 0, 0 /* offset = 21 */, 2, 0, 0, 0, // length = 2
 	}
-	iovsLen := uint32(2)     // The length of iovecs
+	iovsLen := uint32(2)     // The length of iovs
 	resultSize := uint32(24) // arbitrary offset
 	maskLength := 28         // number of bytes to write '?' to tell what we've written
 	expectedMemory := append(
@@ -785,27 +785,27 @@ func TestAPI_FdWrite(t *testing.T) {
 		})
 		return store, ctx, fn, api, file
 	}
-
 	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 	iovs := uint32(1) // arbitrary offset
 	initialMemory := []byte{
+		'?',         // `iovs` is after this
+		18, 0, 0, 0, // = iovs[0].offset
+		4, 0, 0, 0, // = iovs[0].length
+		23, 0, 0, 0, // = iovs[1].offset
+		2, 0, 0, 0, // = iovs[1].length
+		'?',                // iovs[0].offset is after this
+		'w', 'a', 'z', 'e', // iovs[0].length bytes
+		'?',      // iovs[1].offset is after this
+		'r', 'o', // iovs[1].length bytes
 		'?',
-		// iovs[0] and iovs[1], respectively. See the comments of SnapshotPreview1.FdWrite for the detailed layout.
-		17, 0, 0, 0 /* offset = 17 */, 2, 0, 0, 0, // length = 2
-		20, 0, 0, 0 /* offset = 20 */, 2, 0, 0, 0, // length = 2
-		't', 'e', // 17th
-		'?',
-		's', 't', // 20th
 	}
-	iovsLen := uint32(2)     // The length of iovecs
-	resultSize := uint32(22) // arbitrary offset
-	maskLength := 27         // number of bytes to write '?' to tell what we've written
+	iovsLen := uint32(2)              // The length of iovs
+	resultSize := uint32(26)          // arbitrary offset
+	maskLength := int(resultSize) + 5 // number of bytes to write '?' to tell what we've written
 	expectedMemory := append(
 		initialMemory,
-		[]byte{
-			4, 0, 0, 0,
-			'?',
-		}...,
+		6, 0, 0, 0, // sum(iovs[...].length) == length of "wazero"
+		'?',
 	)
 
 	t.Run("SnapshotPreview1.FdWrite", func(t *testing.T) {
@@ -816,9 +816,9 @@ func TestAPI_FdWrite(t *testing.T) {
 		errno := api.FdWrite(ctx, fd, iovs, iovsLen, resultSize)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
-		require.Equal(t, []byte("test"), file.buf.Bytes())
+		require.Equal(t, []byte("wazero"), file.buf.Bytes())
 	})
-	t.Run(FunctionFdRead, func(t *testing.T) {
+	t.Run(FunctionFdWrite, func(t *testing.T) {
 		store, ctx, fn, _, file := setupFD(fd)
 		maskMemory(store, maskLength)
 		copy(store.Memories[0].Buffer[0:], initialMemory)
@@ -827,7 +827,7 @@ func TestAPI_FdWrite(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
-		require.Equal(t, []byte("test"), file.buf.Bytes())
+		require.Equal(t, []byte("wazero"), file.buf.Bytes())
 	})
 }
 
@@ -1001,7 +1001,7 @@ func TestAPI_RandomGet(t *testing.T) {
 
 	store, ctx, fn := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, "test", randOpt)
 
-	t.Run("RandomGet", func(t *testing.T) {
+	t.Run("SnapshotPreview1.RandomGet", func(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// invoke RandomGet directly and check the memory side effects!
