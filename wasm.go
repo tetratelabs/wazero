@@ -67,6 +67,12 @@ type ModuleConfig struct {
 	Source []byte
 }
 
+// Validate errs if the source is invalid. This is used to pre-flight check the Source when instantiation is deferred.
+func (m *ModuleConfig) Validate() error {
+	_, _, err := decodeModule(m)
+	return err
+}
+
 // InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 //
 // Ex.

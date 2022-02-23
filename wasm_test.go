@@ -34,13 +34,17 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, name, err := decodeModule(&ModuleConfig{Name: tc.moduleName, Source: tc.source})
+			config := &ModuleConfig{Name: tc.moduleName, Source: tc.source}
+			_, name, err := decodeModule(config)
 			require.NoError(t, err)
 			if tc.moduleName == "" {
 				require.Equal(t, "test" /* from the text format */, name)
 			} else {
 				require.Equal(t, tc.moduleName, name)
 			}
+
+			// Avoid adding another test just to check Validate works
+			require.NoError(t, config.Validate())
 		})
 	}
 }
@@ -71,8 +75,12 @@ func TestDecodeModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := decodeModule(&ModuleConfig{Source: tc.source})
+			config := &ModuleConfig{Source: tc.source}
+			_, _, err := decodeModule(config)
 			require.EqualError(t, err, tc.expectedErr)
+
+			// Avoid adding another test just to check Validate works
+			require.EqualError(t, config.Validate(), tc.expectedErr)
 		})
 	}
 }
