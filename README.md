@@ -17,11 +17,8 @@ func main() {
 	// * Ex. (func (export "fac") (param i64) (result i64) ...
 	source, _ := os.ReadFile("./tests/engine/testdata/fac.wasm")
 
-	// Decode the binary as WebAssembly module.
-	mod, _ := wazero.DecodeModuleBinary(source)
-
 	// Instantiate the module with a Wasm Interpreter, to return its exported functions
-	exports, _ := wazero.InstantiateModule(wazero.NewStore(), mod)
+	exports, _ := wazero.InstantiateModule(wazero.NewStore(), &wazero.ModuleConfig{Source: source})
 
 	// Discover 7! is 5040
 	fmt.Println(exports.Function("fac")(context.Background(), 7))

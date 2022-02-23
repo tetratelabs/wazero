@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
 )
 
 // fibWasm was compiled from TinyGo testdata/fibonacci.go
@@ -16,16 +15,13 @@ import (
 var fibWasm []byte // TODO: implement this in text format as it is less distracting setup
 
 func Test_fibonacci(t *testing.T) {
-	mod, err := wazero.DecodeModuleBinary(fibWasm)
-	require.NoError(t, err)
-
 	store := wazero.NewStore()
 
 	// Note: fibonacci.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	_, err = wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
+	_, err := wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 
-	exports, err := wazero.StartWASICommand(store, mod)
+	exports, err := wazero.StartWASICommand(store, &wazero.ModuleConfig{Source: fibWasm})
 	require.NoError(t, err)
 
 	fibonacci := exports.Function("fibonacci")

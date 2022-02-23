@@ -16,7 +16,7 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 
 	// Magic number.
 	buf := make([]byte, 4)
-	if _, err := io.ReadFull(r, buf); err != nil || !bytes.Equal(buf, magic) {
+	if _, err := io.ReadFull(r, buf); err != nil || !bytes.Equal(buf, Magic) {
 		return nil, ErrInvalidMagicNumber
 	}
 

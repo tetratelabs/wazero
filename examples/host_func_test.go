@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -50,19 +49,17 @@ func Test_hostFunc(t *testing.T) {
 		require.Equal(t, bufferSize, n)
 	}
 
-	mod, err := wazero.DecodeModuleBinary(hostFuncWasm)
-	require.NoError(t, err)
-
 	store := wazero.NewStore()
 
-	_, err = wazero.ExportHostFunctions(store, "env", map[string]interface{}{"get_random_string": getRandomString})
+	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
+	_, err := wazero.InstantiateHostModule(store, env)
 	require.NoError(t, err)
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	_, err = wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
+	_, err = wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 
-	exports, err := wazero.StartWASICommand(store, mod)
+	exports, err := wazero.StartWASICommand(store, &wazero.ModuleConfig{Source: hostFuncWasm})
 	require.NoError(t, err)
 
 	allocateBufferFn := exports.Function("allocate_buffer")

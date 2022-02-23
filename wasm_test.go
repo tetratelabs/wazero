@@ -8,8 +8,66 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/wasm/binary"
+	"github.com/tetratelabs/wazero/internal/wasm/text"
 	"github.com/tetratelabs/wazero/wasm"
 )
+
+func TestInstantiateModule(t *testing.T) {
+	wat := []byte(`(module)`)
+	m, err := text.DecodeModule(wat)
+	require.NoError(t, err)
+	wasm := binary.EncodeModule(m)
+
+	tests := []struct {
+		name   string
+		source []byte
+	}{
+		{name: "binary", source: wasm},
+		{name: "text", source: wat},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := InstantiateModule(NewStore(), &ModuleConfig{Source: tc.source})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestInstantiateModule_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		source      []byte
+		expectedErr string
+	}{
+		{
+			name:        "nil",
+			expectedErr: "source == nil",
+		},
+		{
+			name:        "invalid binary",
+			source:      append(binary.Magic, []byte("yolo")...),
+			expectedErr: "invalid version header",
+		},
+		{
+			name:        "invalid text",
+			source:      []byte(`(modular)`),
+			expectedErr: "1:2: unexpected field: modular",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := InstantiateModule(NewStore(), &ModuleConfig{Source: tc.source})
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
 
 // TestModuleExports_Memory only covers a couple cases to avoid duplication of internal/wasm/store_test.go
 func TestModuleExports_Memory(t *testing.T) {
@@ -31,15 +89,11 @@ func TestModuleExports_Memory(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			mod, err := DecodeModuleText([]byte(tc.wat))
-			require.NoError(t, err)
-
 			// Instantiate the module and get the export of the above hostFn
-			exports, err := InstantiateModule(NewStore(), mod)
+			exports, err := InstantiateModule(NewStore(), &ModuleConfig{Source: []byte(tc.wat)})
 			require.NoError(t, err)
 
 			mem := exports.Memory("memory")
@@ -89,10 +143,10 @@ func TestFunction_Context(t *testing.T) {
 				require.Equal(t, tc.expected, ctx.Context())
 				return expectedResult
 			}
-			mod := requireImportAndExportFunction(t, store, hostFn, functionName)
+			source := requireImportAndExportFunction(t, store, hostFn, functionName)
 
 			// Instantiate the module and get the export of the above hostFn
-			exports, err := InstantiateModule(store, mod)
+			exports, err := InstantiateModule(store, &ModuleConfig{Source: source})
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
@@ -114,27 +168,27 @@ func TestInstantiateModule_UsesStoreContext(t *testing.T) {
 		calledStart = true
 		require.Equal(t, config.Context, ctx.Context())
 	}
-	_, err := ExportHostFunctions(store, "", map[string]interface{}{"start": start})
-	require.NoError(t, err)
 
-	mod, err := DecodeModuleText([]byte(`(module $store_test.go
-	(import "" "start" (func $start))
-	(start $start)
-)`))
+	_, err := InstantiateHostModule(store, &HostModuleConfig{Functions: map[string]interface{}{"start": start}})
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	_, err = InstantiateModule(store, mod)
+	_, err = InstantiateModule(store, &ModuleConfig{Source: []byte(`(module $store_test.go
+	(import "" "start" (func $start))
+	(start $start)
+)`)})
 	require.NoError(t, err)
 	require.True(t, calledStart)
 }
 
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
-func requireImportAndExportFunction(t *testing.T, store wasm.Store, hostFn func(ctx wasm.ModuleContext) uint64, functionName string) *Module {
-	_, err := ExportHostFunctions(store, "host", map[string]interface{}{functionName: hostFn})
+func requireImportAndExportFunction(t *testing.T, store wasm.Store, hostFn func(ctx wasm.ModuleContext) uint64, functionName string) []byte {
+	_, err := InstantiateHostModule(store, &HostModuleConfig{
+		Name: "host", Functions: map[string]interface{}{functionName: hostFn},
+	})
 	require.NoError(t, err)
-	wat := fmt.Sprintf(`(module (import "host" "%[1]s" (func (result i64))) (export "%[1]s" (func 0)))`, functionName)
-	mod, err := DecodeModuleText([]byte(wat))
-	require.NoError(t, err)
-	return mod
+
+	return []byte(fmt.Sprintf(
+		`(module (import "host" "%[1]s" (func (result i64))) (export "%[1]s" (func 0)))`, functionName,
+	))
 }

@@ -175,14 +175,9 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 }
 
 func newWazeroFacIterBench(engine *wazero.Engine) (wasm.Function, error) {
-	mod, err := wazero.DecodeModuleBinary(facWasm)
-	if err != nil {
-		return nil, err
-	}
-
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
 
-	m, err := wazero.InstantiateModule(store, mod)
+	m, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: facWasm})
 	if err != nil {
 		return nil, err
 	}
