@@ -34,15 +34,43 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, name, err := decodeModule(&ModuleConfig{Name: tc.moduleName, Source: tc.source})
+			config := &ModuleConfig{Name: tc.moduleName, Source: tc.source}
+			_, name, err := decodeModule(config)
 			require.NoError(t, err)
 			if tc.moduleName == "" {
 				require.Equal(t, "test" /* from the text format */, name)
 			} else {
 				require.Equal(t, tc.moduleName, name)
 			}
+
+			// Avoid adding another test just to check Validate works
+			require.NoError(t, config.Validate())
 		})
 	}
+
+	t.Run("caches repetitive decodes", func(t *testing.T) {
+		config := &ModuleConfig{Source: wat}
+		m, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		again, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		require.Same(t, m, again)
+	})
+
+	t.Run("changing source invalidates decode cache", func(t *testing.T) {
+		config := &ModuleConfig{Source: wat}
+		m, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		config.Source = wasm
+		again, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		require.Equal(t, m, again)
+		require.NotSame(t, m, again)
+	})
 }
 
 func TestDecodeModule_Errors(t *testing.T) {
@@ -71,8 +99,12 @@ func TestDecodeModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := decodeModule(&ModuleConfig{Source: tc.source})
+			config := &ModuleConfig{Source: tc.source}
+			_, _, err := decodeModule(config)
 			require.EqualError(t, err, tc.expectedErr)
+
+			// Avoid adding another test just to check Validate works
+			require.EqualError(t, config.Validate(), tc.expectedErr)
 		})
 	}
 }
