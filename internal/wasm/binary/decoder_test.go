@@ -124,9 +124,9 @@ func TestDecodeModule_Errors(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name:        "wrong Magic",
+			name:        "wrong magic",
 			input:       []byte("wasm\x01\x00\x00\x00"),
-			expectedErr: "invalid Magic number",
+			expectedErr: "invalid magic number",
 		},
 		{
 			name:        "wrong version",
