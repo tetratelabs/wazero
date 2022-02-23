@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -132,23 +131,20 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
 
-	_, err := wazero.ExportHostFunctions(store, "env", map[string]interface{}{"get_random_string": getRandomString})
+	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
+	_, err := wazero.InstantiateHostModule(store, env)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	_, err = wazero.ExportHostFunctions(store, wasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
+	// Add WASI to satisfy import tests
+	_, err = wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	mod, err := wazero.DecodeModuleBinary(caseWasm)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	m, err := wazero.StartWASICommand(store, mod)
+	m, err := wazero.StartWASICommand(store, &wazero.ModuleConfig{Source: caseWasm})
 	if err != nil {
 		b.Fatal(err)
 	}

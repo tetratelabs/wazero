@@ -20,12 +20,12 @@ func TestModule_Encode(t *testing.T) {
 		{
 			name:     "empty",
 			input:    &wasm.Module{},
-			expected: append(magic, version...),
+			expected: append(Magic, version...),
 		},
 		{
 			name:  "only name section",
 			input: &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "simple"}},
-			expected: append(append(magic, version...),
+			expected: append(append(Magic, version...),
 				wasm.SectionIDCustom, 0x0e, // 14 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x07, // 7 bytes in this subsection
@@ -41,7 +41,7 @@ func TestModule_Encode(t *testing.T) {
 					{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
 				},
 			},
-			expected: append(append(magic, version...),
+			expected: append(append(Magic, version...),
 				wasm.SectionIDType, 0x12, // 18 bytes in this section
 				0x03,             // 3 types
 				0x60, 0x00, 0x00, // func=0x60 no param no result
@@ -68,7 +68,7 @@ func TestModule_Encode(t *testing.T) {
 					},
 				},
 			},
-			expected: append(append(magic, version...),
+			expected: append(append(Magic, version...),
 				wasm.SectionIDType, 0x0d, // 13 bytes in this section
 				0x02,                            // 2 types
 				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result
@@ -92,7 +92,7 @@ func TestModule_Encode(t *testing.T) {
 				}},
 				StartSection: &zero,
 			},
-			expected: append(append(magic, version...),
+			expected: append(append(Magic, version...),
 				wasm.SectionIDType, 0x04, // 4 bytes in this section
 				0x01,           // 1 type
 				0x60, 0x0, 0x0, // func=0x60 0 params and 0 result
@@ -127,7 +127,7 @@ func TestModule_Encode(t *testing.T) {
 					},
 				},
 			},
-			expected: append(append(magic, version...),
+			expected: append(append(Magic, version...),
 				wasm.SectionIDType, 0x07, // 7 bytes in this section
 				0x01,                            // 1 type
 				0x60, 0x02, i32, i32, 0x01, i32, // func=0x60 2 params and 1 result

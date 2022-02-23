@@ -32,13 +32,13 @@ type WASIConfig struct {
 	Preopens map[string]wasi.FS
 }
 
-// WASISnapshotPreview1 are functions to export as wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1() map[string]interface{} {
+// WASISnapshotPreview1 are functions importable as the module name wasi.ModuleSnapshotPreview1
+func WASISnapshotPreview1() *HostModuleConfig {
 	return WASISnapshotPreview1WithConfig(&WASIConfig{})
 }
 
-// WASISnapshotPreview1WithConfig are functions to export as wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1WithConfig(c *WASIConfig) map[string]interface{} {
+// WASISnapshotPreview1WithConfig are functions importable as the module name wasi.ModuleSnapshotPreview1
+func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
 	// TODO: delete the internalwasi.Option types as they are not accessible as they are internal!
 	var opts []internalwasi.Option
 	if c.Stdin != nil {
@@ -73,7 +73,7 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) map[string]interface{} {
 			opts = append(opts, internalwasi.Preopen(k, v))
 		}
 	}
-	return internalwasi.SnapshotPreview1Functions(opts...)
+	return &HostModuleConfig{Name: wasi.ModuleSnapshotPreview1, Functions: internalwasi.SnapshotPreview1Functions(opts...)}
 }
 
 // StartWASICommand instantiates the module and starts its WASI Command function ("_start"). The return value are all
@@ -89,16 +89,20 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) map[string]interface{} {
 // Note: The wasm.Functions return value does not restrict exports after "_start" as allowed in the specification.
 // Note: All TinyGo Wasm are WASI commands. They initialize memory on "_start" and import "fd_write" to implement panic.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-func StartWASICommand(store wasm.Store, module *Module) (wasm.ModuleExports, error) {
+func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.ModuleExports, error) {
 	internal, ok := store.(*internalwasm.Store)
 	if !ok {
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
 	}
-	if err := internalwasi.ValidateWASICommand(module.wasm, module.name); err != nil {
+	m, name, err := decodeModule(module)
+	if err != nil {
+		return nil, err
+	}
+	if err := internalwasi.ValidateWASICommand(m, name); err != nil {
 		return nil, err
 	}
 
-	instantiated, err := internal.Instantiate(module.wasm, module.name)
+	instantiated, err := internal.Instantiate(m, name)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +110,7 @@ func StartWASICommand(store wasm.Store, module *Module) (wasm.ModuleExports, err
 
 	start := ctx.Function(internalwasi.FunctionStart)
 	if _, err = start(ctx.Context()); err != nil {
-		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
+		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", name, internalwasi.FunctionStart, err)
 	}
 	return instantiated, nil
 }

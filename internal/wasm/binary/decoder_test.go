@@ -93,7 +93,7 @@ func TestDecodeModule(t *testing.T) {
 		})
 	}
 	t.Run("skips custom section", func(t *testing.T) {
-		input := append(append(magic, version...),
+		input := append(append(Magic, version...),
 			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 			0x04, 'm', 'e', 'm', 'e',
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
@@ -102,7 +102,7 @@ func TestDecodeModule(t *testing.T) {
 		require.Equal(t, &wasm.Module{}, m)
 	})
 	t.Run("skips custom section, but not name", func(t *testing.T) {
-		input := append(append(magic, version...),
+		input := append(append(Magic, version...),
 			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 			0x04, 'm', 'e', 'm', 'e',
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 0,
@@ -135,7 +135,7 @@ func TestDecodeModule_Errors(t *testing.T) {
 		},
 		{
 			name: "redundant name section",
-			input: append(append(magic, version...),
+			input: append(append(Magic, version...),
 				wasm.SectionIDCustom, 0x09, // 9 bytes in this section
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x02, 0x01, 'x',

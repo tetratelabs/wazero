@@ -18,7 +18,6 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
-	publicwasi "github.com/tetratelabs/wazero/wasi"
 )
 
 // example holds the latest supported features as described in the comments of exampleText
@@ -106,13 +105,11 @@ func TestExampleUpToDate(t *testing.T) {
 		store := wazero.NewStore()
 
 		// Add WASI to satisfy import tests
-		_, err := wazero.ExportHostFunctions(store, publicwasi.ModuleSnapshotPreview1, wazero.WASISnapshotPreview1())
+		_, err := wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
-		mod, err := wazero.DecodeModuleBinary(exampleBinary)
-		require.NoError(t, err)
-		exports, err := wazero.InstantiateModule(store, mod)
+		exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: exampleBinary})
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
