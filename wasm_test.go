@@ -13,31 +13,39 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestInstantiateModule(t *testing.T) {
-	wat := []byte(`(module)`)
+func TestDecodeModule(t *testing.T) {
+	wat := []byte(`(module $test)`)
 	m, err := text.DecodeModule(wat)
 	require.NoError(t, err)
 	wasm := binary.EncodeModule(m)
 
 	tests := []struct {
-		name   string
-		source []byte
+		name       string
+		moduleName string
+		source     []byte
 	}{
 		{name: "binary", source: wasm},
+		{name: "binary - override name", source: wasm, moduleName: "override"},
 		{name: "text", source: wat},
+		{name: "text - override name", source: wat, moduleName: "override"},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := InstantiateModule(NewStore(), &ModuleConfig{Source: tc.source})
+			_, name, err := decodeModule(&ModuleConfig{Name: tc.moduleName, Source: tc.source})
 			require.NoError(t, err)
+			if tc.moduleName == "" {
+				require.Equal(t, "test" /* from the text format */, name)
+			} else {
+				require.Equal(t, tc.moduleName, name)
+			}
 		})
 	}
 }
 
-func TestInstantiateModule_Errors(t *testing.T) {
+func TestDecodeModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		source      []byte
@@ -63,7 +71,7 @@ func TestInstantiateModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := InstantiateModule(NewStore(), &ModuleConfig{Source: tc.source})
+			_, _, err := decodeModule(&ModuleConfig{Source: tc.source})
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
