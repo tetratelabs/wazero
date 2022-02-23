@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/text"
 	"github.com/tetratelabs/wazero/wasi"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 func TestNewAPI_Args(t *testing.T) {
@@ -771,20 +772,6 @@ func TestAPI_FdRead_Errors(t *testing.T) {
 // TODO: TestAPI_FdTell TestAPI_FdTell_Errors
 
 func TestAPI_FdWrite(t *testing.T) {
-	// setupFD returns the instantiated store with a fresh empty file opened
-	setupFD := func(fd uint32) (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI, *memFile) {
-		file, memFS := createFile(t, "test_path", []byte{}) // file with empty content
-		var api *wasiAPI
-		store, ctx, fn := instantiateWasmStore(t, FunctionFdWrite, ImportFdWrite, "test", func(a *wasiAPI) {
-			a.opened[fd] = fileEntry{
-				path:    "test_path",
-				fileSys: memFS,
-				file:    file,
-			}
-			api = a // for later tests
-		})
-		return store, ctx, fn, api, file
-	}
 	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 	iovs := uint32(1) // arbitrary offset
 	initialMemory := []byte{
@@ -808,27 +795,47 @@ func TestAPI_FdWrite(t *testing.T) {
 		'?',
 	)
 
-	t.Run("SnapshotPreview1.FdWrite", func(t *testing.T) {
-		store, ctx, _, api, file := setupFD(fd)
-		maskMemory(store, maskLength)
-		copy(store.Memories[0].Buffer[0:], initialMemory)
+	type fdWriteFn func(ctx publicwasm.ModuleContext, fd, iovs, iovsLen, resultSize uint32) wasi.Errno
+	tests := []struct {
+		name    string
+		fdWrite func(*wasm.Store, publicwasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI) fdWriteFn
+	}{
+		{"SnapshotPreview1.FdWrite", func(store *wasm.Store, ctx publicwasm.ModuleContext, fn *wasm.FunctionInstance, a *wasiAPI) fdWriteFn {
+			return a.FdWrite
+		}},
+		{FunctionFdWrite, func(store *wasm.Store, ctx publicwasm.ModuleContext, fn *wasm.FunctionInstance, a *wasiAPI) fdWriteFn {
+			return func(ctx publicwasm.ModuleContext, fd, iovs, iovsLen, resultSize uint32) wasi.Errno {
+				ret, err := store.Engine.Call(ctx.(*wasm.ModuleContext), fn, uint64(fd), uint64(iovs), uint64(iovsLen), uint64(resultSize))
+				require.NoError(t, err)
+				return wasi.Errno(ret[0])
+			}
+		}},
+	}
 
-		errno := api.FdWrite(ctx, fd, iovs, iovsLen, resultSize)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
-		require.Equal(t, []byte("wazero"), file.buf.Bytes())
-	})
-	t.Run(FunctionFdWrite, func(t *testing.T) {
-		store, ctx, fn, _, file := setupFD(fd)
-		maskMemory(store, maskLength)
-		copy(store.Memories[0].Buffer[0:], initialMemory)
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			file, memFS := createFile(t, "test_path", []byte{}) // file with empty content
+			var api *wasiAPI
+			store, ctx, fn := instantiateWasmStore(t, FunctionFdWrite, ImportFdWrite, "test", func(a *wasiAPI) {
+				a.opened[fd] = fileEntry{
+					path:    "test_path",
+					fileSys: memFS,
+					file:    file,
+				}
+				api = a // for later tests
+			})
 
-		ret, err := store.Engine.Call(ctx, fn, uint64(fd), uint64(iovs), uint64(iovsLen), uint64(resultSize))
-		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
-		require.Equal(t, []byte("wazero"), file.buf.Bytes())
-	})
+			fdWrite := tc.fdWrite(store, ctx, fn, api)
+			maskMemory(store, maskLength)
+			copy(store.Memories[0].Buffer[0:], initialMemory)
+
+			errno := fdWrite(ctx, fd, iovs, iovsLen, resultSize)
+			require.Equal(t, wasi.ErrnoSuccess, errno)
+			require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
+			require.Equal(t, []byte("wazero"), file.buf.Bytes())
+		})
+	}
 }
 
 func TestAPI_FdWrite_Errors(t *testing.T) {
