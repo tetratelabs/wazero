@@ -188,7 +188,7 @@ func TestAPI_ArgsSizesGet_Errors(t *testing.T) {
 		{
 			name:        "argvBufSize exceeds the maximum valid size by 1",
 			argc:        validAddress,
-			argvBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
+			argvBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the length
 		},
 	}
 
@@ -301,7 +301,7 @@ func TestAPI_EnvironGet_Errors(t *testing.T) {
 		},
 		{
 			name: "environPtr exceeds the maximum valid address by 1",
-			// 4*envCount is the expected buffer size for environPtr, 4 is the size of uint32
+			// 4*envCount is the expected length for environPtr, 4 is the size of uint32
 			environ:    memorySize - 4*2 + 1,
 			environBuf: validAddress,
 		},
@@ -390,7 +390,7 @@ func TestAPI_EnvironSizesGet_Errors(t *testing.T) {
 		{
 			name:           "environBufSizePtr exceeds the maximum valid size by 1",
 			environc:       validAddress,
-			environBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the buffer size
+			environBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the length
 		},
 	}
 
@@ -649,8 +649,8 @@ func TestAPI_FdRead(t *testing.T) {
 	initialMemory := []byte{
 		'?',
 		// iovs[0] and iovs[1], respectively. See the comments of SnapshotPreview1.FdRead for the detailed layout.
-		18, 0, 0, 0 /* buf = 18 */, 2, 0, 0, 0, // bufLen = 2
-		21, 0, 0, 0 /* buf = 21 */, 2, 0, 0, 0, // bufLen = 2
+		18, 0, 0, 0 /* offset = 18 */, 2, 0, 0, 0, // length = 2
+		21, 0, 0, 0 /* offset = 21 */, 2, 0, 0, 0, // length = 2
 	}
 	iovsLen := uint32(2)     // The length of iovecs
 	resultSize := uint32(24) // arbitrary offset
@@ -717,7 +717,7 @@ func TestAPI_FdRead_Errors(t *testing.T) {
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name:          "out-of-memory iovs[0].buf",
+			name:          "out-of-memory iovs[0].offset",
 			iovec:         iovecInBytes(memorySize, 4),
 			expectedErrno: wasi.ErrnoFault,
 		},
@@ -791,8 +791,8 @@ func TestAPI_FdWrite(t *testing.T) {
 	initialMemory := []byte{
 		'?',
 		// iovs[0] and iovs[1], respectively. See the comments of SnapshotPreview1.FdWrite for the detailed layout.
-		17, 0, 0, 0 /* buf = 17 */, 2, 0, 0, 0, // bufLen = 2
-		20, 0, 0, 0 /* buf = 20 */, 2, 0, 0, 0, // bufLen = 2
+		17, 0, 0, 0 /* offset = 17 */, 2, 0, 0, 0, // length = 2
+		20, 0, 0, 0 /* offset = 20 */, 2, 0, 0, 0, // length = 2
 		't', 'e', // 17th
 		'?',
 		's', 't', // 20th
@@ -862,7 +862,7 @@ func TestAPI_FdWrite_Errors(t *testing.T) {
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name:          "out-of-memory iovs[0].buf",
+			name:          "out-of-memory iovs[0].offset",
 			iovec:         iovecInBytes(memorySize, 4),
 			expectedErrno: wasi.ErrnoFault,
 		},
@@ -910,13 +910,13 @@ func TestAPI_FdWrite_Errors(t *testing.T) {
 	}
 }
 
-// iovecInBytes returns the []byte representation of a iovec with the given buf and bufLen fields.
-func iovecInBytes(buf uint32, bufLen uint32) []byte {
-	bufInBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bufInBytes, buf)
-	bufLenInBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bufLenInBytes, bufLen)
-	return append(bufInBytes, bufLenInBytes...)
+// iovecInBytes returns the []byte representation of a iovec with the given offset and length fields.
+func iovecInBytes(offset uint32, length uint32) []byte {
+	offsetInBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(offsetInBytes, offset)
+	lengthInBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(lengthInBytes, length)
+	return append(offsetInBytes, lengthInBytes...)
 }
 
 func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
@@ -980,13 +980,13 @@ func TestAPI_ProcExit(t *testing.T) {
 func TestAPI_RandomGet(t *testing.T) {
 	maskLength := 7 // number of bytes to write '?' to tell what we've written
 	expectedMemory := []byte{
-		'?',                          // random bytes in `buf` is after this
+		'?',                          // `offset` is after this
 		0x53, 0x8c, 0x7f, 0x96, 0xb1, // random data from seed value of 42
 		'?', // stopped after encoding
 	} // tr
 
-	var bufLen = uint32(5) // arbitrary buffer size,
-	var buf = uint32(1)    // offset,
+	var length = uint32(5) // arbitrary length,
+	var offset = uint32(1) // offset,
 	var seed = int64(42)   // and seed value
 
 	randOpt := func(api *wasiAPI) {
@@ -1005,7 +1005,7 @@ func TestAPI_RandomGet(t *testing.T) {
 		maskMemory(store, maskLength)
 
 		// invoke RandomGet directly and check the memory side effects!
-		errno := newAPI(randOpt).RandomGet(ctx, buf, bufLen)
+		errno := newAPI(randOpt).RandomGet(ctx, offset, length)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
 	})
@@ -1013,7 +1013,7 @@ func TestAPI_RandomGet(t *testing.T) {
 	t.Run(FunctionRandomGet, func(t *testing.T) {
 		maskMemory(store, maskLength)
 
-		results, err := store.Engine.Call(ctx, fn, uint64(buf), uint64(bufLen))
+		results, err := store.Engine.Call(ctx, fn, uint64(offset), uint64(length))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer[0:maskLength])
@@ -1028,19 +1028,19 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		buf    uint32
-		bufLen uint32
+		offset uint32
+		length uint32
 	}{
 		{
-			name:   "random buffer out-of-memory",
-			buf:    memorySize,
-			bufLen: 1,
+			name:   "out-of-memory",
+			offset: memorySize,
+			length: 1,
 		},
 
 		{
-			name:   "random buffer size exceeds maximum valid address by 1",
-			buf:    validAddress,
-			bufLen: memorySize + 1,
+			name:   "random length exceeds maximum valid address by 1",
+			offset: validAddress,
+			length: memorySize + 1,
 		},
 	}
 
@@ -1048,7 +1048,7 @@ func TestAPI_RandomGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.buf), uint64(tc.bufLen))
+			results, err := store.Engine.Call(ctx, fn, uint64(tc.offset), uint64(tc.length))
 			require.NoError(t, err)
 			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
 		})
@@ -1062,7 +1062,7 @@ func TestAPI_RandomGet_SourceError(t *testing.T) {
 		}
 	})
 
-	results, err := store.Engine.Call(ctx, fn, uint64(1), uint64(5)) // arbitrary offset and buffer size
+	results, err := store.Engine.Call(ctx, fn, uint64(1), uint64(5)) // arbitrary offset and length
 	require.NoError(t, err)
 	require.Equal(t, uint64(wasi.ErrnoIo), results[0]) // results[0] is the errno
 }
