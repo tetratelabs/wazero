@@ -188,7 +188,7 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 		{
 			name:        "argvBufSize exceeds the maximum valid size by 1",
 			argc:        validAddress,
-			argvBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the length
+			argvBufSize: memorySize - 4 + 1, // 4 the encoded size of uint32le
 		},
 	}
 
