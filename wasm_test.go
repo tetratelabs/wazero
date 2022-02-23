@@ -55,8 +55,12 @@ func TestDecodeModule(t *testing.T) {
 
 		again, _, err := decodeModule(config)
 		require.NoError(t, err)
-
 		require.Same(t, m, again)
+
+		// Ensure config that only changes the name doesn't have to re-decode the source.
+		cloned, _, err := decodeModule(config.WithName("wazero"))
+		require.NoError(t, err)
+		require.Same(t, m, cloned)
 	})
 
 	t.Run("changing source invalidates decode cache", func(t *testing.T) {
@@ -64,12 +68,19 @@ func TestDecodeModule(t *testing.T) {
 		m, _, err := decodeModule(config)
 		require.NoError(t, err)
 
+		clonedConfig := config.WithName("wazero")
+
+		// When the source is changed, the module needs to be decoded again
 		config.Source = wasm
 		again, _, err := decodeModule(config)
 		require.NoError(t, err)
-
 		require.Equal(t, m, again)
 		require.NotSame(t, m, again)
+
+		// Any copies of the config shouldn't be invalidated
+		cloned, _, err := decodeModule(clonedConfig)
+		require.NoError(t, err)
+		require.Same(t, m, cloned)
 	})
 }
 

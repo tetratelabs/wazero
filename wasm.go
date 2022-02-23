@@ -78,6 +78,16 @@ func (m *ModuleConfig) Validate() (err error) {
 	return err
 }
 
+// WithName returns a new instance which overrides the Name, but keeps any internal cache made by Validate.
+func (m *ModuleConfig) WithName(moduleName string) *ModuleConfig {
+	return &ModuleConfig{
+		Name:            moduleName,
+		Source:          m.Source,
+		validatedSource: m.validatedSource,
+		decodedModule:   m.decodedModule,
+	}
+}
+
 // InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 //
 // Ex.
