@@ -82,28 +82,6 @@ func TestExportKindName(t *testing.T) {
 	}
 }
 
-func TestValueTypeName(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    ValueType
-		expected string
-	}{
-		{"i32", ValueTypeI32, "i32"},
-		{"i64", ValueTypeI64, "i64"},
-		{"f32", ValueTypeF32, "f32"},
-		{"f64", ValueTypeF64, "f64"},
-		{"unknown", 100, "unknown"},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, ValueTypeName(tc.input))
-		})
-	}
-}
-
 func TestModule_allDeclarations(t *testing.T) {
 	for i, tc := range []struct {
 		module            *Module

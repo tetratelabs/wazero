@@ -2,6 +2,8 @@ package internalwasm
 
 import (
 	"fmt"
+
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 // DecodeModule parses the configured source into a Module. This function returns when the source is exhausted or
@@ -470,34 +472,19 @@ func SectionIDName(sectionID SectionID) string {
 	return "unknown"
 }
 
-// ValueType is the binary encoding of a type such as i32
-// See https://www.w3.org/TR/wasm-core-1/#binary-valtype
-//
-// Note: This is a type alias as it is easier to encode and decode in the binary format.
-type ValueType = byte
+// ValueType is an alias of wasm.ValueType defined to simplify imports.
+type ValueType = publicwasm.ValueType
 
 const (
-	ValueTypeI32 ValueType = 0x7f
-	ValueTypeI64 ValueType = 0x7e
-	ValueTypeF32 ValueType = 0x7d
-	ValueTypeF64 ValueType = 0x7c
+	ValueTypeI32 = publicwasm.ValueTypeI32
+	ValueTypeI64 = publicwasm.ValueTypeI64
+	ValueTypeF32 = publicwasm.ValueTypeF32
+	ValueTypeF64 = publicwasm.ValueTypeF64
 )
 
-// ValueTypeName returns the type name of the given ValueType as a string.
-// These type names match the names used in the WebAssembly text format.
-// Note that ValueTypeName returns "unknown", if an undefined ValueType value is passed.
+// ValueTypeName is an alias of wasm.ValueTypeName defined to simplify imports.
 func ValueTypeName(t ValueType) string {
-	switch t {
-	case ValueTypeI32:
-		return "i32"
-	case ValueTypeI64:
-		return "i64"
-	case ValueTypeF32:
-		return "f32"
-	case ValueTypeF64:
-		return "f64"
-	}
-	return "unknown"
+	return publicwasm.ValueTypeName(t)
 }
 
 // ImportKind indicates which import description is present

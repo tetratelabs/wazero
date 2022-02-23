@@ -6,6 +6,53 @@ import (
 	"math"
 )
 
+// ValueType describes a numeric type used in Web Assembly 1.0 (MVP). For example, Function parameters and results are
+// only definable as a value type.
+//
+// The following describes how to convert between Wasm and Golang types:
+//  * ValueTypeI32 - uint64(uint32,int32,int64)
+//  * ValueTypeI64 - uint64
+//  * ValueTypeF32 - EncodeF32 DecodeF32 from float32
+//  * ValueTypeF64 - EncodeF64 DecodeF64 from float64
+//
+// Ex. Given a Text Format type use (param i64) (result i64), no conversion is necessary.
+//
+//	results, _ := fn(ctx, input)
+//	result := result[0]
+//
+// Ex. Given a Text Format type use (param f64) (result f64), conversion is necessary.
+//
+//	results, _ := fn(ctx, wasm.EncodeF64(input))
+//	result := wasm.DecodeF64(result[0])
+//
+// Note: This is a type alias as it is easier to encode and decode in the binary format.
+// See https://www.w3.org/TR/wasm-core-1/#binary-valtype
+type ValueType = byte
+
+const (
+	ValueTypeI32 ValueType = 0x7f
+	ValueTypeI64 ValueType = 0x7e
+	ValueTypeF32 ValueType = 0x7d
+	ValueTypeF64 ValueType = 0x7c
+)
+
+// ValueTypeName returns the type name of the given ValueType as a string.
+// These type names match the names used in the WebAssembly text format.
+// Note that ValueTypeName returns "unknown", if an undefined ValueType value is passed.
+func ValueTypeName(t ValueType) string {
+	switch t {
+	case ValueTypeI32:
+		return "i32"
+	case ValueTypeI64:
+		return "i64"
+	case ValueTypeF32:
+		return "f32"
+	case ValueTypeF64:
+		return "f64"
+	}
+	return "unknown"
+}
+
 // Store allows access to instantiated modules and host functions
 type Store interface {
 	// ModuleExports returns exports from an instantiated module or nil if there aren't any.
@@ -43,23 +90,7 @@ type ModuleExports interface {
 //		results, err := fn(ctx.Context(), offset, byteCount)
 //	--snip--
 //
-// The following describes how remaining parameters map to Web Assembly 1.0 (MVP) Value Types:
-//  * I32 - uint64(uint32,int32,int64)
-//  * I64 - uint64
-//  * F32 - EncodeF32 DecodeF32 from float32
-//  * F64 - EncodeF64 DecodeF64 from float64
-//
-// Ex. Given a Text Format type use (param i64) (result i64)
-//
-//	results, _ := fn(ctx, input)
-//	result := result[0]
-//
-// Ex. Given a Text Format type use (param f64) (result f64)
-//
-//	results, _ := fn(ctx, wasm.EncodeF64(input))
-//	result := wasm.DecodeF64(result[0])
-//
-// See https://www.w3.org/TR/wasm-core-1/#binary-valtype
+// Parameters and results are encoded according to documentation on ValueType.
 type Function func(ctx context.Context, params ...uint64) ([]uint64, error)
 
 // HostExports return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (MVP).
@@ -151,25 +182,25 @@ type Memory interface {
 	Write(offset uint32, v []byte) bool
 }
 
-// EncodeF32 converts the input so that it can be used as a Function F32 parameter or result.
+// EncodeF32 encodes the input as a ValueTypeF32.
 // See DecodeF32
 func EncodeF32(input float32) uint64 {
 	return uint64(math.Float32bits(input))
 }
 
-// DecodeF32 converts the Function F32 parameter or result to a float32.
+// DecodeF32 decodes the input as a ValueTypeF32.
 // See DecodeF32
 func DecodeF32(input uint64) float32 {
 	return math.Float32frombits(uint32(input))
 }
 
-// EncodeF64 converts the input so that it can be used as a Function F64 parameter or result.
+// EncodeF64 encodes the input as a ValueTypeF64.
 // See DecodeF64
 func EncodeF64(input float64) uint64 {
 	return math.Float64bits(input)
 }
 
-// DecodeF64 converts the Function F64 parameter or result to a float64.
+// DecodeF64 decodes the input as a ValueTypeF64.
 // See EncodeF64
 func DecodeF64(input uint64) float64 {
 	return math.Float64frombits(input)
