@@ -188,7 +188,7 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 		{
 			name:        "argvBufSize exceeds the maximum valid size by 1",
 			argc:        validAddress,
-			argvBufSize: memorySize - 4 + 1, // 4 the encoded size of uint32le
+			argvBufSize: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 		},
 	}
 
@@ -388,7 +388,7 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 		{
 			name:           "environBufSizePtr exceeds the maximum valid size by 1",
 			environc:       validAddress,
-			environBufSize: memorySize - 4 + 1, // 4 is the size of uint32, the type of the length
+			environBufSize: memorySize - 4 + 1, // 4 is count of bytes to encode uint32le
 		},
 	}
 
@@ -574,9 +574,8 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 	store, ctx, fn := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, opt)
 
 	memorySize := uint32(len(store.Memories[0].Buffer))
-	validAddress := uint32(0)     // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
-	actualPathLen := len(dirName) // Actual length of the dirName as a valid pathLen.
-	fd := uint32(3)               // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
+	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
+	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
 
 	tests := []struct {
 		name          string
@@ -589,28 +588,28 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 			name:          "out-of-memory path",
 			fd:            fd,
 			path:          memorySize,
-			pathLen:       uint32(actualPathLen),
+			pathLen:       uint32(len(dirName)),
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "path exceeds the maximum valid address by 1",
 			fd:            fd,
-			path:          memorySize - uint32(actualPathLen) + 1,
-			pathLen:       uint32(actualPathLen),
+			path:          memorySize - uint32(len(dirName)) + 1,
+			pathLen:       uint32(len(dirName)),
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name:          "pathLen exceeds the actual length of the dir name",
+			name:          "pathLen exceeds the length of the dir name",
 			fd:            fd,
 			path:          validAddress,
-			pathLen:       uint32(actualPathLen) + 1,
+			pathLen:       uint32(len(dirName)) + 1,
 			expectedErrno: wasi.ErrnoNametoolong,
 		},
 		{
 			name:          "invalid fd",
 			fd:            42, // arbitrary invalid fd
 			path:          validAddress,
-			pathLen:       uint32(actualPathLen) + 1,
+			pathLen:       uint32(len(dirName)) + 1,
 			expectedErrno: wasi.ErrnoBadf,
 		},
 	}
