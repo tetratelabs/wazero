@@ -74,7 +74,7 @@ type ModuleConfig struct {
 //
 // This is used to pre-flight check and cache the module for later instantiation.
 func (m *ModuleConfig) Validate() (err error) {
-	_, _, err = decodeModule(m)
+	_, err = decodeModule(m)
 	return err
 }
 
@@ -99,14 +99,22 @@ func InstantiateModule(store wasm.Store, module *ModuleConfig) (wasm.ModuleExpor
 	if !ok {
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
 	}
-	m, name, err := decodeModule(module)
+	m, err := decodeModule(module)
 	if err != nil {
 		return nil, err
 	}
-	return internal.Instantiate(m, name)
+	return internal.Instantiate(m, getModuleName(module.Name, m))
 }
 
-func decodeModule(module *ModuleConfig) (m *internalwasm.Module, name string, err error) {
+// getModuleName returns the ModuleName from the internalwasm.NameSection if the input name was empty.
+func getModuleName(name string, m *internalwasm.Module) string {
+	if name == "" && m.NameSection != nil {
+		return m.NameSection.ModuleName
+	}
+	return name
+}
+
+func decodeModule(module *ModuleConfig) (m *internalwasm.Module, err error) {
 	if module.Source == nil {
 		err = errors.New("source == nil")
 		return
@@ -136,11 +144,6 @@ func decodeModule(module *ModuleConfig) (m *internalwasm.Module, name string, er
 	// Cache as tools like wapc-go re-instantiate the same module many times.
 	module.validatedSource = module.Source
 	module.decodedModule = m
-
-	name = module.Name
-	if name == "" && m.NameSection != nil {
-		name = m.NameSection.ModuleName
-	}
 	return
 }
 
