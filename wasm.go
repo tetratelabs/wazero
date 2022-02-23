@@ -65,11 +65,16 @@ type ModuleConfig struct {
 	Name string
 	// Source is the WebAssembly 1.0 (MVP) text or binary encoding of the module.
 	Source []byte
+
+	validatedSource []byte
+	decodedModule   *internalwasm.Module
 }
 
-// Validate errs if the source is invalid. This is used to pre-flight check the Source when instantiation is deferred.
-func (m *ModuleConfig) Validate() error {
-	_, _, err := decodeModule(m)
+// Validate eagerly decodes the Source and errs if it is invalid.
+//
+// This is used to pre-flight check and cache the module for later instantiation.
+func (m *ModuleConfig) Validate() (err error) {
+	_, _, err = decodeModule(m)
 	return err
 }
 
@@ -102,6 +107,12 @@ func decodeModule(module *ModuleConfig) (m *internalwasm.Module, name string, er
 		return
 	}
 
+	// Check if this source was already decoded
+	if bytes.Equal(module.Source, module.validatedSource) {
+		m = module.decodedModule
+		return
+	}
+
 	// Peek to see if this is a binary or text format
 	if bytes.Equal(module.Source[0:4], binary.Magic) {
 		m, err = binary.DecodeModule(module.Source)
@@ -111,6 +122,10 @@ func decodeModule(module *ModuleConfig) (m *internalwasm.Module, name string, er
 	if err != nil {
 		return
 	}
+
+	// Cache as tools like wapc-go re-instantiate the same module many times.
+	module.validatedSource = module.Source
+	module.decodedModule = m
 
 	name = module.Name
 	if name == "" && m.NameSection != nil {

@@ -47,6 +47,30 @@ func TestDecodeModule(t *testing.T) {
 			require.NoError(t, config.Validate())
 		})
 	}
+
+	t.Run("caches repetitive decodes", func(t *testing.T) {
+		config := &ModuleConfig{Source: wat}
+		m, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		again, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		require.Same(t, m, again)
+	})
+
+	t.Run("changing source invalidates decode cache", func(t *testing.T) {
+		config := &ModuleConfig{Source: wat}
+		m, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		config.Source = wasm
+		again, _, err := decodeModule(config)
+		require.NoError(t, err)
+
+		require.Equal(t, m, again)
+		require.NotSame(t, m, again)
+	})
 }
 
 func TestDecodeModule_Errors(t *testing.T) {
