@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"reflect"
+	"runtime"
 	"testing"
 	"unsafe"
 
@@ -85,6 +86,8 @@ func TestVerifyOffsetValue(t *testing.T) {
 }
 
 func TestEngine_Call(t *testing.T) {
+	requireSupportedOSArch(t)
+
 	i64 := wasm.ValueTypeI64
 	m := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
@@ -115,6 +118,8 @@ func TestEngine_Call(t *testing.T) {
 }
 
 func TestEngine_Call_HostFn(t *testing.T) {
+	requireSupportedOSArch(t)
+
 	memory := &wasm.MemoryInstance{}
 	var ctxMemory publicwasm.Memory
 	hostFn := reflect.ValueOf(func(ctx publicwasm.ModuleContext, v uint64) uint64 {
@@ -155,4 +160,13 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		_, err := e.Call(modCtx, f, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
+}
+
+func requireSupportedOSArch(t *testing.T) {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
+	if runtime.GOOS == "windows" { // TODO: #269
+		t.Skip()
+	}
 }

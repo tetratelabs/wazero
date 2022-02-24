@@ -1,7 +1,8 @@
-//go:build amd64
-// +build amd64
+//go:build amd64 && cgo && !windows
+// +build amd64,cgo,!windows
 
-// Wasmtime cannot be used non-amd64 platform.
+// Wasmtime can only be used in amd64 with CGO
+// Wasmer doesn't link on Windows
 package bench
 
 import (

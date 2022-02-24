@@ -32,6 +32,8 @@ func (j *jitEnv) stackTopAsUint16() uint16 {
 }
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *amd64Compiler {
+	requireSupportedOSArch(t)
+
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)
 	return &amd64Compiler{builder: b,

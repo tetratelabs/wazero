@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -237,6 +236,9 @@ func TestJIT(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
+	if runtime.GOOS == "windows" { // TODO: #269
+		t.Skip()
+	}
 	runTest(t, jit.NewEngine)
 }
 
@@ -251,10 +253,9 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 	jsonfiles := make([]string, 0, len(files))
 	for _, f := range files {
 		filename := f.Name()
-		if filepath.Ext(filename) != ".json" {
-			continue
+		if strings.HasSuffix(filename, ".json") {
+			jsonfiles = append(jsonfiles, testdataPath(filename))
 		}
-		jsonfiles = append(jsonfiles, filepath.Join("testdata", filename))
 	}
 
 	// If the go:embed path resolution was wrong, this fails.
@@ -268,7 +269,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 		var base testbase
 		require.NoError(t, json.Unmarshal(raw, &base))
 
-		wastName := filepath.Base(base.SourceFile)
+		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
 			store := wasm.NewStore(context.Background(), newEngine())
@@ -280,7 +281,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 					switch c.CommandType {
 					case "module":
-						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
+						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
 
 						mod, err := binary.DecodeModule(buf)
@@ -351,7 +352,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							// We don't support direct loading of wast yet.
 							t.Skip()
 						}
-						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
+						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
@@ -380,7 +381,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							// We don't support direct loading of wast yet.
 							t.Skip()
 						}
-						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
+						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
@@ -409,7 +410,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							// We don't support direct loading of wast yet.
 							t.Skip()
 						}
-						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
+						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
 						mod, err := binary.DecodeModule(buf)
 						if err == nil {
@@ -417,7 +418,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						require.Error(t, err, msg)
 					case "assert_uninstantiable":
-						buf, err := testcases.ReadFile(filepath.Join("testdata", c.Filename))
+						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
 
 						mod, err := binary.DecodeModule(buf)
@@ -432,6 +433,19 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 			}
 		})
 	}
+}
+
+// basename avoids filepath.Base to ensure a forward slash is used even in Windows.
+// See https://pkg.go.dev/embed#hdr-Directives
+func basename(path string) string {
+	lastSlash := strings.LastIndexByte(path, '/')
+	return path[lastSlash+1:]
+}
+
+// testdataPath avoids filepath.Join to ensure a forward slash is used even in Windows.
+// See https://pkg.go.dev/embed#hdr-Directives
+func testdataPath(filename string) string {
+	return fmt.Sprintf("testdata/%s", filename)
 }
 
 func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueType, msg string) {
