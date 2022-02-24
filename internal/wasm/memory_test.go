@@ -53,3 +53,37 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 		require.Equal(t, uint32(1), m.PageSize())
 	})
 }
+
+func TestReadByte(t *testing.T) {
+	var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 0, 0, 0, 16}, Min: 1}
+	v, ok := mem.ReadByte(7)
+	require.True(t, ok)
+	require.Equal(t, byte(16), v)
+
+	_, ok = mem.ReadByte(8)
+	require.False(t, ok)
+
+	_, ok = mem.ReadByte(9)
+	require.False(t, ok)
+}
+
+func TestReadUint32Le(t *testing.T) {
+	var mem = &MemoryInstance{Buffer: []byte{0, 0, 0, 0, 16, 0, 0, 0}, Min: 1}
+	v, ok := mem.ReadUint32Le(4)
+	require.True(t, ok)
+	require.Equal(t, uint32(16), v)
+
+	_, ok = mem.ReadUint32Le(5)
+	require.False(t, ok)
+
+	_, ok = mem.ReadUint32Le(9)
+	require.False(t, ok)
+}
+
+func TestWriteUint32Le(t *testing.T) {
+	var mem = &MemoryInstance{Buffer: make([]byte, 8), Min: 1}
+	require.True(t, mem.WriteUint32Le(4, 16))
+	require.Equal(t, []byte{0, 0, 0, 0, 16, 0, 0, 0}, mem.Buffer)
+	require.False(t, mem.WriteUint32Le(5, 16))
+	require.False(t, mem.WriteUint32Le(9, 16))
+}

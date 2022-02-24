@@ -161,6 +161,9 @@ type Memory interface {
 	// See https://www.w3.org/TR/wasm-core-1/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
 	Size() uint32
 
+	// ReadByte reads a single byte from the underlying buffer at the offset in or returns false if out of range.
+	ReadByte(offset uint32) (byte, bool)
+
 	// ReadUint32Le reads a uint32 in little-endian encoding from the underlying buffer at the offset in or returns
 	// false if out of range.
 	ReadUint32Le(offset uint32) (uint32, bool)
@@ -181,6 +184,9 @@ type Memory interface {
 
 	// Read reads byteCount bytes from the underlying buffer at the offset or returns false if out of range.
 	Read(offset, byteCount uint32) ([]byte, bool)
+
+	// WriteByte writes a single byte to the underlying buffer at the offset in or returns false if out of range.
+	WriteByte(offset uint32, v byte) bool
 
 	// WriteUint32Le writes the value in little-endian encoding to the underlying buffer at the offset in or returns
 	// false if out of range.

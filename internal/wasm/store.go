@@ -187,7 +187,7 @@ type (
 		FunctionTypeID FunctionTypeID
 	}
 
-	// MemoryInstance represents a memory instance in a store.
+	// MemoryInstance represents a memory instance in a store, and implements wasm.Memory.
 	//
 	// Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means the precise memory is always
 	// wasm.Store Memories index zero: `store.Memories[0]`

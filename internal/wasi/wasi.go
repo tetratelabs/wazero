@@ -579,7 +579,7 @@ type wasiAPI struct {
 // These should be exported in the module named wasi.ModuleSnapshotPreview1.
 // See internalwasm.NewGoFunc
 func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interface{}) {
-	a := newAPI(opts...)
+	a := NewAPI(opts...)
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
@@ -975,7 +975,8 @@ func Preopen(dir string, fileSys wasi.FS) Option {
 	}
 }
 
-func newAPI(opts ...Option) *wasiAPI {
+// NewAPI is exported for benchmarks
+func NewAPI(opts ...Option) *wasiAPI {
 	ret := &wasiAPI{
 		args:    &nullTerminatedStrings{},
 		environ: &nullTerminatedStrings{},
