@@ -113,7 +113,7 @@ func TestExampleUpToDate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		results, err := exports.Function("AddInt")(context.Background(), uint64(1), uint64(2))
+		results, err := exports.Function("AddInt").Call(context.Background(), 1, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 	})

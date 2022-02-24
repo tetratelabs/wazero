@@ -32,7 +32,7 @@ func Test_AddInt(t *testing.T) {
 		{value1: 1, value2: 2, expected: 3},
 		{value1: 5, value2: 5, expected: 10},
 	} {
-		results, err := addInt(context.Background(), c.value1, c.value2)
+		results, err := addInt.Call(context.Background(), c.value1, c.value2)
 		require.NoError(t, err)
 		require.Equal(t, c.expected, results[0])
 	}

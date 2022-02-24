@@ -363,7 +363,7 @@ func (m *ModuleExports) Function(name string) publicwasm.Function {
 	if err != nil {
 		return nil
 	}
-	return (&function{c: m.Context, f: exp.Function}).Call
+	return &function{c: m.Context, f: exp.Function}
 }
 
 // Memory implements wasm.ModuleExports Memory

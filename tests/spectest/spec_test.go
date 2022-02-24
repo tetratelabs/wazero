@@ -463,20 +463,8 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
-func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) (results []uint64, resultTypes []wasm.ValueType, err error) {
-	ctx := s.ModuleContexts[moduleName]
-	var exp *wasm.ExportInstance
-	if exp, err = ctx.Module.GetExport(funcName, wasm.ExportKindFunc); err != nil {
-		return
-	}
-
-	f := exp.Function
-	if len(f.FunctionType.Type.Params) != len(params) {
-		err = fmt.Errorf("invalid number of parameters")
-		return
-	}
-
-	results, err = s.Engine.Call(ctx, f, params...)
-	resultTypes = f.FunctionType.Type.Results
-	return
+func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
+	fn := s.ModuleExports(moduleName).Function(funcName)
+	results, err := fn.Call(context.Background(), params...)
+	return results, fn.ResultTypes(), err
 }

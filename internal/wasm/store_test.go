@@ -153,7 +153,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 	})
 }
 
-func TestFunctionInstance_call(t *testing.T) {
+func TestFunctionInstance_Call(t *testing.T) {
 	type key string
 	storeCtx := context.WithValue(context.Background(), key("wa"), "zero")
 
@@ -211,7 +211,7 @@ func TestFunctionInstance_call(t *testing.T) {
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
-			_, err = instantiated.Function(functionName)(tc.ctx)
+			_, err = instantiated.Function(functionName).Call(tc.ctx)
 			require.NoError(t, err)
 			if tc.expected == nil {
 				require.Nil(t, engine.ctx)

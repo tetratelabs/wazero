@@ -43,7 +43,7 @@ func Test_WASI(t *testing.T) {
 
 	// Implement the function pointer. This mainly shows how you can decouple a host function dependency.
 	randomGet = func(ctx wasm.ModuleContext, buf, bufLen uint32) wasi.Errno {
-		res, err := randomGetFn(ctx, uint64(buf), uint64(bufLen))
+		res, err := randomGetFn.Call(ctx, uint64(buf), uint64(bufLen))
 		require.NoError(t, err)
 		return wasi.Errno(res[0])
 	}

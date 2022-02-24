@@ -33,7 +33,7 @@ func TestFacIter(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			res, err := fn(ctx, in)
+			res, err := fn.Call(ctx, in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -44,7 +44,7 @@ func TestFacIter(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			res, err := fn(ctx, in)
+			res, err := fn.Call(ctx, in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -129,7 +129,7 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err = fn(ctx, in); err != nil {
+			if _, err = fn.Call(ctx, in); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -141,7 +141,7 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err = fn(ctx, in); err != nil {
+			if _, err = fn.Call(ctx, in); err != nil {
 				b.Fatal(err)
 			}
 		}

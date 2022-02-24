@@ -33,7 +33,7 @@ func Test_fibonacci(t *testing.T) {
 		{input: 10, expected: 55},
 		{input: 5, expected: 5},
 	} {
-		results, err := fibonacci(context.Background(), c.input)
+		results, err := fibonacci.Call(context.Background(), c.input)
 		require.NoError(t, err)
 		require.Equal(t, c.expected, results[0])
 	}

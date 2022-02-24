@@ -1,6 +1,7 @@
 package bench
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"math/rand"
@@ -14,6 +15,9 @@ import (
 // caseWasm was compiled from TinyGo testdata/case.go
 //go:embed testdata/case.wasm
 var caseWasm []byte
+
+// ctx is a default context used to avoid lint warnings even though these tests don't use any context data.
+var ctx = context.Background()
 
 func BenchmarkEngines(b *testing.B) {
 	b.Run("interpreter", func(b *testing.B) {
@@ -43,7 +47,7 @@ func runBase64Benches(b *testing.B, m wasm.ModuleExports) {
 		numPerExec := uint64(numPerExec)
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("base64_%d_per_exec", numPerExec), func(b *testing.B) {
-			if _, err := base64(nil, numPerExec); err != nil {
+			if _, err := base64.Call(ctx, numPerExec); err != nil {
 				b.Fatal(err)
 			}
 		})
@@ -58,7 +62,7 @@ func runFibBenches(b *testing.B, m wasm.ModuleExports) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("fib_for_%d", num), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := fibonacci(nil, num); err != nil {
+				if _, err := fibonacci.Call(ctx, num); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -74,7 +78,7 @@ func runStringManipulationBenches(b *testing.B, m wasm.ModuleExports) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("string_manipulation_size_%d", initialSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := stringManipulation(nil, initialSize); err != nil {
+				if _, err := stringManipulation.Call(ctx, initialSize); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -90,7 +94,7 @@ func runReverseArrayBenches(b *testing.B, m wasm.ModuleExports) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("reverse_array_size_%d", arraySize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := reverseArray(nil, arraySize); err != nil {
+				if _, err := reverseArray.Call(ctx, arraySize); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -106,7 +110,7 @@ func runRandomMatMul(b *testing.B, m wasm.ModuleExports) {
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("random_mat_mul_size_%d", matrixSize), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				if _, err := randomMatMul(nil, matrixSize); err != nil {
+				if _, err := randomMatMul.Call(ctx, matrixSize); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -116,7 +120,7 @@ func runRandomMatMul(b *testing.B, m wasm.ModuleExports) {
 
 func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine) wasm.ModuleExports {
 	getRandomString := func(ctx wasm.ModuleContext, retBufPtr uint32, retBufSize uint32) {
-		results, err := ctx.Function("allocate_buffer")(ctx.Context(), 10)
+		results, err := ctx.Function("allocate_buffer").Call(ctx.Context(), 10)
 		if err != nil {
 			b.Fatal(err)
 		}
