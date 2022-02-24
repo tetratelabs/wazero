@@ -71,16 +71,22 @@ func testFibonacci(t *testing.T, newEngine func() *wazero.Engine) {
 	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
 	// and we have no conflict with Go's runtime.
 	const goroutines = 1000
+
+	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
+	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: fibWasm})
+	var fibs []publicwasm.Function
+	for i := 0; i < goroutines; i++ {
+		require.NoError(t, err)
+		fibs = append(fibs, exports.Function("fib"))
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
+		fib := fibs[i]
 		go func() {
 			defer wg.Done()
-			store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
-			exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: fibWasm})
-			require.NoError(t, err)
-
-			results, err := exports.Function("fib").Call(ctx, 20)
+			results, err := fib.Call(ctx, 20)
 			require.NoError(t, err)
 
 			require.Equal(t, uint64(10946), results[0])
