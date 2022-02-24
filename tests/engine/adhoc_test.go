@@ -119,8 +119,7 @@ func testFac(t *testing.T, newEngine func() *wazero.Engine) {
 
 func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
 	callUnreachable := func(ctx publicwasm.ModuleContext) {
-		_, err := ctx.Function("unreachable_func").Call(ctx.Context())
-		require.NoError(t, err)
+		panic("panic in host function")
 	}
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
@@ -133,14 +132,12 @@ func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
 	require.NoError(t, err)
 
 	_, err = exports.Function("main").Call(ctx)
-	exp := `wasm runtime error: unreachable
+	exp := `wasm runtime error: panic in host function
 wasm backtrace:
-	0: unreachable_func
-	1: host.cause_unreachable
-	2: two
-	3: one
-	4: main`
-	require.ErrorIs(t, err, wasm.ErrRuntimeUnreachable)
+	0: host.cause_unreachable
+	1: two
+	2: one
+	3: main`
 	require.Equal(t, exp, err.Error())
 }
 

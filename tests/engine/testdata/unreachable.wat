@@ -10,7 +10,4 @@
 	(func $two
 		(call $cause_unreachable)
 	)
-	(func $unreachable_func  (export "unreachable_func")
-		(unreachable)
-	)
 )
