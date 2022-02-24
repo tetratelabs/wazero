@@ -447,20 +447,21 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 			if buildoptions.IsDebugMode {
 				debug.PrintStack()
 			}
-			traces := make([]string, 0, len(vm.frames))
-			for i := 0; i < len(vm.frames); i++ {
+
+			traces := make([]string, len(vm.frames))
+			for i := 0; i < len(traces); i++ {
 				frame := vm.popFrame()
 				name := frame.f.funcInstance.Name
 				// TODO: include DWARF symbols. See #58
-				traces = append(traces, fmt.Sprintf("\t%d: %s", i, name))
+				traces[i] = fmt.Sprintf("\t%d: %s", i, name)
 			}
 
-			err2, ok := v.(error)
+			runtimeErr, ok := v.(error)
 			if ok {
-				if err2.Error() == "runtime error: integer divide by zero" {
-					err2 = wasm.ErrRuntimeIntegerDivideByZero
+				if runtimeErr.Error() == "runtime error: integer divide by zero" {
+					runtimeErr = wasm.ErrRuntimeIntegerDivideByZero
 				}
-				err = fmt.Errorf("wasm runtime error: %w", err2)
+				err = fmt.Errorf("wasm runtime error: %w", runtimeErr)
 			} else {
 				err = fmt.Errorf("wasm runtime error: %v", v)
 			}
