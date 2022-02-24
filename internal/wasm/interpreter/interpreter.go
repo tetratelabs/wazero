@@ -39,6 +39,8 @@ func NewEngine() wasm.Engine {
 	}
 }
 
+// virtualMachine holds context per engine.Call, and shared across all the
+// function calls originating from the same engine.Call execution.
 type virtualMachine struct {
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.

@@ -32,12 +32,19 @@ type (
 		mux sync.RWMutex
 	}
 
+	// virtualMachine holds context per engine.Call, and shared across all the
+	// function calls originating from the same engine.Call execution.
 	virtualMachine struct {
+		// These contexts are read and written by JITed code.
+		// Note: we embed these structs so we can reduce the costs to access fields inside of them.
+		// Also, that eases the calculation of offsets to each field.
 		globalContext
 		moduleContext
 		valueStackContext
 		exitContext
 		archContext
+
+		// The following fields are not accessed by JITed code directly.
 
 		// valueStack is the go-allocated stack for holding Wasm values.
 		// Note: We NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
