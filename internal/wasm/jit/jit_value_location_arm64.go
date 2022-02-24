@@ -7,9 +7,9 @@ import "github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 // Reserved registers.
 const (
-	// reservedRegisterForEngine holds the pointer to engine instance (i.e. *engine as uintptr)
-	reservedRegisterForEngine = arm64.REG_R0
-	// reservedRegisterForStackBasePointerAddress holds stack base pointer's address (engine.stackBasePointer) in the current function call.
+	// reservedRegisterForVirtualMachine holds the pointer to virtualMachine instance (i.e. *virtulMachine as uintptr)
+	reservedRegisterForVirtualMachine = arm64.REG_R0
+	// reservedRegisterForStackBasePointerAddress holds stack base pointer's address (virtulMachine.stackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointerAddress = arm64.REG_R1
 	// reservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
 	reservedRegisterForMemory    = arm64.REG_R2

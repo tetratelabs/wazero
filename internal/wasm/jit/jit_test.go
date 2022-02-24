@@ -12,6 +12,7 @@ import (
 
 type jitEnv struct {
 	eng            *engine
+	vm             *virtualMachine
 	moduleInstance *wasm.ModuleInstance
 }
 
@@ -51,27 +52,27 @@ func (j *jitEnv) memory() []byte {
 }
 
 func (j *jitEnv) stack() []uint64 {
-	return j.eng.valueStack
+	return j.vm.valueStack
 }
 
 func (j *jitEnv) jitStatus() jitCallStatusCode {
-	return j.eng.exitContext.statusCode
+	return j.vm.exitContext.statusCode
 }
 
 func (j *jitEnv) functionCallAddress() wasm.FunctionAddress {
-	return j.eng.exitContext.functionCallAddress
+	return j.vm.exitContext.functionCallAddress
 }
 
 func (j *jitEnv) stackPointer() uint64 {
-	return j.eng.valueStackContext.stackPointer
+	return j.vm.valueStackContext.stackPointer
 }
 
 func (j *jitEnv) stackBasePointer() uint64 {
-	return j.eng.valueStackContext.stackBasePointer
+	return j.vm.valueStackContext.stackBasePointer
 }
 
 func (j *jitEnv) setStackPointer(sp uint64) {
-	j.eng.valueStackContext.stackPointer = sp
+	j.vm.valueStackContext.stackPointer = sp
 }
 
 func (j *jitEnv) addGlobals(g ...*wasm.GlobalInstance) {
@@ -87,27 +88,27 @@ func (j *jitEnv) setTable(table []wasm.TableElement) {
 }
 
 func (j *jitEnv) callFrameStackPeek() *callFrame {
-	return &j.eng.callFrameStack[j.eng.globalContext.callFrameStackPointer-1]
+	return &j.vm.callFrameStack[j.vm.globalContext.callFrameStackPointer-1]
 }
 
 func (j *jitEnv) callFrameStackPointer() uint64 {
-	return j.eng.globalContext.callFrameStackPointer
+	return j.vm.globalContext.callFrameStackPointer
 }
 
 func (j *jitEnv) setValueStackBasePointer(sp uint64) {
-	j.eng.valueStackContext.stackBasePointer = sp
+	j.vm.valueStackContext.stackBasePointer = sp
 }
 
 func (j *jitEnv) setCallFrameStackPointer(sp uint64) {
-	j.eng.globalContext.callFrameStackPointer = sp
-}
-
-func (j *jitEnv) setPreviousCallFrameStackPointer(sp uint64) {
-	j.eng.globalContext.previousCallFrameStackPointer = sp
+	j.vm.globalContext.callFrameStackPointer = sp
 }
 
 func (j *jitEnv) engine() *engine {
 	return j.eng
+}
+
+func (j *jitEnv) virtualMachine() *virtualMachine {
+	return j.vm
 }
 
 func (j *jitEnv) exec(code []byte) {
@@ -119,18 +120,19 @@ func (j *jitEnv) exec(code []byte) {
 			FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
 		},
 	}
-	j.eng.pushCallFrame(compiledFunction)
+
+	j.vm.pushCallFrame(compiledFunction)
 
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
-		uintptr(unsafe.Pointer(j.eng)),
+		uintptr(unsafe.Pointer(j.vm)),
 	)
 }
 
 const defaultMemoryPageNumInTest = 2
 
 func newJITEnvironment() *jitEnv {
-	return &jitEnv{
+	env := &jitEnv{
 		eng: newEngine(),
 		moduleInstance: &wasm.ModuleInstance{
 			MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
@@ -138,6 +140,8 @@ func newJITEnvironment() *jitEnv {
 			Globals:        []*wasm.GlobalInstance{},
 		},
 	}
+	env.vm = env.eng.newVirtualMachine()
+	return env
 }
 
 func TestMain(m *testing.M) {
