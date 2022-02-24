@@ -67,28 +67,29 @@ func (c *ModuleContext) Function(name string) publicwasm.Function {
 	if err != nil {
 		return nil
 	}
-	return &function{c: c, f: exp.Function}
+	return &exportedFunction{module: c, function: exp.Function}
 }
 
-// function wraps FunctionInstance to implement wasm.Function as otherwise there's a signature clash on Call.
-type function struct {
-	c *ModuleContext
-	f *FunctionInstance
+// exportedFunction wraps FunctionInstance so that it is called in context of the exporting module.
+type exportedFunction struct {
+	module   *ModuleContext
+	function *FunctionInstance
 }
 
 // ParamTypes implements wasm.Function ParamTypes
-func (f *function) ParamTypes() []publicwasm.ValueType {
-	return f.f.ParamTypes()
+func (f *exportedFunction) ParamTypes() []publicwasm.ValueType {
+	return f.function.ParamTypes()
 }
 
 // ResultTypes implements wasm.Function ResultTypes
-func (f *function) ResultTypes() []publicwasm.ValueType {
-	return f.f.ResultTypes()
+func (f *exportedFunction) ResultTypes() []publicwasm.ValueType {
+	return f.function.ResultTypes()
 }
 
-// Call implements wasm.Function Call
-func (f *function) Call(ctx context.Context, params ...uint64) ([]uint64, error) {
-	return f.f.Call(f.c.WithContext(ctx), params...)
+// Call implements wasm.Function Call in the ModuleContext of the exporting module.
+func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64, error) {
+	modCtx := f.module.WithContext(ctx)
+	return f.module.engine.Call(modCtx, f.function, params...)
 }
 
 // ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
@@ -141,11 +142,6 @@ func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
 
 // Call implements wasm.HostFunction Call
 func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) ([]uint64, error) {
-	paramSignature := f.FunctionType.Type.Params
-	paramCount := len(params)
-	if len(paramSignature) != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
-	}
 	hCtx, ok := ctx.(*ModuleContext)
 	if !ok { // TODO: guard that hCtx.Module actually imported this!
 		return nil, fmt.Errorf("this function was not imported by %s", ctx)
