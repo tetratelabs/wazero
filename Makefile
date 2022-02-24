@@ -37,8 +37,7 @@ build.spectest:
 test:
 	@go test ./...
 
-gopath ?= $(shell go env GOPATH)
-golangci_lint_path := $(gopath)/bin/golangci-lint
+golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
 
 $(golangci_lint_path):
 	@go install $(golangci_lint)
