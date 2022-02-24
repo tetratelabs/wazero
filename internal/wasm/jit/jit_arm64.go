@@ -40,6 +40,7 @@ type archContext struct {
 	// The value is set whenever jitcall is executed and done in jit_arm64.s
 	// Native code can return back to the vm.exec's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
+	// Note: this is only used by JIT code so mark this as nolint.
 	jitCallReturnAddress uint64 //nolint
 
 	// Loading large constants in arm64 is a bit costly so we place the following
