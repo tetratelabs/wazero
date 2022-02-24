@@ -29,19 +29,13 @@ type engine struct {
 	// adding a new compiled function. We take read lock when creating new virtualMachine
 	// for each function invocation while take write lock in engine.addCompiledFunction.
 	mux sync.RWMutex
-
-	// onCompilationDoneCallbacks call back when a function instance is compiled.
-	// See the comment where this is used below for detail.
-	// Not used at runtime, and only in the compilation phase.
-	onCompilationDoneCallbacks map[wasm.FunctionAddress][]func(*interpreterFunction)
 }
 
 const initialCompiledFunctionsSliceSize = 128
 
 func NewEngine() wasm.Engine {
 	return &engine{
-		onCompilationDoneCallbacks: map[wasm.FunctionAddress][]func(*interpreterFunction){},
-		functions:                  make([]*interpreterFunction, initialCompiledFunctionsSliceSize),
+		functions: make([]*interpreterFunction, initialCompiledFunctionsSliceSize),
 	}
 }
 
@@ -150,10 +144,6 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 		if err != nil {
 			return fmt.Errorf("failed to convert wazeroir operations to engine ones: %w", err)
 		}
-		for _, cb := range e.onCompilationDoneCallbacks[funcaddr] {
-			cb(compiled)
-		}
-		delete(e.onCompilationDoneCallbacks, funcaddr)
 	} else {
 		compiled = &interpreterFunction{
 			hostFn: f.HostFunction, funcInstance: f,
@@ -461,8 +451,7 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 			for i := 0; i < len(vm.frames); i++ {
 				frame := vm.popFrame()
 				name := frame.f.funcInstance.Name
-				// TODO: include the original instruction which corresponds
-				// to frame.f.body[frame.pc].
+				// TODO: include DWARF symbols. See #58
 				traces = append(traces, fmt.Sprintf("\t%d: %s", i, name))
 			}
 
