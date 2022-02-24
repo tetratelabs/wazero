@@ -92,7 +92,7 @@ type Function interface {
 	// See ValueType documentation for decoding rules.
 	ResultTypes() []ValueType
 
-	// Call is invokes the function with parameters encoded according to ParamTypes. Up to one result is returned,
+	// Call invokes the function with parameters encoded according to ParamTypes. Up to one result is returned,
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
 	// including signature mismatch.
 	//
