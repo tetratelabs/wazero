@@ -23,6 +23,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+func (j *jitEnv) stackTopAsByte() byte {
+	return byte(j.stack()[j.stackPointer()-1])
+}
+
+func (j *jitEnv) stackTopAsUint16() uint16 {
+	return uint16(j.stack()[j.stackPointer()-1])
+}
+
 func (j *jitEnv) requireNewCompiler(t *testing.T) *amd64Compiler {
 	b, err := asm.NewBuilder("amd64", 128)
 	require.NoError(t, err)

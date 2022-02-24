@@ -37,9 +37,16 @@ build.spectest:
 test:
 	@go test ./...
 
+golangci_lint_path := $(shell go env GOPATH)/bin/golangci-lint
+
+$(golangci_lint_path):
+	@go install $(golangci_lint)
+
+golangci_lint_goarch ?= $(shell go env GOARCH)
+
 .PHONY: lint
-lint:
-	@go run $(golangci_lint) run --timeout 5m
+lint: $(golangci_lint_path)
+	@GOARCH=$(golangci_lint_goarch) $(golangci_lint_path) run --timeout 5m
 
 .PHONY: format
 format:

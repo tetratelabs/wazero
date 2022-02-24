@@ -72,7 +72,8 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 		compiler := env.requireNewCompiler(t)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
-		compiler.compileReturnFunction()
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -162,7 +163,8 @@ func TestArm64Compiler_exit(t *testing.T) {
 			expStackPointer := uint64(100)
 			compiler.locationStack.sp = expStackPointer
 			require.NoError(t, err)
-			compiler.compileExitFromNativeCode(s)
+			err = compiler.compileExitFromNativeCode(s)
+			require.NoError(t, err)
 
 			// Compile and execute the code under test.
 			code, _, _, err := compiler.compile()
@@ -225,8 +227,10 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 					require.True(t, loc.onRegister())
 
 					// Release the register allocated value to the memory stack so that we can see the value after exiting.
-					compiler.compileReleaseRegisterToStack(loc)
-					compiler.compileReturnFunction()
+					err = compiler.compileReleaseRegisterToStack(loc)
+					require.NoError(t, err)
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
 
 					// Generate the code under test.
 					code, _, _, err := compiler.compile()
@@ -286,8 +290,10 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 			require.NoError(t, err)
 
 			// Release the register allocated value to the memory stack so that we can see the value after exiting.
-			compiler.compileReleaseRegisterToStack(compiler.locationStack.peek())
-			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			err = compiler.compileReleaseRegisterToStack(compiler.locationStack.peek())
+			require.NoError(t, err)
+			err = compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			require.NoError(t, err)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -347,7 +353,8 @@ func TestArm64Compiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			require.True(t, loc.onStack())
 
 			// Release the stack-allocated value to register.
-			compiler.compileLoadValueOnStackToRegister(loc)
+			err = compiler.compileLoadValueOnStackToRegister(loc)
+			require.NoError(t, err)
 			require.Len(t, compiler.locationStack.usedRegisters, 1)
 			require.True(t, loc.onRegister())
 
@@ -365,8 +372,10 @@ func TestArm64Compiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			}
 
 			// Release the value to the memory stack so that we can see the value after exiting.
-			compiler.compileReleaseRegisterToStack(loc)
-			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			err = compiler.compileReleaseRegisterToStack(loc)
+			require.NoError(t, err)
+			err = compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			require.NoError(t, err)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -532,7 +541,8 @@ func TestArm64Compiler_compile_Le_Lt_Gt_Ge_Eq_Eqz_Ne(t *testing.T) {
 							compiler.compileLoadConditionalRegisterToGeneralPurposeRegister(resultLocation)
 							require.True(t, resultLocation.onRegister())
 
-							compiler.compileReturnFunction()
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
 
 							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
@@ -726,8 +736,10 @@ func TestArm64Compiler_compile_Add_Sub_Mul(t *testing.T) {
 							}
 
 							// Release the value to the memory stack again to verify the operation.
-							compiler.compileReleaseRegisterToStack(resultLocation)
-							compiler.compileReturnFunction()
+							err = compiler.compileReleaseRegisterToStack(resultLocation)
+							require.NoError(t, err)
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
 
 							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
@@ -885,8 +897,10 @@ func TestArm64Compiler_compile_And_Or_Xor_Shl_Rotr(t *testing.T) {
 							require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
 
 							// Release the value to the memory stack again to verify the operation.
-							compiler.compileReleaseRegisterToStack(resultLocation)
-							compiler.compileReturnFunction()
+							err = compiler.compileReleaseRegisterToStack(resultLocation)
+							require.NoError(t, err)
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
 
 							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()
@@ -1002,8 +1016,10 @@ func TestArm64Compiler_compileShr(t *testing.T) {
 						require.Equal(t, generalPurposeRegisterTypeInt, resultLocation.regType)
 
 						// Release the value to the memory stack again to verify the operation.
-						compiler.compileReleaseRegisterToStack(resultLocation)
-						compiler.compileReturnFunction()
+						err = compiler.compileReleaseRegisterToStack(resultLocation)
+						require.NoError(t, err)
+						err = compiler.compileReturnFunction()
+						require.NoError(t, err)
 
 						// Compile and execute the code under test.
 						code, _, _, err := compiler.compile()
@@ -1104,11 +1120,14 @@ func TestArm64Compiler_compilePick(t *testing.T) {
 			require.Equal(t, pickTargetLocation.registerType(), pickedLocation.registerType())
 
 			// Release the value to the memory stack again to verify the operation, and then return.
-			compiler.compileReleaseRegisterToStack(pickedLocation)
+			err = compiler.compileReleaseRegisterToStack(pickedLocation)
+			require.NoError(t, err)
 			if tc.isPickTargetOnRegister {
-				compiler.compileReleaseRegisterToStack(pickTargetLocation)
+				err = compiler.compileReleaseRegisterToStack(pickTargetLocation)
+				require.NoError(t, err)
 			}
-			compiler.compileReturnFunction()
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
 
 			// Compile and execute the code under test.
 			code, _, _, err := compiler.compile()
@@ -1152,7 +1171,8 @@ func TestArm64Compiler_compileDrop(t *testing.T) {
 		// After the nil range drop, the stack must remain the same.
 		require.Equal(t, uint64(liveNum), compiler.locationStack.sp)
 
-		compiler.compileReturnFunction()
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1192,9 +1212,11 @@ func TestArm64Compiler_compileDrop(t *testing.T) {
 		top := compiler.locationStack.peek()
 		require.True(t, top.onRegister())
 		// Release the top value after drop so that we can verify the cpu itself is not mainpulated.
-		compiler.compileReleaseRegisterToStack(top)
+		err = compiler.compileReleaseRegisterToStack(top)
+		require.NoError(t, err)
 
-		compiler.compileReturnFunction()
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1244,7 +1266,8 @@ func TestArm64Compiler_compileDrop(t *testing.T) {
 		// Release all register values so that we can verify the register allocated values.
 		err = compiler.compileReleaseAllRegistersToStack()
 		require.NoError(t, err)
-		compiler.compileReturnFunction()
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1325,16 +1348,18 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		// Emit code for the backward label.
 		backwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
 		requireAddLabel(t, compiler, backwardLabel)
-		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		err := compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		require.NoError(t, err)
 
 		// Now emit the body. First we add NOP so that we can execute code after the target label.
 		nop := compiler.compileNOP()
 
-		err := compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: backwardLabel}})
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: backwardLabel}})
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with unreachable status.
-		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1364,11 +1389,13 @@ func TestArm64Compiler_compileBr(t *testing.T) {
 		require.NoError(t, err)
 
 		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
-		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
 
 		// Emit code for the forward label where we emit the expectedValue and then exit.
 		requireAddLabel(t, compiler, forwardLabel)
-		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		require.NoError(t, err)
 
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
@@ -1565,15 +1592,18 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 
 					err = compiler.compileBrIf(&wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
 					require.NoError(t, err)
-					compiler.compileExitFromNativeCode(unreachableStatus)
+					err = compiler.compileExitFromNativeCode(unreachableStatus)
+					require.NoError(t, err)
 
 					// Emit code for .then label.
 					requireAddLabel(t, compiler, thenBranchTarget.Target.Label)
-					compiler.compileExitFromNativeCode(thenLabelExitStatus)
+					err = compiler.compileExitFromNativeCode(thenLabelExitStatus)
+					require.NoError(t, err)
 
 					// Emit code for .else label.
 					requireAddLabel(t, compiler, elseBranchTarget.Target.Label)
-					compiler.compileExitFromNativeCode(elseLabelExitStatus)
+					err = compiler.compileExitFromNativeCode(elseLabelExitStatus)
+					require.NoError(t, err)
 
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
@@ -1614,7 +1644,8 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// Set the acquisition target instruction to the one after JMP.
 		compiler.compileReadInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
 
-		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		require.NoError(t, err)
 
 		// If generate the code without JMP after compileReadInstructionAddress,
 		// the call back added must return error.
@@ -1634,14 +1665,16 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		// Add many instruction between the target and compileReadInstructionAddress.
 		for i := 0; i < 100; i++ {
-			compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
+			require.NoError(t, err)
 		}
 
 		ret := compiler.newProg()
 		ret.As = obj.ARET
 		ret.To.Type = obj.TYPE_REG
 		ret.To.Reg = reservedRegisterForTemporary
-		compiler.compileReturnFunction()
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
 
 		// If generate the code with too many instruction between ADR and
 		// the target, compile must fail.
@@ -1667,7 +1700,8 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		// If we fail to branch, we reach here and exit with unreachable status,
 		// so the assertion would fail.
-		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
 
 		// This could be the read instruction target as this is the
 		// right after RET. Therefore, the branch instruction above
@@ -2171,7 +2205,8 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			require.NoError(t, err)
 			require.Empty(t, compiler.locationStack.usedRegisters)
 
-			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			err = compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+			require.NoError(t, err)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -2473,7 +2508,8 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 			require.Equal(t, uint64(0), compiler.locationStack.sp)
 
 			// Generate the code under test.
-			compiler.compileReturnFunction()
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
@@ -2680,7 +2716,8 @@ func TestArm64Compiler_compileLoad(t *testing.T) {
 			} else {
 				require.Equal(t, generalPurposeRegisterTypeInt, loadedLocation.registerType())
 			}
-			compiler.compileReturnFunction()
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
 
 			// Generate and run the code under test.
 			code, _, _, err := compiler.compile()
@@ -2708,7 +2745,7 @@ func TestArm64Compiler_compileMemoryGrow(t *testing.T) {
 	const expValue uint32 = 100
 	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
 	require.NoError(t, err)
-	compiler.compileReturnFunction()
+	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
@@ -2742,7 +2779,7 @@ func TestArm64Compiler_compileMemorySize(t *testing.T) {
 	require.Equal(t, uint64(1), compiler.locationStack.sp)
 	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
 
-	compiler.compileReturnFunction()
+	err = compiler.compileReturnFunction()
 	require.NoError(t, err)
 
 	// Generate and run the code under test.
@@ -2776,7 +2813,8 @@ func TestArm64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 				compiler.onStackPointerCeilDeterminedCallBack = nil
 				env.setValueStackBasePointer(stackBasePointer)
 
-				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+				err = compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+				require.NoError(t, err)
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -2800,7 +2838,8 @@ func TestArm64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 		require.NoError(t, err)
 
 		// On the return from grow value stack, we simply return.
-		compiler.compileReturnFunction()
+		err = compiler.compileReturnFunction()
+		require.NoError(t, err)
 
 		stackPointerCeil := uint64(6)
 		compiler.stackPointerCeil = stackPointerCeil
@@ -3046,7 +3085,8 @@ func TestArm64Compiler_compile_Div_Rem(t *testing.T) {
 							}
 							require.NoError(t, err)
 
-							compiler.compileReturnFunction()
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
 
 							// Compile and execute the code under test.
 							code, _, _, err := compiler.compile()

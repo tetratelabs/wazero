@@ -304,15 +304,3 @@ func (s *valueLocationStack) takeStealTargetFromUsedRegister(tp generalPurposeRe
 	}
 	return nil, false
 }
-
-// findValueForRegister returns the valueLocation of the given register or nil if not found.
-// If not found, return nil.
-func (s *valueLocationStack) findValueForRegister(reg int16) *valueLocation {
-	for i := uint64(0); i < s.sp; i++ {
-		loc := s.stack[i]
-		if loc.register == reg {
-			return loc
-		}
-	}
-	return nil
-}

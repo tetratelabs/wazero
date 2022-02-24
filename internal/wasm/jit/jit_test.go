@@ -16,14 +16,6 @@ type jitEnv struct {
 	moduleInstance *wasm.ModuleInstance
 }
 
-func (j *jitEnv) stackTopAsByte() byte {
-	return byte(j.stack()[j.stackPointer()-1])
-}
-
-func (j *jitEnv) stackTopAsUint16() uint16 {
-	return uint16(j.stack()[j.stackPointer()-1])
-}
-
 func (j *jitEnv) stackTopAsUint32() uint32 {
 	return uint32(j.stack()[j.stackPointer()-1])
 }
