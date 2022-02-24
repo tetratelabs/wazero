@@ -37,9 +37,11 @@ build.spectest:
 test:
 	@go test ./...
 
+golangci_lint_goarch ?= $(shell go env GOARCH)
+
 .PHONY: lint
 lint:
-	@go run $(golangci_lint) run --timeout 5m
+	@GOARCH=$(golangci_lint_goarch) go run $(golangci_lint) run --timeout 5m
 
 .PHONY: format
 format:

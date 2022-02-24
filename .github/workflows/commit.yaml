@@ -32,7 +32,11 @@ jobs:
             ~/go/pkg/mod
           key: check-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
-      - run: make lint
+      - name: line (amd64)
+        run: make lint golangci_lint_goarch=amd64
+
+      - name: line (arm64)
+        run: make lint golangci_lint_goarch=arm64
 
       - run: make build.spectest
 

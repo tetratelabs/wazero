@@ -16,10 +16,14 @@ type jitEnv struct {
 	moduleInstance *wasm.ModuleInstance
 }
 
+// Only used in amd64 test.
+//nolint:unused
 func (j *jitEnv) stackTopAsByte() byte {
 	return byte(j.stack()[j.stackPointer()-1])
 }
 
+// Only used in amd64 test.
+//nolint:unused
 func (j *jitEnv) stackTopAsUint16() uint16 {
 	return uint16(j.stack()[j.stackPointer()-1])
 }

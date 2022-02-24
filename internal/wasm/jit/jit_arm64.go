@@ -40,7 +40,7 @@ type archContext struct {
 	// The value is set whenever jitcall is executed and done in jit_arm64.s
 	// Native code can return back to the vm.exec's main loop back by
 	// executing "ret" instruction with this value. See arm64Compiler.exit.
-	jitCallReturnAddress uint64
+	jitCallReturnAddress uint64 //nolint
 
 	// Loading large constants in arm64 is a bit costly so we place the following
 	// consts on callEngine struct so that we can quickly access them during various operations.
@@ -877,7 +877,9 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	if err := c.compileDropRange(o.Else.ToDrop); err != nil {
 		return err
 	}
-	c.compileBranchInto(o.Else.Target)
+	if err := c.compileBranchInto(o.Else.Target); err != nil {
+		return err
+	}
 
 	// Now ready to emit the code for branching into then branch.
 	// Retrieve the original value location stack so that the code below wont'be affected by the Else branch ^^.
@@ -887,8 +889,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	if err := c.compileDropRange(o.Then.ToDrop); err != nil {
 		return err
 	}
-	c.compileBranchInto(o.Then.Target)
-	return nil
+	return c.compileBranchInto(o.Then.Target)
 }
 
 func (c *arm64Compiler) compileBranchInto(target *wazeroir.BranchTarget) error {
@@ -1130,7 +1131,9 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack,
 		// as the register is not saved across function calls.
 		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(addrRegister)
-		c.compileReleaseRegisterToStack(savedOffsetLocation)
+		if err := c.compileReleaseRegisterToStack(savedOffsetLocation); err != nil {
+			return err
+		}
 	}
 
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
@@ -1145,7 +1148,9 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 
 		savedOffsetLocation := c.locationStack.pop()
 		savedOffsetLocation.setRegister(addrRegister)
-		c.compileLoadValueOnStackToRegister(savedOffsetLocation)
+		if err := c.compileLoadValueOnStackToRegister(savedOffsetLocation); err != nil {
+			return err
+		}
 	}
 
 	// On the function return, we again have to set vm.callFrameStackPointer into callFrameStackPointerRegister.
@@ -1402,7 +1407,9 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// If it exceeds len(table), we exit the execution.
 	brIfOffsetOK := c.compilelBranchInstruction(arm64.ABLO)
-	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+	if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess); err != nil {
+		return err
+	}
 
 	// Otherwise, we proceed to do function type check.
 	c.setBranchTargetOnNext(brIfOffsetOK)
@@ -1441,11 +1448,15 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, tmp, reservedRegisterForTemporary)
 
 		brIfInitizlied := c.compilelBranchInstruction(arm64.ABNE)
-		c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
+		if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess); err != nil {
+			return err
+		}
 
 		// Otherwise exit with jitCallStatusCodeTypeMismatchOnIndirectCall.
 		c.setBranchTargetOnNext(brIfInitizlied)
-		c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
+		if err := c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall); err != nil {
+			return err
+		}
 	}
 
 	c.setBranchTargetOnNext(brIfTypeMatched)
@@ -1600,7 +1611,9 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	} else if pickTarget.onStack() {
 		// Temporarily assign a register to the pick target, and then load the value.
 		pickTarget.setRegister(pickedRegister)
-		c.compileLoadValueOnStackToRegister(pickTarget)
+		if err := c.compileLoadValueOnStackToRegister(pickTarget); err != nil {
+			return err
+		}
 		// After the load, we revert the register assignment to the pick target.
 		pickTarget.setRegister(nilRegister)
 	}
@@ -1836,8 +1849,7 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
 		c.locationStack.pushValueLocationOnStack()
-		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
-		return nil
+		return c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
 	}
 
 	var inst obj.As
@@ -1894,7 +1906,9 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 
 	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
-	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+	if err := c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero); err != nil {
+		return err
+	}
 
 	// Otherwise, we proceed.
 	c.setBranchTargetOnNext(brIfDivisorNonZero)
@@ -1923,7 +1937,9 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		brIfDividendNotMinInt := c.compilelBranchInstruction(arm64.ABNE)
 
 		// Otherwise, we raise overflow error.
-		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
+		if err := c.compileExitFromNativeCode(jitCallStatusIntegerOverflow); err != nil {
+			return err
+		}
 
 		c.setBranchTargetOnNext(brIfDivisorNonMinusOne, brIfDividendNotMinInt)
 	}
@@ -1944,8 +1960,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
 		c.locationStack.pushValueLocationOnStack()
-		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
-		return nil
+		return c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
 	}
 
 	var divInst, msubInst, cmpInst obj.As
@@ -1973,7 +1988,9 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 
 	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
-	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+	if err := c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero); err != nil {
+		return err
+	}
 
 	// Othrewise, we proceed.
 	c.setBranchTargetOnNext(brIfDivisorNonZero)
@@ -2422,10 +2439,14 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 		brIfSourceNaN := c.compilelBranchInstruction(arm64.ABVS)
 
 		// If the source value is not NaN, the operation was overflow.
-		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
+		if err := c.compileExitFromNativeCode(jitCallStatusIntegerOverflow); err != nil {
+			return err
+		}
 		// Otherwise, the operation was invalid as this is trying to convert NaN to integer.
 		c.setBranchTargetOnNext(brIfSourceNaN)
-		c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
+		if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion); err != nil {
+			return err
+		}
 	}
 
 	// Otherwise, we branch into the next instruction.
@@ -2453,8 +2474,7 @@ func (c *arm64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
 		convinst = arm64.AUCVTFD
 	}
-	c.compileSimpleConversion(convinst, generalPurposeRegisterTypeFloat)
-	return nil
+	return c.compileSimpleConversion(convinst, generalPurposeRegisterTypeFloat)
 }
 
 // compileF32DemoteFromF64 implements compiler.compileF32DemoteFromF64 for the arm64 architecture.
