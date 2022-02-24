@@ -55,7 +55,11 @@ type (
 		// and that is equivalent to  engine.callFrameTop().
 		callFrameStack []callFrame
 
-		// TODO: comment
+		// compiledFunctions is engine.compiledFunctions at the time when this virtualMachine was created.
+		// engine.compiledFunction's underlying array can change whenever it compiles a new function while
+		// we have to access it when we make function calls. By copying slice (= copying a pointer to the array)
+		// into this field, we can safely access the compiled function array from the native code without caring
+		// about the change made by engine.
 		compiledFunctions []*compiledFunction
 	}
 
