@@ -103,12 +103,6 @@ func (j *jitEnv) setCallFrameStackPointerLen(l uint64) {
 	j.vm.callFrameStackLen = l
 }
 
-func (j *jitEnv) addCompiledFunction(addr wasm.FunctionAddress, cf *compiledFunction) {
-	j.eng.addCompiledFunction(addr, cf)
-	j.vm.compiledFunctions = j.eng.compiledFunctions
-	j.vm.compiledFunctionsElement0Address = uintptr(unsafe.Pointer(&j.eng.compiledFunctions[0]))
-}
-
 func (j *jitEnv) module() *wasm.ModuleInstance {
 	return j.moduleInstance
 }

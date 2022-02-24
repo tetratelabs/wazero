@@ -6085,20 +6085,12 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 			codeSegment:        code,
 			codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 		})
+		env.module().Functions = append(env.module().Functions,
+			&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: addr})
 	}
 
 	// Now we start building the caller's code.
 	compiler := env.requireNewCompiler(t)
-	compiler.f = &wasm.FunctionInstance{ModuleInstance: &wasm.ModuleInstance{
-		Functions: []*wasm.FunctionInstance{
-			{
-				FunctionKind: wasm.FunctionKindWasm,
-				FunctionType: &wasm.TypeInstance{Type: targetFunctionType},
-				Address:      targetFunctionAddress,
-			},
-		},
-	}}
-
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
 

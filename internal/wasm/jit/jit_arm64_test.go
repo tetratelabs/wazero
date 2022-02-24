@@ -1689,7 +1689,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 		growCallFrameStack := growCallFrameStack
 		t.Run(fmt.Sprintf("grow=%v", growCallFrameStack), func(t *testing.T) {
 			env := newJITEnvironment()
-			vm := env.virtualMachine()
+			eng := env.engine()
 			expectedValue := uint32(0)
 
 			if growCallFrameStack {
@@ -1731,7 +1731,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 					addr := wasm.FunctionAddress(i)
-					env.addCompiledFunction(addr, &compiledFunction{
+					eng.addCompiledFunction(addr, &compiledFunction{
 						codeSegment:        code,
 						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 					})
@@ -1772,6 +1772,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
 
 				// Grow the callFrame stack, and exec again from the return address.
+				vm := env.virtualMachine()
 				vm.builtinFunctionGrowCallFrameStack()
 				jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(vm)))
 			}
@@ -1913,7 +1914,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 				for i := 0; i < len(table); i++ {
 					env := newJITEnvironment()
 					env.setTable(table)
-					vm := env.virtualMachine()
+					eng := env.engine()
 
 					// First we create the call target function with function address = i,
 					// and it returns one value.
@@ -1938,7 +1939,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 							codeSegment:        code,
 							codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 						}
-						env.addCompiledFunction(table[i].FunctionAddress, cf)
+						eng.addCompiledFunction(table[i].FunctionAddress, cf)
 					})
 
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -1980,6 +1981,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 							require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
 
 							// Grow the callFrame stack, and exec again from the return address.
+							vm := env.virtualMachine()
 							vm.builtinFunctionGrowCallFrameStack()
 							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(vm)))
 						}
