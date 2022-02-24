@@ -4714,12 +4714,12 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 
 		// Write the calculated value to virtualMachine.valueStackContext.stackBasePointer.
 		putNextStackBasePointerIntoVirtualMachine := c.newProg()
-		putNextStackBasePointerIntovirtualMachine.As = x86.AMOVQ
-		putNextStackBasePointerIntovirtualMachine.To.Type = obj.TYPE_MEM
-		putNextStackBasePointerIntovirtualMachine.To.Reg = reservedRegisterForVirtualMachine
-		putNextStackBasePointerIntovirtualMachine.To.Offset = virtualMachineValueStackContextStackBasePointerOffset
-		putNextStackBasePointerIntovirtualMachine.From.Type = obj.TYPE_REG
-		putNextStackBasePointerIntovirtualMachine.From.Reg = tmpRegister
+		putNextStackBasePointerIntoVirtualMachine.As = x86.AMOVQ
+		putNextStackBasePointerIntoVirtualMachine.To.Type = obj.TYPE_MEM
+		putNextStackBasePointerIntoVirtualMachine.To.Reg = reservedRegisterForVirtualMachine
+		putNextStackBasePointerIntoVirtualMachine.To.Offset = virtualMachineValueStackContextStackBasePointerOffset
+		putNextStackBasePointerIntoVirtualMachine.From.Type = obj.TYPE_REG
+		putNextStackBasePointerIntoVirtualMachine.From.Reg = tmpRegister
 		c.addInstruction(putNextStackBasePointerIntoVirtualMachine)
 	}
 
