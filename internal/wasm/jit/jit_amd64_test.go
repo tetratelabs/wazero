@@ -106,7 +106,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		// Reenter from the return address.
 		returnAddress := env.callFrameStackPeek().returnAddress
 		require.NotZero(t, returnAddress)
-		jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+		jitcall(returnAddress, uintptr(unsafe.Pointer(env.virtualMachine())))
 
 		// Check the result. This should be "Returned".
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -137,21 +137,19 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		// See the previous call frame stack poitner to verify the correctness of exit decision.
-		const previousCallFrameStackPointer uint64 = 50
-		env.setCallFrameStackPointer(previousCallFrameStackPointer)
-		env.setPreviousCallFrameStackPointer(previousCallFrameStackPointer)
+		env.setCallFrameStackPointerLen(1)
 
 		// Run codes
 		env.exec(code)
 
 		// Check the exit status and returned value.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-		require.Equal(t, previousCallFrameStackPointer, env.callFrameStackPointer())
 		require.Equal(t, expectedValue, env.stackTopAsUint32())
 	})
 	t.Run("deep call stack", func(t *testing.T) {
 		env := newJITEnvironment()
 		engine := env.engine()
+		vm := env.virtualMachine()
 
 		// Push the call frames.
 		const callFrameNums = 10
@@ -186,8 +184,8 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 				returnStackBasePointer: uint64(funcaddr) * 10,
 				compiledFunction:       compiledFunction,
 			}
-			engine.callFrameStack[engine.globalContext.callFrameStackPointer] = frame
-			engine.globalContext.callFrameStackPointer++
+			vm.callFrameStack[vm.globalContext.callFrameStackPointer] = frame
+			vm.globalContext.callFrameStackPointer++
 
 			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
 		}
@@ -195,7 +193,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
 
 		// Run codes.
-		env.exec(engine.callFrameTop().compiledFunction.codeSegment)
+		env.exec(vm.callFrameTop().compiledFunction.codeSegment)
 
 		// Check the exit status.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -277,6 +275,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
+			vm := env.virtualMachine()
 			compiler := env.requireNewCompiler(t)
 			compiler.initializeReservedStackBasePointer()
 			compiler.f.ModuleInstance = tc.moduleInstance
@@ -300,22 +299,20 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			// Check the exit status.
 			require.Equal(t, expectedStatus, env.jitStatus())
 
-			// Check if the fields of engine.moduleContext are updated.
-			engine := env.engine()
-
+			// Check if the fields of virtualMachine.moduleContext are updated.
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
-			require.Equal(t, bufSliceHeader.Data, engine.moduleContext.globalElement0Address)
+			require.Equal(t, bufSliceHeader.Data, vm.moduleContext.globalElement0Address)
 
 			if tc.moduleInstance.MemoryInstance != nil {
 				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.MemoryInstance.Buffer))
-				require.Equal(t, uint64(bufSliceHeader.Len), engine.moduleContext.memorySliceLen)
-				require.Equal(t, bufSliceHeader.Data, engine.moduleContext.memoryElement0Address)
+				require.Equal(t, uint64(bufSliceHeader.Len), vm.moduleContext.memorySliceLen)
+				require.Equal(t, bufSliceHeader.Data, vm.moduleContext.memoryElement0Address)
 			}
 
 			if len(tc.moduleInstance.Tables) > 0 {
 				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
-				require.Equal(t, uint64(tableHeader.Len), engine.moduleContext.tableSliceLen)
-				require.Equal(t, tableHeader.Data, engine.moduleContext.tableElement0Address)
+				require.Equal(t, uint64(tableHeader.Len), vm.moduleContext.tableSliceLen)
+				require.Equal(t, tableHeader.Data, vm.moduleContext.tableElement0Address)
 			}
 		})
 	}
@@ -4762,7 +4759,6 @@ func TestAmd64Compiler_setupMemoryAccessCeil(t *testing.T) {
 				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
 					env := newJITEnvironment()
 					compiler := env.requireNewCompiler(t)
-					compiler.f.ModuleInstance = env.moduleInstance
 
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -4811,7 +4807,6 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = env.moduleInstance
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -4910,7 +4905,6 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = env.moduleInstance
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -4972,7 +4966,6 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = env.moduleInstance
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -5026,7 +5019,6 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 func TestAmd64Compiler_compileLoad32(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
-	compiler.f.ModuleInstance = env.moduleInstance
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -5086,7 +5078,6 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = env.moduleInstance
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -5146,7 +5137,6 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 func TestAmd64Compiler_compileStore8(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
-	compiler.f.ModuleInstance = env.moduleInstance
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -5191,7 +5181,6 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 func TestAmd64Compiler_compileStore16(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
-	compiler.f.ModuleInstance = env.moduleInstance
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -5236,7 +5225,6 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 func TestAmd64Compiler_compileStore32(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
-	compiler.f.ModuleInstance = env.moduleInstance
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -5279,53 +5267,46 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
-	for _, currentCallFrameStackPointer := range []uint64{0, 10, 20} {
-		currentCallFrameStackPointer := currentCallFrameStackPointer
-		t.Run(fmt.Sprintf("%d", currentCallFrameStackPointer), func(t *testing.T) {
-			env := newJITEnvironment()
-			compiler := env.requireNewCompiler(t)
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t)
 
-			err := compiler.compilePreamble()
-			require.NoError(t, err)
-			// Emit memory.grow instructions.
-			err = compiler.compileMemoryGrow()
-			require.NoError(t, err)
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+	// Emit memory.grow instructions.
+	err = compiler.compileMemoryGrow()
+	require.NoError(t, err)
 
-			// Emit arbitrary code after memory.grow returned.
-			const expValue uint32 = 100
-			err = compiler.compilePreamble()
-			require.NoError(t, err)
-			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
-			require.NoError(t, err)
-			err = compiler.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+	// Emit arbitrary code after memory.grow returned.
+	const expValue uint32 = 100
+	err = compiler.compilePreamble()
+	require.NoError(t, err)
+	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+	require.NoError(t, err)
+	err = compiler.releaseAllRegistersToStack()
+	require.NoError(t, err)
+	compiler.exit(jitCallStatusCodeReturned)
 
-			// Generate the code under test.
-			code, _, _, err := compiler.compile()
-			require.NoError(t, err)
+	// Generate the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
 
-			// Run code.
-			env.setCallFrameStackPointer(currentCallFrameStackPointer)
-			env.exec(code)
+	// Run code.
+	env.exec(code)
 
-			require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-			require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
+	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
 
-			returnAddress := env.callFrameStackPeek().returnAddress
-			require.NotZero(t, returnAddress)
-			jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+	returnAddress := env.callFrameStackPeek().returnAddress
+	require.NotZero(t, returnAddress)
+	jitcall(returnAddress, uintptr(unsafe.Pointer(env.virtualMachine())))
 
-			require.Equal(t, expValue, env.stackTopAsUint32())
-			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
-		})
-	}
+	require.Equal(t, expValue, env.stackTopAsUint32())
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 }
 
 func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
-	compiler.f.ModuleInstance = env.moduleInstance
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
@@ -5829,7 +5810,6 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the globals.
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}, nil}
@@ -5885,7 +5865,6 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = env.moduleInstance
 
 			// Setup the globals.
 			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}}, nil)
@@ -5923,9 +5902,8 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 		t.Run(fmt.Sprintf("is_address_from_register=%v", isAddressFromRegister), func(t *testing.T) {
 			t.Run("need to grow call frame stack", func(t *testing.T) {
 				env := newJITEnvironment()
-				engine := env.engine()
 
-				env.setCallFrameStackPointer(engine.globalContext.callFrameStackLen - 1)
+				env.setCallFrameStackPointerLen(1)
 				compiler := env.requireNewCompiler(t)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)

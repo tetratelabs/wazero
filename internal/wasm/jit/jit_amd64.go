@@ -379,8 +379,8 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
-	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
-	moveGlobalSlicePointer.From.Offset = engineModuleContextGlobalElement0AddressOffset
+	moveGlobalSlicePointer.From.Reg = reservedRegisterForVirtualMachine
+	moveGlobalSlicePointer.From.Offset = virtualMachineModuleContextGlobalElement0AddressOffset
 	c.addInstruction(moveGlobalSlicePointer)
 
 	// Then, get the memory location of the target global instance's pointer.
@@ -454,8 +454,8 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	moveGlobalSlicePointer.To.Type = obj.TYPE_REG
 	moveGlobalSlicePointer.To.Reg = intReg
 	moveGlobalSlicePointer.From.Type = obj.TYPE_MEM
-	moveGlobalSlicePointer.From.Reg = reservedRegisterForEngine
-	moveGlobalSlicePointer.From.Offset = engineModuleContextGlobalElement0AddressOffset
+	moveGlobalSlicePointer.From.Reg = reservedRegisterForVirtualMachine
+	moveGlobalSlicePointer.From.Offset = virtualMachineModuleContextGlobalElement0AddressOffset
 	c.addInstruction(moveGlobalSlicePointer)
 
 	// Then, get the memory location of the target global instance's pointer.
@@ -966,8 +966,8 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	cmpLength.To.Type = obj.TYPE_REG
 	cmpLength.To.Reg = offset.register
 	cmpLength.From.Type = obj.TYPE_MEM
-	cmpLength.From.Reg = reservedRegisterForEngine
-	cmpLength.From.Offset = engineModuleContextTableSliceLenOffset
+	cmpLength.From.Reg = reservedRegisterForVirtualMachine
+	cmpLength.From.Offset = virtualMachineModuleContextTableSliceLenOffset
 	c.addInstruction(cmpLength)
 
 	notLengthExceedJump := c.newProg()
@@ -997,8 +997,8 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.To.Type = obj.TYPE_REG
 	movTableSliceAddress.To.Reg = offset.register
 	movTableSliceAddress.From.Type = obj.TYPE_MEM
-	movTableSliceAddress.From.Reg = reservedRegisterForEngine
-	movTableSliceAddress.From.Offset = engineModuleContextTableElement0AddressOffset
+	movTableSliceAddress.From.Reg = reservedRegisterForVirtualMachine
+	movTableSliceAddress.From.Offset = virtualMachineModuleContextTableElement0AddressOffset
 	c.addInstruction(movTableSliceAddress)
 
 	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset].
@@ -4098,8 +4098,8 @@ func (c *amd64Compiler) setupMemoryAccessCeil(offsetArg uint32, targetSizeInByte
 	cmp.To.Type = obj.TYPE_REG
 	cmp.To.Reg = result
 	cmp.From.Type = obj.TYPE_MEM
-	cmp.From.Reg = reservedRegisterForEngine
-	cmp.From.Offset = engineModuleContextMemorySliceLenOffset
+	cmp.From.Reg = reservedRegisterForVirtualMachine
+	cmp.From.Offset = virtualMachineModuleContextMemorySliceLenOffset
 	c.addInstruction(cmp)
 
 	// Jump if the value is within the memory length.
@@ -4213,8 +4213,8 @@ func (c *amd64Compiler) compileMemorySize() error {
 	getMemorySizeInBytes.To.Type = obj.TYPE_REG
 	getMemorySizeInBytes.To.Reg = loc.register
 	getMemorySizeInBytes.From.Type = obj.TYPE_MEM
-	getMemorySizeInBytes.From.Reg = reservedRegisterForEngine
-	getMemorySizeInBytes.From.Offset = engineModuleContextMemorySliceLenOffset
+	getMemorySizeInBytes.From.Reg = reservedRegisterForVirtualMachine
+	getMemorySizeInBytes.From.Offset = virtualMachineModuleContextMemorySliceLenOffset
 	c.addInstruction(getMemorySizeInBytes)
 
 	// WebAssembly's memory.size returns the page size (65536) of memory region.
@@ -4512,8 +4512,8 @@ func (c *amd64Compiler) setJITStatus(status jitCallStatusCode) {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(status)
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineExitContextJITCallStatusCodeOffset
+	prog.To.Reg = reservedRegisterForVirtualMachine
+	prog.To.Offset = virtualMachineExitContextJITCallStatusCodeOffset
 	c.addInstruction(prog)
 }
 
@@ -4523,8 +4523,8 @@ func (c *amd64Compiler) getCallFrameStackPointer(destinationRegister int16) {
 	getCallFrameStackPointer.To.Type = obj.TYPE_REG
 	getCallFrameStackPointer.To.Reg = destinationRegister
 	getCallFrameStackPointer.From.Type = obj.TYPE_MEM
-	getCallFrameStackPointer.From.Reg = reservedRegisterForEngine
-	getCallFrameStackPointer.From.Offset = engineGlobalContextCallFrameStackPointerOffset
+	getCallFrameStackPointer.From.Reg = reservedRegisterForVirtualMachine
+	getCallFrameStackPointer.From.Offset = virtualMachineGlobalContextCallFrameStackPointerOffset
 	c.addInstruction(getCallFrameStackPointer)
 }
 
@@ -4577,8 +4577,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	cmpWithCallFrameStackLen.To.Type = obj.TYPE_REG
 	cmpWithCallFrameStackLen.To.Reg = callFrameStackPointerRegister
 	cmpWithCallFrameStackLen.From.Type = obj.TYPE_MEM
-	cmpWithCallFrameStackLen.From.Reg = reservedRegisterForEngine
-	cmpWithCallFrameStackLen.From.Offset = engineGlobalContextCallFrameStackLenOffset
+	cmpWithCallFrameStackLen.From.Reg = reservedRegisterForVirtualMachine
+	cmpWithCallFrameStackLen.From.Offset = virtualMachineGlobalContextCallFrameStackLenOffset
 	c.addInstruction(cmpWithCallFrameStackLen)
 
 	// If they do not equal, then we don't have to grow the call frame stack.
@@ -4622,8 +4622,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	getCallFrameStackElement0Address.To.Type = obj.TYPE_REG
 	getCallFrameStackElement0Address.To.Reg = tmpRegister
 	getCallFrameStackElement0Address.From.Type = obj.TYPE_MEM
-	getCallFrameStackElement0Address.From.Reg = reservedRegisterForEngine
-	getCallFrameStackElement0Address.From.Offset = engineGlobalContextCallFrameStackElement0AddressOffset
+	getCallFrameStackElement0Address.From.Reg = reservedRegisterForVirtualMachine
+	getCallFrameStackElement0Address.From.Offset = virtualMachineGlobalContextCallFrameStackElement0AddressOffset
 	c.addInstruction(getCallFrameStackElement0Address)
 
 	// Since call frame stack pointer is the index for engine.callFrameStack slice,
@@ -4684,8 +4684,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		movCurrentStackBasePointerIntoTmpRegister.To.Type = obj.TYPE_REG
 		movCurrentStackBasePointerIntoTmpRegister.To.Reg = tmpRegister
 		movCurrentStackBasePointerIntoTmpRegister.From.Type = obj.TYPE_MEM
-		movCurrentStackBasePointerIntoTmpRegister.From.Reg = reservedRegisterForEngine
-		movCurrentStackBasePointerIntoTmpRegister.From.Offset = engineValueStackContextStackBasePointerOffset
+		movCurrentStackBasePointerIntoTmpRegister.From.Reg = reservedRegisterForVirtualMachine
+		movCurrentStackBasePointerIntoTmpRegister.From.Offset = virtualMachineValueStackContextStackBasePointerOffset
 		c.addInstruction(movCurrentStackBasePointerIntoTmpRegister)
 
 		saveCurrentStackBasePointerIntoCallFrameFromTmpRegister := c.newProg()
@@ -4716,8 +4716,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		putNextStackBasePointerIntoEngine := c.newProg()
 		putNextStackBasePointerIntoEngine.As = x86.AMOVQ
 		putNextStackBasePointerIntoEngine.To.Type = obj.TYPE_MEM
-		putNextStackBasePointerIntoEngine.To.Reg = reservedRegisterForEngine
-		putNextStackBasePointerIntoEngine.To.Offset = engineValueStackContextStackBasePointerOffset
+		putNextStackBasePointerIntoEngine.To.Reg = reservedRegisterForVirtualMachine
+		putNextStackBasePointerIntoEngine.To.Offset = virtualMachineValueStackContextStackBasePointerOffset
 		putNextStackBasePointerIntoEngine.From.Type = obj.TYPE_REG
 		putNextStackBasePointerIntoEngine.From.Reg = tmpRegister
 		c.addInstruction(putNextStackBasePointerIntoEngine)
@@ -4735,8 +4735,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		readCopmiledFunctionsElement0Address.To.Type = obj.TYPE_REG
 		readCopmiledFunctionsElement0Address.To.Reg = tmpRegister
 		readCopmiledFunctionsElement0Address.From.Type = obj.TYPE_MEM
-		readCopmiledFunctionsElement0Address.From.Reg = reservedRegisterForEngine
-		readCopmiledFunctionsElement0Address.From.Offset = engineGlobalContextCompiledFunctionsElement0AddressOffset
+		readCopmiledFunctionsElement0Address.From.Reg = reservedRegisterForVirtualMachine
+		readCopmiledFunctionsElement0Address.From.Offset = virtualMachineGlobalContextCompiledFunctionsElement0AddressOffset
 		c.addInstruction(readCopmiledFunctionsElement0Address)
 
 		// Next, read the address of the target function (= &engine.compiledFunctions[offset])
@@ -4791,8 +4791,8 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	incCallFrameStackPointer := c.newProg()
 	incCallFrameStackPointer.As = x86.AINCQ
 	incCallFrameStackPointer.To.Type = obj.TYPE_MEM
-	incCallFrameStackPointer.To.Reg = reservedRegisterForEngine
-	incCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
+	incCallFrameStackPointer.To.Reg = reservedRegisterForVirtualMachine
+	incCallFrameStackPointer.To.Offset = virtualMachineGlobalContextCallFrameStackPointerOffset
 	c.addInstruction(incCallFrameStackPointer)
 
 	// And jump into the initial address of the target function.
@@ -4853,8 +4853,8 @@ func (c *amd64Compiler) returnFunction() error {
 	decCallFrameStackPointer := c.newProg()
 	decCallFrameStackPointer.As = x86.ADECQ
 	decCallFrameStackPointer.To.Type = obj.TYPE_MEM
-	decCallFrameStackPointer.To.Reg = reservedRegisterForEngine
-	decCallFrameStackPointer.To.Offset = engineGlobalContextCallFrameStackPointerOffset
+	decCallFrameStackPointer.To.Reg = reservedRegisterForVirtualMachine
+	decCallFrameStackPointer.To.Offset = virtualMachineGlobalContextCallFrameStackPointerOffset
 	c.addInstruction(decCallFrameStackPointer)
 
 	// Next, get the decremented callframe stack pointer into decrementedCallFrameStackPointerRegister.
@@ -4863,24 +4863,23 @@ func (c *amd64Compiler) returnFunction() error {
 	getCallFrameStackPointer.To.Type = obj.TYPE_REG
 	getCallFrameStackPointer.To.Reg = decrementedCallFrameStackPointerRegister
 	getCallFrameStackPointer.From.Type = obj.TYPE_MEM
-	getCallFrameStackPointer.From.Reg = reservedRegisterForEngine
-	getCallFrameStackPointer.From.Offset = engineGlobalContextCallFrameStackPointerOffset
+	getCallFrameStackPointer.From.Reg = reservedRegisterForVirtualMachine
+	getCallFrameStackPointer.From.Offset = virtualMachineGlobalContextCallFrameStackPointerOffset
 	c.addInstruction(getCallFrameStackPointer)
 
-	// We have to exit if the decremented stack pointer equals the previous callframe stack pointer.
-	cmpWithPreviousCallStackPointer := c.newProg()
-	cmpWithPreviousCallStackPointer.As = x86.ACMPQ
-	cmpWithPreviousCallStackPointer.To.Type = obj.TYPE_REG
-	cmpWithPreviousCallStackPointer.To.Reg = decrementedCallFrameStackPointerRegister
-	cmpWithPreviousCallStackPointer.From.Type = obj.TYPE_MEM
-	cmpWithPreviousCallStackPointer.From.Reg = reservedRegisterForEngine
-	cmpWithPreviousCallStackPointer.From.Offset = engineGlobalContextPreviousCallFrameStackPointer
-	c.addInstruction(cmpWithPreviousCallStackPointer)
+	// We have to exit if the decremented stack pointer equals zero.
+	testCallFrameStackPointer := c.newProg()
+	testCallFrameStackPointer.As = x86.ATESTQ
+	testCallFrameStackPointer.To.Type = obj.TYPE_REG
+	testCallFrameStackPointer.To.Reg = decrementedCallFrameStackPointerRegister
+	testCallFrameStackPointer.From.Type = obj.TYPE_REG
+	testCallFrameStackPointer.From.Reg = decrementedCallFrameStackPointerRegister
+	c.addInstruction(testCallFrameStackPointer)
 
-	jmpIfNotPreviousCallStackPointer := c.newProg()
-	jmpIfNotPreviousCallStackPointer.As = x86.AJNE
-	jmpIfNotPreviousCallStackPointer.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(jmpIfNotPreviousCallStackPointer)
+	jmpIfNotCallStackPointerZero := c.newProg()
+	jmpIfNotCallStackPointerZero.As = x86.AJNE
+	jmpIfNotCallStackPointerZero.To.Type = obj.TYPE_BRANCH
+	c.addInstruction(jmpIfNotCallStackPointerZero)
 
 	// If the callframe stack pointer equals the previous one,
 	// we exit the JIT call with returned status.
@@ -4893,7 +4892,7 @@ func (c *amd64Compiler) returnFunction() error {
 	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
 	// multiplying withe the size of struct equals shifting by its most significant bit.
 	shiftStackPointer := c.newProg()
-	jmpIfNotPreviousCallStackPointer.To.SetTarget(shiftStackPointer)
+	jmpIfNotCallStackPointerZero.To.SetTarget(shiftStackPointer)
 	shiftStackPointer.As = x86.ASHLQ
 	shiftStackPointer.To.Type = obj.TYPE_REG
 	shiftStackPointer.To.Reg = decrementedCallFrameStackPointerRegister
@@ -4906,8 +4905,8 @@ func (c *amd64Compiler) returnFunction() error {
 	getCallFrameStackElement0Address.To.Type = obj.TYPE_REG
 	getCallFrameStackElement0Address.To.Reg = tmpRegister
 	getCallFrameStackElement0Address.From.Type = obj.TYPE_MEM
-	getCallFrameStackElement0Address.From.Reg = reservedRegisterForEngine
-	getCallFrameStackElement0Address.From.Offset = engineGlobalContextCallFrameStackElement0AddressOffset
+	getCallFrameStackElement0Address.From.Reg = reservedRegisterForVirtualMachine
+	getCallFrameStackElement0Address.From.Offset = virtualMachineGlobalContextCallFrameStackElement0AddressOffset
 	c.addInstruction(getCallFrameStackElement0Address)
 
 	calcCallFrameTopAddress := c.newProg()
@@ -4957,8 +4956,8 @@ func (c *amd64Compiler) returnFunction() error {
 		putReturnStackBasePointer := c.newProg()
 		putReturnStackBasePointer.As = x86.AMOVQ
 		putReturnStackBasePointer.To.Type = obj.TYPE_MEM
-		putReturnStackBasePointer.To.Reg = reservedRegisterForEngine
-		putReturnStackBasePointer.To.Offset = engineValueStackContextStackBasePointerOffset
+		putReturnStackBasePointer.To.Reg = reservedRegisterForVirtualMachine
+		putReturnStackBasePointer.To.Offset = virtualMachineValueStackContextStackBasePointerOffset
 		putReturnStackBasePointer.From.Type = obj.TYPE_REG
 		putReturnStackBasePointer.From.Reg = tmpRegister
 		c.addInstruction(putReturnStackBasePointer)
@@ -4998,8 +4997,8 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	setFunctionCallAddress.From.Type = obj.TYPE_CONST
 	setFunctionCallAddress.From.Offset = int64(addr)
 	setFunctionCallAddress.To.Type = obj.TYPE_MEM
-	setFunctionCallAddress.To.Reg = reservedRegisterForEngine
-	setFunctionCallAddress.To.Offset = engineExitContextFunctionCallAddressOffset
+	setFunctionCallAddress.To.Reg = reservedRegisterForVirtualMachine
+	setFunctionCallAddress.To.Offset = virtualMachineExitContextFunctionCallAddressOffset
 	c.addInstruction(setFunctionCallAddress)
 
 	// Release all the registers as our calling convention requires the caller-save.
@@ -5024,8 +5023,8 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	getCallFrameStackPointer.To.Type = obj.TYPE_REG
 	getCallFrameStackPointer.To.Reg = currentCallFrameAddressRegister
 	getCallFrameStackPointer.From.Type = obj.TYPE_MEM
-	getCallFrameStackPointer.From.Reg = reservedRegisterForEngine
-	getCallFrameStackPointer.From.Offset = engineGlobalContextCallFrameStackPointerOffset
+	getCallFrameStackPointer.From.Reg = reservedRegisterForVirtualMachine
+	getCallFrameStackPointer.From.Offset = virtualMachineGlobalContextCallFrameStackPointerOffset
 	c.addInstruction(getCallFrameStackPointer)
 
 	// Next we shift the stack pointer so we get the actual offset from the address of stack's initial item.
@@ -5042,8 +5041,8 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	getCallFrameStackAddress.To.Type = obj.TYPE_REG
 	getCallFrameStackAddress.To.Reg = ripRegister // We temporarily use ripRegister register.
 	getCallFrameStackAddress.From.Type = obj.TYPE_MEM
-	getCallFrameStackAddress.From.Reg = reservedRegisterForEngine
-	getCallFrameStackAddress.From.Offset = engineGlobalContextCallFrameStackElement0AddressOffset
+	getCallFrameStackAddress.From.Reg = reservedRegisterForVirtualMachine
+	getCallFrameStackAddress.From.Offset = virtualMachineGlobalContextCallFrameStackElement0AddressOffset
 	c.addInstruction(getCallFrameStackAddress)
 
 	// Now we can get the current call frame's address, which is equivalent to get &engine.callFrameStack[engine.callStackFramePointer-1].returnAddress.
@@ -5182,8 +5181,8 @@ func (c *amd64Compiler) exit(status jitCallStatusCode) {
 	prog.From.Type = obj.TYPE_CONST
 	prog.From.Offset = int64(c.locationStack.sp)
 	prog.To.Type = obj.TYPE_MEM
-	prog.To.Reg = reservedRegisterForEngine
-	prog.To.Offset = engineValueStackContextStackPointerOffset
+	prog.To.Reg = reservedRegisterForVirtualMachine
+	prog.To.Offset = virtualMachineValueStackContextStackPointerOffset
 	c.addInstruction(prog)
 
 	ret := c.newProg()
@@ -5219,8 +5218,8 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 	getValueStackAddress := c.newProg()
 	getValueStackAddress.As = x86.AMOVQ
 	getValueStackAddress.From.Type = obj.TYPE_MEM
-	getValueStackAddress.From.Reg = reservedRegisterForEngine
-	getValueStackAddress.From.Offset = engineGlobalContextValueStackElement0AddressOffset
+	getValueStackAddress.From.Reg = reservedRegisterForVirtualMachine
+	getValueStackAddress.From.Offset = virtualMachineGlobalContextValueStackElement0AddressOffset
 	getValueStackAddress.To.Type = obj.TYPE_REG
 	getValueStackAddress.To.Reg = reservedRegisterForStackBasePointerAddress
 	c.addInstruction(getValueStackAddress)
@@ -5233,8 +5232,8 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 	getStackBasePointer := c.newProg()
 	getStackBasePointer.As = x86.AMOVQ
 	getStackBasePointer.From.Type = obj.TYPE_MEM
-	getStackBasePointer.From.Reg = reservedRegisterForEngine
-	getStackBasePointer.From.Offset = engineValueStackContextStackBasePointerOffset
+	getStackBasePointer.From.Reg = reservedRegisterForVirtualMachine
+	getStackBasePointer.From.Offset = virtualMachineValueStackContextStackBasePointerOffset
 	getStackBasePointer.To.Type = obj.TYPE_REG
 	getStackBasePointer.To.Reg = tmpReg
 	c.addInstruction(getStackBasePointer)
@@ -5265,8 +5264,8 @@ func (c *amd64Compiler) initializeReservedMemoryPointer() {
 		setupMemoryRegister.To.Type = obj.TYPE_REG
 		setupMemoryRegister.To.Reg = reservedRegisterForMemory
 		setupMemoryRegister.From.Type = obj.TYPE_MEM
-		setupMemoryRegister.From.Reg = reservedRegisterForEngine
-		setupMemoryRegister.From.Offset = engineModuleContextMemoryElement0AddressOffset
+		setupMemoryRegister.From.Reg = reservedRegisterForVirtualMachine
+		setupMemoryRegister.From.Offset = virtualMachineModuleContextMemoryElement0AddressOffset
 		c.addInstruction(setupMemoryRegister)
 	}
 }
@@ -5282,8 +5281,8 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	readValueStackLen.To.Type = obj.TYPE_REG
 	readValueStackLen.To.Reg = tmpRegister
 	readValueStackLen.From.Type = obj.TYPE_MEM
-	readValueStackLen.From.Reg = reservedRegisterForEngine
-	readValueStackLen.From.Offset = engineGlobalContextValueStackLenOffset
+	readValueStackLen.From.Reg = reservedRegisterForVirtualMachine
+	readValueStackLen.From.Offset = virtualMachineGlobalContextValueStackLenOffset
 	c.addInstruction(readValueStackLen)
 
 	subStackBasePointer := c.newProg()
@@ -5291,8 +5290,8 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	subStackBasePointer.To.Type = obj.TYPE_REG
 	subStackBasePointer.To.Reg = tmpRegister
 	subStackBasePointer.From.Type = obj.TYPE_MEM
-	subStackBasePointer.From.Reg = reservedRegisterForEngine
-	subStackBasePointer.From.Offset = engineValueStackContextStackBasePointerOffset
+	subStackBasePointer.From.Reg = reservedRegisterForVirtualMachine
+	subStackBasePointer.From.Offset = virtualMachineValueStackContextStackBasePointerOffset
 	c.addInstruction(subStackBasePointer)
 
 	// If stack base pointer + max stack poitner > valueStackLen, we need to grow the stack.
@@ -5355,8 +5354,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	checkIfModuleChanged.To.Type = obj.TYPE_REG
 	checkIfModuleChanged.To.Reg = moduleInstanceAddressRegister
 	checkIfModuleChanged.From.Type = obj.TYPE_MEM
-	checkIfModuleChanged.From.Reg = reservedRegisterForEngine
-	checkIfModuleChanged.From.Offset = engineModuleContextModuleInstanceAddressOffset
+	checkIfModuleChanged.From.Reg = reservedRegisterForVirtualMachine
+	checkIfModuleChanged.From.Offset = virtualMachineModuleContextModuleInstanceAddressOffset
 	c.addInstruction(checkIfModuleChanged)
 
 	jmpIfEqual := c.newProg()
@@ -5371,8 +5370,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	saveModuleInstanceAddress.From.Type = obj.TYPE_REG
 	saveModuleInstanceAddress.From.Reg = moduleInstanceAddressRegister
 	saveModuleInstanceAddress.To.Type = obj.TYPE_MEM
-	saveModuleInstanceAddress.To.Reg = reservedRegisterForEngine
-	saveModuleInstanceAddress.To.Offset = engineModuleContextModuleInstanceAddressOffset
+	saveModuleInstanceAddress.To.Reg = reservedRegisterForVirtualMachine
+	saveModuleInstanceAddress.To.Offset = virtualMachineModuleContextModuleInstanceAddressOffset
 	c.addInstruction(saveModuleInstanceAddress)
 
 	// Otherwise, we have to update the following fields:
@@ -5403,8 +5402,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putGlobalElement0Address := c.newProg()
 		putGlobalElement0Address.As = x86.AMOVQ
 		putGlobalElement0Address.To.Type = obj.TYPE_MEM
-		putGlobalElement0Address.To.Reg = reservedRegisterForEngine
-		putGlobalElement0Address.To.Offset = engineModuleContextGlobalElement0AddressOffset
+		putGlobalElement0Address.To.Reg = reservedRegisterForVirtualMachine
+		putGlobalElement0Address.To.Offset = virtualMachineModuleContextGlobalElement0AddressOffset
 		putGlobalElement0Address.From.Type = obj.TYPE_REG
 		putGlobalElement0Address.From.Reg = tmpRegister
 		c.addInstruction(putGlobalElement0Address)
@@ -5449,8 +5448,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putTableElement0Address := c.newProg()
 		putTableElement0Address.As = x86.AMOVQ
 		putTableElement0Address.To.Type = obj.TYPE_MEM
-		putTableElement0Address.To.Reg = reservedRegisterForEngine
-		putTableElement0Address.To.Offset = engineModuleContextTableElement0AddressOffset
+		putTableElement0Address.To.Reg = reservedRegisterForVirtualMachine
+		putTableElement0Address.To.Offset = virtualMachineModuleContextTableElement0AddressOffset
 		putTableElement0Address.From.Type = obj.TYPE_REG
 		putTableElement0Address.From.Reg = tmpRegister2
 		c.addInstruction(putTableElement0Address)
@@ -5469,8 +5468,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putTableLength := c.newProg()
 		putTableLength.As = x86.AMOVQ
 		putTableLength.To.Type = obj.TYPE_MEM
-		putTableLength.To.Reg = reservedRegisterForEngine
-		putTableLength.To.Offset = engineModuleContextTableSliceLenOffset
+		putTableLength.To.Reg = reservedRegisterForVirtualMachine
+		putTableLength.To.Offset = virtualMachineModuleContextTableSliceLenOffset
 		putTableLength.From.Type = obj.TYPE_REG
 		putTableLength.From.Reg = tmpRegister2
 		c.addInstruction(putTableLength)
@@ -5503,8 +5502,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putMemoryLength := c.newProg()
 		putMemoryLength.As = x86.AMOVQ
 		putMemoryLength.To.Type = obj.TYPE_MEM
-		putMemoryLength.To.Reg = reservedRegisterForEngine
-		putMemoryLength.To.Offset = engineModuleContextMemorySliceLenOffset
+		putMemoryLength.To.Reg = reservedRegisterForVirtualMachine
+		putMemoryLength.To.Offset = virtualMachineModuleContextMemorySliceLenOffset
 		putMemoryLength.From.Type = obj.TYPE_REG
 		putMemoryLength.From.Reg = tmpRegister2
 		c.addInstruction(putMemoryLength)
@@ -5521,8 +5520,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		putMemoryElement0Address := c.newProg()
 		putMemoryElement0Address.As = x86.AMOVQ
 		putMemoryElement0Address.To.Type = obj.TYPE_MEM
-		putMemoryElement0Address.To.Reg = reservedRegisterForEngine
-		putMemoryElement0Address.To.Offset = engineModuleContextMemoryElement0AddressOffset
+		putMemoryElement0Address.To.Reg = reservedRegisterForVirtualMachine
+		putMemoryElement0Address.To.Offset = virtualMachineModuleContextMemoryElement0AddressOffset
 		putMemoryElement0Address.From.Type = obj.TYPE_REG
 		putMemoryElement0Address.From.Reg = tmpRegister2
 		c.addInstruction(putMemoryElement0Address)

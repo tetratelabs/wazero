@@ -9,9 +9,9 @@ import (
 
 // Reserved registers.
 const (
-	// reservedRegisterForEngine: pointer to engine instance (i.e. *engine as uintptr)
-	reservedRegisterForEngine = x86.REG_R13
-	// reservedRegisterForStackBasePointerAddress: stack base pointer's address (engine.stackBasePointer) in the current function call.
+	// reservedRegisterForVirtualMachine: pointer to virtualMachine (i.e. *virtualMachine as uintptr)
+	reservedRegisterForVirtualMachine = x86.REG_R13
+	// reservedRegisterForStackBasePointerAddress: stack base pointer's address (virtualMachine.stackBasePointer) in the current function call.
 	reservedRegisterForStackBasePointerAddress = x86.REG_R14
 	// reservedRegisterForMemory: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
 	reservedRegisterForMemory    = x86.REG_R15

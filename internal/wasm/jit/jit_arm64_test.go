@@ -2210,8 +2210,6 @@ func TestArm64Compiler_compileGlobalGet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			// Compiler needs global type information at compilation time.
-			compiler.f.ModuleInstance = env.module()
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
 			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}}
@@ -2262,8 +2260,6 @@ func TestArm64Compiler_compileGlobalSet(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			// Compiler needs global type information at compilation time.
-			compiler.f.ModuleInstance = env.module()
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
 			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}})
@@ -2660,7 +2656,6 @@ func TestArm64Compiler_compileLoad(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = env.module()
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)
@@ -2734,7 +2729,6 @@ func TestArm64Compiler_compileMemoryGrow(t *testing.T) {
 func TestArm64Compiler_compileMemorySize(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
-	compiler.f.ModuleInstance = env.module()
 
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
