@@ -99,8 +99,18 @@ func (j *jitEnv) setValueStackBasePointer(sp uint64) {
 	j.vm.valueStackContext.stackBasePointer = sp
 }
 
-func (j *jitEnv) setCallFrameStackPointer(sp uint64) {
-	j.vm.globalContext.callFrameStackPointer = sp
+func (j *jitEnv) setCallFrameStackPointerLen(l uint64) {
+	j.vm.callFrameStackLen = l
+}
+
+func (j *jitEnv) addCompiledFunction(addr wasm.FunctionAddress, cf *compiledFunction) {
+	j.eng.addCompiledFunction(addr, cf)
+	j.vm.compiledFunctions = j.eng.compiledFunctions
+	j.vm.compiledFunctionsElement0Address = uintptr(unsafe.Pointer(&j.eng.compiledFunctions[0]))
+}
+
+func (j *jitEnv) module() *wasm.ModuleInstance {
+	return j.moduleInstance
 }
 
 func (j *jitEnv) engine() *engine {
@@ -132,16 +142,16 @@ func (j *jitEnv) exec(code []byte) {
 const defaultMemoryPageNumInTest = 2
 
 func newJITEnvironment() *jitEnv {
-	env := &jitEnv{
-		eng: newEngine(),
+	eng := newEngine()
+	return &jitEnv{
+		eng: eng,
 		moduleInstance: &wasm.ModuleInstance{
 			MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
 			Tables:         []*wasm.TableInstance{{}},
 			Globals:        []*wasm.GlobalInstance{},
 		},
+		vm: eng.newVirtualMachine(),
 	}
-	env.vm = env.eng.newVirtualMachine()
-	return env
 }
 
 func TestMain(m *testing.M) {

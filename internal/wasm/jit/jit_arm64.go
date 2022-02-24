@@ -65,7 +65,7 @@ const (
 )
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
-// This is used by virtualMachine.exec and the entrypoint to enter the JITed native code.
+// This is used by virtualMachine.execWasmFunction and the entrypoint to enter the JITed native code.
 // codeSegment is the pointer to the initial instruction of the compiled native code.
 // vm is "*virtualMachine" as uintptr.
 func jitcall(codeSegment, vm uintptr)
@@ -1009,6 +1009,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// "tmpReg = &offsetData[0]"
 	c.compileConstToRegisterInstruction(
 		arm64.AMOVD,
+		// Note: this should be modified to support Clone() functionality per #179.
 		int64(uintptr(unsafe.Pointer(&offsetData[0]))),
 		tmpReg,
 	)

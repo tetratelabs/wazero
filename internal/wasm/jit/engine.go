@@ -405,7 +405,7 @@ func newEngine() *engine {
 // TODO: better make them configurable?
 const (
 	initialValueStackSize             = 1024
-	initialCallStackSize              = 256
+	initialCallFrameStackSize         = 256
 	initialCompiledFunctionsSliceSize = 128
 )
 
@@ -415,7 +415,7 @@ func (e *engine) newVirtualMachine() *virtualMachine {
 
 	vm := &virtualMachine{
 		valueStack:        make([]uint64, initialValueStackSize),
-		callFrameStack:    make([]callFrame, initialCallStackSize),
+		callFrameStack:    make([]callFrame, initialCallFrameStackSize),
 		archContext:       newArchContext(),
 		compiledFunctions: e.compiledFunctions,
 	}
