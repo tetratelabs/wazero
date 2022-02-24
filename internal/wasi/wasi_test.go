@@ -8,7 +8,11 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
+	"os/signal"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -997,7 +1001,56 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 	}
 }
 
-// TODO: TestSnapshotPreview1_ProcRaise TestSnapshotPreview1_ProcRaise_Errors
+func TestSnapshotPreview1_ProcRaise(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// On Windows, Go only supports os.Kill signal, which is not suitable for testing since it's not catchable.
+		// So, we just skip this test on Windows.
+		return
+	}
+
+	store, ctx, fn := instantiateWasmStore(t, FunctionProcRaise, ImportProcRaise, moduleName)
+
+	// Setup channel to detect a signal raised.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	defer func() {
+		signal.Reset(os.Interrupt)
+	}()
+
+	results, err := store.Engine.Call(ctx, fn, uint64(SignalInterrupt))
+	require.NoError(t, err)
+
+	isSignalReceived := false
+	select {
+	case <-sigCh:
+		isSignalReceived = true
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	require.True(t, isSignalReceived)
+	require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // results[0] is the errno
+}
+
+func TestSnapshotPreview1_ProcRaise_Errors(t *testing.T) {
+	store, ctx, fn := instantiateWasmStore(t, FunctionProcRaise, ImportProcRaise, moduleName)
+
+	t.Run("Invalid signal number", func(t *testing.T) {
+		results, err := store.Engine.Call(ctx, fn, uint64(127)) // 127 is an arbitrary invalid signal that does not exist
+		require.NoError(t, err)
+		require.Equal(t, wasi.ErrnoInval, wasi.Errno(results[0])) // results[0] is the errno
+	})
+
+	if runtime.GOOS == "windows" {
+		t.Run("Windows doesn't support raising os.Interrupt", func(t *testing.T) {
+			// On Windows, Go only supports os.Kill signal, which is not suitable for testing since it's not catchable.
+			// So, what we can is just to check that ProcRaise returns ErrnoInval for SignalInterrupt on Windows.
+			results, err := store.Engine.Call(ctx, fn, uint64(SignalInterrupt))
+			require.NoError(t, err)
+			require.Equal(t, wasi.ErrnoInval, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+}
+
 // TODO: TestSnapshotPreview1_SchedYield TestSnapshotPreview1_SchedYield_Errors
 
 func TestSnapshotPreview1_RandomGet(t *testing.T) {

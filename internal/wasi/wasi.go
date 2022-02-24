@@ -86,6 +86,7 @@ const (
 	// FunctionFdClose closes a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_close
 	FunctionFdClose = "fd_close"
+
 	// ImportFdClose is the WebAssembly 1.0 (MVP) Text format import of FunctionFdClose
 	ImportFdClose = `(import "wasi_snapshot_preview1" "fd_close"
     (func $wasi.fd_close (param $fd i32) (result (;errno;) i32)))`
@@ -102,6 +103,7 @@ const (
 	// FunctionFdPrestatGet returns the prestat data of a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_get
 	FunctionFdPrestatGet = "fd_prestat_get"
+
 	// ImportFdPrestatGet is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
 	ImportFdPrestatGet = `(import "wasi_snapshot_preview1" "fd_prestat_get"
     (func $wasi.fd_prestat_get (param $fd i32) (param $result.prestat i32) (result (;errno;) i32)))`
@@ -118,6 +120,7 @@ const (
 	// FunctionFdRead read bytes from a file descriptor
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
 	FunctionFdRead = "fd_read"
+
 	// ImportFdRead is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
 	ImportFdRead = `(import "wasi_snapshot_preview1" "fd_read"
     (func $wasi.fd_read (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $result.size i32) (result (;errno;) i32)))`
@@ -131,7 +134,8 @@ const (
 	// FunctionFdWrite write bytes to a file descriptor
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
 	FunctionFdWrite = "fd_write"
-	// ImportFdWrite is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+
+	// ImportFdWrite is the WebAssembly 1.0 (MVP) Text format import of FunctionFdWrite
 	ImportFdWrite = `(import "wasi_snapshot_preview1" "fd_write"
     (func $wasi.fd_write (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $result.size i32) (result (;errno;) i32)))`
 
@@ -148,19 +152,21 @@ const (
 	FunctionPollOneoff           = "poll_oneoff"
 
 	// FunctionProcExit terminates the execution of the module with an exit code.
-	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#proc_exit
 	FunctionProcExit = "proc_exit"
 
 	// ImportProcExit is the WebAssembly 1.0 (MVP) Text format import of ProcExit
-	//
-	// See ImportProcExit
-	// See API.ProcExit
-	// See FunctionProcExit
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#proc_exit
 	ImportProcExit = `(import "wasi_snapshot_preview1" "proc_exit"
     (func $wasi.proc_exit (param $rval i32)))`
 
-	FunctionProcRaise  = "proc_raise"
+	// ImportProcRaise is the WebAssembly 1.0 (MVP) Text format import of FunctionProcRaise
+	ImportProcRaise = `(import "wasi_snapshot_preview1" "proc_raise"
+    (func $wasi.proc_raise (param $signal i32) (result (;errno;) i32)))`
+
+	// FunctionProcRaise send a signal to the wazero process.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#proc_raise
+	FunctionProcRaise = "proc_raise"
+
 	FunctionSchedYield = "sched_yield"
 
 	// FunctionRandomGet write random data in buffer
@@ -536,7 +542,22 @@ type SnapshotPreview1 interface {
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 	ProcExit(rval uint32)
 
-	// TODO: ProcRaise
+	// ProcRaise is the WASI function that sends a signal to the current wazero process.
+	//
+	// * signal - the signal to send.
+	//
+	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+	// * ErrnoInval - If the given signal is an invalid or unsupported,
+	//                or a platform-derived error happens during sending a signal.
+	//
+	// Note: SignalKill is the only valid signal on all platforms, as Golang supports only that signal in a portable way.
+	//       In addition, SignalInterrupt is also valid on non-Windows platforms.
+	// Note: This is similar to `raise` in POSIX.
+	// Note: ImportProcRaise shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_raise
+	// See https://linux.die.net/man/3/raise
+	ProcRaise(signal uint32)
+
 	// TODO: SchedYield
 
 	// RandomGet is the WASI function named FunctionRandomGet that write random data in buffer (rand.Read()).
@@ -621,8 +642,8 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		// TODO: FunctionPathSymlink
 		// TODO: FunctionPathUnlinkFile
 		// TODO: FunctionPollOneoff
-		FunctionProcExit: a.ProcExit,
-		// TODO: FunctionProcRaise
+		FunctionProcExit:  a.ProcExit,
+		FunctionProcRaise: a.ProcRaise,
 		// TODO: FunctionSchedYield
 		FunctionRandomGet: a.RandomGet,
 		// TODO: FunctionSockRecv
@@ -885,6 +906,50 @@ func (a *wasiAPI) ProcExit(exitCode uint32) {
 	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
 	// See the document of API.ProcExit.
 	panic(wasi.ExitCode(exitCode))
+}
+
+// Signal represents a WASI signal that ProcRaise can send.
+//
+// Note: Wazero does not support all signals defined by WASI, but only supports signals Golang's os package defines.
+// See os.Signal
+// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#signal
+type Signal uint8
+
+const (
+	// Signal to interrupt a process.
+	SignalInterrupt Signal = 2
+	// Signal to terminate a process.
+	SignalKill Signal = 9
+)
+
+// OsSignal returns the corresponding os.Signal value to the Signal
+func (s Signal) OsSignal() (os.Signal, error) {
+	switch s {
+	case SignalInterrupt:
+		return os.Interrupt, nil
+	case SignalKill:
+		return os.Kill, nil
+	default:
+		return nil, fmt.Errorf("unsupported Signal(%d)", s)
+	}
+}
+
+// ProcRaise implements SnapshotPreview1.ProcRaise
+func (a *wasiAPI) ProcRaise(signal uint32) wasi.Errno {
+	self, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		// Unlikely to happen because this finds the current process
+		return wasi.ErrnoSrch
+	}
+	osSignal, err := Signal(signal).OsSignal()
+	if err != nil {
+		return wasi.ErrnoInval
+	}
+	err = self.Signal(osSignal)
+	if err != nil {
+		return wasi.ErrnoInval
+	}
+	return wasi.ErrnoSuccess
 }
 
 // RandomGet implements SnapshotPreview1.RandomGet
