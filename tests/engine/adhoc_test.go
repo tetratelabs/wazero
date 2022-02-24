@@ -74,9 +74,9 @@ func testFibonacci(t *testing.T, newEngine func() *wazero.Engine) {
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
 	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: fibWasm})
+	require.NoError(t, err)
 	var fibs []publicwasm.Function
 	for i := 0; i < goroutines; i++ {
-		require.NoError(t, err)
 		fibs = append(fibs, exports.Function("fib"))
 	}
 
