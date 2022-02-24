@@ -13,17 +13,17 @@ import (
 )
 
 func TestCallEngine_PushFrame(t *testing.T) {
-	f1 := &interpreterFrame{}
-	f2 := &interpreterFrame{}
+	f1 := &callFrame{}
+	f2 := &callFrame{}
 
 	vm := callEngine{}
 	require.Empty(t, vm.frames)
 
 	vm.pushFrame(f1)
-	require.Equal(t, []*interpreterFrame{f1}, vm.frames)
+	require.Equal(t, []*callFrame{f1}, vm.frames)
 
 	vm.pushFrame(f2)
-	require.Equal(t, []*interpreterFrame{f1, f2}, vm.frames)
+	require.Equal(t, []*callFrame{f1, f2}, vm.frames)
 }
 
 func TestCallEngine_PushFrame_StackOverflow(t *testing.T) {
@@ -31,10 +31,10 @@ func TestCallEngine_PushFrame_StackOverflow(t *testing.T) {
 
 	callStackCeiling = 3
 
-	f1 := &interpreterFrame{}
-	f2 := &interpreterFrame{}
-	f3 := &interpreterFrame{}
-	f4 := &interpreterFrame{}
+	f1 := &callFrame{}
+	f2 := &callFrame{}
+	f3 := &callFrame{}
+	f4 := &callFrame{}
 
 	vm := callEngine{}
 	vm.pushFrame(f1)

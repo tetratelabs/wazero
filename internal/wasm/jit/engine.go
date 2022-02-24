@@ -333,7 +333,10 @@ func (e *engine) Compile(f *wasm.FunctionInstance) (err error) {
 
 func (e *engine) addCompiledFunction(addr wasm.FunctionAddress, compiled *compiledFunction) {
 	if len(e.compiledFunctions) <= int(addr) {
-		e.mux.Lock() // Write lock.
+		// This case compiledFunctions slice needs to grow to store a new compiledFunction.
+		// However, it is read in newCallEngine, so we have to take write lock (via .Unlock)
+		// rather than read lock (via .RLock).
+		e.mux.Lock()
 		defer e.mux.Unlock()
 		// Double the size of compiled functions.
 		e.compiledFunctions = append(e.compiledFunctions, make([]*compiledFunction, len(e.compiledFunctions))...)

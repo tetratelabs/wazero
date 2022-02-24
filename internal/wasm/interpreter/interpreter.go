@@ -46,7 +46,7 @@ type callEngine struct {
 	// Note that all the values are represented as uint64.
 	stack []uint64
 	// Function call stack.
-	frames []*interpreterFrame
+	frames []*callFrame
 
 	// compiledFunctions is engine.functions at the time when this virtual machine was created.
 	// engine.functions can be modified whenever engine compiles a new function, so
@@ -94,14 +94,14 @@ func (vm *callEngine) drop(r *wazeroir.InclusiveRange) {
 	}
 }
 
-func (vm *callEngine) pushFrame(frame *interpreterFrame) {
+func (vm *callEngine) pushFrame(frame *callFrame) {
 	if callStackCeiling <= len(vm.frames) {
 		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
 	vm.frames = append(vm.frames, frame)
 }
 
-func (vm *callEngine) popFrame() (frame *interpreterFrame) {
+func (vm *callEngine) popFrame() (frame *callFrame) {
 	// No need to check stack bound as we can assume that all the operations are valid thanks to validateFunction at
 	// module validation phase and wazeroir translation before compilation.
 	oneLess := len(vm.frames) - 1
@@ -110,7 +110,7 @@ func (vm *callEngine) popFrame() (frame *interpreterFrame) {
 	return
 }
 
-type interpreterFrame struct {
+type callFrame struct {
 	// Program counter representing the current postion
 	// in the f.body.
 	pc uint64
@@ -153,6 +153,9 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	}
 
 	if l := len(e.compiledFunctions); l <= int(funcaddr) {
+		// This case compiledFunctions slice needs to grow to store a new compiledFunction.
+		// However, it is read in newCallEngine, so we have to take write lock (via .Unlock)
+		// rather than read lock (via .RLock).
 		e.mux.Lock() // Write lock.
 		defer e.mux.Unlock()
 		// Double the size of compiled functions.
@@ -530,7 +533,7 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 		in[0] = *val
 	}
 
-	frame := &interpreterFrame{f: f}
+	frame := &callFrame{f: f}
 	vm.pushFrame(frame)
 	for _, ret := range f.hostFn.Call(in) {
 		switch ret.Kind() {
@@ -550,7 +553,7 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 }
 
 func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
-	frame := &interpreterFrame{f: f}
+	frame := &callFrame{f: f}
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.MemoryInstance
 	globals := moduleInst.Globals
