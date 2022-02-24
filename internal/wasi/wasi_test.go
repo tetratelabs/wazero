@@ -25,7 +25,7 @@ func TestNewSnapshotPreview1_Args(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		o, err := Args("a", "bc")
 		require.NoError(t, err)
-		a := newAPI(o)
+		a := NewAPI(o)
 		require.Equal(t, &nullTerminatedStrings{
 			nullTerminatedValues: [][]byte{
 				{'a', 0},
@@ -60,7 +60,7 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 		maskMemory(store, len(expectedMemory))
 
 		// Invoke ArgsGet directly and check the memory side effects.
-		errno := newAPI(args).ArgsGet(ctx, argv, argvBuf)
+		errno := NewAPI(args).ArgsGet(ctx, argv, argvBuf)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
 	})
@@ -142,7 +142,7 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 		maskMemory(store, len(expectedMemory))
 
 		// Invoke ArgsSizesGet directly and check the memory side effects.
-		errno := newAPI(args).ArgsSizesGet(ctx, resultArgc, resultArgvBufSize)
+		errno := NewAPI(args).ArgsSizesGet(ctx, resultArgc, resultArgvBufSize)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
 	})
@@ -207,7 +207,7 @@ func TestNewSnapshotPreview1_Environ(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		o, err := Environ("a=b", "b=cd")
 		require.NoError(t, err)
-		a := newAPI(o)
+		a := NewAPI(o)
 		require.Equal(t, &nullTerminatedStrings{
 			nullTerminatedValues: [][]byte{
 				{'a', '=', 'b', 0},
@@ -260,7 +260,7 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 		maskMemory(store, len(expectedMemory))
 
 		// Invoke EnvironGet directly and check the memory side effects.
-		errno := newAPI(envOpt).EnvironGet(ctx, resultEnviron, resultEnvironBuf)
+		errno := NewAPI(envOpt).EnvironGet(ctx, resultEnviron, resultEnvironBuf)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
 	})
@@ -342,7 +342,7 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 		maskMemory(store, len(expectedMemory))
 
 		// Invoke EnvironSizesGet directly and check the memory side effects.
-		errno := newAPI(envOpt).EnvironSizesGet(ctx, resultEnvironc, resultEnvironBufSize)
+		errno := NewAPI(envOpt).EnvironSizesGet(ctx, resultEnvironc, resultEnvironBufSize)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
 	})
@@ -423,7 +423,7 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 		maskMemory(store, len(expectedMemory))
 
 		// invoke ClockTimeGet directly and check the memory side effects!
-		errno := newAPI(clockOpt).ClockTimeGet(ctx, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
+		errno := NewAPI(clockOpt).ClockTimeGet(ctx, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
 	})
@@ -1027,7 +1027,7 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 		maskMemory(store, len(expectedMemory))
 
 		// invoke RandomGet directly and check the memory side effects!
-		errno := newAPI(randOpt).RandomGet(ctx, offset, length)
+		errno := NewAPI(randOpt).RandomGet(ctx, offset, length)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
 	})
