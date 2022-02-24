@@ -8,10 +8,14 @@ on:
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.17"  # Latest patch
 
+defaults:
+  run:  # use bash for all operating systems unless overridden
+    shell: bash
+
 jobs:
   check:
     name: Pre-commit check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/setup-go@v2
         with:
@@ -48,10 +52,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
-      matrix:
-        os: 
-        - "ubuntu-latest"
-        - "macos-latest"
+      matrix:  # use latest available versions and be consistent on all workflows!
+        os: [ubuntu-20.04, macos-11, windows-2022]
         go-version:
         - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
         - "1.16" # temporarily support go 1.16 per #37
@@ -73,12 +75,12 @@ jobs:
       - run: make test
 
   test_non_amd64:
-    # Only amd64 is viable with "make test" because other architectures require emulation: 
+    # Only amd64 is viable with "make test" because other architectures require emulation:
     # the process of installing depedencies and building the project through an emulator is unacceptably slow.
-    # Instead, we build cross-platform test binaries on our amd64 runner, which limits what is emulated to 
+    # Instead, we build cross-platform test binaries on our amd64 runner, which limits what is emulated to
     # only executing the tests. This is why below uses "bash -c 'testbin test.v'" (running test binary) instead of make.
     name: ${{ matrix.target.arch }}, ubuntu, Go-${{ matrix.go-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
       matrix:
@@ -120,7 +122,7 @@ jobs:
 
   bench:
     name: Benchmark
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/setup-go@v2

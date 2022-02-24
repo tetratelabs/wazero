@@ -424,8 +424,8 @@ const (
 )
 
 func (e *engine) newCallEngine() *callEngine {
-	// We have to save the current engine.compiledFunctions into vinrtualMachine.compiledFunctions,
-	// therfore we have to take the read lock on it because it can change whenever engine compiles
+	// We have to save the current engine.compiledFunctions into callEngine.compiledFunctions,
+	// therefore we have to take the read lock on it because it can change whenever engine compiles
 	// a new function.
 	e.mux.RLock()
 	defer e.mux.RUnlock()

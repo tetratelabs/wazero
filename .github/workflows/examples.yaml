@@ -16,7 +16,7 @@ on:
 jobs:
   examples:
     name: Build examples
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Install TinyGo
         run: |  # installing via curl so commands are similar on OS/x
