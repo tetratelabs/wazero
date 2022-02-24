@@ -4,8 +4,8 @@
 #include "funcdata.h"
 #include "textflag.h"
 
-// jitcall(codeSegment, virtualMachine)
+// jitcall(codeSegment, callEngine)
 TEXT ·jitcall(SB),NOSPLIT|NOFRAME,$0-16
         MOVQ codeSegment+0(FP),AX      // Load the address of native code.
-        MOVQ virtualMachine+8(FP),R13  // Load the address of virtualMachine.
+        MOVQ callEngine+8(FP),R13  // Load the address of callEngine.
         JMP AX                         // Jump to native code.

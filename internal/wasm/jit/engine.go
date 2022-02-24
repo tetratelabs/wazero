@@ -27,14 +27,14 @@ type (
 		// mux is used for read/write access to compiledFunctions slice.
 		// This is necessary as each compiled function will access the slice from the native code
 		// when they make function calls while engine might be modifying the underlying slice when
-		// adding a new compiled function. We take read lock when creating new virtualMachine
+		// adding a new compiled function. We take read lock when creating new callEngine
 		// for each function invocation while take write lock in engine.addCompiledFunction.
 		mux sync.RWMutex
 	}
 
-	// virtualMachine holds context per engine.Call, and shared across all the
+	// callEngine holds context per engine.Call, and shared across all the
 	// function calls originating from the same engine.Call execution.
-	virtualMachine struct {
+	callEngine struct {
 		// These contexts are read and written by JITed code.
 		// Note: we embed these structs so we can reduce the costs to access fields inside of them.
 		// Also, that eases the calculation of offsets to each field.
@@ -55,7 +55,7 @@ type (
 		// and that is equivalent to  engine.callFrameTop().
 		callFrameStack []callFrame
 
-		// compiledFunctions is engine.compiledFunctions at the time when this virtualMachine was created.
+		// compiledFunctions is engine.compiledFunctions at the time when this callEngine was created.
 		// engine.compiledFunction's underlying array can change whenever it compiles a new function while
 		// we have to access it when we make function calls. By copying slice (= copying a pointer to the array)
 		// into this field, we can safely access the compiled function array from the native code without caring
@@ -191,29 +191,29 @@ type (
 // Native code reads/writes Go's structs with the following constants.
 // See TestVerifyOffsetValue for how to derive these values.
 const (
-	// Offsets for virtualMachine.globalContext.
-	virtualMachineGlobalContextValueStackElement0AddressOffset        = 0
-	virtualMachineGlobalContextValueStackLenOffset                    = 8
-	virtualMachineGlobalContextCallFrameStackElement0AddressOffset    = 16
-	virtualMachineGlobalContextCallFrameStackLenOffset                = 24
-	virtualMachineGlobalContextCallFrameStackPointerOffset            = 32
-	virtualMachineGlobalContextCompiledFunctionsElement0AddressOffset = 40
+	// Offsets for callEngine.globalContext.
+	callEngineGlobalContextValueStackElement0AddressOffset        = 0
+	callEngineGlobalContextValueStackLenOffset                    = 8
+	callEngineGlobalContextCallFrameStackElement0AddressOffset    = 16
+	callEngineGlobalContextCallFrameStackLenOffset                = 24
+	callEngineGlobalContextCallFrameStackPointerOffset            = 32
+	callEngineGlobalContextCompiledFunctionsElement0AddressOffset = 40
 
-	// Offsets for virtualMachine.moduleContext.
-	virtualMachineModuleContextModuleInstanceAddressOffset = 48
-	virtualMachineModuleContextGlobalElement0AddressOffset = 56
-	virtualMachineModuleContextMemoryElement0AddressOffset = 64
-	virtualMachineModuleContextMemorySliceLenOffset        = 72
-	virtualMachineModuleContextTableElement0AddressOffset  = 80
-	virtualMachineModuleContextTableSliceLenOffset         = 88
+	// Offsets for callEngine.moduleContext.
+	callEngineModuleContextModuleInstanceAddressOffset = 48
+	callEngineModuleContextGlobalElement0AddressOffset = 56
+	callEngineModuleContextMemoryElement0AddressOffset = 64
+	callEngineModuleContextMemorySliceLenOffset        = 72
+	callEngineModuleContextTableElement0AddressOffset  = 80
+	callEngineModuleContextTableSliceLenOffset         = 88
 
-	// Offsets for virtualMachine.valueStackContext.
-	virtualMachineValueStackContextStackPointerOffset     = 96
-	virtualMachineValueStackContextStackBasePointerOffset = 104
+	// Offsets for callEngine.valueStackContext.
+	callEngineValueStackContextStackPointerOffset     = 96
+	callEngineValueStackContextStackBasePointerOffset = 104
 
-	// Offsets for virtualMachine.exitContext.
-	virtualMachineExitContextJITCallStatusCodeOffset   = 112
-	virtualMachineExitContextFunctionCallAddressOffset = 120
+	// Offsets for callEngine.exitContext.
+	callEngineExitContextJITCallStatusCodeOffset   = 112
+	callEngineExitContextFunctionCallAddressOffset = 120
 
 	// Offsets for callFrame.
 	callFrameDataSize                      = 32
@@ -348,7 +348,7 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
 	}
 
-	vm := e.newVirtualMachine()
+	vm := e.newCallEngine()
 
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
@@ -420,11 +420,14 @@ const (
 	initialCompiledFunctionsSliceSize = 128
 )
 
-func (e *engine) newVirtualMachine() *virtualMachine {
+func (e *engine) newCallEngine() *callEngine {
+	// We have to save the current engine.compiledFunctions into vinrtualMachine.compiledFunctions,
+	// therfore we have to take the read lock on it because it can change whenever engine compiles
+	// a new function.
 	e.mux.RLock()
 	defer e.mux.RUnlock()
 
-	vm := &virtualMachine{
+	vm := &callEngine{
 		valueStack:        make([]uint64, initialValueStackSize),
 		callFrameStack:    make([]callFrame, initialCallFrameStackSize),
 		archContext:       newArchContext(),
@@ -445,26 +448,26 @@ func (e *engine) newVirtualMachine() *virtualMachine {
 	return vm
 }
 
-func (vm *virtualMachine) popValue() (ret uint64) {
+func (vm *callEngine) popValue() (ret uint64) {
 	vm.valueStackContext.stackPointer--
 	ret = vm.valueStack[vm.valueStackTopIndex()]
 	return
 }
 
-func (vm *virtualMachine) pushValue(v uint64) {
+func (vm *callEngine) pushValue(v uint64) {
 	vm.valueStack[vm.valueStackTopIndex()] = v
 	vm.valueStackContext.stackPointer++
 }
 
-func (vm *virtualMachine) callFrameTop() *callFrame {
+func (vm *callEngine) callFrameTop() *callFrame {
 	return &vm.callFrameStack[vm.globalContext.callFrameStackPointer-1]
 }
 
-func (vm *virtualMachine) callFrameAt(depth uint64) *callFrame {
+func (vm *callEngine) callFrameAt(depth uint64) *callFrame {
 	return &vm.callFrameStack[vm.globalContext.callFrameStackPointer-1-depth]
 }
 
-func (vm *virtualMachine) valueStackTopIndex() uint64 {
+func (vm *callEngine) valueStackTopIndex() uint64 {
 	return vm.valueStackContext.stackBasePointer + vm.valueStackContext.stackPointer
 }
 
@@ -486,7 +489,7 @@ const (
 // After the execution, the result of host function is pushed onto the stack.
 //
 // ctx parameter is passed to the host function as a first argument.
-func (vm *virtualMachine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *wasm.ModuleContext) {
+func (vm *callEngine) execHostFunction(fk wasm.FunctionKind, f *reflect.Value, ctx *wasm.ModuleContext) {
 	// TODO: the signature won't ever change for a host function once instantiated. For this reason, we should be able
 	// to optimize below based on known possible outcomes. This includes knowledge about if it has a context param[0]
 	// and which type (if any) it returns.
@@ -538,7 +541,7 @@ func (vm *virtualMachine) execHostFunction(fk wasm.FunctionKind, f *reflect.Valu
 	}
 }
 
-func (vm *virtualMachine) execWasmFunction(ctx *wasm.ModuleContext, f *compiledFunction) {
+func (vm *callEngine) execWasmFunction(ctx *wasm.ModuleContext, f *compiledFunction) {
 	vm.pushCallFrame(f)
 
 jitentry:
@@ -590,7 +593,7 @@ jitentry:
 }
 
 // pushInitialFrame is implemented in assembly as well, but this Go version is used BEFORE jit entry.
-func (vm *virtualMachine) pushCallFrame(f *compiledFunction) {
+func (vm *callEngine) pushCallFrame(f *compiledFunction) {
 	// Push the new frame to the top of stack.
 	vm.callFrameStack[vm.globalContext.callFrameStackPointer] = callFrame{returnAddress: f.codeInitialAddress, compiledFunction: f}
 	vm.globalContext.callFrameStackPointer++
@@ -612,7 +615,7 @@ func (vm *virtualMachine) pushCallFrame(f *compiledFunction) {
 		vm.valueStackContext.stackBasePointer + vm.valueStackContext.stackPointer - uint64(len(f.source.FunctionType.Type.Params))
 }
 
-func (vm *virtualMachine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
+func (vm *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
 	// Extends the valueStack's length to currentLen*2+stackPointerCeil.
 	newLen := vm.globalContext.valueStackLen*2 + (stackPointerCeil)
 	newStack := make([]uint64, newLen)
@@ -628,7 +631,7 @@ func (vm *virtualMachine) builtinFunctionGrowValueStack(stackPointerCeil uint64)
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 
-func (vm *virtualMachine) builtinFunctionGrowCallFrameStack() {
+func (vm *callEngine) builtinFunctionGrowCallFrameStack() {
 	if callStackCeiling < uint64(len(vm.callFrameStack)+1) {
 		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
@@ -645,7 +648,7 @@ func (vm *virtualMachine) builtinFunctionGrowCallFrameStack() {
 	vm.globalContext.callFrameStackElementZeroAddress = stackSliceHeader.Data
 }
 
-func (e *virtualMachine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
+func (e *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	newPages := e.popValue()
 
 	res := mem.Grow(uint32(newPages))

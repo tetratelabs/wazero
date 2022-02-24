@@ -20,13 +20,13 @@ var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of internalwasm.Engine
 type engine struct {
-	// functions stores compiled functions where the index means wasm.FunctionAddress.
-	functions []*interpreterFunction
+	// compiledFunctions stores compiled functions where the index means wasm.FunctionAddress.
+	compiledFunctions []*compiledFunction
 
 	// mux is used for read/write access to functions slice.
 	// This is necessary as each compiled function will access the slice at runtime
 	// when they make function calls while engine might be modifying the underlying slice when
-	// adding a new compiled function. We take read lock when creating new virtualMachine
+	// adding a new compiled function. We take read lock when creating new callEngine
 	// for each function invocation while take write lock in engine.addCompiledFunction.
 	mux sync.RWMutex
 }
@@ -35,36 +35,36 @@ const initialCompiledFunctionsSliceSize = 128
 
 func NewEngine() wasm.Engine {
 	return &engine{
-		functions: make([]*interpreterFunction, initialCompiledFunctionsSliceSize),
+		compiledFunctions: make([]*compiledFunction, initialCompiledFunctionsSliceSize),
 	}
 }
 
-// virtualMachine holds context per engine.Call, and shared across all the
+// callEngine holds context per engine.Call, and shared across all the
 // function calls originating from the same engine.Call execution.
-type virtualMachine struct {
+type callEngine struct {
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
 	// Function call stack.
 	frames []*interpreterFrame
 
-	// functions is engine.functions at the time when this virtual machine was created.
+	// compiledFunctions is engine.functions at the time when this virtual machine was created.
 	// engine.functions can be modified whenever engine compiles a new function, so
 	// we take a pointer to the current functions array so that it is safe even if engine.functions changes.
-	functions []*interpreterFunction
+	compiledFunctions []*compiledFunction
 }
 
-func (e *engine) newVirtualMachine() *virtualMachine {
+func (e *engine) newCallEngine() *callEngine {
 	e.mux.RLock()
 	defer e.mux.RUnlock()
-	return &virtualMachine{functions: e.functions}
+	return &callEngine{compiledFunctions: e.compiledFunctions}
 }
 
-func (vm *virtualMachine) push(v uint64) {
+func (vm *callEngine) push(v uint64) {
 	vm.stack = append(vm.stack, v)
 }
 
-func (vm *virtualMachine) pop() (v uint64) {
+func (vm *callEngine) pop() (v uint64) {
 	// No need to check stack bound
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
@@ -76,7 +76,7 @@ func (vm *virtualMachine) pop() (v uint64) {
 	return
 }
 
-func (vm *virtualMachine) drop(r *wazeroir.InclusiveRange) {
+func (vm *callEngine) drop(r *wazeroir.InclusiveRange) {
 	// No need to check stack bound
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
@@ -94,14 +94,14 @@ func (vm *virtualMachine) drop(r *wazeroir.InclusiveRange) {
 	}
 }
 
-func (vm *virtualMachine) pushFrame(frame *interpreterFrame) {
+func (vm *callEngine) pushFrame(frame *interpreterFrame) {
 	if callStackCeiling <= len(vm.frames) {
 		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
 	vm.frames = append(vm.frames, frame)
 }
 
-func (vm *virtualMachine) popFrame() (frame *interpreterFrame) {
+func (vm *callEngine) popFrame() (frame *interpreterFrame) {
 	// No need to check stack bound as we can assume that all the operations are valid thanks to validateFunction at
 	// module validation phase and wazeroir translation before compilation.
 	oneLess := len(vm.frames) - 1
@@ -115,10 +115,10 @@ type interpreterFrame struct {
 	// in the f.body.
 	pc uint64
 	// The compiled function used in this function frame.
-	f *interpreterFunction
+	f *compiledFunction
 }
 
-type interpreterFunction struct {
+type compiledFunction struct {
 	funcInstance *wasm.FunctionInstance
 	body         []*interpreterOp
 	hostFn       *reflect.Value
@@ -135,7 +135,7 @@ type interpreterOp struct {
 // Compile Implements wasm.Engine for engine.
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	funcaddr := f.Address
-	var compiled *interpreterFunction
+	var compiled *compiledFunction
 	if f.FunctionKind == wasm.FunctionKindWasm {
 		ir, err := wazeroir.Compile(f)
 		if err != nil {
@@ -147,25 +147,25 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 			return fmt.Errorf("failed to convert wazeroir operations to engine ones: %w", err)
 		}
 	} else {
-		compiled = &interpreterFunction{
+		compiled = &compiledFunction{
 			hostFn: f.HostFunction, funcInstance: f,
 		}
 	}
 
-	if l := len(e.functions); l <= int(funcaddr) {
+	if l := len(e.compiledFunctions); l <= int(funcaddr) {
 		e.mux.Lock() // Write lock.
 		defer e.mux.Unlock()
 		// Double the size of compiled functions.
-		e.functions = append(e.functions, make([]*interpreterFunction, l)...)
+		e.compiledFunctions = append(e.compiledFunctions, make([]*compiledFunction, l)...)
 	}
-	e.functions[funcaddr] = compiled
+	e.compiledFunctions[funcaddr] = compiled
 	return nil
 }
 
 // Lowers the wazeroir operations to engine friendly struct.
 func (e *engine) lowerIROps(f *wasm.FunctionInstance,
-	ops []wazeroir.Operation) (*interpreterFunction, error) {
-	ret := &interpreterFunction{funcInstance: f}
+	ops []wazeroir.Operation) (*compiledFunction, error) {
+	ret := &compiledFunction{funcInstance: f}
 	labelAddress := map[string]uint64{}
 	onLabelAddressResolved := map[string][]func(addr uint64){}
 	for _, original := range ops {
@@ -443,7 +443,7 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
 	}
 
-	vm := e.newVirtualMachine()
+	vm := e.newCallEngine()
 	defer func() {
 		if v := recover(); v != nil {
 			if buildoptions.IsDebugMode {
@@ -474,7 +474,7 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		}
 	}()
 
-	compiled := e.functions[f.Address]
+	compiled := e.compiledFunctions[f.Address]
 	if compiled == nil {
 		err = fmt.Errorf("function not compiled")
 		return
@@ -495,7 +495,7 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 	return
 }
 
-func (vm *virtualMachine) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
+func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
@@ -549,7 +549,7 @@ func (vm *virtualMachine) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFu
 	vm.popFrame()
 }
 
-func (vm *virtualMachine) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
+func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	frame := &interpreterFrame{f: f}
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.MemoryInstance
@@ -595,7 +595,7 @@ func (vm *virtualMachine) callNativeFunc(ctx *wasm.ModuleContext, f *interpreter
 			}
 		case wazeroir.OperationKindCall:
 			{
-				f := vm.functions[op.us[0]]
+				f := vm.compiledFunctions[op.us[0]]
 				if f.hostFn != nil {
 					vm.callHostFunc(ctx, f)
 				} else {
@@ -617,7 +617,7 @@ func (vm *virtualMachine) callNativeFunc(ctx *wasm.ModuleContext, f *interpreter
 					}
 					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
 				}
-				target := vm.functions[table.Table[offset].FunctionAddress]
+				target := vm.compiledFunctions[table.Table[offset].FunctionAddress]
 				// Call in.
 				if target.hostFn != nil {
 					vm.callHostFunc(ctx, target)

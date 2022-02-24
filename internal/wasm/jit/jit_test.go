@@ -12,7 +12,7 @@ import (
 
 type jitEnv struct {
 	eng            *engine
-	vm             *virtualMachine
+	vm             *callEngine
 	moduleInstance *wasm.ModuleInstance
 }
 
@@ -111,7 +111,7 @@ func (j *jitEnv) engine() *engine {
 	return j.eng
 }
 
-func (j *jitEnv) virtualMachine() *virtualMachine {
+func (j *jitEnv) callEngine() *callEngine {
 	return j.vm
 }
 
@@ -144,7 +144,7 @@ func newJITEnvironment() *jitEnv {
 			Tables:         []*wasm.TableInstance{{}},
 			Globals:        []*wasm.GlobalInstance{},
 		},
-		vm: eng.newVirtualMachine(),
+		vm: eng.newCallEngine(),
 	}
 }
 

@@ -34,7 +34,7 @@ func newArchContext() archContext {
 	}
 }
 
-// archContext is embedded in virtualMachine in order to store architecture-specific data.
+// archContext is embedded in callEngine in order to store architecture-specific data.
 type archContext struct {
 	// jitCallReturnAddress holds the absolute return address for jitcall.
 	// The value is set whenever jitcall is executed and done in jit_arm64.s
@@ -43,7 +43,7 @@ type archContext struct {
 	jitCallReturnAddress uint64
 
 	// Loading large constants in arm64 is a bit costly so we place the following
-	// consts on virtualMachine struct so that we can quickly access them during various operations.
+	// consts on callEngine struct so that we can quickly access them during various operations.
 
 	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
 	// Note: this can be obtained by moving $1 and doing left-shift with 31, but it is
@@ -56,18 +56,18 @@ type archContext struct {
 }
 
 const (
-	// virtualMachineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in virtualMachine.
-	virtualMachineArchContextJITCallReturnAddressOffset = 128
-	// virtualMachineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in virtualMachine.
-	virtualMachineArchContextMinimum32BitSignedIntOffset = 136
-	// virtualMachineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in virtualMachine.
-	virtualMachineArchContextMinimum64BitSignedIntOffset = 144
+	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
+	callEngineArchContextJITCallReturnAddressOffset = 128
+	// callEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
+	callEngineArchContextMinimum32BitSignedIntOffset = 136
+	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
+	callEngineArchContextMinimum64BitSignedIntOffset = 144
 )
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
-// This is used by virtualMachine.execWasmFunction and the entrypoint to enter the JITed native code.
+// This is used by callEngine.execWasmFunction and the entrypoint to enter the JITed native code.
 // codeSegment is the pointer to the initial instruction of the compiled native code.
-// vm is "*virtualMachine" as uintptr.
+// vm is "*callEngine" as uintptr.
 func jitcall(codeSegment, vm uintptr)
 
 // golang-asm is not goroutine-safe so we take lock until we complete the compilation.
@@ -449,14 +449,14 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	// "tmpX = len(vm.valueStack)"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextValueStackLenOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextValueStackLenOffset,
 		tmpX,
 	)
 
 	// "tmpY = vm.stackBasePointer"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineValueStackContextStackBasePointerOffset,
+		reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
 		tmpY,
 	)
 
@@ -511,9 +511,9 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	callFramePointerReg, callFrameStackTopAddressRegister, tmpReg := tmpRegs[0], tmpRegs[1], tmpRegs[2]
 
 	// First we decrement the callframe stack pointer.
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackPointerOffset, callFramePointerReg)
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset, callFramePointerReg)
 	c.compileConstToRegisterInstruction(arm64.ASUBS, 1, callFramePointerReg)
-	c.compileRegisterToMemoryInstruction(arm64.AMOVD, callFramePointerReg, reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackPointerOffset)
+	c.compileRegisterToMemoryInstruction(arm64.AMOVD, callFramePointerReg, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	// Next we compare the decremented call frame stack pointer with zero.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, callFramePointerReg, zeroRegister)
@@ -531,7 +531,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	//
 	// "tmpReg = &vm.callFrameStack[0]"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackElement0AddressOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackElement0AddressOffset,
 		tmpReg,
 	)
 	// "callFrameStackTopAddressRegister = tmpReg + callFramePointerReg << ${callFrameDataSizeMostSignificantSetBit}"
@@ -565,7 +565,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		tmpReg)
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
 		tmpReg,
-		reservedRegisterForVirtualMachine, virtualMachineValueStackContextStackBasePointerOffset)
+		reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
 
 	// 2) Branch into the address of "ra.caller".
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
@@ -582,21 +582,21 @@ func (c *arm64Compiler) compileReturnFunction() error {
 func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) error {
 	// Write the current stack pointer to the vm.stackPointer.
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(c.locationStack.sp), reservedRegisterForTemporary)
-	c.compileRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForTemporary, reservedRegisterForVirtualMachine,
-		virtualMachineValueStackContextStackPointerOffset)
+	c.compileRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForTemporary, reservedRegisterForCallEngine,
+		callEngineValueStackContextStackPointerOffset)
 
 	if status != 0 {
 		c.compileConstToRegisterInstruction(arm64.AMOVW, int64(status), reservedRegisterForTemporary)
-		c.compileRegisterToMemoryInstruction(arm64.AMOVW, reservedRegisterForTemporary, reservedRegisterForVirtualMachine, virtualMachineExitContextJITCallStatusCodeOffset)
+		c.compileRegisterToMemoryInstruction(arm64.AMOVW, reservedRegisterForTemporary, reservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
 	} else {
 		// If the status == 0, we use zero register to store zero.
-		c.compileRegisterToMemoryInstruction(arm64.AMOVW, zeroRegister, reservedRegisterForVirtualMachine, virtualMachineExitContextJITCallStatusCodeOffset)
+		c.compileRegisterToMemoryInstruction(arm64.AMOVW, zeroRegister, reservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
 	}
 
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
 	// is embedded in vm. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForVirtualMachine, virtualMachineArchContextJITCallReturnAddressOffset, reservedRegisterForTemporary)
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, callEngineArchContextJITCallReturnAddressOffset, reservedRegisterForTemporary)
 
 	ret := c.newProg()
 	ret.As = obj.ARET
@@ -793,7 +793,7 @@ func (c *arm64Compiler) compileReadGlobalAddress(globalIndex uint32) (destinatio
 	// "reservedRegisterForTemporary = &globals[0]"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineModuleContextGlobalElement0AddressOffset,
+		reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset,
 		reservedRegisterForTemporary,
 	)
 
@@ -1112,12 +1112,12 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 	//
 	// "callFrameStackPointerRegister = vm.callFrameStackPointer"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackPointerOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		callFrameStackPointerRegister)
 	// "tmp = len(vm.callFrameStack)"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackLenOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackLenOffset,
 		tmp,
 	)
 	// Compare tmp(len(vm.callFrameStack)) with callFrameStackPointerRegister(vm.callFrameStackPointer).
@@ -1151,7 +1151,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 	// On the function return, we again have to set vm.callFrameStackPointer into callFrameStackPointerRegister.
 	// "callFrameStackPointerRegister = vm.callFrameStackPointer"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackPointerOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		callFrameStackPointerRegister)
 
 	// Now that we ensured callFrameStack length is enough.
@@ -1181,7 +1181,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 
 	// 1) Set rb.current so that we can return back to this function properly.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineValueStackContextStackBasePointerOffset,
+		reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
 		oldStackBasePointer)
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
 		oldStackBasePointer,
@@ -1197,7 +1197,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 		c.compileConstToRegisterInstruction(arm64.AADD, offset, oldStackBasePointer)
 		c.compileRegisterToMemoryInstruction(arm64.AMOVD,
 			oldStackBasePointer,
-			reservedRegisterForVirtualMachine, virtualMachineValueStackContextStackBasePointerOffset)
+			reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
 	}
 
 	// 3) Set rc.next to specify which function is executed on the current call frame.
@@ -1205,7 +1205,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 	// First, we read the address of the first item of vm.compiledFunctions slice (= &vm.compiledFunctions[0])
 	// into tmp.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCompiledFunctionsElement0AddressOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCompiledFunctionsElement0AddressOffset,
 		tmp)
 
 	// Next, read the address of the target function (= &vm.compiledFunctions[offset])
@@ -1244,12 +1244,12 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 	// Everthing is done to make function call now.
 	// We increment the callframe stack pointer.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackPointerOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		tmp)
 	c.compileConstToRegisterInstruction(arm64.AADD, 1, tmp)
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
 		tmp,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackPointerOffset)
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	// Then, br into the target function's initial address.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
@@ -1293,7 +1293,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 func (c *arm64Compiler) compileCalcCallFrameStackTopAddress(callFrameStackPointerRegister, destinationRegister int16) {
 	// "destinationRegister = &vm.callFrameStack[0]"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackElement0AddressOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackElement0AddressOffset,
 		destinationRegister)
 	// "destinationRegister += callFrameStackPointerRegister << $callFrameDataSizeMostSignificantSetBit"
 	c.compileAddInstructionWithLeftShiftedRegister(
@@ -1394,7 +1394,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// First, we need to check if the offset doesn't exceed the length of table.
 	// "tmp = len(table)"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineModuleContextTableSliceLenOffset,
+		reservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
 		tmp,
 	)
 	// "cmp tmp, offset"
@@ -1411,7 +1411,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// "tmp = &table[0]"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineModuleContextTableElement0AddressOffset,
+		reservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset,
 		tmp,
 	)
 	// "offset = tmp + (offset << 4) (== &table[offset])"
@@ -1884,11 +1884,11 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	if is32Bit {
 		cmpInst = arm64.ACMPW
 		movInst = arm64.AMOVW
-		minValueOffsetInVM = virtualMachineArchContextMinimum32BitSignedIntOffset
+		minValueOffsetInVM = callEngineArchContextMinimum32BitSignedIntOffset
 	} else {
 		cmpInst = arm64.ACMP
 		movInst = arm64.AMOVD
-		minValueOffsetInVM = virtualMachineArchContextMinimum64BitSignedIntOffset
+		minValueOffsetInVM = callEngineArchContextMinimum64BitSignedIntOffset
 	}
 	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisor)
 
@@ -1914,7 +1914,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		// Otherwise, we further check if the dividend equals math.MinInt32 or MinInt64.
 		c.compileMemoryToRegisterInstruction(
 			movInst,
-			reservedRegisterForVirtualMachine, minValueOffsetInVM,
+			reservedRegisterForCallEngine, minValueOffsetInVM,
 			reservedRegisterForTemporary,
 		)
 		c.compileTwoRegistersToNoneInstruction(cmpInst, reservedRegisterForTemporary, dividend)
@@ -2307,10 +2307,10 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	var minValueOffsetInVM int64
 	if o.Type == wazeroir.Float32 {
 		fmov = arm64.AFMOVS
-		minValueOffsetInVM = virtualMachineArchContextMinimum32BitSignedIntOffset
+		minValueOffsetInVM = callEngineArchContextMinimum32BitSignedIntOffset
 	} else {
 		fmov = arm64.AFMOVD
-		minValueOffsetInVM = virtualMachineArchContextMinimum64BitSignedIntOffset
+		minValueOffsetInVM = callEngineArchContextMinimum64BitSignedIntOffset
 	}
 
 	c.markRegisterUsed(x1.register, x2.register)
@@ -2332,7 +2332,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// "mov freg, -9223372036854775808 (stored at vm.minimum64BitSignedInt)"
 	c.compileMemoryToRegisterInstruction(
 		fmov,
-		reservedRegisterForVirtualMachine, minValueOffsetInVM,
+		reservedRegisterForCallEngine, minValueOffsetInVM,
 		freg,
 	)
 
@@ -2940,7 +2940,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	// "reservedRegisterForTemporary = len(memory.Buffer)"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineModuleContextMemorySliceLenOffset,
+		reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
 		reservedRegisterForTemporary)
 
 	// Check if offsetRegister(= base+offsetArg+targetSizeInBytes) > len(memory.Buffer).
@@ -2985,7 +2985,7 @@ func (c *arm64Compiler) compileMemorySize() error {
 	// "reg = len(memory.Buffer)"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineModuleContextMemorySliceLenOffset,
+		reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
 		reg,
 	)
 
@@ -3027,19 +3027,19 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr 
 		int64(addr),
 		tmp,
 	)
-	// "[reservedRegisterForVirtualMachine + virtualMachineExitContextFunctionCallAddressOffset] = tmp"
+	// "[reservedRegisterForCallEngine + callEngineExitContextFunctionCallAddressOffset] = tmp"
 	// In other words, "vm.functionCallAddress = tmp (== $addr)"
 	c.compileRegisterToMemoryInstruction(
 		arm64.AMOVD,
 		tmp,
-		reservedRegisterForVirtualMachine, virtualMachineExitContextFunctionCallAddressOffset,
+		reservedRegisterForCallEngine, callEngineExitContextFunctionCallAddressOffset,
 	)
 
 	// Next, we have to set the return address into callFrameStack[vm.callFrameStackPointer-1].returnAddress.
 	//
 	// "currentCallFrameStackPointerRegister = vm.callFrameStackPointer"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextCallFrameStackPointerOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		currentCallFrameStackPointerRegister)
 
 	// Set the address of callFrameStack[vm.callFrameStackPointer] into currentCallFrameTopAddressRegister.
@@ -3318,12 +3318,12 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) (err e
 func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() {
 	// First, load the address of the first element in the value stack into reservedRegisterForStackBasePointerAddress temporarily.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineGlobalContextValueStackElement0AddressOffset,
+		reservedRegisterForCallEngine, callEngineGlobalContextValueStackElement0AddressOffset,
 		reservedRegisterForStackBasePointerAddress)
 
 	// Next we move the base pointer (vm.stackBasePointer) to reservedRegisterForTemporary.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		reservedRegisterForVirtualMachine, virtualMachineValueStackContextStackBasePointerOffset,
+		reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
 		reservedRegisterForTemporary)
 
 	// Finally, we calculate "reservedRegisterForStackBasePointerAddress + reservedRegisterForTemporary << 3"
@@ -3339,7 +3339,7 @@ func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
 		// "reservedRegisterForMemory = vm.MemoryElement0Address"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
-			reservedRegisterForVirtualMachine, virtualMachineModuleContextMemoryElement0AddressOffset,
+			reservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 			reservedRegisterForMemory,
 		)
 	}
@@ -3363,7 +3363,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(uintptr(unsafe.Pointer(c.f.ModuleInstance))), moduleInstanceAddressRegister)
 
 	// "tmpX = vm.ModuleInstanceAddress"
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForVirtualMachine, virtualMachineModuleContextModuleInstanceAddressOffset, tmpX)
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, tmpX)
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, moduleInstanceAddressRegister, tmpX)
@@ -3392,7 +3392,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		// "vm.GlobalElement0Address = tmpX (== &moduleInstance.Globals[0])"
 		c.compileRegisterToMemoryInstruction(
 			arm64.AMOVD, tmpX,
-			reservedRegisterForVirtualMachine, virtualMachineModuleContextGlobalElement0AddressOffset,
+			reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset,
 		)
 	}
 
@@ -3421,7 +3421,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		c.compileRegisterToMemoryInstruction(
 			arm64.AMOVD,
 			tmpY,
-			reservedRegisterForVirtualMachine, virtualMachineModuleContextMemorySliceLenOffset,
+			reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset,
 		)
 
 		// Next write vm.memoryElement0Address.
@@ -3436,7 +3436,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		c.compileRegisterToMemoryInstruction(
 			arm64.AMOVD,
 			tmpY,
-			reservedRegisterForVirtualMachine, virtualMachineModuleContextMemoryElement0AddressOffset,
+			reservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 		)
 	}
 
@@ -3466,7 +3466,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		c.compileRegisterToMemoryInstruction(
 			arm64.AMOVD,
 			tmpY,
-			reservedRegisterForVirtualMachine, virtualMachineModuleContextTableElement0AddressOffset,
+			reservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset,
 		)
 
 		// Update vm.tableSliceLen.
@@ -3480,7 +3480,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 		c.compileRegisterToMemoryInstruction(
 			arm64.AMOVD,
 			tmpY,
-			reservedRegisterForVirtualMachine, virtualMachineModuleContextTableSliceLenOffset,
+			reservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset,
 		)
 	}
 

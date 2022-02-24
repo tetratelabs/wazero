@@ -106,7 +106,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		// Reenter from the return address.
 		returnAddress := env.callFrameStackPeek().returnAddress
 		require.NotZero(t, returnAddress)
-		jitcall(returnAddress, uintptr(unsafe.Pointer(env.virtualMachine())))
+		jitcall(returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
 
 		// Check the result. This should be "Returned".
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -149,7 +149,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 	t.Run("deep call stack", func(t *testing.T) {
 		env := newJITEnvironment()
 		engine := env.engine()
-		vm := env.virtualMachine()
+		vm := env.callEngine()
 
 		// Push the call frames.
 		const callFrameNums = 10
@@ -275,7 +275,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			vm := env.virtualMachine()
+			vm := env.callEngine()
 			compiler := env.requireNewCompiler(t)
 			compiler.initializeReservedStackBasePointer()
 			compiler.f.ModuleInstance = tc.moduleInstance
@@ -299,7 +299,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			// Check the exit status.
 			require.Equal(t, expectedStatus, env.jitStatus())
 
-			// Check if the fields of virtualMachine.moduleContext are updated.
+			// Check if the fields of callEngine.moduleContext are updated.
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
 			require.Equal(t, bufSliceHeader.Data, vm.moduleContext.globalElement0Address)
 
@@ -5298,7 +5298,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 
 	returnAddress := env.callFrameStackPeek().returnAddress
 	require.NotZero(t, returnAddress)
-	jitcall(returnAddress, uintptr(unsafe.Pointer(env.virtualMachine())))
+	jitcall(returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
 
 	require.Equal(t, expValue, env.stackTopAsUint32())
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
