@@ -79,7 +79,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 
 		env.exec(code)
 
-		// JIT status on engine must be returned.
+		// JIT status must be returned.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 		// Plus, the call frame stack pointer must be zero after return.
 		require.Equal(t, uint64(0), env.callFrameStackPointer())
@@ -169,10 +169,10 @@ func TestArm64Compiler_exit(t *testing.T) {
 			require.NoError(t, err)
 			env.exec(code)
 
-			// JIT status on engine must be updated.
+			// JIT status must be updated.
 			require.Equal(t, s, env.jitStatus())
 
-			// Stack pointer must be written on engine.stackPointer on return.
+			// Stack pointer must be written on virtualMachine on return.
 			require.Equal(t, expStackPointer, env.stackPointer())
 		})
 	}
@@ -235,7 +235,7 @@ func TestArm64Compiler_compileConsts(t *testing.T) {
 					// Run native code.
 					env.exec(code)
 
-					// JIT status on engine must be returned.
+					// JIT status must be returned.
 					require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 					require.Equal(t, uint64(1), env.stackPointer())
 
@@ -297,7 +297,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 			env.virtualMachine().builtinFunctionGrowValueStack(tc.stackPointer)
 			env.exec(code)
 
-			// JIT status on engine must be returned and stack pointer must end up the specified one.
+			// JIT status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
@@ -377,7 +377,7 @@ func TestArm64Compiler_compileLoadValueOnStackToRegister(t *testing.T) {
 			env.stack()[tc.stackPointer] = val
 			env.exec(code)
 
-			// JIT status on engine must be returned and stack pointer must end up the specified one.
+			// JIT status must be returned and stack pointer must end up the specified one.
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 			require.Equal(t, tc.stackPointer+1, env.stackPointer())
 
@@ -1774,7 +1774,9 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 				// Grow the callFrame stack, and exec again from the return address.
 				vm.builtinFunctionGrowCallFrameStack()
-				jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
+				fmt.Println(vm != nil)
+				jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(vm)))
+				fmt.Println(vm != nil) // somehow vm becomes nil pointer..
 			}
 
 			// Check status and returned values.
@@ -1982,7 +1984,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 
 							// Grow the callFrame stack, and exec again from the return address.
 							vm.builtinFunctionGrowCallFrameStack()
-							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
+							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(vm)))
 						}
 
 						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -2181,7 +2183,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			// Check the exit status.
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 
-			// Check if the fields of engine.moduleContext are updated.
+			// Check if the fields of virtualMachine.moduleContext are updated.
 			vm := env.virtualMachine()
 
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
@@ -2725,7 +2727,7 @@ func TestArm64Compiler_compileMemoryGrow(t *testing.T) {
 	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
 
 	// Reenter from the return address.
-	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
+	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.virtualMachine())))
 
 	// Check if the code successfully executed the code after builtin function call.
 	require.Equal(t, expValue, env.stackTopAsUint32())
@@ -2824,7 +2826,7 @@ func TestArm64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 		// Reenter from the return address.
 		returnAddress := env.callFrameStackPeek().returnAddress
 		require.NotZero(t, returnAddress)
-		jitcall(returnAddress, uintptr(unsafe.Pointer(env.engine())))
+		jitcall(returnAddress, uintptr(unsafe.Pointer(env.virtualMachine())))
 
 		// Check the result. This should be "Returned".
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -2853,7 +2855,7 @@ func TestArm64Compiler_compileHostFunction(t *testing.T) {
 	require.Equal(t, addr, env.functionCallAddress())
 
 	// Re-enter the return address.
-	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.engine())))
+	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.virtualMachine())))
 
 	// After that, the code must exit with returned status.
 	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())

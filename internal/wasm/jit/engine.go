@@ -617,21 +617,21 @@ func (vm *virtualMachine) builtinFunctionGrowValueStack(stackPointerCeil uint64)
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)
 
-func (e *virtualMachine) builtinFunctionGrowCallFrameStack() {
-	if callStackCeiling < uint64(len(e.callFrameStack)+1) {
+func (vm *virtualMachine) builtinFunctionGrowCallFrameStack() {
+	if callStackCeiling < uint64(len(vm.callFrameStack)+1) {
 		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
 
 	// Double the callstack slice length.
-	newLen := uint64(e.globalContext.callFrameStackLen) * 2
+	newLen := uint64(vm.globalContext.callFrameStackLen) * 2
 	newStack := make([]callFrame, newLen)
-	copy(newStack, e.callFrameStack)
-	e.callFrameStack = newStack
+	copy(newStack, vm.callFrameStack)
+	vm.callFrameStack = newStack
 
 	// Update the globalContext's fields as they become stale after the update ^^.
 	stackSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&newStack))
-	e.globalContext.callFrameStackLen = uint64(stackSliceHeader.Len)
-	e.globalContext.callFrameStackElementZeroAddress = stackSliceHeader.Data
+	vm.globalContext.callFrameStackLen = uint64(stackSliceHeader.Len)
+	vm.globalContext.callFrameStackElementZeroAddress = stackSliceHeader.Data
 }
 
 func (e *virtualMachine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
