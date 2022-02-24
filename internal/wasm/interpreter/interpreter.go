@@ -21,15 +21,18 @@ var callStackCeiling = buildoptions.CallStackCeiling
 type engine struct {
 	// Stores compiled functions.
 	functions map[wasm.FunctionAddress]*interpreterFunction
+	// onCompilationDoneCallbacks call back when a function instance is compiled.
+	// See the comment where this is used below for detail.
+	// Not used at runtime, and only in the compilation phase.
+	onCompilationDoneCallbacks map[wasm.FunctionAddress][]func(*interpreterFunction)
+}
+
+type virtualMachine struct {
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
 	// Function call stack.
 	frames []*interpreterFrame
-	// onCompilationDoneCallbacks call back when a function instance is compiled.
-	// See the comment where this is used below for detail.
-	// Not used at runtime, and only in the compilation phase.
-	onCompilationDoneCallbacks map[wasm.FunctionAddress][]func(*interpreterFunction)
 }
 
 func NewEngine() wasm.Engine {
@@ -39,23 +42,23 @@ func NewEngine() wasm.Engine {
 	}
 }
 
-func (e *engine) push(v uint64) {
-	e.stack = append(e.stack, v)
+func (vm *virtualMachine) push(v uint64) {
+	vm.stack = append(vm.stack, v)
 }
 
-func (e *engine) pop() (v uint64) {
+func (vm *virtualMachine) pop() (v uint64) {
 	// No need to check stack bound
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
 	// at module validation phase
 	// and wazeroir translation
 	// before compilation.
-	v = e.stack[len(e.stack)-1]
-	e.stack = e.stack[:len(e.stack)-1]
+	v = vm.stack[len(vm.stack)-1]
+	vm.stack = vm.stack[:len(vm.stack)-1]
 	return
 }
 
-func (e *engine) drop(r *wazeroir.InclusiveRange) {
+func (vm *virtualMachine) drop(r *wazeroir.InclusiveRange) {
 	// No need to check stack bound
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
@@ -65,27 +68,27 @@ func (e *engine) drop(r *wazeroir.InclusiveRange) {
 	if r == nil {
 		return
 	} else if r.Start == 0 {
-		e.stack = e.stack[:len(e.stack)-1-r.End]
+		vm.stack = vm.stack[:len(vm.stack)-1-r.End]
 	} else {
-		newStack := e.stack[:len(e.stack)-1-r.End]
-		newStack = append(newStack, e.stack[len(e.stack)-r.Start:]...)
-		e.stack = newStack
+		newStack := vm.stack[:len(vm.stack)-1-r.End]
+		newStack = append(newStack, vm.stack[len(vm.stack)-r.Start:]...)
+		vm.stack = newStack
 	}
 }
 
-func (e *engine) pushFrame(frame *interpreterFrame) {
-	if callStackCeiling <= len(e.frames) {
+func (vm *virtualMachine) pushFrame(frame *interpreterFrame) {
+	if callStackCeiling <= len(vm.frames) {
 		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
-	e.frames = append(e.frames, frame)
+	vm.frames = append(vm.frames, frame)
 }
 
-func (e *engine) popFrame() (frame *interpreterFrame) {
+func (vm *virtualMachine) popFrame() (frame *interpreterFrame) {
 	// No need to check stack bound as we can assume that all the operations are valid thanks to validateFunction at
 	// module validation phase and wazeroir translation before compilation.
-	oneLess := len(e.frames) - 1
-	frame = e.frames[oneLess]
-	e.frames = e.frames[:oneLess]
+	oneLess := len(vm.frames) - 1
+	frame = vm.frames[oneLess]
+	vm.frames = vm.frames[:oneLess]
 	return
 }
 
@@ -431,47 +434,33 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
 	}
 
-	prevFrameLen := len(e.frames)
-
-	// shouldRecover is true when a panic at the origin of callstack should be recovered
-	//
-	// If this is the recursive call into Wasm (prevFrameLen != 0), we do not recover, and delegate the
-	// recovery to the first engine.Call.
-	//
-	// For example, given the call stack:
-	//	 "original host function" --(engine.Call)--> Wasm func A --> Host func --(engine.Call)--> Wasm function B,
-	// if the top Wasm function panics, we go back to the "original host function".
-	shouldRecover := prevFrameLen == 0
+	vm := &virtualMachine{}
 	defer func() {
-		if shouldRecover {
-			if v := recover(); v != nil {
-				if buildoptions.IsDebugMode {
-					debug.PrintStack()
-				}
-				traceNum := len(e.frames) - prevFrameLen
-				traces := make([]string, 0, traceNum)
-				for i := 0; i < traceNum; i++ {
-					frame := e.popFrame()
-					name := frame.f.funcInstance.Name
-					// TODO: include the original instruction which corresponds
-					// to frame.f.body[frame.pc].
-					traces = append(traces, fmt.Sprintf("\t%d: %s", i, name))
-				}
+		if v := recover(); v != nil {
+			if buildoptions.IsDebugMode {
+				debug.PrintStack()
+			}
+			traces := make([]string, 0, len(vm.frames))
+			for i := 0; i < len(vm.frames); i++ {
+				frame := vm.popFrame()
+				name := frame.f.funcInstance.Name
+				// TODO: include the original instruction which corresponds
+				// to frame.f.body[frame.pc].
+				traces = append(traces, fmt.Sprintf("\t%d: %s", i, name))
+			}
 
-				e.frames = e.frames[:prevFrameLen]
-				err2, ok := v.(error)
-				if ok {
-					if err2.Error() == "runtime error: integer divide by zero" {
-						err2 = wasm.ErrRuntimeIntegerDivideByZero
-					}
-					err = fmt.Errorf("wasm runtime error: %w", err2)
-				} else {
-					err = fmt.Errorf("wasm runtime error: %v", v)
+			err2, ok := v.(error)
+			if ok {
+				if err2.Error() == "runtime error: integer divide by zero" {
+					err2 = wasm.ErrRuntimeIntegerDivideByZero
 				}
+				err = fmt.Errorf("wasm runtime error: %w", err2)
+			} else {
+				err = fmt.Errorf("wasm runtime error: %v", v)
+			}
 
-				if len(traces) > 0 {
-					err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
-				}
+			if len(traces) > 0 {
+				err = fmt.Errorf("%w\nwasm backtrace:\n%s", err, strings.Join(traces, "\n"))
 			}
 		}
 	}()
@@ -483,21 +472,21 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 	}
 
 	for _, param := range params {
-		e.push(param)
+		vm.push(param)
 	}
 	if g.hostFn != nil {
-		e.callHostFunc(ctx, g)
+		vm.callHostFunc(ctx, g)
 	} else {
-		e.callNativeFunc(ctx, g)
+		vm.callNativeFunc(ctx, g)
 	}
 	results = make([]uint64, len(f.FunctionType.Type.Results))
 	for i := range results {
-		results[len(results)-1-i] = e.pop()
+		results[len(results)-1-i] = vm.pop()
 	}
 	return
 }
 
-func (e *engine) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
+func (vm *virtualMachine) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
@@ -507,7 +496,7 @@ func (e *engine) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {
 		val := reflect.New(tp.In(i)).Elem()
-		raw := e.pop()
+		raw := vm.pop()
 		kind := tp.In(i).Kind()
 		switch kind {
 		case reflect.Float32:
@@ -523,8 +512,8 @@ func (e *engine) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	}
 
 	// A host function is invoked with the calling frame's memory, which may be different if in another module.
-	if len(e.frames) > 0 {
-		ctx = ctx.WithMemory(e.frames[len(e.frames)-1].f.funcInstance.ModuleInstance.MemoryInstance)
+	if len(vm.frames) > 0 {
+		ctx = ctx.WithMemory(vm.frames[len(vm.frames)-1].f.funcInstance.ModuleInstance.MemoryInstance)
 	}
 
 	// Handle any special parameter zero
@@ -533,25 +522,25 @@ func (e *engine) callHostFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	}
 
 	frame := &interpreterFrame{f: f}
-	e.pushFrame(frame)
+	vm.pushFrame(frame)
 	for _, ret := range f.hostFn.Call(in) {
 		switch ret.Kind() {
 		case reflect.Float32:
-			e.push(uint64(math.Float32bits(float32(ret.Float()))))
+			vm.push(uint64(math.Float32bits(float32(ret.Float()))))
 		case reflect.Float64:
-			e.push(math.Float64bits(ret.Float()))
+			vm.push(math.Float64bits(ret.Float()))
 		case reflect.Uint32, reflect.Uint64:
-			e.push(ret.Uint())
+			vm.push(ret.Uint())
 		case reflect.Int32, reflect.Int64:
-			e.push(uint64(ret.Int()))
+			vm.push(uint64(ret.Int()))
 		default:
 			panic("invalid return type")
 		}
 	}
-	e.popFrame()
+	vm.popFrame()
 }
 
-func (e *engine) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
+func (vm *virtualMachine) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction) {
 	frame := &interpreterFrame{f: f}
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.MemoryInstance
@@ -560,7 +549,7 @@ func (e *engine) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction)
 	if len(moduleInst.Tables) > 0 {
 		table = moduleInst.Tables[0] // WebAssembly 1.0 (MVP) defines at most one table
 	}
-	e.pushFrame(frame)
+	vm.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
 		op := frame.f.body[frame.pc]
@@ -586,8 +575,8 @@ func (e *engine) callNativeFunc(ctx *wasm.ModuleContext, f *interpreterFunction)
 			}
 		case wazeroir.OperationKindBrTable:
 			{
-				if v := int(e.pop()); v < len(op.us)-1 {
-					e.drop(op.rs[v+1])
+				if v := int(vm.pop()); v < len(op.us)-1 {
+					vm.drop(op.rs[v+1])
 					frame.pc = op.us[v+1]
 				} else {
 					// Default branch.
