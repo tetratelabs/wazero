@@ -12,21 +12,21 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
-func TestInterpreter_PushFrame(t *testing.T) {
+func TestVirtualMachine_PushFrame(t *testing.T) {
 	f1 := &interpreterFrame{}
 	f2 := &interpreterFrame{}
 
-	it := engine{}
-	require.Empty(t, it.frames)
+	vm := virtualMachine{}
+	require.Empty(t, vm.frames)
 
-	it.pushFrame(f1)
-	require.Equal(t, []*interpreterFrame{f1}, it.frames)
+	vm.pushFrame(f1)
+	require.Equal(t, []*interpreterFrame{f1}, vm.frames)
 
-	it.pushFrame(f2)
-	require.Equal(t, []*interpreterFrame{f1, f2}, it.frames)
+	vm.pushFrame(f2)
+	require.Equal(t, []*interpreterFrame{f1, f2}, vm.frames)
 }
 
-func TestInterpreter_PushFrame_StackOverflow(t *testing.T) {
+func TestVirtualMachine_PushFrame_StackOverflow(t *testing.T) {
 	defer func() { callStackCeiling = buildoptions.CallStackCeiling }()
 
 	callStackCeiling = 3
@@ -36,11 +36,11 @@ func TestInterpreter_PushFrame_StackOverflow(t *testing.T) {
 	f3 := &interpreterFrame{}
 	f4 := &interpreterFrame{}
 
-	it := engine{}
-	it.pushFrame(f1)
-	it.pushFrame(f2)
-	it.pushFrame(f3)
-	require.Panics(t, func() { it.pushFrame(f4) })
+	vm := virtualMachine{}
+	vm.pushFrame(f1)
+	vm.pushFrame(f2)
+	vm.pushFrame(f3)
+	require.Panics(t, func() { vm.pushFrame(f4) })
 }
 
 func TestEngine_Call(t *testing.T) {
