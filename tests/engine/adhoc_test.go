@@ -71,16 +71,22 @@ func testFibonacci(t *testing.T, newEngine func() *wazero.Engine) {
 	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
 	// and we have no conflict with Go's runtime.
 	const goroutines = 1000
+
+	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
+	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: fibWasm})
+	require.NoError(t, err)
+	var fibs []publicwasm.Function
+	for i := 0; i < goroutines; i++ {
+		fibs = append(fibs, exports.Function("fib"))
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
+		fib := fibs[i]
 		go func() {
 			defer wg.Done()
-			store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
-			exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: fibWasm})
-			require.NoError(t, err)
-
-			results, err := exports.Function("fib").Call(ctx, 20)
+			results, err := fib.Call(ctx, 20)
 			require.NoError(t, err)
 
 			require.Equal(t, uint64(10946), results[0])
@@ -119,8 +125,7 @@ func testFac(t *testing.T, newEngine func() *wazero.Engine) {
 
 func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
 	callUnreachable := func(ctx publicwasm.ModuleContext) {
-		_, err := ctx.Function("unreachable_func").Call(ctx.Context())
-		require.NoError(t, err)
+		panic("panic in host function")
 	}
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
@@ -133,14 +138,12 @@ func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
 	require.NoError(t, err)
 
 	_, err = exports.Function("main").Call(ctx)
-	exp := `wasm runtime error: unreachable
+	exp := `wasm runtime error: panic in host function
 wasm backtrace:
-	0: unreachable_func
-	1: host.cause_unreachable
-	2: two
-	3: one
-	4: main`
-	require.ErrorIs(t, err, wasm.ErrRuntimeUnreachable)
+	0: host.cause_unreachable
+	1: two
+	2: one
+	3: main`
 	require.Equal(t, exp, err.Error())
 }
 

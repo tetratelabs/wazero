@@ -15,31 +15,30 @@ import (
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.
 func TestVerifyOffsetValue(t *testing.T) {
-	var eng engine
-	// Offsets for engine.globalContext.
-	require.Equal(t, int(unsafe.Offsetof(eng.valueStackElement0Address)), engineGlobalContextValueStackElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.valueStackLen)), engineGlobalContextValueStackLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackElementZeroAddress)), engineGlobalContextCallFrameStackElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackLen)), engineGlobalContextCallFrameStackLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.callFrameStackPointer)), engineGlobalContextCallFrameStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.previousCallFrameStackPointer)), engineGlobalContextPreviousCallFrameStackPointer)
-	require.Equal(t, int(unsafe.Offsetof(eng.compiledFunctionsElement0Address)), engineGlobalContextCompiledFunctionsElement0AddressOffset)
+	var vm callEngine
+	// Offsets for callEngine.globalContext.
+	require.Equal(t, int(unsafe.Offsetof(vm.valueStackElement0Address)), callEngineGlobalContextValueStackElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.valueStackLen)), callEngineGlobalContextValueStackLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.callFrameStackElementZeroAddress)), callEngineGlobalContextCallFrameStackElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.compiledFunctionsElement0Address)), callEngineGlobalContextCompiledFunctionsElement0AddressOffset)
 
-	// Offsets for engine.moduleContext.
-	require.Equal(t, int(unsafe.Offsetof(eng.moduleInstanceAddress)), engineModuleContextModuleInstanceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.globalElement0Address)), engineModuleContextGlobalElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.memoryElement0Address)), engineModuleContextMemoryElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.memorySliceLen)), engineModuleContextMemorySliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.tableElement0Address)), engineModuleContextTableElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.tableSliceLen)), engineModuleContextTableSliceLenOffset)
+	// Offsets for callEngine.moduleContext.
+	require.Equal(t, int(unsafe.Offsetof(vm.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
 
-	// Offsets for engine.valueStackContext
-	require.Equal(t, int(unsafe.Offsetof(eng.stackPointer)), engineValueStackContextStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.stackBasePointer)), engineValueStackContextStackBasePointerOffset)
+	// Offsets for callEngine.valueStackContext
+	require.Equal(t, int(unsafe.Offsetof(vm.stackPointer)), callEngineValueStackContextStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset)
 
-	// Offsets for engine.exitContext.
-	require.Equal(t, int(unsafe.Offsetof(eng.statusCode)), engineExitContextJITCallStatusCodeOffset)
-	require.Equal(t, int(unsafe.Offsetof(eng.functionCallAddress)), engineExitContextFunctionCallAddressOffset)
+	// Offsets for callEngine.exitContext.
+	require.Equal(t, int(unsafe.Offsetof(vm.statusCode)), callEngineExitContextJITCallStatusCodeOffset)
+	require.Equal(t, int(unsafe.Offsetof(vm.functionCallAddress)), callEngineExitContextFunctionCallAddressOffset)
 
 	// Size and offsets for callFrame.
 	var frame callFrame
