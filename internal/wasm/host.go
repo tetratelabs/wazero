@@ -142,11 +142,11 @@ func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
 
 // Call implements wasm.HostFunction Call
 func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) ([]uint64, error) {
-	hCtx, ok := ctx.(*ModuleContext)
-	if !ok { // TODO: guard that hCtx.Module actually imported this!
+	modCtx, ok := ctx.(*ModuleContext)
+	if !ok { // TODO: guard that modCtx.Module actually imported this!
 		return nil, fmt.Errorf("this function was not imported by %s", ctx)
 	}
-	return hCtx.engine.Call(hCtx, f, params...)
+	return modCtx.engine.Call(modCtx, f, params...)
 }
 
 // Function implements wasm.HostExports Function
