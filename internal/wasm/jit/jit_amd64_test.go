@@ -6086,7 +6086,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 			codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 		})
 		env.module().Functions = append(env.module().Functions,
-			&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: addr})
+			&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: targetFunctionAddress})
 	}
 
 	// Now we start building the caller's code.
