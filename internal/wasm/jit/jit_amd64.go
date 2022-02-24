@@ -77,12 +77,12 @@ func init() {
 }
 
 // jitcall is implemented in jit_amd64.s as a Go Assembler function.
-// This is used by engine.exec and the entrypoint to enter the JITed native code.
+// This is used by virtualMachine.exec and the entrypoint to enter the JITed native code.
 // codeSegment is the pointer to the initial instruction of the compiled native code.
-// engine is the pointer to the "*engine" as uintptr.
-func jitcall(codeSegment, engine uintptr)
+// vm is the pointer to the virtualMachine as uintptr.
+func jitcall(codeSegment, vm uintptr)
 
-// archContext is embedded in Engine in order to store architecture-specific data.
+// archContext is embedded in virtualMachine in order to store architecture-specific data.
 // For amd64, this is empty.
 type archContext struct{}
 
@@ -991,7 +991,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	getTypeInstanceAddress.From.Offset = 4
 	c.addInstruction(getTypeInstanceAddress)
 
-	// Adds the address of wasm.TableInstance[0] stored as engine.tableSliceAddress to the offset.
+	// Adds the address of wasm.TableInstance[0] stored as virtualMachine.tableSliceAddress to the offset.
 	movTableSliceAddress := c.newProg()
 	movTableSliceAddress.As = x86.AADDQ
 	movTableSliceAddress.To.Type = obj.TYPE_REG
@@ -4092,7 +4092,7 @@ func (c *amd64Compiler) setupMemoryAccessCeil(offsetArg uint32, targetSizeInByte
 		return result, nil
 	}
 
-	// Now we compare the value with the memory length which is held by engine.
+	// Now we compare the value with the memory length which is held by virtualMachine.
 	cmp := c.newProg()
 	cmp.As = x86.ACMPQ
 	cmp.To.Type = obj.TYPE_REG
@@ -4626,7 +4626,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	getCallFrameStackElement0Address.From.Offset = virtualMachineGlobalContextCallFrameStackElement0AddressOffset
 	c.addInstruction(getCallFrameStackElement0Address)
 
-	// Since call frame stack pointer is the index for engine.callFrameStack slice,
+	// Since call frame stack pointer is the index for virtualMachine.callFrameStack slice,
 	// here we get the actual offset in bytes via shifting callFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
 	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
 	// multiplying withe the size of struct equals shifting by its most significant bit.
@@ -4659,7 +4659,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	//
 	// What we have to do in the following is that
 	//   1) Set rb.1 so that we can return back to this function properly.
-	//   2) Set engine.valueStackContext.stackBasePointer for the next function.
+	//   2) Set virtualMachine.valueStackContext.stackBasePointer for the next function.
 	//   3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
 	//   4) Set ra.1 so that we can return back to this function properly.
 
@@ -4677,7 +4677,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 
 	// 1) Set rb.1 so that we can return back to this function properly.
 	{
-		// We must save the current stack base pointer (which lives on engine.valueStackContext.stackPointer)
+		// We must save the current stack base pointer (which lives on virtualMachine.valueStackContext.stackPointer)
 		// to the call frame stack. In the example, this is equivalent to writing the value into "rb.1".
 		movCurrentStackBasePointerIntoTmpRegister := c.newProg()
 		movCurrentStackBasePointerIntoTmpRegister.As = x86.AMOVQ
@@ -4699,11 +4699,11 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		c.addInstruction(saveCurrentStackBasePointerIntoCallFrameFromTmpRegister)
 	}
 
-	// 2) Set engine.valueStackContext.stackBasePointer for the next function.
+	// 2) Set virtualMachine.valueStackContext.stackBasePointer for the next function.
 	if offset := (int64(c.locationStack.sp) - int64(len(functype.Params))); offset > 0 {
 		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
 		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
-		// See the comments in engine.pushCallFrame which does exactly the same calculation in Go.
+		// See the comments in virtualMachine.pushCallFrame which does exactly the same calculation in Go.
 		calculateNextStackBasePointer := c.newProg()
 		calculateNextStackBasePointer.As = x86.AADDQ
 		calculateNextStackBasePointer.To.Type = obj.TYPE_REG
@@ -4712,15 +4712,15 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		calculateNextStackBasePointer.From.Offset = offset
 		c.addInstruction(calculateNextStackBasePointer)
 
-		// Write the calculated value to engine.valueStackContext.stackBasePointer.
-		putNextStackBasePointerIntoEngine := c.newProg()
-		putNextStackBasePointerIntoEngine.As = x86.AMOVQ
-		putNextStackBasePointerIntoEngine.To.Type = obj.TYPE_MEM
-		putNextStackBasePointerIntoEngine.To.Reg = reservedRegisterForVirtualMachine
-		putNextStackBasePointerIntoEngine.To.Offset = virtualMachineValueStackContextStackBasePointerOffset
-		putNextStackBasePointerIntoEngine.From.Type = obj.TYPE_REG
-		putNextStackBasePointerIntoEngine.From.Reg = tmpRegister
-		c.addInstruction(putNextStackBasePointerIntoEngine)
+		// Write the calculated value to virtualMachine.valueStackContext.stackBasePointer.
+		putNextStackBasePointerIntoVirtualMachine := c.newProg()
+		putNextStackBasePointerIntovirtualMachine.As = x86.AMOVQ
+		putNextStackBasePointerIntovirtualMachine.To.Type = obj.TYPE_MEM
+		putNextStackBasePointerIntovirtualMachine.To.Reg = reservedRegisterForVirtualMachine
+		putNextStackBasePointerIntovirtualMachine.To.Offset = virtualMachineValueStackContextStackBasePointerOffset
+		putNextStackBasePointerIntovirtualMachine.From.Type = obj.TYPE_REG
+		putNextStackBasePointerIntovirtualMachine.From.Reg = tmpRegister
+		c.addInstruction(putNextStackBasePointerIntoVirtualMachine)
 	}
 
 	// 3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
@@ -4728,7 +4728,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		// We must set the target function's address(pointer) of *compiledFunction into the next callframe stack.
 		// In the example, this is equivalent to writing the value into "rc.next".
 		//
-		// First, we read the address of the first item of engine.compiledFunctions slice (= &engine.compiledFunctions[0])
+		// First, we read the address of the first item of virtualMachine.compiledFunctions slice (= &virtualMachine.compiledFunctions[0])
 		// into tmpRegister.
 		readCopmiledFunctionsElement0Address := c.newProg()
 		readCopmiledFunctionsElement0Address.As = x86.AMOVQ
@@ -4739,7 +4739,7 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 		readCopmiledFunctionsElement0Address.From.Offset = virtualMachineGlobalContextCompiledFunctionsElement0AddressOffset
 		c.addInstruction(readCopmiledFunctionsElement0Address)
 
-		// Next, read the address of the target function (= &engine.compiledFunctions[offset])
+		// Next, read the address of the target function (= &virtualMachine.compiledFunctions[offset])
 		// into compiledFunctionAddressRegister.
 		readCompiledFunctionAddressAddress := c.newProg()
 		readCompiledFunctionAddressAddress.As = x86.AMOVQ
@@ -4810,26 +4810,26 @@ func (c *amd64Compiler) callFunction(addr wasm.FunctionAddress, addrReg int16, f
 	)
 
 	// On the function return, we have to initialize the state.
-	// This could be reached after returnFunction(), so engine.valueStackContext.stackBasePointer
-	// and engine.moduleContext.moduleInstanceAddress are changed (See comments in returnFunction()).
+	// This could be reached after returnFunction(), so virtualMachine.valueStackContext.stackBasePointer
+	// and virtualMachine.moduleContext.moduleInstanceAddress are changed (See comments in returnFunction()).
 	// Therefore we have to initialize the state according to these changes.
 	//
-	// Due to the change to engine.valueStackContext.stackBasePointer.
+	// Due to the change to virtualMachine.valueStackContext.stackBasePointer.
 	c.initializeReservedStackBasePointer()
-	// Due to the change to engine.moduleContext.moduleInstanceAddress.
+	// Due to the change to virtualMachine.moduleContext.moduleInstanceAddress.
 	if err := c.initializeModuleContext(); err != nil {
 		return err
 	}
-	// Due to the change to engine.moduleContext.moduleInstanceAddress as that might result in
+	// Due to the change to virtualMachine.moduleContext.moduleInstanceAddress as that might result in
 	// the memory instance manipulation.
 	c.initializeReservedMemoryPointer()
 	return nil
 }
 
 // returnFunction adds instructions to return from the current callframe back to the caller's frame.
-// If this is the current one is the origin, we return back to the engine.execWasmFunction with the Returned status.
+// If this is the current one is the origin, we return back to the virtualMachine.execWasmFunction with the Returned status.
 // Otherwise, we jump into the callers' return address stored in callFrame.returnAddress while setting
-// up all the necessary change on the engine's state.
+// up all the necessary change on the virtualMachine's state.
 //
 // Note: this is the counter part for callFunction, and see the comments there as well
 // to understand how the function calls are achieved.
@@ -4887,7 +4887,7 @@ func (c *amd64Compiler) returnFunction() error {
 
 	// Otherwise, we return back to the top call frame.
 	//
-	// Since call frame stack pointer is the index for engine.callFrameStack slice,
+	// Since call frame stack pointer is the index for virtualMachine.callFrameStack slice,
 	// here we get the actual offset in bytes via shifting decrementedCallFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
 	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
 	// multiplying withe the size of struct equals shifting by its most significant bit.
@@ -4938,10 +4938,10 @@ func (c *amd64Compiler) returnFunction() error {
 	//      _  = callFrame's padding (see comment on callFrame._ field.)
 	//
 	// What we have to do in the following is that
-	//   1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller".
+	//   1) Set virtualMachine.valueStackContext.stackBasePointer to the value on "rb.caller".
 	//   2) Jump into the address of "ra.caller".
 
-	// 1) Set engine.valueStackContext.stackBasePointer to the value on "rb.caller"
+	// 1) Set virtualMachine.valueStackContext.stackBasePointer to the value on "rb.caller"
 	{
 		readReturnStackBasePointer := c.newProg()
 		readReturnStackBasePointer.As = x86.AMOVQ
@@ -4991,7 +4991,7 @@ func (c *amd64Compiler) returnFunction() error {
 // jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
 // jitCallStatusCodeCallHostFunction.
 func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
-	// Set the functionAddress to the engine.exitContext functionCallAddress.
+	// Set the functionAddress to the virtualMachine.exitContext functionCallAddress.
 	setFunctionCallAddress := c.newProg()
 	setFunctionCallAddress.As = x86.AMOVQ
 	setFunctionCallAddress.From.Type = obj.TYPE_CONST
@@ -5045,7 +5045,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 	getCallFrameStackAddress.From.Offset = virtualMachineGlobalContextCallFrameStackElement0AddressOffset
 	c.addInstruction(getCallFrameStackAddress)
 
-	// Now we can get the current call frame's address, which is equivalent to get &engine.callFrameStack[engine.callStackFramePointer-1].returnAddress.
+	// Now we can get the current call frame's address, which is equivalent to get &virtualMachine.callFrameStack[virtualMachine.callStackFramePointer-1].returnAddress.
 	readCurrentCallFrameReturnAddress := c.newProg()
 	readCurrentCallFrameReturnAddress.As = x86.ALEAQ
 	readCurrentCallFrameReturnAddress.To.Type = obj.TYPE_REG
@@ -5059,7 +5059,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, addr wasm.Fu
 
 	c.readInstructionAddress(ripRegister, obj.ARET)
 
-	// We are ready to store the return address (in ripRegister) to engine.callFrameStack[engine.callStackFramePointer-1].
+	// We are ready to store the return address (in ripRegister) to virtualMachine.callFrameStack[virtualMachine.callStackFramePointer-1].
 	moveRIP := c.newProg()
 	moveRIP.As = x86.AMOVQ
 	moveRIP.To.Type = obj.TYPE_MEM
@@ -5228,7 +5228,7 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 	// calls (or right after they return), we have free registers at this point.
 	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
-	// Next we move the base pointer (engine.stackBasePointer) to the tmp register.
+	// Next we move the base pointer (virtualMachine.stackBasePointer) to the tmp register.
 	getStackBasePointer := c.newProg()
 	getStackBasePointer.As = x86.AMOVQ
 	getStackBasePointer.From.Type = obj.TYPE_MEM
@@ -5320,8 +5320,8 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	return nil
 }
 
-// initializeModuleContext adds instruction to initialize engine.ModuleContext's fields based on
-// engine.ModuleContext.ModuleInstanceAddress.
+// initializeModuleContext adds instruction to initialize virtualMachine.ModuleContext's fields based on
+// virtualMachine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
 func (c *amd64Compiler) initializeModuleContext() error {
 
@@ -5364,7 +5364,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	c.addInstruction(jmpIfEqual)
 
 	// Otherwise, we need to update fields.
-	// First, save the read module instance address to engine.moduleInstanceAddress
+	// First, save the read module instance address to virtualMachine.moduleInstanceAddress
 	saveModuleInstanceAddress := c.newProg()
 	saveModuleInstanceAddress.As = x86.AMOVQ
 	saveModuleInstanceAddress.From.Type = obj.TYPE_REG
@@ -5375,11 +5375,11 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	c.addInstruction(saveModuleInstanceAddress)
 
 	// Otherwise, we have to update the following fields:
-	// * engine.moduleContext.globalElement0Address
-	// * engine.moduleContext.tableElement0Address
-	// * engine.moduleContext.tableSliceLen
-	// * engine.moduleContext.memoryElement0Address
-	// * engine.moduleContext.memorySliceLen
+	// * virtualMachine.moduleContext.globalElement0Address
+	// * virtualMachine.moduleContext.tableElement0Address
+	// * virtualMachine.moduleContext.tableSliceLen
+	// * virtualMachine.moduleContext.memoryElement0Address
+	// * virtualMachine.moduleContext.memorySliceLen
 
 	// Update globalElement0Address.
 	//

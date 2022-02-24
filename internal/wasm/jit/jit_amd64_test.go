@@ -538,7 +538,7 @@ func Test_setJITStatus(t *testing.T) {
 			// Run codes
 			env.exec(code)
 
-			// JIT status on engine must be updated.
+			// JIT status must be updated.
 			require.Equal(t, s, env.jitStatus())
 		})
 	}
@@ -5589,14 +5589,12 @@ func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 	err = compiler.compileUnreachable()
 	require.NoError(t, err)
 
-	// Generate the code under test.
+	// Generate the code under test and run.
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
-
-	// Run code.
 	env.exec(code)
 
-	// Check the jitCallStatus of engine.
+	// Check the jit status.
 	require.Equal(t, jitCallStatusCodeUnreachable, env.jitStatus())
 	// All the values on registers must be written back to stack.
 	require.Equal(t, uint64(300), env.stack()[0])
