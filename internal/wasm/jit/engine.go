@@ -15,6 +15,7 @@ import (
 )
 
 type (
+	// engine is an JIT implementation of internalwasm.Engine
 	engine struct {
 		// These contexts are read and written by JITed code.
 		// Note that we embed these structs so we can reduce the costs to access fields inside of them.
@@ -26,7 +27,7 @@ type (
 		exitContext
 		archContext
 
-		// The following fields are NOT acceessed by JITed code directly.
+		// The following fields are NOT accessed by JITed code directly.
 
 		// valueStack is the go-allocated stack for holding Wasm values.
 		// Note: We NEVER edit len or cap in JITed code so we won't get screwed when GC comes in.
@@ -334,6 +335,12 @@ func (c *callFrame) String() string {
 }
 
 func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+	paramSignature := f.FunctionType.Type.Params
+	paramCount := len(params)
+	if len(paramSignature) != paramCount {
+		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
+	}
+
 	// We ensure that this Call method never panics as
 	// this Call method is indirectly invoked by embedders via store.CallFunction,
 	// and we have to make sure that all the runtime errors, including the one happening inside

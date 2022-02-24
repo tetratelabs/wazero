@@ -508,7 +508,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 	})
 	t.Run(FunctionFdClose, func(t *testing.T) {
 		store, ctx, fn, api := setupFD()
-		ret, err := store.Engine.Call(ctx, fn, uint64(fdToClose), uint64(fdToClose))
+		ret, err := store.Engine.Call(ctx, fn, uint64(fdToClose))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
 		require.NotContains(t, api.opened, fdToClose)           // Fd is closed and removed from the opened FDs.
