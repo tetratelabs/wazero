@@ -67,22 +67,28 @@ func (c *ModuleContext) Function(name string) publicwasm.Function {
 	if err != nil {
 		return nil
 	}
-	return (&function{c: c, f: exp.Function}).Call
+	return &function{c: c, f: exp.Function}
 }
 
+// function wraps FunctionInstance to implement wasm.Function as otherwise there's a signature clash on Call.
 type function struct {
 	c *ModuleContext
 	f *FunctionInstance
 }
 
+// ParamTypes implements wasm.Function ParamTypes
+func (f *function) ParamTypes() []publicwasm.ValueType {
+	return f.f.ParamTypes()
+}
+
+// ResultTypes implements wasm.Function ResultTypes
+func (f *function) ResultTypes() []publicwasm.ValueType {
+	return f.f.ResultTypes()
+}
+
+// Call implements wasm.Function Call
 func (f *function) Call(ctx context.Context, params ...uint64) ([]uint64, error) {
-	paramSignature := f.f.FunctionType.Type.Params
-	paramCount := len(params)
-	if len(paramSignature) != paramCount {
-		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
-	}
-	hc := f.c.WithContext(ctx)
-	return hc.engine.Call(hc, f.f, params...)
+	return f.f.Call(f.c.WithContext(ctx), params...)
 }
 
 // ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
@@ -123,8 +129,23 @@ type HostExports struct {
 	NameToFunctionInstance map[string]*FunctionInstance
 }
 
-// call implements wasm.HostFunction
-func (f *FunctionInstance) call(ctx publicwasm.ModuleContext, params ...uint64) ([]uint64, error) {
+// ParamTypes implements wasm.HostFunction ParamTypes
+func (f *FunctionInstance) ParamTypes() []publicwasm.ValueType {
+	return f.FunctionType.Type.Params
+}
+
+// ResultTypes implements wasm.HostFunction ResultTypes
+func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
+	return f.FunctionType.Type.Results
+}
+
+// Call implements wasm.HostFunction Call
+func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) ([]uint64, error) {
+	paramSignature := f.FunctionType.Type.Params
+	paramCount := len(params)
+	if len(paramSignature) != paramCount {
+		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
+	}
 	hCtx, ok := ctx.(*ModuleContext)
 	if !ok { // TODO: guard that hCtx.Module actually imported this!
 		return nil, fmt.Errorf("this function was not imported by %s", ctx)
@@ -134,11 +155,7 @@ func (f *FunctionInstance) call(ctx publicwasm.ModuleContext, params ...uint64) 
 
 // Function implements wasm.HostExports Function
 func (g *HostExports) Function(name string) publicwasm.HostFunction {
-	f, ok := g.NameToFunctionInstance[name]
-	if !ok {
-		return nil
-	}
-	return f.call
+	return g.NameToFunctionInstance[name]
 }
 
 // Size implements wasm.ModuleContext Size

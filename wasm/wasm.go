@@ -78,21 +78,34 @@ type ModuleExports interface {
 	Function(name string) Function
 }
 
-// Function is an advanced API allowing efficient invocation of WebAssembly 1.0 (MVP) functions, given predefined
-// knowledge about the function signature. An error is returned for any failure looking up or invoking the function
-// including signature mismatch.
-//
-// If the `ctx` is nil, it defaults to the same context as the module was initialized with.
-//
-// To ensure context propagation in a HostFunction, use or derive `ctx` from ModuleContext.Context:
-//
-//	hostFunction := func(ctx wasm.ModuleContext, offset, byteCount uint32) uint32 {
-//		fn, _ = ctx.Function("__read")
-//		results, err := fn(ctx.Context(), offset, byteCount)
-//	--snip--
-//
-// Parameters and results are encoded according to documentation on ValueType.
-type Function func(ctx context.Context, params ...uint64) ([]uint64, error)
+// Function is a WebAssembly 1.0 (MVP) function exported from an instantiated module (wazero.InstantiateModule).
+// See https://www.w3.org/TR/wasm-core-1/#syntax-func
+type Function interface {
+	// ParamTypes are the possibly empty sequence of value types accepted by a function with this signature.
+	// See ValueType documentation for encoding rules.
+	ParamTypes() []ValueType
+
+	// ResultTypes are the possibly empty sequence of value types returned by a function with this signature.
+	//
+	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
+	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
+	// See ValueType documentation for decoding rules.
+	ResultTypes() []ValueType
+
+	// Call is invokes the function with parameters encoded according to ParamTypes. Up to one result is returned,
+	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
+	// including signature mismatch.
+	//
+	// If the `ctx` is nil, it defaults to the same context as the module was initialized with.
+	//
+	// To ensure context propagation in a HostFunction body, use or derive `ctx` from ModuleContext.Context:
+	//
+	//	hostFunction := func(ctx wasm.ModuleContext, offset, byteCount uint32) uint32 {
+	//		fn, _ = ctx.Function("__read")
+	//		results, err := fn(ctx.Context(), offset, byteCount)
+	//	--snip--
+	Call(ctx context.Context, params ...uint64) ([]uint64, error)
+}
 
 // HostExports return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (MVP).
 //
@@ -105,10 +118,18 @@ type HostExports interface {
 
 // HostFunction is like a Function, except it is implemented in Go. This is a "Host Function" in WebAssembly 1.0 (MVP).
 //
-// Note: The usage is the same as Function, except it must be called from an importing module (ctx). The errs if the
-// module did not import this function!
 // See https://www.w3.org/TR/wasm-core-1/#syntax-hostfunc
-type HostFunction func(ctx ModuleContext, params ...uint64) ([]uint64, error)
+type HostFunction interface {
+	// ParamTypes are documented as Function.ParamTypes
+	ParamTypes() []ValueType
+
+	// ResultTypes are documented as Function.ResultTypes
+	ResultTypes() []ValueType
+
+	// Call is the same as Function.Call, except it must be called from an importing module (ctx). The can also err if
+	// the module did not import this function!
+	Call(ctx ModuleContext, params ...uint64) ([]uint64, error)
+}
 
 // ModuleContext is the first argument of a HostFunction.
 //

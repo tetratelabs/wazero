@@ -214,7 +214,7 @@ func TestFunction_Context(t *testing.T) {
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
-			results, err := exports.Function(functionName)(tc.ctx)
+			results, err := exports.Function(functionName).Call(tc.ctx)
 			require.NoError(t, err)
 			require.Equal(t, expectedResult, results[0])
 		})

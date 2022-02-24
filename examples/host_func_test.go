@@ -66,7 +66,7 @@ func Test_hostFunc(t *testing.T) {
 
 	// Implement the function pointer. This mainly shows how you can decouple a module function dependency.
 	allocateBuffer = func(ctx context.Context, size uint32) uint32 {
-		res, err := allocateBufferFn(ctx, uint64(size))
+		res, err := allocateBufferFn.Call(ctx, uint64(size))
 		require.NoError(t, err)
 		return uint32(res[0])
 	}
@@ -75,6 +75,6 @@ func Test_hostFunc(t *testing.T) {
 	ctx := context.WithValue(context.Background(), testKey{}, int64(12345))
 
 	// Invoke a module-defined function that depends on a host function import
-	_, err = exports.Function("base64")(ctx, uint64(5))
+	_, err = exports.Function("base64").Call(ctx, uint64(5))
 	require.NoError(t, err)
 }
