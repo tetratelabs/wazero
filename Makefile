@@ -38,10 +38,12 @@ test:
 	@go test ./...
 
 golangci_lint_goarch ?= $(shell go env GOARCH)
+gopath ?= $(shell go env GOPATH)
 
 .PHONY: lint
 lint:
-	@GOARCH=$(golangci_lint_goarch) go run $(golangci_lint) run --timeout 5m
+	@go install $(golangci_lint)
+	@GOARCH=$(golangci_lint_goarch) $(gopath)/bin/golangci-lint run --timeout 5m
 
 .PHONY: format
 format:
