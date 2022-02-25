@@ -56,7 +56,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 		b1 := source[i]
 
 		// The spec does not consider newlines apart from '\n'. Notably, a bare '\r' is not a newline here.
-		// See https://www.w3.org/TR/wasm-core-1/#text-comment
+		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-comment
 		if b1 == '\n' {
 			line++
 			col = 0  // for loop will + 1
@@ -150,7 +150,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 		//
 		// Note: Even though string allows unicode contents it is enclosed by ASCII double-quotes (").
 		//
-		// See https://www.w3.org/TR/wasm-core-1/#characters%E2%91%A0
+		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#characters%E2%91%A0
 
 		tok := firstTokenByte[b1]
 		// Track positions passed to the parser
@@ -228,7 +228,7 @@ func lex(parser tokenParser, source []byte) (line, col uint32, err error) {
 
 		// Unsigned floating-point constants for infinity or canonical NaN (not a number) clash with keyword
 		// representation. For example, "nan" and "inf" are floating-point constants, while "nano" and "info" are
-		// possible keywords. See https://www.w3.org/TR/wasm-core-1/#floating-point%E2%91%A6
+		// possible keywords. See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#floating-point%E2%91%A6
 		//
 		// TODO: Ex. inf nan nan:0xfffffffffffff or nan:0x400000
 

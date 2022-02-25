@@ -70,7 +70,7 @@ type compiler interface {
 	// 2) If the type of the function table[offset] doesn't match the specified function type, the function exits with jitCallStatusCodeTypeMismatchOnIndirectCall.
 	// Otherwise, we successfully enter the target function.
 	//
-	// Note: WebAssembly 1.0 (MVP) supports at most one table, so this doesn't support multiple tables.
+	// Note: WebAssembly 1.0 (20191205) supports at most one table, so this doesn't support multiple tables.
 	// See wasm.CallIndirect
 	compileCallIndirect(o *wazeroir.OperationCallIndirect) error
 	// compileDrop adds instructions to drop values within the given inclusive range from the value stack.
@@ -206,8 +206,8 @@ type compiler interface {
 	// To summarize, if the source float value is NaN or doesn't fit in the destination range of integers (incl. +=Inf),
 	// then the runtime behavior is undefined. In wazero, we exit the function in these undefined cases with
 	// jitCallStatusCodeInvalidFloatToIntConversion or jitCallStatusIntegerOverflow status code.
-	// [1] https://www.w3.org/TR/wasm-core-1/#-hrefop-trunc-umathrmtruncmathsfu_m-n-z for unsigned integers.
-	// [2] https://www.w3.org/TR/wasm-core-1/#-hrefop-trunc-smathrmtruncmathsfs_m-n-z for signed integers.
+	// [1] https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefop-trunc-umathrmtruncmathsfu_m-n-z for unsigned integers.
+	// [2] https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefop-trunc-smathrmtruncmathsfs_m-n-z for signed integers.
 	// See OpcodeI32TruncF32S OpcodeI32TruncF32U OpcodeI32TruncF64S OpcodeI32TruncF64U
 	// See OpcodeI64TruncF32S OpcodeI64TruncF32U OpcodeI64TruncF64S OpcodeI64TruncF64U
 	compileITruncFromF(o *wazeroir.OperationITruncFromF) error

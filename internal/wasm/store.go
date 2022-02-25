@@ -24,7 +24,7 @@ type (
 	// via multiple goroutines might result in race conditions. In that case, the invocation
 	// and access to any methods and field of Store must be guarded by mutex.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0
 	Store struct {
 		// The following fields are wazero-specific fields of Store.
 
@@ -59,21 +59,21 @@ type (
 
 		// The followings fields match the definition of Store in the specification.
 
-		// Functions holds function instances (https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0),
+		// Functions holds function instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr).
+		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr).
 		Functions []*FunctionInstance
-		// Globals holds global instances (https://www.w3.org/TR/wasm-core-1/#global-instances%E2%91%A0),
+		// Globals holds global instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as globaladdr (https://www.w3.org/TR/wasm-core-1/#syntax-globaladdr).
+		// The slice index is to be interpreted as globaladdr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaladdr).
 		Globals []*GlobalInstance
-		// Memories holds memory instances (https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0),
+		// Memories holds memory instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as memaddr (https://www.w3.org/TR/wasm-core-1/#syntax-memaddr).
+		// The slice index is to be interpreted as memaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-memaddr).
 		Memories []*MemoryInstance
-		// Tables holds table instances (https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0),
+		// Tables holds table instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0),
 		// in this store.
-		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/wasm-core-1/#syntax-tableaddr).
+		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-tableaddr).
 		Tables []*TableInstance
 	}
 
@@ -81,7 +81,7 @@ type (
 	// The difference from the spec is that in wazero, a ModuleInstance holds pointers
 	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#syntax-moduleinst
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-moduleinst
 	ModuleInstance struct {
 		Name      string
 		Exports   map[string]*ExportInstance
@@ -98,7 +98,7 @@ type (
 	// The difference from the spec is that in wazero, a ExportInstance holds pointers
 	// to the instances, rather than "addresses" (i.e. index to Store.Functions, Globals, etc) for convenience.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#syntax-exportinst
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportinst
 	ExportInstance struct {
 		Kind     ExportKind
 		Function *FunctionInstance
@@ -108,7 +108,7 @@ type (
 	}
 
 	// FunctionInstance represents a function instance in a Store.
-	// See https://www.w3.org/TR/wasm-core-1/#function-instances%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 	FunctionInstance struct {
 		// ModuleInstance holds the pointer to the module instance to which this function belongs.
 		ModuleInstance *ModuleInstance
@@ -124,7 +124,7 @@ type (
 		// This is nil when FunctionKind == FunctionKindWasm. Otherwise, all the above fields are ignored as they are
 		// specific to Wasm functions.
 		HostFunction *reflect.Value
-		// Address is the funcaddr(https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) of this function instance.
+		// Address is the funcaddr(https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr) of this function instance.
 		// More precisely, this equals the index of this function instance in store.FunctionInstances.
 		// All function calls are made via funcaddr at runtime, not the index (scoped to a module).
 		//
@@ -148,7 +148,7 @@ type (
 	}
 
 	// GlobalInstance represents a global instance in a store.
-	// See https://www.w3.org/TR/wasm-core-1/#global-instances%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0
 	GlobalInstance struct {
 		Type *GlobalType
 		// Val holds a 64-bit representation of the actual value.
@@ -156,9 +156,9 @@ type (
 	}
 
 	// TableInstance represents a table instance in a store.
-	// See https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
 	//
-	// Note this is fixed to function type until post MVP reference type is implemented.
+	// Note this is fixed to function type until post 20191205 reference type is implemented.
 	TableInstance struct {
 		// Table holds the table elements managed by this table instance.
 		//
@@ -176,9 +176,9 @@ type (
 
 	// TableElement represents an item in a table instance.
 	//
-	// Note: this is fixed to function type as it is the only supported type in WebAssembly 1.0 (MVP)
+	// Note: this is fixed to function type as it is the only supported type in WebAssembly 1.0 (20191205)
 	TableElement struct {
-		// FunctionAddress is funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr)
+		// FunctionAddress is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr)
 		// of the target function instance. More precisely, this equals the index of
 		// the target function instance in Store.FunctionInstances.
 		FunctionAddress FunctionAddress
@@ -189,16 +189,16 @@ type (
 
 	// MemoryInstance represents a memory instance in a store, and implements wasm.Memory.
 	//
-	// Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means the precise memory is always
+	// Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means the precise memory is always
 	// wasm.Store Memories index zero: `store.Memories[0]`
-	// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
 	MemoryInstance struct {
 		Buffer []byte
 		Min    uint32
 		Max    *uint32
 	}
 
-	// FunctionAddress is funcaddr (https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr),
+	// FunctionAddress is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr),
 	// and the index to Store.Functions.
 	FunctionAddress uint64
 

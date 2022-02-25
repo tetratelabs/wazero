@@ -56,12 +56,12 @@ func TestEncodeFunctionType(t *testing.T) {
 			expected: []byte{0x60, 2, i32, i64, 0},
 		},
 		{
-			name:     "no param two results", // this is just for coverage as WebAssembly 1.0 (MVP) does not allow it!
+			name:     "no param two results", // this is just for coverage as WebAssembly 1.0 (20191205) does not allow it!
 			input:    &wasm.FunctionType{Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 0, 2, i32, i64},
 		},
 		{
-			name:     "one param two results", // this is just for coverage as WebAssembly 1.0 (MVP) does not allow it!
+			name:     "one param two results", // this is just for coverage as WebAssembly 1.0 (20191205) does not allow it!
 			input:    &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 1, i64, 2, i32, i64},
 		},
@@ -71,7 +71,7 @@ func TestEncodeFunctionType(t *testing.T) {
 			expected: []byte{0x60, 2, i32, i64, 1, i32},
 		},
 		{
-			name:     "two param two results", // this is just for coverage as WebAssembly 1.0 (MVP) does not allow it!
+			name:     "two param two results", // this is just for coverage as WebAssembly 1.0 (20191205) does not allow it!
 			input:    &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32, i64}},
 			expected: []byte{0x60, 2, i32, i64, 2, i32, i64},
 		},

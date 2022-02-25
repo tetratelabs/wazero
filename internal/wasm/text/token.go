@@ -1,7 +1,7 @@
 package text
 
 // token is the set of tokens defined by the WebAssembly Text Format 1.0
-// See https://www.w3.org/TR/wasm-core-1/#tokens%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#tokens%E2%91%A0
 type tokenType byte
 
 const (
@@ -13,7 +13,7 @@ const (
 	//		i32.const 6
 	//		i32.lt_s
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#text-keyword
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-keyword
 	tokenKeyword
 
 	// tokenUN is an unsigned integer in decimal or hexadecimal notation, optionally separated by underscores.
@@ -24,7 +24,7 @@ const (
 	//		(i32.const 0x0a)
 	//		(i32.const 0x0_A)
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#text-int
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-int
 	tokenUN
 
 	// tokenSN is a signed integer in decimal or hexadecimal notation, optionally separated by underscores.
@@ -35,7 +35,7 @@ const (
 	//		(i32.const +0x0a)
 	//		(i32.const +0x0_A)
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#text-int
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-int
 	tokenSN
 
 	// tokenFN represents an IEEE-754 floating point number in decimal or hexadecimal notation, optionally separated by
@@ -63,7 +63,7 @@ const (
 	//		(data (i32.const 0) "\u{263a}\u{0a}")
 	//		(data (i32.const 0) "\e2\98\ba\0a")
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#strings%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#strings%E2%91%A0
 	tokenString
 
 	// tokenID is a sequence of idChar characters prefixed by a '$':
@@ -73,7 +73,7 @@ const (
 	//		i32.const 6
 	//		i32.lt_s
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#text-id
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-id
 	tokenID
 
 	// tokenLParen is a left paren: '('
@@ -86,12 +86,12 @@ const (
 	//
 	// For example, '0$y' is a tokenReserved, because it doesn't start with a letter or '$'.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#text-reserved
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-reserved
 	tokenReserved
 )
 
 // tokenNames is index-coordinated with tokenType
-// See https://www.w3.org/TR/wasm-core-1/#tokens%E2%91%A0 for the naming choices.
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#tokens%E2%91%A0 for the naming choices.
 var tokenNames = [...]string{
 	"invalid",
 	"keyword",
@@ -147,7 +147,7 @@ var firstTokenByte = [256]tokenType{
 }
 
 // idChar is a printable ASCII character that does not contain a space, quotation mark, comma, semicolon, or bracket.
-// See https://www.w3.org/TR/wasm-core-1/#text-idchar
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-idchar
 var idChar = buildIdChars()
 
 func buildIdChars() (result [256]bool) {
@@ -176,7 +176,7 @@ func _idChar(ch byte) bool {
 // stripDollar returns the input without a leading '$'
 //
 // The WebAssembly 1.0 specification includes support for naming modules, functions, locals and tables via the custom
-// 'name' section: https://www.w3.org/TR/wasm-core-1/#binary-namesec However, how this round-trips between the text and
+// 'name' section: https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namesec However, how this round-trips between the text and
 // binary format is not discussed.
 //
 // We know that in the text format names must be dollar-sign prefixed to conform with tokenID conventions. However, we

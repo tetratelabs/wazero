@@ -26,7 +26,7 @@ const (
 // * FunctionNames decode from subsection 1
 // * LocalNames decode from subsection 2
 //
-// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namesec
 func decodeNameSection(r *bytes.Reader, limit uint64) (result *wasm.NameSection, err error) {
 	// TODO: add leb128 functions that work on []byte and offset. While using a reader allows us to reuse reader-based
 	// leb128 functions, it is less efficient, causes untestable code and in some cases more complex vs plain []byte.
@@ -154,7 +154,7 @@ func decodeFunctionCount(r *bytes.Reader, subsectionID uint8) (uint32, error) {
 //
 // Note: The result can be nil because this does not encode empty subsections
 //
-// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namesec
 func encodeNameSectionData(n *wasm.NameSection) (data []byte) {
 	if n.ModuleName != "" {
 		data = append(data, encodeNameSubsection(subsectionIDModuleName, encodeSizePrefixed([]byte(n.ModuleName)))...)
@@ -169,7 +169,7 @@ func encodeNameSectionData(n *wasm.NameSection) (data []byte) {
 }
 
 // encodeFunctionNameData encodes the data for the function name subsection.
-// See https://www.w3.org/TR/wasm-core-1/#binary-funcnamesec
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-funcnamesec
 func encodeFunctionNameData(n *wasm.NameSection) []byte {
 	if len(n.FunctionNames) == 0 {
 		return nil
@@ -188,7 +188,7 @@ func encodeNameMap(m wasm.NameMap) []byte {
 }
 
 // encodeLocalNameData encodes the data for the local name subsection.
-// See https://www.w3.org/TR/wasm-core-1/#binary-localnamesec
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-localnamesec
 func encodeLocalNameData(n *wasm.NameSection) []byte {
 	if len(n.LocalNames) == 0 {
 		return nil
@@ -205,7 +205,7 @@ func encodeLocalNameData(n *wasm.NameSection) []byte {
 }
 
 // encodeNameSubsection returns a buffer encoding the given subsection
-// See https://www.w3.org/TR/wasm-core-1/#subsections%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#subsections%E2%91%A0
 func encodeNameSubsection(subsectionID uint8, content []byte) []byte {
 	contentSizeInBytes := leb128.EncodeUint32(uint32(len(content)))
 	result := []byte{subsectionID}
@@ -215,7 +215,7 @@ func encodeNameSubsection(subsectionID uint8, content []byte) []byte {
 }
 
 // encodeNameAssoc encodes the index and data prefixed by their size.
-// See https://www.w3.org/TR/wasm-core-1/#binary-namemap
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namemap
 func encodeNameAssoc(na *wasm.NameAssoc) []byte {
 	return append(leb128.EncodeUint32(na.Index), encodeSizePrefixed([]byte(na.Name))...)
 }

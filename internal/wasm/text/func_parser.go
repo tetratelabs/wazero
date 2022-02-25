@@ -36,12 +36,12 @@ type funcParser struct {
 	currentTypeIdx    wasm.Index
 	currentParamNames wasm.NameMap
 
-	// currentBody is the current function body encoded in WebAssembly 1.0 (MVP) binary format
+	// currentBody is the current function body encoded in WebAssembly 1.0 (20191205) binary format
 	currentBody []byte
 }
 
 // end indicates the end of instructions in this function body
-// See https://www.w3.org/TR/wasm-core-1/#expressions%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#expressions%E2%91%A0
 var end = []byte{wasm.OpcodeEnd}
 var codeEnd = &wasm.Code{Body: end}
 
@@ -143,13 +143,13 @@ func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, l
 func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err error) {
 	var opCode wasm.Opcode
 	switch string(tokenBytes) {
-	case "local.get": // See https://www.w3.org/TR/wasm-core-1/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
+	case "local.get": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-variablemathsflocalgetx%E2%91%A0
 		opCode = wasm.OpcodeLocalGet
 		next = p.parseLocalIndex
-	case "i32.add": // See https://www.w3.org/TR/wasm-core-1/#syntax-instr-numeric
+	case "i32.add": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-instr-numeric
 		opCode = wasm.OpcodeI32Add
 		next = p.beginFieldOrInstruction
-	case "call": // See https://www.w3.org/TR/wasm-core-1/#-hrefsyntax-instr-controlmathsfcallx
+	case "call": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfcallx
 		opCode = wasm.OpcodeCall
 		next = p.parseFuncIndex
 	default:

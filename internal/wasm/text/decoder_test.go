@@ -205,7 +205,7 @@ func TestDecodeModule(t *testing.T) {
 		},
 		{
 			// Spec says expand abbreviations first. It doesn't explicitly say you can't mix forms.
-			// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A0
+			// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#abbreviations%E2%91%A0
 			name: "import func inlined type - mixed abbreviated",
 			input: `(module
 	(import "wasi_snapshot_preview1" "fd_write" (func $wasi.fd_write (param i32) (param i32 i32) (param i32) (result i32)))
@@ -704,7 +704,7 @@ func TestDecodeModule(t *testing.T) {
 		},
 		{
 			// Spec says expand abbreviations first. It doesn't explicitly say you can't mix forms.
-			// See https://www.w3.org/TR/wasm-core-1/#abbreviations%E2%91%A0
+			// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#abbreviations%E2%91%A0
 			name: "func inlined type - mixed abbreviated",
 			input: `(module
 			(func $wasi.fd_write (param i32) (param i32 i32) (param i32) (result i32) local.get 0)

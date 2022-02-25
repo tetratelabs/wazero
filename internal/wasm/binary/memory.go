@@ -7,9 +7,9 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// decodeMemoryType returns the wasm.MemoryType decoded with the WebAssembly 1.0 (MVP) Binary Format.
+// decodeMemoryType returns the wasm.MemoryType decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#binary-memory
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
 func decodeMemoryType(r io.Reader) (*wasm.MemoryType, error) {
 	ret, err := decodeLimitsType(r)
 	if err != nil {
@@ -28,9 +28,9 @@ func decodeMemoryType(r io.Reader) (*wasm.MemoryType, error) {
 	return ret, nil
 }
 
-// encodeMemoryType returns the wasm.MemoryType encoded in WebAssembly 1.0 (MVP) Binary Format.
+// encodeMemoryType returns the wasm.MemoryType encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#binary-memory
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
 func encodeMemoryType(i *wasm.MemoryType) []byte {
 	return encodeLimitsType(i)
 }

@@ -20,7 +20,7 @@ type onMemory func(min uint32, max *uint32) tokenParser
 //    onMemory resumes here --+
 //
 // Note: memoryParser is reusable. The caller resets via begin.
-// See https://www.w3.org/TR/wasm-core-1/#memories%E2%91%A7
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A7
 type memoryParser struct {
 	memoryNamespace *indexNamespace
 

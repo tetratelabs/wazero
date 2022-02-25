@@ -71,12 +71,12 @@ func decodeCode(r io.Reader) (*wasm.Code, error) {
 	return &wasm.Code{Body: body, LocalTypes: localTypes}, nil
 }
 
-// encodeCode returns the wasm.Code encoded in WebAssembly 1.0 (MVP) Binary Format.
+// encodeCode returns the wasm.Code encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#binary-code
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-code
 func encodeCode(c *wasm.Code) []byte {
 	// local blocks compress locals while preserving index order by grouping locals of the same type.
-	// https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
+	// https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#code-section%E2%91%A0
 	localBlockCount := uint32(0) // how many blocks of locals with the same type (types can repeat!)
 	var localBlocks []byte
 	localTypeLen := len(c.LocalTypes)

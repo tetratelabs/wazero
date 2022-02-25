@@ -34,7 +34,7 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_getargv-pointerpointeru8-argv_buf-pointeru8---errno
 	FunctionArgsGet = "args_get"
 
-	// ImportArgsGet is the WebAssembly 1.0 (MVP) Text format import of FunctionArgsGet
+	// ImportArgsGet is the WebAssembly 1.0 (20191205) Text format import of FunctionArgsGet
 	ImportArgsGet = `(import "wasi_snapshot_preview1" "args_get"
     (func $wasi.args_get (param $argv i32) (param $argv_buf i32) (result (;errno;) i32)))`
 
@@ -42,7 +42,7 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-args_sizes_get---errno-size-size
 	FunctionArgsSizesGet = "args_sizes_get"
 
-	// ImportArgsSizesGet is the WebAssembly 1.0 (MVP) Text format import of FunctionArgsSizesGet
+	// ImportArgsSizesGet is the WebAssembly 1.0 (20191205) Text format import of FunctionArgsSizesGet
 	ImportArgsSizesGet = `(import "wasi_snapshot_preview1" "args_sizes_get"
     (func $wasi.args_sizes_get (param $result.argc i32) (param $result.argv_buf_size i32) (result (;errno;) i32)))`
 
@@ -50,7 +50,7 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-environ_getenviron-pointerpointeru8-environ_buf-pointeru8---errno
 	FunctionEnvironGet = "environ_get"
 
-	// ImportEnvironGet is the WebAssembly 1.0 (MVP) Text format import of FunctionEnvironGet
+	// ImportEnvironGet is the WebAssembly 1.0 (20191205) Text format import of FunctionEnvironGet
 	ImportEnvironGet = `(import "wasi_snapshot_preview1" "environ_get"
     (func $wasi.environ_get (param $environ i32) (param $environ_buf i32) (result (;errno;) i32)))`
 
@@ -58,7 +58,7 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-environ_sizes_get---errno-size-size
 	FunctionEnvironSizesGet = "environ_sizes_get"
 
-	// ImportEnvironSizesGet is the WebAssembly 1.0 (MVP) Text format import of FunctionEnvironSizesGet
+	// ImportEnvironSizesGet is the WebAssembly 1.0 (20191205) Text format import of FunctionEnvironSizesGet
 	ImportEnvironSizesGet = `
 (import "wasi_snapshot_preview1" "environ_sizes_get"
     (func $wasi.environ_sizes_get (param $result.environc i32) (param $result.environBufSize i32) (result (;errno;) i32)))`
@@ -67,7 +67,7 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_res_getid-clockid---errno-timestamp
 	FunctionClockResGet = "clock_res_get"
 
-	// ImportClockResGet is the WebAssembly 1.0 (MVP) Text format import of FunctionClockResGet
+	// ImportClockResGet is the WebAssembly 1.0 (20191205) Text format import of FunctionClockResGet
 	ImportClockResGet = `
 (import "wasi_snapshot_preview1" "clock_res_get"
     (func $wasi.clock_res_get (param $id i32) (param $result.resolution i32) (result (;errno;) i32)))`
@@ -76,7 +76,7 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 	FunctionClockTimeGet = "clock_time_get"
 
-	// ImportClockTimeGet is the WebAssembly 1.0 (MVP) Text format import of FunctionClockTimeGet
+	// ImportClockTimeGet is the WebAssembly 1.0 (20191205) Text format import of FunctionClockTimeGet
 	ImportClockTimeGet = `(import "wasi_snapshot_preview1" "clock_time_get"
     (func $wasi.clock_time_get (param $id i32) (param $precision i64) (param $result.timestamp i32) (result (;errno;) i32)))`
 
@@ -86,7 +86,7 @@ const (
 	// FunctionFdClose closes a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_close
 	FunctionFdClose = "fd_close"
-	// ImportFdClose is the WebAssembly 1.0 (MVP) Text format import of FunctionFdClose
+	// ImportFdClose is the WebAssembly 1.0 (20191205) Text format import of FunctionFdClose
 	ImportFdClose = `(import "wasi_snapshot_preview1" "fd_close"
     (func $wasi.fd_close (param $fd i32) (result (;errno;) i32)))`
 
@@ -102,14 +102,14 @@ const (
 	// FunctionFdPrestatGet returns the prestat data of a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_get
 	FunctionFdPrestatGet = "fd_prestat_get"
-	// ImportFdPrestatGet is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	// ImportFdPrestatGet is the WebAssembly 1.0 (20191205) Text format import of FunctionFdPrestatGet
 	ImportFdPrestatGet = `(import "wasi_snapshot_preview1" "fd_prestat_get"
     (func $wasi.fd_prestat_get (param $fd i32) (param $result.prestat i32) (result (;errno;) i32)))`
 
 	// FunctionFdPrestatDirName returns the path of the pre-opened directory of a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 	FunctionFdPrestatDirName = "fd_prestat_dir_name"
-	// ImportFdPrestatDirName is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	// ImportFdPrestatDirName is the WebAssembly 1.0 (20191205) Text format import of FunctionFdPrestatGet
 	ImportFdPrestatDirName = `(import "wasi_snapshot_preview1" "fd_prestat_dir_name"
     (func $wasi.fd_prestat_dir_name (param $fd i32) (param $path i32) (param $path_len i32) (result (;errno;) i32)))`
 
@@ -118,7 +118,7 @@ const (
 	// FunctionFdRead read bytes from a file descriptor
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
 	FunctionFdRead = "fd_read"
-	// ImportFdRead is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	// ImportFdRead is the WebAssembly 1.0 (20191205) Text format import of FunctionFdPrestatGet
 	ImportFdRead = `(import "wasi_snapshot_preview1" "fd_read"
     (func $wasi.fd_read (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $result.size i32) (result (;errno;) i32)))`
 
@@ -131,7 +131,7 @@ const (
 	// FunctionFdWrite write bytes to a file descriptor
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
 	FunctionFdWrite = "fd_write"
-	// ImportFdWrite is the WebAssembly 1.0 (MVP) Text format import of FunctionFdPrestatGet
+	// ImportFdWrite is the WebAssembly 1.0 (20191205) Text format import of FunctionFdPrestatGet
 	ImportFdWrite = `(import "wasi_snapshot_preview1" "fd_write"
     (func $wasi.fd_write (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $result.size i32) (result (;errno;) i32)))`
 
@@ -151,7 +151,7 @@ const (
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 	FunctionProcExit = "proc_exit"
 
-	// ImportProcExit is the WebAssembly 1.0 (MVP) Text format import of ProcExit
+	// ImportProcExit is the WebAssembly 1.0 (20191205) Text format import of ProcExit
 	//
 	// See ImportProcExit
 	// See API.ProcExit
@@ -167,7 +167,7 @@ const (
 	// See: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-buf_len-size---errno
 	FunctionRandomGet = "random_get"
 
-	// ImportRandomGet is the WebAssembly 1.0 (MVP) Text format import of FunctionRandomGet
+	// ImportRandomGet is the WebAssembly 1.0 (20191205) Text format import of FunctionRandomGet
 	ImportRandomGet = `(import "wasi_snapshot_preview1" "random_get"
     (func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))`
 
@@ -178,7 +178,7 @@ const (
 
 // SnapshotPreview1 includes all host functions to export for WASI version wasi.ModuleSnapshotPreview1.
 //
-// Note: When translating WASI functions, each result besides Errno is always an uint32 parameter. WebAssembly 1.0 (MVP)
+// Note: When translating WASI functions, each result besides Errno is always an uint32 parameter. WebAssembly 1.0 (20191205)
 // can have up to one result, which is already used by Errno. This forces other results to be parameters. A result
 // parameter is a memory offset to write the result to. As memory offsets are uint32, each parameter representing a
 // result is uint32.
@@ -188,12 +188,12 @@ const (
 // doubt about portability, first look at internal/wasi/RATIONALE.md and if needed an issue on
 // https://github.com/WebAssembly/WASI/issues
 //
-// Note: In WebAssembly 1.0 (MVP), there may be up to one Memory per store, which means wasm.Memory is always the
+// Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means wasm.Memory is always the
 // wasm.Store Memories index zero: `store.Memories[0].Buffer`
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 // See https://github.com/WebAssembly/WASI/issues/215
-// See https://wwa.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0.
+// See https://wwa.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
 type SnapshotPreview1 interface {
 	// ArgsGet is the WASI function that reads command-line argument data (Args).
 	//
@@ -217,7 +217,7 @@ type SnapshotPreview1 interface {
 	//          offset that begins "a" --+           |
 	//                     offset that begins "bc" --+
 	//
-	// Note: ImportArgsGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportArgsGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -245,7 +245,7 @@ type SnapshotPreview1 interface {
 	//             resultArgvBufSize --|
 	//   len([]byte{'a',0,'b',c',0}) --+
 	//
-	// Note: ImportArgsSizesGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportArgsSizesGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -273,7 +273,7 @@ type SnapshotPreview1 interface {
 	//                              environ offset for "a=b" --+           |
 	//                                         environ offset for "b=cd" --+
 	//
-	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See EnvironSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -302,7 +302,7 @@ type SnapshotPreview1 interface {
 	//    len([]byte{'a','=','b',0,    |
 	//           'b','=','c','d',0}) --+
 	//
-	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportEnvironGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See EnvironGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
@@ -326,7 +326,7 @@ type SnapshotPreview1 interface {
 	//          []byte{?, 0x0, 0x0, 0x1f, 0xa6, 0x70, 0xfc, 0xc5, 0x16, ?}
 	//  resultTimestamp --^
 	//
-	// Note: ImportClockTimeGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportClockTimeGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// Note: This is similar to `clock_gettime` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 	// See https://linux.die.net/man/3/clock_gettime
@@ -339,7 +339,7 @@ type SnapshotPreview1 interface {
 	//
 	// * fd - the file descriptor to close
 	//
-	// Note: ImportFdClose shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportFdClose shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// Note: This is similar to `close` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 	// See https://linux.die.net/man/3/close
@@ -374,7 +374,7 @@ type SnapshotPreview1 interface {
 	//            tag --+           |
 	//                              +-- size in bytes of the string "/tmp"
 	//
-	// Note: ImportFdPrestatGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportFdPrestatGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See FdPrestatDirName
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
@@ -401,7 +401,7 @@ type SnapshotPreview1 interface {
 	//   []byte{?, '/', 't', 'm', 'p', ?}
 	//       path --^
 	//
-	// Note: ImportFdPrestatDirName shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportFdPrestatDirName shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See FdPrestatGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
 	FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, path uint32, pathLen uint32) wasi.Errno
@@ -446,7 +446,7 @@ type SnapshotPreview1 interface {
 	//                            iovs[1].offset --+           |
 	//                                            resultSize --+
 	//
-	// Note: ImportFdRead shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportFdRead shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// Note: This is similar to `readv` in POSIX.
 	// See FdWrite
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
@@ -503,7 +503,7 @@ type SnapshotPreview1 interface {
 	//   []byte{ 0..24, ?, 6, 0, 0, 0', ? }
 	//        resultSize --^
 	//
-	// Note: ImportFdWrite shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportFdWrite shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// Note: This is similar to `writev` in POSIX.
 	// See FdRead
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
@@ -532,7 +532,7 @@ type SnapshotPreview1 interface {
 	// You can get the exit code by casting the error to wasi.ExitCode.
 	// See wasi.ExitCode
 	//
-	// Note: ImportProcExit shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportProcExit shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 	ProcExit(rval uint32)
 
@@ -552,7 +552,7 @@ type SnapshotPreview1 interface {
 	//          []byte{?, 0x53, 0x8c, 0x7f, 0x96, 0xb1, ?}
 	//              buf --^
 	//
-	// Note: ImportRandomGet shows this signature in the WebAssembly 1.0 (MVP) Text Format.
+	// Note: ImportRandomGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
 	RandomGet(ctx wasm.ModuleContext, buf, bufLen uint32) wasi.Errno
 

@@ -71,10 +71,10 @@ var encodedOneResult = map[wasm.ValueType][]byte{
 	wasm.ValueTypeF64: {0x60, 0, 1, wasm.ValueTypeF64},
 }
 
-// encodeFunctionType returns the wasm.FunctionType encoded in WebAssembly 1.0 (MVP) Binary Format.
+// encodeFunctionType returns the wasm.FunctionType encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // Note: Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
-// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A4
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-types%E2%91%A4
 func encodeFunctionType(t *wasm.FunctionType) []byte {
 	paramCount, resultCount := len(t.Params), len(t.Results)
 	if paramCount == 0 && resultCount == 0 {
@@ -95,7 +95,7 @@ func encodeFunctionType(t *wasm.FunctionType) []byte {
 		}
 		return append(append([]byte{0x60}, encodeValTypes(t.Params)...), 1, t.Results[0])
 	}
-	// This branch should never be reaches as WebAssembly 1.0 (MVP) supports at most 1 result
+	// This branch should never be reaches as WebAssembly 1.0 (20191205) supports at most 1 result
 	data := append([]byte{0x60}, encodeValTypes(t.Params)...)
 	return append(data, encodeValTypes(t.Results)...)
 }

@@ -6,9 +6,9 @@ import (
 
 var sizePrefixedName = []byte{4, 'n', 'a', 'm', 'e'}
 
-// EncodeModule implements wasm.EncodeModule for the WebAssembly 1.0 (MVP) Binary Format.
+// EncodeModule implements wasm.EncodeModule for the WebAssembly 1.0 (20191205) Binary Format.
 // Note: If saving to a file, the conventional extension is wasm
-// See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
 func EncodeModule(m *wasm.Module) (bytes []byte) {
 	bytes = append(Magic, version...)
 	if m.SectionElementCount(wasm.SectionIDType) > 0 {
@@ -46,7 +46,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 	}
 	if m.SectionElementCount(wasm.SectionIDCustom) > 0 {
 		// >> The name section should appear only once in a module, and only after the data section.
-		// See https://www.w3.org/TR/wasm-core-1/#binary-namesec
+		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namesec
 		if m.NameSection != nil {
 			nameSection := append(sizePrefixedName, encodeNameSectionData(m.NameSection)...)
 			bytes = append(bytes, encodeSection(wasm.SectionIDCustom, nameSection)...)

@@ -6,7 +6,7 @@ package text
 // length known at the parsing layer.
 //
 // Note: This is similar to, but cannot use strconv.Atoi because WebAssembly allows underscore characters in numeric
-// representation. See https://www.w3.org/TR/wasm-core-1/#integers%E2%91%A6
+// representation. See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#integers%E2%91%A6
 func decodeUint32(tokenBytes []byte) (uint32, bool) { // TODO: hex
 	// The max ASCII length of a uint32 is 10 (length of 4294967295). If we are at that length we can overflow.
 	//

@@ -62,7 +62,7 @@ type typeUseParser struct {
 	parsedTypeField bool
 
 	// currentTypeIndex should be read when parsedTypeField is true
-	// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#type-uses%E2%91%A0
 	currentTypeIndex wasm.Index
 
 	// currentTypeIndexUnresolved is set when the currentTypeIndex was not in the wasm.Module TypeSection
@@ -450,7 +450,7 @@ func (p *typeUseParser) recordInlinedType(inlinedIdx wasm.Index) {
 
 // requireInlinedMatchesReferencedType satisfies the following rule:
 //	>> If inline declarations are given, then their types must match the referenced function type.
-// See https://www.w3.org/TR/wasm-core-1/#type-uses%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#type-uses%E2%91%A0
 func requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, index wasm.Index, params, results []wasm.ValueType) error {
 	if !funcTypeEquals(typeSection[index], params, results) {
 		return fmt.Errorf("inlined type doesn't match module.type[%d].func", index)

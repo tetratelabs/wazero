@@ -9,8 +9,8 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (MVP) Binary Format
-// See https://www.w3.org/TR/wasm-core-1/#binary-format%E2%91%A0
+// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
 func DecodeModule(binary []byte) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
 
@@ -28,7 +28,7 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 	m := &wasm.Module{}
 	for {
 		// TODO: except custom sections, all others are required to be in order, but we aren't checking yet.
-		// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%93%AA
+		// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A0%E2%93%AA
 		sectionID, err := r.ReadByte()
 		if err == io.EOF {
 			break

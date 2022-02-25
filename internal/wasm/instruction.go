@@ -392,7 +392,7 @@ var instructionNames = [256]string{
 }
 
 // InstructionName returns the instruction corresponding to this binary Opcode.
-// See https://www.w3.org/TR/wasm-core-1/#a7-index-of-instructions
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#a7-index-of-instructions
 func InstructionName(oc Opcode) string {
 	return instructionNames[oc]
 }

@@ -8,7 +8,7 @@ language!
 
 Here's an example of using wazero to invoke a factorial included in a Wasm binary.
 
-While our [source for this](tests/engine/testdata/fac.wat) is the WebAssembly 1.0 (MVP) Text Format,
+While our [source for this](tests/engine/testdata/fac.wat) is the WebAssembly 1.0 (20191205) Text Format,
 it could have been written in another language that targets Wasm, such as AssemblyScript/C/C++/Rust/TinyGo/Zig.
 
 ```golang
