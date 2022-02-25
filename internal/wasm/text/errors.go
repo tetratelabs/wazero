@@ -51,7 +51,7 @@ func unexpectedToken(tok tokenType, tokenBytes []byte) error {
 // Ex. Both of these fail because an import can only be declared when SectionIDFunction is empty.
 // `(func) (import "" "" (func))` which is the same as  `(func) (import "" "" (func))`
 //
-// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A0%E2%91%A2
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A0%E2%91%A2
 func importAfterModuleDefined(section wasm.SectionID) error {
 	return fmt.Errorf("import after module-defined %s", wasm.SectionIDName(section))
 }
@@ -64,8 +64,8 @@ func importAfterModuleDefined(section wasm.SectionID) error {
 //   * Note the latter expands to the same as the former: `(import "" "" (memory 1))`
 // * `(module (import "" "" (memory 1)) (import "" "" (memory 1)))`
 //
-// See https://www.w3.org/TR/wasm-core-1/#tables%E2%91%A0
-// See https://www.w3.org/TR/wasm-core-1/#memories%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#tables%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A0
 func moreThanOneInvalidInSection(section wasm.SectionID) error {
 	return moreThanOneInvalid(wasm.SectionIDName(section))
 }

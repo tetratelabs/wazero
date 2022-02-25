@@ -24,7 +24,7 @@ const (
 	FunctionKindGoModuleContext
 )
 
-// GoFunc binds a WebAssembly 1.0 (MVP) Type Use to a Go func signature.
+// GoFunc binds a WebAssembly 1.0 (20191205) Type Use to a Go func signature.
 type GoFunc struct {
 	wasmFunctionName string
 	// functionKind is never FunctionKindWasm

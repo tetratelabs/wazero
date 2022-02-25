@@ -35,7 +35,7 @@ type StoreConfig struct {
 	// * This is the outer-most ancestor of wasm.ModuleContext Context() during wasm.HostFunction invocations.
 	// * This is the default context of wasm.Function when callers pass nil.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#start-function%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-function%E2%91%A0
 	Context context.Context
 	// Engine defaults to NewEngineInterpreter
 	Engine *Engine
@@ -58,12 +58,12 @@ func NewStoreWithConfig(config *StoreConfig) wasm.Store {
 	return internalwasm.NewStore(ctx, engine.e)
 }
 
-// ModuleConfig defines the WebAssembly 1.0 (MVP) module to instantiate.
+// ModuleConfig defines the WebAssembly 1.0 (20191205) module to instantiate.
 type ModuleConfig struct {
 	// Name defaults to what's decoded from the custom name section and can be overridden WithName.
-	// See https://www.w3.org/TR/wasm-core-1/#name-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	Name string
-	// Source is the WebAssembly 1.0 (MVP) text or binary encoding of the module.
+	// Source is the WebAssembly 1.0 (20191205) text or binary encoding of the module.
 	Source []byte
 
 	validatedSource []byte
@@ -93,7 +93,7 @@ func (m *ModuleConfig) WithName(moduleName string) *ModuleConfig {
 // Ex.
 //	exports, _ := wazero.InstantiateModule(wazero.NewStore(), &wazero.ModuleConfig{Source: wasm})
 //
-// Note: StoreConfig.Context is used for any WebAssembly 1.0 (MVP) Start Function.
+// Note: StoreConfig.Context is used for any WebAssembly 1.0 (20191205) Start Function.
 func InstantiateModule(store wasm.Store, module *ModuleConfig) (wasm.ModuleExports, error) {
 	internal, ok := store.(*internalwasm.Store)
 	if !ok {
@@ -147,7 +147,7 @@ func decodeModule(module *ModuleConfig) (m *internalwasm.Module, err error) {
 	return
 }
 
-// HostModuleConfig are WebAssembly 1.0 (MVP) exports from the host bound to a module name used by InstantiateHostModule.
+// HostModuleConfig are WebAssembly 1.0 (20191205) exports from the host bound to a module name used by InstantiateHostModule.
 type HostModuleConfig struct {
 	// Name is the module name that these exports can be imported with. Ex. wasi.ModuleSnapshotPreview1
 	Name string
@@ -156,7 +156,7 @@ type HostModuleConfig struct {
 	//
 	// The key is the name to export and the value is the func. Ex. WASISnapshotPreview1
 	//
-	// Noting a context exception described later, all parameters or result types must match WebAssembly 1.0 (MVP) value
+	// Noting a context exception described later, all parameters or result types must match WebAssembly 1.0 (20191205) value
 	// types. This means uint32, uint64, float32 or float64. Up to one result can be returned.
 	//
 	// Ex. This is a valid host function:
@@ -186,7 +186,7 @@ type HostModuleConfig struct {
 	//		return x + y
 	//	}
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A2
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
 	Functions map[string]interface{}
 }
 

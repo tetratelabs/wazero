@@ -1124,7 +1124,7 @@ func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName str
 
 // maskMemory sets the first memory in the store to '?' * size, so tests can see what's written.
 //
-// Note: WebAssembly 1.0 (MVP) can have only up to one memory, so index zero is unambiguous.
+// Note: WebAssembly 1.0 (20191205) can have only up to one memory, so index zero is unambiguous.
 func maskMemory(store *wasm.Store, size int) {
 	store.Memories[0].Buffer = make([]byte, size)
 	for i := 0; i < size; i++ {

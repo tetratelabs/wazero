@@ -9,7 +9,7 @@ import (
 )
 
 // validateFunctionInstance validates the instruction sequence of a function instance.
-// following the specification https://www.w3.org/TR/wasm-core-1/#instructions%E2%91%A2.
+// following the specification https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#instructions%E2%91%A2.
 //
 // f is the validation target function instance.
 // functions is the list of function indexes which are declared on a module from which the target is instantiated.
@@ -30,9 +30,9 @@ func validateFunctionInstance(
 	types []*FunctionType,
 	maxStackValues int,
 ) error {
-	// Note: In WebAssembly 1.0 (MVP), multiple memories are not allowed.
+	// Note: In WebAssembly 1.0 (20191205), multiple memories are not allowed.
 	hasMemory := len(memories) > 0
-	// Note: In WebAssembly 1.0 (MVP), multiple tables are not allowed.
+	// Note: In WebAssembly 1.0 (20191205), multiple tables are not allowed.
 	hasTable := len(tables) > 0
 
 	// We start with the outermost control block which is for function return if the code branches into it.

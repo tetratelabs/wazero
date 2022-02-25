@@ -211,15 +211,15 @@ func decodeDataSection(r *bytes.Reader) ([]*wasm.DataSegment, error) {
 }
 
 // encodeSection encodes the sectionID, the size of its contents in bytes, followed by the contents.
-// See https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 func encodeSection(sectionID wasm.SectionID, contents []byte) []byte {
 	return append([]byte{sectionID}, encodeSizePrefixed(contents)...)
 }
 
-// encodeTypeSection encodes a SectionIDType for the given imports in WebAssembly 1.0 (MVP) Binary Format.
+// encodeTypeSection encodes a SectionIDType for the given imports in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See encodeFunctionType
-// See https://www.w3.org/TR/wasm-core-1/#type-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#type-section%E2%91%A0
 func encodeTypeSection(types []*wasm.FunctionType) []byte {
 	contents := leb128.EncodeUint32(uint32(len(types)))
 	for _, t := range types {
@@ -228,10 +228,10 @@ func encodeTypeSection(types []*wasm.FunctionType) []byte {
 	return encodeSection(wasm.SectionIDType, contents)
 }
 
-// encodeImportSection encodes a SectionIDImport for the given imports in WebAssembly 1.0 (MVP) Binary Format.
+// encodeImportSection encodes a SectionIDImport for the given imports in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See encodeImport
-// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
 func encodeImportSection(imports []*wasm.Import) []byte {
 	contents := leb128.EncodeUint32(uint32(len(imports)))
 	for _, i := range imports {
@@ -241,9 +241,9 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 }
 
 // encodeFunctionSection encodes a SectionIDFunction for the type indices associated with module-defined functions in
-// WebAssembly 1.0 (MVP) Binary Format.
+// WebAssembly 1.0 (20191205) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#function-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-section%E2%91%A0
 func encodeFunctionSection(typeIndices []wasm.Index) []byte {
 	contents := leb128.EncodeUint32(uint32(len(typeIndices)))
 	for _, index := range typeIndices {
@@ -252,10 +252,10 @@ func encodeFunctionSection(typeIndices []wasm.Index) []byte {
 	return encodeSection(wasm.SectionIDFunction, contents)
 }
 
-// encodeCodeSection encodes a SectionIDCode for the module-defined function in WebAssembly 1.0 (MVP) Binary Format.
+// encodeCodeSection encodes a SectionIDCode for the module-defined function in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See encodeCode
-// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#code-section%E2%91%A0
 func encodeCodeSection(code []*wasm.Code) []byte {
 	contents := leb128.EncodeUint32(uint32(len(code)))
 	for _, i := range code {
@@ -264,10 +264,10 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 	return encodeSection(wasm.SectionIDCode, contents)
 }
 
-// encodeMemorySection encodes a SectionIDMemory for the module-defined function in WebAssembly 1.0 (MVP) Binary Format.
+// encodeMemorySection encodes a SectionIDMemory for the module-defined function in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See encodeMemoryType
-// See https://www.w3.org/TR/wasm-core-1/#memory-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
 func encodeMemorySection(memories []*wasm.MemoryType) []byte {
 	contents := leb128.EncodeUint32(uint32(len(memories)))
 	for _, i := range memories {
@@ -276,10 +276,10 @@ func encodeMemorySection(memories []*wasm.MemoryType) []byte {
 	return encodeSection(wasm.SectionIDMemory, contents)
 }
 
-// encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (MVP) Binary Format.
+// encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See encodeExport
-// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
 func encodeExportSection(exports map[string]*wasm.Export) []byte {
 	contents := leb128.EncodeUint32(uint32(len(exports)))
 	for _, e := range exports {
@@ -288,9 +288,9 @@ func encodeExportSection(exports map[string]*wasm.Export) []byte {
 	return encodeSection(wasm.SectionIDExport, contents)
 }
 
-// encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (MVP) Binary Format.
+// encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (20191205) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-section%E2%91%A0
 func encodeStartSection(funcidx wasm.Index) []byte {
 	return encodeSection(wasm.SectionIDStart, leb128.EncodeUint32(funcidx))
 }

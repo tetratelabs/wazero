@@ -19,7 +19,7 @@ func newIndexNamespace() *indexNamespace {
 // features, uniqueness and lookup, as implemented with a map. The key is stripped of the leading '$' to match other
 // tools, as described in stripDollar
 //
-// See https://www.w3.org/TR/wasm-core-1/#text-context
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-context
 type indexNamespace struct {
 	unresolvedIndices []*unresolvedIndex
 
@@ -29,9 +29,9 @@ type indexNamespace struct {
 	// idToIdx resolves symbolic identifiers, such as "v_v" to a numeric index in the appropriate section, such
 	// as '2'. Duplicate identifiers are not allowed by specification.
 	//
-	// Note: This is not encoded in the wasm.NameSection as there is no type name section in WebAssembly 1.0 (MVP)
+	// Note: This is not encoded in the wasm.NameSection as there is no type name section in WebAssembly 1.0 (20191205)
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#text-context
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-context
 	idToIdx map[string]wasm.Index
 }
 
@@ -104,7 +104,7 @@ func (i *indexNamespace) recordOutOfRange(section wasm.SectionID, idx wasm.Index
 // Note: section, idx, line and col used for lazy validation of index. These are attached to an error if later parsed to
 // be invalid (ex an unknown function or out-of-bound index).
 //
-// See https://www.w3.org/TR/wasm-core-1/#indices%E2%91%A4
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#indices%E2%91%A4
 type unresolvedIndex struct {
 	// section is the primary index of what's targeting this index (in the wasm.Module)
 	section wasm.SectionID

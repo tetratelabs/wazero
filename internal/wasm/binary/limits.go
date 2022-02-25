@@ -8,9 +8,9 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// decodeLimitsType returns the wasm.LimitsType decoded with the WebAssembly 1.0 (MVP) Binary Format.
+// decodeLimitsType returns the wasm.LimitsType decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#limits%E2%91%A6
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#limits%E2%91%A6
 func decodeLimitsType(r io.Reader) (*wasm.LimitsType, error) {
 	b := make([]byte, 1)
 	_, err := io.ReadFull(r, b)
@@ -41,9 +41,9 @@ func decodeLimitsType(r io.Reader) (*wasm.LimitsType, error) {
 	return ret, nil
 }
 
-// encodeLimitsType returns the wasm.LimitsType encoded in WebAssembly 1.0 (MVP) Binary Format.
+// encodeLimitsType returns the wasm.LimitsType encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
-// See https://www.w3.org/TR/wasm-core-1/#limits%E2%91%A6
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#limits%E2%91%A6
 func encodeLimitsType(l *wasm.LimitsType) []byte {
 	if l.Max == nil {
 		return append(leb128.EncodeUint32(0x00), leb128.EncodeUint32(l.Min)...)

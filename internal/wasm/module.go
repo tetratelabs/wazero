@@ -20,7 +20,7 @@ type DecodeModule func(source []byte) (result *Module, err error)
 type EncodeModule func(m *Module) (bytes []byte)
 
 // Module is a WebAssembly binary representation.
-// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A8
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A8
 //
 // Differences from the specification:
 // * The NameSection is decoded, so not present as a key "name" in CustomSections.
@@ -33,7 +33,7 @@ type Module struct {
 	//
 	// Note: In the Binary Format, this is SectionIDType.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#types%E2%91%A0%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#types%E2%91%A0%E2%91%A0
 	TypeSection []*FunctionType
 
 	// ImportSection contains imported functions, tables, memories or globals required for instantiation
@@ -43,7 +43,7 @@ type Module struct {
 	//
 	// Note: In the Binary Format, this is SectionIDImport.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
 	ImportSection []*Import
 
 	// FunctionSection contains the index in TypeSection of each function defined in this module.
@@ -57,7 +57,7 @@ type Module struct {
 	//
 	// Note: In the Binary Format, this is SectionIDFunction.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#function-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-section%E2%91%A0
 	FunctionSection []Index
 
 	// TableSection contains each table defined in this module.
@@ -66,12 +66,12 @@ type Module struct {
 	// For example, if there are two imported tables and one defined in this module, the table Index 3 is defined in
 	// this module at TableSection[0].
 	//
-	// Note: Version 1.0 (MVP) of the WebAssembly spec allows at most one table definition per module, so the length of
+	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one table definition per module, so the length of
 	// the TableSection can be zero or one, and can only be one if there is no ImportKindTable.
 	//
 	// Note: In the Binary Format, this is SectionIDTable.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#table-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
 	TableSection []*TableType
 
 	// MemorySection contains each memory defined in this module.
@@ -80,12 +80,12 @@ type Module struct {
 	// For example, if there are two imported memories and one defined in this module, the memory Index 3 is defined in
 	// this module at TableSection[0].
 	//
-	// Note: Version 1.0 (MVP) of the WebAssembly spec allows at most one memory definition per module, so the length of
+	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory definition per module, so the length of
 	// the MemorySection can be zero or one, and can only be one if there is no ImportKindMemory.
 	//
 	// Note: In the Binary Format, this is SectionIDMemory.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#memory-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
 	MemorySection []*MemoryType
 
 	// GlobalSection contains each global defined in this module.
@@ -96,14 +96,14 @@ type Module struct {
 	//
 	// Note: In the Binary Format, this is SectionIDGlobal.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#global-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-section%E2%91%A0
 	GlobalSection []*Global
 
 	// ExportSection contains each export defined in this module.
 	//
 	// Note: In the Binary Format, this is SectionIDExport.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#exports%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A0
 	ExportSection map[string]*Export
 
 	// StartSection is the index of a function to call before returning from Store.Instantiate.
@@ -113,7 +113,7 @@ type Module struct {
 	//
 	// Note: In the Binary Format, this is SectionIDStart.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#start-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-section%E2%91%A0
 	StartSection *Index
 
 	// Note: In the Binary Format, this is SectionIDElement.
@@ -123,7 +123,7 @@ type Module struct {
 	//
 	// Note: In the Binary Format, this is SectionIDCode.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#code-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#code-section%E2%91%A0
 	CodeSection []*Code
 
 	// Note: In the Binary Format, this is SectionIDData.
@@ -131,11 +131,11 @@ type Module struct {
 
 	// NameSection is set when the SectionIDCustom "name" was successfully decoded from the binary format.
 	//
-	// Note: This is the only SectionIDCustom defined in the WebAssembly 1.0 (MVP) Binary Format.
+	// Note: This is the only SectionIDCustom defined in the WebAssembly 1.0 (20191205) Binary Format.
 	// Others are skipped as they are not used in wazero.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#name-section%E2%91%A0
-	// See https://www.w3.org/TR/wasm-core-1/#custom-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	NameSection *NameSection
 }
 
@@ -175,20 +175,20 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 // For example, the function index namespace starts with any ImportKindFunc in the Module.TypeSection followed by the
 // Module.FunctionSection
 //
-// See https://www.w3.org/TR/wasm-core-1/#binary-index
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-index
 type Index = uint32
 
 // FunctionType is a possibly empty function signature.
 //
-// See https://www.w3.org/TR/wasm-core-1/#function-types%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-types%E2%91%A0
 type FunctionType struct {
 	// Params are the possibly empty sequence of value types accepted by a function with this signature.
 	Params []ValueType
 
 	// Results are the possibly empty sequence of value types returned by a function with this signature.
 	//
-	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
-	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
+	// Note: In WebAssembly 1.0 (20191205), there can be at most one result.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#result-types%E2%91%A0
 	Results []ValueType
 }
 
@@ -210,7 +210,7 @@ func (t *FunctionType) String() (ret string) {
 }
 
 // Import is the binary representation of an import indicated by Kind
-// See https://www.w3.org/TR/wasm-core-1/#binary-import
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-import
 type Import struct {
 	Kind ImportKind
 	// Module is the possibly empty primary namespace of this import
@@ -255,7 +255,7 @@ type ConstantExpression struct {
 }
 
 // Export is the binary representation of an export indicated by Kind
-// See https://www.w3.org/TR/wasm-core-1/#binary-export
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-export
 type Export struct {
 	Kind ExportKind
 	// Name is what the host refers to this definition as.
@@ -272,13 +272,13 @@ type ElementSegment struct {
 }
 
 // Code is an entry in the Module.CodeSection containing the locals and body of the function.
-// See https://www.w3.org/TR/wasm-core-1/#binary-code
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-code
 type Code struct {
 	// LocalTypes are any function-scoped variables in insertion order.
-	// See https://www.w3.org/TR/wasm-core-1/#binary-local
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-local
 	LocalTypes []ValueType
 	// Body is a sequence of expressions ending in OpcodeEnd
-	// See https://www.w3.org/TR/wasm-core-1/#binary-expr
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-expr
 	Body []byte
 }
 
@@ -291,7 +291,7 @@ type DataSegment struct {
 // NameSection represent the known custom name subsections defined in the WebAssembly Binary Format
 //
 // Note: This can be nil if no names were decoded for any reason including configuration.
-// See https://www.w3.org/TR/wasm-core-1/#name-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 type NameSection struct {
 	// ModuleName is the symbolic identifier for a module. Ex. math
 	//
@@ -301,7 +301,7 @@ type NameSection struct {
 	// FunctionNames is an association of a function index to its symbolic identifier. Ex. add
 	//
 	// * the key (idx) is in the function namespace, where module defined functions are preceded by imported ones.
-	// See https://www.w3.org/TR/wasm-core-1/#functions%E2%91%A7
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#functions%E2%91%A7
 	//
 	// Ex. Assuming the below text format is the second import, you would expect FunctionNames[1] = "mul"
 	//	(import "Math" "Mul" (func $mul (param $x f32) (param $y f32) (result f32)))
@@ -329,7 +329,7 @@ type NameSection struct {
 //
 // Note: NameMap is unique by NameAssoc.Index, but NameAssoc.Name needn't be unique.
 // Note: When encoding in the Binary format, this must be ordered by NameAssoc.Index
-// See https://www.w3.org/TR/wasm-core-1/#binary-namemap
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-namemap
 type NameMap []*NameAssoc
 
 type NameAssoc struct {
@@ -341,7 +341,7 @@ type NameAssoc struct {
 //
 // Note: IndirectNameMap is unique by NameMapAssoc.Index, but NameMapAssoc.NameMap needn't be unique.
 // Note: When encoding in the Binary format, this must be ordered by NameMapAssoc.Index
-// https://www.w3.org/TR/wasm-core-1/#binary-indirectnamemap
+// https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-indirectnamemap
 type IndirectNameMap []*NameMapAssoc
 
 type NameMapAssoc struct {
@@ -416,17 +416,17 @@ func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as
 	}
 }
 
-// SectionID identifies the sections of a Module in the WebAssembly 1.0 (MVP) Binary Format.
+// SectionID identifies the sections of a Module in the WebAssembly 1.0 (20191205) Binary Format.
 //
 // Note: these are defined in the wasm package, instead of the binary package, as a key per section is needed regardless
 // of format, and deferring to the binary type avoids confusion.
 //
-// See https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 type SectionID = byte
 
 const (
 	// SectionIDCustom includes the standard defined NameSection and possibly others not defined in the standard.
-	SectionIDCustom SectionID = iota // don't add anything not in https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
+	SectionIDCustom SectionID = iota // don't add anything not in https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 	SectionIDType
 	SectionIDImport
 	SectionIDFunction
@@ -441,7 +441,7 @@ const (
 )
 
 // SectionIDName returns the canonical name of a module section.
-// https://www.w3.org/TR/wasm-core-1/#sections%E2%91%A0
+// https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 func SectionIDName(sectionID SectionID) string {
 	switch sectionID {
 	case SectionIDCustom:
@@ -488,7 +488,7 @@ func ValueTypeName(t ValueType) string {
 }
 
 // ImportKind indicates which import description is present
-// See https://www.w3.org/TR/wasm-core-1/#import-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
 type ImportKind = byte
 
 const (
@@ -499,7 +499,7 @@ const (
 )
 
 // ExportKind indicates which index Export.Index points to
-// See https://www.w3.org/TR/wasm-core-1/#export-section%E2%91%A0
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
 type ExportKind = byte
 
 const (
@@ -510,7 +510,7 @@ const (
 )
 
 // ExportKindName returns the canonical name of the exportdesc.
-// https://www.w3.org/TR/wasm-core-1/#syntax-exportdesc
+// https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportdesc
 func ExportKindName(ek ExportKind) string {
 	switch ek {
 	case ExportKindFunc:

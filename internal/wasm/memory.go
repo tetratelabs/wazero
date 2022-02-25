@@ -8,10 +8,10 @@ import (
 const (
 	// MemoryPageSize is the unit of memory length in WebAssembly,
 	// and is defined as 2^16 = 65536.
-	// See https://www.w3.org/TR/wasm-core-1/#memory-instances%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0
 	MemoryPageSize = uint32(65536)
 	// MemoryMaxPages is maximum number of pages defined (2^16).
-	// See https://www.w3.org/TR/wasm-core-1/#grow-mem
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 	MemoryMaxPages = MemoryPageSize
 	// MemoryPageSizeInBits satisfies the relation: "1 << MemoryPageSizeInBits == MemoryPageSize".
 	MemoryPageSizeInBits = 16
@@ -134,7 +134,7 @@ func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 }
 
 // Grow extends the memory buffer by "newPages" * memoryPageSize.
-// The logic here is described in https://www.w3.org/TR/wasm-core-1/#grow-mem.
+// The logic here is described in https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem.
 //
 // Returns -1 if the operation resulted in excedding the maximum memory pages.
 // Otherwise, returns the prior memory size after growing the memory buffer.

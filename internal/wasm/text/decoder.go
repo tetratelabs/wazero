@@ -38,12 +38,12 @@ const (
 	callbackPositionEndField
 )
 
-// moduleParser parses a single wasm.Module from WebAssembly 1.0 (MVP) Text format.
+// moduleParser parses a single wasm.Module from WebAssembly 1.0 (20191205) Text format.
 //
 // Note: The indexNamespace of wasm.SectionIDMemory and wasm.SectionIDTable allow up-to-one item. For example, you
 // cannot define both one import and one module-defined memory, rather one or the other (or none). Even if these rules
 // are also enforced in module instantiation, they are also enforced here, to allow relevant source line/col in errors.
-// See https://www.w3.org/TR/wasm-core-1/#modules%E2%91%A3
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A3
 type moduleParser struct {
 	// source is the entire WebAssembly text format source code being parsed.
 	source []byte
@@ -89,8 +89,8 @@ type moduleParser struct {
 	unresolvedExports map[wasm.Index]*wasm.Export
 }
 
-// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (MVP) Text Format
-// See https://www.w3.org/TR/wasm-core-1/#text-format%E2%91%A0
+// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-format%E2%91%A0
 func DecodeModule(source []byte) (result *wasm.Module, err error) {
 	// names are the wasm.Module NameSection
 	//

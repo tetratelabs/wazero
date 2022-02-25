@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-// ValueType describes a numeric type used in Web Assembly 1.0 (MVP). For example, Function parameters and results are
+// ValueType describes a numeric type used in Web Assembly 1.0 (20191205). For example, Function parameters and results are
 // only definable as a value type.
 //
 // The following describes how to convert between Wasm and Golang types:
@@ -26,7 +26,7 @@ import (
 //	result := wasm.DecodeF64(result[0])
 //
 // Note: This is a type alias as it is easier to encode and decode in the binary format.
-// See https://www.w3.org/TR/wasm-core-1/#binary-valtype
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-valtype
 type ValueType = byte
 
 const (
@@ -78,8 +78,8 @@ type ModuleExports interface {
 	Function(name string) Function
 }
 
-// Function is a WebAssembly 1.0 (MVP) function exported from an instantiated module (wazero.InstantiateModule).
-// See https://www.w3.org/TR/wasm-core-1/#syntax-func
+// Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.InstantiateModule).
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-func
 type Function interface {
 	// ParamTypes are the possibly empty sequence of value types accepted by a function with this signature.
 	// See ValueType documentation for encoding rules.
@@ -87,8 +87,8 @@ type Function interface {
 
 	// ResultTypes are the possibly empty sequence of value types returned by a function with this signature.
 	//
-	// Note: In WebAssembly 1.0 (MVP), there can be at most one result.
-	// See https://www.w3.org/TR/wasm-core-1/#result-types%E2%91%A0
+	// Note: In WebAssembly 1.0 (20191205), there can be at most one result.
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#result-types%E2%91%A0
 	// See ValueType documentation for decoding rules.
 	ResultTypes() []ValueType
 
@@ -107,18 +107,18 @@ type Function interface {
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 
-// HostExports return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (MVP).
+// HostExports return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (20191205).
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-// See https://www.w3.org/TR/wasm-core-1/#syntax-hostfunc
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-hostfunc
 type HostExports interface {
 	// Function returns a host function exported under this module name or nil if it wasn't.
 	Function(name string) HostFunction
 }
 
-// HostFunction is like a Function, except it is implemented in Go. This is a "Host Function" in WebAssembly 1.0 (MVP).
+// HostFunction is like a Function, except it is implemented in Go. This is a "Host Function" in WebAssembly 1.0 (20191205).
 //
-// See https://www.w3.org/TR/wasm-core-1/#syntax-hostfunc
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-hostfunc
 type HostFunction interface {
 	// ParamTypes are documented as Function.ParamTypes
 	ParamTypes() []ValueType
@@ -150,15 +150,15 @@ type ModuleContext interface {
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-// Note: This includes all value types available in WebAssembly 1.0 (MVP) and all are encoded little-endian.
-// See https://www.w3.org/TR/wasm-core-1/#storage%E2%91%A0
+// Note: This includes all value types available in WebAssembly 1.0 (20191205) and all are encoded little-endian.
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#storage%E2%91%A0
 type Memory interface {
 	// Size returns the size in bytes available. Ex. If the underlying memory has 1 page: 65536
 	//
 	// Note: this will not grow during a host function call, even if the underlying memory can.  Ex. If the underlying
 	// memory has min 0 and max 2 pages, this returns zero.
 	//
-	// See https://www.w3.org/TR/wasm-core-1/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-memorymathsfmemorysize%E2%91%A0
 	Size() uint32
 
 	// ReadByte reads a single byte from the underlying buffer at the offset in or returns false if out of range.

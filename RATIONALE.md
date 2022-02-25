@@ -77,20 +77,20 @@ https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/m
 
 ## Implementation limitations
 
-WebAssembly 1.0 (MVP) specification allows runtimes to [limit certain aspects of Wasm module or execution](https://www.w3.org/TR/wasm-core-1/#a2-implementation-limitations).
+WebAssembly 1.0 (20191205) specification allows runtimes to [limit certain aspects of Wasm module or execution](https://www.w3.org/TR/2019/REC-2019/REC-wasm-core-1-20191205/#a2-implementation-limitations).
 
 wazero limitations are imposed pragmatically and described below.
 
 ### Number of functions in a store
 
-The possible number of function instances in [a store](https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0) is not specified in the WebAssembly specifications since [`funcaddr`](https://www.w3.org/TR/wasm-core-1/#syntax-funcaddr) corresponding to a function instance can be arbitrary number.
+The possible number of function instances in [a store](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0) is not specified in the WebAssembly specifications since [`funcaddr`](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr) corresponding to a function instance can be arbitrary number.
 wazero limits the maximum function instances to 2^27 as even that number would occupy 1GB in function pointers.
 
 That is because not only we _believe_ that all use cases are fine with the limitation, but also we have no way to test wazero runtimes under these unusual circumstances.
 
 ### Number of function types in a store
 
-There's no limitation on the number of function types in [a store](https://www.w3.org/TR/wasm-core-1/#store%E2%91%A0) according to the spec. In wazero implementation, we assign each function type to a unique ID, and choose to use `uint32` to represent the IDs.
+There's no limitation on the number of function types in [a store](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0) according to the spec. In wazero implementation, we assign each function type to a unique ID, and choose to use `uint32` to represent the IDs.
 Therefore the maximum number of function types a store can have is limited to 2^27 as even that number would occupy 512MB just to reference the function types.
 
 This is due to the same reason for the limitation on the number of functions above.
