@@ -42,7 +42,7 @@ Both of engines passes 100% of [WebAssembly spec test suites]((https://github.co
 | Interpreter|`wazero.NewEngineInterpreter()`|✅ |✅|✅|
 | JIT engine |`wazero.NewEngineJIT()`|✅|✅ |❌|
 
-*Note:* JIT does not yet work on Windows. Please use the interpreter and track [this issue](https://github.com/tetratelabs/wazero/issues/270) if interested.
+*Note:* JIT does not yet work on Windows. Please use the interpreter and track [this issue](https://github.com/tetratelabs/wazero/issues/269) if interested.
 
 If you choose no configuration, ex `wazero.NewStore()`, the interpreter is used. You can also choose explicitly like so:
 ```go
@@ -56,10 +56,7 @@ If you want to provide Wasm host environments in your Go programs, currently the
 First, why do you want to write host environments in Go? You might want to have plugin systems in your Go project and want these plugin systems to be safe/fast/flexible, and enable users to
 write plugins in their favorite languages. That's where Wasm comes into play. You write your own Wasm host environments and embed Wasm runtime in your projects, and now users are able to write plugins in their own favorite lanugages (AssembyScript, C, C++, Rust, Zig, etc.). As a specific example, you maybe write proxy severs in Go and want to allow users to extend the proxy via [Proxy-Wasm ABI](https://github.com/proxy-wasm/spec). Maybe you are writing server-side rendering applications via Wasm, or [OpenPolicyAgent](https://www.openpolicyagent.org/docs/latest/wasm/) is using Wasm for plugin system.
 
-However, experienced Golang developers often avoid using CGO because [_CGO is not Go_](https://dave.cheney.net/2016/01/18/cgo-is-not-go)[ -- _Rob_ _Pike_](https://www.youtube.com/watch?v=PAAkCSZUG1c&t=757s), and it introduces another complexity into your projects. But unfortunately, as I mentioned there's no pure Go Wasm runtime out there, so you have to resort to CGO.
+However, experienced Golang developers often avoid using CGO because [_CGO is not Go_](https://dave.cheney.net/2016/01/18/cgo-is-not-go)[ -- _Rob_ _Pike_](https://www.youtube.com/watch?v=PAAkCSZUG1c&t=757s), and it introduces another complexity into your projects. But unfortunately, as I mentioned there's no pure Go Wasm runtime out there, so you have to resort to CGO, and that's the main reason why we have started developing wazero project.
 
-Currently, any performance optimization hasn't been done to this runtime yet, and the runtime is just a simple interpreter of Wasm binary. That means in terms of performance, the runtime here is inferior to any aforementioned runtimes (e.g. Wasmtime) for now.
+Currently, those seeking performance are encouraged to try the JIT engine. You may be surprised to find equal or better performance vs mature JIT-style runtimes. The rationale for that is it is well-know that [CGO is slow](https://github.com/golang/go/issues/19574). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
 
-However, _theoretically speaking_, this project has the potential to compete with these state-of-the-art JIT-style runtimes. The rationale for that is it is well-know that [CGO is slow](https://github.com/golang/go/issues/19574). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
-
-Since we can do JIT compilation purely in Go, this runtime could be the fastest one for some use cases where we have to make large amount of CGO calls (e.g. Proxy-Wasm host environment, or request-based plugin systems).
