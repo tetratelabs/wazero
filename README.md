@@ -42,8 +42,6 @@ Both of engines passes 100% of [WebAssembly spec test suites]((https://github.co
 | Interpreter|`wazero.NewEngineInterpreter()`|✅ |✅|✅|
 | JIT engine |`wazero.NewEngineJIT()`|✅|✅ |❌|
 
-*Note:* JIT does not yet work on Windows. Please use the interpreter and track [this issue](https://github.com/tetratelabs/wazero/issues/269) if interested.
-
 If you choose no configuration, ex `wazero.NewStore()`, the interpreter is used. You can also choose explicitly like so:
 ```go
 store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: wazero.NewEngineJIT()})
