@@ -43,11 +43,11 @@ func newExample() *wasm.Module {
 		ImportSection: []*wasm.Import{
 			{
 				Module: "wasi_snapshot_preview1", Name: wasi.FunctionArgsSizesGet,
-				Kind:     wasm.ImportKindFunc,
+				Type:     wasm.ExternTypeFunc,
 				DescFunc: 0,
 			}, {
 				Module: "wasi_snapshot_preview1", Name: wasi.FunctionFdWrite,
-				Kind:     wasm.ImportKindFunc,
+				Type:     wasm.ExternTypeFunc,
 				DescFunc: 2,
 			},
 		},
@@ -59,9 +59,9 @@ func newExample() *wasm.Module {
 		},
 		MemorySection: []*wasm.MemoryType{{Min: 1, Max: &three}},
 		ExportSection: map[string]*wasm.Export{
-			"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(4)},
-			"":       {Name: "", Kind: wasm.ExportKindFunc, Index: wasm.Index(3)},
-			"mem":    {Name: "mem", Kind: wasm.ExportKindMemory, Index: wasm.Index(0)},
+			"AddInt": {Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(4)},
+			"":       {Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(3)},
+			"mem":    {Name: "mem", Type: wasm.ExternTypeMemory, Index: wasm.Index(0)},
 		},
 		StartSection: &three,
 		NameSection: &wasm.NameSection{

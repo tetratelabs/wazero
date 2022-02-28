@@ -66,8 +66,8 @@ type Module struct {
 	// For example, if there are two imported tables and one defined in this module, the table Index 3 is defined in
 	// this module at TableSection[0].
 	//
-	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one table definition per module, so the length of
-	// the TableSection can be zero or one, and can only be one if there is no ImportKindTable.
+	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one table definition per module, so the
+	// length of the TableSection can be zero or one, and can only be one if there is no imported table.
 	//
 	// Note: In the Binary Format, this is SectionIDTable.
 	//
@@ -81,7 +81,7 @@ type Module struct {
 	// this module at TableSection[0].
 	//
 	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory definition per module, so the length of
-	// the MemorySection can be zero or one, and can only be one if there is no ImportKindMemory.
+	// the MemorySection can be zero or one, and can only be one if there is no imported memory.
 	//
 	// Note: In the Binary Format, this is SectionIDMemory.
 	//
@@ -148,7 +148,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	}
 	funcImportCount := Index(0)
 	for i, im := range m.ImportSection {
-		if im.Kind == ImportKindFunc {
+		if im.Type == ExternTypeFunc {
 			if funcIdx == Index(i) {
 				if im.DescFunc >= typeSectionLength {
 					return nil
@@ -172,8 +172,8 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 // Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because
 // index namespaces are often preceded by a corresponding type in the Module.ImportSection.
 //
-// For example, the function index namespace starts with any ImportKindFunc in the Module.TypeSection followed by the
-// Module.FunctionSection
+// For example, the function index namespace starts with any ExternTypeFunc in the Module.ImportSection followed by
+// the Module.FunctionSection
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-index
 type Index = uint32
@@ -209,21 +209,21 @@ func (t *FunctionType) String() (ret string) {
 	return
 }
 
-// Import is the binary representation of an import indicated by Kind
+// Import is the binary representation of an import indicated by Type
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-import
 type Import struct {
-	Kind ImportKind
+	Type ExternType
 	// Module is the possibly empty primary namespace of this import
 	Module string
 	// Module is the possibly empty secondary namespace of this import
 	Name string
-	// DescFunc is the index in Module.TypeSection when Kind equals ImportKindFunc
+	// DescFunc is the index in Module.TypeSection when Type equals ExternTypeFunc
 	DescFunc Index
-	// DescTable is the inlined TableType when Kind equals ImportKindTable
+	// DescTable is the inlined TableType when Type equals ExternTypeTable
 	DescTable *TableType
-	// DescMem is the inlined MemoryType when Kind equals ImportKindMemory
+	// DescMem is the inlined MemoryType when Type equals ExternTypeMemory
 	DescMem *MemoryType
-	// DescGlobal is the inlined GlobalType when Kind equals ImportKindGlobal
+	// DescGlobal is the inlined GlobalType when Type equals ExternTypeGlobal
 	DescGlobal *GlobalType
 }
 
@@ -254,15 +254,15 @@ type ConstantExpression struct {
 	Data   []byte
 }
 
-// Export is the binary representation of an export indicated by Kind
+// Export is the binary representation of an export indicated by Type
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-export
 type Export struct {
-	Kind ExportKind
+	Type ExternType
 	// Name is what the host refers to this definition as.
 	Name string
-	// Index is the index of the definition to export, the index namespace is by Kind
-	// Ex. If ExportKindFunc, this is an index to ModuleInstance.Functions
-	Index Index // TODO: can you export an import? If so, rewrite the doc ^^ to say "index namespace"
+	// Index is the index of the definition to export, the index namespace is by Type
+	// Ex. If ExternTypeFunc, this is a position in the function index namespace.
+	Index Index
 }
 
 type ElementSegment struct {
@@ -325,7 +325,7 @@ type NameSection struct {
 // NameMap associates an index with any associated names.
 //
 // Note: Often the index namespace bridges multiple sections. For example, the function index namespace starts with any
-// ImportKindFunc in the Module.TypeSection followed by the Module.FunctionSection
+// ExternTypeFunc in the Module.ImportSection followed by the Module.FunctionSection
 //
 // Note: NameMap is unique by NameAssoc.Index, but NameAssoc.Name needn't be unique.
 // Note: When encoding in the Binary format, this must be ordered by NameAssoc.Index
@@ -352,14 +352,14 @@ type NameMapAssoc struct {
 // allDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
 func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) {
 	for _, imp := range m.ImportSection {
-		switch imp.Kind {
-		case ImportKindFunc:
+		switch imp.Type {
+		case ExternTypeFunc:
 			functions = append(functions, imp.DescFunc)
-		case ImportKindGlobal:
+		case ExternTypeGlobal:
 			globals = append(globals, imp.DescGlobal)
-		case ImportKindMemory:
+		case ExternTypeMemory:
 			memories = append(memories, imp.DescMem)
-		case ImportKindTable:
+		case ExternTypeTable:
 			tables = append(tables, imp.DescTable)
 		}
 	}
@@ -487,40 +487,34 @@ func ValueTypeName(t ValueType) string {
 	return publicwasm.ValueTypeName(t)
 }
 
-// ImportKind indicates which import description is present
+// ExternType classifies imports and exports with their respective types.
+//
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
-type ImportKind = byte
-
-const (
-	ImportKindFunc   ImportKind = 0x00
-	ImportKindTable  ImportKind = 0x01
-	ImportKindMemory ImportKind = 0x02
-	ImportKindGlobal ImportKind = 0x03
-)
-
-// ExportKind indicates which index Export.Index points to
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
-type ExportKind = byte
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
+type ExternType = byte
 
 const (
-	ExportKindFunc   ExportKind = 0x00
-	ExportKindTable  ExportKind = 0x01
-	ExportKindMemory ExportKind = 0x02
-	ExportKindGlobal ExportKind = 0x03
+	ExternTypeFunc   ExternType = 0x00
+	ExternTypeTable  ExternType = 0x01
+	ExternTypeMemory ExternType = 0x02
+	ExternTypeGlobal ExternType = 0x03
 )
 
-// ExportKindName returns the canonical name of the exportdesc.
-// https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportdesc
-func ExportKindName(ek ExportKind) string {
-	switch ek {
-	case ExportKindFunc:
+// ExternTypeName returns the canonical name of the import or export description.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-importdesc
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportdesc
+func ExternTypeName(et ExternType) string {
+	switch et {
+	case ExternTypeFunc:
 		return "func"
-	case ExportKindTable:
+	case ExternTypeTable:
 		return "table"
-	case ExportKindMemory:
+	case ExternTypeMemory:
 		return "mem"
-	case ExportKindGlobal:
+	case ExternTypeGlobal:
 		return "global"
 	}
-	return "unknown"
+	return fmt.Sprintf("%#x", et)
 }

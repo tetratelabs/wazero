@@ -46,11 +46,11 @@ func TestDecodeModule(t *testing.T) {
 				ImportSection: []*wasm.Import{
 					{
 						Module: "Math", Name: "Mul",
-						Kind:     wasm.ImportKindFunc,
+						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
 						Module: "Math", Name: "Add",
-						Kind:     wasm.ImportKindFunc,
+						Type:     wasm.ExternTypeFunc,
 						DescFunc: 0,
 					},
 				},
@@ -63,7 +63,7 @@ func TestDecodeModule(t *testing.T) {
 				ExportSection: map[string]*wasm.Export{
 					"mem": {
 						Name:  "mem",
-						Kind:  wasm.ExportKindMemory,
+						Type:  wasm.ExternTypeMemory,
 						Index: 0,
 					},
 				},
@@ -75,7 +75,7 @@ func TestDecodeModule(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{{}},
 				ImportSection: []*wasm.Import{{
 					Module: "", Name: "hello",
-					Kind:     wasm.ImportKindFunc,
+					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
 				StartSection: &zero,

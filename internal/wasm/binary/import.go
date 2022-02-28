@@ -24,21 +24,21 @@ func decodeImport(r *bytes.Reader) (i *wasm.Import, err error) {
 		return nil, fmt.Errorf("error decoding import kind: %w", err)
 	}
 
-	i.Kind = b[0]
-	switch i.Kind {
-	case wasm.ImportKindFunc:
+	i.Type = b[0]
+	switch i.Type {
+	case wasm.ExternTypeFunc:
 		if i.DescFunc, _, err = leb128.DecodeUint32(r); err != nil {
 			return nil, fmt.Errorf("error decoding import func typeindex: %w", err)
 		}
-	case wasm.ImportKindTable:
+	case wasm.ExternTypeTable:
 		if i.DescTable, err = decodeTableType(r); err != nil {
 			return nil, fmt.Errorf("error decoding import table desc: %w", err)
 		}
-	case wasm.ImportKindMemory:
+	case wasm.ExternTypeMemory:
 		if i.DescMem, err = decodeMemoryType(r); err != nil {
 			return nil, fmt.Errorf("error decoding import mem desc: %w", err)
 		}
-	case wasm.ImportKindGlobal:
+	case wasm.ExternTypeGlobal:
 		if i.DescGlobal, err = decodeGlobalType(r); err != nil {
 			return nil, fmt.Errorf("error decoding import global desc: %w", err)
 		}
@@ -54,18 +54,18 @@ func decodeImport(r *bytes.Reader) (i *wasm.Import, err error) {
 func encodeImport(i *wasm.Import) []byte {
 	data := encodeSizePrefixed([]byte(i.Module))
 	data = append(data, encodeSizePrefixed([]byte(i.Name))...)
-	data = append(data, i.Kind)
-	switch i.Kind {
-	case wasm.ImportKindFunc:
+	data = append(data, i.Type)
+	switch i.Type {
+	case wasm.ExternTypeFunc:
 		data = append(data, leb128.EncodeUint32(i.DescFunc)...)
-	case wasm.ImportKindTable:
-		panic("TODO: encodeImportKindTable")
-	case wasm.ImportKindMemory:
-		panic("TODO: encodeImportKindMemory")
-	case wasm.ImportKindGlobal:
-		panic("TODO: encodeImportKindGlobal")
+	case wasm.ExternTypeTable:
+		panic("TODO: encodeExternTypeTable")
+	case wasm.ExternTypeMemory:
+		panic("TODO: encodeExternTypeMemory")
+	case wasm.ExternTypeGlobal:
+		panic("TODO: encodeExternTypeGlobal")
 	default:
-		panic(fmt.Errorf("invalid kind: %#x", i.Kind))
+		panic(fmt.Errorf("invalid externtype: %s", wasm.ExternTypeName(i.Type)))
 	}
 	return data
 }

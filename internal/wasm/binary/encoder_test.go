@@ -59,11 +59,11 @@ func TestModule_Encode(t *testing.T) {
 				ImportSection: []*wasm.Import{
 					{
 						Module: "Math", Name: "Mul",
-						Kind:     wasm.ImportKindFunc,
+						Type:     wasm.ExternTypeFunc,
 						DescFunc: 1,
 					}, {
 						Module: "Math", Name: "Add",
-						Kind:     wasm.ImportKindFunc,
+						Type:     wasm.ExternTypeFunc,
 						DescFunc: 0,
 					},
 				},
@@ -75,9 +75,9 @@ func TestModule_Encode(t *testing.T) {
 				0x60, 0x02, f32, f32, 0x01, f32, // func=0x60 2 params and 1 result
 				wasm.SectionIDImport, 0x17, // 23 bytes in this section
 				0x02, // 2 imports
-				0x04, 'M', 'a', 't', 'h', 0x03, 'M', 'u', 'l', wasm.ImportKindFunc,
+				0x04, 'M', 'a', 't', 'h', 0x03, 'M', 'u', 'l', wasm.ExternTypeFunc,
 				0x01, // type index
-				0x04, 'M', 'a', 't', 'h', 0x03, 'A', 'd', 'd', wasm.ImportKindFunc,
+				0x04, 'M', 'a', 't', 'h', 0x03, 'A', 'd', 'd', wasm.ExternTypeFunc,
 				0x00, // type index
 			),
 		},
@@ -87,7 +87,7 @@ func TestModule_Encode(t *testing.T) {
 				TypeSection: []*wasm.FunctionType{{}},
 				ImportSection: []*wasm.Import{{
 					Module: "", Name: "hello",
-					Kind:     wasm.ImportKindFunc,
+					Type:     wasm.ExternTypeFunc,
 					DescFunc: 0,
 				}},
 				StartSection: &zero,
@@ -98,7 +98,7 @@ func TestModule_Encode(t *testing.T) {
 				0x60, 0x0, 0x0, // func=0x60 0 params and 0 result
 				wasm.SectionIDImport, 0x0a, // 10 bytes in this section
 				0x01, // 1 import
-				0x00, 0x05, 'h', 'e', 'l', 'l', 'o', wasm.ImportKindFunc,
+				0x00, 0x05, 'h', 'e', 'l', 'l', 'o', wasm.ExternTypeFunc,
 				0x00, // type index
 				wasm.SectionIDStart, 0x01,
 				0x00, // start function index
@@ -115,7 +115,7 @@ func TestModule_Encode(t *testing.T) {
 					{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
 				},
 				ExportSection: map[string]*wasm.Export{
-					"AddInt": {Name: "AddInt", Kind: wasm.ExportKindFunc, Index: wasm.Index(0)},
+					"AddInt": {Name: "AddInt", Type: wasm.ExternTypeFunc, Index: wasm.Index(0)},
 				},
 				NameSection: &wasm.NameSection{
 					FunctionNames: wasm.NameMap{{Index: wasm.Index(0), Name: "addInt"}},
@@ -137,7 +137,7 @@ func TestModule_Encode(t *testing.T) {
 				wasm.SectionIDExport, 0x0a, // 10 bytes in this section
 				0x01,                               // 1 export
 				0x06, 'A', 'd', 'd', 'I', 'n', 't', // size of "AddInt", "AddInt"
-				wasm.ExportKindFunc, 0x00, // func[0]
+				wasm.ExternTypeFunc, 0x00, // func[0]
 				wasm.SectionIDCode, 0x09, // 9 bytes in this section
 				01,                     // one code section
 				07,                     // length of the body + locals
