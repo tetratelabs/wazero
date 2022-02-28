@@ -139,8 +139,9 @@ type Module struct {
 	NameSection *NameSection
 }
 
-// TypeOfFunction returns the wasm.SectionIDType index for the given function namespace index or nil.
+// TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
 // Note: The function index namespace is preceded by imported functions.
+// TODO: Returning nil should be impossible when decode results are validated. Validate decode before backfilling tests.
 func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	typeSectionLength := uint32(len(m.TypeSection))
 	if typeSectionLength == 0 {
@@ -371,49 +372,6 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 	memories = append(memories, m.MemorySection...)
 	tables = append(tables, m.TableSection...)
 	return
-}
-
-// SectionElementCount returns the count of elements in a given section ID
-//
-// For example...
-// * SectionIDType returns the count of FunctionType
-// * SectionIDCustom returns one if the NameSection is present
-// * SectionIDExport returns the count of unique export names
-func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as in vector elements!
-	switch sectionID {
-	case SectionIDCustom:
-		if m.NameSection != nil {
-			return 1
-		}
-		return 0
-	case SectionIDType:
-		return uint32(len(m.TypeSection))
-	case SectionIDImport:
-		return uint32(len(m.ImportSection))
-	case SectionIDFunction:
-		return uint32(len(m.FunctionSection))
-	case SectionIDTable:
-		return uint32(len(m.TableSection))
-	case SectionIDMemory:
-		return uint32(len(m.MemorySection))
-	case SectionIDGlobal:
-		return uint32(len(m.GlobalSection))
-	case SectionIDExport:
-		return uint32(len(m.ExportSection))
-	case SectionIDStart:
-		if m.StartSection != nil {
-			return 1
-		}
-		return 0
-	case SectionIDElement:
-		return uint32(len(m.ElementSection))
-	case SectionIDCode:
-		return uint32(len(m.CodeSection))
-	case SectionIDData:
-		return uint32(len(m.DataSection))
-	default:
-		panic(fmt.Errorf("BUG: unknown section: %d", sectionID))
-	}
 }
 
 // SectionID identifies the sections of a Module in the WebAssembly 1.0 (20191205) Binary Format.
