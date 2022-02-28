@@ -90,8 +90,14 @@ const (
 	ImportFdClose = `(import "wasi_snapshot_preview1" "fd_close"
     (func $wasi.fd_close (param $fd i32) (result (;errno;) i32)))`
 
-	FunctionFdDataSync         = "fd_datasync"
-	FunctionFdFdstatGet        = "fd_fdstat_get"
+	FunctionFdDataSync = "fd_datasync"
+
+	// FunctionFdFdStatGet gets the attributes of a file descriptor.
+	FunctionFdFdstatGet = "fd_fdstat_get"
+	// ImportFdFdStatGet is the WebAssembly 1.0 (20191205) Text format import of FunctionFdFdStatGet
+	ImportFdFdStatGet = `(import "wasi_snapshot_preview1" "fd_fdstat_get"
+    (func $wasi.fd_fdstat_get (param $fd i32) (param $result.fdstat i32) (result (;errno;) i32)))`
+
 	FunctionFdFdstatSetFlags   = "fd_fdstat_set_flags"
 	FunctionFdFdstatSetRights  = "fd_fdstat_set_rights"
 	FunctionFdFilestatGet      = "fd_filestat_get"
@@ -346,7 +352,40 @@ type SnapshotPreview1 interface {
 	FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno
 
 	// TODO: wasi.FdDataSync
-	// TODO: wasi.FdFdstatGet
+
+	// FdFdstatGet is the WASI function to return the attributes of a file descriptor.
+	//
+	// * fd - the file descriptor to get the fdstat attributes data
+	// * resultFdstat - the offset to write the result fdstat data
+	//
+	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+	// * wasi.ErrnoBadf - if `fd` is invalid
+	// * wasi.ErrnoFault - if `resultFdstat` contains an invalid offset due to the memory constraint
+	//
+	// fdstat byte layout is 24-byte size, which as the following elements in order
+	// * fs_filetype 1 byte, to indicate the file type
+	// * fs_flags 2 bytes, to indicate the file descriptor flag
+	// * 5 pad bytes
+	// * fs_right_base 8 bytes, to indicate the current rights of the fd
+	// * fs_right_inheriting 8 bytes, to indicate the maximum rights of the fd
+	//
+	// For example, with a file corresponding with `fd` was a directory (=3) opened with `fd_read` right (=1) and no fs_flags (=0),
+	//    parameter resultFdstat=1, this function writes the below to `ctx.Memory`:
+	//
+	//                   uint16le   padding            uint64le                uint64le
+	//          uint8 --+  +--+  +-----------+  +--------------------+  +--------------------+
+	//                  |  |  |  |           |  |                    |  |                    |
+	//        []byte{?, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}
+	//   resultFdstat --^  ^-- fs_flags         ^-- fs_right_base       ^-- fs_right_inheriting
+	//                  |
+	//                  +-- fs_filetype
+	//
+	// Note: ImportFdFdstatGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+	// Note: FdFdstatGet returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as well as additional fields.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
+	FdFdstatGet(ctx wasm.ModuleContext, fd uint32, resultFdstat uint32) wasi.Errno
+
 	// TODO: wasi.FdFdstatSetFlags
 	// TODO: wasi.FdFdstatSetRights
 	// TODO: wasi.FdFilestatGet
@@ -593,7 +632,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		// TODO: FunctionFdAllocate
 		FunctionFdClose: a.FdClose,
 		// TODO: FunctionFdDataSync
-		FunctionFdFdstatGet: a.fd_fdstat_get,
+		FunctionFdFdstatGet: a.FdFdstatGet,
 		// TODO: FunctionFdFdstatSetFlags
 		// TODO: FunctionFdFdstatSetRights
 		// TODO: FunctionFdFilestatGet
@@ -715,11 +754,13 @@ func (a *wasiAPI) FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_fdstat_get(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
+// FdFdstatGet implements SnahpshotPreview1.FdFdstatGet
+// TODO: Currently FdFdstatget implements nothing except returning fake fs_right_inheriting
+func (a *wasiAPI) FdFdstatGet(ctx wasm.ModuleContext, fd uint32, resultFdstat uint32) wasi.Errno {
 	if _, ok := a.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
-	if !ctx.Memory().WriteUint64Le(bufPtr+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
+	if !ctx.Memory().WriteUint64Le(resultFdstat+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
