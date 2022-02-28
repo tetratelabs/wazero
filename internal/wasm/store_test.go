@@ -15,6 +15,108 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+func TestStore_Instantiate_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       *Module
+		expectedErr string
+	}{
+		{
+			name:        "multiple memories",
+			input:       &Module{MemorySection: []*MemoryType{{1, nil}, {1, nil}}},
+			expectedErr: "memories: multiple memories are not supported",
+		},
+		{
+			name: "multiple imported memories",
+			input: &Module{
+				ImportSection: []*Import{
+					{Type: ExternTypeMemory, Module: "one", Name: "memory", DescMem: &LimitsType{}},
+					{Type: ExternTypeMemory, Module: "two", Name: "memory", DescMem: &LimitsType{}},
+				},
+			},
+			expectedErr: "import mem[two.memory]: multiple memories are not supported",
+		},
+		{
+			name: "imported and module-defined memory",
+			input: &Module{
+				MemorySection: []*MemoryType{{1, nil}},
+				ImportSection: []*Import{
+					{Type: ExternTypeMemory, Module: "one", Name: "memory", DescMem: &LimitsType{}},
+				},
+			},
+			expectedErr: "memories: multiple memories are not supported",
+		},
+		{
+			name: "multiple tables",
+			input: &Module{TableSection: []*TableType{
+				{0x70, &LimitsType{1, nil}},
+				{0x70, &LimitsType{1, nil}},
+			}},
+			expectedErr: "tables: multiple tables are not supported",
+		},
+		{
+			name: "multiple imported tables",
+			input: &Module{
+				ImportSection: []*Import{
+					{
+						Type:      ExternTypeTable,
+						Module:    "one",
+						Name:      "table",
+						DescTable: &TableType{0x70, &LimitsType{1, nil}},
+					},
+					{
+						Type:      ExternTypeTable,
+						Module:    "two",
+						Name:      "table",
+						DescTable: &TableType{0x70, &LimitsType{1, nil}},
+					},
+				},
+			},
+			expectedErr: "import table[two.table]: multiple tables are not supported",
+		},
+		{
+			name: "imported and module-defined table",
+			input: &Module{
+				TableSection: []*TableType{{0x70, &LimitsType{1, nil}}},
+				ImportSection: []*Import{
+					{
+						Type:      ExternTypeTable,
+						Module:    "one",
+						Name:      "table",
+						DescTable: &TableType{0x70, &LimitsType{1, nil}},
+					},
+				},
+			},
+			expectedErr: "tables: multiple tables are not supported",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewStore(context.Background(), &catchContext{})
+
+			// Setup modules in the same store for testing cardinality conflicts
+			external := &Module{
+				MemorySection: []*MemoryType{{1, nil}},
+				TableSection:  []*TableType{{0x70, &LimitsType{1, nil}}},
+				ExportSection: map[string]*Export{
+					"memory": {Type: ExternTypeMemory, Name: "memory", Index: 0},
+					"table":  {Type: ExternTypeTable, Name: "table", Index: 0},
+				},
+			}
+			_, err := s.Instantiate(external, "one")
+			require.NoError(t, err)
+			_, err = s.Instantiate(external, "two")
+			require.NoError(t, err)
+
+			_, err = s.Instantiate(tc.input, "test")
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
 func TestModuleInstance_Memory(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -83,6 +185,85 @@ func TestModuleInstance_Memory(t *testing.T) {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
 				require.Nil(t, mem)
+			}
+		})
+	}
+}
+
+func TestModuleInstance_Table(t *testing.T) {
+	one := uint32(1)
+	tests := []struct {
+		name           string
+		input          *Module
+		expectedExport bool
+		expectedMin    uint32
+		expectedMax    *uint32
+	}{
+		{
+			name:        "table not exported, min 1",
+			input:       &Module{TableSection: []*TableType{{0x70, &LimitsType{1, nil}}}},
+			expectedMin: 1,
+		},
+		{
+			name:        "table not exported, min 1",
+			input:       &Module{TableSection: []*TableType{{0x70, &LimitsType{1, nil}}}},
+			expectedMin: 1,
+		},
+		{
+			name: "table exported, different name",
+			input: &Module{
+				TableSection:  []*TableType{{0x70, &LimitsType{1, nil}}},
+				ExportSection: map[string]*Export{"tablo": {Type: ExternTypeTable, Name: "tablo", Index: 0}},
+			},
+			expectedMin: 1,
+		},
+		{
+			name: "table exported, min 0",
+			input: &Module{
+				TableSection:  []*TableType{{0x70, &LimitsType{0, nil}}},
+				ExportSection: map[string]*Export{"table": {Type: ExternTypeTable, Name: "table", Index: 0}},
+			},
+			expectedExport: true,
+		},
+		{
+			name: "table exported, min 1",
+			input: &Module{
+				TableSection:  []*TableType{{0x70, &LimitsType{1, nil}}},
+				ExportSection: map[string]*Export{"table": {Type: ExternTypeTable, Name: "table", Index: 0}},
+			},
+			expectedExport: true,
+			expectedMin:    1,
+		},
+		{
+			name: "table exported, min=max=1",
+			input: &Module{
+				TableSection:  []*TableType{{0x70, &LimitsType{1, &one}}},
+				ExportSection: map[string]*Export{"table": {Type: ExternTypeTable, Name: "table", Index: 0}},
+			},
+			expectedExport: true,
+			expectedMin:    1,
+			expectedMax:    &one,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewStore(context.Background(), &catchContext{})
+
+			_, err := s.Instantiate(tc.input, "test")
+			require.NoError(t, err)
+
+			table := s.ModuleInstances["test"].Table
+			require.Equal(t, tc.expectedMin, table.Min)
+			require.Equal(t, tc.expectedMax, table.Max)
+
+			exported := s.ModuleInstances["test"].Exports["table"]
+			if tc.expectedExport {
+				require.Equal(t, table, exported.Table)
+			} else {
+				require.Nil(t, exported)
 			}
 		})
 	}

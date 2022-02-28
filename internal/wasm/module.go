@@ -234,6 +234,7 @@ type LimitsType struct {
 }
 
 type TableType struct {
+	// ElemType must always be funcref (0x70).
 	ElemType byte
 	Limit    *LimitsType
 }

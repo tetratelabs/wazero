@@ -5414,7 +5414,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if len(c.f.ModuleInstance.Tables) > 0 {
+	if c.f.ModuleInstance.Table != nil {
 		// First, we need to read the *wasm.TableInstance.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
@@ -5422,7 +5422,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		readTableInstancePointer.To.Reg = tmpRegister
 		readTableInstancePointer.From.Type = obj.TYPE_MEM
 		readTableInstancePointer.From.Reg = moduleInstanceAddressRegister
-		readTableInstancePointer.From.Offset = moduleInstanceTablesOffset
+		readTableInstancePointer.From.Offset = moduleInstanceTableOffset
 		c.addInstruction(readTableInstancePointer)
 
 		resolveTableInstanceAddressFromPointer := c.newProg()

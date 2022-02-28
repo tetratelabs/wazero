@@ -224,53 +224,37 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Table:          &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Table:   &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Table:          &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
-			},
-		},
-		{
-			name: "table length zero",
-			moduleInstance: &wasm.ModuleInstance{
-				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: nil}},
-				Globals:        []*wasm.GlobalInstance{{Val: 100}},
-			},
-		},
-		{
-			name: "table length zero part2",
-			moduleInstance: &wasm.ModuleInstance{
-				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
-				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
-			name: "table nil part2",
+			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:          &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -278,7 +262,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Table:          &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 	} {
@@ -319,8 +303,8 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 				require.Equal(t, bufSliceHeader.Data, vm.moduleContext.memoryElement0Address)
 			}
 
-			if len(tc.moduleInstance.Tables) > 0 {
-				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
+			if tc.moduleInstance.Table != nil {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Table.Table))
 				require.Equal(t, uint64(tableHeader.Len), vm.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, vm.moduleContext.tableElement0Address)
 			}
@@ -5539,15 +5523,15 @@ func TestAmd64Compiler_generate(t *testing.T) {
 		}
 		verify := func(t *testing.T, compiler *amd64Compiler, expectedStackPointerCeil uint64) {
 			var called bool
-			compiler.onStackPointerCeilDeterminedCallBack = func(acutalStackPointerCeilInCallBack uint64) {
+			compiler.onStackPointerCeilDeterminedCallBack = func(actualStackPointerCeilInCallBack uint64) {
 				called = true
-				require.Equal(t, expectedStackPointerCeil, acutalStackPointerCeilInCallBack)
+				require.Equal(t, expectedStackPointerCeil, actualStackPointerCeilInCallBack)
 			}
 
-			_, _, acutalStackPointerCeil, err := compiler.compile()
+			_, _, actualStackPointerCeil, err := compiler.compile()
 			require.NoError(t, err)
 			require.True(t, called)
-			require.Equal(t, expectedStackPointerCeil, acutalStackPointerCeil)
+			require.Equal(t, expectedStackPointerCeil, actualStackPointerCeil)
 		}
 		t.Run("current one win", func(t *testing.T) {
 			compiler := getCompiler(t)

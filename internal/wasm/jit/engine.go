@@ -105,9 +105,9 @@ type (
 		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.MemoryInstance.Buffer).
 		memorySliceLen uint64
 		// tableElement0Address is the address of the first item in the global slice,
-		// i.e. &ModuleInstance.Tables[0].Table[0] as uintptr.
+		// i.e. &ModuleInstance.Table.Table[0] as uintptr.
 		tableElement0Address uintptr
-		// tableSliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Tables[0].Table).
+		// tableSliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Table.Table).
 		tableSliceLen uint64
 	}
 
@@ -233,7 +233,7 @@ const (
 	// Offsets for wasm.ModuleInstance
 	moduleInstanceGlobalsOffset = 48
 	moduleInstanceMemoryOffset  = 72
-	moduleInstanceTablesOffset  = 80
+	moduleInstanceTableOffset   = 80
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0

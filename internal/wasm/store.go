@@ -87,11 +87,12 @@ type (
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
-		// MemoryInstance is set when Module.MemorySection had a memory, regardless of whether it was exported.
+		// MemoryInstance is set when the Module.MemorySection had a memory or one was imported (ExternTypeMemory).
 		// Note: This avoids the name "Memory" which is an interface method name.
 		MemoryInstance *MemoryInstance
-		Tables         []*TableInstance
-		Types          []*TypeInstance
+		// Table is set when the Module.TableSection had a table or one was imported (ExternTypeTable).
+		Table *TableInstance
+		Types []*TypeInstance
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -280,7 +281,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleExports, error)
 	s.ModuleInstances[name] = instance
 	// Resolve the imports before doing the actual instantiation (mutating store).
 	if err := s.resolveImports(module, instance); err != nil {
-		return nil, fmt.Errorf("resolve imports: %w", err)
+		return nil, err
 	}
 	// Instantiation.
 	// Note that some of them mutate the store, so
@@ -404,7 +405,7 @@ func (s *Store) nextFunctionAddress() FunctionAddress {
 func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
 	for _, is := range module.ImportSection {
 		if err := s.resolveImport(target, is); err != nil {
-			return fmt.Errorf("%s: %w", is.Name, err)
+			return fmt.Errorf("import %s[%s.%s]: %w", ExternTypeName(is.Type), is.Module, is.Name, err)
 		}
 	}
 	return nil
@@ -419,19 +420,19 @@ func (s *Store) resolveImport(target *ModuleInstance, is *Import) error {
 	switch is.Type {
 	case ExternTypeFunc:
 		if err = s.applyFunctionImport(target, is.DescFunc, exp); err != nil {
-			return fmt.Errorf("applyFunctionImport: %w", err)
+			return err
 		}
 	case ExternTypeTable:
 		if err = s.applyTableImport(target, is.DescTable, exp); err != nil {
-			return fmt.Errorf("applyTableImport: %w", err)
+			return err
 		}
 	case ExternTypeMemory:
 		if err = s.applyMemoryImport(target, is.DescMem, exp); err != nil {
-			return fmt.Errorf("applyMemoryImport: %w", err)
+			return err
 		}
 	case ExternTypeGlobal:
 		if err = s.applyGlobalImport(target, is.DescGlobal, exp); err != nil {
-			return fmt.Errorf("applyGlobalImport: %w", err)
+			return err
 		}
 	default:
 		return fmt.Errorf("invalid externtype: %s", ExternTypeName(is.Type))
@@ -457,7 +458,10 @@ func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex Index, ext
 
 func (s *Store) applyTableImport(target *ModuleInstance, tableTypePtr *TableType, externModuleExportInstance *ExportInstance) error {
 	table := externModuleExportInstance.Table
-	if tableTypePtr == nil {
+	if target.Table != nil {
+		// The current Wasm spec doesn't allow multiple tables.
+		return fmt.Errorf("multiple tables are not supported")
+	} else if tableTypePtr == nil {
 		return fmt.Errorf("table type is invalid")
 	}
 	if table.ElemType != tableTypePtr.ElemType {
@@ -474,7 +478,7 @@ func (s *Store) applyTableImport(target *ModuleInstance, tableTypePtr *TableType
 			return fmt.Errorf("incompatible table imports: maximum size mismatch")
 		}
 	}
-	target.Tables = append(target.Tables, table)
+	target.Table = table
 	return nil
 }
 
@@ -679,12 +683,12 @@ func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (
 }
 
 func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	// Allocate memory instances.
+	// Allocate the memory instance.
 	for _, memSec := range module.MemorySection {
 		if target.MemoryInstance != nil {
 			// This case the memory instance is already imported,
 			// and the current Wasm spec doesn't allow multiple memories.
-			return rollbackFuncs, fmt.Errorf("multiple memories not supported")
+			return rollbackFuncs, fmt.Errorf("multiple memories are not supported")
 		}
 		target.MemoryInstance = &MemoryInstance{
 			Buffer: make([]byte, memoryPagesToBytesNum(memSec.Min)),
@@ -729,7 +733,7 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 		if size > uint64(len(memoryInst.Buffer)) {
 			return rollbackFuncs, fmt.Errorf("out of bounds memory access")
 		}
-		// Setup the rollback function before mutating the acutal memory.
+		// Setup the rollback function before mutating the actual memory.
 		original := make([]byte, len(d.Init))
 		copy(original, memoryInst.Buffer[offset:])
 		rollbackFuncs = append(rollbackFuncs, func() {
@@ -741,16 +745,23 @@ func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (ro
 }
 
 func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	// Allocate table instances.
+	// Allocate the table instance.
 	for _, tableSeg := range module.TableSection {
+		if target.Table != nil {
+			// This case the table instance is already imported,
+			// and the current Wasm spec doesn't allow multiple tables.
+			return rollbackFuncs, fmt.Errorf("multiple tables are not supported")
+		}
 		instance := newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
-		target.Tables = append(target.Tables, instance)
+		target.Table = instance
 		s.Tables = append(s.Tables, instance)
 	}
 
 	for _, elem := range module.ElementSection {
-		if elem.TableIndex >= Index(len(target.Tables)) {
-			return rollbackFuncs, fmt.Errorf("index out of range of index space")
+		if target.Table == nil {
+			return rollbackFuncs, fmt.Errorf("unknown memory")
+		} else if elem.TableIndex != 0 {
+			return rollbackFuncs, fmt.Errorf("table index must be zero")
 		}
 
 		rawOffset, offsetType, err := executeConstExpression(target.Globals, elem.OffsetExpr)
@@ -779,10 +790,7 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 			return rollbackFuncs, fmt.Errorf("table size out of limit of %d", max)
 		}
 
-		tableInst := target.Tables[elem.TableIndex]
-		if size > len(tableInst.Table) {
-			return rollbackFuncs, fmt.Errorf("out of bounds table access %d > %v", size, tableInst.Min)
-		}
+		tableInst := target.Table
 		for i := range elem.Init {
 			i := i
 			elm := elem.Init[i]
@@ -801,9 +809,6 @@ func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rol
 				FunctionTypeID:  targetFunc.FunctionType.TypeID,
 			}
 		}
-	}
-	if len(target.Tables) > 1 {
-		return rollbackFuncs, fmt.Errorf("multiple tables not supported")
 	}
 	return rollbackFuncs, nil
 }
@@ -836,10 +841,10 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			}
 			ei = &ExportInstance{Type: exp.Type, Memory: target.MemoryInstance}
 		case ExternTypeTable:
-			if index >= uint32(len(target.Tables)) {
+			if index != 0 || target.Table == nil {
 				return nil, fmt.Errorf("unknown table for export[%s]", name)
 			}
-			ei = &ExportInstance{Type: exp.Type, Table: target.Tables[index]}
+			ei = &ExportInstance{Type: exp.Type, Table: target.Table}
 		}
 		if err = target.addExport(exp.Name, ei); err != nil {
 			return nil, err

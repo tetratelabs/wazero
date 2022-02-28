@@ -2145,28 +2145,27 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Table:          &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Table:          &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Table:   &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: nil}},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -2174,7 +2173,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				Table:          &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -2229,8 +2228,8 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 				require.Equal(t, bufSliceHeader.Data, vm.moduleContext.memoryElement0Address)
 			}
 
-			if len(tc.moduleInstance.Tables) > 0 {
-				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
+			if tc.moduleInstance.Table != nil {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Table.Table))
 				require.Equal(t, uint64(tableHeader.Len), vm.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, vm.moduleContext.tableElement0Address)
 			}

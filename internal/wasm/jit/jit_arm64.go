@@ -3466,11 +3466,11 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if len(c.f.ModuleInstance.Tables) > 0 {
+	if c.f.ModuleInstance.Table != nil {
 		// "tmpX = &tables[0] (type of **wasm.TableInstance)"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
-			moduleInstanceAddressRegister, moduleInstanceTablesOffset,
+			moduleInstanceAddressRegister, moduleInstanceTableOffset,
 			tmpX,
 		)
 		// "tmpX = *tmpX (tables[0])"

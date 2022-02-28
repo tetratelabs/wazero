@@ -557,10 +557,7 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.MemoryInstance
 	globals := moduleInst.Globals
-	var table *wasm.TableInstance
-	if len(moduleInst.Tables) > 0 {
-		table = moduleInst.Tables[0] // WebAssembly 1.0 (20191205) defines at most one table
-	}
+	table := moduleInst.Table
 	vm.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {

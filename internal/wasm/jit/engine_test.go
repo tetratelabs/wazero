@@ -65,7 +65,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	var moduleInstance wasm.ModuleInstance
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.MemoryInstance)), moduleInstanceMemoryOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Tables)), moduleInstanceTablesOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Table)), moduleInstanceTableOffset)
 
 	// Offsets for wasm.TableInstance.
 	var tableInstance wasm.TableInstance
