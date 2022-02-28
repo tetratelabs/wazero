@@ -23,9 +23,6 @@ func TestJIT(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
-	if runtime.GOOS == "windows" { // TODO: #269
-		t.Skip()
-	}
 	runTests(t, wazero.NewEngineJIT)
 }
 
