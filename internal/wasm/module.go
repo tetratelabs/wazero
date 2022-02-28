@@ -261,7 +261,7 @@ type Export struct {
 	// Name is what the host refers to this definition as.
 	Name string
 	// Index is the index of the definition to export, the index namespace is by Kind
-	// Ex. If ExternalKindFunc, this is an index in the function index namespace.
+	// Ex. If ExternalKindFunc, this is an position in the function index namespace.
 	Index Index
 }
 
