@@ -69,7 +69,9 @@ type moduleParser struct {
 	// functions.
 	typeUseParser *typeUseParser
 
-	// funcNamespace represents the function index namespace, where any wasm.ImportKindFunc precede the FunctionSection.
+	// funcNamespace represents the function index namespace, which begins with any internalwasm.ExternalKindFunc in the
+	// internalwasm.SectionIDImport followed by the internalwasm.SectionIDFunction.
+	//
 	// Non-abbreviated imported and module-defined functions can declare symbolic IDs, such as "$main", which are
 	// resolved here (without the '$' prefix).
 	funcNamespace *indexNamespace
@@ -77,7 +79,9 @@ type moduleParser struct {
 	// funcParser parses the CodeSection for a given module-defined function.
 	funcParser *funcParser
 
-	// memoryNamespace represents the memory index namespace, where any wasm.ImportKindMemory precede the MemorySection.
+	// memoryNamespace represents the memory index namespace, which begins with any internalwasm.ExternalKindMemory in
+	// the internalwasm.SectionIDImport followed by the internalwasm.SectionIDMemory.
+	//
 	// Non-abbreviated imported and module-defined memories can declare symbolic IDs, such as "$mem", which are resolved
 	// here (without the '$' prefix).
 	memoryNamespace *indexNamespace
@@ -288,7 +292,7 @@ func (p *moduleParser) parseImportName(tok tokenType, tokenBytes []byte, _, _ ui
 	}
 }
 
-// parseImport returns beginImportDesc to determine the wasm.ImportKind and dispatch accordingly.
+// parseImport returns beginImportDesc to determine the wasm.ExternalKind and dispatch accordingly.
 func (p *moduleParser) parseImport(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenString: // Ex. (import "Math" "PI" "PI"
@@ -374,7 +378,7 @@ func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, c
 // the current import into the ImportSection.
 func (p *moduleParser) onImportFunc(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPosition, tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	i := p.currentModuleField.(*wasm.Import)
-	i.Kind = wasm.ImportKindFunc
+	i.Kind = wasm.ExternalKindFunc
 	i.DescFunc = typeIdx
 	p.addLocalNames(paramNames)
 
@@ -472,7 +476,7 @@ func (p *moduleParser) parseExportName(tok tokenType, tokenBytes []byte, _, _ ui
 	}
 }
 
-// parseExport returns beginExportDesc to determine the wasm.ExportKind and dispatch accordingly.
+// parseExport returns beginExportDesc to determine the wasm.ExternalKind and dispatch accordingly.
 func (p *moduleParser) parseExport(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenString: // Ex. (export "PI" "PI"
@@ -512,10 +516,10 @@ func (p *moduleParser) parseExportDesc(tok tokenType, tokenBytes []byte, line, c
 	e := p.currentModuleField.(*wasm.Export)
 	switch p.pos {
 	case positionExportFunc:
-		e.Kind = wasm.ExportKindFunc
+		e.Kind = wasm.ExternalKindFunc
 		namespace = p.funcNamespace
 	case positionExportMemory:
-		e.Kind = wasm.ExportKindMemory
+		e.Kind = wasm.ExternalKindMemory
 		namespace = p.memoryNamespace
 	default:
 		panic(fmt.Errorf("BUG: unhandled parsing state on parseExportDesc: %v", p.pos))

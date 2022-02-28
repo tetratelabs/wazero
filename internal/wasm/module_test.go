@@ -60,16 +60,16 @@ func TestSectionIDName(t *testing.T) {
 	}
 }
 
-func TestExportKindName(t *testing.T) {
+func TestExternalKindName(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    ExportKind
+		input    ExternalKind
 		expected string
 	}{
-		{"func", ExportKindFunc, "func"},
-		{"table", ExportKindTable, "table"},
-		{"mem", ExportKindMemory, "mem"},
-		{"global", ExportKindGlobal, "global"},
+		{"func", ExternalKindFunc, "func"},
+		{"table", ExternalKindTable, "table"},
+		{"mem", ExternalKindMemory, "mem"},
+		{"global", ExternalKindGlobal, "global"},
 		{"unknown", 100, "unknown"},
 	}
 
@@ -77,7 +77,7 @@ func TestExportKindName(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, ExportKindName(tc.input))
+			require.Equal(t, tc.expected, ExternalKindName(tc.input))
 		})
 	}
 }
@@ -93,7 +93,7 @@ func TestModule_allDeclarations(t *testing.T) {
 		// Functions.
 		{
 			module: &Module{
-				ImportSection:   []*Import{{Kind: ImportKindFunc, DescFunc: 10000}},
+				ImportSection:   []*Import{{Kind: ExternalKindFunc, DescFunc: 10000}},
 				FunctionSection: []Index{10, 20, 30},
 			},
 			expectedFunctions: []Index{10000, 10, 20, 30},
@@ -106,14 +106,14 @@ func TestModule_allDeclarations(t *testing.T) {
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: ImportKindFunc, DescFunc: 10000}},
+				ImportSection: []*Import{{Kind: ExternalKindFunc, DescFunc: 10000}},
 			},
 			expectedFunctions: []Index{10000},
 		},
 		// Globals.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: ImportKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
+				ImportSection: []*Import{{Kind: ExternalKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
 				GlobalSection: []*Global{{Type: &GlobalType{Mutable: true}}},
 			},
 			expectedGlobals: []*GlobalType{{Mutable: false}, {Mutable: true}},
@@ -126,21 +126,21 @@ func TestModule_allDeclarations(t *testing.T) {
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: ImportKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
+				ImportSection: []*Import{{Kind: ExternalKindGlobal, DescGlobal: &GlobalType{Mutable: false}}},
 			},
 			expectedGlobals: []*GlobalType{{Mutable: false}},
 		},
 		// Memories.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: ImportKindMemory, DescMem: &LimitsType{Min: 1}}},
+				ImportSection: []*Import{{Kind: ExternalKindMemory, DescMem: &LimitsType{Min: 1}}},
 				MemorySection: []*MemoryType{{Min: 100}},
 			},
 			expectedMemories: []*MemoryType{{Min: 1}, {Min: 100}},
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: ImportKindMemory, DescMem: &LimitsType{Min: 1}}},
+				ImportSection: []*Import{{Kind: ExternalKindMemory, DescMem: &LimitsType{Min: 1}}},
 			},
 			expectedMemories: []*MemoryType{{Min: 1}},
 		},
@@ -153,14 +153,14 @@ func TestModule_allDeclarations(t *testing.T) {
 		// Tables.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: ImportKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
+				ImportSection: []*Import{{Kind: ExternalKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
 				TableSection:  []*TableType{{Limit: &LimitsType{Min: 10}}},
 			},
 			expectedTables: []*TableType{{Limit: &LimitsType{Min: 1}}, {Limit: &LimitsType{Min: 10}}},
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Kind: ImportKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
+				ImportSection: []*Import{{Kind: ExternalKindTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
 			},
 			expectedTables: []*TableType{{Limit: &LimitsType{Min: 1}}},
 		},
@@ -223,11 +223,11 @@ func TestModule_SectionSize(t *testing.T) {
 				ImportSection: []*Import{
 					{
 						Module: "Math", Name: "Mul",
-						Kind:     ImportKindFunc,
+						Kind:     ExternalKindFunc,
 						DescFunc: 1,
 					}, {
 						Module: "Math", Name: "Add",
-						Kind:     ImportKindFunc,
+						Kind:     ExternalKindFunc,
 						DescFunc: 0,
 					},
 				},
@@ -243,7 +243,7 @@ func TestModule_SectionSize(t *testing.T) {
 					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},
 				},
 				ExportSection: map[string]*Export{
-					"AddInt": {Name: "AddInt", Kind: ExportKindFunc, Index: Index(0)},
+					"AddInt": {Name: "AddInt", Kind: ExternalKindFunc, Index: Index(0)},
 				},
 				StartSection: &zero,
 			},

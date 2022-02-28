@@ -100,7 +100,7 @@ type (
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportinst
 	ExportInstance struct {
-		Kind     ExportKind
+		Kind     ExternalKind
 		Function *FunctionInstance
 		Global   *GlobalInstance
 		Memory   *MemoryInstance
@@ -226,13 +226,13 @@ func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
 }
 
 // GetExport returns an export of the given name and kind or errs if not exported or the wrong kind.
-func (m *ModuleInstance) GetExport(name string, kind ExportKind) (*ExportInstance, error) {
+func (m *ModuleInstance) GetExport(name string, kind ExternalKind) (*ExportInstance, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
 		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
 	}
 	if exp.Kind != kind {
-		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExportKindName(exp.Kind), ExportKindName(kind))
+		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExternalKindName(exp.Kind), ExternalKindName(kind))
 	}
 	return exp, nil
 }
@@ -359,7 +359,7 @@ type ModuleExports struct {
 
 // Function implements wasm.ModuleExports Function
 func (m *ModuleExports) Function(name string) publicwasm.Function {
-	exp, err := m.Context.Module.GetExport(name, ExportKindFunc)
+	exp, err := m.Context.Module.GetExport(name, ExternalKindFunc)
 	if err != nil {
 		return nil
 	}
@@ -368,7 +368,7 @@ func (m *ModuleExports) Function(name string) publicwasm.Function {
 
 // Memory implements wasm.ModuleExports Memory
 func (m *ModuleExports) Memory(name string) publicwasm.Memory {
-	exp, err := m.Context.Module.GetExport(name, ExportKindMemory)
+	exp, err := m.Context.Module.GetExport(name, ExternalKindMemory)
 	if err != nil {
 		return nil
 	}
@@ -380,7 +380,7 @@ func (s *Store) HostExports(moduleName string) publicwasm.HostExports {
 	return s.hostExports[moduleName]
 }
 
-func (s *Store) getExport(moduleName string, name string, kind ExportKind) (exp *ExportInstance, err error) {
+func (s *Store) getExport(moduleName string, name string, kind ExternalKind) (exp *ExportInstance, err error) {
 	if m, ok := s.ModuleInstances[moduleName]; !ok {
 		return nil, fmt.Errorf("module %s not instantiated", moduleName)
 	} else if exp, err = m.GetExport(name, kind); err != nil {
@@ -417,19 +417,19 @@ func (s *Store) resolveImport(target *ModuleInstance, is *Import) error {
 	}
 
 	switch is.Kind {
-	case ImportKindFunc:
+	case ExternalKindFunc:
 		if err = s.applyFunctionImport(target, is.DescFunc, exp); err != nil {
 			return fmt.Errorf("applyFunctionImport: %w", err)
 		}
-	case ImportKindTable:
+	case ExternalKindTable:
 		if err = s.applyTableImport(target, is.DescTable, exp); err != nil {
 			return fmt.Errorf("applyTableImport: %w", err)
 		}
-	case ImportKindMemory:
+	case ExternalKindMemory:
 		if err = s.applyMemoryImport(target, is.DescMem, exp); err != nil {
 			return fmt.Errorf("applyMemoryImport: %w", err)
 		}
-	case ImportKindGlobal:
+	case ExternalKindGlobal:
 		if err = s.applyGlobalImport(target, is.DescGlobal, exp); err != nil {
 			return fmt.Errorf("applyGlobalImport: %w", err)
 		}
@@ -577,7 +577,7 @@ func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (ro
 	// We limit the number of globals in a moudle to 2^27.
 	globalDecls := len(module.GlobalSection)
 	for _, imp := range module.ImportSection {
-		if imp.Kind == ImportKindGlobal {
+		if imp.Kind == ExternalKindGlobal {
 			globalDecls++
 		}
 	}
@@ -814,7 +814,7 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 		index := exp.Index
 		var ei *ExportInstance
 		switch exp.Kind {
-		case ExportKindFunc:
+		case ExternalKindFunc:
 			if index >= uint32(len(target.Functions)) {
 				return nil, fmt.Errorf("unknown function for export[%s]", name)
 			}
@@ -825,17 +825,17 @@ func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (ro
 			if ei.Function.HostFunction != nil {
 				ei.Function.ModuleInstance = target
 			}
-		case ExportKindGlobal:
+		case ExternalKindGlobal:
 			if index >= uint32(len(target.Globals)) {
 				return nil, fmt.Errorf("unknown global for export[%s]", name)
 			}
 			ei = &ExportInstance{Kind: exp.Kind, Global: target.Globals[index]}
-		case ExportKindMemory:
+		case ExternalKindMemory:
 			if index != 0 || target.MemoryInstance == nil {
 				return nil, fmt.Errorf("unknown memory for export[%s]", name)
 			}
 			ei = &ExportInstance{Kind: exp.Kind, Memory: target.MemoryInstance}
-		case ExportKindTable:
+		case ExternalKindTable:
 			if index >= uint32(len(target.Tables)) {
 				return nil, fmt.Errorf("unknown table for export[%s]", name)
 			}
@@ -903,7 +903,7 @@ func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstanc
 	}
 	// TODO: This races on adding export. A future design may be able to eliminate this race, possibly via a HostModule
 	// type.
-	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Kind: ExportKindFunc, Function: f}); err != nil {
+	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Kind: ExternalKindFunc, Function: f}); err != nil {
 		s.Functions = s.Functions[:len(s.Functions)-1] // lost race: revert the add on conflict
 		return nil, err
 	}
@@ -917,14 +917,14 @@ func (s *Store) AddGlobal(m *ModuleInstance, name string, value uint64, valueTyp
 	}
 	s.Globals = append(s.Globals, g)
 
-	return m.addExport(name, &ExportInstance{Kind: ExportKindGlobal, Global: g})
+	return m.addExport(name, &ExportInstance{Kind: ExternalKindGlobal, Global: g})
 }
 
 func (s *Store) AddTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	t := newTableInstance(min, max)
 	s.Tables = append(s.Tables, t)
 
-	return m.addExport(name, &ExportInstance{Kind: ExportKindTable, Table: t})
+	return m.addExport(name, &ExportInstance{Kind: ExternalKindTable, Table: t})
 }
 
 func (s *Store) AddMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
@@ -935,7 +935,7 @@ func (s *Store) AddMemoryInstance(m *ModuleInstance, name string, min uint32, ma
 	}
 	s.Memories = append(s.Memories, memory)
 
-	return m.addExport(name, &ExportInstance{Kind: ExportKindMemory, Memory: memory})
+	return m.addExport(name, &ExportInstance{Kind: ExternalKindMemory, Memory: memory})
 }
 
 func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {

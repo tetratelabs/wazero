@@ -38,14 +38,14 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, different name",
 			input: &Module{
 				MemorySection: []*MemoryType{{1, nil}},
-				ExportSection: map[string]*Export{"momory": {Kind: ExportKindMemory, Name: "momory", Index: 0}},
+				ExportSection: map[string]*Export{"momory": {Kind: ExternalKindMemory, Name: "momory", Index: 0}},
 			},
 		},
 		{
 			name: "memory exported, but zero length",
 			input: &Module{
 				MemorySection: []*MemoryType{{0, nil}},
-				ExportSection: map[string]*Export{"memory": {Kind: ExportKindMemory, Name: "memory", Index: 0}},
+				ExportSection: map[string]*Export{"memory": {Kind: ExternalKindMemory, Name: "memory", Index: 0}},
 			},
 			expected: true,
 		},
@@ -53,7 +53,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, one page",
 			input: &Module{
 				MemorySection: []*MemoryType{{1, nil}},
-				ExportSection: map[string]*Export{"memory": {Kind: ExportKindMemory, Name: "memory", Index: 0}},
+				ExportSection: map[string]*Export{"memory": {Kind: ExternalKindMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
 			expectedLen: 65536,
@@ -62,7 +62,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			name: "memory exported, two pages",
 			input: &Module{
 				MemorySection: []*MemoryType{{2, nil}},
-				ExportSection: map[string]*Export{"memory": {Kind: ExportKindMemory, Name: "memory", Index: 0}},
+				ExportSection: map[string]*Export{"memory": {Kind: ExternalKindMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
 			expectedLen: 65536 * 2,
@@ -137,13 +137,13 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
 		_, err = s.Instantiate(&Module{
 			TypeSection:   []*FunctionType{{}},
-			ImportSection: []*Import{{Kind: ImportKindFunc, Name: "host_fn", DescFunc: 0}},
+			ImportSection: []*Import{{Kind: ExternalKindFunc, Name: "host_fn", DescFunc: 0}},
 			MemorySection: []*MemoryType{{1, nil}},
-			ExportSection: map[string]*Export{"host.fn": {Kind: ExportKindFunc, Name: "host.fn", Index: 0}},
+			ExportSection: map[string]*Export{"host.fn": {Kind: ExternalKindFunc, Name: "host.fn", Index: 0}},
 		}, "test")
 		require.NoError(t, err)
 
-		ei, err := s.getExport("test", "host.fn", ExportKindFunc)
+		ei, err := s.getExport("test", "host.fn", ExternalKindFunc)
 		require.NoError(t, err)
 		os.Environ()
 		// We expect the host function to be called in context of the importing module.
@@ -200,13 +200,13 @@ func TestFunctionInstance_Call(t *testing.T) {
 			instantiated, err := store.Instantiate(&Module{
 				TypeSection: []*FunctionType{{}},
 				ImportSection: []*Import{{
-					Kind:     ImportKindFunc,
+					Kind:     ExternalKindFunc,
 					Module:   hostModule.Name,
 					Name:     functionName,
 					DescFunc: 0,
 				}},
 				MemorySection: []*MemoryType{{1, nil}},
-				ExportSection: map[string]*Export{functionName: {Kind: ExportKindFunc, Name: functionName, Index: 0}},
+				ExportSection: map[string]*Export{functionName: {Kind: ExternalKindFunc, Name: functionName, Index: 0}},
 			}, "test")
 			require.NoError(t, err)
 
