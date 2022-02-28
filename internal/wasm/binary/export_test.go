@@ -17,70 +17,70 @@ func TestEncodeExport(t *testing.T) {
 		{
 			name: "func no name, index 0",
 			input: &wasm.Export{ // Ex. (export "" (func 0)))
-				Kind:  wasm.ExternalKindFunc,
+				Type:  wasm.ExternTypeFunc,
 				Name:  "",
 				Index: 0,
 			},
-			expected: []byte{wasm.ExternalKindFunc, 0x00, 0x00},
+			expected: []byte{wasm.ExternTypeFunc, 0x00, 0x00},
 		},
 		{
 			name: "func name, func index 0",
 			input: &wasm.Export{ // Ex. (export "pi" (func 0))
-				Kind:  wasm.ExternalKindFunc,
+				Type:  wasm.ExternTypeFunc,
 				Name:  "pi",
 				Index: 0,
 			},
 			expected: []byte{
 				0x02, 'p', 'i',
-				wasm.ExternalKindFunc,
+				wasm.ExternTypeFunc,
 				0x00,
 			},
 		},
 		{
 			name: "func name, index 10",
 			input: &wasm.Export{ // Ex. (export "pi" (func 10))
-				Kind:  wasm.ExternalKindFunc,
+				Type:  wasm.ExternTypeFunc,
 				Name:  "pi",
 				Index: 10,
 			},
 			expected: []byte{
 				0x02, 'p', 'i',
-				wasm.ExternalKindFunc,
+				wasm.ExternTypeFunc,
 				0x0a,
 			},
 		},
 		{
 			name: "memory no name, index 0",
 			input: &wasm.Export{ // Ex. (export "" (memory 0)))
-				Kind:  wasm.ExternalKindMemory,
+				Type:  wasm.ExternTypeMemory,
 				Name:  "",
 				Index: 0,
 			},
-			expected: []byte{0x00, wasm.ExternalKindMemory, 0x00},
+			expected: []byte{0x00, wasm.ExternTypeMemory, 0x00},
 		},
 		{
 			name: "memory name, memory index 0",
 			input: &wasm.Export{ // Ex. (export "mem" (memory 0))
-				Kind:  wasm.ExternalKindMemory,
+				Type:  wasm.ExternTypeMemory,
 				Name:  "mem",
 				Index: 0,
 			},
 			expected: []byte{
 				0x03, 'm', 'e', 'm',
-				wasm.ExternalKindMemory,
+				wasm.ExternTypeMemory,
 				0x00,
 			},
 		},
 		{
 			name: "memory name, index 10",
 			input: &wasm.Export{ // Ex. (export "mem" (memory 10))
-				Kind:  wasm.ExternalKindMemory,
+				Type:  wasm.ExternTypeMemory,
 				Name:  "mem",
 				Index: 10,
 			},
 			expected: []byte{
 				0x03, 'm', 'e', 'm',
-				wasm.ExternalKindMemory,
+				wasm.ExternTypeMemory,
 				0x0a,
 			},
 		},

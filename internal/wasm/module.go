@@ -148,7 +148,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	}
 	funcImportCount := Index(0)
 	for i, im := range m.ImportSection {
-		if im.Kind == ExternalKindFunc {
+		if im.Type == ExternTypeFunc {
 			if funcIdx == Index(i) {
 				if im.DescFunc >= typeSectionLength {
 					return nil
@@ -172,7 +172,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 // Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because
 // index namespaces are often preceded by a corresponding type in the Module.ImportSection.
 //
-// For example, the function index namespace starts with any ExternalKindFunc in the Module.ImportSection followed by
+// For example, the function index namespace starts with any ExternTypeFunc in the Module.ImportSection followed by
 // the Module.FunctionSection
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-index
@@ -209,21 +209,21 @@ func (t *FunctionType) String() (ret string) {
 	return
 }
 
-// Import is the binary representation of an import indicated by Kind
+// Import is the binary representation of an import indicated by Type
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-import
 type Import struct {
-	Kind ExternalKind
+	Type ExternType
 	// Module is the possibly empty primary namespace of this import
 	Module string
 	// Module is the possibly empty secondary namespace of this import
 	Name string
-	// DescFunc is the index in Module.TypeSection when Kind equals ExternalKindFunc
+	// DescFunc is the index in Module.TypeSection when Type equals ExternTypeFunc
 	DescFunc Index
-	// DescTable is the inlined TableType when Kind equals ExternalKindTable
+	// DescTable is the inlined TableType when Type equals ExternTypeTable
 	DescTable *TableType
-	// DescMem is the inlined MemoryType when Kind equals ExternalKindMemory
+	// DescMem is the inlined MemoryType when Type equals ExternTypeMemory
 	DescMem *MemoryType
-	// DescGlobal is the inlined GlobalType when Kind equals ExternalKindGlobal
+	// DescGlobal is the inlined GlobalType when Type equals ExternTypeGlobal
 	DescGlobal *GlobalType
 }
 
@@ -254,14 +254,14 @@ type ConstantExpression struct {
 	Data   []byte
 }
 
-// Export is the binary representation of an export indicated by Kind
+// Export is the binary representation of an export indicated by Type
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-export
 type Export struct {
-	Kind ExternalKind
+	Type ExternType
 	// Name is what the host refers to this definition as.
 	Name string
-	// Index is the index of the definition to export, the index namespace is by Kind
-	// Ex. If ExternalKindFunc, this is an position in the function index namespace.
+	// Index is the index of the definition to export, the index namespace is by Type
+	// Ex. If ExternTypeFunc, this is a position in the function index namespace.
 	Index Index
 }
 
@@ -325,7 +325,7 @@ type NameSection struct {
 // NameMap associates an index with any associated names.
 //
 // Note: Often the index namespace bridges multiple sections. For example, the function index namespace starts with any
-// ExternalKindFunc in the Module.ImportSection followed by the Module.FunctionSection
+// ExternTypeFunc in the Module.ImportSection followed by the Module.FunctionSection
 //
 // Note: NameMap is unique by NameAssoc.Index, but NameAssoc.Name needn't be unique.
 // Note: When encoding in the Binary format, this must be ordered by NameAssoc.Index
@@ -352,14 +352,14 @@ type NameMapAssoc struct {
 // allDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
 func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) {
 	for _, imp := range m.ImportSection {
-		switch imp.Kind {
-		case ExternalKindFunc:
+		switch imp.Type {
+		case ExternTypeFunc:
 			functions = append(functions, imp.DescFunc)
-		case ExternalKindGlobal:
+		case ExternTypeGlobal:
 			globals = append(globals, imp.DescGlobal)
-		case ExternalKindMemory:
+		case ExternTypeMemory:
 			memories = append(memories, imp.DescMem)
-		case ExternalKindTable:
+		case ExternTypeTable:
 			tables = append(tables, imp.DescTable)
 		}
 	}
@@ -487,34 +487,34 @@ func ValueTypeName(t ValueType) string {
 	return publicwasm.ValueTypeName(t)
 }
 
-// ExternalKind classifies imports and exports with their respective types.
+// ExternType classifies imports and exports with their respective types.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
-type ExternalKind = byte
+type ExternType = byte
 
 const (
-	ExternalKindFunc   ExternalKind = 0x00
-	ExternalKindTable  ExternalKind = 0x01
-	ExternalKindMemory ExternalKind = 0x02
-	ExternalKindGlobal ExternalKind = 0x03
+	ExternTypeFunc   ExternType = 0x00
+	ExternTypeTable  ExternType = 0x01
+	ExternTypeMemory ExternType = 0x02
+	ExternTypeGlobal ExternType = 0x03
 )
 
-// ExternalKindName returns the canonical name of the import or export description.
+// ExternTypeName returns the canonical name of the import or export description.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-importdesc
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportdesc
-func ExternalKindName(ek ExternalKind) string {
-	switch ek {
-	case ExternalKindFunc:
+func ExternTypeName(et ExternType) string {
+	switch et {
+	case ExternTypeFunc:
 		return "func"
-	case ExternalKindTable:
+	case ExternTypeTable:
 		return "table"
-	case ExternalKindMemory:
+	case ExternTypeMemory:
 		return "mem"
-	case ExternalKindGlobal:
+	case ExternTypeGlobal:
 		return "global"
 	}
-	return "unknown"
+	return fmt.Sprintf("%#x", et)
 }

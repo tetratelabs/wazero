@@ -47,15 +47,15 @@ func TestDecodeExportSection(t *testing.T) {
 		{
 			name: "empty and non-empty name",
 			input: []byte{
-				0x02,                        // 2 exports
-				0x00,                        // Size of empty name
-				wasm.ExternalKindFunc, 0x02, // func[2]
+				0x02,                      // 2 exports
+				0x00,                      // Size of empty name
+				wasm.ExternTypeFunc, 0x02, // func[2]
 				0x01, 'a', // Size of name, name
-				wasm.ExternalKindFunc, 0x01, // func[1]
+				wasm.ExternTypeFunc, 0x01, // func[1]
 			},
 			expected: map[string]*wasm.Export{
-				"":  {Name: "", Kind: wasm.ExternalKindFunc, Index: wasm.Index(2)},
-				"a": {Name: "a", Kind: wasm.ExternalKindFunc, Index: wasm.Index(1)},
+				"":  {Name: "", Type: wasm.ExternTypeFunc, Index: wasm.Index(2)},
+				"a": {Name: "a", Type: wasm.ExternTypeFunc, Index: wasm.Index(1)},
 			},
 		},
 	}
@@ -80,11 +80,11 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 		{
 			name: "duplicates empty name",
 			input: []byte{
-				0x02,                        // 2 exports
-				0x00,                        // Size of empty name
-				wasm.ExternalKindFunc, 0x00, // func[0]
-				0x00,                        // Size of empty name
-				wasm.ExternalKindFunc, 0x00, // func[0]
+				0x02,                      // 2 exports
+				0x00,                      // Size of empty name
+				wasm.ExternTypeFunc, 0x00, // func[0]
+				0x00,                      // Size of empty name
+				wasm.ExternTypeFunc, 0x00, // func[0]
 			},
 			expectedErr: "export[1] duplicates name \"\"",
 		},
@@ -93,9 +93,9 @@ func TestDecodeExportSection_Errors(t *testing.T) {
 			input: []byte{
 				0x02,      // 2 exports
 				0x01, 'a', // Size of name, name
-				wasm.ExternalKindFunc, 0x00, // func[0]
+				wasm.ExternTypeFunc, 0x00, // func[0]
 				0x01, 'a', // Size of name, name
-				wasm.ExternalKindFunc, 0x00, // func[0]
+				wasm.ExternTypeFunc, 0x00, // func[0]
 			},
 			expectedErr: "export[1] duplicates name \"a\"",
 		},

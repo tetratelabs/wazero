@@ -61,7 +61,7 @@ func (c *ModuleContext) Memory() publicwasm.Memory {
 
 // Function implements wasm.ModuleContext Function
 func (c *ModuleContext) Function(name string) publicwasm.Function {
-	exp, err := c.Module.GetExport(name, ExternalKindFunc)
+	exp, err := c.Module.GetExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
 	}

@@ -1011,7 +1011,7 @@ func (a *wasiAPI) randUnusedFD() uint32 {
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
-	if start, err := requireExport(module, moduleName, FunctionStart, internalwasm.ExternalKindFunc); err != nil {
+	if start, err := requireExport(module, moduleName, FunctionStart, internalwasm.ExternTypeFunc); err != nil {
 		return err
 	} else {
 		// TODO: this should be verified during decode so that errors have the correct source positions
@@ -1023,10 +1023,10 @@ func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
 			return fmt.Errorf("module[%s] function[%s] must have an empty (nullary) signature: %s", moduleName, FunctionStart, ft.String())
 		}
 	}
-	if _, err := requireExport(module, moduleName, FunctionInitialize, internalwasm.ExternalKindFunc); err == nil {
+	if _, err := requireExport(module, moduleName, FunctionInitialize, internalwasm.ExternTypeFunc); err == nil {
 		return fmt.Errorf("module[%s] must not export func[%s]", moduleName, FunctionInitialize)
 	}
-	if _, err := requireExport(module, moduleName, "memory", internalwasm.ExternalKindMemory); err != nil {
+	if _, err := requireExport(module, moduleName, "memory", internalwasm.ExternTypeMemory); err != nil {
 		return err
 	}
 	// TODO: the spec also requires export of "__indirect_function_table", but we aren't enforcing it, and doing so
@@ -1034,10 +1034,10 @@ func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
 	return nil
 }
 
-func requireExport(module *internalwasm.Module, moduleName string, exportName string, kind internalwasm.ExternalKind) (*internalwasm.Export, error) {
+func requireExport(module *internalwasm.Module, moduleName string, exportName string, kind internalwasm.ExternType) (*internalwasm.Export, error) {
 	exp, ok := module.ExportSection[exportName]
-	if !ok || exp.Kind != kind {
-		return nil, fmt.Errorf("module[%s] does not export %s[%s]", moduleName, internalwasm.ExternalKindName(kind), exportName)
+	if !ok || exp.Type != kind {
+		return nil, fmt.Errorf("module[%s] does not export %s[%s]", moduleName, internalwasm.ExternTypeName(kind), exportName)
 	}
 	return exp, nil
 }
