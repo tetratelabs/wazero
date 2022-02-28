@@ -645,7 +645,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		FunctionFdRead: a.FdRead,
 		// TODO: FunctionFdReaddir
 		// TODO: FunctionFdRenumber
-		FunctionFdSeek: a.fd_seek,
+		FunctionFdSeek: a.FdSeek,
 		// TODO: FunctionFdSync
 		// TODO: FunctionFdTell
 		FunctionFdWrite: a.FdWrite,
@@ -838,7 +838,7 @@ func (a *wasiAPI) FdRead(ctx wasm.ModuleContext, fd, iovs, iovsLen, resultSize u
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) fd_seek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, nwrittenPtr uint32) wasi.Errno {
+func (a *wasiAPI) FdSeek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, resultFilesize uint32) wasi.Errno {
 	return wasi.ErrnoNosys // TODO: implement
 }
 
