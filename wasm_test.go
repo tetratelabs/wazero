@@ -160,7 +160,7 @@ func TestModuleExports_Memory(t *testing.T) {
 			exports, err := InstantiateModule(NewStore(), &ModuleConfig{Source: []byte(tc.wat)})
 			require.NoError(t, err)
 
-			mem := exports.Memory("memory")
+			mem := exports.Memory()
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {

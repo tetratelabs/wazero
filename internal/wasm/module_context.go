@@ -19,7 +19,7 @@ func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstan
 	}
 }
 
-// ModuleContext implements wasm.ModuleContext and wasm.Module
+// ModuleContext implements wasm.ModuleContext, wasm.ModuleExports, and wasm.Module
 type ModuleContext struct {
 	// ctx is returned by Context and overridden WithContext
 	ctx context.Context
@@ -90,11 +90,6 @@ func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64
 	return f.module.engine.Call(modCtx, f.function, params...)
 }
 
-// HostExports implements wasm.HostExports
-type HostExports struct {
-	NameToFunctionInstance map[string]*FunctionInstance
-}
-
 // ParamTypes implements wasm.HostFunction ParamTypes
 func (f *FunctionInstance) ParamTypes() []publicwasm.ValueType {
 	return f.FunctionType.Type.Params
@@ -112,9 +107,4 @@ func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) 
 		return nil, fmt.Errorf("this function was not imported by %s", ctx)
 	}
 	return modCtx.engine.Call(modCtx, f, params...)
-}
-
-// Function implements wasm.HostExports Function
-func (g *HostExports) Function(name string) publicwasm.HostFunction {
-	return g.NameToFunctionInstance[name]
 }

@@ -67,14 +67,10 @@ type Store interface {
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 //
-// TODO: rename this to ModuleExports.
+// TODO: rename this to InstantiatedModule per https://github.com/tetratelabs/wazero/issues/293.
 type ModuleExports interface {
 	// Memory returns a memory exported from this module or nil if it wasn't.
-	//
-	// Note: WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
-	// as a WASI Command or Reactor will never return nil for this name.
-	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-	Memory(name string) Memory
+	Memory() Memory
 
 	// Function returns a function exported from this module or nil if it wasn't.
 	Function(name string) Function

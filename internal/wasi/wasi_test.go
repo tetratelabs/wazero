@@ -1252,7 +1252,7 @@ func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName str
 
 	instantiated, err := store.Instantiate(mod, moduleName)
 	require.NoError(t, err)
-	return store, instantiated.Context
+	return store, instantiated
 }
 
 // maskMemory sets the first memory in the store to '?' * size, so tests can see what's written.
