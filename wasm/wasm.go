@@ -56,17 +56,19 @@ func ValueTypeName(t ValueType) string {
 
 // Store allows access to instantiated modules and host functions
 type Store interface {
-	// ModuleExports returns exports from an instantiated module or nil if there aren't any.
-	ModuleExports(moduleName string) ModuleExports
+	// InstantiatedModule returns exports from an instantiated module or nil if there aren't any.
+	InstantiatedModule(moduleName string) InstantiatedModule
 
 	// HostExports returns exported host functions for the moduleName or nil if there aren't any.
 	HostExports(moduleName string) HostExports
 }
 
-// ModuleExports return functions exported in a module, post-instantiation.
+// InstantiatedModule return functions exported in a module, post-instantiation.
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-type ModuleExports interface {
+//
+// TODO: rename this to InstantiatedModule.
+type InstantiatedModule interface {
 	// Memory returns a memory exported from this module or nil if it wasn't.
 	//
 	// Note: WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
@@ -76,6 +78,9 @@ type ModuleExports interface {
 
 	// Function returns a function exported from this module or nil if it wasn't.
 	Function(name string) Function
+
+	// TODO
+	Close() error
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.InstantiateModule).

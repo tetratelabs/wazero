@@ -100,7 +100,7 @@ func (m *ModuleConfig) WithName(moduleName string) *ModuleConfig {
 //	exports, _ := wazero.InstantiateModule(wazero.NewStore(), &wazero.ModuleConfig{Source: wasm})
 //
 // Note: StoreConfig.Context is used for any WebAssembly 1.0 (20191205) Start Function.
-func InstantiateModule(store wasm.Store, module *ModuleConfig) (wasm.ModuleExports, error) {
+func InstantiateModule(store wasm.Store, module *ModuleConfig) (wasm.InstantiatedModule, error) {
 	internal, ok := store.(*internalwasm.Store)
 	if !ok {
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)

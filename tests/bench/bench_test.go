@@ -32,7 +32,7 @@ func BenchmarkEngines(b *testing.B) {
 	}
 }
 
-func runAllBenches(b *testing.B, m wasm.ModuleExports) {
+func runAllBenches(b *testing.B, m wasm.InstantiatedModule) {
 	runBase64Benches(b, m)
 	runFibBenches(b, m)
 	runStringManipulationBenches(b, m)
@@ -40,7 +40,7 @@ func runAllBenches(b *testing.B, m wasm.ModuleExports) {
 	runRandomMatMul(b, m)
 }
 
-func runBase64Benches(b *testing.B, m wasm.ModuleExports) {
+func runBase64Benches(b *testing.B, m wasm.InstantiatedModule) {
 	base64 := m.Function("base64")
 
 	for _, numPerExec := range []int{5, 100, 10000} {
@@ -54,7 +54,7 @@ func runBase64Benches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runFibBenches(b *testing.B, m wasm.ModuleExports) {
+func runFibBenches(b *testing.B, m wasm.InstantiatedModule) {
 	fibonacci := m.Function("fibonacci")
 
 	for _, num := range []int{5, 10, 20, 30} {
@@ -70,7 +70,7 @@ func runFibBenches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runStringManipulationBenches(b *testing.B, m wasm.ModuleExports) {
+func runStringManipulationBenches(b *testing.B, m wasm.InstantiatedModule) {
 	stringManipulation := m.Function("string_manipulation")
 
 	for _, initialSize := range []int{50, 100, 1000} {
@@ -86,7 +86,7 @@ func runStringManipulationBenches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runReverseArrayBenches(b *testing.B, m wasm.ModuleExports) {
+func runReverseArrayBenches(b *testing.B, m wasm.InstantiatedModule) {
 	reverseArray := m.Function("reverse_array")
 
 	for _, arraySize := range []int{500, 1000, 10000} {
@@ -102,7 +102,7 @@ func runReverseArrayBenches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runRandomMatMul(b *testing.B, m wasm.ModuleExports) {
+func runRandomMatMul(b *testing.B, m wasm.InstantiatedModule) {
 	randomMatMul := m.Function("random_mat_mul")
 
 	for _, matrixSize := range []int{5, 10, 20} {
@@ -118,7 +118,7 @@ func runRandomMatMul(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine) wasm.ModuleExports {
+func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine) wasm.InstantiatedModule {
 	getRandomString := func(ctx wasm.ModuleContext, retBufPtr uint32, retBufSize uint32) {
 		results, err := ctx.Function("allocate_buffer").Call(ctx.Context(), 10)
 		if err != nil {

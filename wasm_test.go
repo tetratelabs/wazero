@@ -133,8 +133,8 @@ func TestInstantiateModule_Renamed(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestModuleExports_Memory only covers a couple cases to avoid duplication of internal/wasm/store_test.go
-func TestModuleExports_Memory(t *testing.T) {
+// TestInstantiatedModule_Memory only covers a couple cases to avoid duplication of internal/wasm/store_test.go
+func TestInstantiatedModule_Memory(t *testing.T) {
 	tests := []struct {
 		name, wat   string
 		expected    bool
