@@ -5820,7 +5820,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			compiler := env.requireNewCompiler(t)
 
 			// Setup the globals.
-			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}, nil}
+			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, GlobalType: &wasm.GlobalType{ValType: tp}}, nil}
 			env.addGlobals(globals...)
 			// Compiler needs global type information at compilation time.
 			compiler.f = &wasm.FunctionInstance{
@@ -5875,7 +5875,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			compiler := env.requireNewCompiler(t)
 
 			// Setup the globals.
-			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}}, nil)
+			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, GlobalType: &wasm.GlobalType{ValType: tp}}, nil)
 
 			// Place the set target value.
 			loc := compiler.locationStack.pushValueLocationOnStack()

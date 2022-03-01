@@ -404,7 +404,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
-	wasmType := c.f.ModuleInstance.Globals[o.Index].Type.ValType
+	wasmType := c.f.ModuleInstance.Globals[o.Index].GlobalType.ValType
 	switch wasmType {
 	case wasm.ValueTypeF32, wasm.ValueTypeF64:
 		valueReg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
