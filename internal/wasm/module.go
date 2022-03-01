@@ -459,20 +459,32 @@ const (
 	ExternTypeGlobal ExternType = 0x03
 )
 
-// ExternTypeName returns the canonical name of the import or export description.
+// The below are exported to consolidate parsing behavior for external types.
+const (
+	// ExternTypeFuncName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeFunc.
+	ExternTypeFuncName = "func"
+	// ExternTypeTableName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeTable.
+	ExternTypeTableName = "table"
+	// ExternTypeMemoryName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeMemory.
+	ExternTypeMemoryName = "memory"
+	// ExternTypeGlobalName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeGlobal.
+	ExternTypeGlobalName = "global"
+)
+
+// ExternTypeName returns the name of the WebAssembly 1.0 (20191205) Text Format field of the given type.
 //
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-importdesc
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportdesc
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#imports⑤
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A4
 func ExternTypeName(et ExternType) string {
 	switch et {
 	case ExternTypeFunc:
-		return "func"
+		return ExternTypeFuncName
 	case ExternTypeTable:
-		return "table"
+		return ExternTypeTableName
 	case ExternTypeMemory:
-		return "mem"
+		return ExternTypeMemoryName
 	case ExternTypeGlobal:
-		return "global"
+		return ExternTypeGlobalName
 	}
 	return fmt.Sprintf("%#x", et)
 }

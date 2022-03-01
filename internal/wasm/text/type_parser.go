@@ -91,7 +91,7 @@ func (p *typeParser) beginFunc(tok tokenType, tokenBytes []byte, _, _ uint32) (t
 		return nil, expectedField(tok)
 	}
 
-	if string(tokenBytes) != "func" {
+	if string(tokenBytes) != wasm.ExternTypeFuncName {
 		return nil, unexpectedFieldName(tokenBytes)
 	}
 
@@ -118,7 +118,7 @@ func (p *typeParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 	}
 }
 
-// parseFuncEnd completes the "func" field and returns end
+// parseFuncEnd completes the internalwasm.ExternTypeFuncName field and returns end
 func (p *typeParser) parseFuncEnd(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	if tok != tokenRParen {
 		return nil, unexpectedToken(tok, tokenBytes)

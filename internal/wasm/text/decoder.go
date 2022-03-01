@@ -91,6 +91,10 @@ type moduleParser struct {
 
 	// unresolvedExports holds any exports whose type index wasn't resolvable when parsed.
 	unresolvedExports map[wasm.Index]*wasm.Export
+
+	// field counts can be different from the count in a section when abbreviated imports exist. To give an accurate
+	// errorContext, we count explicitly.
+	fieldCountFunc, fieldCountMemory uint32
 }
 
 // DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
@@ -177,20 +181,20 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 		case "import":
 			p.pos = positionImport
 			return p.parseImportModule, nil
-		case "func":
+		case wasm.ExternTypeFuncName:
 			p.pos = positionFunc
 			p.funcParser.currentIdx = p.module.SectionElementCount(wasm.SectionIDFunction)
 			return p.funcParser.begin, nil
-		case "table":
-			return nil, errors.New("TODO: table")
-		case "memory":
+		case wasm.ExternTypeTableName:
+			return nil, fmt.Errorf("TODO: %s", tokenBytes)
+		case wasm.ExternTypeMemoryName:
 			if p.memoryNamespace.count > 0 {
 				return nil, moreThanOneInvalidInSection(wasm.SectionIDMemory)
 			}
 			p.pos = positionMemory
 			return p.memoryParser.begin, nil
-		case "global":
-			return nil, errors.New("TODO: global")
+		case wasm.ExternTypeGlobalName:
+			return nil, fmt.Errorf("TODO: %s", tokenBytes)
 		case "export":
 			p.pos = positionExport
 			return p.parseExportName, nil
@@ -313,13 +317,13 @@ func (p *moduleParser) beginImportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 	}
 
 	switch string(tokenBytes) {
-	case "func":
+	case wasm.ExternTypeFuncName:
 		if p.module.SectionElementCount(wasm.SectionIDFunction) > 0 {
 			return nil, importAfterModuleDefined(wasm.SectionIDFunction)
 		}
 		p.pos = positionImportFunc
 		return p.parseImportFuncID, nil
-	case "table", "memory", "global":
+	case wasm.ExternTypeTableName, wasm.ExternTypeMemoryName, wasm.ExternTypeGlobalName:
 		return nil, fmt.Errorf("TODO: %s", tokenBytes)
 	default:
 		return nil, unexpectedFieldName(tokenBytes)
@@ -436,6 +440,7 @@ func (p *moduleParser) endFunc(typeIdx wasm.Index, code *wasm.Code, name string,
 
 	// Multiple funcs are allowed, so advance in case there's a next.
 	p.funcNamespace.count++
+	p.fieldCountFunc++
 	p.pos = positionModule
 	return p.parseModule, nil
 }
@@ -447,6 +452,7 @@ func (p *moduleParser) endMemory(min uint32, max *uint32) tokenParser {
 
 	// Multiple memories are allowed, so advance in case there's a next.
 	p.memoryNamespace.count++
+	p.fieldCountMemory++
 	p.pos = positionModule
 	return p.parseModule
 }
@@ -497,13 +503,13 @@ func (p *moduleParser) beginExportDesc(tok tokenType, tokenBytes []byte, _, _ ui
 	}
 
 	switch string(tokenBytes) {
-	case "func":
+	case wasm.ExternTypeFuncName:
 		p.pos = positionExportFunc
 		return p.parseExportDesc, nil
-	case "memory":
+	case wasm.ExternTypeMemoryName:
 		p.pos = positionExportMemory
 		return p.parseExportDesc, nil
-	case "table", "global":
+	case wasm.ExternTypeTableName, wasm.ExternTypeGlobalName:
 		return nil, fmt.Errorf("TODO: %s", tokenBytes)
 	default:
 		return nil, unexpectedFieldName(tokenBytes)
@@ -741,19 +747,18 @@ func (p *moduleParser) errorContext() string {
 		if p.pos == positionImport {
 			return fmt.Sprintf("module.import[%d]", idx)
 		}
-		return fmt.Sprintf("module.import[%d].func%s", idx, p.typeUseParser.errorContext())
+		return fmt.Sprintf("module.import[%d].%s%s", idx, wasm.ExternTypeFuncName, p.typeUseParser.errorContext())
 	case positionFunc:
-		idx := p.module.SectionElementCount(wasm.SectionIDFunction)
-		return fmt.Sprintf("module.func[%d]%s", idx, p.typeUseParser.errorContext())
+		idx := p.fieldCountFunc
+		return fmt.Sprintf("module.%s[%d]%s", wasm.ExternTypeFuncName, idx, p.typeUseParser.errorContext())
 	case positionMemory:
-		idx := p.module.SectionElementCount(wasm.SectionIDMemory)
-		return fmt.Sprintf("module.memory[%d]", idx)
+		return fmt.Sprintf("module.%s[%d]", wasm.ExternTypeMemoryName, p.fieldCountMemory)
 	case positionExport, positionExportFunc: // TODO: table, memory or global
 		idx := p.module.SectionElementCount(wasm.SectionIDExport)
 		if p.pos == positionExport {
 			return fmt.Sprintf("module.export[%d]", idx)
 		}
-		return fmt.Sprintf("module.export[%d].func", idx)
+		return fmt.Sprintf("module.export[%d].%s", idx, wasm.ExternTypeFuncName)
 	case positionStart:
 		return "module.start"
 	default: // parserPosition is an enum, we expect to have handled all cases above. panic if we didn't
