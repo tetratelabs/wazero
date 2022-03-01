@@ -1,8 +1,13 @@
 package internalwasm
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
+
+	"github.com/tetratelabs/wazero/internal/ieee754"
+	"github.com/tetratelabs/wazero/internal/leb128"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 type (
@@ -278,7 +283,7 @@ func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
-func (m *ModuleInstance) GetExport(name string, et ExternType) (*ExportInstance, error) {
+func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
 		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
@@ -287,4 +292,32 @@ func (m *ModuleInstance) GetExport(name string, et ExternType) (*ExportInstance,
 		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExternTypeName(exp.Type), ExternTypeName(et))
 	}
 	return exp, nil
+}
+
+func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
+	r := bytes.NewBuffer(expr.Data)
+	switch expr.Opcode {
+	case OpcodeI32Const:
+		v, _, _ = leb128.DecodeInt32(r)
+	case OpcodeI64Const:
+		v, _, _ = leb128.DecodeInt64(r)
+	case OpcodeF32Const:
+		v, _ = ieee754.DecodeFloat32(r)
+	case OpcodeF64Const:
+		v, _ = ieee754.DecodeFloat64(r)
+	case OpcodeGlobalGet:
+		id, _, _ := leb128.DecodeUint32(r)
+		g := globals[id]
+		switch g.Type.ValType {
+		case ValueTypeI32:
+			v = int32(g.Val)
+		case ValueTypeI64:
+			v = int64(g.Val)
+		case ValueTypeF32:
+			v = publicwasm.DecodeF32(g.Val)
+		case ValueTypeF64:
+			v = publicwasm.DecodeF64(g.Val)
+		}
+	}
+	return
 }

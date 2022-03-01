@@ -15,7 +15,7 @@ func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstan
 		ctx:    ctx,
 		engine: engine,
 		memory: instance.MemoryInstance,
-		Module: instance,
+		module: instance,
 	}
 }
 
@@ -26,7 +26,7 @@ type ModuleContext struct {
 	// engine is used to implement function.Call
 	engine Engine
 	// Module is exported for spectests
-	Module *ModuleInstance
+	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory publicwasm.Memory
 }
@@ -35,7 +35,7 @@ type ModuleContext struct {
 func (c *ModuleContext) WithContext(ctx context.Context) *ModuleContext {
 	// only re-allocate if it will change the effective context
 	if ctx != nil && ctx != c.ctx {
-		return &ModuleContext{engine: c.engine, Module: c.Module, memory: c.memory, ctx: ctx}
+		return &ModuleContext{engine: c.engine, module: c.module, memory: c.memory, ctx: ctx}
 	}
 	return c
 }
@@ -44,7 +44,7 @@ func (c *ModuleContext) WithContext(ctx context.Context) *ModuleContext {
 func (c *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	// only re-allocate if it will change the effective memory
 	if c.memory == nil || (memory != nil && memory.Max != nil && *memory.Max > 0 && memory != c.memory) {
-		return &ModuleContext{engine: c.engine, Module: c.Module, memory: memory, ctx: c.ctx}
+		return &ModuleContext{engine: c.engine, module: c.module, memory: memory, ctx: c.ctx}
 	}
 	return c
 }
@@ -61,7 +61,7 @@ func (c *ModuleContext) Memory() publicwasm.Memory {
 
 // Function implements wasm.ModuleContext Function
 func (c *ModuleContext) Function(name string) publicwasm.Function {
-	exp, err := c.Module.GetExport(name, ExternTypeFunc)
+	exp, err := c.module.getExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
 	}

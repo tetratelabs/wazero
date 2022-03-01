@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/tetratelabs/wazero/internal/ieee754"
-	"github.com/tetratelabs/wazero/internal/leb128"
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
@@ -371,7 +369,7 @@ func (s *Store) HostExports(moduleName string) publicwasm.HostExports {
 func (s *Store) getExport(moduleName string, name string, et ExternType) (exp *ExportInstance, err error) {
 	if m, ok := s.moduleInstances[moduleName]; !ok {
 		return nil, fmt.Errorf("module %s not instantiated", moduleName)
-	} else if exp, err = m.GetExport(name, et); err != nil {
+	} else if exp, err = m.getExport(name, et); err != nil {
 		return
 	}
 	return
@@ -395,7 +393,7 @@ func (s *Store) resolveImports(module *Module) (
 		moduleImports[m] = struct{}{}
 
 		var exp *ExportInstance
-		exp, err = m.GetExport(is.Name, is.Type)
+		exp, err = m.getExport(is.Name, is.Type)
 		if err != nil {
 			return
 		}
@@ -462,34 +460,6 @@ func (s *Store) resolveImports(module *Module) (
 				return
 			}
 			globals = append(globals, g)
-		}
-	}
-	return
-}
-
-func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
-	r := bytes.NewBuffer(expr.Data)
-	switch expr.Opcode {
-	case OpcodeI32Const:
-		v, _, _ = leb128.DecodeInt32(r)
-	case OpcodeI64Const:
-		v, _, _ = leb128.DecodeInt64(r)
-	case OpcodeF32Const:
-		v, _ = ieee754.DecodeFloat32(r)
-	case OpcodeF64Const:
-		v, _ = ieee754.DecodeFloat64(r)
-	case OpcodeGlobalGet:
-		id, _, _ := leb128.DecodeUint32(r)
-		g := globals[id]
-		switch g.Type.ValType {
-		case ValueTypeI32:
-			v = int32(g.Val)
-		case ValueTypeI64:
-			v = int64(g.Val)
-		case ValueTypeF32:
-			v = publicwasm.DecodeF32(g.Val)
-		case ValueTypeF64:
-			v = publicwasm.DecodeF64(g.Val)
 		}
 	}
 	return
