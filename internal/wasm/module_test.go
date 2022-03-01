@@ -68,7 +68,7 @@ func TestExternTypeName(t *testing.T) {
 	}{
 		{"func", ExternTypeFunc, "func"},
 		{"table", ExternTypeTable, "table"},
-		{"mem", ExternTypeMemory, "mem"},
+		{"mem", ExternTypeMemory, "memory"},
 		{"global", ExternTypeGlobal, "global"},
 		{"unknown", 100, "0x64"},
 	}

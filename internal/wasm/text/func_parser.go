@@ -45,8 +45,8 @@ type funcParser struct {
 var end = []byte{wasm.OpcodeEnd}
 var codeEnd = &wasm.Code{Body: end}
 
-// begin should be called after reaching the "func" keyword in a module field. Parsing continues until onFunc or
-// error.
+// begin should be called after reaching the internalwasm.ExternTypeFuncName keyword in a module field. Parsing
+// continues until onFunc or error.
 //
 // This stage records the ID of the current function, if present, and resumes with onFunc.
 //
