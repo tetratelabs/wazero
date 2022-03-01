@@ -51,7 +51,7 @@ func (s *Store) ExportHostModule(config *publicwasm.HostModuleConfig) (publicwas
 	return ret, nil
 }
 
-// ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
+// exportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
 func (s *Store) exportHostFunctions(m *ModuleInstance, nameToGoFunc map[string]interface{}) error {
 	for name, goFunc := range nameToGoFunc {
 		hf, err := NewGoFunc(name, goFunc)

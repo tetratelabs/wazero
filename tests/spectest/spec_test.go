@@ -220,7 +220,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 		},
 		Memory: &publicwasm.HostModuleConfigMemory{
 			Name: "memory",
-			Min:  10,
+			Min:  1,
 			Max:  &memoryLimitMax,
 		},
 	}
