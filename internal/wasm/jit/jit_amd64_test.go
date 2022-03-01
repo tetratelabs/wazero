@@ -164,7 +164,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		// Push the call frames.
 		const callFrameNums = 10
 		stackPointerToExpectedValue := map[uint64]uint32{}
-		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
+		for funcaddr := wasm.FunctionIndex(0); funcaddr < callFrameNums; funcaddr++ {
 			//	Each function pushes its funcaddr and soon returns.
 			compiler := env.requireNewCompiler(t)
 			err := compiler.compilePreamble()
@@ -224,21 +224,21 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				TableInstance: &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
+				Globals:       []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
@@ -247,7 +247,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "table length zero",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: nil}},
+				TableInstance:  &wasm.TableInstance{Table: nil},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -255,7 +255,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "table length zero part2",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -263,7 +263,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{},
+				TableInstance:  &wasm.TableInstance{},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -278,7 +278,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 	} {
@@ -319,8 +319,8 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 				require.Equal(t, bufSliceHeader.Data, vm.moduleContext.memoryElement0Address)
 			}
 
-			if len(tc.moduleInstance.Tables) > 0 {
-				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
+			if tc.moduleInstance.TableInstance != nil {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.TableInstance.Table))
 				require.Equal(t, uint64(tableHeader.Len), vm.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, vm.moduleContext.tableElement0Address)
 			}
@@ -5304,7 +5304,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 	env.exec(code)
 
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
+	require.Equal(t, builtinFunctionIndexMemoryGrow, env.functionCallAddress())
 
 	returnAddress := env.callFrameStackPeek().returnAddress
 	require.NotZero(t, returnAddress)
@@ -5920,13 +5920,13 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				if isAddressFromRegister {
 					err = compiler.callFunctionFromRegister(x86.REG_AX, &wasm.FunctionType{})
 				} else {
-					err = compiler.callFunctionFromAddress(11111 /* can be arbitrary*/, &wasm.FunctionType{})
+					err = compiler.callFunctionFromConst(11111 /* can be arbitrary*/, &wasm.FunctionType{})
 				}
 				require.NoError(t, err)
 				require.Empty(t, compiler.locationStack.usedRegisters)
 
 				// Because we must early return from the function this case,
-				// we emit the undefined instruction after the callFunctionFromAddress.
+				// we emit the undefined instruction after the callFunctionFromConst.
 				compiler.undefined()
 
 				// Generate the code under test.
@@ -5939,7 +5939,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 				// If the call frame stack pointer equals the length of call frame stack length,
 				// we have to call the builtin function to grow the slice.
 				require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-				require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress())
+				require.Equal(t, builtinFunctionIndexGrowCallFrameStack, env.functionCallAddress())
 			})
 			t.Run("stack ok", func(t *testing.T) {
 				env := newJITEnvironment()
@@ -6007,7 +6007,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 						codeSegment:        code,
 						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 					}
-					engine.addCompiledFunction(wasm.FunctionAddress(i), compiledFunction)
+					engine.addCompiledFunction(wasm.FunctionIndex(i), compiledFunction)
 				}
 
 				// Now we start building the caller's code.
@@ -6029,7 +6029,7 @@ func TestAmd64Compiler_callFunction(t *testing.T) {
 						compiler.movIntConstToRegister(int64(i), tmpReg)
 						err = compiler.callFunctionFromRegister(tmpReg, targetFunctionType)
 					} else {
-						err = compiler.callFunctionFromAddress(wasm.FunctionAddress(i), targetFunctionType)
+						err = compiler.callFunctionFromConst(wasm.FunctionIndex(i), targetFunctionType)
 					}
 					require.NoError(t, err)
 				}
@@ -6063,7 +6063,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 	env := newJITEnvironment()
 	engine := env.engine()
 
-	const targetFunctionAddress wasm.FunctionAddress = 5 // arbitrary value for testing
+	const targetFunctionIndex wasm.FunctionIndex = 5 // arbitrary value for testing
 	targetFunctionType := &wasm.FunctionType{
 		Params:  []wasm.ValueType{wasm.ValueTypeI32, wasm.ValueTypeI32, wasm.ValueTypeI32},
 		Results: []wasm.ValueType{wasm.ValueTypeI32},
@@ -6089,12 +6089,12 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		engine.addCompiledFunction(targetFunctionAddress, &compiledFunction{
+		engine.addCompiledFunction(targetFunctionIndex, &compiledFunction{
 			codeSegment:        code,
 			codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 		})
 		env.module().Functions = append(env.module().Functions,
-			&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: targetFunctionAddress})
+			&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Index: targetFunctionIndex})
 	}
 
 	// Now we start building the caller's code.
@@ -6244,7 +6244,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 		table := make([]wasm.TableElement, 10)
 		for i := 0; i < len(table); i++ {
-			table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
+			table[i] = wasm.TableElement{FunctionIndex: wasm.FunctionIndex(i), FunctionTypeID: targetTypeID}
 		}
 
 		for i := 0; i < len(table); i++ {
@@ -6268,7 +6268,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
 
-					engine.addCompiledFunction(table[i].FunctionAddress, &compiledFunction{
+					engine.addCompiledFunction(table[i].FunctionIndex, &compiledFunction{
 						codeSegment:        code,
 						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 					})
@@ -6282,7 +6282,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
 				// and the typeID  matches the table[targetOffset]'s type ID.
 
-				// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
+				// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
 				require.NoError(t, err)
 

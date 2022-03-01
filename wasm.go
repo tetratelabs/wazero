@@ -74,8 +74,14 @@ type ModuleConfig struct {
 //
 // This is used to pre-flight check and cache the module for later instantiation.
 func (m *ModuleConfig) Validate() (err error) {
-	_, err = decodeModule(m)
-	return err
+	mod, err := decodeModule(m)
+	if err != nil {
+		return
+	}
+	// TODO: decoders should validate before returning, as that allows
+	// them to err with the correct source position.
+	err = mod.Validate()
+	return
 }
 
 // WithName returns a new instance which overrides the Name, but keeps any internal cache made by Validate.
@@ -101,6 +107,10 @@ func InstantiateModule(store wasm.Store, module *ModuleConfig) (wasm.ModuleExpor
 	}
 	m, err := decodeModule(module)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = m.Validate(); err != nil {
 		return nil, err
 	}
 	return internal.Instantiate(m, getModuleName(module.Name, m))

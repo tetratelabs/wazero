@@ -354,11 +354,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf)
-						if err == nil {
-							_, err = store.Instantiate(mod, "")
-						}
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					case "assert_trap":
 						moduleName := lastInstanceName
 						if c.Action.Module != "" {
@@ -383,11 +379,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf)
-						if err == nil {
-							_, err = store.Instantiate(mod, "")
-						}
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					case "assert_exhaustion":
 						moduleName := lastInstanceName
 						if c.Action.Module != "" {
@@ -412,20 +404,11 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf)
-						if err == nil {
-							_, err = store.Instantiate(mod, "")
-						}
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					case "assert_uninstantiable":
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-
-						mod, err := binary.DecodeModule(buf)
-						require.NoError(t, err, msg)
-
-						_, err = store.Instantiate(mod, "")
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					default:
 						t.Fatalf("unsupported command type: %s", c)
 					}
@@ -433,6 +416,21 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 			}
 		})
 	}
+}
+
+func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg string) {
+	mod, err := binary.DecodeModule(buf)
+	if err != nil {
+		return
+	}
+
+	err = mod.Validate()
+	if err != nil {
+		return
+	}
+
+	_, err = store.Instantiate(mod, "")
+	require.Error(t, err, msg)
 }
 
 // basename avoids filepath.Base to ensure a forward slash is used even in Windows.

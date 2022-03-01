@@ -19,7 +19,7 @@ type (
 	// engine is an JIT implementation of internalwasm.Engine
 	engine struct {
 		// compiledFunctions are the currently compiled functions.
-		// The index means wasm.FunctionAddress, but we intentionally avoid using map
+		// The index means wasm.FunctionIndex, but we intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by
 		// using compiledFunctionsElement0Address.
 		compiledFunctions []*compiledFunction
@@ -141,7 +141,7 @@ type (
 
 		// Set when statusCode == jitStatusCall{HostFunction,BuiltInFunction}
 		// Indicating the function call index.
-		functionCallAddress wasm.FunctionAddress
+		functionCallAddress wasm.FunctionIndex
 	}
 
 	// callFrame holds the information to which the caller function can return.
@@ -227,13 +227,13 @@ const (
 	compiledFunctionStackPointerCeilOffset   = 8
 
 	// Offsets for wasm.TableElement
-	tableElementFunctionAddressOffset = 0
-	tableElementFunctionTypeIDOffset  = 8
+	tableElementFunctionIndexOffset  = 0
+	tableElementFunctionTypeIDOffset = 8
 
 	// Offsets for wasm.ModuleInstance
 	moduleInstanceGlobalsOffset = 48
 	moduleInstanceMemoryOffset  = 72
-	moduleInstanceTablesOffset  = 80
+	moduleInstanceTableOffset   = 80
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
@@ -316,6 +316,16 @@ func (c *callFrame) String() string {
 	)
 }
 
+// Release implements wasm.Engine Release
+func (e *engine) Release(f *wasm.FunctionInstance) error {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	e.compiledFunctions[f.Index] = nil
+
+	// TODO: UnMap memory region.
+	return nil
+}
+
 func (e *engine) Compile(f *wasm.FunctionInstance) (err error) {
 	var compiled *compiledFunction
 	if f.FunctionKind == wasm.FunctionKindWasm {
@@ -327,12 +337,12 @@ func (e *engine) Compile(f *wasm.FunctionInstance) (err error) {
 		return fmt.Errorf("failed to compile function: %w", err)
 	}
 
-	e.addCompiledFunction(f.Address, compiled)
+	e.addCompiledFunction(f.Index, compiled)
 	return
 }
 
-func (e *engine) addCompiledFunction(addr wasm.FunctionAddress, compiled *compiledFunction) {
-	if len(e.compiledFunctions) <= int(addr) {
+func (e *engine) addCompiledFunction(index wasm.FunctionIndex, compiled *compiledFunction) {
+	if len(e.compiledFunctions) <= int(index) {
 		// This case compiledFunctions slice needs to grow to store a new compiledFunction.
 		// However, it is read in newCallEngine, so we have to take write lock (via .Unlock)
 		// rather than read lock (via .RLock).
@@ -341,7 +351,7 @@ func (e *engine) addCompiledFunction(addr wasm.FunctionAddress, compiled *compil
 		// Double the size of compiled functions.
 		e.compiledFunctions = append(e.compiledFunctions, make([]*compiledFunction, len(e.compiledFunctions))...)
 	}
-	e.compiledFunctions[addr] = compiled
+	e.compiledFunctions[index] = compiled
 }
 
 func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
@@ -387,7 +397,7 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		vm.pushValue(param)
 	}
 
-	compiled := vm.compiledFunctions[f.Address]
+	compiled := vm.compiledFunctions[f.Index]
 	if compiled == nil {
 		err = fmt.Errorf("function not compiled")
 		return
@@ -475,11 +485,11 @@ func (vm *callEngine) valueStackTopIndex() uint64 {
 }
 
 const (
-	builtinFunctionAddressMemoryGrow wasm.FunctionAddress = iota
-	builtinFunctionAddressGrowValueStack
-	builtinFunctionAddressGrowCallFrameStack
-	// builtinFunctionAddressBreakPoint is internal (only for wazero developers). Disabled by default.
-	builtinFunctionAddressBreakPoint
+	builtinFunctionIndexMemoryGrow wasm.FunctionIndex = iota
+	builtinFunctionIndexGrowValueStack
+	builtinFunctionIndexGrowCallFrameStack
+	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
+	builtinFunctionIndexBreakPoint
 )
 
 // execHostFunction executes the given host function represented as *reflect.Value.
@@ -574,17 +584,17 @@ jitentry:
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch vm.exitContext.functionCallAddress {
-			case builtinFunctionAddressMemoryGrow:
+			case builtinFunctionIndexMemoryGrow:
 				callerCompiledFunction := vm.callFrameTop().compiledFunction
 				vm.builtinFunctionMemoryGrow(callerCompiledFunction.source.ModuleInstance.MemoryInstance)
-			case builtinFunctionAddressGrowValueStack:
+			case builtinFunctionIndexGrowValueStack:
 				callerCompiledFunction := vm.callFrameTop().compiledFunction
 				vm.builtinFunctionGrowValueStack(callerCompiledFunction.stackPointerCeil)
-			case builtinFunctionAddressGrowCallFrameStack:
+			case builtinFunctionIndexGrowCallFrameStack:
 				vm.builtinFunctionGrowCallFrameStack()
 			}
 			if buildoptions.IsDebugMode {
-				if vm.exitContext.functionCallAddress == builtinFunctionAddressBreakPoint {
+				if vm.exitContext.functionCallAddress == builtinFunctionIndexBreakPoint {
 					runtime.Breakpoint()
 				}
 			}
@@ -671,7 +681,7 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, err
 	}
 
-	if err = compiler.compileHostFunction(f.Address); err != nil {
+	if err = compiler.compileHostFunction(f.Index); err != nil {
 		return nil, err
 	}
 
