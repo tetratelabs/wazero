@@ -1247,7 +1247,10 @@ func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName str
 	store := wasm.NewStore(context.Background(), interpreter.NewEngine())
 
 	snapshotPreview1Functions := SnapshotPreview1Functions(opts...)
-	_, err = store.ExportHostFunctions(wasi.ModuleSnapshotPreview1, snapshotPreview1Functions)
+	_, err = store.ExportHostModule(&publicwasm.HostModuleConfig{
+		Name:      wasi.ModuleSnapshotPreview1,
+		Functions: snapshotPreview1Functions,
+	})
 	require.NoError(t, err)
 
 	instantiated, err := store.Instantiate(mod, moduleName)

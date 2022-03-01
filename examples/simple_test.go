@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 // Test_Simple implements a basic function in go: hello. This is imported as the Wasm name "$hello" and run on start.
@@ -20,7 +21,7 @@ func Test_Simple(t *testing.T) {
 	store := wazero.NewStore()
 
 	// Host functions can be exported as any module name, including the empty string.
-	env := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"hello": goFunc}}
+	env := &wasm.HostModuleConfig{Name: "", Functions: map[string]interface{}{"hello": goFunc}}
 	_, err := wazero.InstantiateHostModule(store, env)
 	require.NoError(t, err)
 

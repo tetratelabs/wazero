@@ -16,46 +16,58 @@ func (g *HostExports) Function(name string) publicwasm.HostFunction {
 	return g.NameToFunctionInstance[name]
 }
 
-func (s *Store) getOrCreateHostModuleInstance(moduleName string) *ModuleInstance {
-	if m, ok := s.moduleInstances[moduleName]; ok {
-		return m
-	}
-
-	m := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, 0)}
-	s.moduleInstances[moduleName] = m
-	return m
-}
-
 // ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func (s *Store) ExportHostFunctions(moduleName string, nameToGoFunc map[string]interface{}) (publicwasm.HostExports, error) {
+func (s *Store) ExportHostModule(config *publicwasm.HostModuleConfig) (publicwasm.HostExports, error) {
+	moduleName := config.Name
+
 	if err := s.requireModuleUnused(moduleName); err != nil {
 		return nil, err
 	}
 
-	exportCount := len(nameToGoFunc)
+	m := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, 0)}
+	s.moduleInstances[moduleName] = m
 
-	m := s.getOrCreateHostModuleInstance(moduleName)
-	ret := HostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
+	if err := s.exportHostFunctions(m, config.Functions); err != nil {
+		return nil, s.ReleaseModuleInstance(m)
+	}
+
+	if err := s.exportHostGlobals(m, config.Globals); err != nil {
+		return nil, s.ReleaseModuleInstance(m)
+	}
+
+	if err := s.exportHostTableInstance(m, config.Table); err != nil {
+		return nil, s.ReleaseModuleInstance(m)
+	}
+
+	if err := s.exportHostMemoryInstance(m, config.Memory); err != nil {
+		return nil, s.ReleaseModuleInstance(m)
+	}
+
+	return nil, nil
+}
+
+// ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
+func (s *Store) exportHostFunctions(m *ModuleInstance, nameToGoFunc map[string]interface{}) error {
 	for name, goFunc := range nameToGoFunc {
-		if hf, err := NewGoFunc(name, goFunc); err != nil {
-			return nil, err
-		} else if function, err := s.exportHostFunction(m, hf); err != nil {
-			return nil, err
-		} else {
-			ret.NameToFunctionInstance[name] = function
+		hf, err := NewGoFunc(name, goFunc)
+		if err != nil {
+			return err
+		}
+		if err = s.exportHostFunction(m, hf); err != nil {
+			return err
 		}
 	}
-	return &ret, nil
+	return nil
 }
 
 // exportHostFunction exports a function so that it can be imported under the given module and name. If a function already
 // exists for this module and name it is ignored rather than overwritten.
 //
 // Note: The wasm.Memory of the fn will be from the importing module.
-func (s *Store) exportHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
+func (s *Store) exportHostFunction(m *ModuleInstance, hf *GoFunc) error {
 	typeInstance, err := s.getTypeInstance(hf.functionType)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	f := &FunctionInstance{
@@ -69,49 +81,62 @@ func (s *Store) exportHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInst
 	s.addFunctionInstances(f)
 
 	if err = s.engine.Compile(f); err != nil {
-		return nil, fmt.Errorf("failed to compile %s: %v", f.Name, err)
+		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
 
 	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Type: ExternTypeFunc, Function: f}); err != nil {
-		return nil, err
+		return err
 	}
 
 	m.Functions = append(m.Functions, f)
-	return f, nil
+	return nil
 }
 
-func (s *Store) ExportHostGlobal(m *ModuleInstance, name string, value uint64, valueType ValueType, mutable bool) error {
-	g := &GlobalInstance{
-		Val:  value,
-		Type: &GlobalType{Mutable: mutable, ValType: valueType},
+func (s *Store) exportHostGlobals(m *ModuleInstance, globals map[string]*publicwasm.HostModuleConfigGlobal) error {
+	for name, config := range globals {
+		g := &GlobalInstance{
+			Val:  config.Value,
+			Type: &GlobalType{ValType: config.Type},
+		}
+
+		m.Globals = append(m.Globals, g)
+		s.addGlobalInstances(g)
+
+		if err := m.addExport(name, &ExportInstance{Type: ExternTypeGlobal, Global: g}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) exportHostTableInstance(m *ModuleInstance, config *publicwasm.HostModuleConfigTable) error {
+	if config == nil {
+		return nil
 	}
 
-	m.Globals = append(m.Globals, g)
-	s.addGlobalInstances(g)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeGlobal, Global: g})
-}
-
-func (s *Store) ExportHostTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
-	t := newTableInstance(min, max)
+	t := newTableInstance(config.Min, config.Max)
 
 	// TODO: check if the module already has memory, and if so, returns error.
 	m.TableInstance = t
 	s.addTableInstance(t)
 
-	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
+	return m.addExport(config.Name, &ExportInstance{Type: ExternTypeTable, Table: t})
 }
 
-func (s *Store) ExportHostMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
+func (s *Store) exportHostMemoryInstance(m *ModuleInstance, config *publicwasm.HostModuleConfigMemory) error {
+	if config == nil {
+		return nil
+	}
+
 	memory := &MemoryInstance{
-		Buffer: make([]byte, MemoryPagesToBytesNum(min)),
-		Min:    min,
-		Max:    max,
+		Buffer: make([]byte, MemoryPagesToBytesNum(config.Min)),
+		Min:    config.Min,
+		Max:    config.Max,
 	}
 
 	// TODO: check if the module already has memory, and if so, returns error.
 	m.MemoryInstance = memory
 	s.addMemoryInstance(memory)
 
-	return m.addExport(name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
+	return m.addExport(config.Name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
 }

@@ -33,12 +33,12 @@ type WASIConfig struct {
 }
 
 // WASISnapshotPreview1 are functions importable as the module name wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1() *HostModuleConfig {
+func WASISnapshotPreview1() *wasm.HostModuleConfig {
 	return WASISnapshotPreview1WithConfig(&WASIConfig{})
 }
 
 // WASISnapshotPreview1WithConfig are functions importable as the module name wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
+func WASISnapshotPreview1WithConfig(c *WASIConfig) *wasm.HostModuleConfig {
 	// TODO: delete the internalwasi.Option types as they are not accessible as they are internal!
 	var opts []internalwasi.Option
 	if c.Stdin != nil {
@@ -73,7 +73,7 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
 			opts = append(opts, internalwasi.Preopen(k, v))
 		}
 	}
-	return &HostModuleConfig{Name: wasi.ModuleSnapshotPreview1, Functions: internalwasi.SnapshotPreview1Functions(opts...)}
+	return &wasm.HostModuleConfig{Name: wasi.ModuleSnapshotPreview1, Functions: internalwasi.SnapshotPreview1Functions(opts...)}
 }
 
 // StartWASICommand instantiates the module and starts its WASI Command function ("_start"). The return value are all
