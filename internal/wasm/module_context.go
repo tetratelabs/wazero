@@ -68,6 +68,15 @@ func (c *ModuleContext) Function(name string) publicwasm.Function {
 	return &exportedFunction{module: c, function: exp.Function}
 }
 
+// Function implements wasm.ModuleContext Global
+func (c *ModuleContext) Global(name string) publicwasm.Global {
+	exp, err := c.module.getExport(name, ExternTypeGlobal)
+	if err != nil {
+		return nil
+	}
+	return exp.Global
+}
+
 // exportedFunction wraps FunctionInstance so that it is called in context of the exporting module.
 type exportedFunction struct {
 	module   *ModuleContext
@@ -107,4 +116,12 @@ func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) 
 		return nil, fmt.Errorf("this function was not imported by %s", ctx)
 	}
 	return modCtx.engine.Call(modCtx, f, params...)
+}
+
+func (g *GlobalInstance) Value() uint64 {
+	return g.Val
+}
+
+func (g *GlobalInstance) Type() ValueType {
+	return g.GlobalType.ValType
 }

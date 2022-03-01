@@ -210,14 +210,14 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
-			out: []UnsignedType{wasmValueTypeToUnsignedType(f.ModuleInstance.Globals[index].Type.ValType)},
+			out: []UnsignedType{wasmValueTypeToUnsignedType(f.ModuleInstance.Globals[index].GlobalType.ValType)},
 		}, nil
 	case wasm.OpcodeGlobalSet:
 		if len(f.ModuleInstance.Globals) <= int(index) {
 			return nil, fmt.Errorf("invalid global index for global.get %d >= %d", index, len(f.ModuleInstance.Globals))
 		}
 		return &signature{
-			in: []UnsignedType{wasmValueTypeToUnsignedType(f.ModuleInstance.Globals[index].Type.ValType)},
+			in: []UnsignedType{wasmValueTypeToUnsignedType(f.ModuleInstance.Globals[index].GlobalType.ValType)},
 		}, nil
 	case wasm.OpcodeI32Load:
 		return signature_I32_I32, nil

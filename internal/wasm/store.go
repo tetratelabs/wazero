@@ -34,7 +34,7 @@ type (
 		moduleInstances map[string]*ModuleInstance
 
 		// hostExports holds host functions by module name from ExportHostFunctions.
-		hostExports map[string]*HostExports
+		hostExports map[string]*hostExports
 
 		// ModuleContexts holds default host function call contexts keyed by module name.
 		moduleContexts map[string]*ModuleContext
@@ -452,10 +452,10 @@ func (s *Store) resolveImports(module *Module) (
 		case ExternTypeGlobal:
 			globalType := is.DescGlobal
 			g := exp.Global
-			if globalType.Mutable != g.Type.Mutable {
+			if globalType.Mutable != g.GlobalType.Mutable {
 				err = fmt.Errorf("incompatible global import: mutability mismatch")
 				return
-			} else if globalType.ValType != g.Type.ValType {
+			} else if globalType.ValType != g.GlobalType.ValType {
 				err = fmt.Errorf("incompatible global import: value type mismatch")
 				return
 			}

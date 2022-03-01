@@ -88,7 +88,7 @@ type (
 	// GlobalInstance represents a global instance in a store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0
 	GlobalInstance struct {
-		Type *GlobalType
+		GlobalType *GlobalType
 		// Val holds a 64-bit representation of the actual value.
 		Val   uint64
 		index globalIndex
@@ -308,7 +308,7 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	case OpcodeGlobalGet:
 		id, _, _ := leb128.DecodeUint32(r)
 		g := globals[id]
-		switch g.Type.ValType {
+		switch g.GlobalType.ValType {
 		case ValueTypeI32:
 			v = int32(g.Val)
 		case ValueTypeI64:

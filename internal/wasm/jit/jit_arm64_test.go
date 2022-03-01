@@ -2249,7 +2249,7 @@ func TestArm64Compiler_compileGlobalGet(t *testing.T) {
 			compiler := env.requireNewCompiler(t)
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, Type: &wasm.GlobalType{ValType: tp}}}
+			globals := []*wasm.GlobalInstance{nil, {Val: globalValue, GlobalType: &wasm.GlobalType{ValType: tp}}}
 			env.addGlobals(globals...)
 
 			// Emit the code.
@@ -2299,7 +2299,7 @@ func TestArm64Compiler_compileGlobalSet(t *testing.T) {
 			compiler := env.requireNewCompiler(t)
 
 			// Setup the global. (Start with nil as a dummy so that global index can be non-trivial.)
-			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, Type: &wasm.GlobalType{ValType: tp}})
+			env.addGlobals(nil, &wasm.GlobalInstance{Val: 40, GlobalType: &wasm.GlobalType{ValType: tp}})
 
 			err := compiler.compilePreamble()
 			require.NoError(t, err)

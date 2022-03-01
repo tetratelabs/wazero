@@ -383,8 +383,8 @@ func (m *Module) buildGlobalInstances(importedGlobals []*GlobalInstance) (global
 			gv = publicwasm.EncodeF64(v)
 		}
 		globals = append(globals, &GlobalInstance{
-			Type: gs.Type,
-			Val:  gv,
+			GlobalType: gs.Type,
+			Val:        gv,
 		})
 	}
 	return

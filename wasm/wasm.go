@@ -74,6 +74,9 @@ type ModuleExports interface {
 
 	// Function returns a function exported from this module or nil if it wasn't.
 	Function(name string) Function
+
+	// TODO
+	Global(name string) Global
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.InstantiateModule).
@@ -103,6 +106,11 @@ type Function interface {
 	//		results, err := fn(ctx.Context(), offset, byteCount)
 	//	--snip--
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
+}
+
+type Global interface {
+	Value() uint64
+	Type() ValueType
 }
 
 // HostExports return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (20191205).

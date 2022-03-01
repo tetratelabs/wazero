@@ -313,33 +313,28 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								requireValueEq(t, vals[i], exp, types[i], msg)
 							}
 						case "get":
-							// TODO: See https://github.com/tetratelabs/wazero/issues/279
-							t.Skip()
-							// _, exps := c.getAssertReturnArgsExps()
-							// require.Len(t, exps, 1)
-							// msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
-							// if c.Action.Module != "" {
-							// 	msg += " in module " + c.Action.Module
-							// }
-							// inst, ok := store.ModuleInstances[moduleName]
-							// require.True(t, ok, msg)
-							// addr, err := inst.GetExport(c.Action.Field, wasm.ExternTypeGlobal)
-							// require.NoError(t, err)
-							// actual := addr.Global
-							// var expType wasm.ValueType
-							// switch c.Exps[0].ValType {
-							// case "i32":
-							// 	expType = wasm.ValueTypeI32
-							// case "i64":
-							// 	expType = wasm.ValueTypeI64
-							// case "f32":
-							// 	expType = wasm.ValueTypeF32
-							// case "f64":
-							// 	expType = wasm.ValueTypeF64
-							// }
-							// require.NotNil(t, actual, msg)
-							// require.Equal(t, expType, actual.Type.ValType, msg)
-							// require.Equal(t, exps[0], actual.Val, expType, msg)
+							_, exps := c.getAssertReturnArgsExps()
+							require.Len(t, exps, 1)
+							msg = fmt.Sprintf("%s invoke %s (%s)", msg, c.Action.Field, c.Action.Args)
+							if c.Action.Module != "" {
+								msg += " in module " + c.Action.Module
+							}
+							exports := store.ModuleExports(moduleName)
+							global := exports.Global(c.Action.Field)
+							var expType wasm.ValueType
+							switch c.Exps[0].ValType {
+							case "i32":
+								expType = wasm.ValueTypeI32
+							case "i64":
+								expType = wasm.ValueTypeI64
+							case "f32":
+								expType = wasm.ValueTypeF32
+							case "f64":
+								expType = wasm.ValueTypeF64
+							}
+							require.NotNil(t, global, msg)
+							require.Equal(t, expType, global.Type(), msg)
+							require.Equal(t, exps[0], global.Value(), expType, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

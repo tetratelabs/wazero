@@ -6,13 +6,13 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
-// HostExports implements wasm.HostExports
-type HostExports struct {
+// hostExports implements wasm.HostExports
+type hostExports struct {
 	NameToFunctionInstance map[string]*FunctionInstance
 }
 
 // Function implements wasm.HostExports Function
-func (g *HostExports) Function(name string) publicwasm.HostFunction {
+func (g *hostExports) Function(name string) publicwasm.HostFunction {
 	return g.NameToFunctionInstance[name]
 }
 
@@ -43,7 +43,7 @@ func (s *Store) ExportHostModule(config *publicwasm.HostModuleConfig) (publicwas
 		return nil, s.ReleaseModuleInstance(m)
 	}
 
-	ret := &HostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, len(config.Functions))}
+	ret := &hostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, len(config.Functions))}
 	for name := range config.Functions {
 		ret.NameToFunctionInstance[name] = m.Exports[name].Function
 	}
@@ -100,8 +100,8 @@ func (s *Store) exportHostFunction(m *ModuleInstance, hf *GoFunc) error {
 func (s *Store) exportHostGlobals(m *ModuleInstance, globals map[string]*publicwasm.HostModuleConfigGlobal) error {
 	for name, config := range globals {
 		g := &GlobalInstance{
-			Val:  config.Value,
-			Type: &GlobalType{ValType: config.Type},
+			Val:        config.Value,
+			GlobalType: &GlobalType{ValType: config.Type},
 		}
 
 		m.Globals = append(m.Globals, g)
