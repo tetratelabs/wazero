@@ -51,7 +51,9 @@ func TestFuncParser(t *testing.T) {
 				return parseErr, nil
 			}
 
-			require.NoError(t, parseFunc(newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), setFunc), tc.source))
+			module := &wasm.Module{}
+			fp := newFuncParser(&typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
+			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
 	}
@@ -107,7 +109,8 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 				return parseErr, nil
 			}
 
-			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), setFunc)
+			module := &wasm.Module{}
+			fp := newFuncParser(&typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expectedCode, parsedCode)
 			require.Equal(t, []*unresolvedIndex{tc.expectedUnresolvedIndex}, fp.funcNamespace.unresolvedIndices)
@@ -141,7 +144,10 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			funcNamespace := newIndexNamespace()
+			funcNamespace := newIndexNamespace(func(sectionID wasm.SectionID) uint32 {
+				require.Equal(t, wasm.SectionIDFunction, sectionID)
+				return 0
+			})
 			_, err := funcNamespace.setID([]byte("$not_main"))
 			require.NoError(t, err)
 			funcNamespace.count++
@@ -221,7 +227,8 @@ func TestFuncParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, newIndexNamespace(), failOnFunc)
+			module := &wasm.Module{}
+			fp := newFuncParser(&typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), failOnFunc)
 			require.EqualError(t, parseFunc(fp, tc.source), tc.expectedErr)
 		})
 	}

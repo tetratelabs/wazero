@@ -138,9 +138,9 @@ func DecodeModule(source []byte) (result *wasm.Module, err error) {
 
 func newModuleParser(module *wasm.Module) *moduleParser {
 	p := moduleParser{module: module,
-		typeNamespace:   newIndexNamespace(),
-		funcNamespace:   newIndexNamespace(),
-		memoryNamespace: newIndexNamespace(),
+		typeNamespace:   newIndexNamespace(module.SectionElementCount),
+		funcNamespace:   newIndexNamespace(module.SectionElementCount),
+		memoryNamespace: newIndexNamespace(module.SectionElementCount),
 	}
 	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
 	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
@@ -183,7 +183,6 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 			return p.parseImportModule, nil
 		case wasm.ExternTypeFuncName:
 			p.pos = positionFunc
-			p.funcParser.currentIdx = p.module.SectionElementCount(wasm.SectionIDFunction)
 			return p.funcParser.begin, nil
 		case wasm.ExternTypeTableName:
 			return nil, fmt.Errorf("TODO: %s", tokenBytes)
@@ -369,12 +368,10 @@ func (p *moduleParser) addFunctionName(name string) {
 // Ex. If there is no signature `(import "" "main" (func))`
 //                     calls onImportFunc here ---^
 func (p *moduleParser) parseImportFunc(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	idx := p.module.SectionElementCount(wasm.SectionIDImport)
 	if tok == tokenID { // Ex. (func $main $main)
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
 	}
-
-	return p.typeUseParser.begin(wasm.SectionIDImport, idx, p.onImportFunc, tok, tokenBytes, line, col)
+	return p.typeUseParser.begin(wasm.SectionIDImport, p.onImportFunc, tok, tokenBytes, line, col)
 }
 
 // onImportFunc records the type index and local names of the current imported function, and increments
@@ -530,8 +527,7 @@ func (p *moduleParser) parseExportDesc(tok tokenType, tokenBytes []byte, line, c
 	default:
 		panic(fmt.Errorf("BUG: unhandled parsing state on parseExportDesc: %v", p.pos))
 	}
-	eIdx := p.module.SectionElementCount(wasm.SectionIDExport)
-	typeIdx, resolved, err := namespace.parseIndex(wasm.SectionIDExport, eIdx, 0, tok, tokenBytes, line, col)
+	typeIdx, resolved, err := namespace.parseIndex(wasm.SectionIDExport, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}
@@ -539,6 +535,7 @@ func (p *moduleParser) parseExportDesc(tok tokenType, tokenBytes []byte, line, c
 
 	// All sections in wasm.Module are numeric indices except exports. Hence, we have to special-case here
 	if !resolved {
+		eIdx := p.module.SectionElementCount(wasm.SectionIDExport)
 		if p.unresolvedExports == nil {
 			p.unresolvedExports = map[wasm.Index]*wasm.Export{eIdx: e}
 		} else {
@@ -580,7 +577,7 @@ func (p *moduleParser) parseExportEnd(tok tokenType, tokenBytes []byte, _, _ uin
 
 // parseStart returns parseStartEnd after recording the start function index, or errs if it couldn't be read.
 func (p *moduleParser) parseStart(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	idx, _, err := p.funcNamespace.parseIndex(wasm.SectionIDStart, 0, 0, tok, tokenBytes, line, col)
+	idx, _, err := p.funcNamespace.parseIndex(wasm.SectionIDStart, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}
