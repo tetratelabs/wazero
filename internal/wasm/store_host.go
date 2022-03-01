@@ -24,7 +24,7 @@ func (s *Store) ExportHostModule(config *publicwasm.HostModuleConfig) (publicwas
 		return nil, err
 	}
 
-	m := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, 0)}
+	m := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance)}
 	s.moduleInstances[moduleName] = m
 
 	if err := s.exportHostFunctions(m, config.Functions); err != nil {
