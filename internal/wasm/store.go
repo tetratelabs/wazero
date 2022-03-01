@@ -859,7 +859,7 @@ func (s *Store) AddTableInstance(m *ModuleInstance, name string, min uint32, max
 
 func (s *Store) AddMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
-		Buffer: make([]byte, memoryPagesToBytesNum(min)),
+		Buffer: make([]byte, MemoryPagesToBytesNum(min)),
 		Min:    min,
 		Max:    max,
 	}

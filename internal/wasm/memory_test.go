@@ -14,7 +14,7 @@ func TestMemoryPageConsts(t *testing.T) {
 
 func Test_MemoryPagesToBytesNum(t *testing.T) {
 	for _, numPage := range []uint32{0, 1, 5, 10} {
-		require.Equal(t, uint64(numPage*MemoryPageSize), memoryPagesToBytesNum(numPage))
+		require.Equal(t, uint64(numPage*MemoryPageSize), MemoryPagesToBytesNum(numPage))
 	}
 }
 

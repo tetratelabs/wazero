@@ -124,7 +124,7 @@ func (m *MemoryInstance) Write(offset uint32, val []byte) bool {
 }
 
 // MemoryPagesToBytesNum converts the given pages into the number of bytes contained in these pages.
-func memoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
+func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 	return uint64(pages) << MemoryPageSizeInBits
 }
 
@@ -151,7 +151,7 @@ func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
 		return 0xffffffff // = -1 in signed 32 bit integer.
 	} else {
 		// Otherwise, grow the memory.
-		m.Buffer = append(m.Buffer, make([]byte, memoryPagesToBytesNum(newPages))...)
+		m.Buffer = append(m.Buffer, make([]byte, MemoryPagesToBytesNum(newPages))...)
 		return currentPages
 	}
 }
