@@ -320,9 +320,13 @@ func (c *callFrame) String() string {
 func (e *engine) Release(f *wasm.FunctionInstance) error {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.compiledFunctions[f.Index] = nil
 
-	// TODO: UnMap memory region.
+	codeSegment := e.compiledFunctions[f.Index].codeSegment
+	if err := munmapCodeSegment(codeSegment); err != nil {
+		return err
+	}
+
+	e.compiledFunctions[f.Index] = nil
 	return nil
 }
 

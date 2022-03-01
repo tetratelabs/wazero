@@ -18,6 +18,11 @@ func mmapCodeSegment(code []byte) ([]byte, error) {
 	}
 }
 
+// munmapCodeSegment unmaps the given memory region.
+func munmapCodeSegment(code []byte) error {
+	return syscall.Munmap(code)
+}
+
 // mmapCodeSegmentAMD64 gives all read-write-exec permission to the mmap region
 // to enter the function. Otherwise, segmentation fault exeception is raied.
 func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
