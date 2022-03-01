@@ -19,7 +19,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 	hostModule := &ModuleInstance{Name: "test", Exports: make(map[string]*ExportInstance, 1)}
 	s.moduleInstances[hostModule.Name] = hostModule
 
-	_, err = s.exportHostFunction(hostModule, hf)
+	err = s.exportHostFunction(hostModule, hf)
 	require.NoError(t, err)
 
 	// The function was added to the store, prefixed by the owning module name
@@ -33,7 +33,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 	require.True(t, ok)
 
 	// Trying to register it again should fail
-	_, err = s.exportHostFunction(hostModule, hf)
+	err = s.exportHostFunction(hostModule, hf)
 	require.EqualError(t, err, `"fn" is already exported in module "test"`)
 
 	// Any side effects should be reverted
@@ -50,7 +50,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 	// Add the host module
 	hostModule := &ModuleInstance{Name: "", Exports: make(map[string]*ExportInstance, 1)}
 	s.moduleInstances[hostModule.Name] = hostModule
-	_, err = s.exportHostFunction(hostModule, hf)
+	err = s.exportHostFunction(hostModule, hf)
 	require.NoError(t, err)
 
 	t.Run("ModuleInstance is the importing module", func(t *testing.T) {

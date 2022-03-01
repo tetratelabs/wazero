@@ -17,6 +17,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
+	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 //go:embed testdata/*.wasm
@@ -184,12 +185,9 @@ func (c command) expectedError() (err error) {
 	return
 }
 
-// TODO: Fix
 func addSpectestModule(t *testing.T, store *wasm.Store) {
-	// Add the host module
-	spectest := &wasm.ModuleInstance{Name: "spectest", Exports: map[string]*wasm.ExportInstance{}}
-	store.ModuleInstances[spectest.Name] = spectest
-
+	tableLimitMax := uint32(20)
+	memoryLimitMax := uint32(2)
 	var printV = func() {}
 	var printI32 = func(uint32) {}
 	var printF32 = func(float32) {}
@@ -198,43 +196,40 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	var printI32F32 = func(uint32, float32) {}
 	var printF64F64 = func(float64, float64) {}
 
-	for n, v := range map[string]interface{}{
-		"print":         printV,
-		"print_i32":     printI32,
-		"print_f32":     printF32,
-		"print_i64":     printI64,
-		"print_f64":     printF64,
-		"print_i32_f32": printI32F32,
-		"print_f64_f64": printF64F64,
-	} {
-		fn, err := wasm.NewGoFunc(n, v)
-		require.NoError(t, err)
-		_, err = store.AddHostFunction(spectest, fn)
-		require.NoError(t, err, "AddHostFunction(%s)", n)
+	config := &publicwasm.HostModuleConfig{
+		Name: "spectest",
+		Functions: map[string]interface{}{
+			"print":         printV,
+			"print_i32":     printI32,
+			"print_f32":     printF32,
+			"print_i64":     printI64,
+			"print_f64":     printF64,
+			"print_i32_f32": printI32F32,
+			"print_f64_f64": printF64F64,
+		},
+		Globals: map[string]*publicwasm.HostModuleConfigGlobal{
+			"global_i32": {Type: wasm.ValueTypeI32, Value: uint64(int32(666))},
+			"global_i64": {Type: wasm.ValueTypeI64, Value: uint64(int64(666))},
+			"global_f32": {Type: wasm.ValueTypeF32, Value: uint64(uint32(0x44268000))},
+			"global_f64": {Type: wasm.ValueTypeF64, Value: uint64(0x4084d00000000000)},
+		},
+		Table: &publicwasm.HostModuleConfigTable{
+			Name: "table",
+			Min:  10,
+			Max:  &tableLimitMax,
+		},
+		Memory: &publicwasm.HostModuleConfigMemory{
+			Name: "memory",
+			Min:  10,
+			Max:  &memoryLimitMax,
+		},
 	}
 
-	for _, g := range []struct {
-		name      string
-		valueType wasm.ValueType
-		value     uint64
-	}{
-		{name: "global_i32", valueType: wasm.ValueTypeI32, value: uint64(int32(666))},
-		{name: "global_i64", valueType: wasm.ValueTypeI64, value: uint64(int64(666))},
-		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
-		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
-	} {
-		require.NoError(t, store.AddGlobal(spectest, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
-	}
-
-	tableLimitMax := uint32(20)
-	require.NoError(t, store.AddTableInstance(spectest, "table", 10, &tableLimitMax))
-
-	memoryLimitMax := uint32(2)
-	require.NoError(t, store.AddMemoryInstance(spectest, "memory", 1, &memoryLimitMax))
+	_, err := store.ExportHostModule(config)
+	require.NoError(t, err)
 }
 
 func TestJIT(t *testing.T) {
-	t.Skip()
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
@@ -242,7 +237,6 @@ func TestJIT(t *testing.T) {
 }
 
 func TestInterpreter(t *testing.T) {
-	t.Skip()
 	runTest(t, interpreter.NewEngine)
 }
 
@@ -273,7 +267,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 
 		t.Run(wastName, func(t *testing.T) {
 			store := wasm.NewStore(context.Background(), newEngine())
-			// addSpectestModule(t, store)
+			addSpectestModule(t, store)
 
 			var lastInstanceName string
 			for _, c := range base.Commands {

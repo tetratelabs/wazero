@@ -125,7 +125,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 			// Add the host module
 			hostModule := &ModuleInstance{Name: "host", Exports: map[string]*ExportInstance{}}
 			store.moduleInstances[hostModule.Name] = hostModule
-			_, err = store.exportHostFunction(hostModule, fn)
+			err = store.exportHostFunction(hostModule, fn)
 			require.NoError(t, err)
 
 			// Make a module to import the function

@@ -43,7 +43,12 @@ func (s *Store) ExportHostModule(config *publicwasm.HostModuleConfig) (publicwas
 		return nil, s.ReleaseModuleInstance(m)
 	}
 
-	return nil, nil
+	ret := &HostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, len(config.Functions))}
+	for name := range config.Functions {
+		ret.NameToFunctionInstance[name] = m.Exports[name].Function
+	}
+
+	return ret, nil
 }
 
 // ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.

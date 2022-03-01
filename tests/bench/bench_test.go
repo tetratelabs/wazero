@@ -135,7 +135,7 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
 
-	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
+	env := &wasm.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
 	_, err := wazero.InstantiateHostModule(store, env)
 	if err != nil {
 		b.Fatal(err)
