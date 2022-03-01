@@ -7,8 +7,9 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func newIndexNamespace() *indexNamespace {
-	return &indexNamespace{idToIdx: map[string]wasm.Index{}}
+// newIndexNamespace sectionElementCount parameter should be internalwasm.Module SectionElementCount unless testing.
+func newIndexNamespace(sectionElementCount func(wasm.SectionID) uint32) *indexNamespace {
+	return &indexNamespace{sectionElementCount: sectionElementCount, idToIdx: map[string]wasm.Index{}}
 }
 
 // indexNamespace contains the count in an index namespace and any association of symbolic IDs to numeric indices.
@@ -21,6 +22,8 @@ func newIndexNamespace() *indexNamespace {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-context
 type indexNamespace struct {
+	sectionElementCount func(wasm.SectionID) uint32
+
 	unresolvedIndices []*unresolvedIndex
 
 	// count is the count of items in this namespace
@@ -57,7 +60,7 @@ func (i *indexNamespace) requireNoID(idToken []byte) (string, error) {
 }
 
 // parseIndex is a tokenParser called in a field that can only contain a symbolic identifier or raw numeric index.
-func (i *indexNamespace) parseIndex(section wasm.SectionID, idx wasm.Index, bodyOffset uint32, tok tokenType, tokenBytes []byte, line, col uint32) (targetIdx wasm.Index, resolved bool, err error) {
+func (i *indexNamespace) parseIndex(section wasm.SectionID, bodyOffset uint32, tok tokenType, tokenBytes []byte, line, col uint32) (targetIdx wasm.Index, resolved bool, err error) {
 	switch tok {
 	case tokenUN: // Ex. 2
 		if i, overflow := decodeUint32(tokenBytes); overflow {
@@ -69,12 +72,12 @@ func (i *indexNamespace) parseIndex(section wasm.SectionID, idx wasm.Index, body
 		if targetIdx < i.count {
 			resolved = true
 		} else {
-			i.recordOutOfRange(section, idx, bodyOffset, targetIdx, line, col)
+			i.recordOutOfRange(section, bodyOffset, targetIdx, line, col)
 		}
 	case tokenID: // Ex. $main
 		targetID := string(stripDollar(tokenBytes))
 		if targetIdx, resolved = i.idToIdx[targetID]; !resolved {
-			i.recordUnresolved(section, idx, bodyOffset, targetID, line, col)
+			i.recordUnresolved(section, bodyOffset, targetID, line, col)
 		}
 		return
 	case tokenRParen:
@@ -88,14 +91,16 @@ func (i *indexNamespace) parseIndex(section wasm.SectionID, idx wasm.Index, body
 // recordUnresolved records an ID, such as "main", is not yet resolvable.
 //
 // See unresolvedIndex for parameter descriptions
-func (i *indexNamespace) recordUnresolved(section wasm.SectionID, idx wasm.Index, bodyOffset uint32, targetID string, line, col uint32) {
+func (i *indexNamespace) recordUnresolved(section wasm.SectionID, bodyOffset uint32, targetID string, line, col uint32) {
+	idx := i.sectionElementCount(section)
 	i.unresolvedIndices = append(i.unresolvedIndices, &unresolvedIndex{section: section, idx: idx, bodyOffset: bodyOffset, targetID: targetID, line: line, col: col})
 }
 
 // recordUnresolved records numeric index is currently out of bounds.
 //
 // See unresolvedIndex for parameter descriptions
-func (i *indexNamespace) recordOutOfRange(section wasm.SectionID, idx wasm.Index, bodyOffset uint32, targetIdx wasm.Index, line, col uint32) {
+func (i *indexNamespace) recordOutOfRange(section wasm.SectionID, bodyOffset uint32, targetIdx wasm.Index, line, col uint32) {
+	idx := i.sectionElementCount(section)
 	i.unresolvedIndices = append(i.unresolvedIndices, &unresolvedIndex{section: section, idx: idx, bodyOffset: bodyOffset, targetIdx: targetIdx, line: line, col: col})
 }
 

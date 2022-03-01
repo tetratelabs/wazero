@@ -81,7 +81,8 @@ func TestTypeUseParser_InlinesTypesWhenNotYetAdded(t *testing.T) {
 	}
 
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		module := &wasm.Module{}
+		tp := newTypeUseParser(module, newIndexNamespace(module.SectionElementCount))
 		return tp, func(t *testing.T) {
 			// We should have inlined the type, and it is the first type use, which means the inlined index is zero
 			require.Zero(t, tp.inlinedTypeIndices[0].inlinedIdx)
@@ -116,7 +117,8 @@ func TestTypeUseParser_UnresolvedType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		module := &wasm.Module{}
+		tp := newTypeUseParser(module, newIndexNamespace(module.SectionElementCount))
 		return tp, func(t *testing.T) {
 			require.NotNil(t, tp.typeNamespace.unresolvedIndices)
 			if tc.expectedInlinedType == nil {
@@ -207,10 +209,9 @@ func TestTypeUseParser_ReuseExistingType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		typeNamespace := newIndexNamespace()
-
 		// Add types to cover the main ways types uses are declared
 		module := &wasm.Module{TypeSection: []*wasm.FunctionType{v_i32, v_v, i32_v, i32i64_i32}}
+		typeNamespace := newIndexNamespace(module.SectionElementCount)
 		_, err := typeNamespace.setID([]byte("$v_i32"))
 		require.NoError(t, err)
 		typeNamespace.count++
@@ -260,7 +261,8 @@ func TestTypeUseParser_ReuseExistingInlinedType(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		module := &wasm.Module{}
+		tp := newTypeUseParser(module, newIndexNamespace(module.SectionElementCount))
 		// inline a type that doesn't match the test
 		require.NoError(t, parseTypeUse(tp, "((param i32 i64))", ignoreTypeUse))
 		// inline the test type
@@ -305,7 +307,8 @@ func TestTypeUseParser_BeginResets(t *testing.T) {
 		},
 	}
 	runTypeUseParserTests(t, tests, func(tc *typeUseParserTest) (*typeUseParser, func(t *testing.T)) {
-		tp := newTypeUseParser(&wasm.Module{}, newIndexNamespace())
+		module := &wasm.Module{}
+		tp := newTypeUseParser(module, newIndexNamespace(module.SectionElementCount))
 		// inline a type that uses all fields
 		require.NoError(t, parseTypeUse(tp, "((type $i32i64_i32) (param $x i32) (param $y i64) (result i32))", ignoreTypeUse))
 		require.NoError(t, parseTypeUse(tp, tc.source, ignoreTypeUse))
@@ -482,17 +485,18 @@ func TestTypeUseParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			err := parseTypeUse(newTypeUseParser(&wasm.Module{}, newIndexNamespace()), tc.source, failOnTypeUse)
+			module := &wasm.Module{}
+			tp := newTypeUseParser(module, newIndexNamespace(module.SectionElementCount))
+			err := parseTypeUse(tp, tc.source, failOnTypeUse)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }
 
 func TestTypeUseParser_FailsMatch(t *testing.T) {
-	typeNamespace := newIndexNamespace()
-
 	// Add types to cover the main ways types uses are declared
 	module := &wasm.Module{TypeSection: []*wasm.FunctionType{v_v, i32i64_i32}}
+	typeNamespace := newIndexNamespace(module.SectionElementCount)
 	_, err := typeNamespace.setID([]byte("$v_v"))
 	require.NoError(t, err)
 	typeNamespace.count++
@@ -544,7 +548,7 @@ var failOnTypeUse onTypeUse = func(typeIdx wasm.Index, paramNames wasm.NameMap, 
 
 func parseTypeUse(tp *typeUseParser, source string, onTypeUse onTypeUse) error {
 	var parser tokenParser = func(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-		return tp.begin(wasm.SectionIDFunction, 0, onTypeUse, tok, tokenBytes, line, col)
+		return tp.begin(wasm.SectionIDFunction, onTypeUse, tok, tokenBytes, line, col)
 	}
 
 	line, col, err := lex(skipTokens(1, parser), []byte(source))

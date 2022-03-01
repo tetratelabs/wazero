@@ -60,7 +60,10 @@ func TestMemoryParser(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			memoryNamespace := newIndexNamespace()
+			memoryNamespace := newIndexNamespace(func(sectionID wasm.SectionID) uint32 {
+				require.Equal(t, wasm.SectionIDMemory, sectionID)
+				return 0
+			})
 			parsed, tp, err := parseMemoryType(memoryNamespace, tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, parsed)
@@ -133,14 +136,21 @@ func TestMemoryParser_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			parsed, _, err := parseMemoryType(newIndexNamespace(), tc.input)
+			memoryNamespace := newIndexNamespace(func(sectionID wasm.SectionID) uint32 {
+				require.Equal(t, wasm.SectionIDMemory, sectionID)
+				return 0
+			})
+			parsed, _, err := parseMemoryType(memoryNamespace, tc.input)
 			require.EqualError(t, err, tc.expectedErr)
 			require.Nil(t, parsed)
 		})
 	}
 
 	t.Run("duplicate ID", func(t *testing.T) {
-		memoryNamespace := newIndexNamespace()
+		memoryNamespace := newIndexNamespace(func(sectionID wasm.SectionID) uint32 {
+			require.Equal(t, wasm.SectionIDMemory, sectionID)
+			return 0
+		})
 		_, err := memoryNamespace.setID([]byte("$mem"))
 		require.NoError(t, err)
 		memoryNamespace.count++

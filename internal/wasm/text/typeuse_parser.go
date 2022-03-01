@@ -32,13 +32,12 @@ type onTypeUse func(typeIdx wasm.Index, paramNames wasm.NameMap, pos callbackPos
 // "type", "param" and "result" inner fields in the correct order.
 // Note: typeUseParser is reusable. The caller resets via begin.
 type typeUseParser struct {
-	// module during parsing is a read-only pointer to the TypeSection.
+	// module during parsing is a read-only pointer to the TypeSection and SectionElementCount
 	module *wasm.Module
 
 	typeNamespace *indexNamespace
 
 	section wasm.SectionID
-	idx     wasm.Index
 
 	// inlinedTypes are anonymous types defined by signature, which at the time of definition didn't match a
 	// module-defined type. Ex. `(param i32)` in `(import (func (param i32)))`
@@ -101,26 +100,25 @@ type typeUseParser struct {
 //      beginTypeParamOrResult starts here --^             ^
 //                                onTypeUse resumes here --+
 //
-func (p *typeUseParser) begin(section wasm.SectionID, idx wasm.Index, onTypeUse onTypeUse, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *typeUseParser) begin(section wasm.SectionID, onTypeUse onTypeUse, tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	pos := callbackPositionUnhandledToken
 	p.pos = positionInitial // to ensure errorContext reports properly
 	switch tok {
 	case tokenLParen:
 		p.section = section
-		p.idx = idx
 		p.onTypeUse = onTypeUse
 		return p.beginTypeParamOrResult, nil
 	case tokenRParen:
 		pos = callbackPositionEndField
 	}
-	return onTypeUse(p.emptyTypeIndex(section, idx), nil, pos, tok, tokenBytes, line, col)
+	return onTypeUse(p.emptyTypeIndex(section), nil, pos, tok, tokenBytes, line, col)
 }
 
 // v_v is a nullary function type (void -> void)
 var v_v = &wasm.FunctionType{}
 
 // inlinedTypeIndex searches for any existing empty type to re-use
-func (p *typeUseParser) emptyTypeIndex(section wasm.SectionID, idx wasm.Index) wasm.Index {
+func (p *typeUseParser) emptyTypeIndex(section wasm.SectionID) wasm.Index {
 	for i, t := range p.module.TypeSection {
 		if t == v_v {
 			return wasm.Index(i)
@@ -142,6 +140,7 @@ func (p *typeUseParser) emptyTypeIndex(section wasm.SectionID, idx wasm.Index) w
 	}
 
 	// typePos is not needed on empty as there's nothing to verify
+	idx := p.module.SectionElementCount(section)
 	i := &inlinedTypeIndex{section: section, idx: idx, inlinedIdx: inlinedIdx, typePos: nil}
 	p.inlinedTypeIndices = append(p.inlinedTypeIndices, i)
 	return 0 // substitute index that will be replaced later
@@ -168,7 +167,7 @@ func (p *typeUseParser) beginTypeParamOrResult(tok tokenType, tokenBytes []byte,
 // parseType parses a type index inside the "type" field. If not yet in the TypeSection, the position is recorded for
 // resolution later. Finally, this returns parseTypeEnd to finish the field.
 func (p *typeUseParser) parseType(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
-	idx, resolved, err := p.typeNamespace.parseIndex(p.section, p.idx, 0, tok, tokenBytes, line, col)
+	idx, resolved, err := p.typeNamespace.parseIndex(p.section, 0, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +377,7 @@ func (p *typeUseParser) end(pos callbackPosition, tok tokenType, tokenBytes []by
 			return nil, err
 		}
 	} else if p.currentInlinedType == nil { // no type was found
-		typeIdx = p.emptyTypeIndex(p.section, p.idx)
+		typeIdx = p.emptyTypeIndex(p.section)
 	} else { // There was no explicitly defined type, so search for any existing ones to re-use
 		typeIdx = p.inlinedTypeIndex()
 	}
@@ -444,7 +443,8 @@ type inlinedTypeIndex struct {
 }
 
 func (p *typeUseParser) recordInlinedType(inlinedIdx wasm.Index) {
-	i := &inlinedTypeIndex{section: p.section, idx: p.idx, inlinedIdx: inlinedIdx, typePos: p.currentTypeIndexUnresolved}
+	idx := p.module.SectionElementCount(p.section)
+	i := &inlinedTypeIndex{section: p.section, idx: idx, inlinedIdx: inlinedIdx, typePos: p.currentTypeIndexUnresolved}
 	p.inlinedTypeIndices = append(p.inlinedTypeIndices, i)
 }
 
