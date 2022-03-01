@@ -100,7 +100,7 @@ func (m *ModuleConfig) WithName(moduleName string) *ModuleConfig {
 //	exports, _ := wazero.InstantiateModule(wazero.NewStore(), &wazero.ModuleConfig{Source: wasm})
 //
 // Note: StoreConfig.Context is used for any WebAssembly 1.0 (20191205) Start Function.
-func InstantiateModule(store wasm.Store, module *ModuleConfig) (wasm.InstantiatedModule, error) {
+func InstantiateModule(store wasm.Store, module *ModuleConfig) (wasm.ModuleExports, error) {
 	internal, ok := store.(*internalwasm.Store)
 	if !ok {
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
@@ -198,6 +198,9 @@ type HostModuleConfig struct {
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
 	Functions map[string]interface{}
+
+	// TODO
+	Globals map[string]uint64
 }
 
 // InstantiateHostModule instantiates the module namespace from the host or errs if the configuration was invalid.

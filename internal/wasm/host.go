@@ -90,39 +90,6 @@ func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64
 	return f.module.engine.Call(modCtx, f.function, params...)
 }
 
-// ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func (s *Store) ExportHostFunctions(moduleName string, nameToGoFunc map[string]interface{}) (publicwasm.HostExports, error) {
-	if err := s.requireModuleUnused(moduleName); err != nil {
-		return nil, err
-	}
-
-	exportCount := len(nameToGoFunc)
-
-	hostModule := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, exportCount)}
-	s.moduleInstances[moduleName] = hostModule
-	ret := HostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
-	for name, goFunc := range nameToGoFunc {
-		if hf, err := NewGoFunc(name, goFunc); err != nil {
-			return nil, err
-		} else if function, err := s.AddHostFunction(hostModule, hf); err != nil {
-			return nil, err
-		} else {
-			ret.NameToFunctionInstance[name] = function
-		}
-	}
-	return &ret, nil
-}
-
-func (s *Store) requireModuleUnused(moduleName string) error {
-	if _, ok := s.hostExports[moduleName]; ok {
-		return fmt.Errorf("module %s has already been exported by this host", moduleName)
-	}
-	if _, ok := s.moduleContexts[moduleName]; ok {
-		return fmt.Errorf("module %s has already been instantiated", moduleName)
-	}
-	return nil
-}
-
 // HostExports implements wasm.HostExports
 type HostExports struct {
 	NameToFunctionInstance map[string]*FunctionInstance

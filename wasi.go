@@ -89,7 +89,7 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
 // Note: The wasm.Functions return value does not restrict exports after "_start" as allowed in the specification.
 // Note: All TinyGo Wasm are WASI commands. They initialize memory on "_start" and import "fd_write" to implement panic.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.InstantiatedModule, error) {
+func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.ModuleExports, error) {
 	internal, ok := store.(*internalwasm.Store)
 	if !ok {
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)

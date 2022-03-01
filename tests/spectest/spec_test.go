@@ -185,53 +185,53 @@ func (c command) expectedError() (err error) {
 }
 
 // TODO: Fix
-// func addSpectestModule(t *testing.T, store *wasm.Store) {
-// 	// Add the host module
-// 	spectest := &wasm.ModuleInstance{Name: "spectest", Exports: map[string]*wasm.ExportInstance{}}
-// 	store.ModuleInstances[spectest.Name] = spectest
+func addSpectestModule(t *testing.T, store *wasm.Store) {
+	// Add the host module
+	spectest := &wasm.ModuleInstance{Name: "spectest", Exports: map[string]*wasm.ExportInstance{}}
+	store.ModuleInstances[spectest.Name] = spectest
 
-// 	var printV = func() {}
-// 	var printI32 = func(uint32) {}
-// 	var printF32 = func(float32) {}
-// 	var printI64 = func(uint64) {}
-// 	var printF64 = func(float64) {}
-// 	var printI32F32 = func(uint32, float32) {}
-// 	var printF64F64 = func(float64, float64) {}
+	var printV = func() {}
+	var printI32 = func(uint32) {}
+	var printF32 = func(float32) {}
+	var printI64 = func(uint64) {}
+	var printF64 = func(float64) {}
+	var printI32F32 = func(uint32, float32) {}
+	var printF64F64 = func(float64, float64) {}
 
-// 	for n, v := range map[string]interface{}{
-// 		"print":         printV,
-// 		"print_i32":     printI32,
-// 		"print_f32":     printF32,
-// 		"print_i64":     printI64,
-// 		"print_f64":     printF64,
-// 		"print_i32_f32": printI32F32,
-// 		"print_f64_f64": printF64F64,
-// 	} {
-// 		fn, err := wasm.NewGoFunc(n, v)
-// 		require.NoError(t, err)
-// 		_, err = store.AddHostFunction(spectest, fn)
-// 		require.NoError(t, err, "AddHostFunction(%s)", n)
-// 	}
+	for n, v := range map[string]interface{}{
+		"print":         printV,
+		"print_i32":     printI32,
+		"print_f32":     printF32,
+		"print_i64":     printI64,
+		"print_f64":     printF64,
+		"print_i32_f32": printI32F32,
+		"print_f64_f64": printF64F64,
+	} {
+		fn, err := wasm.NewGoFunc(n, v)
+		require.NoError(t, err)
+		_, err = store.AddHostFunction(spectest, fn)
+		require.NoError(t, err, "AddHostFunction(%s)", n)
+	}
 
-// 	for _, g := range []struct {
-// 		name      string
-// 		valueType wasm.ValueType
-// 		value     uint64
-// 	}{
-// 		{name: "global_i32", valueType: wasm.ValueTypeI32, value: uint64(int32(666))},
-// 		{name: "global_i64", valueType: wasm.ValueTypeI64, value: uint64(int64(666))},
-// 		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
-// 		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
-// 	} {
-// 		require.NoError(t, store.AddGlobal(spectest, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
-// 	}
+	for _, g := range []struct {
+		name      string
+		valueType wasm.ValueType
+		value     uint64
+	}{
+		{name: "global_i32", valueType: wasm.ValueTypeI32, value: uint64(int32(666))},
+		{name: "global_i64", valueType: wasm.ValueTypeI64, value: uint64(int64(666))},
+		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
+		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
+	} {
+		require.NoError(t, store.AddGlobal(spectest, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
+	}
 
-// 	tableLimitMax := uint32(20)
-// 	require.NoError(t, store.AddTableInstance(spectest, "table", 10, &tableLimitMax))
+	tableLimitMax := uint32(20)
+	require.NoError(t, store.AddTableInstance(spectest, "table", 10, &tableLimitMax))
 
-// 	memoryLimitMax := uint32(2)
-// 	require.NoError(t, store.AddMemoryInstance(spectest, "memory", 1, &memoryLimitMax))
-// }
+	memoryLimitMax := uint32(2)
+	require.NoError(t, store.AddMemoryInstance(spectest, "memory", 1, &memoryLimitMax))
+}
 
 func TestJIT(t *testing.T) {
 	t.Skip()
@@ -478,7 +478,7 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
 func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
-	fn := s.InstantiatedModule(moduleName).Function(funcName)
+	fn := s.ModuleExports(moduleName).Function(funcName)
 	results, err := fn.Call(context.Background(), params...)
 	return results, fn.ResultTypes(), err
 }
