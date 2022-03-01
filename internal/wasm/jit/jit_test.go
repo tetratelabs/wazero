@@ -51,7 +51,7 @@ func (j *jitEnv) jitStatus() jitCallStatusCode {
 	return j.vm.exitContext.statusCode
 }
 
-func (j *jitEnv) functionCallAddress() wasm.FunctionAddress {
+func (j *jitEnv) functionCallAddress() wasm.FunctionIndex {
 	return j.vm.exitContext.functionCallAddress
 }
 
@@ -76,7 +76,7 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 }
 
 func (j *jitEnv) setTable(table []wasm.TableElement) {
-	j.moduleInstance.Tables[0] = &wasm.TableInstance{Table: table}
+	j.moduleInstance.TableInstance = &wasm.TableInstance{Table: table}
 }
 
 func (j *jitEnv) callFrameStackPeek() *callFrame {
@@ -133,7 +133,7 @@ func newJITEnvironment() *jitEnv {
 		eng: eng,
 		moduleInstance: &wasm.ModuleInstance{
 			MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
-			Tables:         []*wasm.TableInstance{{}},
+			TableInstance:  &wasm.TableInstance{},
 			Globals:        []*wasm.GlobalInstance{},
 		},
 		vm: eng.newCallEngine(),
