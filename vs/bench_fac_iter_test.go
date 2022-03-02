@@ -3,7 +3,7 @@
 
 // Wasmtime can only be used in amd64 with CGO
 // Wasmer doesn't link on Windows
-package bench
+package vs
 
 import (
 	"context"
