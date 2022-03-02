@@ -91,6 +91,9 @@ func (s *Store) exportHostFunction(m *ModuleInstance, hf *GoFunc) error {
 	return nil
 }
 
+// ExportHostGlobals is only used in spectests.
+//
+// TODO: unexport once ExportHostModule supports globals.
 func (s *Store) ExportHostGlobals(m *ModuleInstance, nameToValue map[string]uint64, nameToValueType map[string]ValueType) error {
 	for name, v := range nameToValue {
 		g := &GlobalInstance{
@@ -108,6 +111,9 @@ func (s *Store) ExportHostGlobals(m *ModuleInstance, nameToValue map[string]uint
 	return nil
 }
 
+// ExportHostTableInstance is only used in spectests.
+//
+// TODO: unexport once ExportHostModule supports table.
 func (s *Store) ExportHostTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	t := newTableInstance(min, max)
 
@@ -118,6 +124,9 @@ func (s *Store) ExportHostTableInstance(m *ModuleInstance, name string, min uint
 	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
 }
 
+// ExportHostMemoryInstance is only used in spectests.
+//
+// TODO: unexport once ExportHostModule supports memory.
 func (s *Store) ExportHostMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
 		Buffer: make([]byte, MemoryPagesToBytesNum(min)),
