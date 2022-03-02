@@ -12,12 +12,14 @@ const (
 // TODO: rename these according to other naming conventions
 const (
 	// WASI open flags
+
 	O_CREATE = 1 << iota
 	O_DIR
 	O_EXCL
 	O_TRUNC
 
 	// WASI fs rights
+
 	R_FD_READ = 1 << iota
 	R_FD_SEEK
 	R_FD_FDSTAT_SET_FLAGS
