@@ -17,11 +17,11 @@ func main() {
 	// * Ex. (func (export "fac") (param i64) (result i64) ...
 	source, _ := os.ReadFile("./tests/engine/testdata/fac.wasm")
 
-	// Instantiate the module with a Wasm Interpreter, to return its exported functions
-	exports, _ := wazero.InstantiateModule(wazero.NewStore(), &wazero.ModuleConfig{Source: source})
+	// Instantiate the module and return its exported functions
+	module, _ := wazero.NewRuntime().NewModuleFromSource(source)
 
 	// Discover 7! is 5040
-	fmt.Println(exports.Function("fac").Call(context.Background(), 7))
+	fmt.Println(module.Function("fac").Call(context.Background(), 7))
 }
 ```
 
@@ -29,22 +29,21 @@ func main() {
 
 wazero is an early project, so APIs are subject to change until version 1.0.
 
-There's the concept called "engine" in wazero (which is a word commonly used in Wasm runtimes). Engines are responsible for compiling and executing WebAssembly modules.
-There are two types of engines are available for wazero:
+There are two runtime configurations supported in wazero, where _JIT_ is default:
 
 1. _Interpreter_: a naive interpreter-based implementation of Wasm virtual machine. Its implementation doesn't have any platform (GOARCH, GOOS) specific code, therefore _interpreter_ engine can be used for any compilation target available for Go (such as `riscv64`).
-2. _JIT engine_: compiles WebAssembly modules, generates the machine code, and executing it all at runtime. Currently wazero implements the JIT compiler for `amd64` and `arm64` target. Generally speaking, _JIT engine_ is faster than _Interpreter_ by order of magnitude. However, the implementation is immature and has a bunch of aspects that could be improved (for example, it just does a singlepass compilation and doesn't do any optimizations, etc.). Please refer to [internal/wasm/jit/RATIONALE.md](internal/wasm/jit/RATIONALE.md) for the design choices and considerations in our JIT engine.
+2. _JIT_: compiles WebAssembly modules, generates the machine code, and executing it all at runtime. Currently wazero implements the JIT compiler for `amd64` and `arm64` target. Generally speaking, _JIT engine_ is faster than _Interpreter_ by order of magnitude. However, the implementation is immature and has a bunch of aspects that could be improved (for example, it just does a singlepass compilation and doesn't do any optimizations, etc.). Please refer to [internal/wasm/jit/RATIONALE.md](internal/wasm/jit/RATIONALE.md) for the design choices and considerations in our JIT engine.
 
-Both of engines passes 100% of [WebAssembly spec test suites]((https://github.com/WebAssembly/spec/tree/wg-1.0/test/core)) (on supported platforms).
+Both of configurations passes 100% of [WebAssembly spec test suites]((https://github.com/WebAssembly/spec/tree/wg-1.0/test/core)) (on supported platforms).
 
 | Engine     | Usage| amd64 | arm64 | others |
 |:---:|:---:|:---:|:---:|:---:|
-| Interpreter|`wazero.NewEngineInterpreter()`|✅ |✅|✅|
-| JIT engine |`wazero.NewEngineJIT()`|✅|✅ |❌|
+| Interpreter|`wazero.NewRuntimeConfigInterpreter()`|✅ |✅|✅|
+| JIT |`wazero.NewRuntimeConfigJIT()`|✅|✅ |❌|
 
-If you choose no configuration, ex `wazero.NewStore()`, the interpreter is used. You can also choose explicitly like so:
+If you don't choose, ex `wazero.NewRuntime()`, JIT is used if supported. You can also force the interpreter like so:
 ```go
-store, err := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: wazero.NewEngineJIT()})
+r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 ```
 
 ## Background
@@ -56,5 +55,5 @@ write plugins in their favorite languages. That's where Wasm comes into play. Yo
 
 However, experienced Golang developers often avoid using CGO because it introduces complexity. For example, CGO projects are larger and complicated to consume due to their libc + shared library dependency. Debugging is more difficult for Go developers when most of a library is written in Rustlang. [_CGO is not Go_](https://dave.cheney.net/2016/01/18/cgo-is-not-go)[ -- _Rob_ _Pike_](https://www.youtube.com/watch?v=PAAkCSZUG1c&t=757s) dives in deeper. In short, the primary motivation to start wazero was to avoid CGO.
 
-Currently, those seeking performance are encouraged to try the JIT engine. You may be surprised to find equal or better performance vs mature JIT-style runtimes. The rationale for that is it is well-know that [CGO is slow](https://github.com/golang/go/issues/19574). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
+wazero compiles WebAssembly modules into native assembly (JIT) by default. You may be surprised to find equal or better performance vs mature JIT-style runtimes because [CGO is slow](https://github.com/golang/go/issues/19574). More specifically, if you make large amount of CGO calls which cross the boundary between Go and C (stack) space, then the usage of CGO could be a bottleneck.
 

@@ -21,18 +21,18 @@ var ctx = context.Background()
 
 func BenchmarkEngines(b *testing.B) {
 	b.Run("interpreter", func(b *testing.B) {
-		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewEngineInterpreter())
+		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigInterpreter())
 		runAllBenches(b, m)
 	})
 	if runtime.GOARCH == "amd64" {
 		b.Run("jit", func(b *testing.B) {
-			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewEngineJIT())
+			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigJIT())
 			runAllBenches(b, m)
 		})
 	}
 }
 
-func runAllBenches(b *testing.B, m wasm.ModuleExports) {
+func runAllBenches(b *testing.B, m wasm.Module) {
 	runBase64Benches(b, m)
 	runFibBenches(b, m)
 	runStringManipulationBenches(b, m)
@@ -40,7 +40,7 @@ func runAllBenches(b *testing.B, m wasm.ModuleExports) {
 	runRandomMatMul(b, m)
 }
 
-func runBase64Benches(b *testing.B, m wasm.ModuleExports) {
+func runBase64Benches(b *testing.B, m wasm.Module) {
 	base64 := m.Function("base64")
 
 	for _, numPerExec := range []int{5, 100, 10000} {
@@ -54,7 +54,7 @@ func runBase64Benches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runFibBenches(b *testing.B, m wasm.ModuleExports) {
+func runFibBenches(b *testing.B, m wasm.Module) {
 	fibonacci := m.Function("fibonacci")
 
 	for _, num := range []int{5, 10, 20, 30} {
@@ -70,7 +70,7 @@ func runFibBenches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runStringManipulationBenches(b *testing.B, m wasm.ModuleExports) {
+func runStringManipulationBenches(b *testing.B, m wasm.Module) {
 	stringManipulation := m.Function("string_manipulation")
 
 	for _, initialSize := range []int{50, 100, 1000} {
@@ -86,7 +86,7 @@ func runStringManipulationBenches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runReverseArrayBenches(b *testing.B, m wasm.ModuleExports) {
+func runReverseArrayBenches(b *testing.B, m wasm.Module) {
 	reverseArray := m.Function("reverse_array")
 
 	for _, arraySize := range []int{500, 1000, 10000} {
@@ -102,7 +102,7 @@ func runReverseArrayBenches(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func runRandomMatMul(b *testing.B, m wasm.ModuleExports) {
+func runRandomMatMul(b *testing.B, m wasm.Module) {
 	randomMatMul := m.Function("random_mat_mul")
 
 	for _, matrixSize := range []int{5, 10, 20} {
@@ -118,7 +118,7 @@ func runRandomMatMul(b *testing.B, m wasm.ModuleExports) {
 	}
 }
 
-func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine) wasm.ModuleExports {
+func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.RuntimeConfig) wasm.Module {
 	getRandomString := func(ctx wasm.ModuleContext, retBufPtr uint32, retBufSize uint32) {
 		results, err := ctx.Function("allocate_buffer").Call(ctx.Context(), 10)
 		if err != nil {
@@ -133,22 +133,22 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Engine
 		ctx.Memory().Write(offset, b)
 	}
 
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
+	r := wazero.NewRuntimeWithConfig(engine)
 
 	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
-	_, err := wazero.InstantiateHostModule(store, env)
+	_, err := r.NewHostModule(env)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
 	// Add WASI to satisfy import tests
-	_, err = wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
+	_, err = r.NewHostModule(wazero.WASISnapshotPreview1())
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	m, err := wazero.StartWASICommand(store, &wazero.ModuleConfig{Source: caseWasm})
+	m, err := wazero.StartWASICommandFromSource(r, caseWasm)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -36,8 +36,8 @@ type (
 		// ModuleInstances holds the instantiated Wasm modules by module name from Instantiate.
 		ModuleInstances map[string]*ModuleInstance
 
-		// hostExports holds host functions by module name from ExportHostFunctions.
-		hostExports map[string]*HostExports
+		// hostModules holds host functions by module name from NewHostModule.
+		hostModules map[string]*HostModule
 
 		// ModuleContexts holds default host function call contexts keyed by module name.
 		ModuleContexts map[string]*ModuleContext
@@ -401,7 +401,7 @@ func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
 	return nil
 }
 
-func (s *Store) Instantiate(module *Module, name string) (*ModuleExports, error) {
+func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) {
 	if err := s.requireModuleUnused(name); err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleExports, error)
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
-	return &ModuleExports{s, modCtx}, nil
+	return &PublicModule{s, modCtx}, nil
 }
 
 func (s *Store) ReleaseModuleInstance(instance *ModuleInstance) error {
@@ -546,7 +546,7 @@ func (s *Store) addFunctionInstances(fs ...*FunctionInstance) {
 
 func (s *Store) releaseGlobalInstances(gs ...*GlobalInstance) {
 	for _, g := range gs {
-		// Release refernce to the global instance.
+		// Release reference to the global instance.
 		s.Globals[g.index] = nil
 
 		// Append the address so that we can reuse it in order to avoid index space explosion.
@@ -622,24 +622,24 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 	m.index = addr
 }
 
-// ModuleExports implements wasm.Store ModuleExports
-func (s *Store) ModuleExports(moduleName string) publicwasm.ModuleExports {
+// Module implements wasm.Store Module
+func (s *Store) Module(moduleName string) publicwasm.Module {
 	if m, ok := s.ModuleContexts[moduleName]; !ok {
 		return nil
 	} else {
-		return &ModuleExports{s, m}
+		return &PublicModule{s, m}
 	}
 }
 
-// ModuleExports implements wasm.ModuleExports
-type ModuleExports struct {
+// PublicModule implements wasm.Module
+type PublicModule struct {
 	s *Store
 	// Context is exported for /wasi.go
 	Context *ModuleContext
 }
 
-// Function implements wasm.ModuleExports Function
-func (m *ModuleExports) Function(name string) publicwasm.Function {
+// Function implements wasm.Module Function
+func (m *PublicModule) Function(name string) publicwasm.Function {
 	exp, err := m.Context.Module.GetExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
@@ -647,8 +647,8 @@ func (m *ModuleExports) Function(name string) publicwasm.Function {
 	return &exportedFunction{module: m.Context, function: exp.Function}
 }
 
-// Memory implements wasm.ModuleExports Memory
-func (m *ModuleExports) Memory(name string) publicwasm.Memory {
+// Memory implements wasm.Module Memory
+func (m *PublicModule) Memory(name string) publicwasm.Memory {
 	exp, err := m.Context.Module.GetExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
@@ -656,9 +656,9 @@ func (m *ModuleExports) Memory(name string) publicwasm.Memory {
 	return exp.Memory
 }
 
-// HostExports implements wasm.Store HostExports
-func (s *Store) HostExports(moduleName string) publicwasm.HostExports {
-	return s.hostExports[moduleName]
+// HostModule implements wasm.Store HostModule
+func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
+	return s.hostModules[moduleName]
 }
 
 func (s *Store) getExport(moduleName string, name string, et ExternType) (exp *ExportInstance, err error) {

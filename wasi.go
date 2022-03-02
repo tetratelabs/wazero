@@ -5,7 +5,6 @@ import (
 	"io"
 
 	internalwasi "github.com/tetratelabs/wazero/internal/wasi"
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
@@ -76,36 +75,53 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
 	return &HostModuleConfig{Name: wasi.ModuleSnapshotPreview1, Functions: internalwasi.SnapshotPreview1Functions(opts...)}
 }
 
+// StartWASICommandFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or errs if
+// invalid. Once instantiated, this starts its WASI Command function ("_start").
+//
+// Ex.
+//	r := wazero.NewRuntime()
+//	wasi, _ := r.NewHostModule(wazero.WASISnapshotPreview1())
+//	module, _ := StartWASICommandFromSource(r, source)
+//
+// Note: This is a convenience utility that chains Runtime.DecodeModule with StartWASICommand.
+func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
+	if decoded, err := r.DecodeModule(source); err != nil {
+		return nil, err
+	} else {
+		return StartWASICommand(r, decoded)
+	}
+}
+
 // StartWASICommand instantiates the module and starts its WASI Command function ("_start"). The return value are all
 // exported functions in the module. This errs if the module doesn't comply with prerequisites, or any instantiation
 // or function call error.
+//
+// Ex.
+//	r := wazero.NewRuntime()
+//	wasi, _ := r.NewHostModule(wazero.WASISnapshotPreview1())
+//	decoded, _ := r.DecodeModule(source)
+//	module, _ := StartWASICommand(r, decoded)
 //
 // Prerequisites of the "Current Unstable ABI" from wasi.ModuleSnapshotPreview1:
 // * "_start" is an exported nullary function and does not export "_initialize"
 // * "memory" is an exported memory.
 //
-// Note: "_start" is invoked in the StoreConfig.Context.
+// Note: "_start" is invoked in the RuntimeConfig.Context.
 // Note: Exporting "__indirect_function_table" is mentioned as required, but not enforced here.
 // Note: The wasm.Functions return value does not restrict exports after "_start" as allowed in the specification.
 // Note: All TinyGo Wasm are WASI commands. They initialize memory on "_start" and import "fd_write" to implement panic.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.ModuleExports, error) {
-	internal, ok := store.(*internalwasm.Store)
+func StartWASICommand(r Runtime, module *DecodedModule) (wasm.Module, error) {
+	if err := internalwasi.ValidateWASICommand(module.module, module.name); err != nil {
+		return nil, err
+	}
+
+	internal, ok := r.(*runtime)
 	if !ok {
-		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
-	}
-	m, err := decodeModule(module)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unsupported Runtime implementation: %s", r)
 	}
 
-	moduleName := getModuleName(module.Name, m)
-
-	if err = internalwasi.ValidateWASICommand(m, moduleName); err != nil {
-		return nil, err
-	}
-
-	instantiated, err := internal.Instantiate(m, moduleName)
+	instantiated, err := internal.store.Instantiate(module.module, module.name)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +129,7 @@ func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.ModuleExport
 
 	start := ctx.Function(internalwasi.FunctionStart)
 	if _, err = start.Call(ctx.Context()); err != nil {
-		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", moduleName, internalwasi.FunctionStart, err)
+		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
 	}
 	return instantiated, nil
 }

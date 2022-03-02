@@ -49,20 +49,20 @@ func Test_hostFunc(t *testing.T) {
 		require.Equal(t, bufferSize, n)
 	}
 
-	store := wazero.NewStore()
+	r := wazero.NewRuntime()
 
 	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
-	_, err := wazero.InstantiateHostModule(store, env)
+	_, err := r.NewHostModule(env)
 	require.NoError(t, err)
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	_, err = wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
+	_, err = r.NewHostModule(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 
-	exports, err := wazero.StartWASICommand(store, &wazero.ModuleConfig{Source: hostFuncWasm})
+	module, err := wazero.StartWASICommandFromSource(r, hostFuncWasm)
 	require.NoError(t, err)
 
-	allocateBufferFn := exports.Function("allocate_buffer")
+	allocateBufferFn := module.Function("allocate_buffer")
 
 	// Implement the function pointer. This mainly shows how you can decouple a module function dependency.
 	allocateBuffer = func(ctx context.Context, size uint32) uint32 {
@@ -75,6 +75,6 @@ func Test_hostFunc(t *testing.T) {
 	ctx := context.WithValue(context.Background(), testKey{}, int64(12345))
 
 	// Invoke a module-defined function that depends on a host function import
-	_, err = exports.Function("base64").Call(ctx, uint64(5))
+	_, err = module.Function("base64").Call(ctx, uint64(5))
 	require.NoError(t, err)
 }

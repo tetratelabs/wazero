@@ -103,18 +103,18 @@ func TestExampleUpToDate(t *testing.T) {
 	})
 
 	t.Run("Executable", func(t *testing.T) {
-		store := wazero.NewStore()
+		r := wazero.NewRuntime()
 
 		// Add WASI to satisfy import tests
-		_, err := wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
+		_, err := r.NewHostModule(wazero.WASISnapshotPreview1())
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
-		exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: exampleBinary})
+		module, err := r.NewModuleFromSource(exampleBinary)
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		results, err := exports.Function("AddInt").Call(context.Background(), 1, 2)
+		results, err := module.Function("AddInt").Call(context.Background(), 1, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 	})

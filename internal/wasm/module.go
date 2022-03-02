@@ -423,8 +423,8 @@ func (m *Module) buildFunctionInstances() (functions []*FunctionInstance) {
 	return
 }
 
-func (module *Module) buildMemoryInstance() (mem *MemoryInstance) {
-	for _, memSec := range module.MemorySection {
+func (m *Module) buildMemoryInstance() (mem *MemoryInstance) {
+	for _, memSec := range m.MemorySection {
 		mem = &MemoryInstance{
 			Buffer: make([]byte, memoryPagesToBytesNum(memSec.Min)),
 			Min:    memSec.Min,
@@ -434,8 +434,8 @@ func (module *Module) buildMemoryInstance() (mem *MemoryInstance) {
 	return
 }
 
-func (module *Module) buildTableInstance() (table *TableInstance) {
-	for _, tableSeg := range module.TableSection {
+func (m *Module) buildTableInstance() (table *TableInstance) {
+	for _, tableSeg := range m.TableSection {
 		table = newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
 	}
 	return

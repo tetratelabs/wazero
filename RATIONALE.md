@@ -62,6 +62,19 @@ Ex. There is no exported symbol for the `[]byte` representing the `CodeSection`
 
 Besides security, this practice prevents other bugs and allows centralization of validation logic such as decoding Wasm.
 
+## Runtime == Engine+Store
+wazero defines a single user-type which combines the specification concept of `Store` with the unspecified `Engine`
+which manages them.
+
+### Why not multi-store?
+Multi-store isn't supported as the extra tier complicates lifecycle and locking. Moreover, in practice it is unusual for
+there to be an engine that has multiple stores which have multiple modules. More often, it is the case that there is
+either 1 engine with 1 store and multiple modules, or 1 engine with many stores, each having 1 non-host module. In worst
+case, a user can use multiple runtimes until "multi-store" is better understood.
+
+If later, we have demand for multiple stores, that can be accomplished by overload. Ex. `Runtime.InstantiateInStore` or
+`Runtime.Store(name) Store`.
+
 ## wazeroir
 wazero's intermediate representation (IR) is called `wazeroir`. Compiling into an IR provides us a faster interpreter
 and a building block for a future JIT compilation engine. Both of these help answer demands for a more performant

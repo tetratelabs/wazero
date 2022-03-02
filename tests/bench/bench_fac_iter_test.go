@@ -30,7 +30,7 @@ func TestFacIter(t *testing.T) {
 	expValue := uint64(0x865df5dd54000000)
 
 	t.Run("Interpreter", func(t *testing.T) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineInterpreter())
+		fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter())
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
@@ -41,7 +41,7 @@ func TestFacIter(t *testing.T) {
 	})
 
 	t.Run("JIT", func(t *testing.T) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineJIT())
+		fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT())
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
@@ -82,7 +82,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("Interpreter", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err := newWazeroFacIterBench(wazero.NewEngineInterpreter()); err != nil {
+			if _, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter()); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -91,7 +91,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("JIT", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err := newWazeroFacIterBench(wazero.NewEngineJIT()); err != nil {
+			if _, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT()); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -124,7 +124,7 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 	ctx := context.Background()
 	const in = 30
 	b.Run("Interpreter", func(b *testing.B) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineInterpreter())
+		fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter())
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -136,7 +136,7 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 		}
 	})
 	b.Run("JIT", func(b *testing.B) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineJIT())
+		fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT())
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -175,10 +175,10 @@ func BenchmarkFacIter_Invoke(b *testing.B) {
 	})
 }
 
-func newWazeroFacIterBench(engine *wazero.Engine) (wasm.Function, error) {
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
+func newWazeroFacIterBench(engine *wazero.RuntimeConfig) (wasm.Function, error) {
+	r := wazero.NewRuntimeWithConfig(engine)
 
-	m, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: facWasm})
+	m, err := r.NewModuleFromSource(facWasm)
 	if err != nil {
 		return nil, err
 	}

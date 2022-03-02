@@ -56,17 +56,17 @@ func ValueTypeName(t ValueType) string {
 
 // Store allows access to instantiated modules and host functions
 type Store interface {
-	// ModuleExports returns exports from an instantiated module or nil if there aren't any.
-	ModuleExports(moduleName string) ModuleExports
+	// Module returns exports from an instantiated module or nil if there aren't any.
+	Module(moduleName string) Module
 
-	// HostExports returns exported host functions for the moduleName or nil if there aren't any.
-	HostExports(moduleName string) HostExports
+	// HostModule returns exported host functions for the moduleName or nil if there aren't any.
+	HostModule(moduleName string) HostModule
 }
 
-// ModuleExports return functions exported in a module, post-instantiation.
+// Module return functions exported in a module, post-instantiation.
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-type ModuleExports interface {
+type Module interface {
 	// Memory returns a memory exported from this module or nil if it wasn't.
 	//
 	// Note: WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
@@ -78,7 +78,7 @@ type ModuleExports interface {
 	Function(name string) Function
 }
 
-// Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.InstantiateModule).
+// Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.NewModule).
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-func
 type Function interface {
 	// ParamTypes are the possibly empty sequence of value types accepted by a function with this signature.
@@ -107,11 +107,11 @@ type Function interface {
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
 }
 
-// HostExports return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (20191205).
+// HostModule return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (20191205).
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-hostfunc
-type HostExports interface {
+type HostModule interface {
 	// Function returns a host function exported under this module name or nil if it wasn't.
 	Function(name string) HostFunction
 }

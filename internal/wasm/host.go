@@ -90,8 +90,8 @@ func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64
 	return f.module.engine.Call(modCtx, f.function, params...)
 }
 
-// ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func (s *Store) ExportHostFunctions(moduleName string, nameToGoFunc map[string]interface{}) (publicwasm.HostExports, error) {
+// NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
+func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (publicwasm.HostModule, error) {
 	if err := s.requireModuleUnused(moduleName); err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *Store) ExportHostFunctions(moduleName string, nameToGoFunc map[string]i
 
 	hostModule := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, exportCount)}
 	s.ModuleInstances[moduleName] = hostModule
-	ret := HostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
+	ret := HostModule{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
 	for name, goFunc := range nameToGoFunc {
 		if hf, err := NewGoFunc(name, goFunc); err != nil {
 			return nil, err
@@ -114,7 +114,7 @@ func (s *Store) ExportHostFunctions(moduleName string, nameToGoFunc map[string]i
 }
 
 func (s *Store) requireModuleUnused(moduleName string) error {
-	if _, ok := s.hostExports[moduleName]; ok {
+	if _, ok := s.hostModules[moduleName]; ok {
 		return fmt.Errorf("module %s has already been exported by this host", moduleName)
 	}
 	if _, ok := s.ModuleContexts[moduleName]; ok {
@@ -123,8 +123,8 @@ func (s *Store) requireModuleUnused(moduleName string) error {
 	return nil
 }
 
-// HostExports implements wasm.HostExports
-type HostExports struct {
+// HostModule implements wasm.HostModule
+type HostModule struct {
 	NameToFunctionInstance map[string]*FunctionInstance
 }
 
@@ -147,7 +147,7 @@ func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) 
 	return modCtx.engine.Call(modCtx, f, params...)
 }
 
-// Function implements wasm.HostExports Function
-func (g *HostExports) Function(name string) publicwasm.HostFunction {
+// Function implements wasm.HostModule Function
+func (g *HostModule) Function(name string) publicwasm.HostFunction {
 	return g.NameToFunctionInstance[name]
 }

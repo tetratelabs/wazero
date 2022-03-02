@@ -23,11 +23,11 @@ func TestJIT(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
 		t.Skip()
 	}
-	runTests(t, wazero.NewEngineJIT)
+	runTests(t, wazero.NewRuntimeConfigJIT)
 }
 
 func TestInterpreter(t *testing.T) {
-	runTests(t, wazero.NewEngineInterpreter)
+	runTests(t, wazero.NewRuntimeConfigInterpreter)
 }
 
 var (
@@ -43,41 +43,41 @@ var (
 	recursiveWasm []byte
 )
 
-func runTests(t *testing.T, newEngine func() *wazero.Engine) {
+func runTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	t.Run("fibonacci", func(t *testing.T) {
-		testFibonacci(t, newEngine)
+		testFibonacci(t, newRuntimeConfig)
 	})
 	t.Run("fac", func(t *testing.T) {
-		testFac(t, newEngine)
+		testFac(t, newRuntimeConfig)
 	})
 	t.Run("unreachable", func(t *testing.T) {
-		testUnreachable(t, newEngine)
+		testUnreachable(t, newRuntimeConfig)
 	})
 	t.Run("memory", func(t *testing.T) {
-		testMemory(t, newEngine)
+		testMemory(t, newRuntimeConfig)
 	})
 	t.Run("recursive entry", func(t *testing.T) {
-		testRecursiveEntry(t, newEngine)
+		testRecursiveEntry(t, newRuntimeConfig)
 	})
 	t.Run("imported-and-exported func", func(t *testing.T) {
-		testImportedAndExportedFunc(t, newEngine)
+		testImportedAndExportedFunc(t, newRuntimeConfig)
 	})
 	t.Run("host function with float type", func(t *testing.T) {
-		testHostFunctions(t, newEngine)
+		testHostFunctions(t, newRuntimeConfig)
 	})
 }
 
-func testFibonacci(t *testing.T, newEngine func() *wazero.Engine) {
+func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
 	// and we have no conflict with Go's runtime.
 	const goroutines = 1000
 
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
-	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: fibWasm})
+	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+	module, err := r.NewModuleFromSource(fibWasm)
 	require.NoError(t, err)
 	var fibs []publicwasm.Function
 	for i := 0; i < goroutines; i++ {
-		fibs = append(fibs, exports.Function("fib"))
+		fibs = append(fibs, module.Function("fib"))
 	}
 
 	var wg sync.WaitGroup
@@ -95,9 +95,9 @@ func testFibonacci(t *testing.T, newEngine func() *wazero.Engine) {
 	wg.Wait()
 }
 
-func testFac(t *testing.T, newEngine func() *wazero.Engine) {
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
-	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: facWasm})
+func testFac(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+	module, err := r.NewModuleFromSource(facWasm)
 	require.NoError(t, err)
 	for _, name := range []string{
 		"fac-rec",
@@ -108,7 +108,7 @@ func testFac(t *testing.T, newEngine func() *wazero.Engine) {
 	} {
 		name := name
 
-		fac := exports.Function("fac")
+		fac := module.Function("fac")
 
 		t.Run(name, func(t *testing.T) {
 			results, err := fac.Call(ctx, 25)
@@ -118,26 +118,26 @@ func testFac(t *testing.T, newEngine func() *wazero.Engine) {
 	}
 
 	t.Run("fac-rec - stack overflow", func(t *testing.T) {
-		_, err := exports.Function("fac-rec").Call(ctx, 1073741824)
+		_, err := module.Function("fac-rec").Call(ctx, 1073741824)
 		require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow)
 	})
 }
 
-func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
+func testUnreachable(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	callUnreachable := func(ctx publicwasm.ModuleContext) {
 		panic("panic in host function")
 	}
 
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
+	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 	hostModule := &wazero.HostModuleConfig{Name: "host", Functions: map[string]interface{}{"cause_unreachable": callUnreachable}}
-	_, err := wazero.InstantiateHostModule(store, hostModule)
+	_, err := r.NewHostModule(hostModule)
 	require.NoError(t, err)
 
-	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: unreachableWasm})
+	module, err := r.NewModuleFromSource(unreachableWasm)
 	require.NoError(t, err)
 
-	_, err = exports.Function("main").Call(ctx)
+	_, err = module.Function("main").Call(ctx)
 	exp := `wasm runtime error: panic in host function
 wasm backtrace:
 	0: host.cause_unreachable
@@ -147,19 +147,19 @@ wasm backtrace:
 	require.Equal(t, exp, err.Error())
 }
 
-func testMemory(t *testing.T, newEngine func() *wazero.Engine) {
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
-	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: memoryWasm})
+func testMemory(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+	module, err := r.NewModuleFromSource(memoryWasm)
 	require.NoError(t, err)
 
-	size := exports.Function("size")
+	size := module.Function("size")
 
 	// First, we have zero-length memory instance.
 	results, err := size.Call(ctx)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), results[0])
 
-	grow := exports.Function("grow")
+	grow := module.Function("grow")
 
 	// Then grow the memory.
 	newPages := uint64(10)
@@ -180,28 +180,28 @@ func testMemory(t *testing.T, newEngine func() *wazero.Engine) {
 	require.Equal(t, newPages, results[0])
 }
 
-func testRecursiveEntry(t *testing.T, newEngine func() *wazero.Engine) {
+func testRecursiveEntry(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	hostfunc := func(mod publicwasm.ModuleContext) {
 		_, err := mod.Function("called_by_host_func").Call(ctx)
 		require.NoError(t, err)
 	}
 
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
+	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 	hostModule := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"host_func": hostfunc}}
-	_, err := wazero.InstantiateHostModule(store, hostModule)
+	_, err := r.NewHostModule(hostModule)
 	require.NoError(t, err)
 
-	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: recursiveWasm})
+	module, err := r.NewModuleFromSource(recursiveWasm)
 	require.NoError(t, err)
 
-	_, err = exports.Function("main").Call(ctx, 1)
+	_, err = module.Function("main").Call(ctx, 1)
 	require.NoError(t, err)
 }
 
 // testImportedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
 // Notably, this uses memory, which ensures wasm.ModuleContext is valid in both interpreter and JIT engines.
-func testImportedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) {
+func testImportedAndExportedFunc(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	var memory *wasm.MemoryInstance
 	storeInt := func(ctx publicwasm.ModuleContext, offset uint32, val uint64) uint32 {
 		if !ctx.Memory().WriteUint64Le(offset, val) {
@@ -212,24 +212,24 @@ func testImportedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) 
 		return 0
 	}
 
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
+	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 	hostModule := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"store_int": storeInt}}
-	_, err := wazero.InstantiateHostModule(store, hostModule)
+	_, err := r.NewHostModule(hostModule)
 	require.NoError(t, err)
 
-	exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: []byte(`(module $test
+	module, err := r.NewModuleFromSource([]byte(`(module $test
 		(import "" "store_int"
 			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
 		(memory $memory 1 1)
 		(export "memory" (memory $memory))
 		;; store_int is imported from the environment, but it's also exported back to the environment
 		(export "store_int" (func $store_int))
-		)`)})
+		)`))
 	require.NoError(t, err)
 
 	// Call store_int and ensure it didn't return an error code.
-	results, err := exports.Function("store_int").Call(ctx, 1, math.MaxUint64)
+	results, err := module.Function("store_int").Call(ctx, 1, math.MaxUint64)
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), results[0])
 
@@ -238,7 +238,7 @@ func testImportedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) 
 }
 
 //  testHostFunctions ensures arg0 is optionally a context, and fails if a float parameter corrupts a host function value
-func testHostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
+func testHostFunctions(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	ctx := context.Background()
 
 	floatFuncs := map[string]interface{}{
@@ -274,13 +274,13 @@ func testHostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
 		" - context.Context":    floatFuncsGoContext,
 		" - wasm.ModuleContext": floatFuncsModuleContext,
 	} {
-		store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
+		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 		hostModule := &wazero.HostModuleConfig{Name: "host", Functions: v}
-		_, err := wazero.InstantiateHostModule(store, hostModule)
+		_, err := r.NewHostModule(hostModule)
 		require.NoError(t, err)
 
-		m, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: []byte(`(module $test
+		m, err := r.NewModuleFromSource([]byte(`(module $test
 	;; these imports return the input param
 	(import "host" "identity_f32" (func $test.identity_f32 (param f32) (result f32)))
 	(import "host" "identity_f64" (func $test.identity_f64 (param f64) (result f64)))
@@ -296,7 +296,7 @@ func testHostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
 		call $test.identity_f64
 	)
 	(export "call->test.identity_f64" (func $call->test.identity_f64))
-)`)})
+)`))
 		require.NoError(t, err)
 
 		t.Run(fmt.Sprintf("host function with f32 param%s", k), func(t *testing.T) {
