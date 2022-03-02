@@ -322,11 +322,10 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							inst, ok := store.ModuleInstances[moduleName]
-							require.True(t, ok, msg)
-							addr, err := inst.GetExport(c.Action.Field, wasm.ExternTypeGlobal)
-							require.NoError(t, err)
-							actual := addr.Global
+							module := store.Module(moduleName)
+							require.NotNil(t, module)
+							global := module.Global(c.Action.Field)
+							require.NotNil(t, global)
 							var expType wasm.ValueType
 							switch c.Exps[0].ValType {
 							case "i32":
@@ -338,9 +337,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							case "f64":
 								expType = wasm.ValueTypeF64
 							}
-							require.NotNil(t, actual, msg)
-							require.Equal(t, expType, actual.Type.ValType, msg)
-							require.Equal(t, exps[0], actual.Val, expType, msg)
+							require.Equal(t, expType, global.Type(), msg)
+							require.Equal(t, exps[0], global.Get(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

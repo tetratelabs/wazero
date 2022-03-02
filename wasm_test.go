@@ -114,8 +114,8 @@ func TestDecodedModule_WithName(t *testing.T) {
 	require.Equal(t, internal.ModuleContexts["2"], m2.(*internalwasm.PublicModule).Context)
 }
 
-// TestModuleExports_Memory only covers a couple cases to avoid duplication of internal/wasm/runtime_test.go
-func TestModuleExports_Memory(t *testing.T) {
+// TestModule_Memory only covers a couple cases to avoid duplication of internal/wasm/runtime_test.go
+func TestModule_Memory(t *testing.T) {
 	tests := []struct {
 		name, wat   string
 		expected    bool
@@ -150,6 +150,87 @@ func TestModuleExports_Memory(t *testing.T) {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
 				require.Nil(t, mem)
+			}
+		})
+	}
+}
+
+// TestModule_Global only covers a couple cases to avoid duplication of internal/wasm/global_test.go
+func TestModule_Global(t *testing.T) {
+	tests := []struct {
+		name                      string
+		module                    *internalwasm.Module // module as wat doesn't yet support globals
+		expected, expectedMutable bool
+	}{
+		{
+			name:   "no global",
+			module: &internalwasm.Module{},
+		},
+		{
+			name: "global not exported",
+			module: &internalwasm.Module{
+				GlobalSection: []*internalwasm.Global{
+					{
+						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64, Mutable: true},
+						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+					},
+				},
+			},
+		},
+		{
+			name: "global exported",
+			module: &internalwasm.Module{
+				GlobalSection: []*internalwasm.Global{
+					{
+						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64},
+						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+					},
+				},
+				ExportSection: map[string]*internalwasm.Export{
+					"global": {Type: internalwasm.ExternTypeGlobal, Name: "global"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "global exported and mutable",
+			module: &internalwasm.Module{
+				GlobalSection: []*internalwasm.Global{
+					{
+						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64, Mutable: true},
+						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+					},
+				},
+				ExportSection: map[string]*internalwasm.Export{
+					"global": {Type: internalwasm.ExternTypeGlobal, Name: "global"},
+				},
+			},
+			expected:        true,
+			expectedMutable: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		r := NewRuntime()
+		t.Run(tc.name, func(t *testing.T) {
+			// Instantiate the module and get the export of the above global
+			module, err := r.NewModule(&DecodedModule{module: tc.module})
+			require.NoError(t, err)
+
+			global := module.Global("global")
+			if !tc.expected {
+				require.Nil(t, global)
+				return
+			}
+			require.Equal(t, uint64(1), global.Get())
+
+			mutable, ok := global.(wasm.MutableGlobal)
+			require.Equal(t, tc.expectedMutable, ok)
+			if ok {
+				mutable.Set(2)
+				require.Equal(t, uint64(2), global.Get())
 			}
 		})
 	}
