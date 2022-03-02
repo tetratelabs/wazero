@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -958,7 +959,168 @@ func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
 // TODO: TestSnapshotPreview1_PathFilestatGet TestSnapshotPreview1_PathFilestatGet_Errors
 // TODO: TestSnapshotPreview1_PathFilestatSetTimes TestSnapshotPreview1_PathFilestatSetTimes_Errors
 // TODO: TestSnapshotPreview1_PathLink TestSnapshotPreview1_PathLink_Errors
-// TODO: TestSnapshotPreview1_PathOpen TestSnapshotPreview1_PathOpen_Errors
+
+func TestSnapshotPreview1_PathOpen(t *testing.T) {
+	fd := uint32(3)                              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	lookupFlags := uint32(0)                     // arbitrary lookupFlags
+	path := uint32(1)                            // arbitrary offset
+	pathLen := uint32(6)                         // The length of path
+	oFlags := uint32(0)                          // arbitrary oFlags
+	fsRightsBase := uint64(wasi.R_FD_READ)       // arbitrary right
+	fsRightsInheriting := uint64(wasi.R_FD_READ) // arbitrary right
+	fdFlags := uint32(0)
+	resultFD := uint32(8)
+	initialMemory := []byte{
+		'?',                          // `path` is after this
+		'w', 'a', 'z', 'e', 'r', 'o', // path
+		'?', // `resultFD` is after this
+	}
+	expectedMemory := append(
+		initialMemory,
+		4, 0, 0, 0, // resultFD
+		'?',
+	)
+	expectedFd := uint32(4) // arbitrary expected FD
+
+	var api *wasiAPI
+	store, ctx, fn := instantiateWasmStore(t, FunctionPathOpen, ImportPathOpen, moduleName, func(a *wasiAPI) {
+		// randSouce is used to determine the new fd. Fix it to the expectedFD for testing.
+		a.randSource = func(b []byte) error {
+			binary.LittleEndian.PutUint32(b, expectedFd)
+			return nil
+		}
+		api = a // for later tests
+	})
+
+	// TestSnapshotPreview1_PathOpen uses a matrix because setting up test files is complicated and has to be clean each time.
+	type pathOpenFn func(ctx publicwasm.ModuleContext, fd, lookupFlags, path, pathLen, oFlags uint32,
+		fsRightsBase, fsRightsInheriting uint64,
+		fdFlags, resultFD uint32) wasi.Errno
+	tests := []struct {
+		name     string
+		pathOpen func() pathOpenFn
+	}{
+		{"SnapshotPreview1.PathOpen", func() pathOpenFn {
+			return api.PathOpen
+		}},
+		{FunctionPathOpen, func() pathOpenFn {
+			return func(ctx publicwasm.ModuleContext, fd, lookupFlags, path, pathLen, oFlags uint32,
+				fsRightsBase, fsRightsInheriting uint64,
+				fdFlags, resultFD uint32) wasi.Errno {
+				ret, err := store.Engine.Call(ctx.(*wasm.ModuleContext), fn, uint64(fd), uint64(lookupFlags), uint64(path), uint64(pathLen), uint64(oFlags), uint64(fsRightsBase), uint64(fsRightsInheriting), uint64(fdFlags), uint64(resultFD))
+				require.NoError(t, err)
+				return wasi.Errno(ret[0])
+			}
+		}},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a memFS for testing that has "./wazero" file.
+			memFS := &MemFS{
+				Files: map[string][]byte{
+					"wazero": []byte(""),
+				},
+			}
+			api.opened = map[uint32]fileEntry{
+				fd: {
+					path:    ".",
+					fileSys: memFS,
+				},
+			}
+
+			maskMemory(store, len(expectedMemory))
+			copy(store.Memories[0].Buffer[0:], initialMemory)
+
+			errno := tc.pathOpen()(ctx, fd, lookupFlags, path, pathLen, oFlags, fsRightsBase, fsRightsInheriting, fdFlags, resultFD)
+			require.Equal(t, wasi.ErrnoSuccess, errno)
+			require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+			require.Equal(t, "wazero", api.opened[expectedFd].path) // verify the file was actually opened
+		})
+	}
+}
+
+func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
+	validFD := uint64(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
+	store, ctx, fn := instantiateWasmStore(t, FunctionPathOpen, ImportPathOpen, moduleName, func(a *wasiAPI) {
+		// Create a memFS for testing that has "./wazero" file.
+		memFS := &MemFS{
+			Files: map[string][]byte{
+				"wazero": []byte(""),
+			},
+		}
+		a.opened = map[uint32]fileEntry{
+			uint32(validFD): {
+				path:    ".",
+				fileSys: memFS,
+			},
+		}
+	})
+
+	tests := []struct {
+		name                                                                                        string
+		fd, lookupFlags, path, pathLen, oFlags, fsRightsBase, fsRightsInheriting, fdFlags, resultFD uint64
+		memory                                                                                      []byte
+		expectedErrno                                                                               wasi.Errno
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: wasi.ErrnoBadf,
+		},
+		{
+			name:          "out-of-memory reading path",
+			fd:            validFD,
+			path:          1,
+			pathLen:       1,
+			memory:        []byte{'?'},
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "out-of-memory reading pathLen",
+			fd:            validFD,
+			path:          0,
+			pathLen:       2,
+			memory:        []byte{'?'},
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:    "no such file exists",
+			fd:      validFD,
+			path:    0,
+			pathLen: 4,
+			memory: []byte{
+				'n', 'o', 'n', 'e', // file name which doesn't exist
+			},
+			expectedErrno: wasi.ErrnoNoent,
+		},
+		{
+			name:     "out-of-memory writing resultFD",
+			fd:       validFD,
+			path:     0,
+			pathLen:  6,
+			resultFD: 6,
+			memory: []byte{
+				'w', 'a', 'z', 'e', 'r', 'o', // the file which exists
+				'?', // resultFD, but there's not enough space for uint32
+			},
+			expectedErrno: wasi.ErrnoFault,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			store.Memories[0].Buffer = tc.memory
+
+			results, err := store.Engine.Call(ctx, fn, tc.fd, tc.lookupFlags, tc.path, tc.pathLen, tc.oFlags, tc.fsRightsBase, tc.fsRightsInheriting, tc.fdFlags, tc.resultFD)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+}
+
 // TODO: TestSnapshotPreview1_PathReadlink TestSnapshotPreview1_PathReadlink_Errors
 // TODO: TestSnapshotPreview1_PathRemoveDirectory TestSnapshotPreview1_PathRemoveDirectory_Errors
 // TODO: TestSnapshotPreview1_PathRename TestSnapshotPreview1_PathRename_Errors

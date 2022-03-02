@@ -2,12 +2,12 @@ package internalwasi
 
 import (
 	crand "crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"math"
-	mrand "math/rand"
 	"os"
 	"strings"
 	"time"
@@ -145,13 +145,23 @@ const (
 	FunctionPathFilestatGet      = "path_filestat_get"
 	FunctionPathFilestatSetTimes = "path_filestat_set_times"
 	FunctionPathLink             = "path_link"
-	FunctionPathOpen             = "path_open"
-	FunctionPathReadlink         = "path_readlink"
-	FunctionPathRemoveDirectory  = "path_remove_directory"
-	FunctionPathRename           = "path_rename"
-	FunctionPathSymlink          = "path_symlink"
-	FunctionPathUnlinkFile       = "path_unlink_file"
-	FunctionPollOneoff           = "poll_oneoff"
+
+	// FunctionPathOpen opens a file or directory.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#path_open
+	FunctionPathOpen = "path_open"
+	// ImportPathOpen is the WebAssembly 1.0 (20191205) Text format import of FunctionPathOpen
+	ImportPathOpen = `(import "wasi_snapshot_preview1" "path_open"
+    (func $wasi.path_open 
+	(param $fd i32) (param $lookupFlags i32) (param $path i32) (param $pathLen i32) (param $oFlags i32) 
+	(param $fsRightsBase i64) (param $fsRightsInheriting i64) (param $fdFlags i32)
+	(param $result.FD i32) (result (;errno;) i32)))`
+
+	FunctionPathReadlink        = "path_readlink"
+	FunctionPathRemoveDirectory = "path_remove_directory"
+	FunctionPathRename          = "path_rename"
+	FunctionPathSymlink         = "path_symlink"
+	FunctionPathUnlinkFile      = "path_unlink_file"
+	FunctionPollOneoff          = "poll_oneoff"
 
 	// FunctionProcExit terminates the execution of the module with an exit code.
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
@@ -384,7 +394,8 @@ type SnapshotPreview1 interface {
 	// Note: FdFdstatGet returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as well as additional fields.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
-	FdFdstatGet(ctx wasm.ModuleContext, fd uint32, resultFdstat uint32) wasi.Errno
+	// See https://linux.die.net/man/3/fsync
+	FdFdstatGet(ctx wasm.ModuleContext, fd, resultFdstat uint32) wasi.Errno
 
 	// TODO: wasi.FdFdstatSetFlags
 	// TODO: wasi.FdFdstatSetRights
@@ -554,7 +565,42 @@ type SnapshotPreview1 interface {
 	// TODO: PathFilestatGet
 	// TODO: PathFilestatSetTimes
 	// TODO: PathLink
-	// TODO: PathOpen
+
+	// PathOpen is the WASI function to open a file or directory. This returns ErrnoBadf if the fd is invalid.
+	//
+	// * fd - the file descriptor of a directory that `path` is relative to
+	// * lookupFlags - flags to indicate how to resolve `path`
+	// * path - the offset in `ctx.Memory` to read the path string from
+	// * pathLen - the length of `path`
+	// * oFlags - the open flags to indicate the method by which to open the file
+	// * fsRightsBase - the rights of the newly created file descriptor for `path`
+	// * fsRightsInheriting - the rights of the file descriptors derived from the newly created file descriptor for `path`
+	// * fdFlags - the file descriptor flags
+	// * resultFD - the offset in `ctx.Memory` to write the newly created file descriptor to
+	//
+	// For example, this function needs to first read `path` to determine the file to open.
+	//    If parameters `path` = 1, `pathLen` = 6, and the path is "wazero", PathOpen reads the path from `ctx.Memory`:
+	//
+	//                   pathLen
+	//               +------------------------+
+	//               |                        |
+	//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
+	//        path --^
+	//
+	// Then, if parameters resultFD = 8, and this function opened a new file descriptor 3 with the given flags,
+	// this function writes the blow to `ctx.Memory`:
+	//
+	//                          uint32le
+	//                         +--------+
+	//                         |        |
+	//        []byte{ 0..6, ?, 4, 0, 0, 0, ?}
+	//              resultFD --^
+	//
+	// Note: ImportPathOpen shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+	// Note: This is similar to `openat` in POSIX.
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
+	// See https://linux.die.net/man/3/openat
+
 	// TODO: PathReadlink
 	// TODO: PathRemoveDirectory
 	// TODO: PathRename
@@ -653,7 +699,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 		// TODO: FunctionPathFilestatGet
 		// TODO: FunctionPathFilestatSetTimes
 		// TODO: FunctionPathLink
-		FunctionPathOpen: a.path_open,
+		FunctionPathOpen: a.PathOpen,
 		// TODO: FunctionPathReadlink
 		// TODO: FunctionPathRemoveDirectory
 		// TODO: FunctionPathRename
@@ -886,20 +932,19 @@ func (a *wasiAPI) FdWrite(ctx wasm.ModuleContext, fd, iovs, iovsLen, resultSize 
 	return wasi.ErrnoSuccess
 }
 
-func (a *wasiAPI) path_open(ctx wasm.ModuleContext, fd, dirFlags, pathPtr, pathLen, oFlags uint32,
-	fsRightsBase, fsRightsInheriting uint64,
-	fdFlags, fdPtr uint32) (errno wasi.Errno) {
+// PathOpen implements SnapshotPreview1.PathOpen
+func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, lookupFlags, path, pathLen, oFlags uint32, fsRightsBase, fsRightsInheriting uint64, fdFlags, resultFD uint32) (errno wasi.Errno) {
 	dir, ok := a.opened[fd]
 	if !ok || dir.fileSys == nil {
-		return wasi.ErrnoInval
+		return wasi.ErrnoBadf
 	}
 
-	b, ok := ctx.Memory().Read(pathPtr, pathLen)
+	b, ok := ctx.Memory().Read(path, pathLen)
 	if !ok {
 		return wasi.ErrnoFault
 	}
-	path := string(b)
-	f, err := dir.fileSys.OpenWASI(dirFlags, path, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
+	pathString := string(b)
+	f, err := dir.fileSys.OpenWASI(lookupFlags, pathString, oFlags, fsRightsBase, fsRightsInheriting, fdFlags)
 	if err != nil {
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
@@ -909,13 +954,18 @@ func (a *wasiAPI) path_open(ctx wasm.ModuleContext, fd, dirFlags, pathPtr, pathL
 		}
 	}
 
-	newFD := a.randUnusedFD()
-
-	a.opened[newFD] = fileEntry{
-		file: f,
+	newFD, err := a.randUnusedFD()
+	if err != nil {
+		return wasi.ErrnoIo
 	}
 
-	if !ctx.Memory().WriteUint32Le(fdPtr, newFD) {
+	a.opened[newFD] = fileEntry{
+		path:    pathString,
+		fileSys: dir.fileSys,
+		file:    f,
+	}
+
+	if !ctx.Memory().WriteUint32Le(resultFD, newFD) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1041,11 +1091,16 @@ func NewAPI(opts ...Option) *wasiAPI {
 	return ret
 }
 
-func (a *wasiAPI) randUnusedFD() uint32 {
-	fd := uint32(mrand.Int31())
+func (a *wasiAPI) randUnusedFD() (uint32, error) {
+	rand := make([]byte, 4)
+	err := a.randSource(rand)
+	if err != nil {
+		return 0, err
+	}
+	fd := binary.LittleEndian.Uint32(rand)
 	for {
 		if _, ok := a.opened[fd]; !ok {
-			return fd
+			return fd, nil
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
