@@ -70,13 +70,13 @@ type Store interface {
 // TODO: rename this to InstantiatedModule per https://github.com/tetratelabs/wazero/issues/293.
 type ModuleExports interface {
 	// Memory returns a memory exported from this module or nil if it wasn't.
-	Memory() Memory
-
+	//
+	// Note: WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
+	// as a WASI Command or Reactor will never return nil for this name.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
+	Memory(name string) Memory
 	// Function returns a function exported from this module or nil if it wasn't.
 	Function(name string) Function
-
-	// TODO
-	Global(name string) Global
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.InstantiateModule).
@@ -106,11 +106,6 @@ type Function interface {
 	//		results, err := fn(ctx.Context(), offset, byteCount)
 	//	--snip--
 	Call(ctx context.Context, params ...uint64) ([]uint64, error)
-}
-
-type Global interface {
-	Value() uint64
-	Type() ValueType
 }
 
 // HostExports return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (20191205).

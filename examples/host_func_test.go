@@ -51,7 +51,7 @@ func Test_hostFunc(t *testing.T) {
 
 	store := wazero.NewStore()
 
-	env := &wasm.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
+	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
 	_, err := wazero.InstantiateHostModule(store, env)
 	require.NoError(t, err)
 

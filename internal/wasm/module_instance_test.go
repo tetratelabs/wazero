@@ -71,7 +71,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			instance, err := s.Instantiate(tc.input, "test")
 			require.NoError(t, err)
 
-			mem := instance.Memory()
+			mem := instance.Context.Memory()
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {

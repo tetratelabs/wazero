@@ -33,7 +33,7 @@ func Test_WASI(t *testing.T) {
 	store := wazero.NewStore()
 
 	// Host functions can be exported as any module name, including the empty string.
-	env := &wasm.HostModuleConfig{Name: "", Functions: map[string]interface{}{"random": goFunc}}
+	env := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"random": goFunc}}
 	_, err := wazero.InstantiateHostModule(store, env)
 
 	// Configure WASI and implement the function to use it

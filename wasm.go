@@ -211,5 +211,5 @@ func InstantiateHostModule(store wasm.Store, config *HostModuleConfig) (wasm.Hos
 	if !ok {
 		return nil, fmt.Errorf("unsupported Store implementation: %s", store)
 	}
-	return internal.ExportHostModule(config)
+	return internal.ExportHostModule(config.Name, config.Functions)
 }

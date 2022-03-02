@@ -130,7 +130,7 @@ func testUnreachable(t *testing.T, newEngine func() *wazero.Engine) {
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
 
-	hostModule := &publicwasm.HostModuleConfig{Name: "host", Functions: map[string]interface{}{"cause_unreachable": callUnreachable}}
+	hostModule := &wazero.HostModuleConfig{Name: "host", Functions: map[string]interface{}{"cause_unreachable": callUnreachable}}
 	_, err := wazero.InstantiateHostModule(store, hostModule)
 	require.NoError(t, err)
 
@@ -188,7 +188,7 @@ func testRecursiveEntry(t *testing.T, newEngine func() *wazero.Engine) {
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
 
-	hostModule := &publicwasm.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"host_func": hostfunc}}
+	hostModule := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"host_func": hostfunc}}
 	_, err := wazero.InstantiateHostModule(store, hostModule)
 	require.NoError(t, err)
 
@@ -214,7 +214,7 @@ func testImportedAndExportedFunc(t *testing.T, newEngine func() *wazero.Engine) 
 
 	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
 
-	hostModule := &publicwasm.HostModuleConfig{Name: "", Functions: map[string]interface{}{"store_int": storeInt}}
+	hostModule := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"store_int": storeInt}}
 	_, err := wazero.InstantiateHostModule(store, hostModule)
 	require.NoError(t, err)
 
@@ -276,7 +276,7 @@ func testHostFunctions(t *testing.T, newEngine func() *wazero.Engine) {
 	} {
 		store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: newEngine()})
 
-		hostModule := &publicwasm.HostModuleConfig{Name: "host", Functions: v}
+		hostModule := &wazero.HostModuleConfig{Name: "host", Functions: v}
 		_, err := wazero.InstantiateHostModule(store, hostModule)
 		require.NoError(t, err)
 

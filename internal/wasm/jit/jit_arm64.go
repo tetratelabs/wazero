@@ -703,7 +703,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	}
 
 	var intMov, floatMov obj.As = obj.ANOP, obj.ANOP
-	switch c.f.ModuleInstance.Globals[o.Index].GlobalType.ValType {
+	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
 	case wasm.ValueTypeI32:
 		intMov = arm64.AMOVWU
 	case wasm.ValueTypeI64:
@@ -751,7 +751,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	}
 
 	var mov obj.As
-	switch c.f.ModuleInstance.Globals[o.Index].GlobalType.ValType {
+	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
 	case wasm.ValueTypeI32:
 		mov = arm64.AMOVWU
 	case wasm.ValueTypeI64:

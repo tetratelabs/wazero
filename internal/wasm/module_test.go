@@ -674,8 +674,8 @@ func TestModule_buildGlobalInstances(t *testing.T) {
 
 	globals := m.buildGlobalInstances(nil)
 	expectedGlobals := []*GlobalInstance{
-		{GlobalType: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: math.Float64bits(1.0)},
-		{GlobalType: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(1)},
+		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: math.Float64bits(1.0)},
+		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(1)},
 	}
 
 	require.Len(t, globals, len(expectedGlobals))

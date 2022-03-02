@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math"
-
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 type (
@@ -102,6 +99,7 @@ func NewStore(ctx context.Context, engine Engine) *Store {
 		ctx:                  ctx,
 		moduleInstances:      map[string]*ModuleInstance{},
 		moduleContexts:       map[string]*ModuleContext{},
+		hostExports:          map[string]*hostExports{},
 		typeIDs:              map[string]FunctionTypeID{},
 		engine:               engine,
 		maximumFunctionIndex: maximumFunctionIndex,
@@ -117,7 +115,7 @@ func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
 	return nil
 }
 
-func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
+func (s *Store) Instantiate(module *Module, name string) (*ModuleExports, error) {
 	if err := s.requireModuleUnused(name); err != nil {
 		return nil, err
 	}
@@ -190,7 +188,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
-	return modCtx, nil
+	return &ModuleExports{s, modCtx}, nil
 }
 
 func (s *Store) ReleaseModuleInstance(instance *ModuleInstance) error {
@@ -338,19 +336,6 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 	m.index = addr
 }
 
-func (s *Store) AliasModuleInstance(src, dst string) {
-	s.moduleInstances[dst] = s.moduleInstances[src]
-}
-
-// ModuleExports implements wasm.Store ModuleExports
-func (s *Store) ModuleExports(moduleName string) publicwasm.ModuleExports {
-	if m, ok := s.moduleContexts[moduleName]; !ok {
-		return nil
-	} else {
-		return m
-	}
-}
-
 func (s *Store) requireModuleUnused(moduleName string) error {
 	if _, ok := s.hostExports[moduleName]; ok {
 		return fmt.Errorf("module %s has already been exported by this host", moduleName)
@@ -361,15 +346,10 @@ func (s *Store) requireModuleUnused(moduleName string) error {
 	return nil
 }
 
-// HostExports implements wasm.Store HostExports
-func (s *Store) HostExports(moduleName string) publicwasm.HostExports {
-	return s.hostExports[moduleName]
-}
-
 func (s *Store) getExport(moduleName string, name string, et ExternType) (exp *ExportInstance, err error) {
 	if m, ok := s.moduleInstances[moduleName]; !ok {
 		return nil, fmt.Errorf("module %s not instantiated", moduleName)
-	} else if exp, err = m.getExport(name, et); err != nil {
+	} else if exp, err = m.GetExport(name, et); err != nil {
 		return
 	}
 	return
@@ -393,7 +373,7 @@ func (s *Store) resolveImports(module *Module) (
 		moduleImports[m] = struct{}{}
 
 		var exp *ExportInstance
-		exp, err = m.getExport(is.Name, is.Type)
+		exp, err = m.GetExport(is.Name, is.Type)
 		if err != nil {
 			return
 		}
@@ -452,10 +432,10 @@ func (s *Store) resolveImports(module *Module) (
 		case ExternTypeGlobal:
 			globalType := is.DescGlobal
 			g := exp.Global
-			if globalType.Mutable != g.GlobalType.Mutable {
+			if globalType.Mutable != g.Type.Mutable {
 				err = fmt.Errorf("incompatible global import: mutability mismatch")
 				return
-			} else if globalType.ValType != g.GlobalType.ValType {
+			} else if globalType.ValType != g.Type.ValType {
 				err = fmt.Errorf("incompatible global import: value type mismatch")
 				return
 			}
@@ -491,20 +471,12 @@ func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
 	return &TypeInstance{Type: t, TypeID: id}, nil
 }
 
-func newTableInstance(min uint32, max *uint32) *TableInstance {
-	tableInst := &TableInstance{
-		Table:    make([]TableElement, min),
-		Min:      min,
-		Max:      max,
-		ElemType: 0x70, // funcref
-	}
-	for i := range tableInst.Table {
-		tableInst.Table[i] = TableElement{
-			FunctionTypeID: UninitializedTableElementTypeID,
-		}
-	}
-	return tableInst
+// Used only in spectets.
+func (s *Store) AliasModuleInstance(src, dst string) {
+	s.moduleInstances[dst] = s.moduleInstances[src]
 }
 
-// UninitializedTableElementTypeID math.MaxUint32 to represent the uninitialized elements.
-const UninitializedTableElementTypeID FunctionTypeID = math.MaxUint32
+// Used only in spectets.
+func (s *Store) ModuleInstance(name string) *ModuleInstance {
+	return s.moduleInstances[name]
+}

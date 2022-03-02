@@ -33,12 +33,12 @@ type WASIConfig struct {
 }
 
 // WASISnapshotPreview1 are functions importable as the module name wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1() *wasm.HostModuleConfig {
+func WASISnapshotPreview1() *HostModuleConfig {
 	return WASISnapshotPreview1WithConfig(&WASIConfig{})
 }
 
 // WASISnapshotPreview1WithConfig are functions importable as the module name wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1WithConfig(c *WASIConfig) *wasm.HostModuleConfig {
+func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
 	// TODO: delete the internalwasi.Option types as they are not accessible as they are internal!
 	var opts []internalwasi.Option
 	if c.Stdin != nil {
@@ -73,7 +73,7 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *wasm.HostModuleConfig {
 			opts = append(opts, internalwasi.Preopen(k, v))
 		}
 	}
-	return &wasm.HostModuleConfig{Name: wasi.ModuleSnapshotPreview1, Functions: internalwasi.SnapshotPreview1Functions(opts...)}
+	return &HostModuleConfig{Name: wasi.ModuleSnapshotPreview1, Functions: internalwasi.SnapshotPreview1Functions(opts...)}
 }
 
 // StartWASICommand instantiates the module and starts its WASI Command function ("_start"). The return value are all
@@ -105,14 +105,15 @@ func StartWASICommand(store wasm.Store, module *ModuleConfig) (wasm.ModuleExport
 		return nil, err
 	}
 
-	modCtx, err := internal.Instantiate(m, moduleName)
+	instantiated, err := internal.Instantiate(m, moduleName)
 	if err != nil {
 		return nil, err
 	}
+	ctx := instantiated.Context
 
-	start := modCtx.Function(internalwasi.FunctionStart)
-	if _, err = start.Call(modCtx.Context()); err != nil {
+	start := instantiated.Context.Function(internalwasi.FunctionStart)
+	if _, err = start.Call(ctx.Context()); err != nil {
 		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", moduleName, internalwasi.FunctionStart, err)
 	}
-	return modCtx, nil
+	return instantiated, nil
 }

@@ -21,7 +21,7 @@ func TestStartWASICommand_UsesStoreContext(t *testing.T) {
 		require.Equal(t, config.Context, ctx.Context())
 	}
 
-	_, err := InstantiateHostModule(store, &wasm.HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	_, err := InstantiateHostModule(store, &HostModuleConfig{Functions: map[string]interface{}{"start": start}})
 	require.NoError(t, err)
 
 	_, err = InstantiateHostModule(store, WASISnapshotPreview1())

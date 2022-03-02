@@ -160,7 +160,7 @@ func TestModuleExports_Memory(t *testing.T) {
 			exports, err := InstantiateModule(NewStore(), &ModuleConfig{Source: []byte(tc.wat)})
 			require.NoError(t, err)
 
-			mem := exports.Memory()
+			mem := exports.Memory("memory")
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
@@ -233,7 +233,7 @@ func TestInstantiateModule_UsesStoreContext(t *testing.T) {
 		require.Equal(t, config.Context, ctx.Context())
 	}
 
-	_, err := InstantiateHostModule(store, &wasm.HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	_, err := InstantiateHostModule(store, &HostModuleConfig{Functions: map[string]interface{}{"start": start}})
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
@@ -247,7 +247,7 @@ func TestInstantiateModule_UsesStoreContext(t *testing.T) {
 
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
 func requireImportAndExportFunction(t *testing.T, store wasm.Store, hostFn func(ctx wasm.ModuleContext) uint64, functionName string) []byte {
-	_, err := InstantiateHostModule(store, &wasm.HostModuleConfig{
+	_, err := InstantiateHostModule(store, &HostModuleConfig{
 		Name: "host", Functions: map[string]interface{}{functionName: hostFn},
 	})
 	require.NoError(t, err)

@@ -17,7 +17,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 //go:embed testdata/*.wasm
@@ -196,36 +195,38 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	var printI32F32 = func(uint32, float32) {}
 	var printF64F64 = func(float64, float64) {}
 
-	config := &publicwasm.HostModuleConfig{
-		Name: "spectest",
-		Functions: map[string]interface{}{
-			"print":         printV,
-			"print_i32":     printI32,
-			"print_f32":     printF32,
-			"print_i64":     printI64,
-			"print_f64":     printF64,
-			"print_i32_f32": printI32F32,
-			"print_f64_f64": printF64F64,
-		},
-		Globals: map[string]*publicwasm.HostModuleConfigGlobal{
-			"global_i32": {Type: wasm.ValueTypeI32, Value: uint64(int32(666))},
-			"global_i64": {Type: wasm.ValueTypeI64, Value: uint64(int64(666))},
-			"global_f32": {Type: wasm.ValueTypeF32, Value: uint64(uint32(0x44268000))},
-			"global_f64": {Type: wasm.ValueTypeF64, Value: uint64(0x4084d00000000000)},
-		},
-		Table: &publicwasm.HostModuleConfigTable{
-			Name: "table",
-			Min:  10,
-			Max:  &tableLimitMax,
-		},
-		Memory: &publicwasm.HostModuleConfigMemory{
-			Name: "memory",
-			Min:  1,
-			Max:  &memoryLimitMax,
-		},
-	}
+	const name = "spectest"
 
-	_, err := store.ExportHostModule(config)
+	_, err := store.ExportHostModule(name, map[string]interface{}{
+		"print":         printV,
+		"print_i32":     printI32,
+		"print_f32":     printF32,
+		"print_i64":     printI64,
+		"print_f64":     printF64,
+		"print_i32_f32": printI32F32,
+		"print_f64_f64": printF64F64,
+	})
+	require.NoError(t, err)
+
+	mod := store.ModuleInstance(name)
+
+	err = store.ExportHostGlobals(mod, map[string]uint64{
+		"global_i32": uint64(int32(666)),
+		"global_i64": uint64(int64(666)),
+		"global_f32": uint64(uint32(0x44268000)),
+		"global_f64": uint64(0x4084d00000000000),
+	}, map[string]wasm.ValueType{
+		"global_i32": wasm.ValueTypeI32,
+		"global_i64": wasm.ValueTypeI64,
+		"global_f32": wasm.ValueTypeF32,
+		"global_f64": wasm.ValueTypeF64,
+	})
+	require.NoError(t, err)
+
+	err = store.ExportHostTableInstance(mod, "table", 10, &tableLimitMax)
+	require.NoError(t, err)
+
+	err = store.ExportHostMemoryInstance(mod, "memory", 1, &memoryLimitMax)
 	require.NoError(t, err)
 }
 
@@ -319,8 +320,9 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							exports := store.ModuleExports(moduleName)
-							global := exports.Global(c.Action.Field)
+							mod := store.ModuleInstance(moduleName)
+							global, err := mod.GetExport(c.Action.Field, wasm.ExternTypeGlobal)
+							require.NoError(t, err, msg)
 							var expType wasm.ValueType
 							switch c.Exps[0].ValType {
 							case "i32":
@@ -333,8 +335,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 								expType = wasm.ValueTypeF64
 							}
 							require.NotNil(t, global, msg)
-							require.Equal(t, expType, global.Type(), msg)
-							require.Equal(t, exps[0], global.Value(), expType, msg)
+							require.Equal(t, expType, global.Global.Type.ValType, msg)
+							require.Equal(t, exps[0], global.Global.Val, expType, msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}

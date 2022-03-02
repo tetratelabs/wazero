@@ -207,7 +207,7 @@ func TestExecuteConstExpression(t *testing.T) {
 			t.Run(ValueTypeName(tc.valueType), func(t *testing.T) {
 				// The index specified in Data equals zero.
 				expr := &ConstantExpression{Data: []byte{0}, Opcode: OpcodeGlobalGet}
-				globals := []*GlobalInstance{{Val: tc.val, GlobalType: &GlobalType{ValType: tc.valueType}}}
+				globals := []*GlobalInstance{{Val: tc.val, Type: &GlobalType{ValType: tc.valueType}}}
 
 				val := executeConstExpression(globals, expr)
 				require.NotNil(t, val)
@@ -555,7 +555,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := NewStore(context.Background(), &catchContext{})
 			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeGlobal,
-				Global: &GlobalInstance{GlobalType: &GlobalType{Mutable: false}},
+				Global: &GlobalInstance{Type: &GlobalType{Mutable: false}},
 			}}, Name: moduleName}
 			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: true}}}})
 			require.Error(t, err)
@@ -565,7 +565,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := NewStore(context.Background(), &catchContext{})
 			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeGlobal,
-				Global: &GlobalInstance{GlobalType: &GlobalType{ValType: ValueTypeI32}},
+				Global: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}},
 			}}, Name: moduleName}
 			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeF64}}}})
 			require.Error(t, err)
@@ -573,9 +573,9 @@ func TestStore_resolveImports(t *testing.T) {
 		})
 		t.Run("ok", func(t *testing.T) {
 			s := NewStore(context.Background(), &catchContext{})
-			inst := &GlobalInstance{GlobalType: &GlobalType{ValType: ValueTypeI32}}
+			inst := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
 			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: inst}}, Name: moduleName}
-			_, globals, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.GlobalType}}})
+			_, globals, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.Type}}})
 			require.NoError(t, err)
 			require.Contains(t, globals, inst)
 		})

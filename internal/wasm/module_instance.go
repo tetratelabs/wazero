@@ -3,6 +3,7 @@ package internalwasm
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"reflect"
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
@@ -88,7 +89,7 @@ type (
 	// GlobalInstance represents a global instance in a store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0
 	GlobalInstance struct {
-		GlobalType *GlobalType
+		Type *GlobalType
 		// Val holds a 64-bit representation of the actual value.
 		Val   uint64
 		index globalIndex
@@ -283,7 +284,7 @@ func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
-func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance, error) {
+func (m *ModuleInstance) GetExport(name string, et ExternType) (*ExportInstance, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
 		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
@@ -308,7 +309,7 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	case OpcodeGlobalGet:
 		id, _, _ := leb128.DecodeUint32(r)
 		g := globals[id]
-		switch g.GlobalType.ValType {
+		switch g.Type.ValType {
 		case ValueTypeI32:
 			v = int32(g.Val)
 		case ValueTypeI64:
@@ -321,3 +322,21 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	}
 	return
 }
+
+func newTableInstance(min uint32, max *uint32) *TableInstance {
+	tableInst := &TableInstance{
+		Table:    make([]TableElement, min),
+		Min:      min,
+		Max:      max,
+		ElemType: 0x70, // funcref
+	}
+	for i := range tableInst.Table {
+		tableInst.Table[i] = TableElement{
+			FunctionTypeID: UninitializedTableElementTypeID,
+		}
+	}
+	return tableInst
+}
+
+// UninitializedTableElementTypeID math.MaxUint32 to represent the uninitialized elements.
+const UninitializedTableElementTypeID FunctionTypeID = math.MaxUint32
