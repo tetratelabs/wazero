@@ -8,7 +8,6 @@ import (
 )
 
 func TestModuleInstance_Memory(t *testing.T) {
-	t.Skip() // TODO fix
 	tests := []struct {
 		name        string
 		input       *Module
@@ -71,7 +70,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			instance, err := s.Instantiate(tc.input, "test")
 			require.NoError(t, err)
 
-			mem := instance.Context.Memory()
+			mem := instance.Memory("memory")
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
