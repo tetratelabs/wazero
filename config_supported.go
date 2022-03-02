@@ -3,8 +3,7 @@
 
 package wazero
 
-// NewRuntimeConfig returns NewRuntimeConfigInterpreter
-// TODO: switch back to NewRuntimeConfigJIT https://github.com/tetratelabs/wazero/issues/308
+// NewRuntimeConfig returns NewRuntimeConfigJIT
 func NewRuntimeConfig() *RuntimeConfig {
 	return NewRuntimeConfigJIT()
 }
