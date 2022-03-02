@@ -36,10 +36,14 @@ func newArchContext() archContext {
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 type archContext struct {
-	calleeSavedRegisterR19, calleeSavedRegisterR20, calleeSavedRegisterR21,
-	calleeSavedRegisterR22, calleeSavedRegisterR23, calleeSavedRegisterR24,
-	calleeSavedRegisterR25, calleeSavedRegisterR26, calleeSavedRegisterR27,
-	calleeSavedRegisterR28, calleeSavedRegisterR29 uint64
+	// arm64 calling convention requires X19-X29 to be saved and restored on function return.
+	// We save the caller's values on these registers here and restore when exiting from native code.
+	// Note: R28 is reserved for Gorutine by goruntime, and we never manipulate in JIT so we don't save here.
+	// Note: this is only used by JIT code so mark this as nolint.
+	calleeSavedRegisterR19, calleeSavedRegisterR20, calleeSavedRegisterR21, //nolint
+	calleeSavedRegisterR22, calleeSavedRegisterR23, calleeSavedRegisterR24, //nolint
+	calleeSavedRegisterR25, calleeSavedRegisterR26, calleeSavedRegisterR27, //nolint
+	calleeSavedRegisterR29 uint64 //nolint
 
 	// jitCallReturnAddress holds the absolute return address for jitcall.
 	// The value is set whenever jitcall is executed and done in jit_arm64.s
@@ -62,15 +66,46 @@ type archContext struct {
 }
 
 const (
+	// callEngineArchContextCalleeSavedRegisterR19Offset is the offset of archContext.calleeSavedRegisterR19 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR19Offset = 128
+	// callEngineArchContextCalleeSavedRegisterR20Offset is the offset of archContext.calleeSavedRegisterR20 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR20Offset = 136
+	// callEngineArchContextCalleeSavedRegisterR21Offset is the offset of archContext.calleeSavedRegisterR21 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR21Offset = 144
+	// callEngineArchContextCalleeSavedRegisterR22Offset is the offset of archContext.calleeSavedRegisterR22 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR22Offset = 152
+	// callEngineArchContextCalleeSavedRegisterR23Offset is the offset of archContext.calleeSavedRegisterR23 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR23Offset = 160
+	// callEngineArchContextCalleeSavedRegisterR24Offset is the offset of archContext.calleeSavedRegisterR24 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR24Offset = 168
+	// callEngineArchContextCalleeSavedRegisterR25Offset is the offset of archContext.calleeSavedRegisterR25 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR25Offset = 176
+	// callEngineArchContextCalleeSavedRegisterR26Offset is the offset of archContext.calleeSavedRegisterR26 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR26Offset = 184
+	// callEngineArchContextCalleeSavedRegisterR27Offset is the offset of archContext.calleeSavedRegisterR27 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR27Offset = 192
+	// callEngineArchContextCalleeSavedRegisterR29Offset is the offset of archContext.calleeSavedRegisterR29 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR29Offset = 200
 	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	callEngineArchContextCalleeSavedRegistersBeginningOffset = 128
-	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	callEngineArchContextJITCallReturnAddressOffset = 216
+	callEngineArchContextJITCallReturnAddressOffset = 208
 	// callEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum32BitSignedIntOffset = 224
+	callEngineArchContextMinimum32BitSignedIntOffset = 216
 	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum64BitSignedIntOffset = 232
+	callEngineArchContextMinimum64BitSignedIntOffset = 224
 )
+
+var calleeSavedRegisterToOffsetInCallEngine = map[int16]int64{
+	arm64.REG_R19: callEngineArchContextCalleeSavedRegisterR19Offset,
+	arm64.REG_R20: callEngineArchContextCalleeSavedRegisterR20Offset,
+	arm64.REG_R21: callEngineArchContextCalleeSavedRegisterR21Offset,
+	arm64.REG_R22: callEngineArchContextCalleeSavedRegisterR22Offset,
+	arm64.REG_R23: callEngineArchContextCalleeSavedRegisterR23Offset,
+	arm64.REG_R24: callEngineArchContextCalleeSavedRegisterR24Offset,
+	arm64.REG_R25: callEngineArchContextCalleeSavedRegisterR25Offset,
+	arm64.REG_R26: callEngineArchContextCalleeSavedRegisterR26Offset,
+	arm64.REG_R27: callEngineArchContextCalleeSavedRegisterR27Offset,
+	arm64.REG_R29: callEngineArchContextCalleeSavedRegisterR29Offset,
+}
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
 // This is used by callEngine.execWasmFunction and the entrypoint to enter the JITed native code.
@@ -602,15 +637,9 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 	}
 
 	// arm64 calling convention requires X19-X29 to be saved and restored on function return.
-	// https://developer.arm.com/documentation/den0024/a/The-ABI-for-ARM-64-bit-Architecture/Register-use-in-the-AArch64-Procedure-Call-Standard/Parameters-in-general-purpose-registers
-	for reg := int16(arm64.REG_R19); reg <= arm64.REG_R29; reg++ {
-		if reg == arm64.REGG {
-			continue
-		}
-		c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-			reservedRegisterForCallEngine, callEngineArchContextCalleeSavedRegistersBeginningOffset+int64(reg-arm64.REG_R19)*8,
-			reg,
-		)
+	for reg, offset := range calleeSavedRegisterToOffsetInCallEngine {
+		fmt.Println(reg, offset)
+		c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, offset, reg)
 	}
 
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
