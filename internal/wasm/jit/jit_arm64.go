@@ -36,6 +36,11 @@ func newArchContext() archContext {
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 type archContext struct {
+	calleeSavedRegisterR19, calleeSavedRegisterR20, calleeSavedRegisterR21,
+	calleeSavedRegisterR22, calleeSavedRegisterR23, calleeSavedRegisterR24,
+	calleeSavedRegisterR25, calleeSavedRegisterR26, calleeSavedRegisterR27,
+	calleeSavedRegisterR28, calleeSavedRegisterR29 uint64
+
 	// jitCallReturnAddress holds the absolute return address for jitcall.
 	// The value is set whenever jitcall is executed and done in jit_arm64.s
 	// Native code can return back to the vm.exec's main loop back by
@@ -58,11 +63,13 @@ type archContext struct {
 
 const (
 	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	callEngineArchContextJITCallReturnAddressOffset = 128
+	callEngineArchContextCalleeSavedRegistersBeginningOffset = 128
+	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
+	callEngineArchContextJITCallReturnAddressOffset = 216
 	// callEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum32BitSignedIntOffset = 136
+	callEngineArchContextMinimum32BitSignedIntOffset = 224
 	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum64BitSignedIntOffset = 144
+	callEngineArchContextMinimum64BitSignedIntOffset = 232
 )
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
@@ -592,6 +599,18 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 	} else {
 		// If the status == 0, we use zero register to store zero.
 		c.compileRegisterToMemoryInstruction(arm64.AMOVW, zeroRegister, reservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
+	}
+
+	// arm64 calling convention requires X19-X29 to be saved and restored on function return.
+	// https://developer.arm.com/documentation/den0024/a/The-ABI-for-ARM-64-bit-Architecture/Register-use-in-the-AArch64-Procedure-Call-Standard/Parameters-in-general-purpose-registers
+	for reg := int16(arm64.REG_R19); reg <= arm64.REG_R29; reg++ {
+		if reg == arm64.REGG {
+			continue
+		}
+		c.compileMemoryToRegisterInstruction(arm64.AMOVD,
+			reservedRegisterForCallEngine, callEngineArchContextCalleeSavedRegistersBeginningOffset+int64(reg-arm64.REG_R19)*8,
+			reg,
+		)
 	}
 
 	// The return address to the Go code is stored in archContext.jitReturnAddress which

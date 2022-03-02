@@ -58,10 +58,11 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 }
 
 func TestArchContextOffsetInEngine(t *testing.T) {
-	var vm callEngine
-	require.Equal(t, int(unsafe.Offsetof(vm.jitCallReturnAddress)), callEngineArchContextJITCallReturnAddressOffset) // If this fails, we have to fix jit_arm64.s as well.
-	require.Equal(t, int(unsafe.Offsetof(vm.minimum32BitSignedInt)), callEngineArchContextMinimum32BitSignedIntOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.minimum64BitSignedInt)), callEngineArchContextMinimum64BitSignedIntOffset)
+	var ctx callEngine
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR19)), callEngineArchContextCalleeSavedRegistersBeginningOffset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.jitCallReturnAddress)), callEngineArchContextJITCallReturnAddressOffset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.minimum32BitSignedInt)), callEngineArchContextMinimum32BitSignedIntOffset)
+	require.Equal(t, int(unsafe.Offsetof(ctx.minimum64BitSignedInt)), callEngineArchContextMinimum64BitSignedIntOffset)
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {
