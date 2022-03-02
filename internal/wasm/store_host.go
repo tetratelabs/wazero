@@ -17,9 +17,7 @@ func (g *hostExports) Function(name string) publicwasm.HostFunction {
 }
 
 // ExportHostFunctions is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func (s *Store) ExportHostModule(config *publicwasm.HostModuleConfig) (publicwasm.HostExports, error) {
-	moduleName := config.Name
-
+func (s *Store) ExportHostModule(moduleName string, nametToGoFunc map[string]interface{}) (publicwasm.HostExports, error) {
 	if err := s.requireModuleUnused(moduleName); err != nil {
 		return nil, err
 	}
@@ -27,27 +25,18 @@ func (s *Store) ExportHostModule(config *publicwasm.HostModuleConfig) (publicwas
 	m := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance)}
 	s.moduleInstances[moduleName] = m
 
-	if err := s.exportHostFunctions(m, config.Functions); err != nil {
+	if err := s.exportHostFunctions(m, nametToGoFunc); err != nil {
 		return nil, s.ReleaseModuleInstance(m)
 	}
 
-	if err := s.exportHostGlobals(m, config.Globals); err != nil {
-		return nil, s.ReleaseModuleInstance(m)
-	}
+	// TODO: Allow globals, table and memory per https://github.com/tetratelabs/wazero/issues/279
 
-	if err := s.exportHostTableInstance(m, config.Table); err != nil {
-		return nil, s.ReleaseModuleInstance(m)
-	}
-
-	if err := s.exportHostMemoryInstance(m, config.Memory); err != nil {
-		return nil, s.ReleaseModuleInstance(m)
-	}
-
-	ret := &hostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, len(config.Functions))}
-	for name := range config.Functions {
+	ret := &hostExports{NameToFunctionInstance: make(map[string]*FunctionInstance, len(nametToGoFunc))}
+	for name := range nametToGoFunc {
 		ret.NameToFunctionInstance[name] = m.Exports[name].Function
 	}
 
+	s.hostExports[moduleName] = ret
 	return ret, nil
 }
 
@@ -97,11 +86,11 @@ func (s *Store) exportHostFunction(m *ModuleInstance, hf *GoFunc) error {
 	return nil
 }
 
-func (s *Store) exportHostGlobals(m *ModuleInstance, globals map[string]*publicwasm.HostModuleConfigGlobal) error {
-	for name, config := range globals {
+func (s *Store) ExportHostGlobals(m *ModuleInstance, nameToValue map[string]uint64, nameToValueType map[string]ValueType) error {
+	for name, v := range nameToValue {
 		g := &GlobalInstance{
-			Val:        config.Value,
-			GlobalType: &GlobalType{ValType: config.Type},
+			Val:        v,
+			GlobalType: &GlobalType{ValType: nameToValueType[name]},
 		}
 
 		m.Globals = append(m.Globals, g)
@@ -114,34 +103,26 @@ func (s *Store) exportHostGlobals(m *ModuleInstance, globals map[string]*publicw
 	return nil
 }
 
-func (s *Store) exportHostTableInstance(m *ModuleInstance, config *publicwasm.HostModuleConfigTable) error {
-	if config == nil {
-		return nil
-	}
-
-	t := newTableInstance(config.Min, config.Max)
+func (s *Store) ExportHostTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
+	t := newTableInstance(min, max)
 
 	// TODO: check if the module already has memory, and if so, returns error.
 	m.TableInstance = t
 	s.addTableInstance(t)
 
-	return m.addExport(config.Name, &ExportInstance{Type: ExternTypeTable, Table: t})
+	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
 }
 
-func (s *Store) exportHostMemoryInstance(m *ModuleInstance, config *publicwasm.HostModuleConfigMemory) error {
-	if config == nil {
-		return nil
-	}
-
+func (s *Store) ExportHostMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
-		Buffer: make([]byte, MemoryPagesToBytesNum(config.Min)),
-		Min:    config.Min,
-		Max:    config.Max,
+		Buffer: make([]byte, MemoryPagesToBytesNum(min)),
+		Min:    min,
+		Max:    max,
 	}
 
 	// TODO: check if the module already has memory, and if so, returns error.
 	m.MemoryInstance = memory
 	s.addMemoryInstance(memory)
 
-	return m.addExport(config.Name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
+	return m.addExport(name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
 }
