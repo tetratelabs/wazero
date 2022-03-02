@@ -19,7 +19,7 @@ func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstan
 	}
 }
 
-// ModuleContext implements wasm.ModuleContext, wasm.ModuleExports, and wasm.Module
+// ModuleContext implements wasm.ModuleContext, and wasm.Module
 type ModuleContext struct {
 	// ctx is returned by Context and overridden WithContext
 	ctx context.Context
