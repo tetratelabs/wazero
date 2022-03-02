@@ -29,7 +29,7 @@ var (
 		arm64.REG_F24, arm64.REG_F25, arm64.REG_F26, arm64.REG_F27, arm64.REG_F28,
 		arm64.REG_F29, arm64.REG_F30, arm64.REG_F31,
 	}
-	// Note: arm64.REG_R29 is reserved for Goroutine by goruntime.
+	// Note: arm64.REG_R28 is reserved for Goroutine by goruntime, and not here.
 	unreservedGeneralPurposeIntRegisters = []int16{
 		arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,

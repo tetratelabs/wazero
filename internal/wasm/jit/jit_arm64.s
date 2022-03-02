@@ -14,7 +14,7 @@ TEXT ·jitcall(SB),NOSPLIT|NOFRAME,$0-16
         // We save the return address value into archContext.jitReturnAddress in Engine.
         // Note that the const 208 drifts after editting Engine or archContext struct. See TestArchContextOffsetInEngine.
         MOVD R30,208(R0)
-	// arm64 calling convention requires R19-R29 to be saved and restored on function return.
+        // arm64 calling convention requires R19-R29 to be saved and restored on function return.
         // Since R28 is reserved for Gorutine by goruntime, and we never manipulate in JIT, we don't need to save here.
         // Note: these offset consts drifts after editting Engine or archContext struct. See TestArchContextOffsetInEngine.
         MOVD R19,128(R0)
