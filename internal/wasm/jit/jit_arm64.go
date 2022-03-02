@@ -638,7 +638,6 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 
 	// arm64 calling convention requires X19-X29 to be saved and restored on function return.
 	for reg, offset := range calleeSavedRegisterToOffsetInCallEngine {
-		fmt.Println(reg, offset)
 		c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, offset, reg)
 	}
 
