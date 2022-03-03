@@ -188,7 +188,7 @@ func (s *Store) AddHostTableInstance(m *ModuleInstance, name string, min uint32,
 // Only used in spectest as of now.
 func (s *Store) AddHostMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
-		Buffer: make([]byte, memoryPagesToBytesNum(min)),
+		Buffer: make([]byte, MemoryPagesToBytesNum(min)),
 		Min:    min,
 		Max:    max,
 	}

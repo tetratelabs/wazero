@@ -426,7 +426,7 @@ func (m *Module) buildFunctionInstances() (functions []*FunctionInstance) {
 func (m *Module) buildMemoryInstance() (mem *MemoryInstance) {
 	for _, memSec := range m.MemorySection {
 		mem = &MemoryInstance{
-			Buffer: make([]byte, memoryPagesToBytesNum(memSec.Min)),
+			Buffer: make([]byte, MemoryPagesToBytesNum(memSec.Min)),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
 		}
