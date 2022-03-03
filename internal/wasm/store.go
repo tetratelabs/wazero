@@ -790,11 +790,6 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	return
 }
 
-// Only used in spectests.
-func (s *Store) AliasModuleInstance(src, dst string) {
-	s.moduleInstances[dst] = s.moduleInstances[src]
-}
-
 func (s *Store) getTypeInstances(ts []*FunctionType) ([]*TypeInstance, error) {
 	ret := make([]*TypeInstance, len(ts))
 	for i, t := range ts {
