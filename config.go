@@ -13,18 +13,27 @@ import (
 // Note: This panics at runtime the runtime.GOOS or runtime.GOARCH does not support JIT. Use NewRuntimeConfig to safely
 // detect and fallback to NewRuntimeConfigInterpreter if needed.
 func NewRuntimeConfigJIT() *RuntimeConfig {
-	return &RuntimeConfig{engine: jit.NewEngine(), ctx: context.Background()}
+	return &RuntimeConfig{
+		engine:          jit.NewEngine(),
+		ctx:             context.Background(),
+		enabledFeatures: internalwasm.Features20191205,
+	}
 }
 
 // NewRuntimeConfigInterpreter interprets WebAssembly modules instead of compiling them into assembly.
 func NewRuntimeConfigInterpreter() *RuntimeConfig {
-	return &RuntimeConfig{engine: interpreter.NewEngine(), ctx: context.Background()}
+	return &RuntimeConfig{
+		engine:          interpreter.NewEngine(),
+		ctx:             context.Background(),
+		enabledFeatures: internalwasm.Features20191205,
+	}
 }
 
 // RuntimeConfig controls runtime behavior, with the default implementation as NewRuntimeConfig
 type RuntimeConfig struct {
-	engine internalwasm.Engine
-	ctx    context.Context
+	engine          internalwasm.Engine
+	ctx             context.Context
+	enabledFeatures internalwasm.Features
 }
 
 // WithContext sets the default context used to initialize the module. Defaults to context.Background if nil.
@@ -39,7 +48,18 @@ func (r *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return &RuntimeConfig{engine: r.engine, ctx: ctx}
+	return &RuntimeConfig{engine: r.engine, ctx: ctx, enabledFeatures: r.enabledFeatures}
+}
+
+// WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
+// WebAssembly 1.0 (20191205).
+//
+// When false, a wasm.Global can never be cast to a wasm.MutableGlobal, and any source that includes mutable globals
+// will fail to parse.
+//
+func (r *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
+	enabledFeatures := r.enabledFeatures.Set(internalwasm.FeatureMutableGlobal, enabled)
+	return &RuntimeConfig{engine: r.engine, ctx: r.ctx, enabledFeatures: enabledFeatures}
 }
 
 // DecodedModule is a WebAssembly 1.0 (20191205) text or binary encoded module to instantiate.

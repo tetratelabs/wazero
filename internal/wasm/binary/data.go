@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -8,7 +9,7 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeDataSegment(r io.Reader) (*wasm.DataSegment, error) {
+func decodeDataSegment(r *bytes.Reader) (*wasm.DataSegment, error) {
 	d, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("read memory index: %v", err)

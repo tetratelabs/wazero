@@ -65,12 +65,16 @@ func NewRuntime() Runtime {
 
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
-	return &runtime{store: internalwasm.NewStore(config.ctx, config.engine)}
+	return &runtime{
+		store:           internalwasm.NewStore(config.ctx, config.engine, config.enabledFeatures),
+		enabledFeatures: config.enabledFeatures,
+	}
 }
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
-	store *internalwasm.Store
+	store           *internalwasm.Store
+	enabledFeatures internalwasm.Features
 }
 
 // Module implements wasm.Store Module
@@ -101,7 +105,7 @@ func (r *runtime) DecodeModule(source []byte) (*DecodedModule, error) {
 		decoder = text.DecodeModule
 	}
 
-	internal, err := decoder(source)
+	internal, err := decoder(source, r.enabledFeatures)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(); err != nil {

@@ -1,20 +1,20 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeTableType(r io.Reader) (*wasm.TableType, error) {
-	b := make([]byte, 1)
-	if _, err := io.ReadFull(r, b); err != nil {
+func decodeTableType(r *bytes.Reader) (*wasm.TableType, error) {
+	b, err := r.ReadByte()
+	if err != nil {
 		return nil, fmt.Errorf("read leading byte: %v", err)
 	}
 
-	if b[0] != 0x70 {
-		return nil, fmt.Errorf("%w: invalid element type %#x != %#x", ErrInvalidByte, b[0], 0x70)
+	if b != 0x70 {
+		return nil, fmt.Errorf("%w: invalid element type %#x != %#x", ErrInvalidByte, b, 0x70)
 	}
 
 	lm, err := decodeLimitsType(r)
@@ -28,7 +28,7 @@ func decodeTableType(r io.Reader) (*wasm.TableType, error) {
 	}, nil
 }
 
-func decodeGlobalType(r io.Reader) (*wasm.GlobalType, error) {
+func decodeGlobalType(r *bytes.Reader, features wasm.Features) (*wasm.GlobalType, error) {
 	vt, err := decodeValueTypes(r, 1)
 	if err != nil {
 		return nil, fmt.Errorf("read value type: %w", err)
@@ -38,14 +38,17 @@ func decodeGlobalType(r io.Reader) (*wasm.GlobalType, error) {
 		ValType: vt[0],
 	}
 
-	b := make([]byte, 1)
-	if _, err := io.ReadFull(r, b); err != nil {
+	b, err := r.ReadByte()
+	if err != nil {
 		return nil, fmt.Errorf("read mutablity: %w", err)
 	}
 
-	switch mut := b[0]; mut {
+	switch mut := b; mut {
 	case 0x00:
 	case 0x01:
+		if err = features.Require(wasm.FeatureMutableGlobal); err != nil {
+			return nil, err
+		}
 		ret.Mutable = true
 	default:
 		return nil, fmt.Errorf("%w for mutability: %#x != 0x00 or 0x01", ErrInvalidByte, mut)

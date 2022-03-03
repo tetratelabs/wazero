@@ -1,9 +1,9 @@
 package leb128
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"io"
 )
 
 const (
@@ -57,12 +57,12 @@ func EncodeUint32(value uint32) (buf []byte) {
 	}
 }
 
-func DecodeUint32(r io.Reader) (ret uint32, bytesRead uint64, err error) {
+func DecodeUint32(r *bytes.Reader) (ret uint32, bytesRead uint64, err error) {
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	// with the modification on the overflow handling tailored for 32-bits.
 	var s uint32
 	for i := 0; i < maxVarintLen32; i++ {
-		b, err := readByte(r)
+		b, err := r.ReadByte()
 		if err != nil {
 			return 0, 0, err
 		}
@@ -79,11 +79,11 @@ func DecodeUint32(r io.Reader) (ret uint32, bytesRead uint64, err error) {
 	return 0, 0, errOverflow32
 }
 
-func DecodeUint64(r io.Reader) (ret uint64, bytesRead uint64, err error) {
+func DecodeUint64(r *bytes.Reader) (ret uint64, bytesRead uint64, err error) {
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	var s uint64
 	for i := 0; i < maxVarintLen64; i++ {
-		b, err := readByte(r)
+		b, err := r.ReadByte()
 		if err != nil {
 			return 0, 0, err
 		}
@@ -100,11 +100,11 @@ func DecodeUint64(r io.Reader) (ret uint64, bytesRead uint64, err error) {
 	return 0, 0, errOverflow64
 }
 
-func DecodeInt32(r io.Reader) (ret int32, bytesRead uint64, err error) {
+func DecodeInt32(r *bytes.Reader) (ret int32, bytesRead uint64, err error) {
 	var shift int
 	var b byte
 	for {
-		b, err = readByte(r)
+		b, err = r.ReadByte()
 		if err != nil {
 			return 0, 0, fmt.Errorf("readByte failed: %w", err)
 		}
@@ -133,7 +133,7 @@ func DecodeInt32(r io.Reader) (ret int32, bytesRead uint64, err error) {
 // still needs to fit the 32-bit range of allowed indices. Hence, this is 33, not 32-bit!
 //
 // See https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions
-func DecodeInt33AsInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
+func DecodeInt33AsInt64(r *bytes.Reader) (ret int64, bytesRead uint64, err error) {
 	const (
 		int33Mask  int64 = 1 << 7
 		int33Mask2       = ^int33Mask
@@ -146,7 +146,7 @@ func DecodeInt33AsInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
 	var b int64
 	var rb byte
 	for shift < 35 {
-		rb, err = readByte(r)
+		rb, err = r.ReadByte()
 		if err != nil {
 			return 0, 0, fmt.Errorf("readByte failed: %w", err)
 		}
@@ -181,7 +181,7 @@ func DecodeInt33AsInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
 	return ret, bytesRead, nil
 }
 
-func DecodeInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
+func DecodeInt64(r *bytes.Reader) (ret int64, bytesRead uint64, err error) {
 	const (
 		int64Mask3 = 1 << 6
 		int64Mask4 = ^0
@@ -189,7 +189,7 @@ func DecodeInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
 	var shift int
 	var b byte
 	for {
-		b, err = readByte(r)
+		b, err = r.ReadByte()
 		if err != nil {
 			return 0, 0, fmt.Errorf("readByte failed: %w", err)
 		}
@@ -212,10 +212,4 @@ func DecodeInt64(r io.Reader) (ret int64, bytesRead uint64, err error) {
 			return
 		}
 	}
-}
-
-func readByte(r io.Reader) (byte, error) {
-	b := make([]byte, 1)
-	_, err := io.ReadFull(r, b)
-	return b[0], err
 }

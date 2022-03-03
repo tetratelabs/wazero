@@ -3,7 +3,6 @@ package binary
 import (
 	"bytes"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -16,19 +15,19 @@ func decodeExport(r *bytes.Reader) (i *wasm.Export, err error) {
 		return nil, err
 	}
 
-	b := make([]byte, 1)
-	if _, err = io.ReadFull(r, b); err != nil {
+	b, err := r.ReadByte()
+	if err != nil {
 		return nil, fmt.Errorf("error decoding export kind: %w", err)
 	}
 
-	i.Type = b[0]
+	i.Type = b
 	switch i.Type {
 	case wasm.ExternTypeFunc, wasm.ExternTypeTable, wasm.ExternTypeMemory, wasm.ExternTypeGlobal:
 		if i.Index, _, err = leb128.DecodeUint32(r); err != nil {
 			return nil, fmt.Errorf("error decoding export index: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("%w: invalid byte for exportdesc: %#x", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%w: invalid byte for exportdesc: %#x", ErrInvalidByte, b)
 	}
 	return
 }

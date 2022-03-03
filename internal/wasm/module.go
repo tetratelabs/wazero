@@ -16,7 +16,7 @@ import (
 // * result is the module parsed or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 // See binary.DecodeModule and text.DecodeModule
-type DecodeModule func(source []byte) (result *Module, err error)
+type DecodeModule func(source []byte, features Features) (result *Module, err error)
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
 // See binary.EncodeModule
@@ -322,7 +322,7 @@ func (m *Module) validateExports(functions []Index, globals []*GlobalType, memor
 
 func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, expectedType ValueType) (err error) {
 	var actualType ValueType
-	r := bytes.NewBuffer(expr.Data)
+	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		_, _, err = leb128.DecodeInt32(r)

@@ -9,9 +9,9 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
+// DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Binary Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-format%E2%91%A0
-func DecodeModule(binary []byte) (*wasm.Module, error) {
+func DecodeModule(binary []byte, features wasm.Features) (*wasm.Module, error) {
 	r := bytes.NewReader(binary)
 
 	// Magic number.
@@ -71,7 +71,9 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		case wasm.SectionIDType:
 			m.TypeSection, err = decodeTypeSection(r)
 		case wasm.SectionIDImport:
-			m.ImportSection, err = decodeImportSection(r)
+			if m.ImportSection, err = decodeImportSection(r, features); err != nil {
+				return nil, err // avoid re-wrapping the error.
+			}
 		case wasm.SectionIDFunction:
 			m.FunctionSection, err = decodeFunctionSection(r)
 		case wasm.SectionIDTable:
@@ -79,7 +81,9 @@ func DecodeModule(binary []byte) (*wasm.Module, error) {
 		case wasm.SectionIDMemory:
 			m.MemorySection, err = decodeMemorySection(r)
 		case wasm.SectionIDGlobal:
-			m.GlobalSection, err = decodeGlobalSection(r)
+			if m.GlobalSection, err = decodeGlobalSection(r, features); err != nil {
+				return nil, err // avoid re-wrapping the error.
+			}
 		case wasm.SectionIDExport:
 			m.ExportSection, err = decodeExportSection(r)
 		case wasm.SectionIDStart:

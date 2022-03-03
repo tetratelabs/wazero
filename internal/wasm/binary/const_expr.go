@@ -3,52 +3,53 @@ package binary
 import (
 	"bytes"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeConstantExpression(r io.Reader) (*wasm.ConstantExpression, error) {
-	b := make([]byte, 1)
-	_, err := io.ReadFull(r, b)
+func decodeConstantExpression(r *bytes.Reader) (*wasm.ConstantExpression, error) {
+	b, err := r.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("read opcode: %v", err)
 	}
-	buf := new(bytes.Buffer)
-	teeR := io.TeeReader(r, buf)
 
-	opcode := b[0]
+	remainingBeforeData := int64(r.Len())
+	offsetAtData := r.Size() - remainingBeforeData
+
+	opcode := b
 	switch opcode {
 	case wasm.OpcodeI32Const:
-		_, _, err = leb128.DecodeInt32(teeR)
+		_, _, err = leb128.DecodeInt32(r)
 	case wasm.OpcodeI64Const:
-		_, _, err = leb128.DecodeInt64(teeR)
+		_, _, err = leb128.DecodeInt64(r)
 	case wasm.OpcodeF32Const:
-		_, err = ieee754.DecodeFloat32(teeR)
+		_, err = ieee754.DecodeFloat32(r)
 	case wasm.OpcodeF64Const:
-		_, err = ieee754.DecodeFloat64(teeR)
+		_, err = ieee754.DecodeFloat64(r)
 	case wasm.OpcodeGlobalGet:
-		_, _, err = leb128.DecodeUint32(teeR)
+		_, _, err = leb128.DecodeUint32(r)
 	default:
-		return nil, fmt.Errorf("%v for const expression opt code: %#x", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%v for const expression opt code: %#x", ErrInvalidByte, b)
 	}
 
 	if err != nil {
 		return nil, fmt.Errorf("read value: %v", err)
 	}
 
-	if _, err := io.ReadFull(r, b); err != nil {
+	if b, err = r.ReadByte(); err != nil {
 		return nil, fmt.Errorf("look for end opcode: %v", err)
 	}
 
-	if b[0] != byte(wasm.OpcodeEnd) {
+	if b != wasm.OpcodeEnd {
 		return nil, fmt.Errorf("constant expression has been not terminated")
 	}
 
-	return &wasm.ConstantExpression{
-		Opcode: opcode,
-		Data:   buf.Bytes(),
-	}, nil
+	data := make([]byte, remainingBeforeData-int64(r.Len()))
+	if _, err := r.ReadAt(data, offsetAtData); err != nil {
+		return nil, fmt.Errorf("error re-buffering ConstantExpression.Data")
+	}
+
+	return &wasm.ConstantExpression{Opcode: opcode, Data: data}, nil
 }

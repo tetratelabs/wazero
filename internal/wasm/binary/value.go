@@ -42,7 +42,7 @@ func encodeValTypes(vt []wasm.ValueType) []byte {
 	return append(count, vt...)
 }
 
-func decodeValueTypes(r io.Reader, num uint32) ([]wasm.ValueType, error) {
+func decodeValueTypes(r *bytes.Reader, num uint32) ([]wasm.ValueType, error) {
 	if num == 0 {
 		return nil, nil
 	}
