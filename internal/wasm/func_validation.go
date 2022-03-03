@@ -814,6 +814,8 @@ func validateFunction(
 			// unreachable instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
 		} else if op == OpcodeNop {
+		} else if OpcodeI32Extend8S <= op && op <= OpcodeI64Extend32S {
+			return fmt.Errorf("%s invalid as %s is not yet unsupported. See #66", InstructionName(op), FeatureSignExtensionOps)
 		} else {
 			return fmt.Errorf("invalid instruction 0x%x", op)
 		}
