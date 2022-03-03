@@ -124,7 +124,7 @@ func (g globalF64) String() string {
 
 // Global implements wasm.Module Global
 func (m *PublicModule) Global(name string) publicwasm.Global {
-	exp, err := m.Context.Module.GetExport(name, ExternTypeGlobal)
+	exp, err := m.Instance.GetExport(name, ExternTypeGlobal)
 	if err != nil {
 		return nil
 	}

@@ -98,7 +98,7 @@ func TestEngine_Call(t *testing.T) {
 
 	// Use exported functions to simplify instantiation of a Wasm function
 	e := NewEngine()
-	store := wasm.NewStore(context.Background(), e, , wasm.Features20191205)
+	store := wasm.NewStore(context.Background(), e, wasm.Features20191205)
 	mod, err := store.Instantiate(m, "")
 	require.NoError(t, err)
 

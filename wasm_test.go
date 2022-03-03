@@ -105,13 +105,13 @@ func TestDecodedModule_WithName(t *testing.T) {
 	internal := r.(*runtime).store
 	m1, err := r.NewModule(base.WithName("1"))
 	require.NoError(t, err)
-	require.Nil(t, internal.ModuleContexts["0"])
-	require.Equal(t, internal.ModuleContexts["1"], m1.(*internalwasm.PublicModule).Context)
+	require.Nil(t, internal.Module("0"))
+	require.Equal(t, internal.Module("1"), m1.(*internalwasm.PublicModule))
 
 	m2, err := r.NewModule(base.WithName("2"))
 	require.NoError(t, err)
-	require.Nil(t, internal.ModuleContexts["0"])
-	require.Equal(t, internal.ModuleContexts["2"], m2.(*internalwasm.PublicModule).Context)
+	require.Nil(t, internal.Module("0"))
+	require.Equal(t, internal.Module("2"), m2.(*internalwasm.PublicModule))
 }
 
 // TestModule_Memory only covers a couple cases to avoid duplication of internal/wasm/runtime_test.go

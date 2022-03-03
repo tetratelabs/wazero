@@ -34,16 +34,10 @@ type (
 		engine Engine
 
 		// EnabledFeatures are read-only to allow optimizations.
-		enabledFeatures Features
+		EnabledFeatures Features
 
 		// ModuleInstances holds the instantiated Wasm modules by module name from Instantiate.
 		moduleInstances map[string]*ModuleInstance
-
-		// hostModules holds host functions by module name from NewHostModule.
-		hostModules map[string]*HostModule
-
-		// ModuleContexts holds default host function call contexts keyed by module name.
-		moduleContexts map[string]*ModuleContext
 
 		// TypeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
 		// do type-checks on indirect function calls.
@@ -111,6 +105,12 @@ type (
 		MemoryInstance *MemoryInstance
 		TableInstance  *TableInstance
 		Types          []*TypeInstance
+
+		// ModuleContexts holds default host function call context.
+		Ctx *ModuleContext
+
+		// TODO
+		hostModule *HostModule
 
 		// TODO
 		refCount      int
@@ -388,10 +388,8 @@ func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Sto
 	return &Store{
 		ctx:                  ctx,
 		engine:               engine,
-		enabledFeatures:      enabledFeatures,
+		EnabledFeatures:      enabledFeatures,
 		moduleInstances:      map[string]*ModuleInstance{},
-		moduleContexts:       map[string]*ModuleContext{},
-		hostModules:          map[string]*HostModule{},
 		typeIDs:              map[string]FunctionTypeID{},
 		maximumFunctionIndex: maximumFunctionIndex,
 		maximumFunctionTypes: maximumFunctionTypes,
@@ -468,18 +466,18 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	}
 
 	// Build the default context for calls to this module.
-	modCtx := NewModuleContext(s.ctx, s.engine, instance)
-	s.moduleContexts[instance.Name] = modCtx
+	instance.Ctx = NewModuleContext(s.ctx, s.engine, instance)
+
 	s.moduleInstances[instance.Name] = instance
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		if _, err := s.engine.Call(modCtx, instance.Functions[funcIdx]); err != nil {
+		if _, err := s.engine.Call(instance.Ctx, instance.Functions[funcIdx]); err != nil {
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
-	return &PublicModule{s, modCtx}, nil
+	return &PublicModule{s, instance}, nil
 }
 
 func (s *Store) ReleaseModuleInstance(instance *ModuleInstance) error {
@@ -513,9 +511,7 @@ func (s *Store) ReleaseModuleInstance(instance *ModuleInstance) error {
 	instance.MemoryInstance = nil
 	instance.Types = nil
 
-	delete(s.moduleContexts, instance.Name)
 	delete(s.moduleInstances, instance.Name)
-	delete(s.hostModules, instance.Name)
 	return nil
 }
 
@@ -630,7 +626,7 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 
 // Module implements wasm.Store Module
 func (s *Store) Module(moduleName string) publicwasm.Module {
-	if m, ok := s.moduleContexts[moduleName]; !ok {
+	if m, ok := s.moduleInstances[moduleName]; !ok {
 		return nil
 	} else {
 		return &PublicModule{s, m}
@@ -641,21 +637,21 @@ func (s *Store) Module(moduleName string) publicwasm.Module {
 type PublicModule struct {
 	s *Store
 	// Context is exported for /wasi.go
-	Context *ModuleContext
+	Instance *ModuleInstance
 }
 
 // Function implements wasm.Module Function
 func (m *PublicModule) Function(name string) publicwasm.Function {
-	exp, err := m.Context.Module.GetExport(name, ExternTypeFunc)
+	exp, err := m.Instance.GetExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
 	}
-	return &exportedFunction{module: m.Context, function: exp.Function}
+	return &exportedFunction{module: m.Instance.Ctx, function: exp.Function}
 }
 
 // Memory implements wasm.Module Memory
 func (m *PublicModule) Memory(name string) publicwasm.Memory {
-	exp, err := m.Context.Module.GetExport(name, ExternTypeMemory)
+	exp, err := m.Instance.GetExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
 	}
@@ -664,7 +660,7 @@ func (m *PublicModule) Memory(name string) publicwasm.Memory {
 
 // HostModule implements wasm.Store HostModule
 func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
-	return s.hostModules[moduleName]
+	return s.moduleInstances[moduleName].hostModule
 }
 
 func (s *Store) getExport(moduleName string, name string, et ExternType) (exp *ExportInstance, err error) {
@@ -794,88 +790,9 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	return
 }
 
-// AddHostFunction exports a function so that it can be imported under the given module and name. If a function already
-// exists for this module and name it is ignored rather than overwritten.
-//
-// Note: The wasm.Memory of the fn will be from the importing module.
-func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
-	typeInstance, err := s.getTypeInstance(hf.functionType)
-	if err != nil {
-		return nil, err
-	}
-
-	f := &FunctionInstance{
-		Name:           fmt.Sprintf("%s.%s", m.Name, hf.wasmFunctionName),
-		HostFunction:   hf.goFunc,
-		FunctionKind:   hf.functionKind,
-		FunctionType:   typeInstance,
-		ModuleInstance: m,
-	}
-
-	s.addFunctionInstances(f)
-
-	if err = s.engine.Compile(f); err != nil {
-		// On failure, we must release the function instance.
-		if err := s.releaseFunctionInstances(f); err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("failed to compile %s: %v", f.Name, err)
-	}
-
-	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Type: ExternTypeFunc, Function: f}); err != nil {
-		// On failure, we must release the function instance.
-		if err := s.releaseFunctionInstances(f); err != nil {
-			return nil, err
-		}
-		return nil, err
-	}
-
-	m.Functions = append(m.Functions, f)
-	return f, nil
-}
-
-func (s *Store) AddGlobal(m *ModuleInstance, name string, value uint64, valueType ValueType, mutable bool) error {
-	if mutable {
-		if err := s.EnabledFeatures.Require(FeatureMutableGlobal); err != nil {
-			return err
-		}
-	}
-	g := &GlobalInstance{
-		Val:  value,
-		Type: &GlobalType{Mutable: mutable, ValType: valueType},
-	}
-
-	m.Globals = append(m.Globals, g)
-	s.addGlobalInstances(g)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeGlobal, Global: g})
-}
-
-func (s *Store) AddTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
-	t := newTableInstance(min, max)
-
-	// TODO: check if the module already has memory, and if so, returns error.
-	m.TableInstance = t
-	s.addTableInstance(t)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
-}
-
-func (s *Store) AddMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
-	memory := &MemoryInstance{
-		Buffer: make([]byte, memoryPagesToBytesNum(min)),
-		Min:    min,
-		Max:    max,
-	}
-
-	// TODO: check if the module already has memory, and if so, returns error.
-	m.MemoryInstance = memory
-	s.addMemoryInstance(memory)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
-}
-
-func (s *Store) AliasModuleInstance(src, dst string) error {
+// Only used in spectests.
+func (s *Store) AliasModuleInstance(src, dst string) {
+	s.moduleInstances[dst] = s.moduleInstances[src]
 }
 
 func (s *Store) getTypeInstances(ts []*FunctionType) ([]*TypeInstance, error) {

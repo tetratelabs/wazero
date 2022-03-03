@@ -95,7 +95,7 @@ func TestStore_AddHostFunction(t *testing.T) {
 
 	// Add the host module
 	hostModule := &ModuleInstance{Name: "test", Exports: make(map[string]*ExportInstance, 1)}
-	s.ModuleInstances[hostModule.Name] = hostModule
+	s.moduleInstances[hostModule.Name] = hostModule
 
 	_, err = s.AddHostFunction(hostModule, hf)
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 
 	// Add the host module
 	hostModule := &ModuleInstance{Name: "", Exports: make(map[string]*ExportInstance, 1)}
-	s.ModuleInstances[hostModule.Name] = hostModule
+	s.moduleInstances[hostModule.Name] = hostModule
 	_, err = s.AddHostFunction(hostModule, hf)
 	require.NoError(t, err)
 
@@ -146,7 +146,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 		// We expect the host function to be called in context of the importing module.
 		// Otherwise, it would be the pseudo-module of the host, which only includes types and function definitions.
 		// Notably, this ensures the host function call context has the correct memory (from the importing module).
-		require.Equal(t, s.ModuleInstances["test"], ei.Function.ModuleInstance)
+		require.Equal(t, s.moduleInstances["test"], ei.Function.ModuleInstance)
 	})
 }
 
@@ -373,7 +373,7 @@ func TestExecuteConstExpression(t *testing.T) {
 	})
 }
 
-func TestStore_AddGlobal(t *testing.T) {
+func TestStore_AddHostGlobal(t *testing.T) {
 	tests := []struct {
 		name            string
 		enabledFeatures Features
@@ -404,7 +404,7 @@ func TestStore_AddGlobal(t *testing.T) {
 			s := NewStore(context.Background(), &catchContext{}, tc.enabledFeatures)
 			m := &ModuleInstance{Exports: map[string]*ExportInstance{}}
 
-			err := s.AddGlobal(m, "test", 1, ValueTypeI64, tc.mutable)
+			err := s.AddHostGlobal(m, "test", 1, ValueTypeI64, tc.mutable)
 			if tc.expectedErr == "" {
 				require.NoError(t, err)
 				e, err := m.GetExport("test", ExternTypeGlobal)
@@ -690,7 +690,7 @@ func TestStore_resolveImports(t *testing.T) {
 	})
 	t.Run("export instance not found", func(t *testing.T) {
 		s := newStore()
-		s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{}, Name: moduleName}
+		s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{}, Name: moduleName}
 		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: "unknown"}}})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "\"unknown\" is not exported in module \"test\"")
@@ -698,14 +698,14 @@ func TestStore_resolveImports(t *testing.T) {
 	t.Run("func", func(t *testing.T) {
 		t.Run("unknwon type", func(t *testing.T) {
 			s := newStore()
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {}}, Name: moduleName}
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {}}, Name: moduleName}
 			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}})
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "unknown type for function import")
 		})
 		t.Run("signature mismatch", func(t *testing.T) {
 			s := newStore()
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Function: &FunctionInstance{FunctionType: &TypeInstance{Type: &FunctionType{}}},
 			}}, Name: moduleName}
 			m := &Module{
@@ -719,7 +719,7 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			f := &FunctionInstance{FunctionType: &TypeInstance{Type: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Function: f,
 			}}, Name: moduleName}
 			m := &Module{
@@ -728,14 +728,14 @@ func TestStore_resolveImports(t *testing.T) {
 			}
 			functions, _, _, _, moduleImports, err := s.resolveImports(m)
 			require.NoError(t, err)
-			require.Contains(t, moduleImports, s.ModuleInstances[moduleName])
+			require.Contains(t, moduleImports, s.moduleInstances[moduleName])
 			require.Contains(t, functions, f)
 		})
 	})
 	t.Run("global", func(t *testing.T) {
 		t.Run("mutability mismatch", func(t *testing.T) {
 			s := newStore()
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeGlobal,
 				Global: &GlobalInstance{Type: &GlobalType{Mutable: false}},
 			}}, Name: moduleName}
@@ -745,7 +745,7 @@ func TestStore_resolveImports(t *testing.T) {
 		})
 		t.Run("type mismatch", func(t *testing.T) {
 			s := newStore()
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeGlobal,
 				Global: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}},
 			}}, Name: moduleName}
@@ -756,7 +756,7 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			inst := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: inst}}, Name: moduleName}
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: inst}}, Name: moduleName}
 			_, globals, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.Type}}})
 			require.NoError(t, err)
 			require.Contains(t, globals, inst)
@@ -765,7 +765,7 @@ func TestStore_resolveImports(t *testing.T) {
 	t.Run("table", func(t *testing.T) {
 		t.Run("element type", func(t *testing.T) {
 			s := newStore()
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{ElemType: 0x00}, // Unknown!
 			}}, Name: moduleName}
@@ -776,7 +776,7 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
 			importTableType := &TableType{Limit: &LimitsType{Min: 2}}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
 			}}, Name: moduleName}
@@ -788,7 +788,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			importTableType := &TableType{Limit: &LimitsType{Max: &max}}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
 			}}, Name: moduleName}
@@ -800,7 +800,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			tableInst := &TableInstance{Max: &max}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: tableInst,
 			}}, Name: moduleName}
@@ -813,7 +813,7 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
 			importMemoryType := &MemoryType{Min: 2}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{Min: importMemoryType.Min - 1},
 			}}, Name: moduleName}
@@ -825,7 +825,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			importMemoryType := &MemoryType{Max: &max}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{},
 			}}, Name: moduleName}
@@ -837,7 +837,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			memoryInst := &MemoryInstance{Max: &max}
-			s.ModuleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: memoryInst,
 			}}, Name: moduleName}
@@ -967,7 +967,7 @@ func TestModuleInstance_applyElements(t *testing.T) {
 }
 
 func Test_newModuleInstance(t *testing.T) {
-
+	// TODO
 }
 
 func newStore() *Store {

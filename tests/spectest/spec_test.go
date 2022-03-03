@@ -200,7 +200,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 	pubMod, ok := store.Module(name).(*wasm.PublicModule)
 	require.True(t, ok)
 
-	mod := pubMod.Context.Module
+	mod := pubMod.Instance
 
 	for _, g := range []struct {
 		name      string
@@ -212,14 +212,14 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
 		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
 	} {
-		require.NoError(t, store.AddGlobal(mod, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
+		require.NoError(t, store.AddHostGlobal(mod, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
 	}
 
 	tableLimitMax := uint32(20)
-	require.NoError(t, store.AddTableInstance(mod, "table", 10, &tableLimitMax))
+	require.NoError(t, store.AddHostTableInstance(mod, "table", 10, &tableLimitMax))
 
 	memoryLimitMax := uint32(2)
-	require.NoError(t, store.AddMemoryInstance(mod, "memory", 1, &memoryLimitMax))
+	require.NoError(t, store.AddHostMemoryInstance(mod, "memory", 1, &memoryLimitMax))
 }
 
 func TestJIT(t *testing.T) {
@@ -285,7 +285,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						if c.Name != "" {
 							name = c.Name
 						}
-						store.ModuleInstances[c.As] = store.ModuleInstances[name]
+
+						store.AliasModuleInstance(name, c.As)
 					case "assert_return", "action":
 						moduleName := lastInstanceName
 						if c.Action.Module != "" {
