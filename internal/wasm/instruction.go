@@ -214,6 +214,14 @@ const (
 	OpcodeI64ReinterpretF64 Opcode = 0xbd
 	OpcodeF32ReinterpretI32 Opcode = 0xbe
 	OpcodeF64ReinterpretI64 Opcode = 0xbf
+
+	// Below are toggled with FeatureSignExtensionOps
+
+	OpcodeI32Extend8S  Opcode = 0xC0
+	OpcodeI32Extend16S Opcode = 0xC1
+	OpcodeI64Extend8S  Opcode = 0xC2
+	OpcodeI64Extend16S Opcode = 0xC3
+	OpcodeI64Extend32S Opcode = 0xC4
 )
 
 var instructionNames = [256]string{
@@ -389,6 +397,13 @@ var instructionNames = [256]string{
 	OpcodeI64ReinterpretF64: "i64.reinterpret_f64",
 	OpcodeF32ReinterpretI32: "f32.reinterpret_i32",
 	OpcodeF64ReinterpretI64: "f64.reinterpret_i64",
+
+	// Below are toggled with FeatureSignExtensionOps
+	OpcodeI32Extend8S:  "i32.extend8_s",
+	OpcodeI32Extend16S: "i32.extend16_s",
+	OpcodeI64Extend8S:  "i64.extend8_s",
+	OpcodeI64Extend16S: "i64.extend16_s",
+	OpcodeI64Extend32S: "i64.extend32_s",
 }
 
 // InstructionName returns the instruction corresponding to this binary Opcode.

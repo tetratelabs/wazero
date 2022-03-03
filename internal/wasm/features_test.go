@@ -58,6 +58,7 @@ func TestFeatures_String(t *testing.T) {
 	}{
 		{name: "none", feature: 0, expected: ""},
 		{name: "mutable-global", feature: FeatureMutableGlobal, expected: "mutable-global"},
+		{name: "sign-extension-ops", feature: FeatureSignExtensionOps, expected: "sign-extension-ops"},
 		{name: "undefined", feature: 1 << 63, expected: "undefined"},
 	}
 
@@ -77,6 +78,7 @@ func TestFeatures_Require(t *testing.T) {
 	}{
 		{name: "none", feature: 0, expectedErr: "feature mutable-global is disabled"},
 		{name: "mutable-global", feature: FeatureMutableGlobal},
+		{name: "sign-extension-ops", feature: FeatureSignExtensionOps, expectedErr: "feature mutable-global is disabled"},
 		{name: "undefined", feature: 1 << 63, expectedErr: "feature mutable-global is disabled"},
 	}
 
