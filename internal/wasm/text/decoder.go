@@ -97,9 +97,11 @@ type moduleParser struct {
 	fieldCountFunc, fieldCountMemory uint32
 }
 
-// DecodeModule implements wasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
+// DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-format%E2%91%A0
-func DecodeModule(source []byte) (result *wasm.Module, err error) {
+func DecodeModule(source []byte, _ wasm.Features) (result *wasm.Module, err error) {
+	// TODO: when globals are supported, err on mutable globals if disabled
+
 	// names are the wasm.Module NameSection
 	//
 	// * ModuleName: ex. "test" if (module $test)

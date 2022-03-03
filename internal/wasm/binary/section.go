@@ -3,13 +3,12 @@ package binary
 import (
 	"bytes"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeTypeSection(r io.Reader) ([]*wasm.FunctionType, error) {
+func decodeTypeSection(r *bytes.Reader) ([]*wasm.FunctionType, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -24,14 +23,14 @@ func decodeTypeSection(r io.Reader) ([]*wasm.FunctionType, error) {
 	return result, nil
 }
 
-func decodeFunctionType(r io.Reader) (*wasm.FunctionType, error) {
-	b := make([]byte, 1)
-	if _, err := io.ReadFull(r, b); err != nil {
+func decodeFunctionType(r *bytes.Reader) (*wasm.FunctionType, error) {
+	b, err := r.ReadByte()
+	if err != nil {
 		return nil, fmt.Errorf("read leading byte: %w", err)
 	}
 
-	if b[0] != 0x60 {
-		return nil, fmt.Errorf("%w: %#x != 0x60", ErrInvalidByte, b[0])
+	if b != 0x60 {
+		return nil, fmt.Errorf("%w: %#x != 0x60", ErrInvalidByte, b)
 	}
 
 	s, _, err := leb128.DecodeUint32(r)
@@ -62,7 +61,7 @@ func decodeFunctionType(r io.Reader) (*wasm.FunctionType, error) {
 	}, nil
 }
 
-func decodeImportSection(r *bytes.Reader) ([]*wasm.Import, error) {
+func decodeImportSection(r *bytes.Reader, features wasm.Features) ([]*wasm.Import, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -70,8 +69,8 @@ func decodeImportSection(r *bytes.Reader) ([]*wasm.Import, error) {
 
 	result := make([]*wasm.Import, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeImport(r); err != nil {
-			return nil, fmt.Errorf("read import: %w", err)
+		if result[i], err = decodeImport(r, i, features); err != nil {
+			return nil, err
 		}
 	}
 	return result, nil
@@ -122,7 +121,7 @@ func decodeMemorySection(r *bytes.Reader) ([]*wasm.MemoryType, error) {
 	return result, nil
 }
 
-func decodeGlobalSection(r *bytes.Reader) ([]*wasm.Global, error) {
+func decodeGlobalSection(r *bytes.Reader, features wasm.Features) ([]*wasm.Global, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -130,8 +129,8 @@ func decodeGlobalSection(r *bytes.Reader) ([]*wasm.Global, error) {
 
 	result := make([]*wasm.Global, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeGlobal(r); err != nil {
-			return nil, fmt.Errorf("read global: %v ", err)
+		if result[i], err = decodeGlobal(r, features); err != nil {
+			return nil, fmt.Errorf("global[%d]: %w", i, err)
 		}
 	}
 	return result, nil

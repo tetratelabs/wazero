@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"math"
@@ -9,37 +10,43 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeCode(r io.Reader) (*wasm.Code, error) {
+func decodeCode(r *bytes.Reader) (*wasm.Code, error) {
 	ss, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get the size of code: %w", err)
 	}
-
-	r = io.LimitReader(r, int64(ss))
+	remaining := int64(ss)
 
 	// parse locals
-	ls, _, err := leb128.DecodeUint32(r)
+	ls, bytesRead, err := leb128.DecodeUint32(r)
+	remaining -= int64(bytesRead)
 	if err != nil {
 		return nil, fmt.Errorf("get the size locals: %v", err)
+	} else if remaining < 0 {
+		return nil, io.EOF
 	}
 
 	var nums []uint64
 	var types []wasm.ValueType
 	var sum uint64
-	b := make([]byte, 1)
+	var n uint32
 	for i := uint32(0); i < ls; i++ {
-		n, _, err := leb128.DecodeUint32(r)
+		n, bytesRead, err = leb128.DecodeUint32(r)
+		remaining -= int64(bytesRead) + 1 // +1 for the subsequent ReadByte
 		if err != nil {
 			return nil, fmt.Errorf("read n of locals: %v", err)
+		} else if remaining < 0 {
+			return nil, io.EOF
 		}
+
 		sum += uint64(n)
 		nums = append(nums, uint64(n))
 
-		_, err = io.ReadFull(r, b)
+		b, err := r.ReadByte()
 		if err != nil {
 			return nil, fmt.Errorf("read type of local: %v", err)
 		}
-		switch vt := b[0]; vt {
+		switch vt := b; vt {
 		case wasm.ValueTypeI32, wasm.ValueTypeF32, wasm.ValueTypeI64, wasm.ValueTypeF64:
 			types = append(types, vt)
 		default:
@@ -59,8 +66,8 @@ func decodeCode(r io.Reader) (*wasm.Code, error) {
 		}
 	}
 
-	body, err := io.ReadAll(r)
-	if err != nil {
+	body := make([]byte, remaining)
+	if _, err = io.ReadFull(r, body); err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
 

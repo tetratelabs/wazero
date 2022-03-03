@@ -3,7 +3,6 @@ package internalwasm
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -52,7 +51,7 @@ func validateFunction(
 				return fmt.Errorf("unknown memory access")
 			}
 			pc++
-			align, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			align, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read memory align: %v", err)
 			}
@@ -230,7 +229,7 @@ func validateFunction(
 			}
 			pc += num
 			// offset
-			_, num, err = leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			_, num, err = leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read memory offset: %v", err)
 			}
@@ -240,7 +239,7 @@ func validateFunction(
 				return fmt.Errorf("unknown memory access")
 			}
 			pc++
-			val, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -261,14 +260,14 @@ func validateFunction(
 			pc++
 			switch Opcode(op) {
 			case OpcodeI32Const:
-				_, num, err := leb128.DecodeInt32(bytes.NewBuffer(body[pc:]))
+				_, num, err := leb128.DecodeInt32(bytes.NewReader(body[pc:]))
 				if err != nil {
 					return fmt.Errorf("read i32 immediate: %s", err)
 				}
 				pc += num - 1
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Const:
-				_, num, err := leb128.DecodeInt64(bytes.NewBuffer(body[pc:]))
+				_, num, err := leb128.DecodeInt64(bytes.NewReader(body[pc:]))
 				if err != nil {
 					return fmt.Errorf("read i64 immediate: %v", err)
 				}
@@ -283,7 +282,7 @@ func validateFunction(
 			}
 		} else if OpcodeLocalGet <= op && op <= OpcodeGlobalSet {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -345,7 +344,7 @@ func validateFunction(
 			}
 		} else if op == OpcodeBr {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBloclStack) {
@@ -367,7 +366,7 @@ func validateFunction(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeBrIf {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBloclStack) {
@@ -396,7 +395,7 @@ func validateFunction(
 			}
 		} else if op == OpcodeBrTable {
 			pc++
-			r := bytes.NewBuffer(body[pc:])
+			r := bytes.NewReader(body[pc:])
 			nl, num, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return fmt.Errorf("read immediate: %w", err)
@@ -458,7 +457,7 @@ func validateFunction(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeCall {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -477,7 +476,7 @@ func validateFunction(
 			}
 		} else if op == OpcodeCallIndirect {
 			pc++
-			typeIndex, num, err := leb128.DecodeUint32(bytes.NewBuffer(body[pc:]))
+			typeIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -702,7 +701,7 @@ func validateFunction(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := decodeBlockType(types, bytes.NewBuffer(body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -714,7 +713,7 @@ func validateFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := decodeBlockType(types, bytes.NewBuffer(body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -727,7 +726,7 @@ func validateFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := decodeBlockType(types, bytes.NewBuffer(body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -948,7 +947,7 @@ type controlBlock struct {
 	isIf                   bool
 }
 
-func decodeBlockType(types []*FunctionType, r io.Reader) (*FunctionType, uint64, error) {
+func decodeBlockType(types []*FunctionType, r *bytes.Reader) (*FunctionType, uint64, error) {
 	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
 		if index < 0 || (index >= int64(len(types))) {
 			return nil, fmt.Errorf("type index out of range: %d", index)
@@ -958,7 +957,7 @@ func decodeBlockType(types []*FunctionType, r io.Reader) (*FunctionType, uint64,
 }
 
 // DecodeBlockType is exported for use in the compiler
-func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, error) {
+func DecodeBlockType(types []*TypeInstance, r *bytes.Reader) (*FunctionType, uint64, error) {
 	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
 		if index < 0 || (index >= int64(len(types))) {
 			return nil, fmt.Errorf("type index out of range: %d", index)
@@ -967,7 +966,7 @@ func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64,
 	}, r)
 }
 
-func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, error), r io.Reader) (*FunctionType, uint64, error) {
+func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, error), r *bytes.Reader) (*FunctionType, uint64, error) {
 	raw, num, err := leb128.DecodeInt33AsInt64(r)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode int33: %w", err)

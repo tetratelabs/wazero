@@ -1,14 +1,14 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeElementSegment(r io.Reader) (*wasm.ElementSegment, error) {
+func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 	ti, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get table index: %w", err)

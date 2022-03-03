@@ -91,13 +91,13 @@ func newExample() *wasm.Module {
 
 func TestExampleUpToDate(t *testing.T) {
 	t.Run("binary.DecodeModule", func(t *testing.T) {
-		m, err := binary.DecodeModule(exampleBinary)
+		m, err := binary.DecodeModule(exampleBinary, wasm.Features20191205)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("text.DecodeModule", func(t *testing.T) {
-		m, err := text.DecodeModule(exampleText)
+		m, err := text.DecodeModule(exampleText, wasm.Features20191205)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
@@ -124,7 +124,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("binary.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleBinary); err != nil {
+			if _, err := binary.DecodeModule(exampleBinary, wasm.Features20191205); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -138,7 +138,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("text.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := text.DecodeModule(exampleText); err != nil {
+			if _, err := text.DecodeModule(exampleText, wasm.Features20191205); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -146,7 +146,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("wat2wasm via text.DecodeModule->binary.EncodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if m, err := text.DecodeModule(exampleText); err != nil {
+			if m, err := text.DecodeModule(exampleText, wasm.Features20191205); err != nil {
 				b.Fatal(err)
 			} else {
 				_ = binary.EncodeModule(m)

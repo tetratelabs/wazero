@@ -1493,7 +1493,7 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := DecodeModule([]byte(tc.input))
+			m, err := DecodeModule([]byte(tc.input), wasm.Features20191205)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m)
 		})
@@ -2080,7 +2080,7 @@ func TestParseModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := DecodeModule([]byte(tc.input))
+			_, err := DecodeModule([]byte(tc.input), wasm.Features20191205)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

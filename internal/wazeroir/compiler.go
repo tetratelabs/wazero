@@ -221,7 +221,7 @@ operatorSwitch:
 		// Nop is noop!
 	case wasm.OpcodeBlock:
 		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
-			bytes.NewBuffer(c.f.Body[c.pc+1:]))
+			bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for block instruction: %w", err)
 		}
@@ -247,7 +247,7 @@ operatorSwitch:
 
 	case wasm.OpcodeLoop:
 		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
-			bytes.NewBuffer(c.f.Body[c.pc+1:]))
+			bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for loop instruction: %w", err)
 		}
@@ -285,7 +285,7 @@ operatorSwitch:
 
 	case wasm.OpcodeIf:
 		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
-			bytes.NewBuffer(c.f.Body[c.pc+1:]))
+			bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for if instruction: %w", err)
 		}
@@ -468,7 +468,7 @@ operatorSwitch:
 		}
 
 	case wasm.OpcodeBr:
-		targetIndex, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		targetIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
 		}
@@ -488,7 +488,7 @@ operatorSwitch:
 		// and can be safely removed.
 		c.markUnreachable()
 	case wasm.OpcodeBrIf:
-		targetIndex, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		targetIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read the target for br_if: %w", err)
 		}
@@ -513,7 +513,7 @@ operatorSwitch:
 			},
 		)
 	case wasm.OpcodeBrTable:
-		r := bytes.NewBuffer(c.f.Body[c.pc+1:])
+		r := bytes.NewReader(c.f.Body[c.pc+1:])
 		numTargets, n, err := leb128.DecodeUint32(r)
 		if err != nil {
 			return fmt.Errorf("error reading number of targets in br_table: %w", err)
@@ -585,7 +585,7 @@ operatorSwitch:
 		if index == nil {
 			return fmt.Errorf("index does not exist for indirect function call")
 		}
-		tableIndex, n, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		tableIndex, n, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("read target for br_table: %w", err)
 		}
@@ -841,7 +841,7 @@ operatorSwitch:
 			&OperationMemoryGrow{},
 		)
 	case wasm.OpcodeI32Const:
-		val, num, err := leb128.DecodeInt32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		val, num, err := leb128.DecodeInt32(bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading i32.const value: %v", err)
 		}
@@ -850,7 +850,7 @@ operatorSwitch:
 			&OperationConstI32{Value: uint32(val)},
 		)
 	case wasm.OpcodeI64Const:
-		val, num, err := leb128.DecodeInt64(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		val, num, err := leb128.DecodeInt64(bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading i64.const value: %v", err)
 		}
@@ -1392,7 +1392,7 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 		wasm.OpcodeGlobalGet,
 		wasm.OpcodeGlobalSet:
 		// Assumes that we are at the opcode now so skip it before read immediates.
-		v, num, err := leb128.DecodeUint32(bytes.NewBuffer(c.f.Body[c.pc+1:]))
+		v, num, err := leb128.DecodeUint32(bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return nil, fmt.Errorf("reading immediates: %w", err)
 		}
@@ -1530,7 +1530,7 @@ func (c *compiler) getFrameDropRange(frame *controlFrame) *InclusiveRange {
 }
 
 func (c *compiler) readMemoryImmediate(tag string) (*MemoryImmediate, error) {
-	r := bytes.NewBuffer(c.f.Body[c.pc+1:])
+	r := bytes.NewReader(c.f.Body[c.pc+1:])
 	alignment, num, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("reading alignment for %s: %w", tag, err)

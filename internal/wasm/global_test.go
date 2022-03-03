@@ -1,7 +1,6 @@
 package internalwasm
 
 import (
-	"context"
 	gobinary "encoding/binary"
 	"testing"
 
@@ -257,7 +256,7 @@ func TestPublicModule_Global(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
-		s := NewStore(context.Background(), &catchContext{})
+		s := newStore()
 		t.Run(tc.name, func(t *testing.T) {
 			// Instantiate the module and get the export of the above global
 			module, err := s.Instantiate(tc.module, "")

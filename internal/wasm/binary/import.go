@@ -3,47 +3,40 @@ package binary
 import (
 	"bytes"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeImport(r *bytes.Reader) (i *wasm.Import, err error) {
+func decodeImport(r *bytes.Reader, idx uint32, features wasm.Features) (i *wasm.Import, err error) {
 	i = &wasm.Import{}
 	if i.Module, _, err = decodeUTF8(r, "import module"); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("import[%d] error decoding module: %w", idx, err)
 	}
 
 	if i.Name, _, err = decodeUTF8(r, "import name"); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("import[%d] error decoding name: %w", idx, err)
 	}
 
-	b := make([]byte, 1)
-	if _, err = io.ReadFull(r, b); err != nil {
-		return nil, fmt.Errorf("error decoding import kind: %w", err)
+	b, err := r.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("import[%d] error decoding type: %w", idx, err)
 	}
-
-	i.Type = b[0]
+	i.Type = b
 	switch i.Type {
 	case wasm.ExternTypeFunc:
-		if i.DescFunc, _, err = leb128.DecodeUint32(r); err != nil {
-			return nil, fmt.Errorf("error decoding import func typeindex: %w", err)
-		}
+		i.DescFunc, _, err = leb128.DecodeUint32(r)
 	case wasm.ExternTypeTable:
-		if i.DescTable, err = decodeTableType(r); err != nil {
-			return nil, fmt.Errorf("error decoding import table desc: %w", err)
-		}
+		i.DescTable, err = decodeTableType(r)
 	case wasm.ExternTypeMemory:
-		if i.DescMem, err = decodeMemoryType(r); err != nil {
-			return nil, fmt.Errorf("error decoding import mem desc: %w", err)
-		}
+		i.DescMem, err = decodeMemoryType(r)
 	case wasm.ExternTypeGlobal:
-		if i.DescGlobal, err = decodeGlobalType(r); err != nil {
-			return nil, fmt.Errorf("error decoding import global desc: %w", err)
-		}
+		i.DescGlobal, err = decodeGlobalType(r, features)
 	default:
-		return nil, fmt.Errorf("%w: invalid byte for importdesc: %#x", ErrInvalidByte, b[0])
+		err = fmt.Errorf("%w: invalid byte for importdesc: %#x", ErrInvalidByte, b)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("import[%d] %s[%s.%s]: %w", idx, wasm.ExternTypeName(i.Type), i.Module, i.Name, err)
 	}
 	return
 }

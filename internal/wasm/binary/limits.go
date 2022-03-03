@@ -1,8 +1,8 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 
 	"github.com/tetratelabs/wazero/internal/leb128"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -11,15 +11,14 @@ import (
 // decodeLimitsType returns the wasm.LimitsType decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#limits%E2%91%A6
-func decodeLimitsType(r io.Reader) (*wasm.LimitsType, error) {
-	b := make([]byte, 1)
-	_, err := io.ReadFull(r, b)
+func decodeLimitsType(r *bytes.Reader) (*wasm.LimitsType, error) {
+	b, err := r.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("read leading byte: %v", err)
 	}
 
 	ret := &wasm.LimitsType{}
-	switch b[0] {
+	switch b {
 	case 0x00:
 		ret.Min, _, err = leb128.DecodeUint32(r)
 		if err != nil {
@@ -36,7 +35,7 @@ func decodeLimitsType(r io.Reader) (*wasm.LimitsType, error) {
 		}
 		ret.Max = &m
 	default:
-		return nil, fmt.Errorf("%v for limits: %#x != 0x00 or 0x01", ErrInvalidByte, b[0])
+		return nil, fmt.Errorf("%v for limits: %#x != 0x00 or 0x01", ErrInvalidByte, b)
 	}
 	return ret, nil
 }

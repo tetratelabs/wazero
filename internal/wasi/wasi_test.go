@@ -1094,15 +1094,16 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 // TODO: TestSnapshotPreview1_SockShutdown TestSnapshotPreview1_SockShutdown_Errors
 
 func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName string, opts ...Option) (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance) {
+	enabledFeatures := wasm.Features20191205
 	mod, err := text.DecodeModule([]byte(fmt.Sprintf(`(module
   %[2]s
   (memory 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
-)`, wasiFunction, wasiImport)))
+)`, wasiFunction, wasiImport)), enabledFeatures)
 	require.NoError(t, err)
 
-	store := wasm.NewStore(context.Background(), interpreter.NewEngine())
+	store := wasm.NewStore(context.Background(), interpreter.NewEngine(), enabledFeatures)
 
 	snapshotPreview1Functions := SnapshotPreview1Functions(opts...)
 	goFunc := snapshotPreview1Functions[wasiFunction]

@@ -269,7 +269,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			store := wasm.NewStore(context.Background(), newEngine())
+			store := wasm.NewStore(context.Background(), newEngine(), wasm.Features20191205)
 			addSpectestModule(t, store)
 
 			var lastInstanceName string
@@ -281,7 +281,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
 
-						mod, err := binary.DecodeModule(buf)
+						mod, err := binary.DecodeModule(buf, wasm.Features20191205)
 						require.NoError(t, err, msg)
 
 						lastInstanceName = c.Name
@@ -414,7 +414,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 }
 
 func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg string) {
-	mod, err := binary.DecodeModule(buf)
+	mod, err := binary.DecodeModule(buf, store.EnabledFeatures)
 	if err != nil {
 		return
 	}

@@ -33,6 +33,9 @@ type (
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
 		Engine Engine
 
+		// EnabledFeatures are read-only to allow optimizations.
+		EnabledFeatures Features
+
 		// ModuleInstances holds the instantiated Wasm modules by module name from Instantiate.
 		ModuleInstances map[string]*ModuleInstance
 
@@ -381,13 +384,14 @@ func (m *ModuleInstance) GetExport(name string, et ExternType) (*ExportInstance,
 	return exp, nil
 }
 
-func NewStore(ctx context.Context, engine Engine) *Store {
+func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Store {
 	return &Store{
 		ctx:                  ctx,
+		Engine:               engine,
+		EnabledFeatures:      enabledFeatures,
 		ModuleInstances:      map[string]*ModuleInstance{},
 		ModuleContexts:       map[string]*ModuleContext{},
 		TypeIDs:              map[string]FunctionTypeID{},
-		Engine:               engine,
 		maximumFunctionIndex: maximumFunctionIndex,
 		maximumFunctionTypes: maximumFunctionTypes,
 	}
@@ -761,7 +765,7 @@ func (s *Store) resolveImports(module *Module) (
 }
 
 func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
-	r := bytes.NewBuffer(expr.Data)
+	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		v, _, _ = leb128.DecodeInt32(r)
@@ -829,6 +833,11 @@ func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstanc
 }
 
 func (s *Store) AddGlobal(m *ModuleInstance, name string, value uint64, valueType ValueType, mutable bool) error {
+	if mutable {
+		if err := s.EnabledFeatures.Require(FeatureMutableGlobal); err != nil {
+			return err
+		}
+	}
 	g := &GlobalInstance{
 		Val:  value,
 		Type: &GlobalType{Mutable: mutable, ValType: valueType},
