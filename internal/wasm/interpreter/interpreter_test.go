@@ -44,7 +44,6 @@ func TestCallEngine_PushFrame_StackOverflow(t *testing.T) {
 }
 
 func TestEngine_Call(t *testing.T) {
-
 	i64 := wasm.ValueTypeI64
 	m := &wasm.Module{
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
