@@ -1,9 +1,12 @@
 package examples
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	_ "embed"
+	"encoding/base64"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,22 +22,22 @@ type testKey struct{}
 var hostFuncWasm []byte
 
 func Test_hostFunc(t *testing.T) {
-	allocateBuffer := func(context.Context, uint32) uint32 {
-		panic("unimplemented")
-	}
+	// The function for allocating the in-Wasm memory region.
+	// We resolve this function after main module instantiation.
+	var allocateInWasmBufferFn wasm.Function
+
+	var expectedBase64String string
 
 	// Host-side implementation of get_random_string on Wasm import.
-	getRandomString := func(ctx wasm.ModuleContext, retBufPtr uint32, retBufSize uint32) {
+	getRandomBytes := func(ctx wasm.ModuleContext, retBufPtr uint32, retBufSize uint32) {
 		// Assert that context values passed in from CallFunctionContext are accessible.
 		contextValue := ctx.Context().Value(testKey{}).(int64)
 		require.Equal(t, int64(12345), contextValue)
 
-		const bufferSize = 10000 // force memory space grow to ensure eager failures on missing setup
-		// Allocate the in-Wasm memory region so we can store the generated string.
-		// Note that this is recursive call. That means that this is the VM function call during the VM function call.
-		// More precisely, we call test.base64 (in Wasm), and the function in turn calls this get_random_string function,
-		// and we call test.allocate_buffer (in Wasm) here: host->vm->host->vm.
-		offset := allocateBuffer(ctx.Context(), bufferSize)
+		const bufferSize = 10
+		res, err := allocateInWasmBufferFn.Call(ctx.Context(), uint64(bufferSize))
+		require.NoError(t, err)
+		offset := uint32(res[0])
 
 		// Store the address info to the memory.
 		require.True(t, ctx.Memory().WriteUint32Le(retBufPtr, offset))
@@ -47,34 +50,34 @@ func Test_hostFunc(t *testing.T) {
 		n, err := rand.Read(b)
 		require.NoError(t, err)
 		require.Equal(t, bufferSize, n)
+
+		expectedBase64String = base64.StdEncoding.EncodeToString(b)
 	}
 
 	r := wazero.NewRuntime()
 
-	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_string": getRandomString}}
+	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_bytes": getRandomBytes}}
 	_, err := r.NewHostModule(env)
 	require.NoError(t, err)
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	_, err = r.NewHostModule(wazero.WASISnapshotPreview1())
+	stdout := bytes.NewBuffer(nil)
+	_, err = r.NewHostModule(wazero.WASISnapshotPreview1WithConfig(&wazero.WASIConfig{Stdout: stdout}))
 	require.NoError(t, err)
 
 	module, err := wazero.StartWASICommandFromSource(r, hostFuncWasm)
 	require.NoError(t, err)
 
-	allocateBufferFn := module.Function("allocate_buffer")
-
-	// Implement the function pointer. This mainly shows how you can decouple a module function dependency.
-	allocateBuffer = func(ctx context.Context, size uint32) uint32 {
-		res, err := allocateBufferFn.Call(ctx, uint64(size))
-		require.NoError(t, err)
-		return uint32(res[0])
-	}
+	allocateInWasmBufferFn = module.Function("allocate_buffer")
+	require.NotNil(t, allocateInWasmBufferFn)
 
 	// Set a context variable that should be available in wasm.ModuleContext.
 	ctx := context.WithValue(context.Background(), testKey{}, int64(12345))
 
 	// Invoke a module-defined function that depends on a host function import
-	_, err = module.Function("base64").Call(ctx, uint64(5))
+	_, err = module.Function("base64").Call(ctx)
 	require.NoError(t, err)
+
+	// Verify that in-Wasm calculated base64 strings match the ones calculated in native Go.
+	require.Equal(t, expectedBase64String, strings.TrimSpace(stdout.String()))
 }
