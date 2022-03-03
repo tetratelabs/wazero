@@ -119,6 +119,16 @@ func (c command) String() string {
 	return "{" + msg + "}"
 }
 
+func (c command) moduleName(lastInstantiatedModuleName string) string {
+	if c.Action.Module != "" {
+		// If the module name is specified for the command, it almost always starts with $, but
+		// it might be aliased as the one without $. To remove the necessity for "register"
+		// command, we always treat module name without $
+		return strings.TrimPrefix(c.Action.Module, "$")
+	}
+	return lastInstantiatedModuleName
+}
+
 func (c command) getAssertReturnArgs() []uint64 {
 	var args []uint64
 	for _, arg := range c.Action.Args {
@@ -301,8 +311,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 			store := wasm.NewStore(context.Background(), newEngine(), wasm.Features20191205)
 			addSpectestModule(t, store)
 
-			var lastInstanceName string
-			for _, c := range base.Commands {
+			var lastInstantiatedModuleName string
+			for i, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 					switch c.CommandType {
@@ -313,23 +323,23 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						mod, err := binary.DecodeModule(buf, wasm.Features20191205)
 						require.NoError(t, err, msg)
 
-						lastInstanceName = c.Name
-						if lastInstanceName == "" {
-							lastInstanceName = c.Filename
+						moduleName := c.Name
+						if moduleName == "" { // When "(module ...) directive doesn't have name.
+							if i+1 < len(base.Commands) && base.Commands[i+1].CommandType == "register" {
+								// If the next command is "(register ...)", we use that name for this module.
+								moduleName = base.Commands[i+1].As
+							} else {
+								// Otherwise, use the file name as the name.
+								moduleName = c.Filename
+							}
 						}
-						_, err = store.Instantiate(mod, lastInstanceName)
+						moduleName = strings.TrimPrefix(moduleName, "$")
+						_, err = store.Instantiate(mod, moduleName)
+						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
-						name := lastInstanceName
-						if c.Name != "" {
-							name = c.Name
-						}
-						store.AliasModuleInstance(name, c.As)
 					case "assert_return", "action":
-						moduleName := lastInstanceName
-						if c.Action.Module != "" {
-							moduleName = c.Action.Module
-						}
+						moduleName := c.moduleName(lastInstantiatedModuleName)
 						switch c.Action.ActionType {
 						case "invoke":
 							args, exps := c.getAssertReturnArgsExps()
@@ -380,10 +390,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						require.NoError(t, err, msg)
 						requireInstantiationError(t, store, buf, msg)
 					case "assert_trap":
-						moduleName := lastInstanceName
-						if c.Action.Module != "" {
-							moduleName = c.Action.Module
-						}
+						moduleName := c.moduleName(lastInstantiatedModuleName)
 						switch c.Action.ActionType {
 						case "invoke":
 							args := c.getAssertReturnArgs()
@@ -405,10 +412,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						require.NoError(t, err, msg)
 						requireInstantiationError(t, store, buf, msg)
 					case "assert_exhaustion":
-						moduleName := lastInstanceName
-						if c.Action.Module != "" {
-							moduleName = c.Action.Module
-						}
+						moduleName := c.moduleName(lastInstantiatedModuleName)
 						switch c.Action.ActionType {
 						case "invoke":
 							args := c.getAssertReturnArgs()
