@@ -99,7 +99,7 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 	exportCount := len(nameToGoFunc)
 
 	hostModule := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, exportCount)}
-	s.ModuleInstances[moduleName] = hostModule
+	s.moduleInstances[moduleName] = hostModule
 	ret := HostModule{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
 	for name, goFunc := range nameToGoFunc {
 		if hf, err := NewGoFunc(name, goFunc); err != nil {
@@ -117,7 +117,7 @@ func (s *Store) requireModuleUnused(moduleName string) error {
 	if _, ok := s.hostModules[moduleName]; ok {
 		return fmt.Errorf("module %s has already been exported by this host", moduleName)
 	}
-	if _, ok := s.ModuleContexts[moduleName]; ok {
+	if _, ok := s.moduleContexts[moduleName]; ok {
 		return fmt.Errorf("module %s has already been instantiated", moduleName)
 	}
 	return nil
