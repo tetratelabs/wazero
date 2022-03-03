@@ -121,15 +121,14 @@ func StartWASICommand(r Runtime, module *DecodedModule) (wasm.Module, error) {
 		return nil, fmt.Errorf("unsupported Runtime implementation: %s", r)
 	}
 
-	instantiated, err := internal.store.Instantiate(module.module, module.name)
+	mod, err := internal.store.Instantiate(module.module, module.name)
 	if err != nil {
 		return nil, err
 	}
-	ctx := instantiated.Context
 
-	start := ctx.Function(internalwasi.FunctionStart)
-	if _, err = start.Call(ctx.Context()); err != nil {
+	start := mod.Function(internalwasi.FunctionStart)
+	if _, err = start.Call(mod.Instance.Ctx.Context()); err != nil {
 		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
 	}
-	return instantiated, nil
+	return mod, nil
 }

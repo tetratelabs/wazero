@@ -54,33 +54,40 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, moduleName, args)
+	mod, fn := instantiateModule(t, FunctionArgsGet, ImportArgsGet, moduleName, args)
+	mem := mod.Memory("memory")
 
 	t.Run("SnapshotPreview1.ArgsGet", func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
 		// Invoke ArgsGet directly and check the memory side effects.
-		errno := NewAPI(args).ArgsGet(ctx, argv, argvBuf)
+		errno := NewAPI(args).ArgsGet(mod.Instance.Ctx, argv, argvBuf)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(FunctionArgsGet, func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		results, err := store.Engine.Call(ctx, fn, uint64(argv), uint64(argvBuf))
+		results, err := fn.Call(context.Background(), uint64(argv), uint64(argvBuf))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
 func TestSnapshotPreview1_ArgsGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsGet, ImportArgsGet, moduleName, args)
+	mod, fn := instantiateModule(t, FunctionArgsGet, ImportArgsGet, moduleName, args)
 
-	memorySize := uint32(len(store.Memories[0].Buffer))
+	memorySize := mod.Memory("memory").Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
 
 	tests := []struct {
@@ -116,7 +123,7 @@ func TestSnapshotPreview1_ArgsGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.argv), uint64(tc.argvBuf))
+			results, err := fn.Call(context.Background(), uint64(tc.argv), uint64(tc.argvBuf))
 			require.NoError(t, err)
 			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
 		})
@@ -136,24 +143,32 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, args)
+	mod, fn := instantiateModule(t, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, args)
+
+	mem := mod.Memory("memory")
 
 	t.Run("SnapshotPreview1.ArgsSizesGet", func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
 		// Invoke ArgsSizesGet directly and check the memory side effects.
-		errno := NewAPI(args).ArgsSizesGet(ctx, resultArgc, resultArgvBufSize)
+		errno := NewAPI(args).ArgsSizesGet(mod.Instance.Ctx, resultArgc, resultArgvBufSize)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(FunctionArgsSizesGet, func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		results, err := store.Engine.Call(ctx, fn, uint64(resultArgc), uint64(resultArgvBufSize))
+		results, err := fn.Call(context.Background(), uint64(resultArgc), uint64(resultArgvBufSize))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
@@ -161,8 +176,9 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 	args, err := Args("a", "bc")
 	require.NoError(t, err)
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, args)
-	memorySize := uint32(len(store.Memories[0].Buffer))
+	mod, fn := instantiateModule(t, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, args)
+
+	memorySize := mod.Memory("memory").Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
 
 	tests := []struct {
@@ -196,7 +212,7 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.argc), uint64(tc.argvBufSize))
+			results, err := fn.Call(context.Background(), uint64(tc.argc), uint64(tc.argvBufSize))
 			require.NoError(t, err)
 			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
 		})
@@ -254,24 +270,31 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, moduleName, envOpt)
+	mod, fn := instantiateModule(t, FunctionEnvironGet, ImportEnvironGet, moduleName, envOpt)
+	mem := mod.Memory("memory")
 
 	t.Run("SnapshotPreview1.EnvironGet", func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
 		// Invoke EnvironGet directly and check the memory side effects.
-		errno := NewAPI(envOpt).EnvironGet(ctx, resultEnviron, resultEnvironBuf)
+		errno := NewAPI(envOpt).EnvironGet(mod.Instance.Ctx, resultEnviron, resultEnvironBuf)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(FunctionEnvironGet, func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		results, err := store.Engine.Call(ctx, fn, uint64(resultEnviron), uint64(resultEnvironBuf))
+		results, err := fn.Call(context.Background(), uint64(resultEnviron), uint64(resultEnvironBuf))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
@@ -279,8 +302,9 @@ func TestSnapshotPreview1_EnvironGet_Errors(t *testing.T) {
 	envOpt, err := Environ("a=bc", "b=cd")
 	require.NoError(t, err)
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironGet, ImportEnvironGet, moduleName, envOpt)
-	memorySize := uint32(len(store.Memories[0].Buffer))
+	mod, fn := instantiateModule(t, FunctionEnvironGet, ImportEnvironGet, moduleName, envOpt)
+
+	memorySize := mod.Memory("memory").Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
 
 	tests := []struct {
@@ -316,7 +340,7 @@ func TestSnapshotPreview1_EnvironGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.environ), uint64(tc.environBuf))
+			results, err := fn.Call(context.Background(), uint64(tc.environ), uint64(tc.environBuf))
 			require.NoError(t, err)
 			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
 		})
@@ -336,24 +360,31 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, envOpt)
+	mod, fn := instantiateModule(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, envOpt)
+	mem := mod.Memory("memory")
 
 	t.Run("SnapshotPreview1.EnvironSizesGet", func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
 		// Invoke EnvironSizesGet directly and check the memory side effects.
-		errno := NewAPI(envOpt).EnvironSizesGet(ctx, resultEnvironc, resultEnvironBufSize)
+		errno := NewAPI(envOpt).EnvironSizesGet(mod.Instance.Ctx, resultEnvironc, resultEnvironBufSize)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(FunctionEnvironSizesGet, func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		results, err := store.Engine.Call(ctx, fn, uint64(resultEnvironc), uint64(resultEnvironBufSize))
+		results, err := fn.Call(context.Background(), uint64(resultEnvironc), uint64(resultEnvironBufSize))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
@@ -361,8 +392,9 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 	envOpt, err := Environ("a=b", "b=cd")
 	require.NoError(t, err)
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, envOpt)
-	memorySize := uint32(len(store.Memories[0].Buffer))
+	mod, fn := instantiateModule(t, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, envOpt)
+
+	memorySize := mod.Memory("memory").Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_sizes_get. We chose 0 here.
 
 	tests := []struct {
@@ -396,7 +428,7 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.environc), uint64(tc.environBufSize))
+			results, err := fn.Call(context.Background(), uint64(tc.environc), uint64(tc.environBufSize))
 			require.NoError(t, err)
 			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
 		})
@@ -417,34 +449,42 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 	clockOpt := func(api *wasiAPI) {
 		api.timeNowUnixNano = func() uint64 { return epochNanos }
 	}
-	store, ctx, fn := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, moduleName, clockOpt)
+	mod, fn := instantiateModule(t, FunctionClockTimeGet, ImportClockTimeGet, moduleName, clockOpt)
+	mem := mod.Memory("memory")
 
 	t.Run("SnapshotPreview1.ClockTimeGet", func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
 		// invoke ClockTimeGet directly and check the memory side effects!
-		errno := NewAPI(clockOpt).ClockTimeGet(ctx, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
+		errno := NewAPI(clockOpt).ClockTimeGet(mod.Instance.Ctx, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(FunctionClockTimeGet, func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		results, err := store.Engine.Call(ctx, fn, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(resultTimestamp))
+		results, err := fn.Call(context.Background(), 0 /* TODO: id */, 0 /* TODO: precision */, uint64(resultTimestamp))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
 func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionClockTimeGet, ImportClockTimeGet, moduleName, func(api *wasiAPI) {
+	mod, fn := instantiateModule(t, FunctionClockTimeGet, ImportClockTimeGet, moduleName, func(api *wasiAPI) {
 		api.timeNowUnixNano = func() uint64 { return epochNanos }
 	})
-	memorySize := uint32(len(store.Memories[0].Buffer))
+
+	memorySize := mod.Memory("memory").Size()
 
 	tests := []struct {
 		name            string
@@ -466,7 +506,7 @@ func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(tc.resultTimestamp))
+			results, err := fn.Call(context.Background(), 0 /* TODO: id */, 0 /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.NoError(t, err)
 			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
 		})
@@ -480,9 +520,9 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 	fdToClose := uint32(3) // arbitrary fd
 	fdToKeep := uint32(4)  // another arbitrary fd
 
-	setupFD := func() (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance, *wasiAPI) {
+	setupFD := func() (*wasm.PublicModule, publicwasm.Function, *wasiAPI) {
 		var api *wasiAPI
-		store, ctx, fn := instantiateWasmStore(t, FunctionFdClose, ImportFdClose, moduleName, func(a *wasiAPI) {
+		mod, fn := instantiateModule(t, FunctionFdClose, ImportFdClose, moduleName, func(a *wasiAPI) {
 			memFs := &MemFS{}
 			a.opened = map[uint32]fileEntry{
 				fdToClose: {
@@ -496,27 +536,29 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 			}
 			api = a // for later tests
 		})
-		return store, ctx, fn, api
+		return mod, fn, api
 	}
 
 	t.Run("SnapshotPreview1.FdClose", func(t *testing.T) {
-		_, ctx, _, api := setupFD()
-		errno := api.FdClose(ctx, fdToClose)
+		mod, _, api := setupFD()
+
+		errno := api.FdClose(mod.Instance.Ctx, fdToClose)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
 		require.NotContains(t, api.opened, fdToClose) // Fd is closed and removed from the opened FDs.
 		require.Contains(t, api.opened, fdToKeep)
 	})
 	t.Run(FunctionFdClose, func(t *testing.T) {
-		store, ctx, fn, api := setupFD()
-		ret, err := store.Engine.Call(ctx, fn, uint64(fdToClose))
+		_, fn, api := setupFD()
+
+		ret, err := fn.Call(context.Background(), uint64(fdToClose))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
 		require.NotContains(t, api.opened, fdToClose)           // Fd is closed and removed from the opened FDs.
 		require.Contains(t, api.opened, fdToKeep)
 	})
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
-		_, ctx, _, api := setupFD()
-		errno := api.FdClose(ctx, 42) // 42 is an arbitrary invalid FD
+		mod, _, api := setupFD()
+		errno := api.FdClose(mod.Instance.Ctx, 42) // 42 is an arbitrary invalid FD
 		require.Equal(t, wasi.ErrnoBadf, errno)
 	})
 }
@@ -534,13 +576,14 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 	var api *wasiAPI
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, func(a *wasiAPI) {
+	mod, fn := instantiateModule(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, func(a *wasiAPI) {
 		a.opened[fd] = fileEntry{
 			path:    "/tmp",
 			fileSys: &MemFS{},
 		}
 		api = a // for later tests
 	})
+	mem := mod.Memory("memory")
 
 	path := uint32(1)    // arbitrary offset
 	pathLen := uint32(3) // shorter than len("/tmp") to test the path is written for the length of pathLen
@@ -551,29 +594,37 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	}
 
 	t.Run("SnapshotPreview1.FdPrestatDirName", func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		errno := api.FdPrestatDirName(ctx, fd, path, pathLen)
+		errno := api.FdPrestatDirName(mod.Instance.Ctx, fd, path, pathLen)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(FunctionFdPrestatDirName, func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		ret, err := store.Engine.Call(ctx, fn, uint64(fd), uint64(path), uint64(pathLen))
+		ret, err := fn.Call(context.Background(), uint64(fd), uint64(path), uint64(pathLen))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
 func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 	dirName := "/tmp"
 	opt := Preopen(dirName, &MemFS{})
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, opt)
+	mod, fn := instantiateModule(t, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, opt)
 
-	memorySize := uint32(len(store.Memories[0].Buffer))
+	mem := mod.Memory("memory")
+
+	memorySize := mem.Size()
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
 	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
 
@@ -618,7 +669,7 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
+			results, err := fn.Call(context.Background(), uint64(tc.fd), uint64(tc.path), uint64(tc.pathLen))
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
@@ -649,9 +700,11 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 	)
 
 	var api *wasiAPI
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdRead, ImportFdRead, moduleName, func(a *wasiAPI) {
+	mod, fn := instantiateModule(t, FunctionFdRead, ImportFdRead, moduleName, func(a *wasiAPI) {
 		api = a // for later tests
 	})
+
+	mem := mod.Memory("memory")
 
 	// TestSnapshotPreview1_FdRead uses a matrix because setting up test files is complicated and has to be clean each time.
 	type fdReadFn func(ctx publicwasm.ModuleContext, fd, iovs, iovsLen, resultSize uint32) wasi.Errno
@@ -664,7 +717,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 		}},
 		{FunctionFdRead, func() fdReadFn {
 			return func(ctx publicwasm.ModuleContext, fd, iovs, iovsLen, resultSize uint32) wasi.Errno {
-				ret, err := store.Engine.Call(ctx.(*wasm.ModuleContext), fn, uint64(fd), uint64(iovs), uint64(iovsLen), uint64(resultSize))
+				ret, err := fn.Call(context.Background(), uint64(fd), uint64(iovs), uint64(iovsLen), uint64(resultSize))
 				require.NoError(t, err)
 				return wasi.Errno(ret[0])
 			}
@@ -681,12 +734,17 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 				fileSys: memFS,
 				file:    file,
 			}
-			maskMemory(store, len(expectedMemory))
-			copy(store.Memories[0].Buffer[0:], initialMemory)
+			maskMemory(t, mem, len(expectedMemory))
 
-			errno := tc.fdRead()(ctx, fd, iovs, iovsLen, resultSize)
+			ok := mem.Write(0, initialMemory)
+			require.True(t, ok)
+
+			errno := tc.fdRead()(mod.Instance.Ctx, fd, iovs, iovsLen, resultSize)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
-			require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, expectedMemory, actual)
 		})
 	}
 }
@@ -694,13 +752,15 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	validFD := uint64(3)                                // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, memFS := createFile(t, "test_path", []byte{}) // file with empty contents
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdRead, ImportFdRead, moduleName, func(a *wasiAPI) {
+	mod, fn := instantiateModule(t, FunctionFdRead, ImportFdRead, moduleName, func(a *wasiAPI) {
 		a.opened[uint32(validFD)] = fileEntry{
 			path:    "test_path",
 			fileSys: memFS,
 			file:    file,
 		}
 	})
+
+	mem := mod.Memory("memory")
 
 	tests := []struct {
 		name                          string
@@ -735,8 +795,8 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 			fd:   validFD,
 			iovs: 1, iovsLen: 1,
 			memory: []byte{
-				'?',        // `iovs` is after this
-				9, 0, 0, 0, // = iovs[0].offset = one past the size of this memory
+				'?',          // `iovs` is after this
+				0, 0, 0x1, 0, // = iovs[0].offset on the secod page
 				1, 0, 0, 0, // = iovs[0].length
 			},
 			expectedErrno: wasi.ErrnoFault,
@@ -748,7 +808,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 			memory: []byte{
 				'?',        // `iovs` is after this
 				9, 0, 0, 0, // = iovs[0].offset
-				2, 0, 0, 0, // = iovs[0].length = one past the size of this memory
+				0, 0, 0x1, 0, // = iovs[0].length on the secod page
 				'?',
 			},
 			expectedErrno: wasi.ErrnoFault,
@@ -771,9 +831,12 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			store.Memories[0].Buffer = tc.memory
+			offset := uint64(wasm.MemoryPagesToBytesNum(testMemoryPageSize)) - uint64(len(tc.memory))
 
-			results, err := store.Engine.Call(ctx, fn, tc.fd, tc.iovs, tc.iovsLen, tc.resultSize)
+			memoryWriteOK := mem.Write(uint32(offset), tc.memory)
+			require.True(t, memoryWriteOK)
+
+			results, err := fn.Call(context.Background(), tc.fd, tc.iovs+offset, tc.iovsLen+offset, tc.resultSize+offset)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
@@ -810,9 +873,11 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 	)
 
 	var api *wasiAPI
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdWrite, ImportFdWrite, moduleName, func(a *wasiAPI) {
+	mod, fn := instantiateModule(t, FunctionFdWrite, ImportFdWrite, moduleName, func(a *wasiAPI) {
 		api = a // for later tests
 	})
+
+	mem := mod.Memory("memory")
 
 	// TestSnapshotPreview1_FdWrite uses a matrix because setting up test files is complicated and has to be clean each time.
 	type fdWriteFn func(ctx publicwasm.ModuleContext, fd, iovs, iovsLen, resultSize uint32) wasi.Errno
@@ -825,7 +890,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 		}},
 		{FunctionFdWrite, func() fdWriteFn {
 			return func(ctx publicwasm.ModuleContext, fd, iovs, iovsLen, resultSize uint32) wasi.Errno {
-				ret, err := store.Engine.Call(ctx.(*wasm.ModuleContext), fn, uint64(fd), uint64(iovs), uint64(iovsLen), uint64(resultSize))
+				ret, err := fn.Call(context.Background(), uint64(fd), uint64(iovs), uint64(iovsLen), uint64(resultSize))
 				require.NoError(t, err)
 				return wasi.Errno(ret[0])
 			}
@@ -842,12 +907,16 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 				fileSys: memFS,
 				file:    file,
 			}
-			maskMemory(store, len(expectedMemory))
-			copy(store.Memories[0].Buffer[0:], initialMemory)
+			maskMemory(t, mem, len(expectedMemory))
+			ok := mem.Write(0, initialMemory)
+			require.True(t, ok)
 
-			errno := tc.fdWrite()(ctx, fd, iovs, iovsLen, resultSize)
+			errno := tc.fdWrite()(mod.Instance.Ctx, fd, iovs, iovsLen, resultSize)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
-			require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, expectedMemory, actual)
 			require.Equal(t, []byte("wazero"), file.buf.Bytes()) // verify the file was actually written
 		})
 	}
@@ -856,13 +925,15 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	validFD := uint64(3)                                // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, memFS := createFile(t, "test_path", []byte{}) // file with empty contents
-	store, ctx, fn := instantiateWasmStore(t, FunctionFdWrite, ImportFdWrite, moduleName, func(a *wasiAPI) {
+	mod, fn := instantiateModule(t, FunctionFdWrite, ImportFdWrite, moduleName, func(a *wasiAPI) {
 		a.opened[uint32(validFD)] = fileEntry{
 			path:    "test_path",
 			fileSys: memFS,
 			file:    file,
 		}
 	})
+
+	mem := mod.Memory("memory")
 
 	tests := []struct {
 		name                          string
@@ -933,9 +1004,12 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			store.Memories[0].Buffer = tc.memory
+			offset := uint64(wasm.MemoryPagesToBytesNum(testMemoryPageSize)) - uint64(len(tc.memory))
 
-			results, err := store.Engine.Call(ctx, fn, tc.fd, tc.iovs, tc.iovsLen, tc.resultSize)
+			memoryWriteOK := mem.Write(uint32(offset), tc.memory)
+			require.True(t, memoryWriteOK)
+
+			results, err := fn.Call(context.Background(), tc.fd, tc.iovs+offset, tc.iovsLen+offset, tc.resultSize+offset)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
@@ -982,14 +1056,14 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 		},
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionProcExit, ImportProcExit, moduleName)
+	_, fn := instantiateModule(t, FunctionProcExit, ImportProcExit, moduleName)
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
 			// When ProcExit is called, store.CallFunction returns immediately, returning the exit code as the error.
-			_, err := store.Engine.Call(ctx, fn, uint64(tc.exitCode))
+			_, err := fn.Call(context.Background(), uint64(tc.exitCode))
 			var code wasi.ExitCode
 			require.ErrorAs(t, err, &code)
 			require.Equal(t, code, wasi.ExitCode(tc.exitCode))
@@ -1021,32 +1095,38 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 		}
 	}
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, moduleName, randOpt)
-
+	mod, fn := instantiateModule(t, FunctionRandomGet, ImportRandomGet, moduleName, randOpt)
+	mem := mod.Memory("memory")
 	t.Run("SnapshotPreview1.RandomGet", func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		// invoke RandomGet directly and check the memory side effects!
-		errno := NewAPI(randOpt).RandomGet(ctx, offset, length)
+		// Invoke RandomGet directly and check the memory side effects!
+		errno := NewAPI(randOpt).RandomGet(mod.Instance.Ctx, offset, length)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, offset+length+1)
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 
 	t.Run(FunctionRandomGet, func(t *testing.T) {
-		maskMemory(store, len(expectedMemory))
+		maskMemory(t, mem, len(expectedMemory))
 
-		results, err := store.Engine.Call(ctx, fn, uint64(offset), uint64(length))
+		results, err := fn.Call(context.Background(), uint64(offset), uint64(length))
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
-		require.Equal(t, expectedMemory, store.Memories[0].Buffer)
+
+		actual, ok := mem.Read(0, offset+length+1)
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
 	})
 }
 
 func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 	validAddress := uint32(0) // arbitrary valid address
 
-	store, ctx, fn := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, moduleName)
-	memorySize := uint32(len(store.Memories[0].Buffer))
+	mod, fn := instantiateModule(t, FunctionRandomGet, ImportRandomGet, moduleName)
+	memorySize := mod.Memory("memory").Size()
 
 	tests := []struct {
 		name   string
@@ -1070,7 +1150,7 @@ func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := store.Engine.Call(ctx, fn, uint64(tc.offset), uint64(tc.length))
+			results, err := fn.Call(context.Background(), uint64(tc.offset), uint64(tc.length))
 			require.NoError(t, err)
 			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
 		})
@@ -1078,13 +1158,13 @@ func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 }
 
 func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
-	store, ctx, fn := instantiateWasmStore(t, FunctionRandomGet, ImportRandomGet, moduleName, func(api *wasiAPI) {
+	_, fn := instantiateModule(t, FunctionRandomGet, ImportRandomGet, moduleName, func(api *wasiAPI) {
 		api.randSource = func(p []byte) error {
 			return errors.New("random source error")
 		}
 	})
 
-	results, err := store.Engine.Call(ctx, fn, uint64(1), uint64(5)) // arbitrary offset and length
+	results, err := fn.Call(context.Background(), uint64(1), uint64(5)) // arbitrary offset and length
 	require.NoError(t, err)
 	require.Equal(t, uint64(wasi.ErrnoIo), results[0]) // results[0] is the errno
 }
@@ -1093,7 +1173,9 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 // TODO: TestSnapshotPreview1_SockSend TestSnapshotPreview1_SockSend_Errors
 // TODO: TestSnapshotPreview1_SockShutdown TestSnapshotPreview1_SockShutdown_Errors
 
-func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName string, opts ...Option) (*wasm.Store, *wasm.ModuleContext, *wasm.FunctionInstance) {
+const testMemoryPageSize = 1
+
+func instantiateModule(t *testing.T, wasiFunction, wasiImport, moduleName string, opts ...Option) (*wasm.PublicModule, publicwasm.Function) {
 	enabledFeatures := wasm.Features20191205
 	mod, err := text.DecodeModule([]byte(fmt.Sprintf(`(module
   %[2]s
@@ -1106,29 +1188,21 @@ func instantiateWasmStore(t *testing.T, wasiFunction, wasiImport, moduleName str
 	store := wasm.NewStore(context.Background(), interpreter.NewEngine(), enabledFeatures)
 
 	snapshotPreview1Functions := SnapshotPreview1Functions(opts...)
-	goFunc := snapshotPreview1Functions[wasiFunction]
-	fn, err := wasm.NewGoFunc(wasiFunction, goFunc)
-	require.NoError(t, err)
-
-	// Add the host module
-	hostModule := &wasm.ModuleInstance{Name: wasi.ModuleSnapshotPreview1, Exports: map[string]*wasm.ExportInstance{}}
-	store.ModuleInstances[hostModule.Name] = hostModule
-
-	wasiFn, err := store.AddHostFunction(hostModule, fn)
+	_, err = store.NewHostModule(wasi.ModuleSnapshotPreview1, snapshotPreview1Functions)
 	require.NoError(t, err)
 
 	instantiated, err := store.Instantiate(mod, moduleName)
 	require.NoError(t, err)
 
-	return store, instantiated.Context, wasiFn
+	fn := instantiated.Function(wasiFunction)
+	require.NotNil(t, fn)
+	return instantiated, fn
 }
 
 // maskMemory sets the first memory in the store to '?' * size, so tests can see what's written.
 //
-// Note: WebAssembly 1.0 (20191205) can have only up to one memory, so index zero is unambiguous.
-func maskMemory(store *wasm.Store, size int) {
-	store.Memories[0].Buffer = make([]byte, size)
-	for i := 0; i < size; i++ {
-		store.Memories[0].Buffer[i] = '?'
+func maskMemory(t *testing.T, mem publicwasm.Memory, size int) {
+	for i := uint32(0); i < uint32(size); i++ {
+		require.True(t, mem.WriteByte(i, '?'))
 	}
 }

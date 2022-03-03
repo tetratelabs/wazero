@@ -98,9 +98,12 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 
 	exportCount := len(nameToGoFunc)
 
-	hostModule := &ModuleInstance{Name: moduleName, Exports: make(map[string]*ExportInstance, exportCount)}
-	s.ModuleInstances[moduleName] = hostModule
-	ret := HostModule{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
+	ret := &HostModule{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
+	hostModule := &ModuleInstance{
+		Name: moduleName, Exports: make(map[string]*ExportInstance, exportCount),
+		hostModule: ret,
+	}
+	s.moduleInstances[moduleName] = hostModule
 	for name, goFunc := range nameToGoFunc {
 		if hf, err := NewGoFunc(name, goFunc); err != nil {
 			return nil, err
@@ -110,14 +113,95 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 			ret.NameToFunctionInstance[name] = function
 		}
 	}
-	return &ret, nil
+	return ret, nil
+}
+
+// AddHostFunction exports a function so that it can be imported under the given module and name. If a function already
+// exists for this module and name it is ignored rather than overwritten.
+//
+// Note: The wasm.Memory of the fn will be from the importing module.
+func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
+	typeInstance, err := s.getTypeInstance(hf.functionType)
+	if err != nil {
+		return nil, err
+	}
+
+	f := &FunctionInstance{
+		Name:           fmt.Sprintf("%s.%s", m.Name, hf.wasmFunctionName),
+		HostFunction:   hf.goFunc,
+		FunctionKind:   hf.functionKind,
+		FunctionType:   typeInstance,
+		ModuleInstance: m,
+	}
+
+	s.addFunctionInstances(f)
+
+	if err = s.engine.Compile(f); err != nil {
+		// On failure, we must release the function instance.
+		if err := s.releaseFunctionInstances(f); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("failed to compile %s: %v", f.Name, err)
+	}
+
+	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Type: ExternTypeFunc, Function: f}); err != nil {
+		// On failure, we must release the function instance.
+		if err := s.releaseFunctionInstances(f); err != nil {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	m.Functions = append(m.Functions, f)
+	return f, nil
+}
+
+// Only used in spectest.
+func (s *Store) AddHostGlobal(m *ModuleInstance, name string, value uint64, valueType ValueType, mutable bool) error {
+	if mutable {
+		if err := s.EnabledFeatures.Require(FeatureMutableGlobal); err != nil {
+			return err
+		}
+	}
+	g := &GlobalInstance{
+		Val:  value,
+		Type: &GlobalType{Mutable: mutable, ValType: valueType},
+	}
+
+	m.Globals = append(m.Globals, g)
+	s.addGlobalInstances(g)
+
+	return m.addExport(name, &ExportInstance{Type: ExternTypeGlobal, Global: g})
+}
+
+// Only used in spectest.
+func (s *Store) AddHostTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
+	t := newTableInstance(min, max)
+
+	// TODO: check if the module already has memory, and if so, returns error.
+	m.TableInstance = t
+	s.addTableInstance(t)
+
+	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
+}
+
+// Only used in spectest.
+func (s *Store) AddHostMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
+	memory := &MemoryInstance{
+		Buffer: make([]byte, MemoryPagesToBytesNum(min)),
+		Min:    min,
+		Max:    max,
+	}
+
+	// TODO: check if the module already has memory, and if so, returns error.
+	m.MemoryInstance = memory
+	s.addMemoryInstance(memory)
+
+	return m.addExport(name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
 }
 
 func (s *Store) requireModuleUnused(moduleName string) error {
-	if _, ok := s.hostModules[moduleName]; ok {
-		return fmt.Errorf("module %s has already been exported by this host", moduleName)
-	}
-	if _, ok := s.ModuleContexts[moduleName]; ok {
+	if _, ok := s.moduleInstances[moduleName]; ok {
 		return fmt.Errorf("module %s has already been instantiated", moduleName)
 	}
 	return nil
