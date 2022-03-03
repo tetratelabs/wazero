@@ -285,7 +285,6 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						if c.Name != "" {
 							name = c.Name
 						}
-
 						store.AliasModuleInstance(name, c.As)
 					case "assert_return", "action":
 						moduleName := lastInstanceName

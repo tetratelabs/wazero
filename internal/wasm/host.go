@@ -174,7 +174,7 @@ func (s *Store) AddHostGlobal(m *ModuleInstance, name string, value uint64, valu
 	return m.addExport(name, &ExportInstance{Type: ExternTypeGlobal, Global: g})
 }
 
-// Only used in spectest as of now.
+// Only used in spectest.
 func (s *Store) AddHostTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	t := newTableInstance(min, max)
 
@@ -185,7 +185,7 @@ func (s *Store) AddHostTableInstance(m *ModuleInstance, name string, min uint32,
 	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
 }
 
-// Only used in spectest as of now.
+// Only used in spectest.
 func (s *Store) AddHostMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
 	memory := &MemoryInstance{
 		Buffer: make([]byte, MemoryPagesToBytesNum(min)),

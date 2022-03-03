@@ -106,13 +106,13 @@ type (
 		TableInstance  *TableInstance
 		Types          []*TypeInstance
 
-		// ModuleContexts holds default host function call context.
+		// Ctx holds default function call context from this function instance.
 		Ctx *ModuleContext
 
-		// TODO
+		// hostModule holds HostModule if this is a "host module" which is created in store.NewHostModule.
 		hostModule *HostModule
 
-		// TODO
+		// TODO per https://github.com/tetratelabs/wazero/issues/293
 		refCount      int
 		moduleImports map[*ModuleInstance]struct{}
 	}
