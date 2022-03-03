@@ -121,7 +121,7 @@ func (c command) String() string {
 
 func (c command) moduleName(lastInstanceName string) string {
 	if c.Action.Module != "" {
-		// If the module name is specified for the command, it always start with $, but
+		// If the module name is specified for the command, it almost always starts with $, but
 		// it might be aliased as the one without $. To remove the necessity for "register"
 		// command, we always treat module name without $
 		return strings.TrimPrefix(c.Action.Module, "$")
