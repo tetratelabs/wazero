@@ -128,7 +128,7 @@ var facIterArgumentI64 int64 = int64(facIterArgumentU64)
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
 func TestFacIter_JIT_Fastest(t *testing.T) {
 	if ensureJITFastest != "true" {
-		// t.Skip()
+		t.Skip()
 	}
 
 	jitResult := testing.Benchmark(jitFacIterInvoke)
