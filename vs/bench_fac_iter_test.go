@@ -27,7 +27,6 @@ var facWasm []byte
 
 // TestFacIter ensures that the code in BenchmarkFacIter works as expected.
 func TestFacIter(t *testing.T) {
-	t.Skip()
 	ctx := context.Background()
 	const in = 30
 	expValue := uint64(0x865df5dd54000000)
@@ -129,11 +128,10 @@ var facIterArgumentI64 int64 = int64(facIterArgumentU64)
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
 func TestFacIter_JIT_Fastest(t *testing.T) {
 	if ensureJITFastest != "true" {
+		t.Skip()
 	}
 
 	jitResult := testing.Benchmark(jitFacIterInvoke)
-	jitNanoPerOp := float64(jitResult.T.Nanoseconds()) / float64(jitResult.N)
-
 	fmt.Println("JIT", jitResult)
 
 	cases := []struct {
@@ -154,6 +152,7 @@ func TestFacIter_JIT_Fastest(t *testing.T) {
 		},
 	}
 
+	jitNanoPerOp := float64(jitResult.T.Nanoseconds()) / float64(jitResult.N)
 	for _, tc := range cases {
 		// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
 		nanoPerOp := float64(tc.result.T.Nanoseconds()) / float64(tc.result.N)
