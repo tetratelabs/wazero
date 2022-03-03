@@ -4,7 +4,11 @@ golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 .PHONY: bench
 bench:
 	@go test -run=NONE -benchmem -bench=. ./tests/...
-	@cd vs && go test -run=NONE -benchmem -bench=. .
+	@cd vs && go test -benchmem -bench=. .
+
+.PHONY: bench.check
+bench.check:
+	@cd vs && go test -benchmem -bench=. . -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
 
 bench_testdata_dir := tests/bench/testdata
 
