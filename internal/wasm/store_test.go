@@ -3,7 +3,6 @@ package internalwasm
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"os"
 	"strconv"
@@ -371,54 +370,6 @@ func TestExecuteConstExpression(t *testing.T) {
 			})
 		}
 	})
-}
-
-func TestStore_AddHostGlobal(t *testing.T) {
-	tests := []struct {
-		name            string
-		enabledFeatures Features
-		mutable         bool
-		expectedErr     string
-	}{
-		{
-			name:            fmt.Sprintf("immutable when %s enabled", FeatureMutableGlobal),
-			enabledFeatures: Features20191205,
-		},
-		{
-			name:            fmt.Sprintf("immutable when %s disabled", FeatureMutableGlobal),
-			enabledFeatures: Features20191205.Set(FeatureMutableGlobal, false),
-		},
-		{
-			name:            fmt.Sprintf("mutable when %s enabled", FeatureMutableGlobal),
-			enabledFeatures: Features20191205,
-		},
-		{
-			name:            fmt.Sprintf("mutable when %s disabled", FeatureMutableGlobal),
-			enabledFeatures: Features20191205.Set(FeatureMutableGlobal, false),
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			s := NewStore(context.Background(), &catchContext{}, tc.enabledFeatures)
-			m := &ModuleInstance{Exports: map[string]*ExportInstance{}}
-
-			err := s.AddHostGlobal(m, "test", 1, ValueTypeI64, tc.mutable)
-			if tc.expectedErr == "" {
-				require.NoError(t, err)
-				e, err := m.GetExport("test", ExternTypeGlobal)
-				require.NoError(t, err)
-				require.NotNil(t, e.Global)
-			} else {
-				require.EqualError(t, err, tc.expectedErr)
-			}
-		})
-	}
-}
-
-func TestStore_releaseModuleInstance(t *testing.T) {
-	// TODO:
 }
 
 func TestStore_releaseFunctionInstances(t *testing.T) {
@@ -968,6 +919,10 @@ func TestModuleInstance_applyElements(t *testing.T) {
 
 func Test_newModuleInstance(t *testing.T) {
 	// TODO
+}
+
+func TestStore_releaseModuleInstance(t *testing.T) {
+	// TODO:
 }
 
 func newStore() *Store {

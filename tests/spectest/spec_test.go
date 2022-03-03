@@ -185,41 +185,80 @@ func (c command) expectedError() (err error) {
 }
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
-	const name = "spectest"
-	_, err := store.NewHostModule(name, map[string]interface{}{
-		"print":         func() {},
-		"print_i32":     func(uint32) {},
-		"print_f32":     func(float32) {},
-		"print_i64":     func(uint64) {},
-		"print_f64":     func(float64) {},
-		"print_i32_f32": func(uint32, float32) {},
-		"print_f64_f64": func(float64, float64) {},
-	})
-	require.NoError(t, err)
+	memoryLimitMax := uint32(2)
+	tableLimitMax := uint32(20)
 
-	pubMod, ok := store.Module(name).(*wasm.PublicModule)
-	require.True(t, ok)
-
-	mod := pubMod.Instance
-
-	for _, g := range []struct {
-		name      string
-		valueType wasm.ValueType
-		value     uint64
-	}{
-		{name: "global_i32", valueType: wasm.ValueTypeI32, value: uint64(int32(666))},
-		{name: "global_i64", valueType: wasm.ValueTypeI64, value: uint64(int64(666))},
-		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
-		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
-	} {
-		require.NoError(t, store.AddHostGlobal(mod, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
+	mod := &wasm.Module{
+		FunctionSection: []uint32{
+			0, // print
+			1, // print_i32
+			2, // print_i64
+			3, // print_f32
+			4, // print_f64
+			5, // print_f64
+			6, // print_f64
+		},
+		TypeSection: []*wasm.FunctionType{
+			{},                                  // print
+			{Params: []byte{wasm.ValueTypeI32}}, // print_i32
+			{Params: []byte{wasm.ValueTypeI64}}, // print_i64
+			{Params: []byte{wasm.ValueTypeF32}}, // print_f32
+			{Params: []byte{wasm.ValueTypeF64}}, // print_f64
+			{Params: []byte{wasm.ValueTypeI32, wasm.ValueTypeF32}}, // print_i32_f32
+			{Params: []byte{wasm.ValueTypeF64, wasm.ValueTypeF64}}, // print_f64_f64
+		},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeEnd}},                                   // print
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_i32
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_i64
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_f32
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_f64
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_i32_f32
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_f64_f64
+		},
+		GlobalSection: []*wasm.Global{
+			{ // global_i32
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x9a, 0x5} /* = 666 */},
+			},
+			{ // global_i64
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{0x9a, 0x5} /* = 666 */},
+			},
+			{ // global_f32
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x44, 0x26, 0x80, 0x00}},
+			},
+			{ // global_f64
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x40, 0x84, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}},
+			},
+		},
+		MemorySection: []*wasm.LimitsType{{
+			Min: 1, Max: &memoryLimitMax,
+		}},
+		TableSection: []*wasm.TableType{
+			{Limit: &wasm.LimitsType{Min: 10, Max: &tableLimitMax}},
+		},
+		ExportSection: map[string]*wasm.Export{
+			"print":         {Name: "print", Index: 0, Type: wasm.ExternTypeFunc},
+			"print_i32":     {Name: "print_i32", Index: 1, Type: wasm.ExternTypeFunc},
+			"print_i64":     {Name: "print_i64", Index: 2, Type: wasm.ExternTypeFunc},
+			"print_f32":     {Name: "print_f32", Index: 3, Type: wasm.ExternTypeFunc},
+			"print_f64":     {Name: "print_f64", Index: 4, Type: wasm.ExternTypeFunc},
+			"print_i32_f32": {Name: "print_i32_f32", Index: 5, Type: wasm.ExternTypeFunc},
+			"print_f64_f64": {Name: "print_f64_f64", Index: 6, Type: wasm.ExternTypeFunc},
+			"global_i32":    {Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal},
+			"global_i64":    {Name: "global_i64", Index: 1, Type: wasm.ExternTypeGlobal},
+			"global_f32":    {Name: "global_f32", Index: 2, Type: wasm.ExternTypeGlobal},
+			"global_f64":    {Name: "global_f64", Index: 3, Type: wasm.ExternTypeGlobal},
+			"table":         {Name: "table", Index: 0, Type: wasm.ExternTypeTable},
+			"memory":        {Name: "memory", Index: 0, Type: wasm.ExternTypeMemory},
+		},
 	}
 
-	tableLimitMax := uint32(20)
-	require.NoError(t, store.AddHostTableInstance(mod, "table", 10, &tableLimitMax))
-
-	memoryLimitMax := uint32(2)
-	require.NoError(t, store.AddHostMemoryInstance(mod, "memory", 1, &memoryLimitMax))
+	_, err := store.Instantiate(mod, "spectest")
+	require.NoError(t, err)
 }
 
 func TestJIT(t *testing.T) {
