@@ -79,6 +79,7 @@ func TestFacIter(t *testing.T) {
 	})
 }
 
+// BenchmarkFacIter_Init tracks the time spent readying a function for use
 func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("Interpreter", func(b *testing.B) {
 		b.ResetTimer()
