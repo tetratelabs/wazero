@@ -128,11 +128,10 @@ var facIterArgumentI64 int64 = int64(facIterArgumentU64)
 // This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
 func TestFacIter_JIT_Fastest(t *testing.T) {
 	if ensureJITFastest != "true" {
-		t.Skip()
+		// t.Skip()
 	}
 
 	jitResult := testing.Benchmark(jitFacIterInvoke)
-	fmt.Println("JIT", jitResult)
 
 	cases := []struct {
 		runtimeName string
@@ -152,13 +151,23 @@ func TestFacIter_JIT_Fastest(t *testing.T) {
 		},
 	}
 
+	// Print results before running each subtest.
+	fmt.Println("JIT", jitResult)
+	for _, tc := range cases {
+		fmt.Println(tc.runtimeName, tc.result)
+	}
+
 	jitNanoPerOp := float64(jitResult.T.Nanoseconds()) / float64(jitResult.N)
 	for _, tc := range cases {
-		// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
-		nanoPerOp := float64(tc.result.T.Nanoseconds()) / float64(tc.result.N)
-		fmt.Println(tc.runtimeName, tc.result)
-		require.Lessf(t, jitNanoPerOp, nanoPerOp,
-			"JIT engine must be faster than %s. Run BenchmarkFacIter_Invoke with ensureJITFastest=false instead to see the detailed result", tc.runtimeName)
+		tc := tc
+		t.Run(tc.runtimeName, func(t *testing.T) {
+			// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
+			nanoPerOp := float64(tc.result.T.Nanoseconds()) / float64(tc.result.N)
+			msg := fmt.Sprintf("JIT engine must be faster than %s. "+
+				"Run BenchmarkFacIter_Invoke with ensureJITFastest=false instead to see the detailed result",
+				tc.runtimeName)
+			require.Lessf(t, jitNanoPerOp, nanoPerOp, msg)
+		})
 	}
 }
 
