@@ -78,6 +78,6 @@ func Test_hostFunc(t *testing.T) {
 	_, err = module.Function("base64").Call(ctx)
 	require.NoError(t, err)
 
-	// Verify that in-Wasm calculated base64 strings match the ones calculated in native Go.
+	// Verify that in-Wasm calculated base64 string matches the one calculated in native Go.
 	require.Equal(t, expectedBase64String, strings.TrimSpace(stdout.String()))
 }
