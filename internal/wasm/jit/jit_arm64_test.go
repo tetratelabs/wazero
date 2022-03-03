@@ -132,8 +132,8 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 				frame := callFrame{
 					// Set the return address to the beginning of the function so that we can execute the constI32 above.
 					returnAddress: compiledFunction.codeInitialAddress,
-					// Note: return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
-					returnStackBasePointer: uint64(funcaddr) * 10,
+					// Note: return stack base pointer is set to funcaddr*5 and this is where the const should be pushed.
+					returnStackBasePointer: uint64(funcaddr) * 5,
 					compiledFunction:       compiledFunction,
 				}
 				vm.callFrameStack[vm.globalContext.callFrameStackPointer] = frame
