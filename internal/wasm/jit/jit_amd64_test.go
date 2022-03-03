@@ -191,7 +191,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 			frame := callFrame{
 				returnAddress: codeInitialAddress,
 				// Note that return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
-				returnStackBasePointer: uint64(funcaddr) * 10,
+				returnStackBasePointer: uint64(funcaddr) * 5,
 				compiledFunction:       compiledFunction,
 			}
 			vm.callFrameStack[vm.globalContext.callFrameStackPointer] = frame

@@ -432,8 +432,8 @@ func newEngine() *engine {
 
 // TODO: better make them configurable?
 const (
-	initialValueStackSize             = 1024
-	initialCallFrameStackSize         = 256
+	initialValueStackSize             = 64
+	initialCallFrameStackSize         = 16
 	initialCompiledFunctionsSliceSize = 128
 )
 
