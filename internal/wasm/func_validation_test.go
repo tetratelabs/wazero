@@ -45,23 +45,23 @@ func TestValidateFunction_FeatureSignExtensionOps(t *testing.T) {
 	}{
 		{
 			input:       OpcodeI32Extend8S,
-			expectedErr: "i32.extend8_s invalid as sign-extension-ops is not yet unsupported. See #66",
+			expectedErr: "i32.extend8_s invalid as sign-extension-ops is not yet supported. See #66",
 		},
 		{
 			input:       OpcodeI32Extend16S,
-			expectedErr: "i32.extend16_s invalid as sign-extension-ops is not yet unsupported. See #66",
+			expectedErr: "i32.extend16_s invalid as sign-extension-ops is not yet supported. See #66",
 		},
 		{
 			input:       OpcodeI64Extend8S,
-			expectedErr: "i64.extend8_s invalid as sign-extension-ops is not yet unsupported. See #66",
+			expectedErr: "i64.extend8_s invalid as sign-extension-ops is not yet supported. See #66",
 		},
 		{
 			input:       OpcodeI64Extend16S,
-			expectedErr: "i64.extend16_s invalid as sign-extension-ops is not yet unsupported. See #66",
+			expectedErr: "i64.extend16_s invalid as sign-extension-ops is not yet supported. See #66",
 		},
 		{
 			input:       OpcodeI64Extend32S,
-			expectedErr: "i64.extend32_s invalid as sign-extension-ops is not yet unsupported. See #66",
+			expectedErr: "i64.extend32_s invalid as sign-extension-ops is not yet supported. See #66",
 		},
 	}
 
