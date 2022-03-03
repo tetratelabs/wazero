@@ -843,11 +843,11 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	}
 }
 
-// // TODO: TestSnapshotPreview1_FdReaddir TestSnapshotPreview1_FdReaddir_Errors
-// // TODO: TestSnapshotPreview1_FdRenumber TestSnapshotPreview1_FdRenumber_Errors
-// // TODO: TestSnapshotPreview1_FdSeek TestSnapshotPreview1_FdSeek_Errors
-// // TODO: TestSnapshotPreview1_FdSync TestSnapshotPreview1_FdSync_Errors
-// // TODO: TestSnapshotPreview1_FdTell TestSnapshotPreview1_FdTell_Errors
+// TODO: TestSnapshotPreview1_FdReaddir TestSnapshotPreview1_FdReaddir_Errors
+// TODO: TestSnapshotPreview1_FdRenumber TestSnapshotPreview1_FdRenumber_Errors
+// TODO: TestSnapshotPreview1_FdSeek TestSnapshotPreview1_FdSeek_Errors
+// TODO: TestSnapshotPreview1_FdSync TestSnapshotPreview1_FdSync_Errors
+// TODO: TestSnapshotPreview1_FdTell TestSnapshotPreview1_FdTell_Errors
 
 func TestSnapshotPreview1_FdWrite(t *testing.T) {
 	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
@@ -1028,17 +1028,17 @@ func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
 	return f.(*memFile), memFS
 }
 
-// // TODO: TestSnapshotPreview1_PathCreateDirectory TestSnapshotPreview1_PathCreateDirectory_Errors
-// // TODO: TestSnapshotPreview1_PathFilestatGet TestSnapshotPreview1_PathFilestatGet_Errors
-// // TODO: TestSnapshotPreview1_PathFilestatSetTimes TestSnapshotPreview1_PathFilestatSetTimes_Errors
-// // TODO: TestSnapshotPreview1_PathLink TestSnapshotPreview1_PathLink_Errors
-// // TODO: TestSnapshotPreview1_PathOpen TestSnapshotPreview1_PathOpen_Errors
-// // TODO: TestSnapshotPreview1_PathReadlink TestSnapshotPreview1_PathReadlink_Errors
-// // TODO: TestSnapshotPreview1_PathRemoveDirectory TestSnapshotPreview1_PathRemoveDirectory_Errors
-// // TODO: TestSnapshotPreview1_PathRename TestSnapshotPreview1_PathRename_Errors
-// // TODO: TestSnapshotPreview1_PathSymlink TestSnapshotPreview1_PathSymlink_Errors
-// // TODO: TestSnapshotPreview1_PathUnlinkFile TestSnapshotPreview1_PathUnlinkFile_Errors
-// // TODO: TestSnapshotPreview1_PollOneoff TestSnapshotPreview1_PollOneoff_Errors
+// TODO: TestSnapshotPreview1_PathCreateDirectory TestSnapshotPreview1_PathCreateDirectory_Errors
+// TODO: TestSnapshotPreview1_PathFilestatGet TestSnapshotPreview1_PathFilestatGet_Errors
+// TODO: TestSnapshotPreview1_PathFilestatSetTimes TestSnapshotPreview1_PathFilestatSetTimes_Errors
+// TODO: TestSnapshotPreview1_PathLink TestSnapshotPreview1_PathLink_Errors
+// TODO: TestSnapshotPreview1_PathOpen TestSnapshotPreview1_PathOpen_Errors
+// TODO: TestSnapshotPreview1_PathReadlink TestSnapshotPreview1_PathReadlink_Errors
+// TODO: TestSnapshotPreview1_PathRemoveDirectory TestSnapshotPreview1_PathRemoveDirectory_Errors
+// TODO: TestSnapshotPreview1_PathRename TestSnapshotPreview1_PathRename_Errors
+// TODO: TestSnapshotPreview1_PathSymlink TestSnapshotPreview1_PathSymlink_Errors
+// TODO: TestSnapshotPreview1_PathUnlinkFile TestSnapshotPreview1_PathUnlinkFile_Errors
+// TODO: TestSnapshotPreview1_PollOneoff TestSnapshotPreview1_PollOneoff_Errors
 
 func TestSnapshotPreview1_ProcExit(t *testing.T) {
 	tests := []struct {
@@ -1071,8 +1071,8 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 	}
 }
 
-// // TODO: TestSnapshotPreview1_ProcRaise TestSnapshotPreview1_ProcRaise_Errors
-// // TODO: TestSnapshotPreview1_SchedYield TestSnapshotPreview1_SchedYield_Errors
+// TODO: TestSnapshotPreview1_ProcRaise TestSnapshotPreview1_ProcRaise_Errors
+// TODO: TestSnapshotPreview1_SchedYield TestSnapshotPreview1_SchedYield_Errors
 
 func TestSnapshotPreview1_RandomGet(t *testing.T) {
 	expectedMemory := []byte{
