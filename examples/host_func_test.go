@@ -24,7 +24,9 @@ var hostFuncWasm []byte
 func Test_hostFunc(t *testing.T) {
 	// The function for allocating the in-Wasm memory region.
 	// We resolve this function after main module instantiation.
-	var allocateInWasmBufferFn wasm.Function
+	allocateInWasmBuffer := func(context.Context, uint32) uint32 {
+		panic("unimplemented")
+	}
 
 	var expectedBase64String string
 
@@ -35,9 +37,7 @@ func Test_hostFunc(t *testing.T) {
 		require.Equal(t, int64(12345), contextValue)
 
 		const bufferSize = 10
-		res, err := allocateInWasmBufferFn.Call(ctx.Context(), uint64(bufferSize))
-		require.NoError(t, err)
-		offset := uint32(res[0])
+		offset := allocateInWasmBuffer(ctx.Context(), bufferSize)
 
 		// Store the address info to the memory.
 		require.True(t, ctx.Memory().WriteUint32Le(retBufPtr, offset))
@@ -68,8 +68,15 @@ func Test_hostFunc(t *testing.T) {
 	module, err := wazero.StartWASICommandFromSource(r, hostFuncWasm)
 	require.NoError(t, err)
 
-	allocateInWasmBufferFn = module.Function("allocate_buffer")
-	require.NotNil(t, allocateInWasmBufferFn)
+	allocateInWasmBufferFn := module.Function("allocate_buffer")
+	require.NotNil(t, allocateInWasmBuffer)
+
+	// Implement the function pointer. This mainly shows how you can decouple a module function dependency.
+	allocateInWasmBuffer = func(ctx context.Context, size uint32) uint32 {
+		res, err := allocateInWasmBufferFn.Call(ctx, uint64(size))
+		require.NoError(t, err)
+		return uint32(res[0])
+	}
 
 	// Set a context variable that should be available in wasm.ModuleContext.
 	ctx := context.WithValue(context.Background(), testKey{}, int64(12345))
