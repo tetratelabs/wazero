@@ -136,4 +136,4 @@ jobs:
             ~/go/pkg/mod
           key: bench-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
 
-      - run: make bench
+      - run: make bench.check
