@@ -1,5 +1,4 @@
 //go:build amd64 && cgo && !windows
-// +build amd64,cgo,!windows
 
 // Wasmtime can only be used in amd64 with CGO
 // Wasmer doesn't link on Windows
