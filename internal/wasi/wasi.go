@@ -1097,7 +1097,8 @@ func (a *wasiAPI) randUnusedFD() (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	fd := binary.LittleEndian.Uint32(rand)
+	// fd is actually a signed int32, and must be a positive number.
+	fd := binary.LittleEndian.Uint32(rand) % (1 << 31)
 	for {
 		if _, ok := a.opened[fd]; !ok {
 			return fd, nil
