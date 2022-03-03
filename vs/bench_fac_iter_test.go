@@ -19,6 +19,8 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
+// ensureJITFastest is overridable via ldflags. Ex.
+//	-ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
 var ensureJITFastest string = "false"
 
 // facWasm is compiled from testdata/fac.wat
