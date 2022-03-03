@@ -156,50 +156,6 @@ func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstanc
 	return f, nil
 }
 
-// Only used in spectest.
-func (s *Store) AddHostGlobal(m *ModuleInstance, name string, value uint64, valueType ValueType, mutable bool) error {
-	if mutable {
-		if err := s.EnabledFeatures.Require(FeatureMutableGlobal); err != nil {
-			return err
-		}
-	}
-	g := &GlobalInstance{
-		Val:  value,
-		Type: &GlobalType{Mutable: mutable, ValType: valueType},
-	}
-
-	m.Globals = append(m.Globals, g)
-	s.addGlobalInstances(g)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeGlobal, Global: g})
-}
-
-// Only used in spectest.
-func (s *Store) AddHostTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
-	t := newTableInstance(min, max)
-
-	// TODO: check if the module already has memory, and if so, returns error.
-	m.TableInstance = t
-	s.addTableInstance(t)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
-}
-
-// Only used in spectest.
-func (s *Store) AddHostMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
-	memory := &MemoryInstance{
-		Buffer: make([]byte, MemoryPagesToBytesNum(min)),
-		Min:    min,
-		Max:    max,
-	}
-
-	// TODO: check if the module already has memory, and if so, returns error.
-	m.MemoryInstance = memory
-	s.addMemoryInstance(memory)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
-}
-
 func (s *Store) requireModuleUnused(moduleName string) error {
 	if _, ok := s.moduleInstances[moduleName]; ok {
 		return fmt.Errorf("module %s has already been instantiated", moduleName)
