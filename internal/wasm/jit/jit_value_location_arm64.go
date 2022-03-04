@@ -29,8 +29,8 @@ var (
 		arm64.REG_F29, arm64.REG_F30, arm64.REG_F31,
 	}
 	// Note (see arm64 section in https://go.dev/doc/asm):
-	// * REG_R28 is reserved for Goroutine by goruntime, and not here.
-	// * REG_R18 is reserved as a platform register.
+	// * REG_R18 is reserved as a platform register, and we don't use it in JIT.
+	// * REG_R28 is reserved for Goroutine by Go runtime, and we don't use it in JIT.
 	unreservedGeneralPurposeIntRegisters = []int16{
 		arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
