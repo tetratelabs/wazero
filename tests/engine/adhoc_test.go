@@ -45,11 +45,10 @@ var (
 	hugestackWasm []byte
 )
 
-func Test_JIT(t *testing.T) {
-	testHugeStack(t, wazero.NewRuntimeConfigJIT)
-}
-
 func runTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+	t.Run("huge stack", func(t *testing.T) {
+		testHugeStack(t, newRuntimeConfig)
+	})
 	t.Run("fibonacci", func(t *testing.T) {
 		testFibonacci(t, newRuntimeConfig)
 	})
@@ -74,6 +73,10 @@ func runTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 }
 
 func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
+	// and we have no conflict with Go's runtime.
+	const goroutines = 1000
+
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 	module, err := r.NewModuleFromSource(hugestackWasm)
@@ -82,7 +85,6 @@ func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	fn := module.Function("main")
 	require.NotNil(t, fn)
 
-	const goroutines = 1000
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
@@ -103,20 +105,17 @@ func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 	module, err := r.NewModuleFromSource(fibWasm)
 	require.NoError(t, err)
-	var fibs []publicwasm.Function
-	for i := 0; i < goroutines; i++ {
-		fibs = append(fibs, module.Function("fib"))
-	}
+
+	fib := module.Function("fib")
+	require.NotNil(t, fib)
 
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
-		fib := fibs[i]
 		go func() {
 			defer wg.Done()
 			results, err := fib.Call(ctx, 20)
 			require.NoError(t, err)
-
 			require.Equal(t, uint64(10946), results[0])
 		}()
 	}
