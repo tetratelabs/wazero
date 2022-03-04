@@ -41,7 +41,13 @@ var (
 	memoryWasm []byte
 	//go:embed testdata/recursive.wasm
 	recursiveWasm []byte
+	//go:embed testdata/hugestack.wasm
+	hugestackWasm []byte
 )
+
+func Test_JIT(t *testing.T) {
+	testHugeStack(t, wazero.NewRuntimeConfigJIT)
+}
 
 func runTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	t.Run("fibonacci", func(t *testing.T) {
@@ -65,6 +71,31 @@ func runTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	t.Run("host function with float type", func(t *testing.T) {
 		testHostFunctions(t, newRuntimeConfig)
 	})
+}
+
+func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+
+	module, err := r.NewModuleFromSource(hugestackWasm)
+	require.NoError(t, err)
+
+	fn := module.Function("main")
+	require.NotNil(t, fn)
+
+	const goroutines = 1000
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			_, err = fn.Call(ctx)
+			require.NoError(t, err)
+
+			fmt.Println(i)
+		}()
+	}
+	wg.Wait()
 }
 
 func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
