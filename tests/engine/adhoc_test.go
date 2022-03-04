@@ -5,8 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"math"
-	"runtime"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,15 +17,15 @@ import (
 // ctx is a default context used to avoid lint warnings even though these tests don't use any context data.
 var ctx = context.Background()
 
-func TestJIT(t *testing.T) {
-	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+func TestJITAdhoc(t *testing.T) {
+	if !wazero.JITSupported {
 		t.Skip()
 	}
-	runTests(t, wazero.NewRuntimeConfigJIT)
+	runAdhocTests(t, wazero.NewRuntimeConfigJIT)
 }
 
-func TestInterpreter(t *testing.T) {
-	runTests(t, wazero.NewRuntimeConfigInterpreter)
+func TestInterpreterAdhoc(t *testing.T) {
+	runAdhocTests(t, wazero.NewRuntimeConfigInterpreter)
 }
 
 var (
@@ -45,7 +43,7 @@ var (
 	hugestackWasm []byte
 )
 
-func runTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func runAdhocTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	t.Run("huge stack", func(t *testing.T) {
 		testHugeStack(t, newRuntimeConfig)
 	})
@@ -73,35 +71,18 @@ func runTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 }
 
 func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
-	// and we have no conflict with Go's runtime.
-	const goroutines = 1000
-
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-
 	module, err := r.NewModuleFromSource(hugestackWasm)
 	require.NoError(t, err)
 
 	fn := module.Function("main")
 	require.NotNil(t, fn)
 
-	var wg sync.WaitGroup
-	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
-		go func() {
-			defer wg.Done()
-			_, err = fn.Call(ctx)
-			require.NoError(t, err)
-		}()
-	}
-	wg.Wait()
+	_, err = fn.Call(ctx)
+	require.NoError(t, err)
 }
 
 func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	// We execute 1000 times in order to ensure the JIT engine is stable under high concurrency
-	// and we have no conflict with Go's runtime.
-	const goroutines = 1000
-
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 	module, err := r.NewModuleFromSource(fibWasm)
 	require.NoError(t, err)
@@ -109,17 +90,9 @@ func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	fib := module.Function("fib")
 	require.NotNil(t, fib)
 
-	var wg sync.WaitGroup
-	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
-		go func() {
-			defer wg.Done()
-			results, err := fib.Call(ctx, 20)
-			require.NoError(t, err)
-			require.Equal(t, uint64(10946), results[0])
-		}()
-	}
-	wg.Wait()
+	results, err := fib.Call(ctx, 20)
+	require.NoError(t, err)
+	require.Equal(t, uint64(10946), results[0])
 }
 
 func testFac(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
