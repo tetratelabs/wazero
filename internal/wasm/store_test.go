@@ -85,32 +85,6 @@ func TestModuleInstance_Memory(t *testing.T) {
 	}
 }
 
-func TestStore_NewHostModule(t *testing.T) {
-	s := newStore()
-
-	// Add the host module
-	_, err := s.NewHostModule("test", map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
-	require.NoError(t, err)
-
-	// Ensure it was added to module instances
-	hm := s.moduleInstances["test"]
-	require.NotNil(t, hm)
-
-	// The function was added to the store, prefixed by the owning module name
-	require.Equal(t, 1, len(s.functions))
-	fn := s.functions[0]
-	require.Equal(t, "test.fn", fn.Name)
-
-	// The function was exported in the module
-	require.Equal(t, 1, len(hm.Exports))
-	_, ok := hm.Exports["fn"]
-	require.True(t, ok)
-
-	// Trying to register it again should fail
-	_, err = s.NewHostModule("test", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
-	require.EqualError(t, err, "module test has already been instantiated")
-}
-
 func TestPublicModule_String(t *testing.T) {
 	s := newStore()
 
@@ -119,15 +93,6 @@ func TestPublicModule_String(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Module[module]", m.String())
 	require.Equal(t, "Module[module]", s.Module(m.instance.Name).String())
-}
-
-func TestHostModule_String(t *testing.T) {
-	s := newStore()
-
-	// Ensure paths that can create the host module can see the name.
-	hm, err := s.NewHostModule("host", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
-	require.NoError(t, err)
-	require.Equal(t, "HostModule[host]", hm.String())
 }
 
 func TestStore_ReleaseModule(t *testing.T) {
