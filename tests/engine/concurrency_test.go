@@ -8,7 +8,9 @@ import (
 )
 
 func TestJITConcurrency(t *testing.T) {
-	requireJITSupported(t)
+	if !wazero.JITSupported {
+		t.Skip()
+	}
 	runAdhocTestsUnderHighConcurrency(t, wazero.NewRuntimeConfigJIT)
 	// TODO: Add conccurent instantiation, invocation and release on a single store test case in https://github.com/tetratelabs/wazero/issues/293
 

@@ -14,17 +14,13 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
-func requireJITSupported(t *testing.T) {
-	if !wazero.JITSupported {
-		t.Skip()
-	}
-}
-
 // ctx is a default context used to avoid lint warnings even though these tests don't use any context data.
 var ctx = context.Background()
 
 func TestJITAdhoc(t *testing.T) {
-	requireJITSupported(t)
+	if !wazero.JITSupported {
+		t.Skip()
+	}
 	runAdhocTests(t, wazero.NewRuntimeConfigJIT)
 }
 
