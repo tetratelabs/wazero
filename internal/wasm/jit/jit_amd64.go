@@ -76,10 +76,10 @@ func init() {
 }
 
 // jitcall is implemented in jit_amd64.s as a Go Assembler function.
-// This is used by callEngine.exec and the entrypoint to enter the JITed native code.
+// This is used by callEngine.execWasmFunction and the entrypoint to enter the JITed native code.
 // codeSegment is the pointer to the initial instruction of the compiled native code.
-// vm is the pointer to the callEngine as uintptr.
-func jitcall(codeSegment, vm uintptr)
+// ce is the pointer to the *callEngine as uintptr.
+func jitcall(codeSegment, ce uintptr)
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 // For amd64, this is empty.

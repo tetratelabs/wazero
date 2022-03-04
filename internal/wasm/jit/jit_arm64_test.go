@@ -87,7 +87,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 	t.Run("deep call stack", func(t *testing.T) {
 		env := newJITEnvironment()
 		engine := env.engine()
-		vm := env.callEngine()
+		ce := env.callEngine()
 
 		// Push the call frames.
 		const callFrameNums = 10
@@ -125,8 +125,8 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 					returnStackBasePointer: uint64(funcaddr) * 5,
 					compiledFunction:       compiledFunction,
 				}
-				vm.callFrameStack[vm.globalContext.callFrameStackPointer] = frame
-				vm.globalContext.callFrameStackPointer++
+				ce.callFrameStack[ce.globalContext.callFrameStackPointer] = frame
+				ce.globalContext.callFrameStackPointer++
 				stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
 			})
 		}
@@ -134,7 +134,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
 
 		// Run code from the top frame.
-		env.exec(vm.callFrameTop().compiledFunction.codeSegment)
+		env.exec(ce.callFrameTop().compiledFunction.codeSegment)
 
 		// Check the exit status and the values on stack.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -1051,7 +1051,7 @@ func TestArm64Compiler_compilePick(t *testing.T) {
 
 	for _, tc := range []struct {
 		name                                      string
-		pickTargetSetupFunc                       func(compiler *arm64Compiler, vm *callEngine) error
+		pickTargetSetupFunc                       func(compiler *arm64Compiler, ce *callEngine) error
 		isPickTargetFloat, isPickTargetOnRegister bool
 	}{
 		{
@@ -1072,10 +1072,10 @@ func TestArm64Compiler_compilePick(t *testing.T) {
 		},
 		{
 			name: "float on stack",
-			pickTargetSetupFunc: func(compiler *arm64Compiler, vm *callEngine) error {
+			pickTargetSetupFunc: func(compiler *arm64Compiler, ce *callEngine) error {
 				pickTargetLocation := compiler.locationStack.pushValueLocationOnStack()
 				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeFloat)
-				vm.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
+				ce.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
 			},
 			isPickTargetFloat:      true,
@@ -1083,10 +1083,10 @@ func TestArm64Compiler_compilePick(t *testing.T) {
 		},
 		{
 			name: "int on stack",
-			pickTargetSetupFunc: func(compiler *arm64Compiler, vm *callEngine) error {
+			pickTargetSetupFunc: func(compiler *arm64Compiler, ce *callEngine) error {
 				pickTargetLocation := compiler.locationStack.pushValueLocationOnStack()
 				pickTargetLocation.setRegisterType(generalPurposeRegisterTypeInt)
-				vm.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
+				ce.valueStack[pickTargetLocation.stackPointer] = pickTargetValue
 				return nil
 			},
 			isPickTargetFloat:      false,
@@ -1235,7 +1235,7 @@ func TestArm64Compiler_compileDrop(t *testing.T) {
 		liveTotal := liveAboveDropStartNum + liveBelowDropEndNum
 
 		env := newJITEnvironment()
-		vm := env.callEngine()
+		ce := env.callEngine()
 		compiler := env.requireNewCompiler(t)
 
 		err := compiler.compilePreamble()
@@ -1244,7 +1244,7 @@ func TestArm64Compiler_compileDrop(t *testing.T) {
 		// Put existing contents except the top on stack
 		for i := 0; i < total-1; i++ {
 			loc := compiler.locationStack.pushValueLocationOnStack()
-			vm.valueStack[loc.stackPointer] = uint64(i) // Put the initial value.
+			ce.valueStack[loc.stackPointer] = uint64(i) // Put the initial value.
 		}
 
 		// Place the top value.
@@ -1805,9 +1805,9 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				require.Equal(t, builtinFunctionIndexGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
 
 				// Grow the callFrame stack, and exec again from the return address.
-				vm := env.callEngine()
-				vm.builtinFunctionGrowCallFrameStack()
-				jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(vm)))
+				ce := env.callEngine()
+				ce.builtinFunctionGrowCallFrameStack()
+				jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)))
 			}
 
 			// Check status and returned values.
@@ -2014,9 +2014,9 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 							require.Equal(t, builtinFunctionIndexGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
 
 							// Grow the callFrame stack, and exec again from the return address.
-							vm := env.callEngine()
-							vm.builtinFunctionGrowCallFrameStack()
-							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(vm)))
+							ce := env.callEngine()
+							ce.builtinFunctionGrowCallFrameStack()
+							jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(ce)))
 						}
 
 						require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -2217,21 +2217,21 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 
 			// Check if the fields of callEngine.moduleContext are updated.
-			vm := env.callEngine()
+			ce := env.callEngine()
 
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
-			require.Equal(t, bufSliceHeader.Data, vm.moduleContext.globalElement0Address)
+			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
 
 			if tc.moduleInstance.MemoryInstance != nil {
 				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.MemoryInstance.Buffer))
-				require.Equal(t, uint64(bufSliceHeader.Len), vm.moduleContext.memorySliceLen)
-				require.Equal(t, bufSliceHeader.Data, vm.moduleContext.memoryElement0Address)
+				require.Equal(t, uint64(bufSliceHeader.Len), ce.moduleContext.memorySliceLen)
+				require.Equal(t, bufSliceHeader.Data, ce.moduleContext.memoryElement0Address)
 			}
 
 			if tc.moduleInstance.TableInstance != nil {
 				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.TableInstance.Table))
-				require.Equal(t, uint64(tableHeader.Len), vm.moduleContext.tableSliceLen)
-				require.Equal(t, tableHeader.Data, vm.moduleContext.tableElement0Address)
+				require.Equal(t, uint64(tableHeader.Len), ce.moduleContext.tableSliceLen)
+				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 			}
 		})
 	}
@@ -4109,7 +4109,7 @@ func TestArm64Compiler_compileFConvertFromI(t *testing.T) {
 }
 
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
-	requireRunAndExpectedValueReturned := func(t *testing.T, c *arm64Compiler, expValue uint32) {
+	requireRunAndExpectedValueReturned := func(t *testing.T, env *jitEnv, c *arm64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 7; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
@@ -4121,7 +4121,6 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		}
 
 		// Generate the code under test and run.
-		env := newJITEnvironment()
 		code, _, _, err := c.compile()
 		require.NoError(t, err)
 		env.exec(code)
@@ -4266,7 +4265,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 
 			require.Len(t, compiler.locationStack.usedRegisters, 0)
 
-			requireRunAndExpectedValueReturned(t, compiler, tc.expectedValue)
+			requireRunAndExpectedValueReturned(t, env, compiler, tc.expectedValue)
 		})
 	}
 }

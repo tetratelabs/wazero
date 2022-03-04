@@ -12,7 +12,7 @@ import (
 
 type jitEnv struct {
 	eng            *engine
-	vm             *callEngine
+	ce             *callEngine
 	moduleInstance *wasm.ModuleInstance
 }
 
@@ -44,27 +44,27 @@ func (j *jitEnv) memory() []byte {
 }
 
 func (j *jitEnv) stack() []uint64 {
-	return j.vm.valueStack
+	return j.ce.valueStack
 }
 
 func (j *jitEnv) jitStatus() jitCallStatusCode {
-	return j.vm.exitContext.statusCode
+	return j.ce.exitContext.statusCode
 }
 
 func (j *jitEnv) functionCallAddress() wasm.FunctionIndex {
-	return j.vm.exitContext.functionCallAddress
+	return j.ce.exitContext.functionCallAddress
 }
 
 func (j *jitEnv) stackPointer() uint64 {
-	return j.vm.valueStackContext.stackPointer
+	return j.ce.valueStackContext.stackPointer
 }
 
 func (j *jitEnv) stackBasePointer() uint64 {
-	return j.vm.valueStackContext.stackBasePointer
+	return j.ce.valueStackContext.stackBasePointer
 }
 
 func (j *jitEnv) setStackPointer(sp uint64) {
-	j.vm.valueStackContext.stackPointer = sp
+	j.ce.valueStackContext.stackPointer = sp
 }
 
 func (j *jitEnv) addGlobals(g ...*wasm.GlobalInstance) {
@@ -80,19 +80,19 @@ func (j *jitEnv) setTable(table []wasm.TableElement) {
 }
 
 func (j *jitEnv) callFrameStackPeek() *callFrame {
-	return &j.vm.callFrameStack[j.vm.globalContext.callFrameStackPointer-1]
+	return &j.ce.callFrameStack[j.ce.globalContext.callFrameStackPointer-1]
 }
 
 func (j *jitEnv) callFrameStackPointer() uint64 {
-	return j.vm.globalContext.callFrameStackPointer
+	return j.ce.globalContext.callFrameStackPointer
 }
 
 func (j *jitEnv) setValueStackBasePointer(sp uint64) {
-	j.vm.valueStackContext.stackBasePointer = sp
+	j.ce.valueStackContext.stackBasePointer = sp
 }
 
 func (j *jitEnv) setCallFrameStackPointerLen(l uint64) {
-	j.vm.callFrameStackLen = l
+	j.ce.callFrameStackLen = l
 }
 
 func (j *jitEnv) module() *wasm.ModuleInstance {
@@ -104,7 +104,7 @@ func (j *jitEnv) engine() *engine {
 }
 
 func (j *jitEnv) callEngine() *callEngine {
-	return j.vm
+	return j.ce
 }
 
 func (j *jitEnv) exec(code []byte) {
@@ -117,11 +117,11 @@ func (j *jitEnv) exec(code []byte) {
 		},
 	}
 
-	j.vm.pushCallFrame(compiledFunction)
+	j.ce.pushCallFrame(compiledFunction)
 
 	jitcall(
 		uintptr(unsafe.Pointer(&code[0])),
-		uintptr(unsafe.Pointer(j.vm)),
+		uintptr(unsafe.Pointer(j.ce)),
 	)
 }
 
@@ -136,7 +136,7 @@ func newJITEnvironment() *jitEnv {
 			TableInstance:  &wasm.TableInstance{},
 			Globals:        []*wasm.GlobalInstance{},
 		},
-		vm: eng.newCallEngine(),
+		ce: eng.newCallEngine(),
 	}
 }
 

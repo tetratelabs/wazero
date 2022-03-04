@@ -11,7 +11,7 @@ type archContext struct{}
 
 func newArchContext() (ret archContext) { return }
 
-func jitcall(codeSegment, engine uintptr) {
+func jitcall(codeSegment, ce uintptr) {
 	panic("unsupported GOARCH")
 }
 
