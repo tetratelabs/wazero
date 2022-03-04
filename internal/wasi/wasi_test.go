@@ -1444,7 +1444,7 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 			fd:             validFD,
 			path:           validPath,
 			pathLen:        validPathLen,
-			resultOpenedFd: uint64(mem.Size()), // path and pathLen correctly point to the right path, but where to write the opned FD is outside memory.
+			resultOpenedFd: uint64(mem.Size()), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
 			expectedErrno:  wasi.ErrnoFault,
 		},
 	}
