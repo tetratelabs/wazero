@@ -1,11 +1,12 @@
 package internalwasm
 
 import (
-	"github.com/tetratelabs/wazero/wasm"
 	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestMemoryInstance_HasLen(t *testing.T) {
