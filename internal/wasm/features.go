@@ -21,7 +21,7 @@ const (
 	FeatureMutableGlobal Features = 1 << iota
 	// FeatureSignExtensionOps decides if parsing should succeed on internalwasm.GlobalType Mutable
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
-	FeatureSignExtensionOps Features = 1 << iota
+	FeatureSignExtensionOps
 )
 
 // Set assigns the value for the given feature.
