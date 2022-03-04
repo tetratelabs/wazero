@@ -139,7 +139,10 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 		}, "test")
 		require.NoError(t, err)
 
-		ei, err := s.getExport("test", "host.fn", ExternTypeFunc)
+		mod, ok := s.moduleInstances["test"]
+		require.True(t, ok)
+
+		ei, err := mod.getExport("host.fn", ExternTypeFunc)
 		require.NoError(t, err)
 		os.Environ()
 		// We expect the host function to be called in context of the importing module.

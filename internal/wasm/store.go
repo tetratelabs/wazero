@@ -373,7 +373,7 @@ func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
-func (m *ModuleInstance) GetExport(name string, et ExternType) (*ExportInstance, error) {
+func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
 		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
@@ -642,7 +642,7 @@ type PublicModule struct {
 
 // Function implements wasm.Module Function
 func (m *PublicModule) Function(name string) publicwasm.Function {
-	exp, err := m.Instance.GetExport(name, ExternTypeFunc)
+	exp, err := m.Instance.getExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
 	}
@@ -651,7 +651,7 @@ func (m *PublicModule) Function(name string) publicwasm.Function {
 
 // Memory implements wasm.Module Memory
 func (m *PublicModule) Memory(name string) publicwasm.Memory {
-	exp, err := m.Instance.GetExport(name, ExternTypeMemory)
+	exp, err := m.Instance.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
 	}
@@ -661,15 +661,6 @@ func (m *PublicModule) Memory(name string) publicwasm.Memory {
 // HostModule implements wasm.Store HostModule
 func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
 	return s.moduleInstances[moduleName].hostModule
-}
-
-func (s *Store) getExport(moduleName string, name string, et ExternType) (exp *ExportInstance, err error) {
-	if m, ok := s.moduleInstances[moduleName]; !ok {
-		return nil, fmt.Errorf("module %s not instantiated", moduleName)
-	} else if exp, err = m.GetExport(name, et); err != nil {
-		return
-	}
-	return
 }
 
 func (s *Store) resolveImports(module *Module) (
@@ -690,7 +681,7 @@ func (s *Store) resolveImports(module *Module) (
 		moduleImports[m] = struct{}{}
 
 		var exp *ExportInstance
-		exp, err = m.GetExport(is.Name, is.Type)
+		exp, err = m.getExport(is.Name, is.Type)
 		if err != nil {
 			return
 		}
