@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -1283,7 +1284,163 @@ func TestSnapshotPreview1_PathLink(t *testing.T) {
 	})
 }
 
-// TODO: TestSnapshotPreview1_PathOpen TestSnapshotPreview1_PathOpen_Errors
+func TestSnapshotPreview1_PathOpen(t *testing.T) {
+	fd := uint32(3)                              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	dirflags := uint32(0)                        // arbitrary dirflags
+	path := uint32(1)                            // arbitrary offset
+	pathLen := uint32(6)                         // The length of path
+	oflags := uint32(0)                          // arbitrary oflags
+	fsRightsBase := uint64(wasi.R_FD_READ)       // arbitrary right
+	fsRightsInheriting := uint64(wasi.R_FD_READ) // arbitrary right
+	fdFlags := uint32(0)
+	resultOpenedFd := uint32(8)
+	initialMemory := []byte{
+		'?',                          // `path` is after this
+		'w', 'a', 'z', 'e', 'r', 'o', // path
+		'?', // `resultOpenedFd` is after this
+	}
+	expectedMemory := append(
+		initialMemory,
+		4, 0, 0, 0, // resultOpenedFd
+		'?',
+	)
+	expectedFD := uint32(4) // arbitrary expected FD
+
+	var api *wasiAPI
+	mem, fn := instantiateModule(t, FunctionPathOpen, ImportPathOpen, moduleName, func(a *wasiAPI) {
+		// randSouce is used to determine the new fd. Fix it to the expectedFD for testing.
+		a.randSource = func(b []byte) error {
+			binary.LittleEndian.PutUint32(b, expectedFD)
+			return nil
+		}
+		api = a // for later tests
+	})
+
+	// TestSnapshotPreview1_PathOpen uses a matrix because setting up test files is complicated and has to be clean each time.
+	type pathOpenFn func(ctx publicwasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32,
+		fsRightsBase, fsRightsInheriting uint64,
+		fdFlags, resultOpenedFd uint32) wasi.Errno
+	tests := []struct {
+		name     string
+		pathOpen func() pathOpenFn
+	}{
+		{"SnapshotPreview1.PathOpen", func() pathOpenFn {
+			return api.PathOpen
+		}},
+		{FunctionPathOpen, func() pathOpenFn {
+			return func(ctx publicwasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32,
+				fsRightsBase, fsRightsInheriting uint64,
+				fdFlags, resultOpenedFd uint32) wasi.Errno {
+				ret, err := fn.Call(context.Background(), uint64(fd), uint64(dirflags), uint64(path), uint64(pathLen), uint64(oflags), uint64(fsRightsBase), uint64(fsRightsInheriting), uint64(fdFlags), uint64(resultOpenedFd))
+				require.NoError(t, err)
+				return wasi.Errno(ret[0])
+			}
+		}},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a memFS for testing that has "./wazero" file.
+			memFS := &MemFS{
+				Files: map[string][]byte{
+					"wazero": []byte(""),
+				},
+			}
+			api.opened = map[uint32]fileEntry{
+				fd: {
+					path:    ".",
+					fileSys: memFS,
+				},
+			}
+
+			maskMemory(t, mem, len(expectedMemory))
+			ok := mem.Write(0, initialMemory)
+			require.True(t, ok)
+
+			errno := tc.pathOpen()(ctx(mem), fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
+			require.Equal(t, wasi.ErrnoSuccess, errno)
+
+			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, expectedMemory, actual)
+			require.Equal(t, "wazero", api.opened[expectedFD].path) // verify the file was actually opened
+		})
+	}
+}
+
+func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
+	validFD := uint64(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
+	mem, fn := instantiateModule(t, FunctionPathOpen, ImportPathOpen, moduleName, func(a *wasiAPI) {
+		// Create a memFS for testing that has "./wazero" file.
+		memFS := &MemFS{
+			Files: map[string][]byte{
+				"wazero": []byte(""),
+			},
+		}
+		a.opened = map[uint32]fileEntry{
+			uint32(validFD): {
+				path:    ".",
+				fileSys: memFS,
+			},
+		}
+	})
+	validPath := uint64(0)    // arbitrary offset
+	validPathLen := uint64(6) // the length of "wazero"
+	mem.Write(uint32(validPath), []byte{
+		'w', 'a', 'z', 'e', 'r', 'o', // write to offset 0 (= validPath)
+	}) // wazero is the path to the file in the memFS
+
+	tests := []struct {
+		name                              string
+		fd, path, pathLen, resultOpenedFd uint64
+		expectedErrno                     wasi.Errno
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: wasi.ErrnoBadf,
+		},
+		{
+			name:          "out-of-memory reading path",
+			fd:            validFD,
+			path:          uint64(mem.Size()),
+			pathLen:       validPathLen,
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "out-of-memory reading pathLen",
+			fd:            validFD,
+			path:          validPath,
+			pathLen:       uint64(mem.Size() + 1), // path is in the valid memory range, but pathLen is out-of-memory for path
+			expectedErrno: wasi.ErrnoFault,
+		},
+		{
+			name:          "no such file exists",
+			fd:            validFD,
+			path:          validPath,
+			pathLen:       validPathLen - 1, // this make the path "wazer", which doesn't exit
+			expectedErrno: wasi.ErrnoNoent,
+		},
+		{
+			name:           "out-of-memory writing resultOpenedFd",
+			fd:             validFD,
+			path:           validPath,
+			pathLen:        validPathLen,
+			resultOpenedFd: uint64(mem.Size()), // path and pathLen correctly point to the right path, but where to write the opened FD is outside memory.
+			expectedErrno:  wasi.ErrnoFault,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := fn.Call(context.Background(), tc.fd, 0, tc.path, tc.pathLen, 0, 0, 0, 0, tc.resultOpenedFd)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+}
 
 // TestSnapshotPreview1_PathReadlink only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathReadlink(t *testing.T) {

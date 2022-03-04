@@ -2,12 +2,12 @@ package internalwasi
 
 import (
 	crand "crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"math"
-	mrand "math/rand"
 	"os"
 	"strings"
 	"time"
@@ -582,9 +582,39 @@ type SnapshotPreview1 interface {
 	// FdDatasync is the WASI function named FunctionFdDatasync and is stubbed for GrainLang per #271
 	FdDatasync(ctx wasm.ModuleContext, fd uint32) wasi.Errno
 
-	// FdFdstatGet is the WASI function named FunctionFdFdstatGet
-	// TODO: complete documentation and tests
-	FdFdstatGet(ctx wasm.ModuleContext, fd uint32, resultStat uint32) wasi.Errno
+	// FdFdstatGet is the WASI function to return the attributes of a file descriptor.
+	//
+	// * fd - the file descriptor to get the fdstat attributes data
+	// * resultFdstat - the offset to write the result fdstat data
+	//
+	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+	// * wasi.ErrnoBadf - if `fd` is invalid
+	// * wasi.ErrnoFault - if `resultFdstat` contains an invalid offset due to the memory constraint
+	//
+	// fdstat byte layout is 24-byte size, which as the following elements in order
+	// * fs_filetype 1 byte, to indicate the file type
+	// * fs_flags 2 bytes, to indicate the file descriptor flag
+	// * 5 pad bytes
+	// * fs_right_base 8 bytes, to indicate the current rights of the fd
+	// * fs_right_inheriting 8 bytes, to indicate the maximum rights of the fd
+	//
+	// For example, with a file corresponding with `fd` was a directory (=3) opened with `fd_read` right (=1) and no fs_flags (=0),
+	//    parameter resultFdstat=1, this function writes the below to `ctx.Memory`:
+	//
+	//                   uint16le   padding            uint64le                uint64le
+	//          uint8 --+  +--+  +-----------+  +--------------------+  +--------------------+
+	//                  |  |  |  |           |  |                    |  |                    |
+	//        []byte{?, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}
+	//   resultFdstat --^  ^-- fs_flags         ^-- fs_right_base       ^-- fs_right_inheriting
+	//                  |
+	//                  +-- fs_filetype
+	//
+	// Note: ImportFdFdstatGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+	// Note: FdFdstatGet returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as well as additional fields.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
+	// See https://linux.die.net/man/3/fsync
+	FdFdstatGet(ctx wasm.ModuleContext, fd, resultFdstat uint32) wasi.Errno
 
 	// FdFdstatSetFlags is the WASI function named FunctionFdFdstatSetFlags and is stubbed for GrainLang per #271
 	FdFdstatSetFlags(ctx wasm.ModuleContext, fd uint32, flags uint32) wasi.Errno
@@ -783,7 +813,42 @@ type SnapshotPreview1 interface {
 	// PathLink is the WASI function named FunctionPathLink
 	PathLink(ctx wasm.ModuleContext, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno
 
-	// PathOpen is the WASI function named FunctionPathOpen
+	// PathOpen is the WASI function to open a file or directory. This returns ErrnoBadf if the fd is invalid.
+	//
+	// * fd - the file descriptor of a directory that `path` is relative to
+	// * dirflags - flags to indicate how to resolve `path`
+	// * path - the offset in `ctx.Memory` to read the path string from
+	// * pathLen - the length of `path`
+	// * oFlags - the open flags to indicate the method by which to open the file
+	// * fsRightsBase - the rights of the newly created file descriptor for `path`
+	// * fsRightsInheriting - the rights of the file descriptors derived from the newly created file descriptor for `path`
+	// * fdFlags - the file descriptor flags
+	// * resultOpenedFd - the offset in `ctx.Memory` to write the newly created file descriptor to.
+	//     * The result FD value is guaranteed to be less than 2**31
+	//
+	// For example, this function needs to first read `path` to determine the file to open.
+	//    If parameters `path` = 1, `pathLen` = 6, and the path is "wazero", PathOpen reads the path from `ctx.Memory`:
+	//
+	//                   pathLen
+	//               +------------------------+
+	//               |                        |
+	//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
+	//        path --^
+	//
+	// Then, if parameters resultOpenedFd = 8, and this function opened a new file descriptor 3 with the given flags,
+	// this function writes the blow to `ctx.Memory`:
+	//
+	//                          uint32le
+	//                         +--------+
+	//                         |        |
+	//        []byte{ 0..6, ?, 4, 0, 0, 0, ?}
+	//        resultOpenedFd --^
+	//
+	// Note: ImportPathOpen shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+	// Note: This is similar to `openat` in POSIX.
+	// Note: The returned file descriptor is not guaranteed to be the lowest-numbered file
+	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
+	// See https://linux.die.net/man/3/openat
 	PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase, fsRightsInheriting uint32, fdflags, resultOpenedFd uint32) wasi.Errno
 
 	// PathReadlink is the WASI function named FunctionPathReadlink
@@ -1023,6 +1088,7 @@ func (a *wasiAPI) FdDatasync(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
 }
 
 // FdFdstatGet implements SnapshotPreview1.FdFdstatGet
+// TODO: Currently FdFdstatget implements nothing except returning fake fs_right_inheriting
 func (a *wasiAPI) FdFdstatGet(ctx wasm.ModuleContext, fd uint32, resultStat uint32) wasi.Errno {
 	if _, ok := a.opened[fd]; !ok {
 		return wasi.ErrnoBadf
@@ -1234,7 +1300,7 @@ func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, 
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
 	dir, ok := a.opened[fd]
 	if !ok || dir.fileSys == nil {
-		return wasi.ErrnoInval
+		return wasi.ErrnoBadf
 	}
 
 	b, ok := ctx.Memory().Read(path, pathLen)
@@ -1252,10 +1318,15 @@ func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, 
 		}
 	}
 
-	newFD := a.randUnusedFD()
+	newFD, err := a.randUnusedFD()
+	if err != nil {
+		return wasi.ErrnoIo
+	}
 
 	a.opened[newFD] = fileEntry{
-		file: f,
+		path:    pathName,
+		fileSys: dir.fileSys,
+		file:    f,
 	}
 
 	if !ctx.Memory().WriteUint32Le(resultOpenedFd, newFD) {
@@ -1439,11 +1510,17 @@ func NewAPI(opts ...Option) *wasiAPI {
 	return ret
 }
 
-func (a *wasiAPI) randUnusedFD() uint32 {
-	fd := uint32(mrand.Int31())
+func (a *wasiAPI) randUnusedFD() (uint32, error) {
+	rand := make([]byte, 4)
+	err := a.randSource(rand)
+	if err != nil {
+		return 0, err
+	}
+	// fd is actually a signed int32, and must be a positive number.
+	fd := binary.LittleEndian.Uint32(rand) % (1 << 31)
 	for {
 		if _, ok := a.opened[fd]; !ok {
-			return fd
+			return fd, nil
 		}
 		fd = (fd + 1) % (1 << 31)
 	}
