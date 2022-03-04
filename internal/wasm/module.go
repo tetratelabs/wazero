@@ -1,8 +1,11 @@
 package internalwasm
 
 import (
+	"bytes"
 	"fmt"
 
+	"github.com/tetratelabs/wazero/internal/ieee754"
+	"github.com/tetratelabs/wazero/internal/leb128"
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
@@ -13,7 +16,7 @@ import (
 // * result is the module parsed or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 // See binary.DecodeModule and text.DecodeModule
-type DecodeModule func(source []byte) (result *Module, err error)
+type DecodeModule func(source []byte, features Features) (result *Module, err error)
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
 // See binary.EncodeModule
@@ -139,8 +142,9 @@ type Module struct {
 	NameSection *NameSection
 }
 
-// TypeOfFunction returns the wasm.SectionIDType index for the given function namespace index or nil.
+// TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
 // Note: The function index namespace is preceded by imported functions.
+// TODO: Returning nil should be impossible when decode results are validated. Validate decode before backfilling tests.
 func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	typeSectionLength := uint32(len(m.TypeSection))
 	if typeSectionLength == 0 {
@@ -167,6 +171,274 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 		return nil
 	}
 	return m.TypeSection[typeIdx]
+}
+
+func (m *Module) Validate() error {
+	if err := m.validateStartSection(); err != nil {
+		return err
+	}
+
+	functions, globals, memories, tables := m.allDeclarations()
+
+	// The wazero specific limitation described at RATIONALE.md.
+	const maximumGlobals = 1 << 27
+	if err := m.validateGlobals(globals, maximumGlobals); err != nil {
+		return err
+	}
+
+	if err := m.validateTables(tables, globals); err != nil {
+		return err
+	}
+
+	if err := m.validateMemories(memories, globals); err != nil {
+		return err
+	}
+
+	if err := m.validateFunctions(functions, globals, memories, tables); err != nil {
+		return err
+	}
+
+	if err := m.validateExports(functions, globals, memories, tables); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Module) validateStartSection() error {
+	// Check the start function is valid.
+	// TODO: this should be verified during decode so that errors have the correct source positions
+	if m.StartSection != nil {
+		startIndex := *m.StartSection
+		ft := m.TypeOfFunction(startIndex)
+		if ft == nil { // TODO: move this check to decoder so that a module can never be decoded invalidly
+			return fmt.Errorf("start function has an invalid type")
+		}
+		if len(ft.Params) > 0 || len(ft.Results) > 0 {
+			return fmt.Errorf("start function must have an empty (nullary) signature: %s", ft.String())
+		}
+	}
+	return nil
+}
+
+func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
+	if len(globals) > maxGlobals {
+		return fmt.Errorf("too many globals in a module")
+	}
+
+	// Global's initialization constant expression can only reference the imported globals.
+	// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
+	importedGlobals := globals[:m.ImportGlobalCount()]
+	for _, g := range m.GlobalSection {
+		if err := validateConstExpression(importedGlobals, g.Init, g.Type.ValType); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
+	// The wazero specific limitation described at RATIONALE.md.
+	const maximumValuesOnStack = 1 << 27
+
+	for codeIndex, typeIndex := range m.FunctionSection {
+		if typeIndex >= m.SectionElementCount(SectionIDType) {
+			return fmt.Errorf("function type index out of range")
+		} else if uint32(codeIndex) >= m.SectionElementCount(SectionIDCode) {
+			return fmt.Errorf("code index out of range")
+		}
+
+		if err := validateFunction(
+			m.TypeSection[typeIndex],
+			m.CodeSection[codeIndex].Body,
+			m.CodeSection[codeIndex].LocalTypes,
+			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack); err != nil {
+			idx := m.SectionElementCount(SectionIDFunction) - 1
+			return fmt.Errorf("invalid function (%d/%d): %v", codeIndex, idx, err)
+		}
+	}
+	return nil
+}
+
+func (m *Module) validateTables(tables []*TableType, globals []*GlobalType) error {
+	if len(tables) > 1 {
+		return fmt.Errorf("multiple tables are not supported")
+	}
+
+	for _, elem := range m.ElementSection {
+		if int(elem.TableIndex) >= len(tables) {
+			return fmt.Errorf("table index out of range")
+		}
+		err := validateConstExpression(globals, elem.OffsetExpr, ValueTypeI32)
+		if err != nil {
+			return fmt.Errorf("invalid const expression for element: %w", err)
+		}
+	}
+	return nil
+}
+
+func (m *Module) validateMemories(memories []*MemoryType, globals []*GlobalType) error {
+	if len(memories) > 1 {
+		return fmt.Errorf("multiple memories are not supported")
+	} else if len(m.DataSection) > 0 && len(memories) == 0 {
+		return fmt.Errorf("unknown memory")
+	}
+
+	for _, d := range m.DataSection {
+		if d.MemoryIndex != 0 {
+			return fmt.Errorf("memory index must be zero")
+		}
+		if err := validateConstExpression(globals, d.OffsetExpression, ValueTypeI32); err != nil {
+			return fmt.Errorf("calculate offset: %w", err)
+		}
+	}
+	return nil
+}
+
+func (m *Module) validateExports(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
+	for name, exp := range m.ExportSection {
+		index := exp.Index
+		switch exp.Type {
+		case ExternTypeFunc:
+			if index >= uint32(len(functions)) {
+				return fmt.Errorf("unknown function for export[%s]", name)
+			}
+		case ExternTypeGlobal:
+			if index >= uint32(len(globals)) {
+				return fmt.Errorf("unknown global for export[%s]", name)
+			}
+		case ExternTypeMemory:
+			if index != 0 || len(memories) == 0 {
+				return fmt.Errorf("unknown memory for export[%s]", name)
+			}
+		case ExternTypeTable:
+			if index >= uint32(len(tables)) {
+				return fmt.Errorf("unknown table for export[%s]", name)
+			}
+		}
+	}
+	return nil
+}
+
+func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, expectedType ValueType) (err error) {
+	var actualType ValueType
+	r := bytes.NewReader(expr.Data)
+	switch expr.Opcode {
+	case OpcodeI32Const:
+		_, _, err = leb128.DecodeInt32(r)
+		if err != nil {
+			return fmt.Errorf("read i32: %w", err)
+		}
+		actualType = ValueTypeI32
+	case OpcodeI64Const:
+		_, _, err = leb128.DecodeInt64(r)
+		if err != nil {
+			return fmt.Errorf("read i64: %w", err)
+		}
+		actualType = ValueTypeI64
+	case OpcodeF32Const:
+		_, err = ieee754.DecodeFloat32(r)
+		if err != nil {
+			return fmt.Errorf("read f32: %w", err)
+		}
+		actualType = ValueTypeF32
+	case OpcodeF64Const:
+		_, err = ieee754.DecodeFloat64(r)
+		if err != nil {
+			return fmt.Errorf("read f64: %w", err)
+		}
+		actualType = ValueTypeF64
+	case OpcodeGlobalGet:
+		id, _, err := leb128.DecodeUint32(r)
+		if err != nil {
+			return fmt.Errorf("read index of global: %w", err)
+		}
+		if uint32(len(globals)) <= id {
+			return fmt.Errorf("global index out of range")
+		}
+		actualType = globals[id].ValType
+	default:
+		return fmt.Errorf("invalid opcode for const expression: 0x%x", expr.Opcode)
+	}
+
+	if actualType != expectedType {
+		return fmt.Errorf("const expression type mismatch")
+	}
+	return nil
+}
+
+func (m *Module) buildGlobalInstances(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
+	for _, gs := range m.GlobalSection {
+		var gv uint64
+		// Global's initialization constant expression can only reference the imported globals.
+		// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
+		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
+		case int32:
+			gv = uint64(v)
+		case int64:
+			gv = uint64(v)
+		case float32:
+			gv = publicwasm.EncodeF32(v)
+		case float64:
+			gv = publicwasm.EncodeF64(v)
+		}
+		globals = append(globals, &GlobalInstance{
+			Type: gs.Type,
+			Val:  gv,
+		})
+	}
+	return
+}
+
+func (m *Module) buildFunctionInstances() (functions []*FunctionInstance) {
+	var functionNames NameMap
+	if m.NameSection != nil {
+		functionNames = m.NameSection.FunctionNames
+	}
+
+	importCount := m.ImportFuncCount()
+	n, nLen := 0, len(functionNames)
+	for codeIndex := range m.FunctionSection {
+		funcIdx := Index(importCount + uint32(len(functions)))
+		// Seek to see if there's a better name than "unknown"
+		name := "unknown"
+		for ; n < nLen; n++ {
+			next := functionNames[n]
+			if next.Index > funcIdx {
+				break // we have function names, but starting at a later index
+			} else if next.Index == funcIdx {
+				name = next.Name
+				break
+			}
+		}
+
+		f := &FunctionInstance{
+			Name:         name,
+			FunctionKind: FunctionKindWasm,
+			Body:         m.CodeSection[codeIndex].Body,
+			LocalTypes:   m.CodeSection[codeIndex].LocalTypes,
+		}
+		functions = append(functions, f)
+	}
+	return
+}
+
+func (m *Module) buildMemoryInstance() (mem *MemoryInstance) {
+	for _, memSec := range m.MemorySection {
+		mem = &MemoryInstance{
+			Buffer: make([]byte, MemoryPagesToBytesNum(memSec.Min)),
+			Min:    memSec.Min,
+			Max:    memSec.Max,
+		}
+	}
+	return
+}
+
+func (m *Module) buildTableInstance() (table *TableInstance) {
+	for _, tableSeg := range m.TableSection {
+		table = newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
+	}
+	return
 }
 
 // Index is the offset in an index namespace, not necessarily an absolute position in a Module section. This is because
@@ -373,49 +645,6 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 	return
 }
 
-// SectionElementCount returns the count of elements in a given section ID
-//
-// For example...
-// * SectionIDType returns the count of FunctionType
-// * SectionIDCustom returns one if the NameSection is present
-// * SectionIDExport returns the count of unique export names
-func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as in vector elements!
-	switch sectionID {
-	case SectionIDCustom:
-		if m.NameSection != nil {
-			return 1
-		}
-		return 0
-	case SectionIDType:
-		return uint32(len(m.TypeSection))
-	case SectionIDImport:
-		return uint32(len(m.ImportSection))
-	case SectionIDFunction:
-		return uint32(len(m.FunctionSection))
-	case SectionIDTable:
-		return uint32(len(m.TableSection))
-	case SectionIDMemory:
-		return uint32(len(m.MemorySection))
-	case SectionIDGlobal:
-		return uint32(len(m.GlobalSection))
-	case SectionIDExport:
-		return uint32(len(m.ExportSection))
-	case SectionIDStart:
-		if m.StartSection != nil {
-			return 1
-		}
-		return 0
-	case SectionIDElement:
-		return uint32(len(m.ElementSection))
-	case SectionIDCode:
-		return uint32(len(m.CodeSection))
-	case SectionIDData:
-		return uint32(len(m.DataSection))
-	default:
-		panic(fmt.Errorf("BUG: unknown section: %d", sectionID))
-	}
-}
-
 // SectionID identifies the sections of a Module in the WebAssembly 1.0 (20191205) Binary Format.
 //
 // Note: these are defined in the wasm package, instead of the binary package, as a key per section is needed regardless
@@ -501,20 +730,32 @@ const (
 	ExternTypeGlobal ExternType = 0x03
 )
 
-// ExternTypeName returns the canonical name of the import or export description.
+// The below are exported to consolidate parsing behavior for external types.
+const (
+	// ExternTypeFuncName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeFunc.
+	ExternTypeFuncName = "func"
+	// ExternTypeTableName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeTable.
+	ExternTypeTableName = "table"
+	// ExternTypeMemoryName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeMemory.
+	ExternTypeMemoryName = "memory"
+	// ExternTypeGlobalName is the name of the WebAssembly 1.0 (20191205) Text Format field for ExternTypeGlobal.
+	ExternTypeGlobalName = "global"
+)
+
+// ExternTypeName returns the name of the WebAssembly 1.0 (20191205) Text Format field of the given type.
 //
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-importdesc
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportdesc
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#imports⑤
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#exports%E2%91%A4
 func ExternTypeName(et ExternType) string {
 	switch et {
 	case ExternTypeFunc:
-		return "func"
+		return ExternTypeFuncName
 	case ExternTypeTable:
-		return "table"
+		return ExternTypeTableName
 	case ExternTypeMemory:
-		return "mem"
+		return ExternTypeMemoryName
 	case ExternTypeGlobal:
-		return "global"
+		return ExternTypeGlobalName
 	}
 	return fmt.Sprintf("%#x", et)
 }

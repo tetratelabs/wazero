@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
 
-// validateFunctionInstance validates the instruction sequence of a function instance.
+// validateFunction validates the instruction sequence of a function.
 // following the specification https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#instructions%E2%91%A2.
 //
 // f is the validation target function instance.
@@ -21,8 +21,10 @@ import (
 //
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
-func validateFunctionInstance(
-	f *FunctionInstance,
+func validateFunction(
+	functionType *FunctionType,
+	body []byte,
+	localTypes []ValueType,
 	functions []Index,
 	globals []*GlobalType,
 	memories []*MemoryType,
@@ -36,20 +38,20 @@ func validateFunctionInstance(
 	hasTable := len(tables) > 0
 
 	// We start with the outermost control block which is for function return if the code branches into it.
-	controlBloclStack := []*controlBlock{{blockType: f.FunctionType.Type}}
+	controlBloclStack := []*controlBlock{{blockType: functionType}}
 	// Create the valueTypeStack to track the state of Wasm value stacks at anypoint of execution.
 	valueTypeStack := &valueTypeStack{}
 
 	// Now start walking through all the instructions in the body while tracking
 	// control blocks and value types to check the validity of all instructions.
-	for pc := uint64(0); pc < uint64(len(f.Body)); pc++ {
-		op := f.Body[pc]
+	for pc := uint64(0); pc < uint64(len(body)); pc++ {
+		op := body[pc]
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
 			if !hasMemory {
 				return fmt.Errorf("unknown memory access")
 			}
 			pc++
-			align, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			align, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read memory align: %v", err)
 			}
@@ -227,7 +229,7 @@ func validateFunctionInstance(
 			}
 			pc += num
 			// offset
-			_, num, err = leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			_, num, err = leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read memory offset: %v", err)
 			}
@@ -237,7 +239,7 @@ func validateFunctionInstance(
 				return fmt.Errorf("unknown memory access")
 			}
 			pc++
-			val, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -258,14 +260,14 @@ func validateFunctionInstance(
 			pc++
 			switch Opcode(op) {
 			case OpcodeI32Const:
-				_, num, err := leb128.DecodeInt32(bytes.NewBuffer(f.Body[pc:]))
+				_, num, err := leb128.DecodeInt32(bytes.NewReader(body[pc:]))
 				if err != nil {
 					return fmt.Errorf("read i32 immediate: %s", err)
 				}
 				pc += num - 1
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Const:
-				_, num, err := leb128.DecodeInt64(bytes.NewBuffer(f.Body[pc:]))
+				_, num, err := leb128.DecodeInt64(bytes.NewReader(body[pc:]))
 				if err != nil {
 					return fmt.Errorf("read i64 immediate: %v", err)
 				}
@@ -280,46 +282,46 @@ func validateFunctionInstance(
 			}
 		} else if OpcodeLocalGet <= op && op <= OpcodeGlobalSet {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
 			pc += num - 1
 			switch op {
 			case OpcodeLocalGet:
-				inputLen := uint32(len(f.FunctionType.Type.Params))
-				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
+				inputLen := uint32(len(functionType.Params))
+				if l := uint32(len(localTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.get %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				if index < inputLen {
-					valueTypeStack.push(f.FunctionType.Type.Params[index])
+					valueTypeStack.push(functionType.Params[index])
 				} else {
-					valueTypeStack.push(f.LocalTypes[index-inputLen])
+					valueTypeStack.push(localTypes[index-inputLen])
 				}
 			case OpcodeLocalSet:
-				inputLen := uint32(len(f.FunctionType.Type.Params))
-				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
+				inputLen := uint32(len(functionType.Params))
+				if l := uint32(len(localTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.set %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.FunctionType.Type.Params[index]
+					expType = functionType.Params[index]
 				} else {
-					expType = f.LocalTypes[index-inputLen]
+					expType = localTypes[index-inputLen]
 				}
 				if err := valueTypeStack.popAndVerifyType(expType); err != nil {
 					return err
 				}
 			case OpcodeLocalTee:
-				inputLen := uint32(len(f.FunctionType.Type.Params))
-				if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {
+				inputLen := uint32(len(functionType.Params))
+				if l := uint32(len(localTypes)) + inputLen; index >= l {
 					return fmt.Errorf("invalid local index for local.tee %d >= %d(=len(locals)+len(parameters))", index, l)
 				}
 				var expType ValueType
 				if index < inputLen {
-					expType = f.FunctionType.Type.Params[index]
+					expType = functionType.Params[index]
 				} else {
-					expType = f.LocalTypes[index-inputLen]
+					expType = localTypes[index-inputLen]
 				}
 				if err := valueTypeStack.popAndVerifyType(expType); err != nil {
 					return err
@@ -342,7 +344,7 @@ func validateFunctionInstance(
 			}
 		} else if op == OpcodeBr {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBloclStack) {
@@ -364,7 +366,7 @@ func validateFunctionInstance(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeBrIf {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBloclStack) {
@@ -393,7 +395,7 @@ func validateFunctionInstance(
 			}
 		} else if op == OpcodeBrTable {
 			pc++
-			r := bytes.NewBuffer(f.Body[pc:])
+			r := bytes.NewReader(body[pc:])
 			nl, num, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return fmt.Errorf("read immediate: %w", err)
@@ -455,7 +457,7 @@ func validateFunctionInstance(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeCall {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -474,14 +476,14 @@ func validateFunctionInstance(
 			}
 		} else if op == OpcodeCallIndirect {
 			pc++
-			typeIndex, num, err := leb128.DecodeUint32(bytes.NewBuffer(f.Body[pc:]))
+			typeIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
 			pc += num - 1
 			pc++
-			if f.Body[pc] != 0x00 {
-				return fmt.Errorf("call_indirect reserved bytes not zero but got %d", f.Body[pc])
+			if body[pc] != 0x00 {
+				return fmt.Errorf("call_indirect reserved bytes not zero but got %d", body[pc])
 			}
 			if !hasTable {
 				return fmt.Errorf("table not given while having call_indirect")
@@ -699,7 +701,7 @@ func validateFunctionInstance(
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
 		} else if op == OpcodeBlock {
-			bt, num, err := DecodeBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -711,7 +713,7 @@ func validateFunctionInstance(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeLoop {
-			bt, num, err := DecodeBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -724,7 +726,7 @@ func validateFunctionInstance(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeIf {
-			bt, num, err := DecodeBlockType(f.ModuleInstance.Types, bytes.NewBuffer(f.Body[pc+1:]))
+			bt, num, err := decodeBlockType(types, bytes.NewReader(body[pc+1:]))
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
@@ -775,7 +777,7 @@ func validateFunctionInstance(
 			// on values previously pushed by outer blocks.
 			valueTypeStack.popStackLimit()
 		} else if op == OpcodeReturn {
-			expTypes := f.FunctionType.Type.Results
+			expTypes := functionType.Results
 			for i := 0; i < len(expTypes); i++ {
 				if err := valueTypeStack.popAndVerifyType(expTypes[len(expTypes)-1-i]); err != nil {
 					return fmt.Errorf("return type mismatch on return: %v; want %v", err, expTypes)
@@ -812,6 +814,8 @@ func validateFunctionInstance(
 			// unreachable instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
 		} else if op == OpcodeNop {
+		} else if OpcodeI32Extend8S <= op && op <= OpcodeI64Extend32S {
+			return fmt.Errorf("%s invalid as %s is not yet supported. See #66", InstructionName(op), FeatureSignExtensionOps)
 		} else {
 			return fmt.Errorf("invalid instruction 0x%x", op)
 		}
@@ -943,4 +947,47 @@ type controlBlock struct {
 	blockTypeBytes         uint64
 	isLoop                 bool
 	isIf                   bool
+}
+
+func decodeBlockType(types []*FunctionType, r *bytes.Reader) (*FunctionType, uint64, error) {
+	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
+		if index < 0 || (index >= int64(len(types))) {
+			return nil, fmt.Errorf("type index out of range: %d", index)
+		}
+		return types[index], nil
+	}, r)
+}
+
+// DecodeBlockType is exported for use in the compiler
+func DecodeBlockType(types []*TypeInstance, r *bytes.Reader) (*FunctionType, uint64, error) {
+	return decodeBlockTypeImpl(func(index int64) (*FunctionType, error) {
+		if index < 0 || (index >= int64(len(types))) {
+			return nil, fmt.Errorf("type index out of range: %d", index)
+		}
+		return types[index].Type, nil
+	}, r)
+}
+
+func decodeBlockTypeImpl(functionTypeResolver func(index int64) (*FunctionType, error), r *bytes.Reader) (*FunctionType, uint64, error) {
+	raw, num, err := leb128.DecodeInt33AsInt64(r)
+	if err != nil {
+		return nil, 0, fmt.Errorf("decode int33: %w", err)
+	}
+
+	var ret *FunctionType
+	switch raw {
+	case -64: // 0x40 in original byte = nil
+		ret = &FunctionType{}
+	case -1: // 0x7f in original byte = i32
+		ret = &FunctionType{Results: []ValueType{ValueTypeI32}}
+	case -2: // 0x7e in original byte = i64
+		ret = &FunctionType{Results: []ValueType{ValueTypeI64}}
+	case -3: // 0x7d in original byte = f32
+		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
+	case -4: // 0x7c in original byte = f64
+		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
+	default:
+		ret, err = functionTypeResolver(raw)
+	}
+	return ret, num, err
 }

@@ -20,7 +20,7 @@ var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of internalwasm.Engine
 type engine struct {
-	// compiledFunctions stores compiled functions where the index means wasm.FunctionAddress.
+	// compiledFunctions stores compiled functions where the index means wasm.FunctionIndex.
 	compiledFunctions []*compiledFunction
 
 	// mux is used for read/write access to functions slice.
@@ -132,9 +132,17 @@ type interpreterOp struct {
 	rs     []*wazeroir.InclusiveRange
 }
 
+// Release implements wasm.Engine Release
+func (e *engine) Release(f *wasm.FunctionInstance) error {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	e.compiledFunctions[f.Index] = nil
+	return nil
+}
+
 // Compile Implements wasm.Engine for engine.
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
-	funcaddr := f.Address
+	funcIndex := f.Index
 	var compiled *compiledFunction
 	if f.FunctionKind == wasm.FunctionKindWasm {
 		ir, err := wazeroir.Compile(f)
@@ -152,7 +160,7 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 		}
 	}
 
-	if l := len(e.compiledFunctions); l <= int(funcaddr) {
+	if l := len(e.compiledFunctions); l <= int(funcIndex) {
 		// This case compiledFunctions slice needs to grow to store a new compiledFunction.
 		// However, it is read in newCallEngine, so we have to take write lock (via .Unlock)
 		// rather than read lock (via .RLock).
@@ -161,7 +169,7 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 		// Double the size of compiled functions.
 		e.compiledFunctions = append(e.compiledFunctions, make([]*compiledFunction, l)...)
 	}
-	e.compiledFunctions[funcaddr] = compiled
+	e.compiledFunctions[funcIndex] = compiled
 	return nil
 }
 
@@ -260,7 +268,7 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 		case *wazeroir.OperationCall:
 			target := f.ModuleInstance.Functions[o.FunctionIndex]
 			op.us = make([]uint64, 1)
-			op.us[0] = uint64(target.Address)
+			op.us[0] = uint64(target.Index)
 		case *wazeroir.OperationCallIndirect:
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.TableIndex)
@@ -477,7 +485,7 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		}
 	}()
 
-	compiled := e.compiledFunctions[f.Address]
+	compiled := e.compiledFunctions[f.Index]
 	if compiled == nil {
 		err = fmt.Errorf("function not compiled")
 		return
@@ -557,10 +565,7 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 	moduleInst := f.funcInstance.ModuleInstance
 	memoryInst := moduleInst.MemoryInstance
 	globals := moduleInst.Globals
-	var table *wasm.TableInstance
-	if len(moduleInst.Tables) > 0 {
-		table = moduleInst.Tables[0] // WebAssembly 1.0 (20191205) defines at most one table
-	}
+	table := moduleInst.TableInstance
 	vm.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
@@ -620,7 +625,7 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					}
 					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
 				}
-				target := vm.compiledFunctions[table.Table[offset].FunctionAddress]
+				target := vm.compiledFunctions[table.Table[offset].FunctionIndex]
 				// Call in.
 				if target.hostFn != nil {
 					vm.callHostFunc(ctx, target)

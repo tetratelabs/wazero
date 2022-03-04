@@ -15,16 +15,16 @@ import (
 var fibWasm []byte // TODO: implement this in text format as it is less distracting setup
 
 func Test_fibonacci(t *testing.T) {
-	store := wazero.NewStore()
+	r := wazero.NewRuntime()
 
 	// Note: fibonacci.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	_, err := wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
+	_, err := r.NewHostModule(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 
-	exports, err := wazero.StartWASICommand(store, &wazero.ModuleConfig{Source: fibWasm})
+	module, err := wazero.StartWASICommandFromSource(r, fibWasm)
 	require.NoError(t, err)
 
-	fibonacci := exports.Function("fibonacci")
+	fibonacci := module.Function("fibonacci")
 
 	for _, c := range []struct {
 		input, expected uint64 // i32_i32 sig, but wasm.Function params and results are uint64

@@ -1,5 +1,4 @@
 //go:build arm64
-// +build arm64
 
 package jit
 
@@ -29,13 +28,14 @@ var (
 		arm64.REG_F24, arm64.REG_F25, arm64.REG_F26, arm64.REG_F27, arm64.REG_F28,
 		arm64.REG_F29, arm64.REG_F30, arm64.REG_F31,
 	}
+	// Note: arm64.REG_R28 is reserved for Goroutine by goruntime, and not here.
 	unreservedGeneralPurposeIntRegisters = []int16{
 		arm64.REG_R4, arm64.REG_R5, arm64.REG_R6, arm64.REG_R7, arm64.REG_R8,
 		arm64.REG_R9, arm64.REG_R10, arm64.REG_R11, arm64.REG_R12, arm64.REG_R13,
 		arm64.REG_R14, arm64.REG_R15, arm64.REG_R16, arm64.REG_R17, arm64.REG_R18,
 		arm64.REG_R19, arm64.REG_R20, arm64.REG_R21, arm64.REG_R22, arm64.REG_R23,
-		arm64.REG_R24, arm64.REG_R25, arm64.REG_R26, arm64.REG_R27, arm64.REG_R28,
-		arm64.REG_R29, arm64.REG_R30,
+		arm64.REG_R24, arm64.REG_R25, arm64.REG_R26, arm64.REG_R27, arm64.REG_R29,
+		arm64.REG_R30,
 	}
 )
 

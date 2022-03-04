@@ -12,8 +12,8 @@ import (
 // Test_AddInt shows how you can define a function in text format and have it compiled inline.
 // See https://github.com/summerwind/the-art-of-webassembly-go/blob/main/chapter1/addint/addint.wat
 func Test_AddInt(t *testing.T) {
-	exports, err := wazero.InstantiateModule(wazero.NewStore(), &wazero.ModuleConfig{Source: []byte(`(module $test
-    (func $addInt ;; TODO: function exports (export "AddInt")
+	module, err := wazero.NewRuntime().NewModuleFromSource([]byte(`(module $test
+    (func $addInt ;; TODO: function module (export "AddInt")
         (param $value_1 i32) (param $value_2 i32)
         (result i32)
         local.get 0 ;; TODO: instruction variables $value_1
@@ -21,10 +21,10 @@ func Test_AddInt(t *testing.T) {
         i32.add
     )
     (export "AddInt" (func $addInt))
-)`)})
+)`))
 	require.NoError(t, err)
 
-	addInt := exports.Function("AddInt")
+	addInt := module.Function("AddInt")
 
 	for _, c := range []struct {
 		value1, value2, expected uint64 // i32i32_i32 sig, but wasm.Function params and results are uint64

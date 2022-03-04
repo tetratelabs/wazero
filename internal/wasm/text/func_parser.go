@@ -31,7 +31,6 @@ type funcParser struct {
 	// funcNamespace is described by moduleParser.funcNamespace
 	funcNamespace *indexNamespace
 
-	currentIdx        wasm.Index
 	currentName       string
 	currentTypeIdx    wasm.Index
 	currentParamNames wasm.NameMap
@@ -45,8 +44,8 @@ type funcParser struct {
 var end = []byte{wasm.OpcodeEnd}
 var codeEnd = &wasm.Code{Body: end}
 
-// begin should be called after reaching the "func" keyword in a module field. Parsing continues until onFunc or
-// error.
+// begin should be called after reaching the internalwasm.ExternTypeFuncName keyword in a module field. Parsing
+// continues until onFunc or error.
 //
 // This stage records the ID of the current function, if present, and resumes with onFunc.
 //
@@ -88,7 +87,7 @@ func (p *funcParser) parseFunc(tok tokenType, tokenBytes []byte, line, col uint3
 		return nil, fmt.Errorf("redundant ID %s", tokenBytes)
 	}
 
-	return p.typeUseParser.begin(wasm.SectionIDFunction, p.currentIdx, p.afterTypeUse, tok, tokenBytes, line, col)
+	return p.typeUseParser.begin(wasm.SectionIDFunction, p.afterTypeUse, tok, tokenBytes, line, col)
 }
 
 // afterTypeUse is a tokenParser that starts after a type use.
@@ -127,7 +126,7 @@ func sExpressionsUnsupported(tok tokenType, tokenBytes []byte, _, _ uint32) (tok
 	return nil, fmt.Errorf("TODO: s-expressions are not yet supported: %s", tokenBytes)
 }
 
-func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
+func (p *funcParser) beginFieldOrInstruction(tok tokenType, tokenBytes []byte, _, _ uint32) (tokenParser, error) {
 	switch tok {
 	case tokenLParen:
 		return sExpressionsUnsupported, nil
@@ -174,7 +173,7 @@ func (p *funcParser) end() (tokenParser, error) {
 // placeholder byte(0) is added instead and will be resolved later.
 func (p *funcParser) parseFuncIndex(tok tokenType, tokenBytes []byte, line, col uint32) (tokenParser, error) {
 	bodyOffset := uint32(len(p.currentBody))
-	idx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDCode, p.currentIdx, bodyOffset, tok, tokenBytes, line, col)
+	idx, resolved, err := p.funcNamespace.parseIndex(wasm.SectionIDCode, bodyOffset, tok, tokenBytes, line, col)
 	if err != nil {
 		return nil, err
 	}

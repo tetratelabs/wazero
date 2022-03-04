@@ -9,4 +9,10 @@ type Engine interface {
 
 	// Compile compiles down the function instance.
 	Compile(f *FunctionInstance) error
+
+	// Release releases the resources allocated by a function instance.
+	// Note: this is only called after ensuring that no existing function will call the release target.
+	// Therefore, it is safe to reuse the resource, for example reallocate the new compiled function
+	// for the same FunctionIndex.
+	Release(f *FunctionInstance) error
 }

@@ -1,8 +1,8 @@
 package binary
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -10,7 +10,7 @@ import (
 // decodeMemoryType returns the wasm.MemoryType decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
-func decodeMemoryType(r io.Reader) (*wasm.MemoryType, error) {
+func decodeMemoryType(r *bytes.Reader) (*wasm.MemoryType, error) {
 	ret, err := decodeLimitsType(r)
 	if err != nil {
 		return nil, err

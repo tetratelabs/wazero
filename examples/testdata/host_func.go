@@ -12,23 +12,22 @@ func main() {}
 //export allocate_buffer
 func allocateBuffer(size uint32) *byte {
 	// Allocate the in-Wasm memory region and returns its pointer to hosts.
-	// The region is supposed to store random strings generated in hosts,
-	// meaning that this is called "inside" of get_random_string.
+	// The region is supposed to store random bytes generated in hosts.
 	buf := make([]byte, size)
 	return &buf[0]
 }
 
 // Note: Export on a function without an implementation is a Wasm import that defaults to the module "env".
-//export get_random_string
-func getRandomStringRaw(retBufPtr **byte, retBufSize *int)
+//export get_random_bytes
+func get_random_bytes(retBufPtr **byte, retBufSize *int)
 
-// Get random string from the hosts.
-func getRandomString() string {
+// Get random bytes from the host.
+func getRandomBytes() []byte {
 	var bufPtr *byte
 	var bufSize int
-	getRandomStringRaw(&bufPtr, &bufSize)
+	get_random_bytes(&bufPtr, &bufSize)
 	//nolint
-	return *(*string)(unsafe.Pointer(&reflect.SliceHeader{
+	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: uintptr(unsafe.Pointer(bufPtr)),
 		Len:  uintptr(bufSize),
 		Cap:  uintptr(bufSize),
@@ -36,12 +35,10 @@ func getRandomString() string {
 }
 
 //export base64
-func base64OnString(num uint32) {
-	// Get random strings from the host and
+func base64OnString() {
+	// Get random bytes from the host and
 	// do base64 encoding them for given times.
-	for i := uint32(0); i < num; i++ {
-		msg := getRandomString()
-		encoded := base64.StdEncoding.EncodeToString([]byte(msg))
-		fmt.Printf("base64 encoded string '%s'\n", encoded[:10])
-	}
+	buf := getRandomBytes()
+	encoded := base64.StdEncoding.EncodeToString(buf)
+	fmt.Println(encoded)
 }

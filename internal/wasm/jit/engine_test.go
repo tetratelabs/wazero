@@ -58,14 +58,14 @@ func TestVerifyOffsetValue(t *testing.T) {
 
 	// Offsets for wasm.TableElement.
 	var tableElement wasm.TableElement
-	require.Equal(t, int(unsafe.Offsetof(tableElement.FunctionAddress)), tableElementFunctionAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(tableElement.FunctionIndex)), tableElementFunctionIndexOffset)
 	require.Equal(t, int(unsafe.Offsetof(tableElement.FunctionTypeID)), tableElementFunctionTypeIDOffset)
 
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.MemoryInstance)), moduleInstanceMemoryOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Tables)), moduleInstanceTablesOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.TableInstance)), moduleInstanceTableOffset)
 
 	// Offsets for wasm.TableInstance.
 	var tableInstance wasm.TableInstance
@@ -93,26 +93,30 @@ func TestEngine_Call(t *testing.T) {
 		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
 		FunctionSection: []wasm.Index{wasm.Index(0)},
 		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
+		ExportSection:   map[string]*wasm.Export{"fn": {Type: wasm.ExternTypeFunc, Index: 0, Name: "fn"}},
 	}
 
 	// Use exported functions to simplify instantiation of a Wasm function
 	e := NewEngine()
-	store := wasm.NewStore(context.Background(), e)
-	_, err := store.Instantiate(m, "")
+	store := wasm.NewStore(context.Background(), e, wasm.Features20191205)
+	mod, err := store.Instantiate(m, "")
 	require.NoError(t, err)
 
+	fn := mod.Function("fn")
+	require.NotNil(t, fn)
+
 	// ensure base case doesn't fail
-	results, err := e.Call(store.ModuleContexts[""], store.Functions[0], 3)
+	results, err := fn.Call(context.Background(), 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := e.Call(store.ModuleContexts[""], store.Functions[0])
+		_, err := fn.Call(context.Background())
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := e.Call(store.ModuleContexts[""], store.Functions[0], 1, 2)
+		_, err := fn.Call(context.Background(), 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
@@ -164,9 +168,6 @@ func TestEngine_Call_HostFn(t *testing.T) {
 
 func requireSupportedOSArch(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
-		t.Skip()
-	}
-	if runtime.GOOS == "windows" { // TODO: #269
 		t.Skip()
 	}
 }

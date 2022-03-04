@@ -10,78 +10,56 @@ import (
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/binary"
-	"github.com/tetratelabs/wazero/internal/wasm/text"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestDecodeModule(t *testing.T) {
-	wat := []byte(`(module $test)`)
-	m, err := text.DecodeModule(wat)
-	require.NoError(t, err)
-	wasm := binary.EncodeModule(m)
-
+func TestRuntime_DecodeModule(t *testing.T) {
 	tests := []struct {
-		name       string
-		moduleName string
-		source     []byte
+		name         string
+		source       []byte
+		expectedName string
 	}{
-		{name: "binary", source: wasm},
-		{name: "binary - override name", source: wasm, moduleName: "override"},
-		{name: "text", source: wat},
-		{name: "text - override name", source: wat, moduleName: "override"},
+		{
+			name:   "text - no name",
+			source: []byte(`(module)`),
+		},
+		{
+			name:   "text - empty name",
+			source: []byte(`(module $)`),
+		},
+		{
+			name:         "text - name",
+			source:       []byte(`(module $test)`),
+			expectedName: "test",
+		},
+		{
+			name:   "binary - no name section",
+			source: binary.EncodeModule(&internalwasm.Module{}),
+		},
+		{
+			name:   "binary - empty NameSection.ModuleName",
+			source: binary.EncodeModule(&internalwasm.Module{NameSection: &internalwasm.NameSection{}}),
+		},
+		{
+			name:         "binary - NameSection.ModuleName",
+			source:       binary.EncodeModule(&internalwasm.Module{NameSection: &internalwasm.NameSection{ModuleName: "test"}}),
+			expectedName: "test",
+		},
 	}
 
+	r := NewRuntime()
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			config := &ModuleConfig{Name: tc.moduleName, Source: tc.source}
-			_, err := decodeModule(config)
+			decoded, err := r.DecodeModule(tc.source)
 			require.NoError(t, err)
-			require.Equal(t, tc.moduleName, config.Name)
-
-			// Avoid adding another test just to check Validate works
-			require.NoError(t, config.Validate())
+			require.Equal(t, tc.expectedName, decoded.name)
 		})
 	}
-
-	t.Run("caches repetitive decodes", func(t *testing.T) {
-		config := &ModuleConfig{Source: wat}
-		m, err := decodeModule(config)
-		require.NoError(t, err)
-
-		again, err := decodeModule(config)
-		require.NoError(t, err)
-		require.Same(t, m, again)
-
-		// Ensure config that only changes the name doesn't have to re-decode the source.
-		cloned, err := decodeModule(config.WithName("wazero"))
-		require.NoError(t, err)
-		require.Same(t, m, cloned)
-	})
-
-	t.Run("changing source invalidates decode cache", func(t *testing.T) {
-		config := &ModuleConfig{Source: wat}
-		m, err := decodeModule(config)
-		require.NoError(t, err)
-
-		clonedConfig := config.WithName("wazero")
-
-		// When the source is changed, the module needs to be decoded again
-		config.Source = wasm
-		again, err := decodeModule(config)
-		require.NoError(t, err)
-		require.Equal(t, m, again)
-		require.NotSame(t, m, again)
-
-		// Any copies of the config shouldn't be invalidated
-		cloned, err := decodeModule(clonedConfig)
-		require.NoError(t, err)
-		require.Same(t, m, cloned)
-	})
 }
 
-func TestDecodeModule_Errors(t *testing.T) {
+func TestRuntime_DecodeModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		source      []byte
@@ -103,38 +81,41 @@ func TestDecodeModule_Errors(t *testing.T) {
 		},
 	}
 
+	r := NewRuntime()
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			config := &ModuleConfig{Source: tc.source}
-			_, err := decodeModule(config)
+			_, err := r.DecodeModule(tc.source)
 			require.EqualError(t, err, tc.expectedErr)
-
-			// Avoid adding another test just to check Validate works
-			require.EqualError(t, config.Validate(), tc.expectedErr)
 		})
 	}
 }
 
-// TestInstantiateModule_Renamed tests that we can pre-validate (cache) a module and instantiate it under different
+// TestDecodedModule_WithName tests that we can pre-validate (cache) a module and instantiate it under different
 // names. This pattern is used in wapc-go.
-func TestInstantiateModule_Renamed(t *testing.T) {
-	base := &ModuleConfig{Source: []byte(`(module (memory 1))`)}
-	require.NoError(t, base.Validate()) // cache
-
-	// Use the same store to instantiate multiple modules
-	store := NewStore()
-
-	_, err := InstantiateModule(store, base.WithName("1"))
+func TestDecodedModule_WithName(t *testing.T) {
+	r := NewRuntime()
+	base, err := r.DecodeModule([]byte(`(module $0 (memory 1))`))
 	require.NoError(t, err)
 
-	_, err = InstantiateModule(store, base.WithName("2"))
+	require.Equal(t, "0", base.name)
+
+	// Use the same runtime to instantiate multiple modules
+	internal := r.(*runtime).store
+	m1, err := r.NewModule(base.WithName("1"))
 	require.NoError(t, err)
+	require.Nil(t, internal.Module("0"))
+	require.Equal(t, internal.Module("1"), m1.(*internalwasm.PublicModule))
+
+	m2, err := r.NewModule(base.WithName("2"))
+	require.NoError(t, err)
+	require.Nil(t, internal.Module("0"))
+	require.Equal(t, internal.Module("2"), m2.(*internalwasm.PublicModule))
 }
 
-// TestModuleExports_Memory only covers a couple cases to avoid duplication of internal/wasm/store_test.go
-func TestModuleExports_Memory(t *testing.T) {
+// TestModule_Memory only covers a couple cases to avoid duplication of internal/wasm/runtime_test.go
+func TestModule_Memory(t *testing.T) {
 	tests := []struct {
 		name, wat   string
 		expected    bool
@@ -155,12 +136,16 @@ func TestModuleExports_Memory(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 
+		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
-			// Instantiate the module and get the export of the above hostFn
-			exports, err := InstantiateModule(NewStore(), &ModuleConfig{Source: []byte(tc.wat)})
+			decoded, err := r.DecodeModule([]byte(tc.wat))
 			require.NoError(t, err)
 
-			mem := exports.Memory("memory")
+			// Instantiate the module and get the export of the above hostFn
+			module, err := r.NewModule(decoded)
+			require.NoError(t, err)
+
+			mem := module.Memory("memory")
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
@@ -170,10 +155,91 @@ func TestModuleExports_Memory(t *testing.T) {
 	}
 }
 
+// TestModule_Global only covers a couple cases to avoid duplication of internal/wasm/global_test.go
+func TestModule_Global(t *testing.T) {
+	tests := []struct {
+		name                      string
+		module                    *internalwasm.Module // module as wat doesn't yet support globals
+		expected, expectedMutable bool
+	}{
+		{
+			name:   "no global",
+			module: &internalwasm.Module{},
+		},
+		{
+			name: "global not exported",
+			module: &internalwasm.Module{
+				GlobalSection: []*internalwasm.Global{
+					{
+						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64, Mutable: true},
+						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+					},
+				},
+			},
+		},
+		{
+			name: "global exported",
+			module: &internalwasm.Module{
+				GlobalSection: []*internalwasm.Global{
+					{
+						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64},
+						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+					},
+				},
+				ExportSection: map[string]*internalwasm.Export{
+					"global": {Type: internalwasm.ExternTypeGlobal, Name: "global"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "global exported and mutable",
+			module: &internalwasm.Module{
+				GlobalSection: []*internalwasm.Global{
+					{
+						Type: &internalwasm.GlobalType{ValType: internalwasm.ValueTypeI64, Mutable: true},
+						Init: &internalwasm.ConstantExpression{Opcode: internalwasm.OpcodeI64Const, Data: []byte{1}},
+					},
+				},
+				ExportSection: map[string]*internalwasm.Export{
+					"global": {Type: internalwasm.ExternTypeGlobal, Name: "global"},
+				},
+			},
+			expected:        true,
+			expectedMutable: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		r := NewRuntime()
+		t.Run(tc.name, func(t *testing.T) {
+			// Instantiate the module and get the export of the above global
+			module, err := r.NewModule(&DecodedModule{module: tc.module})
+			require.NoError(t, err)
+
+			global := module.Global("global")
+			if !tc.expected {
+				require.Nil(t, global)
+				return
+			}
+			require.Equal(t, uint64(1), global.Get())
+
+			mutable, ok := global.(wasm.MutableGlobal)
+			require.Equal(t, tc.expectedMutable, ok)
+			if ok {
+				mutable.Set(2)
+				require.Equal(t, uint64(2), global.Get())
+			}
+		})
+	}
+}
+
 func TestFunction_Context(t *testing.T) {
 	type key string
-	storeCtx := context.WithValue(context.Background(), key("wa"), "zero")
-	config := &StoreConfig{Context: storeCtx}
+	runtimeCtx := context.WithValue(context.Background(), key("wa"), "zero")
+	config := NewRuntimeConfig().WithContext(runtimeCtx)
 
 	notStoreCtx := context.WithValue(context.Background(), key("wazer"), "o")
 
@@ -183,12 +249,12 @@ func TestFunction_Context(t *testing.T) {
 		expected context.Context
 	}{
 		{
-			name:     "nil defaults to store context",
+			name:     "nil defaults to runtime context",
 			ctx:      nil,
-			expected: storeCtx,
+			expected: runtimeCtx,
 		},
 		{
-			name:     "set overrides store context",
+			name:     "set overrides runtime context",
 			ctx:      notStoreCtx,
 			expected: notStoreCtx,
 		},
@@ -198,7 +264,7 @@ func TestFunction_Context(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			store := NewStoreWithConfig(config)
+			r := NewRuntimeWithConfig(config)
 
 			// Define a host function so that we can catch the context propagated from a module function call
 			functionName := "fn"
@@ -207,47 +273,54 @@ func TestFunction_Context(t *testing.T) {
 				require.Equal(t, tc.expected, ctx.Context())
 				return expectedResult
 			}
-			source := requireImportAndExportFunction(t, store, hostFn, functionName)
+			source := requireImportAndExportFunction(t, r, hostFn, functionName)
 
 			// Instantiate the module and get the export of the above hostFn
-			exports, err := InstantiateModule(store, &ModuleConfig{Source: source})
+			decoded, err := r.DecodeModule(source)
+			require.NoError(t, err)
+
+			module, err := r.NewModule(decoded)
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
-			results, err := exports.Function(functionName).Call(tc.ctx)
+			results, err := module.Function(functionName).Call(tc.ctx)
 			require.NoError(t, err)
 			require.Equal(t, expectedResult, results[0])
 		})
 	}
 }
 
-func TestInstantiateModule_UsesStoreContext(t *testing.T) {
+func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 	type key string
-	config := &StoreConfig{Context: context.WithValue(context.Background(), key("wa"), "zero")}
-	store := NewStoreWithConfig(config)
+	runtimeCtx := context.WithValue(context.Background(), key("wa"), "zero")
+	config := NewRuntimeConfig().WithContext(runtimeCtx)
+	r := NewRuntimeWithConfig(config)
 
 	// Define a function that will be set as the start function
 	var calledStart bool
 	start := func(ctx wasm.ModuleContext) {
 		calledStart = true
-		require.Equal(t, config.Context, ctx.Context())
+		require.Equal(t, runtimeCtx, ctx.Context())
 	}
 
-	_, err := InstantiateHostModule(store, &HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	_, err := r.NewHostModule(&HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	require.NoError(t, err)
+
+	decoded, err := r.DecodeModule([]byte(`(module $runtime_test.go
+	(import "" "start" (func $start))
+	(start $start)
+)`))
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	_, err = InstantiateModule(store, &ModuleConfig{Source: []byte(`(module $store_test.go
-	(import "" "start" (func $start))
-	(start $start)
-)`)})
+	_, err = r.NewModule(decoded)
 	require.NoError(t, err)
 	require.True(t, calledStart)
 }
 
-// requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
-func requireImportAndExportFunction(t *testing.T, store wasm.Store, hostFn func(ctx wasm.ModuleContext) uint64, functionName string) []byte {
-	_, err := InstantiateHostModule(store, &HostModuleConfig{
+// requireImportAndExportFunction re-module a host function because only host functions can see the propagated context.
+func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx wasm.ModuleContext) uint64, functionName string) []byte {
+	_, err := r.NewHostModule(&HostModuleConfig{
 		Name: "host", Functions: map[string]interface{}{functionName: hostFn},
 	})
 	require.NoError(t, err)
@@ -255,53 +328,4 @@ func requireImportAndExportFunction(t *testing.T, store wasm.Store, hostFn func(
 	return []byte(fmt.Sprintf(
 		`(module (import "host" "%[1]s" (func (result i64))) (export "%[1]s" (func 0)))`, functionName,
 	))
-}
-
-func TestGetModuleName(t *testing.T) {
-	tests := []struct {
-		name       string
-		moduleName string
-		module     *internalwasm.Module
-		expected   string
-	}{
-		{
-			name:   "empty on nil name section",
-			module: &internalwasm.Module{},
-		},
-		{
-			name:   "empty on empty NameSection.ModuleName",
-			module: &internalwasm.Module{NameSection: &internalwasm.NameSection{}},
-		},
-		{
-			name:     "NameSection.ModuleName",
-			module:   &internalwasm.Module{NameSection: &internalwasm.NameSection{ModuleName: "test"}},
-			expected: "test",
-		},
-		{
-			name:       "overrides nil name section",
-			moduleName: "wazero",
-			module:     &internalwasm.Module{},
-			expected:   "wazero",
-		},
-		{
-			name:       "overrides empty NameSection.ModuleName",
-			moduleName: "wazero",
-			module:     &internalwasm.Module{NameSection: &internalwasm.NameSection{}},
-			expected:   "wazero",
-		},
-		{
-			name:       "overrides NameSection.ModuleName",
-			moduleName: "wazero",
-			module:     &internalwasm.Module{NameSection: &internalwasm.NameSection{ModuleName: "test"}},
-			expected:   "wazero",
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, getModuleName(tc.moduleName, tc.module))
-		})
-	}
 }

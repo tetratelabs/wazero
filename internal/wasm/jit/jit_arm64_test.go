@@ -1,5 +1,4 @@
 //go:build arm64
-// +build arm64
 
 package jit
 
@@ -58,10 +57,20 @@ func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 }
 
 func TestArchContextOffsetInEngine(t *testing.T) {
-	var vm callEngine
-	require.Equal(t, int(unsafe.Offsetof(vm.jitCallReturnAddress)), callEngineArchContextJITCallReturnAddressOffset) // If this fails, we have to fix jit_arm64.s as well.
-	require.Equal(t, int(unsafe.Offsetof(vm.minimum32BitSignedInt)), callEngineArchContextMinimum32BitSignedIntOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.minimum64BitSignedInt)), callEngineArchContextMinimum64BitSignedIntOffset)
+	var ctx callEngine
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR19)), callEngineArchContextCalleeSavedRegisterR19Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR20)), callEngineArchContextCalleeSavedRegisterR20Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR21)), callEngineArchContextCalleeSavedRegisterR21Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR22)), callEngineArchContextCalleeSavedRegisterR22Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR23)), callEngineArchContextCalleeSavedRegisterR23Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR24)), callEngineArchContextCalleeSavedRegisterR24Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR25)), callEngineArchContextCalleeSavedRegisterR25Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR26)), callEngineArchContextCalleeSavedRegisterR26Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR27)), callEngineArchContextCalleeSavedRegisterR27Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.calleeSavedRegisterR29)), callEngineArchContextCalleeSavedRegisterR29Offset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.jitCallReturnAddress)), callEngineArchContextJITCallReturnAddressOffset, "fix consts in jit_arm64.s")
+	require.Equal(t, int(unsafe.Offsetof(ctx.minimum32BitSignedInt)), callEngineArchContextMinimum32BitSignedIntOffset)
+	require.Equal(t, int(unsafe.Offsetof(ctx.minimum64BitSignedInt)), callEngineArchContextMinimum64BitSignedIntOffset)
 }
 
 func TestArm64Compiler_returnFunction(t *testing.T) {
@@ -93,7 +102,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 		// Push the call frames.
 		const callFrameNums = 10
 		stackPointerToExpectedValue := map[uint64]uint32{}
-		for funcaddr := wasm.FunctionAddress(0); funcaddr < callFrameNums; funcaddr++ {
+		for funcaddr := wasm.FunctionIndex(0); funcaddr < callFrameNums; funcaddr++ {
 			// We have to do compilation in a separate subtest since each compilation takes
 			// the mutext lock and must release on the cleanup of each subtest.
 			// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
@@ -122,8 +131,8 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 				frame := callFrame{
 					// Set the return address to the beginning of the function so that we can execute the constI32 above.
 					returnAddress: compiledFunction.codeInitialAddress,
-					// Note: return stack base pointer is set to funcaddr*10 and this is where the const should be pushed.
-					returnStackBasePointer: uint64(funcaddr) * 10,
+					// Note: return stack base pointer is set to funcaddr*5 and this is where the const should be pushed.
+					returnStackBasePointer: uint64(funcaddr) * 5,
 					compiledFunction:       compiledFunction,
 				}
 				vm.callFrameStack[vm.globalContext.callFrameStackPointer] = frame
@@ -1764,13 +1773,13 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 
 					code, _, _, err := compiler.compile()
 					require.NoError(t, err)
-					addr := wasm.FunctionAddress(i)
-					eng.addCompiledFunction(addr, &compiledFunction{
+					index := wasm.FunctionIndex(i)
+					eng.addCompiledFunction(index, &compiledFunction{
 						codeSegment:        code,
 						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 					})
 					env.module().Functions = append(env.module().Functions,
-						&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Address: addr})
+						&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Index: index})
 				})
 			}
 
@@ -1803,7 +1812,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				// If the call frame stack pointer equals the length of call frame stack length,
 				// we have to call the builtin function to grow the slice.
 				require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-				require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
+				require.Equal(t, builtinFunctionIndexGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
 
 				// Grow the callFrame stack, and exec again from the return address.
 				vm := env.callEngine()
@@ -1942,7 +1951,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 
 				table := make([]wasm.TableElement, 10)
 				for i := 0; i < len(table); i++ {
-					table[i] = wasm.TableElement{FunctionAddress: wasm.FunctionAddress(i), FunctionTypeID: targetTypeID}
+					table[i] = wasm.TableElement{FunctionIndex: wasm.FunctionIndex(i), FunctionTypeID: targetTypeID}
 				}
 
 				for i := 0; i < len(table); i++ {
@@ -1973,7 +1982,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 							codeSegment:        code,
 							codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 						}
-						eng.addCompiledFunction(table[i].FunctionAddress, cf)
+						eng.addCompiledFunction(table[i].FunctionIndex, cf)
 					})
 
 					t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -1987,7 +1996,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 
 						compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
 
-						// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionAddress.
+						// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
 						require.NoError(t, err)
 
@@ -2012,7 +2021,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 							// If the call frame stack pointer equals the length of call frame stack length,
 							// we have to call the builtin function to grow the slice.
 							require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-							require.Equal(t, builtinFunctionAddressGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
+							require.Equal(t, builtinFunctionIndexGrowCallFrameStack, env.functionCallAddress(), env.functionCallAddress())
 
 							// Grow the callFrame stack, and exec again from the return address.
 							vm := env.callEngine()
@@ -2145,28 +2154,28 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Tables:  []*wasm.TableInstance{{Table: make([]wasm.TableElement, 20)}},
+				Globals:       []*wasm.GlobalInstance{{Val: 100}},
+				TableInstance: &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: nil}},
+				TableInstance:  &wasm.TableInstance{Table: nil},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -2174,7 +2183,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -2182,7 +2191,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals:        []*wasm.GlobalInstance{{Val: 100}},
-				Tables:         []*wasm.TableInstance{{Table: make([]wasm.TableElement, 0)}},
+				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
 				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
@@ -2229,8 +2238,8 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 				require.Equal(t, bufSliceHeader.Data, vm.moduleContext.memoryElement0Address)
 			}
 
-			if len(tc.moduleInstance.Tables) > 0 {
-				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Tables[0].Table))
+			if tc.moduleInstance.TableInstance != nil {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.TableInstance.Table))
 				require.Equal(t, uint64(tableHeader.Len), vm.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, vm.moduleContext.tableElement0Address)
 			}
@@ -2755,7 +2764,7 @@ func TestArm64Compiler_compileMemoryGrow(t *testing.T) {
 
 	// After the initial exec, the code must exit with builtin function call status and funcaddress for memory grow.
 	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
-	require.Equal(t, builtinFunctionAddressMemoryGrow, env.functionCallAddress())
+	require.Equal(t, builtinFunctionIndexMemoryGrow, env.functionCallAddress())
 
 	// Reenter from the return address.
 	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
@@ -2873,7 +2882,7 @@ func TestArm64Compiler_compileHostFunction(t *testing.T) {
 	// TODO: delete after #233
 	compiler.compileNOP()
 
-	addr := wasm.FunctionAddress(100)
+	addr := wasm.FunctionIndex(100)
 	err := compiler.compileHostFunction(addr)
 	require.NoError(t, err)
 

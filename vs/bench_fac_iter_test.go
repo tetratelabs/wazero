@@ -1,14 +1,14 @@
 //go:build amd64 && cgo && !windows
-// +build amd64,cgo,!windows
 
 // Wasmtime can only be used in amd64 with CGO
 // Wasmer doesn't link on Windows
-package bench
+package vs
 
 import (
 	"context"
 	_ "embed"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/bytecodealliance/wasmtime-go"
@@ -18,6 +18,10 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/wasm"
 )
+
+// ensureJITFastest is overridable via ldflags. Ex.
+//	-ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
+var ensureJITFastest string = "false"
 
 // facWasm is compiled from testdata/fac.wat
 //go:embed testdata/fac.wasm
@@ -30,7 +34,7 @@ func TestFacIter(t *testing.T) {
 	expValue := uint64(0x865df5dd54000000)
 
 	t.Run("Interpreter", func(t *testing.T) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineInterpreter())
+		fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter())
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
@@ -41,7 +45,7 @@ func TestFacIter(t *testing.T) {
 	})
 
 	t.Run("JIT", func(t *testing.T) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineJIT())
+		fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT())
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
@@ -82,7 +86,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("Interpreter", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err := newWazeroFacIterBench(wazero.NewEngineInterpreter()); err != nil {
+			if _, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter()); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -91,7 +95,7 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	b.Run("JIT", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			if _, err := newWazeroFacIterBench(wazero.NewEngineJIT()); err != nil {
+			if _, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT()); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -119,66 +123,128 @@ func BenchmarkFacIter_Init(b *testing.B) {
 	})
 }
 
-// BenchmarkFacIter_Invoke benchmarks the time spent invoking a factorial calculation.
-func BenchmarkFacIter_Invoke(b *testing.B) {
-	ctx := context.Background()
-	const in = 30
-	b.Run("Interpreter", func(b *testing.B) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineInterpreter())
-		if err != nil {
-			b.Fatal(err)
-		}
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			if _, err = fn.Call(ctx, in); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	b.Run("JIT", func(b *testing.B) {
-		fn, err := newWazeroFacIterBench(wazero.NewEngineJIT())
-		if err != nil {
-			b.Fatal(err)
-		}
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			if _, err = fn.Call(ctx, in); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	b.Run("wasmer-go", func(b *testing.B) {
-		store, instance, fn, err := newWasmerForFacIterBench()
-		if err != nil {
-			b.Fatal(err)
-		}
-		defer store.Close()
-		defer instance.Close()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			if _, err = fn(in); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
-	b.Run("wasmtime-go", func(b *testing.B) {
-		store, run, err := newWasmtimeForFacIterBench()
-		if err != nil {
-			b.Fatal(err)
-		}
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			if _, err = run.Call(store, in); err != nil {
-				b.Fatal(err)
-			}
-		}
-	})
+var ctx = context.Background()
+var facIterArgumentU64 uint64 = 30
+var facIterArgumentI64 int64 = int64(facIterArgumentU64)
+
+// TestFacIter_JIT_Fastest ensures that JIT is the fastest engine for function invocations.
+// This is disabled by default, and can be run with -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'.
+func TestFacIter_JIT_Fastest(t *testing.T) {
+	if ensureJITFastest != "true" {
+		t.Skip()
+	}
+
+	jitResult := testing.Benchmark(jitFacIterInvoke)
+
+	cases := []struct {
+		runtimeName string
+		result      testing.BenchmarkResult
+	}{
+		{
+			runtimeName: "interpreter",
+			result:      testing.Benchmark(interpreterFacIterInvoke),
+		},
+		{
+			runtimeName: "wasmer-go",
+			result:      testing.Benchmark(wasmerGoFacIterInvoke),
+		},
+		{
+			runtimeName: "wasmtime-go",
+			result:      testing.Benchmark(wasmtimeGoFacIterInvoke),
+		},
+	}
+
+	// Print results before running each subtest.
+	fmt.Println("JIT", jitResult)
+	for _, tc := range cases {
+		fmt.Println(tc.runtimeName, tc.result)
+	}
+
+	jitNanoPerOp := float64(jitResult.T.Nanoseconds()) / float64(jitResult.N)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.runtimeName, func(t *testing.T) {
+			// https://github.com/golang/go/blob/fd09e88722e0af150bf8960e95e8da500ad91001/src/testing/benchmark.go#L428-L432
+			nanoPerOp := float64(tc.result.T.Nanoseconds()) / float64(tc.result.N)
+			msg := fmt.Sprintf("JIT engine must be faster than %s. "+
+				"Run BenchmarkFacIter_Invoke with ensureJITFastest=false instead to see the detailed result",
+				tc.runtimeName)
+			require.Lessf(t, jitNanoPerOp, nanoPerOp, msg)
+		})
+	}
 }
 
-func newWazeroFacIterBench(engine *wazero.Engine) (wasm.Function, error) {
-	store := wazero.NewStoreWithConfig(&wazero.StoreConfig{Engine: engine})
+// BenchmarkFacIter_Invoke benchmarks the time spent invoking a factorial calculation.
+func BenchmarkFacIter_Invoke(b *testing.B) {
+	if ensureJITFastest == "true" {
+		// If ensureJITFastest == "true", the benchmark for invocation will be run by
+		// TestFacIter_JIT_Fastest so skip here.
+		b.Skip()
+	}
+	b.Run("Interpreter", interpreterFacIterInvoke)
+	b.Run("JIT", jitFacIterInvoke)
+	b.Run("wasmer-go", wasmerGoFacIterInvoke)
+	b.Run("wasmtime-go", wasmtimeGoFacIterInvoke)
+}
 
-	m, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: facWasm})
+func interpreterFacIterInvoke(b *testing.B) {
+	fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigInterpreter())
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err = fn.Call(ctx, facIterArgumentU64); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func jitFacIterInvoke(b *testing.B) {
+	fn, err := newWazeroFacIterBench(wazero.NewRuntimeConfigJIT())
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err = fn.Call(ctx, facIterArgumentU64); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func wasmerGoFacIterInvoke(b *testing.B) {
+	store, instance, fn, err := newWasmerForFacIterBench()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+	defer instance.Close()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err = fn(facIterArgumentI64); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func wasmtimeGoFacIterInvoke(b *testing.B) {
+	store, run, err := newWasmtimeForFacIterBench()
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err = run.Call(store, facIterArgumentI64); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func newWazeroFacIterBench(engine *wazero.RuntimeConfig) (wasm.Function, error) {
+	r := wazero.NewRuntimeWithConfig(engine)
+
+	m, err := r.NewModuleFromSource(facWasm)
 	if err != nil {
 		return nil, err
 	}

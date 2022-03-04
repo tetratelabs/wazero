@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"math"
 	"reflect"
 
@@ -32,49 +31,64 @@ type (
 		ctx context.Context
 
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
-		Engine Engine
+		engine Engine
+
+		// EnabledFeatures are read-only to allow optimizations.
+		EnabledFeatures Features
 
 		// ModuleInstances holds the instantiated Wasm modules by module name from Instantiate.
-		ModuleInstances map[string]*ModuleInstance
-
-		// hostExports holds host functions by module name from ExportHostFunctions.
-		hostExports map[string]*HostExports
-
-		// ModuleContexts holds default host function call contexts keyed by module name.
-		ModuleContexts map[string]*ModuleContext
+		moduleInstances map[string]*ModuleInstance
 
 		// TypeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
 		// do type-checks on indirect function calls.
-		TypeIDs map[string]FunctionTypeID
+		typeIDs map[string]FunctionTypeID
 
-		// maximumFunctionAddress represents the limit on the number of function addresses (= function instances) in a store.
+		// maximumFunctionIndex represents the limit on the number of function addresses (= function instances) in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
-		maximumFunctionAddress FunctionAddress
+		maximumFunctionIndex FunctionIndex
+
 		//  maximumFunctionTypes represents the limit on the number of function types in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionTypes int
-		// maximumGlobals is the maximum number of globals that can be declared in a module.
-		// Note: this is fixed to 2^27 but have this a field for testability.
-		maximumGlobals int
+
+		// releasedFunctionIndex holds reusable FunctionIndexes. An index is added when
+		// a function instance is released in releaseFunctionInstances, and is popped when
+		// a new instance is added in addFunctionInstances.
+		releasedFunctionIndex []FunctionIndex
+
+		// releasedMemoryIndex holds reusable memoryIndexes. An index is added when
+		// an memory instance is released in releaseMemoryInstance, and is popped when
+		// a new instance is added in addMemoryInstance.
+		releasedMemoryIndex []memoryIndex
+
+		// releasedTableIndex holds reusable tableIndexes. An index is added when
+		// an table instance is released in releaseTableInstance, and is popped when
+		// a new instance is added in addTableInstance.
+		releasedTableIndex []tableIndex
+
+		// releasedGlobalIndex holds reusable globalIndexes. An index is added when
+		// an global instance is released in releaseGlobalInstances, and is popped when
+		// a new instance is added in addGlobalInstances.
+		releasedGlobalIndex []globalIndex
 
 		// The followings fields match the definition of Store in the specification.
 
 		// Functions holds function instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr).
-		Functions []*FunctionInstance
+		functions []*FunctionInstance
 		// Globals holds global instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as globaladdr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaladdr).
-		Globals []*GlobalInstance
+		globals []*GlobalInstance
 		// Memories holds memory instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as memaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-memaddr).
-		Memories []*MemoryInstance
+		memories []*MemoryInstance
 		// Tables holds table instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-tableaddr).
-		Tables []*TableInstance
+		tables []*TableInstance
 	}
 
 	// ModuleInstance represents instantiated wasm module.
@@ -90,8 +104,18 @@ type (
 		// MemoryInstance is set when Module.MemorySection had a memory, regardless of whether it was exported.
 		// Note: This avoids the name "Memory" which is an interface method name.
 		MemoryInstance *MemoryInstance
-		Tables         []*TableInstance
+		TableInstance  *TableInstance
 		Types          []*TypeInstance
+
+		// Ctx holds default function call context from this function instance.
+		Ctx *ModuleContext
+
+		// hostModule holds HostModule if this is a "host module" which is created in store.NewHostModule.
+		hostModule *HostModule
+
+		// TODO: https://github.com/tetratelabs/wazero/issues/293
+		refCount      int
+		moduleImports map[*ModuleInstance]struct{}
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -124,12 +148,11 @@ type (
 		// This is nil when FunctionKind == FunctionKindWasm. Otherwise, all the above fields are ignored as they are
 		// specific to Wasm functions.
 		HostFunction *reflect.Value
-		// Address is the funcaddr(https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr) of this function instance.
-		// More precisely, this equals the index of this function instance in store.FunctionInstances.
-		// All function calls are made via funcaddr at runtime, not the index (scoped to a module).
+		// Index is the index of this function instance in store.Functions, and is exported because
+		// all function calls are made via funcaddr at runtime, not the index (scoped to a module).
 		//
 		// This is used by both host and non-host functions.
-		Address FunctionAddress
+		Index FunctionIndex
 		// Name is for debugging purpose, and is used to argument the stack traces.
 		//
 		// When HostFunction is not nil, this returns dot-delimited parameters given to
@@ -152,7 +175,8 @@ type (
 	GlobalInstance struct {
 		Type *GlobalType
 		// Val holds a 64-bit representation of the actual value.
-		Val uint64
+		Val   uint64
+		index globalIndex
 	}
 
 	// TableInstance represents a table instance in a store.
@@ -172,18 +196,19 @@ type (
 		Max   *uint32
 		// Currently fixed to 0x70 (funcref type).
 		ElemType byte
+		index    tableIndex
 	}
 
 	// TableElement represents an item in a table instance.
 	//
 	// Note: this is fixed to function type as it is the only supported type in WebAssembly 1.0 (20191205)
 	TableElement struct {
-		// FunctionAddress is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr)
+		// FunctionIndex is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr)
 		// of the target function instance. More precisely, this equals the index of
 		// the target function instance in Store.FunctionInstances.
-		FunctionAddress FunctionAddress
+		FunctionIndex FunctionIndex
 		// FunctionTypeID is the type ID of the target function's type, which
-		// equals store.Functions[FunctionAddress].FunctionType.TypeID.
+		// equals store.Functions[FunctionIndex].FunctionType.TypeID.
 		FunctionTypeID FunctionTypeID
 	}
 
@@ -196,11 +221,24 @@ type (
 		Buffer []byte
 		Min    uint32
 		Max    *uint32
+		index  memoryIndex
 	}
 
-	// FunctionAddress is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr),
+	// FunctionIndex is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr),
 	// and the index to Store.Functions.
-	FunctionAddress uint64
+	FunctionIndex storeIndex
+	// memoryIndex is memaddr in the spec(https://www.w3.org/TR/wasm-core-1/#syntax-memaddr),
+	// and the index to Store.Functions.
+	memoryIndex storeIndex
+	// globalIndex is memaddr (https://www.w3.org/TR/wasm-core-1/#syntax-globaladdr),
+	// and the index to Store.Globals.
+	globalIndex storeIndex
+	// tableIndex is tableaddr (https://www.w3.org/TR/wasm-core-1/#syntax-tableaddr),
+	// and the index to Store.Tables.
+	tableIndex storeIndex
+
+	// storeIndex represents the offset in of an instance in a store.
+	storeIndex uint64
 
 	// FunctionTypeID is a uniquely assigned integer for a function type.
 	// This is wazero specific runtime object and specific to a store,
@@ -210,11 +248,121 @@ type (
 
 // The wazero specific limitations described at RATIONALE.md.
 const (
-	maximumFunctionAddress = 1 << 27
-	maximumFunctionTypes   = 1 << 27
-	maximumGlobals         = 1 << 27
-	maximumValuesOnStack   = 1 << 27
+	maximumFunctionIndex = 1 << 27
+	maximumFunctionTypes = 1 << 27
 )
+
+// newModuleInstance bundles all the instances for a module and creates a new module instance.
+func newModuleInstance(name string, module *Module, importedFunctions, functions []*FunctionInstance,
+	importedGlobals, globals []*GlobalInstance, importedTable, table *TableInstance,
+	memory, importedMemory *MemoryInstance, typeInstances []*TypeInstance, moduleImports map[*ModuleInstance]struct{}) *ModuleInstance {
+
+	instance := &ModuleInstance{Name: name, Types: typeInstances, moduleImports: moduleImports}
+
+	instance.Functions = append(instance.Functions, importedFunctions...)
+	for i, f := range functions {
+		// Associate each function with the type instance and the module instance's pointer.
+		f.FunctionType = typeInstances[module.FunctionSection[i]]
+		f.ModuleInstance = instance
+		instance.Functions = append(instance.Functions, f)
+	}
+
+	instance.Globals = append(instance.Globals, importedGlobals...)
+	instance.Globals = append(instance.Globals, globals...)
+
+	if importedTable != nil {
+		instance.TableInstance = importedTable
+	} else {
+		instance.TableInstance = table
+	}
+
+	if importedMemory != nil {
+		instance.MemoryInstance = importedMemory
+	} else {
+		instance.MemoryInstance = memory
+	}
+
+	instance.buildExportInstances(module.ExportSection)
+	return instance
+}
+
+func (m *ModuleInstance) buildExportInstances(exports map[string]*Export) {
+	m.Exports = make(map[string]*ExportInstance, len(exports))
+	for _, exp := range exports {
+		index := exp.Index
+		var ei *ExportInstance
+		switch exp.Type {
+		case ExternTypeFunc:
+			ei = &ExportInstance{Type: exp.Type, Function: m.Functions[index]}
+			// The module instance of the host function is a fake that only includes the function and its types.
+			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
+			// available to the wasm.ModuleContext Memory.
+			if ei.Function.HostFunction != nil {
+				ei.Function.ModuleInstance = m
+			}
+		case ExternTypeGlobal:
+			ei = &ExportInstance{Type: exp.Type, Global: m.Globals[index]}
+		case ExternTypeMemory:
+			ei = &ExportInstance{Type: exp.Type, Memory: m.MemoryInstance}
+		case ExternTypeTable:
+			ei = &ExportInstance{Type: exp.Type, Table: m.TableInstance}
+		}
+
+		// We already validated the duplicates during module validation phase.
+		_ = m.addExport(exp.Name, ei)
+	}
+}
+
+func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
+	for _, d := range data {
+		offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
+
+		ceil := offset + len(d.Init)
+		if offset < 0 || ceil > len(m.MemoryInstance.Buffer) {
+			return fmt.Errorf("out of bounds memory access")
+		}
+	}
+	return
+}
+
+func (m *ModuleInstance) applyData(data []*DataSegment) {
+	for _, d := range data {
+		offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
+		copy(m.MemoryInstance.Buffer[offset:], d.Init)
+	}
+}
+
+func (m *ModuleInstance) validateElements(elements []*ElementSegment) (err error) {
+	for _, elem := range elements {
+		offset := int(executeConstExpression(m.Globals, elem.OffsetExpr).(int32))
+		ceil := offset + len(elem.Init)
+
+		if offset < 0 || ceil > len(m.TableInstance.Table) {
+			return fmt.Errorf("out of bounds table access")
+		}
+		for _, elm := range elem.Init {
+			if elm >= uint32(len(m.Functions)) {
+				return fmt.Errorf("unknown function specified by element")
+			}
+		}
+	}
+	return
+}
+
+func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
+	for _, elem := range elements {
+		offset := int(executeConstExpression(m.Globals, elem.OffsetExpr).(int32))
+		table := m.TableInstance.Table
+		for i, elm := range elem.Init {
+			pos := i + offset
+			targetFunc := m.Functions[elm]
+			table[pos] = TableElement{
+				FunctionIndex:  targetFunc.Index,
+				FunctionTypeID: targetFunc.FunctionType.TypeID,
+			}
+		}
+	}
+}
 
 // addExport adds and indexes the given export or errs if the name is already exported.
 func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
@@ -226,7 +374,7 @@ func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
-func (m *ModuleInstance) GetExport(name string, et ExternType) (*ExportInstance, error) {
+func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
 		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
@@ -237,717 +385,444 @@ func (m *ModuleInstance) GetExport(name string, et ExternType) (*ExportInstance,
 	return exp, nil
 }
 
-func NewStore(ctx context.Context, engine Engine) *Store {
+func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Store {
 	return &Store{
-		ctx:                    ctx,
-		ModuleInstances:        map[string]*ModuleInstance{},
-		ModuleContexts:         map[string]*ModuleContext{},
-		TypeIDs:                map[string]FunctionTypeID{},
-		Engine:                 engine,
-		maximumFunctionAddress: maximumFunctionAddress,
-		maximumFunctionTypes:   maximumFunctionTypes,
-		maximumGlobals:         maximumGlobals,
+		ctx:                  ctx,
+		engine:               engine,
+		EnabledFeatures:      enabledFeatures,
+		moduleInstances:      map[string]*ModuleInstance{},
+		typeIDs:              map[string]FunctionTypeID{},
+		maximumFunctionIndex: maximumFunctionIndex,
+		maximumFunctionTypes: maximumFunctionTypes,
 	}
 }
 
-func (s *Store) Instantiate(module *Module, name string) (*ModuleExports, error) {
+// checkFunctionIndexOverflow checks if there would be too many function instances in a store.
+func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
+	if len(s.functions) > int(s.maximumFunctionIndex)-newInstanceNum {
+		return fmt.Errorf("too many functions in a store")
+	}
+	return nil
+}
+
+func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) {
 	if err := s.requireModuleUnused(name); err != nil {
 		return nil, err
 	}
 
-	// Check the start function is valid.
-	// TODO: this should be verified during decode so that errors have the correct source positions
-	if module.StartSection != nil {
-		startIndex := *module.StartSection
-		ft := module.TypeOfFunction(startIndex)
-		if ft == nil { // TODO: move this check to that a module can never be decoded invalidly
-			return nil, fmt.Errorf("module[%s] start function has an invalid type", name)
-		}
-		if len(ft.Params) > 0 || len(ft.Results) > 0 {
-			return nil, fmt.Errorf("module[%s] start function must have an empty (nullary) signature: %s", name, ft.String())
-		}
+	if err := s.checkFunctionIndexOverflow(len(module.FunctionSection)); err != nil {
+		return nil, err
 	}
 
-	instance := &ModuleInstance{Name: name}
-	for _, t := range module.TypeSection {
-		typeInstance, err := s.getTypeInstance(t)
-		if err != nil {
-			return nil, err
-		}
-		instance.Types = append(instance.Types, typeInstance)
+	importedFunctions, importedGlobals, importedTable, importedMemory, moduleImports, err := s.resolveImports(module)
+	if err != nil {
+		return nil, err
 	}
 
-	s.ModuleInstances[name] = instance
-	// Resolve the imports before doing the actual instantiation (mutating store).
-	if err := s.resolveImports(module, instance); err != nil {
-		return nil, fmt.Errorf("resolve imports: %w", err)
-	}
-	// Instantiation.
-	// Note that some of them mutate the store, so
-	// in the case of errors, we must rollback the state of store.
-	var rollbackFuncs []func()
-	defer func() {
-		for _, f := range rollbackFuncs {
-			f()
-		}
-	}()
-	rs, err := s.buildGlobalInstances(module, instance)
-	rollbackFuncs = append(rollbackFuncs, rs...)
+	functions, globals, table, memory :=
+		module.buildFunctionInstances(), module.buildGlobalInstances(importedGlobals), module.buildTableInstance(), module.buildMemoryInstance()
+
+	types, err := s.getTypeInstances(module.TypeSection)
 	if err != nil {
-		return nil, fmt.Errorf("globals: %w", err)
-	}
-	rs, err = s.buildFunctionInstances(module, instance)
-	rollbackFuncs = append(rollbackFuncs, rs...)
-	if err != nil {
-		return nil, fmt.Errorf("functions: %w", err)
-	}
-	rs, err = s.buildTableInstances(module, instance)
-	rollbackFuncs = append(rollbackFuncs, rs...)
-	if err != nil {
-		return nil, fmt.Errorf("tables: %w", err)
-	}
-	rs, err = s.buildMemoryInstances(module, instance)
-	rollbackFuncs = append(rollbackFuncs, rs...)
-	if err != nil {
-		return nil, fmt.Errorf("memories: %w", err)
-	}
-	rs, err = s.buildExportInstances(module, instance)
-	rollbackFuncs = append(rollbackFuncs, rs...)
-	if err != nil {
-		return nil, fmt.Errorf("exports: %w", err)
+		return nil, err
 	}
 
-	for i, f := range instance.Functions {
-		if err := s.Engine.Compile(f); err != nil {
+	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
+	instance := newModuleInstance(name, module, importedFunctions, functions, importedGlobals,
+		globals, importedTable, table, importedMemory, memory, types, moduleImports)
+
+	if err = instance.validateElements(module.ElementSection); err != nil {
+		return nil, err
+	}
+
+	if err := instance.validateData(module.DataSection); err != nil {
+		return nil, err
+	}
+
+	// Now we are ready to compile functions.
+	s.addFunctionInstances(functions...) // Need to assign funcaddr to each instance before compilation.
+	for i, f := range functions {
+		if err := s.engine.Compile(f); err != nil {
+			// On the failure, release the assigned funcaddr and already compiled functions.
+			if err := s.releaseFunctionInstances(functions...); err != nil {
+				return nil, err
+			}
 			idx := module.SectionElementCount(SectionIDFunction) - 1
-			return nil, fmt.Errorf("compilation failed at index %d/%d: %v", i, idx, err)
+			return nil, fmt.Errorf("compilation failed at index %d/%d: %w", i, idx, err)
 		}
 	}
 
-	// Build the default context for calls to this module
-	modCtx := NewModuleContext(s.ctx, s.Engine, instance)
-	s.ModuleContexts[name] = modCtx
+	// Now all the validation passes, we are safe to mutate memory/table instances (possibly imported ones).
+	instance.applyElements(module.ElementSection)
+	instance.applyData(module.DataSection)
 
-	// Now we are safe to finalize the state.
-	rollbackFuncs = nil
+	// Persist the instances other tha functions (which we already persisted before compilation).
+	s.addGlobalInstances(globals...)
+	s.addTableInstance(table)
+	s.addMemoryInstance(instance.MemoryInstance)
+
+	// Increase the reference count of imported modules.
+	for imported := range instance.moduleImports {
+		imported.refCount++
+	}
+
+	// Build the default context for calls to this module.
+	instance.Ctx = NewModuleContext(s.ctx, s.engine, instance)
+
+	s.moduleInstances[instance.Name] = instance
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		if _, err = s.Engine.Call(modCtx, instance.Functions[funcIdx]); err != nil {
+		if _, err := s.engine.Call(instance.Ctx, instance.Functions[funcIdx]); err != nil {
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
-	return &ModuleExports{s, modCtx}, nil
+	return &PublicModule{s: s, instance: instance}, nil
 }
 
-// ModuleExports implements wasm.Store ModuleExports
-func (s *Store) ModuleExports(moduleName string) publicwasm.ModuleExports {
-	if m, ok := s.ModuleContexts[moduleName]; !ok {
-		return nil
-	} else {
-		return &ModuleExports{s, m}
+// ReleaseModuleInstance deallocates resources if a module with the given name exists.
+func (s *Store) ReleaseModuleInstance(moduleName string) error {
+	// TODO: none of this is goroutine safe
+	instance := s.moduleInstances[moduleName]
+	if instance == nil {
+		return nil // already released
+	}
+
+	instance.refCount--
+	if instance.refCount > 0 {
+		// This case other modules are importing this module instance and still alive.
+		return fmt.Errorf("%d modules import this and need to be closed first", instance.refCount)
+	}
+
+	// TODO: check outstanding calls and wait until they exit.
+
+	// Recursively release the imported instances.
+	for mod := range instance.moduleImports {
+		if err := s.ReleaseModuleInstance(mod.Name); err != nil {
+			return fmt.Errorf("unable to release imported module [%s]: %w", mod.Name, err)
+		}
+	}
+
+	if err := s.releaseFunctionInstances(instance.Functions...); err != nil {
+		return fmt.Errorf("unable to release function instance: %w", err)
+	}
+
+	if instance.MemoryInstance != nil {
+		s.releaseMemoryInstance(instance.MemoryInstance)
+	}
+
+	if instance.TableInstance != nil {
+		s.releaseTableInstance(instance.TableInstance)
+	}
+
+	s.releaseGlobalInstances(instance.Globals...)
+
+	// Explicitly assign nil so that we ensure this moduleInstance no longer holds reference to instances.
+	instance.Exports = nil
+	instance.Globals = nil
+	instance.Functions = nil
+	instance.TableInstance = nil
+	instance.MemoryInstance = nil
+	instance.Types = nil
+
+	delete(s.moduleInstances, instance.Name)
+	return nil
+}
+
+func (s *Store) releaseFunctionInstances(fs ...*FunctionInstance) error {
+	for _, f := range fs {
+		if err := s.engine.Release(f); err != nil {
+			return err
+		}
+
+		// Release reference to the function instance.
+		s.functions[f.Index] = nil
+
+		// Append the address so that we can reuse it in order to avoid index space explosion.
+		s.releasedFunctionIndex = append(s.releasedFunctionIndex, f.Index)
+	}
+	return nil
+}
+
+func (s *Store) addFunctionInstances(fs ...*FunctionInstance) {
+	for _, f := range fs {
+		var addr FunctionIndex
+		if len(s.releasedFunctionIndex) > 0 {
+			id := len(s.releasedFunctionIndex) - 1
+			// Pop one address from releasedFunctionIndex slice.
+			addr, s.releasedFunctionIndex = s.releasedFunctionIndex[id], s.releasedFunctionIndex[:id]
+			s.functions[f.Index] = f
+		} else {
+			addr = FunctionIndex(len(s.functions))
+			s.functions = append(s.functions, f)
+		}
+		f.Index = addr
 	}
 }
 
-// ModuleExports implements wasm.ModuleExports
-type ModuleExports struct {
-	s *Store
-	// Context is exported for /wasi.go
-	Context *ModuleContext
+func (s *Store) releaseGlobalInstances(gs ...*GlobalInstance) {
+	for _, g := range gs {
+		// Release reference to the global instance.
+		s.globals[g.index] = nil
+
+		// Append the address so that we can reuse it in order to avoid index space explosion.
+		s.releasedGlobalIndex = append(s.releasedGlobalIndex, g.index)
+	}
 }
 
-// Function implements wasm.ModuleExports Function
-func (m *ModuleExports) Function(name string) publicwasm.Function {
-	exp, err := m.Context.Module.GetExport(name, ExternTypeFunc)
+func (s *Store) addGlobalInstances(gs ...*GlobalInstance) {
+	for _, g := range gs {
+		var addr globalIndex
+		if len(s.releasedGlobalIndex) > 0 {
+			id := len(s.releasedGlobalIndex) - 1
+			// Pop one address from releasedGlobalIndex slice.
+			addr, s.releasedGlobalIndex = s.releasedGlobalIndex[id], s.releasedGlobalIndex[:id]
+			s.globals[g.index] = g
+		} else {
+			addr = globalIndex(len(s.globals))
+			s.globals = append(s.globals, g)
+		}
+		g.index = addr
+	}
+}
+
+func (s *Store) releaseTableInstance(t *TableInstance) {
+	// Release reference to the table instance.
+	s.tables[t.index] = nil
+
+	// Append the index so that we can reuse it in order to avoid index space explosion.
+	s.releasedTableIndex = append(s.releasedTableIndex, t.index)
+}
+
+func (s *Store) addTableInstance(t *TableInstance) {
+	if t == nil {
+		return
+	}
+
+	var addr tableIndex
+	if len(s.releasedTableIndex) > 0 {
+		id := len(s.releasedTableIndex) - 1
+		// Pop one index from releasedTableIndex slice.
+		addr, s.releasedTableIndex = s.releasedTableIndex[id], s.releasedTableIndex[:id]
+		s.tables[addr] = t
+	} else {
+		addr = tableIndex(len(s.tables))
+		s.tables = append(s.tables, t)
+	}
+	t.index = addr
+}
+
+func (s *Store) releaseMemoryInstance(m *MemoryInstance) {
+	// Release reference to the memory instance.
+	s.memories[m.index] = nil
+
+	// Append the index so that we can reuse it in order to avoid index space explosion.
+	s.releasedMemoryIndex = append(s.releasedMemoryIndex, m.index)
+}
+
+func (s *Store) addMemoryInstance(m *MemoryInstance) {
+	if m == nil {
+		return
+	}
+
+	var addr memoryIndex
+	if len(s.releasedMemoryIndex) > 0 {
+		id := len(s.releasedMemoryIndex) - 1
+		// Pop one index from releasedMemoryIndex slice.
+		addr, s.releasedMemoryIndex = s.releasedMemoryIndex[id], s.releasedMemoryIndex[:id]
+		s.memories[addr] = m
+	} else {
+		addr = memoryIndex(len(s.memories))
+		s.memories = append(s.memories, m)
+	}
+	m.index = addr
+}
+
+// Module implements wasm.Store Module
+func (s *Store) Module(moduleName string) publicwasm.Module {
+	if m, ok := s.moduleInstances[moduleName]; !ok {
+		return nil
+	} else {
+		return &PublicModule{s: s, instance: m}
+	}
+}
+
+// PublicModule implements wasm.Module
+type PublicModule struct {
+	s        *Store
+	instance *ModuleInstance
+}
+
+// String implements fmt.Stringer
+func (m *PublicModule) String() string {
+	return fmt.Sprintf("Module[%s]", m.instance.Name)
+}
+
+// Function implements wasm.Module Function
+func (m *PublicModule) Function(name string) publicwasm.Function {
+	exp, err := m.instance.getExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
 	}
-	return &exportedFunction{module: m.Context, function: exp.Function}
+	return &exportedFunction{module: m.instance.Ctx, function: exp.Function}
 }
 
-// Memory implements wasm.ModuleExports Memory
-func (m *ModuleExports) Memory(name string) publicwasm.Memory {
-	exp, err := m.Context.Module.GetExport(name, ExternTypeMemory)
+// Memory implements wasm.Module Memory
+func (m *PublicModule) Memory(name string) publicwasm.Memory {
+	exp, err := m.instance.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
 	}
 	return exp.Memory
 }
 
-// HostExports implements wasm.Store HostExports
-func (s *Store) HostExports(moduleName string) publicwasm.HostExports {
-	return s.hostExports[moduleName]
+// HostModule implements wasm.Store HostModule
+func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
+	return s.moduleInstances[moduleName].hostModule
 }
 
-func (s *Store) getExport(moduleName string, name string, et ExternType) (exp *ExportInstance, err error) {
-	if m, ok := s.ModuleInstances[moduleName]; !ok {
-		return nil, fmt.Errorf("module %s not instantiated", moduleName)
-	} else if exp, err = m.GetExport(name, et); err != nil {
-		return
+func (s *Store) resolveImports(module *Module) (
+	functions []*FunctionInstance, globals []*GlobalInstance,
+	table *TableInstance, memory *MemoryInstance,
+	moduleImports map[*ModuleInstance]struct{},
+	err error,
+) {
+	moduleImports = map[*ModuleInstance]struct{}{}
+	for _, is := range module.ImportSection {
+		m, ok := s.moduleInstances[is.Module]
+		if !ok {
+			err = fmt.Errorf("module \"%s\" not instantiated", is.Module)
+			return
+		}
+
+		// Note: at this point we don't increase the ref count.
+		moduleImports[m] = struct{}{}
+
+		var exp *ExportInstance
+		exp, err = m.getExport(is.Name, is.Type)
+		if err != nil {
+			return
+		}
+
+		switch is.Type {
+		case ExternTypeFunc:
+			typeIndex := is.DescFunc
+			if int(typeIndex) >= len(module.TypeSection) {
+				err = fmt.Errorf("unknown type for function import")
+				return
+			}
+			expectedType := module.TypeSection[typeIndex]
+			f := exp.Function
+			if !bytes.Equal(expectedType.Results, f.FunctionType.Type.Results) || !bytes.Equal(expectedType.Params, f.FunctionType.Type.Params) {
+				err = fmt.Errorf("signature mimatch: %s != %s", expectedType, f.FunctionType.Type)
+				return
+			}
+			functions = append(functions, f)
+		case ExternTypeTable:
+			tableType := is.DescTable
+			table = exp.Table
+			if table.ElemType != tableType.ElemType {
+				err = fmt.Errorf("incompatible table improt: element type mismatch")
+				return
+			}
+			if table.Min < tableType.Limit.Min {
+				err = fmt.Errorf("incompatible table import: minimum size mismatch")
+				return
+			}
+
+			if tableType.Limit.Max != nil {
+				if table.Max == nil {
+					err = fmt.Errorf("incompatible table import: maximum size mismatch")
+					return
+				} else if *table.Max > *tableType.Limit.Max {
+					err = fmt.Errorf("incompatible table import: maximum size mismatch")
+					return
+				}
+			}
+		case ExternTypeMemory:
+			memoryType := is.DescMem
+			memory = exp.Memory
+			if memory.Min < memoryType.Min {
+				err = fmt.Errorf("incompatible memory import: minimum size mismatch")
+				return
+			}
+			if memoryType.Max != nil {
+				if memory.Max == nil {
+					err = fmt.Errorf("incompatible memory import: maximum size mismatch")
+					return
+				} else if *memory.Max > *memoryType.Max {
+					err = fmt.Errorf("incompatible memory import: maximum size mismatch")
+					return
+				}
+			}
+		case ExternTypeGlobal:
+			globalType := is.DescGlobal
+			g := exp.Global
+			if globalType.Mutable != g.Type.Mutable {
+				err = fmt.Errorf("incompatible global import: mutability mismatch")
+				return
+			} else if globalType.ValType != g.Type.ValType {
+				err = fmt.Errorf("incompatible global import: value type mismatch")
+				return
+			}
+			globals = append(globals, g)
+		}
 	}
 	return
 }
 
-func (s *Store) addFunctionInstance(f *FunctionInstance) error {
-	if f.Address >= s.maximumFunctionAddress {
-		return fmt.Errorf("too many functions in a store")
-	}
-	s.Functions = append(s.Functions, f)
-	return nil
-}
-
-func (s *Store) nextFunctionAddress() FunctionAddress {
-	return FunctionAddress(len(s.Functions))
-}
-
-func (s *Store) resolveImports(module *Module, target *ModuleInstance) error {
-	for _, is := range module.ImportSection {
-		if err := s.resolveImport(target, is); err != nil {
-			return fmt.Errorf("%s: %w", is.Name, err)
-		}
-	}
-	return nil
-}
-
-func (s *Store) resolveImport(target *ModuleInstance, is *Import) error {
-	exp, err := s.getExport(is.Module, is.Name, is.Type)
-	if err != nil {
-		return err
-	}
-
-	switch is.Type {
-	case ExternTypeFunc:
-		if err = s.applyFunctionImport(target, is.DescFunc, exp); err != nil {
-			return fmt.Errorf("applyFunctionImport: %w", err)
-		}
-	case ExternTypeTable:
-		if err = s.applyTableImport(target, is.DescTable, exp); err != nil {
-			return fmt.Errorf("applyTableImport: %w", err)
-		}
-	case ExternTypeMemory:
-		if err = s.applyMemoryImport(target, is.DescMem, exp); err != nil {
-			return fmt.Errorf("applyMemoryImport: %w", err)
-		}
-	case ExternTypeGlobal:
-		if err = s.applyGlobalImport(target, is.DescGlobal, exp); err != nil {
-			return fmt.Errorf("applyGlobalImport: %w", err)
-		}
-	default:
-		return fmt.Errorf("invalid externtype: %s", ExternTypeName(is.Type))
-	}
-
-	return nil
-}
-
-func (s *Store) applyFunctionImport(target *ModuleInstance, typeIndex Index, externModuleExportInstance *ExportInstance) error {
-	f := externModuleExportInstance.Function
-	if int(typeIndex) >= len(target.Types) {
-		return fmt.Errorf("unknown type for function import")
-	}
-	expectedType := target.Types[typeIndex].Type
-	if !bytes.Equal(expectedType.Results, f.FunctionType.Type.Results) {
-		return fmt.Errorf("return signature mimatch: %#x != %#x", expectedType.Results, f.FunctionType.Type.Results)
-	} else if !bytes.Equal(expectedType.Params, f.FunctionType.Type.Params) {
-		return fmt.Errorf("input signature mimatch: %#x != %#x", expectedType.Params, f.FunctionType.Type.Params)
-	}
-	target.Functions = append(target.Functions, f)
-	return nil
-}
-
-func (s *Store) applyTableImport(target *ModuleInstance, tableTypePtr *TableType, externModuleExportInstance *ExportInstance) error {
-	table := externModuleExportInstance.Table
-	if tableTypePtr == nil {
-		return fmt.Errorf("table type is invalid")
-	}
-	if table.ElemType != tableTypePtr.ElemType {
-		return fmt.Errorf("incompatible table imports: element type mismatch")
-	}
-	if table.Min < tableTypePtr.Limit.Min {
-		return fmt.Errorf("incompatible table imports: minimum size mismatch")
-	}
-
-	if tableTypePtr.Limit.Max != nil {
-		if table.Max == nil {
-			return fmt.Errorf("incompatible table imports: maximum size mismatch")
-		} else if *table.Max > *tableTypePtr.Limit.Max {
-			return fmt.Errorf("incompatible table imports: maximum size mismatch")
-		}
-	}
-	target.Tables = append(target.Tables, table)
-	return nil
-}
-
-func (s *Store) applyMemoryImport(target *ModuleInstance, memoryTypePtr *MemoryType, externModuleExportInstance *ExportInstance) error {
-	if target.MemoryInstance != nil {
-		// The current Wasm spec doesn't allow multiple memories.
-		return fmt.Errorf("multiple memories are not supported")
-	} else if memoryTypePtr == nil {
-		return fmt.Errorf("memory type is invalid")
-	}
-	memory := externModuleExportInstance.Memory
-	if memory.Min < memoryTypePtr.Min {
-		return fmt.Errorf("incompatible memory imports: minimum size mismatch")
-	}
-	if memoryTypePtr.Max != nil {
-		if memory.Max == nil {
-			return fmt.Errorf("incompatible memory imports: maximum size mismatch")
-		} else if *memory.Max > *memoryTypePtr.Max {
-			return fmt.Errorf("incompatible memory imports: maximum size mismatch")
-		}
-	}
-	target.MemoryInstance = memory
-	return nil
-}
-
-func (s *Store) applyGlobalImport(target *ModuleInstance, globalTypePtr *GlobalType, externModuleExportInstance *ExportInstance) error {
-	if globalTypePtr == nil {
-		return fmt.Errorf("global type is invalid")
-	}
-	g := externModuleExportInstance.Global
-	if globalTypePtr.Mutable != g.Type.Mutable {
-		return fmt.Errorf("incompatible global import: mutability mismatch")
-	} else if globalTypePtr.ValType != g.Type.ValType {
-		return fmt.Errorf("incompatible global import: value type mismatch")
-	}
-	target.Globals = append(target.Globals, g)
-	return nil
-}
-
-func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}, valueType ValueType, err error) {
-	r := bytes.NewBuffer(expr.Data)
+func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
+	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
-		v, _, err = leb128.DecodeInt32(r)
-		if err != nil {
-			return nil, 0, fmt.Errorf("read i32: %w", err)
-		}
-		return v, ValueTypeI32, nil
+		v, _, _ = leb128.DecodeInt32(r)
 	case OpcodeI64Const:
-		v, _, err = leb128.DecodeInt64(r)
-		if err != nil {
-			return nil, 0, fmt.Errorf("read i64: %w", err)
-		}
-		return v, ValueTypeI64, nil
+		v, _, _ = leb128.DecodeInt64(r)
 	case OpcodeF32Const:
-		v, err = ieee754.DecodeFloat32(r)
-		if err != nil {
-			return nil, 0, fmt.Errorf("read f32: %w", err)
-		}
-		return v, ValueTypeF32, nil
+		v, _ = ieee754.DecodeFloat32(r)
 	case OpcodeF64Const:
-		v, err = ieee754.DecodeFloat64(r)
-		if err != nil {
-			return nil, 0, fmt.Errorf("read f64: %w", err)
-		}
-		return v, ValueTypeF64, nil
+		v, _ = ieee754.DecodeFloat64(r)
 	case OpcodeGlobalGet:
-		id, _, err := leb128.DecodeUint32(r)
-		if err != nil {
-			return nil, 0, fmt.Errorf("read index of global: %w", err)
-		}
-		if uint32(len(globals)) <= id {
-			return nil, 0, fmt.Errorf("global index out of range")
-		}
+		id, _, _ := leb128.DecodeUint32(r)
 		g := globals[id]
 		switch g.Type.ValType {
 		case ValueTypeI32:
 			v = int32(g.Val)
-			return v, ValueTypeI32, nil
 		case ValueTypeI64:
 			v = int64(g.Val)
-			return v, ValueTypeI64, nil
 		case ValueTypeF32:
 			v = publicwasm.DecodeF32(g.Val)
-			return v, ValueTypeF32, nil
 		case ValueTypeF64:
 			v = publicwasm.DecodeF64(g.Val)
-			return v, ValueTypeF64, nil
-		}
-	}
-	return nil, 0, fmt.Errorf("invalid opt code: %#x", expr.Opcode)
-}
-
-func (s *Store) buildGlobalInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	prevLen := len(s.Globals)
-	rollbackFuncs = append(rollbackFuncs, func() {
-		s.Globals = s.Globals[:prevLen]
-	})
-
-	// We limit the number of globals in a moudle to 2^27.
-	globalDecls := len(module.GlobalSection)
-	for _, imp := range module.ImportSection {
-		if imp.Type == ExternTypeGlobal {
-			globalDecls++
-		}
-	}
-	if globalDecls > s.maximumGlobals {
-		return rollbackFuncs, fmt.Errorf("too many globals in a module")
-	}
-
-	for _, gs := range module.GlobalSection {
-		raw, t, err := executeConstExpression(target.Globals, gs.Init)
-		if err != nil {
-			return rollbackFuncs, fmt.Errorf("execution failed: %w", err)
-		}
-		if gs.Type.ValType != t {
-			return rollbackFuncs, fmt.Errorf("global type mismatch")
-		}
-		var gv uint64
-		switch v := raw.(type) {
-		case int32:
-			gv = uint64(v)
-		case int64:
-			gv = uint64(v)
-		case float32:
-			gv = publicwasm.EncodeF32(v)
-		case float64:
-			gv = publicwasm.EncodeF64(v)
-		}
-		g := &GlobalInstance{
-			Type: gs.Type,
-			Val:  gv,
-		}
-		target.Globals = append(target.Globals, g)
-		s.Globals = append(s.Globals, g)
-	}
-	return rollbackFuncs, nil
-}
-
-func (s *Store) buildFunctionInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	prevLen := len(s.Functions)
-	rollbackFuncs = append(rollbackFuncs, func() {
-		s.Functions = s.Functions[:prevLen]
-	})
-
-	funcs, globals, mems, tables := module.allDeclarations()
-
-	var functionNames NameMap
-	if module.NameSection != nil {
-		functionNames = module.NameSection.FunctionNames
-	}
-
-	n, nLen := 0, len(functionNames)
-
-	for codeIndex, typeIndex := range module.FunctionSection {
-		if typeIndex >= module.SectionElementCount(SectionIDType) {
-			return rollbackFuncs, fmt.Errorf("function type index out of range")
-		} else if uint32(codeIndex) >= module.SectionElementCount(SectionIDCode) {
-			return rollbackFuncs, fmt.Errorf("code index out of range")
-		}
-
-		funcIdx := Index(len(target.Functions))
-		// Seek to see if there's a better name than "unknown"
-		name := "unknown"
-		for ; n < nLen; n++ {
-			next := functionNames[n]
-			if next.Index > funcIdx {
-				break // we have function names, but starting at a later index
-			} else if next.Index == funcIdx {
-				name = next.Name
-				break
-			}
-		}
-
-		typeInstance, err := s.getTypeInstance(module.TypeSection[typeIndex])
-		if err != nil {
-			return rollbackFuncs, err
-		}
-
-		f := &FunctionInstance{
-			Name:           name,
-			FunctionKind:   FunctionKindWasm,
-			FunctionType:   typeInstance,
-			Body:           module.CodeSection[codeIndex].Body,
-			LocalTypes:     module.CodeSection[codeIndex].LocalTypes,
-			ModuleInstance: target,
-			Address:        s.nextFunctionAddress(),
-		}
-
-		if err := validateFunctionInstance(f, funcs, globals, mems, tables, module.TypeSection, maximumValuesOnStack); err != nil {
-			idx := module.SectionElementCount(SectionIDFunction) - 1
-			return rollbackFuncs, fmt.Errorf("invalid function '%s' (%d/%d): %v", f.Name, codeIndex, idx, err)
-		}
-
-		err = s.addFunctionInstance(f)
-		if err != nil {
-			return rollbackFuncs, err
-		}
-		target.Functions = append(target.Functions, f)
-	}
-	return rollbackFuncs, nil
-}
-
-func (s *Store) buildMemoryInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	// Allocate memory instances.
-	for _, memSec := range module.MemorySection {
-		if target.MemoryInstance != nil {
-			// This case the memory instance is already imported,
-			// and the current Wasm spec doesn't allow multiple memories.
-			return rollbackFuncs, fmt.Errorf("multiple memories not supported")
-		}
-		target.MemoryInstance = &MemoryInstance{
-			Buffer: make([]byte, memoryPagesToBytesNum(memSec.Min)),
-			Min:    memSec.Min,
-			Max:    memSec.Max,
-		}
-		s.Memories = append(s.Memories, target.MemoryInstance)
-	}
-
-	// Initialize the memory instance according to the Data section.
-	for _, d := range module.DataSection {
-		if target.MemoryInstance == nil {
-			return rollbackFuncs, fmt.Errorf("unknown memory")
-		} else if d.MemoryIndex != 0 {
-			return rollbackFuncs, fmt.Errorf("memory index must be zero")
-		}
-
-		rawOffset, offsetType, err := executeConstExpression(target.Globals, d.OffsetExpression)
-		if err != nil {
-			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
-		} else if offsetType != ValueTypeI32 {
-			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
-		}
-
-		offset, ok := rawOffset.(int32)
-		if !ok {
-			return rollbackFuncs, fmt.Errorf("offset is not int32 but 0x%x", offsetType)
-		} else if offset < 0 {
-			return rollbackFuncs, fmt.Errorf("offset must be positive int32: %d", offset)
-		}
-
-		size := uint64(offset) + uint64(len(d.Init))
-		maxPage := MemoryMaxPages
-		if d.MemoryIndex < module.SectionElementCount(SectionIDMemory) && module.MemorySection[d.MemoryIndex].Max != nil {
-			maxPage = *module.MemorySection[d.MemoryIndex].Max
-		}
-		if size > memoryPagesToBytesNum(maxPage) {
-			return rollbackFuncs, fmt.Errorf("memory size out of limit %d * 64Ki", int(*(module.MemorySection[d.MemoryIndex].Max)))
-		}
-
-		memoryInst := target.MemoryInstance
-		if size > uint64(len(memoryInst.Buffer)) {
-			return rollbackFuncs, fmt.Errorf("out of bounds memory access")
-		}
-		// Setup the rollback function before mutating the acutal memory.
-		original := make([]byte, len(d.Init))
-		copy(original, memoryInst.Buffer[offset:])
-		rollbackFuncs = append(rollbackFuncs, func() {
-			copy(memoryInst.Buffer[offset:], original)
-		})
-		copy(memoryInst.Buffer[offset:], d.Init)
-	}
-	return rollbackFuncs, nil
-}
-
-func (s *Store) buildTableInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	// Allocate table instances.
-	for _, tableSeg := range module.TableSection {
-		instance := newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
-		target.Tables = append(target.Tables, instance)
-		s.Tables = append(s.Tables, instance)
-	}
-
-	for _, elem := range module.ElementSection {
-		if elem.TableIndex >= Index(len(target.Tables)) {
-			return rollbackFuncs, fmt.Errorf("index out of range of index space")
-		}
-
-		rawOffset, offsetType, err := executeConstExpression(target.Globals, elem.OffsetExpr)
-		if err != nil {
-			return rollbackFuncs, fmt.Errorf("calculate offset: %w", err)
-		} else if offsetType != ValueTypeI32 {
-			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
-		}
-
-		offset32, ok := rawOffset.(int32)
-		if !ok {
-			return rollbackFuncs, fmt.Errorf("offset is not int32 but %T", offsetType)
-		} else if offset32 < 0 {
-			return rollbackFuncs, fmt.Errorf("offset must be positive int32 but %d", offset32)
-		}
-
-		offset := int(offset32)
-		size := offset + len(elem.Init)
-
-		max := uint32(math.MaxUint32)
-		if elem.TableIndex < module.SectionElementCount(SectionIDTable) && module.TableSection[elem.TableIndex].Limit.Max != nil {
-			max = *module.TableSection[elem.TableIndex].Limit.Max
-		}
-
-		if size > int(max) {
-			return rollbackFuncs, fmt.Errorf("table size out of limit of %d", max)
-		}
-
-		tableInst := target.Tables[elem.TableIndex]
-		if size > len(tableInst.Table) {
-			return rollbackFuncs, fmt.Errorf("out of bounds table access %d > %v", size, tableInst.Min)
-		}
-		for i := range elem.Init {
-			i := i
-			elm := elem.Init[i]
-			if elm >= uint32(len(target.Functions)) {
-				return rollbackFuncs, fmt.Errorf("unknown function specified by element")
-			}
-			// Setup the rollback function before mutating the table instance.
-			pos := i + offset
-			original := tableInst.Table[pos]
-			rollbackFuncs = append(rollbackFuncs, func() {
-				tableInst.Table[pos] = original
-			})
-			targetFunc := target.Functions[elm]
-			tableInst.Table[pos] = TableElement{
-				FunctionAddress: targetFunc.Address,
-				FunctionTypeID:  targetFunc.FunctionType.TypeID,
-			}
-		}
-	}
-	if len(target.Tables) > 1 {
-		return rollbackFuncs, fmt.Errorf("multiple tables not supported")
-	}
-	return rollbackFuncs, nil
-}
-
-func (s *Store) buildExportInstances(module *Module, target *ModuleInstance) (rollbackFuncs []func(), err error) {
-	target.Exports = make(map[string]*ExportInstance, module.SectionElementCount(SectionIDExport))
-	for name, exp := range module.ExportSection {
-		index := exp.Index
-		var ei *ExportInstance
-		switch exp.Type {
-		case ExternTypeFunc:
-			if index >= uint32(len(target.Functions)) {
-				return nil, fmt.Errorf("unknown function for export[%s]", name)
-			}
-			ei = &ExportInstance{Type: exp.Type, Function: target.Functions[index]}
-			// The module instance of the host function is a fake that only includes the function and its types.
-			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
-			// available to the wasm.ModuleContext Memory.
-			if ei.Function.HostFunction != nil {
-				ei.Function.ModuleInstance = target
-			}
-		case ExternTypeGlobal:
-			if index >= uint32(len(target.Globals)) {
-				return nil, fmt.Errorf("unknown global for export[%s]", name)
-			}
-			ei = &ExportInstance{Type: exp.Type, Global: target.Globals[index]}
-		case ExternTypeMemory:
-			if index != 0 || target.MemoryInstance == nil {
-				return nil, fmt.Errorf("unknown memory for export[%s]", name)
-			}
-			ei = &ExportInstance{Type: exp.Type, Memory: target.MemoryInstance}
-		case ExternTypeTable:
-			if index >= uint32(len(target.Tables)) {
-				return nil, fmt.Errorf("unknown table for export[%s]", name)
-			}
-			ei = &ExportInstance{Type: exp.Type, Table: target.Tables[index]}
-		}
-		if err = target.addExport(exp.Name, ei); err != nil {
-			return nil, err
 		}
 	}
 	return
 }
 
-// DecodeBlockType is exported for use in the compiler
-func DecodeBlockType(types []*TypeInstance, r io.Reader) (*FunctionType, uint64, error) {
-	raw, num, err := leb128.DecodeInt33AsInt64(r)
-	if err != nil {
-		return nil, 0, fmt.Errorf("decode int33: %w", err)
-	}
-
-	var ret *FunctionType
-	switch raw {
-	case -64: // 0x40 in original byte = nil
-		ret = &FunctionType{}
-	case -1: // 0x7f in original byte = i32
-		ret = &FunctionType{Results: []ValueType{ValueTypeI32}}
-	case -2: // 0x7e in original byte = i64
-		ret = &FunctionType{Results: []ValueType{ValueTypeI64}}
-	case -3: // 0x7d in original byte = f32
-		ret = &FunctionType{Results: []ValueType{ValueTypeF32}}
-	case -4: // 0x7c in original byte = f64
-		ret = &FunctionType{Results: []ValueType{ValueTypeF64}}
-	default:
-		if raw < 0 || (raw >= int64(len(types))) {
-			return nil, 0, fmt.Errorf("invalid block type: %d", raw)
+func (s *Store) getTypeInstances(ts []*FunctionType) ([]*TypeInstance, error) {
+	ret := make([]*TypeInstance, len(ts))
+	for i, t := range ts {
+		inst, err := s.getTypeInstance(t)
+		if err != nil {
+			return nil, err
 		}
-		ret = types[raw].Type
+		ret[i] = inst
 	}
-	return ret, num, nil
-}
-
-// AddHostFunction exports a function so that it can be imported under the given module and name. If a function already
-// exists for this module and name it is ignored rather than overwritten.
-//
-// Note: The wasm.Memory of the fn will be from the importing module.
-func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
-	typeInstance, err := s.getTypeInstance(hf.functionType)
-	if err != nil {
-		return nil, err
-	}
-
-	f := &FunctionInstance{
-		Name:           fmt.Sprintf("%s.%s", m.Name, hf.wasmFunctionName),
-		HostFunction:   hf.goFunc,
-		FunctionKind:   hf.functionKind,
-		FunctionType:   typeInstance,
-		ModuleInstance: m,
-		Address:        s.nextFunctionAddress(),
-	}
-
-	if err = s.Engine.Compile(f); err != nil {
-		return nil, fmt.Errorf("failed to compile %s: %v", f.Name, err)
-	}
-	if err = s.addFunctionInstance(f); err != nil {
-		return nil, err
-	}
-	// TODO: This races on adding export. A future design may be able to eliminate this race, possibly via a HostModule
-	// type.
-	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Type: ExternTypeFunc, Function: f}); err != nil {
-		s.Functions = s.Functions[:len(s.Functions)-1] // lost race: revert the add on conflict
-		return nil, err
-	}
-	return f, nil
-}
-
-func (s *Store) AddGlobal(m *ModuleInstance, name string, value uint64, valueType ValueType, mutable bool) error {
-	g := &GlobalInstance{
-		Val:  value,
-		Type: &GlobalType{Mutable: mutable, ValType: valueType},
-	}
-	s.Globals = append(s.Globals, g)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeGlobal, Global: g})
-}
-
-func (s *Store) AddTableInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
-	t := newTableInstance(min, max)
-	s.Tables = append(s.Tables, t)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeTable, Table: t})
-}
-
-func (s *Store) AddMemoryInstance(m *ModuleInstance, name string, min uint32, max *uint32) error {
-	memory := &MemoryInstance{
-		Buffer: make([]byte, memoryPagesToBytesNum(min)),
-		Min:    min,
-		Max:    max,
-	}
-	s.Memories = append(s.Memories, memory)
-
-	return m.addExport(name, &ExportInstance{Type: ExternTypeMemory, Memory: memory})
+	return ret, nil
 }
 
 func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
+	// TODO: take mutex
 	key := t.String()
-	id, ok := s.TypeIDs[key]
+	id, ok := s.typeIDs[key]
 	if !ok {
-		l := len(s.TypeIDs)
+		l := len(s.typeIDs)
 		if l >= s.maximumFunctionTypes {
 			return nil, fmt.Errorf("too many function types in a store")
 		}
-		id = FunctionTypeID(len(s.TypeIDs))
-		s.TypeIDs[key] = id
+		id = FunctionTypeID(len(s.typeIDs))
+		s.typeIDs[key] = id
 	}
 	return &TypeInstance{Type: t, TypeID: id}, nil
 }
@@ -967,5 +842,5 @@ func newTableInstance(min uint32, max *uint32) *TableInstance {
 	return tableInst
 }
 
-// UninitializedTableElementTypeID math.MaxUint64 to represent the uninitialized elements.
-var UninitializedTableElementTypeID FunctionTypeID = math.MaxUint32
+// UninitializedTableElementTypeID math.MaxUint32 to represent the uninitialized elements.
+const UninitializedTableElementTypeID FunctionTypeID = math.MaxUint32

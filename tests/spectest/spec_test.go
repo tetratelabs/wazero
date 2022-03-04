@@ -119,6 +119,16 @@ func (c command) String() string {
 	return "{" + msg + "}"
 }
 
+func (c command) moduleName(lastInstantiatedModuleName string) string {
+	if c.Action.Module != "" {
+		// If the module name is specified for the command, it almost always starts with $, but
+		// it might be aliased as the one without $. To remove the necessity for "register"
+		// command, we always treat module name without $
+		return strings.TrimPrefix(c.Action.Module, "$")
+	}
+	return lastInstantiatedModuleName
+}
+
 func (c command) getAssertReturnArgs() []uint64 {
 	var args []uint64
 	for _, arg := range c.Action.Args {
@@ -185,58 +195,84 @@ func (c command) expectedError() (err error) {
 }
 
 func addSpectestModule(t *testing.T, store *wasm.Store) {
-	// Add the host module
-	spectest := &wasm.ModuleInstance{Name: "spectest", Exports: map[string]*wasm.ExportInstance{}}
-	store.ModuleInstances[spectest.Name] = spectest
-
-	var printV = func() {}
-	var printI32 = func(uint32) {}
-	var printF32 = func(float32) {}
-	var printI64 = func(uint64) {}
-	var printF64 = func(float64) {}
-	var printI32F32 = func(uint32, float32) {}
-	var printF64F64 = func(float64, float64) {}
-
-	for n, v := range map[string]interface{}{
-		"print":         printV,
-		"print_i32":     printI32,
-		"print_f32":     printF32,
-		"print_i64":     printI64,
-		"print_f64":     printF64,
-		"print_i32_f32": printI32F32,
-		"print_f64_f64": printF64F64,
-	} {
-		fn, err := wasm.NewGoFunc(n, v)
-		require.NoError(t, err)
-		_, err = store.AddHostFunction(spectest, fn)
-		require.NoError(t, err, "AddHostFunction(%s)", n)
-	}
-
-	for _, g := range []struct {
-		name      string
-		valueType wasm.ValueType
-		value     uint64
-	}{
-		{name: "global_i32", valueType: wasm.ValueTypeI32, value: uint64(int32(666))},
-		{name: "global_i64", valueType: wasm.ValueTypeI64, value: uint64(int64(666))},
-		{name: "global_f32", valueType: wasm.ValueTypeF32, value: uint64(uint32(0x44268000))},
-		{name: "global_f64", valueType: wasm.ValueTypeF64, value: uint64(0x4084d00000000000)},
-	} {
-		require.NoError(t, store.AddGlobal(spectest, g.name, g.value, g.valueType, false), "AddGlobal(%s)", g.name)
-	}
-
-	tableLimitMax := uint32(20)
-	require.NoError(t, store.AddTableInstance(spectest, "table", 10, &tableLimitMax))
-
 	memoryLimitMax := uint32(2)
-	require.NoError(t, store.AddMemoryInstance(spectest, "memory", 1, &memoryLimitMax))
+	tableLimitMax := uint32(20)
+
+	mod := &wasm.Module{
+		FunctionSection: []uint32{
+			0, // print
+			1, // print_i32
+			2, // print_i64
+			3, // print_f32
+			4, // print_f64
+			5, // print_f64
+			6, // print_f64
+		},
+		TypeSection: []*wasm.FunctionType{
+			{},                                  // print
+			{Params: []byte{wasm.ValueTypeI32}}, // print_i32
+			{Params: []byte{wasm.ValueTypeI64}}, // print_i64
+			{Params: []byte{wasm.ValueTypeF32}}, // print_f32
+			{Params: []byte{wasm.ValueTypeF64}}, // print_f64
+			{Params: []byte{wasm.ValueTypeI32, wasm.ValueTypeF32}}, // print_i32_f32
+			{Params: []byte{wasm.ValueTypeF64, wasm.ValueTypeF64}}, // print_f64_f64
+		},
+		CodeSection: []*wasm.Code{
+			{Body: []byte{wasm.OpcodeEnd}},                                   // print
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_i32
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_i64
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_f32
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_f64
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_i32_f32
+			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_f64_f64
+		},
+		GlobalSection: []*wasm.Global{
+			{ // global_i32
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI32},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0x9a, 0x5} /* = 666 */},
+			},
+			{ // global_i64
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeI64},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI64Const, Data: []byte{0x9a, 0x5} /* = 666 */},
+			},
+			{ // global_f32
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeF32},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x44, 0x26, 0x80, 0x00}},
+			},
+			{ // global_f64
+				Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x40, 0x84, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}},
+			},
+		},
+		MemorySection: []*wasm.LimitsType{{
+			Min: 1, Max: &memoryLimitMax,
+		}},
+		TableSection: []*wasm.TableType{
+			{Limit: &wasm.LimitsType{Min: 10, Max: &tableLimitMax}},
+		},
+		ExportSection: map[string]*wasm.Export{
+			"print":         {Name: "print", Index: 0, Type: wasm.ExternTypeFunc},
+			"print_i32":     {Name: "print_i32", Index: 1, Type: wasm.ExternTypeFunc},
+			"print_i64":     {Name: "print_i64", Index: 2, Type: wasm.ExternTypeFunc},
+			"print_f32":     {Name: "print_f32", Index: 3, Type: wasm.ExternTypeFunc},
+			"print_f64":     {Name: "print_f64", Index: 4, Type: wasm.ExternTypeFunc},
+			"print_i32_f32": {Name: "print_i32_f32", Index: 5, Type: wasm.ExternTypeFunc},
+			"print_f64_f64": {Name: "print_f64_f64", Index: 6, Type: wasm.ExternTypeFunc},
+			"global_i32":    {Name: "global_i32", Index: 0, Type: wasm.ExternTypeGlobal},
+			"global_i64":    {Name: "global_i64", Index: 1, Type: wasm.ExternTypeGlobal},
+			"global_f32":    {Name: "global_f32", Index: 2, Type: wasm.ExternTypeGlobal},
+			"global_f64":    {Name: "global_f64", Index: 3, Type: wasm.ExternTypeGlobal},
+			"table":         {Name: "table", Index: 0, Type: wasm.ExternTypeTable},
+			"memory":        {Name: "memory", Index: 0, Type: wasm.ExternTypeMemory},
+		},
+	}
+
+	_, err := store.Instantiate(mod, "spectest")
+	require.NoError(t, err)
 }
 
 func TestJIT(t *testing.T) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
-		t.Skip()
-	}
-	if runtime.GOOS == "windows" { // TODO: #269
 		t.Skip()
 	}
 	runTest(t, jit.NewEngine)
@@ -272,11 +308,11 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 		wastName := basename(base.SourceFile)
 
 		t.Run(wastName, func(t *testing.T) {
-			store := wasm.NewStore(context.Background(), newEngine())
+			store := wasm.NewStore(context.Background(), newEngine(), wasm.Features20191205)
 			addSpectestModule(t, store)
 
-			var lastInstanceName string
-			for _, c := range base.Commands {
+			var lastInstantiatedModuleName string
+			for i, c := range base.Commands {
 				t.Run(fmt.Sprintf("%s/line:%d", c.CommandType, c.Line), func(t *testing.T) {
 					msg := fmt.Sprintf("%s:%d %s", wastName, c.Line, c.CommandType)
 					switch c.CommandType {
@@ -284,26 +320,26 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
 
-						mod, err := binary.DecodeModule(buf)
+						mod, err := binary.DecodeModule(buf, wasm.Features20191205)
 						require.NoError(t, err, msg)
 
-						lastInstanceName = c.Name
-						if lastInstanceName == "" {
-							lastInstanceName = c.Filename
+						moduleName := c.Name
+						if moduleName == "" { // When "(module ...) directive doesn't have name.
+							if i+1 < len(base.Commands) && base.Commands[i+1].CommandType == "register" {
+								// If the next command is "(register ...)", we use that name for this module.
+								moduleName = base.Commands[i+1].As
+							} else {
+								// Otherwise, use the file name as the name.
+								moduleName = c.Filename
+							}
 						}
-						_, err = store.Instantiate(mod, lastInstanceName)
+						moduleName = strings.TrimPrefix(moduleName, "$")
+						_, err = store.Instantiate(mod, moduleName)
+						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
-						name := lastInstanceName
-						if c.Name != "" {
-							name = c.Name
-						}
-						store.ModuleInstances[c.As] = store.ModuleInstances[name]
 					case "assert_return", "action":
-						moduleName := lastInstanceName
-						if c.Action.Module != "" {
-							moduleName = c.Action.Module
-						}
+						moduleName := c.moduleName(lastInstantiatedModuleName)
 						switch c.Action.ActionType {
 						case "invoke":
 							args, exps := c.getAssertReturnArgsExps()
@@ -325,11 +361,10 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							if c.Action.Module != "" {
 								msg += " in module " + c.Action.Module
 							}
-							inst, ok := store.ModuleInstances[moduleName]
-							require.True(t, ok, msg)
-							addr, err := inst.GetExport(c.Action.Field, wasm.ExternTypeGlobal)
-							require.NoError(t, err)
-							actual := addr.Global
+							module := store.Module(moduleName)
+							require.NotNil(t, module)
+							global := module.Global(c.Action.Field)
+							require.NotNil(t, global)
 							var expType wasm.ValueType
 							switch c.Exps[0].ValType {
 							case "i32":
@@ -341,9 +376,8 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							case "f64":
 								expType = wasm.ValueTypeF64
 							}
-							require.NotNil(t, actual, msg)
-							require.Equal(t, expType, actual.Type.ValType, msg)
-							require.Equal(t, exps[0], actual.Val, expType, msg)
+							require.Equal(t, expType, global.Type(), msg)
+							require.Equal(t, exps[0], global.Get(), msg)
 						default:
 							t.Fatalf("unsupported action type type: %v", c)
 						}
@@ -354,16 +388,9 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf)
-						if err == nil {
-							_, err = store.Instantiate(mod, "")
-						}
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					case "assert_trap":
-						moduleName := lastInstanceName
-						if c.Action.Module != "" {
-							moduleName = c.Action.Module
-						}
+						moduleName := c.moduleName(lastInstantiatedModuleName)
 						switch c.Action.ActionType {
 						case "invoke":
 							args := c.getAssertReturnArgs()
@@ -383,16 +410,9 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf)
-						if err == nil {
-							_, err = store.Instantiate(mod, "")
-						}
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					case "assert_exhaustion":
-						moduleName := lastInstanceName
-						if c.Action.Module != "" {
-							moduleName = c.Action.Module
-						}
+						moduleName := c.moduleName(lastInstantiatedModuleName)
 						switch c.Action.ActionType {
 						case "invoke":
 							args := c.getAssertReturnArgs()
@@ -412,20 +432,11 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 						}
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-						mod, err := binary.DecodeModule(buf)
-						if err == nil {
-							_, err = store.Instantiate(mod, "")
-						}
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					case "assert_uninstantiable":
 						buf, err := testcases.ReadFile(testdataPath(c.Filename))
 						require.NoError(t, err, msg)
-
-						mod, err := binary.DecodeModule(buf)
-						require.NoError(t, err, msg)
-
-						_, err = store.Instantiate(mod, "")
-						require.Error(t, err, msg)
+						requireInstantiationError(t, store, buf, msg)
 					default:
 						t.Fatalf("unsupported command type: %s", c)
 					}
@@ -433,6 +444,21 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 			}
 		})
 	}
+}
+
+func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg string) {
+	mod, err := binary.DecodeModule(buf, store.EnabledFeatures)
+	if err != nil {
+		return
+	}
+
+	err = mod.Validate()
+	if err != nil {
+		return
+	}
+
+	_, err = store.Instantiate(mod, "")
+	require.Error(t, err, msg)
 }
 
 // basename avoids filepath.Base to ensure a forward slash is used even in Windows.
@@ -478,7 +504,7 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
 func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
-	fn := s.ModuleExports(moduleName).Function(funcName)
+	fn := s.Module(moduleName).Function(funcName)
 	results, err := fn.Call(context.Background(), params...)
 	return results, fn.ResultTypes(), err
 }

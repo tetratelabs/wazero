@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -87,7 +88,7 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, e := DecodeModule(EncodeModule(tc.input))
+			m, e := DecodeModule(EncodeModule(tc.input), wasm.Features20191205)
 			require.NoError(t, e)
 			require.Equal(t, tc.input, m)
 		})
@@ -97,7 +98,7 @@ func TestDecodeModule(t *testing.T) {
 			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
 			0x04, 'm', 'e', 'm', 'e',
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 0)
-		m, e := DecodeModule(input)
+		m, e := DecodeModule(input, wasm.Features20191205)
 		require.NoError(t, e)
 		require.Equal(t, &wasm.Module{}, m)
 	})
@@ -111,7 +112,7 @@ func TestDecodeModule(t *testing.T) {
 			subsectionIDModuleName, 0x07, // 7 bytes in this subsection
 			0x06, // the Module name simple is 6 bytes long
 			's', 'i', 'm', 'p', 'l', 'e')
-		m, e := DecodeModule(input)
+		m, e := DecodeModule(input, wasm.Features20191205)
 		require.NoError(t, e)
 		require.Equal(t, &wasm.Module{NameSection: &wasm.NameSection{ModuleName: "simple"}}, m)
 	})
@@ -121,6 +122,7 @@ func TestDecodeModule_Errors(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       []byte
+		features    wasm.Features
 		expectedErr string
 	}{
 		{
@@ -144,13 +146,33 @@ func TestDecodeModule_Errors(t *testing.T) {
 				subsectionIDModuleName, 0x02, 0x01, 'x'),
 			expectedErr: "section custom: redundant custom section name",
 		},
+		{
+			name:     fmt.Sprintf("define mutable global when %s disabled", wasm.FeatureMutableGlobal),
+			features: wasm.Features20191205.Set(wasm.FeatureMutableGlobal, false),
+			input: append(append(Magic, version...),
+				wasm.SectionIDGlobal, 0x06, // 6 bytes in this section
+				0x01, wasm.ValueTypeI32, 0x01, // 1 global i32 mutable
+				wasm.OpcodeI32Const, 0x00, wasm.OpcodeEnd, // arbitrary init to zero
+			),
+			expectedErr: "global[0]: feature mutable-global is disabled",
+		},
+		{
+			name:     fmt.Sprintf("import mutable global when %s disabled", wasm.FeatureMutableGlobal),
+			features: wasm.Features20191205.Set(wasm.FeatureMutableGlobal, false),
+			input: append(append(Magic, version...),
+				wasm.SectionIDImport, 0x08, // 8 bytes in this section
+				0x01, 0x01, 'a', 0x01, 'b', wasm.ExternTypeGlobal, // 1 import a.b of type global
+				wasm.ValueTypeI32, 0x01, // 1 global i32 mutable
+			),
+			expectedErr: "import[0] global[a.b]: feature mutable-global is disabled",
+		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, e := DecodeModule(tc.input)
+			_, e := DecodeModule(tc.input, tc.features)
 			require.EqualError(t, e, tc.expectedErr)
 		})
 	}

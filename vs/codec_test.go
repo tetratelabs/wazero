@@ -1,9 +1,8 @@
 //go:build amd64 && cgo && !windows
-// +build amd64,cgo,!windows
 
 // Wasmtime can only be used in amd64 with CGO
 // Wasmer doesn't link on Windows
-package example
+package vs
 
 import (
 	"context"
@@ -91,30 +90,30 @@ func newExample() *wasm.Module {
 
 func TestExampleUpToDate(t *testing.T) {
 	t.Run("binary.DecodeModule", func(t *testing.T) {
-		m, err := binary.DecodeModule(exampleBinary)
+		m, err := binary.DecodeModule(exampleBinary, wasm.Features20191205)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("text.DecodeModule", func(t *testing.T) {
-		m, err := text.DecodeModule(exampleText)
+		m, err := text.DecodeModule(exampleText, wasm.Features20191205)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("Executable", func(t *testing.T) {
-		store := wazero.NewStore()
+		r := wazero.NewRuntime()
 
 		// Add WASI to satisfy import tests
-		_, err := wazero.InstantiateHostModule(store, wazero.WASISnapshotPreview1())
+		_, err := r.NewHostModule(wazero.WASISnapshotPreview1())
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
-		exports, err := wazero.InstantiateModule(store, &wazero.ModuleConfig{Source: exampleBinary})
+		module, err := r.NewModuleFromSource(exampleBinary)
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		results, err := exports.Function("AddInt").Call(context.Background(), 1, 2)
+		results, err := module.Function("AddInt").Call(context.Background(), 1, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 	})
@@ -124,7 +123,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("binary.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleBinary); err != nil {
+			if _, err := binary.DecodeModule(exampleBinary, wasm.Features20191205); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -138,7 +137,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("text.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := text.DecodeModule(exampleText); err != nil {
+			if _, err := text.DecodeModule(exampleText, wasm.Features20191205); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -146,7 +145,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("wat2wasm via text.DecodeModule->binary.EncodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if m, err := text.DecodeModule(exampleText); err != nil {
+			if m, err := text.DecodeModule(exampleText, wasm.Features20191205); err != nil {
 				b.Fatal(err)
 			} else {
 				_ = binary.EncodeModule(m)

@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 package jit
 
@@ -16,6 +15,11 @@ func mmapCodeSegment(code []byte) ([]byte, error) {
 	} else {
 		return mmapCodeSegmentARM64(code)
 	}
+}
+
+// munmapCodeSegment unmaps the given memory region.
+func munmapCodeSegment(code []byte) error {
+	return syscall.Munmap(code)
 }
 
 // mmapCodeSegmentAMD64 gives all read-write-exec permission to the mmap region

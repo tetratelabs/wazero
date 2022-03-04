@@ -56,7 +56,6 @@ jobs:
         os: [ubuntu-20.04, macos-11, windows-2022]
         go-version:
         - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.16" # temporarily support go 1.16 per #37
 
     steps:
       - uses: actions/setup-go@v2
@@ -86,7 +85,6 @@ jobs:
       matrix:
         go-version:
         - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
-        - "1.16"  # temporarily support go 1.16 per #37
         target:
         - arch: arm64
           image: arm64v8/ubuntu
@@ -138,4 +136,4 @@ jobs:
             ~/go/pkg/mod
           key: bench-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
 
-      - run: make bench
+      - run: make bench.check

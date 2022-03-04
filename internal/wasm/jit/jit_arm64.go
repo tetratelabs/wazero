@@ -1,5 +1,4 @@
 //go:build arm64
-// +build arm64
 
 // This file implements the compiler for arm64 target.
 // Please refer to https://developer.arm.com/documentation/102374/latest/
@@ -36,6 +35,15 @@ func newArchContext() archContext {
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 type archContext struct {
+	// arm64 calling convention requires X19-X29 to be saved and restored on function return.
+	// We save the caller's values on these registers here and restore when exiting from native code.
+	// Note: R28 is reserved for Gorutine by goruntime, and we never manipulate in JIT so we don't save here.
+	// Note: this is only used by JIT code so mark this as nolint.
+	calleeSavedRegisterR19, calleeSavedRegisterR20, calleeSavedRegisterR21, //nolint
+	calleeSavedRegisterR22, calleeSavedRegisterR23, calleeSavedRegisterR24, //nolint
+	calleeSavedRegisterR25, calleeSavedRegisterR26, calleeSavedRegisterR27, //nolint
+	calleeSavedRegisterR29 uint64 //nolint
+
 	// jitCallReturnAddress holds the absolute return address for jitcall.
 	// The value is set whenever jitcall is executed and done in jit_arm64.s
 	// Native code can return back to the vm.exec's main loop back by
@@ -57,13 +65,46 @@ type archContext struct {
 }
 
 const (
+	// callEngineArchContextCalleeSavedRegisterR19Offset is the offset of archContext.calleeSavedRegisterR19 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR19Offset = 128
+	// callEngineArchContextCalleeSavedRegisterR20Offset is the offset of archContext.calleeSavedRegisterR20 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR20Offset = 136
+	// callEngineArchContextCalleeSavedRegisterR21Offset is the offset of archContext.calleeSavedRegisterR21 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR21Offset = 144
+	// callEngineArchContextCalleeSavedRegisterR22Offset is the offset of archContext.calleeSavedRegisterR22 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR22Offset = 152
+	// callEngineArchContextCalleeSavedRegisterR23Offset is the offset of archContext.calleeSavedRegisterR23 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR23Offset = 160
+	// callEngineArchContextCalleeSavedRegisterR24Offset is the offset of archContext.calleeSavedRegisterR24 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR24Offset = 168
+	// callEngineArchContextCalleeSavedRegisterR25Offset is the offset of archContext.calleeSavedRegisterR25 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR25Offset = 176
+	// callEngineArchContextCalleeSavedRegisterR26Offset is the offset of archContext.calleeSavedRegisterR26 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR26Offset = 184
+	// callEngineArchContextCalleeSavedRegisterR27Offset is the offset of archContext.calleeSavedRegisterR27 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR27Offset = 192
+	// callEngineArchContextCalleeSavedRegisterR29Offset is the offset of archContext.calleeSavedRegisterR29 in callEngine.
+	callEngineArchContextCalleeSavedRegisterR29Offset = 200
 	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	callEngineArchContextJITCallReturnAddressOffset = 128
+	callEngineArchContextJITCallReturnAddressOffset = 208
 	// callEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum32BitSignedIntOffset = 136
+	callEngineArchContextMinimum32BitSignedIntOffset = 216
 	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum64BitSignedIntOffset = 144
+	callEngineArchContextMinimum64BitSignedIntOffset = 224
 )
+
+var calleeSavedRegisterToOffsetInCallEngine = map[int16]int64{
+	arm64.REG_R19: callEngineArchContextCalleeSavedRegisterR19Offset,
+	arm64.REG_R20: callEngineArchContextCalleeSavedRegisterR20Offset,
+	arm64.REG_R21: callEngineArchContextCalleeSavedRegisterR21Offset,
+	arm64.REG_R22: callEngineArchContextCalleeSavedRegisterR22Offset,
+	arm64.REG_R23: callEngineArchContextCalleeSavedRegisterR23Offset,
+	arm64.REG_R24: callEngineArchContextCalleeSavedRegisterR24Offset,
+	arm64.REG_R25: callEngineArchContextCalleeSavedRegisterR25Offset,
+	arm64.REG_R26: callEngineArchContextCalleeSavedRegisterR26Offset,
+	arm64.REG_R27: callEngineArchContextCalleeSavedRegisterR27Offset,
+	arm64.REG_R29: callEngineArchContextCalleeSavedRegisterR29Offset,
+}
 
 // jitcall is implemented in jit_arm64.s as a Go Assembler function.
 // This is used by callEngine.execWasmFunction and the entrypoint to enter the JITed native code.
@@ -483,7 +524,7 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 
 	// If ceil > valueStackLen - stack base pointer, we need to grow the stack by calling builtin Go function.
 	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABLS)
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowValueStack); err != nil {
+	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowValueStack); err != nil {
 		return err
 	}
 
@@ -594,6 +635,11 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 		c.compileRegisterToMemoryInstruction(arm64.AMOVW, zeroRegister, reservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
 	}
 
+	// arm64 calling convention requires X19-X29 to be saved and restored on function return.
+	for reg, offset := range calleeSavedRegisterToOffsetInCallEngine {
+		c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, offset, reg)
+	}
+
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
 	// is embedded in vm. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
@@ -608,7 +654,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 }
 
 // compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
-func (c *arm64Compiler) compileHostFunction(address wasm.FunctionAddress) error {
+func (c *arm64Compiler) compileHostFunction(address wasm.FunctionIndex) error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
 	// TODO: delete after #233
 	c.compileNOP()
@@ -1090,11 +1136,11 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	return c.compileCallImpl(target.Address, nilRegister, target.FunctionType.Type)
+	return c.compileCallImpl(target.Index, nilRegister, target.FunctionType.Type)
 }
 
 // compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect for the arm64 architecture.
-func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister int16, functype *wasm.FunctionType) error {
+func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionIndex, indexRegister int16, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err
@@ -1102,12 +1148,12 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 
 	freeRegisters, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 5)
 	if !found {
-		return fmt.Errorf("BUG: all registers except addrReg should be free at this point")
+		return fmt.Errorf("BUG: all registers except indexReg should be free at this point")
 	}
 	c.locationStack.markRegisterUsed(freeRegisters...)
 
 	// Alias for readability.
-	callFrameStackPointerRegister, callFrameStackTopAddressRegister, compiledFunctionAddressRegister, oldStackBasePointer,
+	callFrameStackPointerRegister, callFrameStackTopAddressRegister, compiledFunctionIndexRegister, oldStackBasePointer,
 		tmp := freeRegisters[0], freeRegisters[1], freeRegisters[2], freeRegisters[3], freeRegisters[4]
 
 	// First, we have to check if we need to grow the callFrame stack.
@@ -1128,27 +1174,27 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 
 	// If these values equal, we need to grow the callFrame stack.
 	// For call_indirect, we need to push the value back to the register.
-	if !isNilRegister(addrRegister) {
+	if !isNilRegister(indexRegister) {
 		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack,
 		// as the register is not saved across function calls.
-		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(addrRegister)
+		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(indexRegister)
 		if err := c.compileReleaseRegisterToStack(savedOffsetLocation); err != nil {
 			return err
 		}
 	}
 
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressGrowCallFrameStack); err != nil {
+	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowCallFrameStack); err != nil {
 		return err
 	}
 
 	// For call_indirect, we need to push the value back to the register.
-	if !isNilRegister(addrRegister) {
+	if !isNilRegister(indexRegister) {
 		// Since this is right after callGoFunction, we have to initialize the stack base pointer
 		// to properly load the value on memory stack.
 		c.compileReservedStackBasePointerRegisterInitialization()
 
 		savedOffsetLocation := c.locationStack.pop()
-		savedOffsetLocation.setRegister(addrRegister)
+		savedOffsetLocation.setRegister(indexRegister)
 		if err := c.compileLoadValueOnStackToRegister(savedOffsetLocation); err != nil {
 			return err
 		}
@@ -1214,26 +1260,26 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 		reservedRegisterForCallEngine, callEngineGlobalContextCompiledFunctionsElement0AddressOffset,
 		tmp)
 
-	// Next, read the address of the target function (= &vm.compiledFunctions[offset])
-	// into compiledFunctionAddressRegister.
-	if isNilRegister(addrRegister) {
+	// Next, read the index of the target function (= &vm.compiledFunctions[offset])
+	// into compiledFunctionIndexRegister.
+	if isNilRegister(indexRegister) {
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
 			tmp, int64(addr)*8, // * 8 because the size of *compiledFunction equals 8 bytes.
-			compiledFunctionAddressRegister)
+			compiledFunctionIndexRegister)
 	} else {
-		// Shift addrRegister by 3 because the size of *compiledFunction equals 8 bytes.
-		c.compileConstToRegisterInstruction(arm64.ALSLW, 3, addrRegister)
+		// Shift indexRegister by 3 because the size of *compiledFunction equals 8 bytes.
+		c.compileConstToRegisterInstruction(arm64.ALSLW, 3, indexRegister)
 		c.compileMemoryWithRegisterOffsetToRegisterInstruction(
 			arm64.AMOVD,
-			tmp, addrRegister,
-			compiledFunctionAddressRegister,
+			tmp, indexRegister,
+			compiledFunctionIndexRegister,
 		)
 	}
 
 	// Finally, we are ready to write the address of the target function's *compiledFunction into the new callframe.
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
-		compiledFunctionAddressRegister,
+		compiledFunctionIndexRegister,
 		callFrameStackTopAddressRegister, callFrameCompiledFunctionOffset)
 
 	// 4) Set ra.current so that we can return back to this function properly.
@@ -1259,7 +1305,7 @@ func (c *arm64Compiler) compileCallImpl(addr wasm.FunctionAddress, addrRegister 
 
 	// Then, br into the target function's initial address.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
-		compiledFunctionAddressRegister, compiledFunctionCodeInitialAddressOffset,
+		compiledFunctionIndexRegister, compiledFunctionCodeInitialAddressOffset,
 		tmp)
 
 	c.compileUnconditionalBranchToAddressOnRegister(tmp)
@@ -1465,7 +1511,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Now all checks passed, so read the target's function address, and make call.
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVW,
-		offset.register, tableElementFunctionAddressOffset,
+		offset.register, tableElementFunctionIndexOffset,
 		offset.register,
 	)
 
@@ -2984,7 +3030,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 func (c *arm64Compiler) compileMemoryGrow() error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
-	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionAddressMemoryGrow); err != nil {
+	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexMemoryGrow); err != nil {
 		return err
 	}
 
@@ -3025,7 +3071,7 @@ func (c *arm64Compiler) compileMemorySize() error {
 // compileCallGoFunction adds instructions to call a Go function whose address equals the addr parameter.
 // jitStatus is set before making call, and it should be either jitCallStatusCodeCallBuiltInFunction or
 // jitCallStatusCodeCallHostFunction.
-func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionAddress) error {
+func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr wasm.FunctionIndex) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	if err := c.compileReleaseAllRegistersToStack(); err != nil {
 		return err
@@ -3033,7 +3079,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, addr 
 
 	freeRegs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 4)
 	if !found {
-		return fmt.Errorf("BUG: all registers except addrReg should be free at this point")
+		return fmt.Errorf("BUG: all registers except indexReg should be free at this point")
 	}
 	c.locationStack.markRegisterUsed(freeRegs...)
 
@@ -3466,15 +3512,13 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if len(c.f.ModuleInstance.Tables) > 0 {
+	if c.f.ModuleInstance.TableInstance != nil {
 		// "tmpX = &tables[0] (type of **wasm.TableInstance)"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
-			moduleInstanceAddressRegister, moduleInstanceTablesOffset,
+			moduleInstanceAddressRegister, moduleInstanceTableOffset,
 			tmpX,
 		)
-		// "tmpX = *tmpX (tables[0])"
-		c.compileMemoryToRegisterInstruction(arm64.AMOVD, tmpX, 0, tmpX)
 
 		// Update vm.tableElement0Address.
 		// "tmpY = &tables[0].Table[0]"
