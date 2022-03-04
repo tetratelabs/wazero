@@ -1411,7 +1411,6 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 	tests := []struct {
 		name                              string
 		fd, path, pathLen, resultOpenedFd uint64
-		pathName                          string
 		expectedErrno                     wasi.Errno
 	}{
 		{
@@ -1453,10 +1452,6 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.pathName != "" {
-				mem.Write(uint32(tc.path), []byte(tc.pathName))
-			}
-
 			results, err := fn.Call(context.Background(), tc.fd, 0, tc.path, tc.pathLen, 0, 0, 0, 0, tc.resultOpenedFd)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
