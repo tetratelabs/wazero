@@ -15,13 +15,17 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
+func requireJITSupported(t *testing.T) {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
+}
+
 // ctx is a default context used to avoid lint warnings even though these tests don't use any context data.
 var ctx = context.Background()
 
 func TestJITAdhoc(t *testing.T) {
-	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
-		t.Skip()
-	}
+	requireJITSupported(t)
 	runAdhocTests(t, wazero.NewRuntimeConfigJIT)
 }
 
