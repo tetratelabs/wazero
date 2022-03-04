@@ -2,6 +2,7 @@ package wazero
 
 import (
 	"bytes"
+	"context"
 	"errors"
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -66,6 +67,7 @@ func NewRuntime() Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
+		ctx:             config.ctx,
 		store:           internalwasm.NewStore(config.ctx, config.engine, config.enabledFeatures),
 		enabledFeatures: config.enabledFeatures,
 	}
@@ -73,6 +75,7 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
+	ctx             context.Context
 	store           *internalwasm.Store
 	enabledFeatures internalwasm.Features
 }

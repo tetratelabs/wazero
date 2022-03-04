@@ -46,28 +46,29 @@ type (
 		// maximumFunctionIndex represents the limit on the number of function addresses (= function instances) in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionIndex FunctionIndex
+
 		//  maximumFunctionTypes represents the limit on the number of function types in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionTypes int
 
 		// releasedFunctionIndex holds reusable FunctionIndexes. An index is added when
-		// an function instance is released in releaseFunctionInstances, and is popped when
-		// an new instance is added in store.addFunctionInstances.
+		// a function instance is released in releaseFunctionInstances, and is popped when
+		// a new instance is added in addFunctionInstances.
 		releasedFunctionIndex []FunctionIndex
 
 		// releasedMemoryIndex holds reusable memoryIndexes. An index is added when
 		// an memory instance is released in releaseMemoryInstance, and is popped when
-		// an new instance is added in store.addMemoryInstance.
+		// a new instance is added in addMemoryInstance.
 		releasedMemoryIndex []memoryIndex
 
 		// releasedTableIndex holds reusable tableIndexes. An index is added when
 		// an table instance is released in releaseTableInstance, and is popped when
-		// an new instance is added in store.addTableInstance.
+		// a new instance is added in addTableInstance.
 		releasedTableIndex []tableIndex
 
 		// releasedGlobalIndex holds reusable globalIndexes. An index is added when
 		// an global instance is released in releaseGlobalInstances, and is popped when
-		// an new instance is added in store.addGlobalInstances.
+		// a new instance is added in addGlobalInstances.
 		releasedGlobalIndex []globalIndex
 
 		// The followings fields match the definition of Store in the specification.
@@ -112,7 +113,7 @@ type (
 		// hostModule holds HostModule if this is a "host module" which is created in store.NewHostModule.
 		hostModule *HostModule
 
-		// TODO per https://github.com/tetratelabs/wazero/issues/293
+		// TODO: https://github.com/tetratelabs/wazero/issues/293
 		refCount      int
 		moduleImports map[*ModuleInstance]struct{}
 	}
@@ -455,7 +456,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	instance.applyElements(module.ElementSection)
 	instance.applyData(module.DataSection)
 
-	// Persist the instances other than functions (which we already persisted before compilation).
+	// Persist the instances other tha functions (which we already persisted before compilation).
 	s.addGlobalInstances(globals...)
 	s.addTableInstance(table)
 	s.addMemoryInstance(instance.MemoryInstance)
@@ -477,21 +478,28 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
-	return &PublicModule{s, instance}, nil
+	return &PublicModule{s: s, instance: instance}, nil
 }
 
-func (s *Store) ReleaseModuleInstance(instance *ModuleInstance) error {
+// ReleaseModuleInstance deallocates resources if a module with the given name exists.
+func (s *Store) ReleaseModuleInstance(moduleName string) error {
+	// TODO: none of this is goroutine safe
+	instance := s.moduleInstances[moduleName]
+	if instance == nil {
+		return nil // already released
+	}
+
 	instance.refCount--
 	if instance.refCount > 0 {
 		// This case other modules are importing this module instance and still alive.
-		return nil
+		return fmt.Errorf("%d modules import this and need to be closed first", instance.refCount)
 	}
 
 	// TODO: check outstanding calls and wait until they exit.
 
 	// Recursively release the imported instances.
 	for mod := range instance.moduleImports {
-		if err := s.ReleaseModuleInstance(mod); err != nil {
+		if err := s.ReleaseModuleInstance(mod.Name); err != nil {
 			return fmt.Errorf("unable to release imported module [%s]: %w", mod.Name, err)
 		}
 	}
@@ -499,8 +507,15 @@ func (s *Store) ReleaseModuleInstance(instance *ModuleInstance) error {
 	if err := s.releaseFunctionInstances(instance.Functions...); err != nil {
 		return fmt.Errorf("unable to release function instance: %w", err)
 	}
-	s.releaseMemoryInstance(instance.MemoryInstance)
-	s.releaseTableInstance(instance.TableInstance)
+
+	if instance.MemoryInstance != nil {
+		s.releaseMemoryInstance(instance.MemoryInstance)
+	}
+
+	if instance.TableInstance != nil {
+		s.releaseTableInstance(instance.TableInstance)
+	}
+
 	s.releaseGlobalInstances(instance.Globals...)
 
 	// Explicitly assign nil so that we ensure this moduleInstance no longer holds reference to instances.
@@ -521,7 +536,7 @@ func (s *Store) releaseFunctionInstances(fs ...*FunctionInstance) error {
 			return err
 		}
 
-		// Release refernce to the function instance.
+		// Release reference to the function instance.
 		s.functions[f.Index] = nil
 
 		// Append the address so that we can reuse it in order to avoid index space explosion.
@@ -573,7 +588,7 @@ func (s *Store) addGlobalInstances(gs ...*GlobalInstance) {
 }
 
 func (s *Store) releaseTableInstance(t *TableInstance) {
-	// Release refernce to the table instance.
+	// Release reference to the table instance.
 	s.tables[t.index] = nil
 
 	// Append the index so that we can reuse it in order to avoid index space explosion.
@@ -599,7 +614,7 @@ func (s *Store) addTableInstance(t *TableInstance) {
 }
 
 func (s *Store) releaseMemoryInstance(m *MemoryInstance) {
-	// Release refernce to the memory instance.
+	// Release reference to the memory instance.
 	s.memories[m.index] = nil
 
 	// Append the index so that we can reuse it in order to avoid index space explosion.
@@ -629,29 +644,33 @@ func (s *Store) Module(moduleName string) publicwasm.Module {
 	if m, ok := s.moduleInstances[moduleName]; !ok {
 		return nil
 	} else {
-		return &PublicModule{s, m}
+		return &PublicModule{s: s, instance: m}
 	}
 }
 
 // PublicModule implements wasm.Module
 type PublicModule struct {
-	s *Store
-	// Context is exported for /wasi.go
-	Instance *ModuleInstance
+	s        *Store
+	instance *ModuleInstance
+}
+
+// String implements fmt.Stringer
+func (m *PublicModule) String() string {
+	return fmt.Sprintf("Module[%s]", m.instance.Name)
 }
 
 // Function implements wasm.Module Function
 func (m *PublicModule) Function(name string) publicwasm.Function {
-	exp, err := m.Instance.getExport(name, ExternTypeFunc)
+	exp, err := m.instance.getExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
 	}
-	return &exportedFunction{module: m.Instance.Ctx, function: exp.Function}
+	return &exportedFunction{module: m.instance.Ctx, function: exp.Function}
 }
 
 // Memory implements wasm.Module Memory
 func (m *PublicModule) Memory(name string) publicwasm.Memory {
-	exp, err := m.Instance.getExport(name, ExternTypeMemory)
+	exp, err := m.instance.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
 	}
