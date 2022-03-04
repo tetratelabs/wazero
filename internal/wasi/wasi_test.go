@@ -1129,9 +1129,9 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			errno := tc.fdWrite()(ctx(mem), fd, iovs, iovsCount, resultSize)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
 
-			actualMemory, ok := mem.Read(0, uint32(len(expectedMemory)))
+			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
-			require.Equal(t, expectedMemory, actualMemory)
+			require.Equal(t, expectedMemory, actual)
 			require.Equal(t, []byte("wazero"), file.buf.Bytes()) // verify the file was actually written
 		})
 	}
@@ -1378,9 +1378,9 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 			errno := tc.pathOpen()(ctx(mem), fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFD)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
 
-			actualMemory, ok := mem.Read(0, uint32(len(expectedMemory)))
+			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
-			require.Equal(t, expectedMemory, actualMemory)
+			require.Equal(t, expectedMemory, actual)
 			require.Equal(t, "wazero", api.opened[expectedFd].path) // verify the file was actually opened
 		})
 	}
