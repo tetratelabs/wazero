@@ -97,57 +97,53 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 	}
 
 	exportCount := len(nameToGoFunc)
-
 	ret := &HostModule{name: moduleName, NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
 	hostModule := &ModuleInstance{
 		Name:       moduleName,
 		Exports:    make(map[string]*ExportInstance, exportCount),
 		hostModule: ret,
 	}
-	s.moduleInstances[moduleName] = hostModule
+
 	for name, goFunc := range nameToGoFunc {
-		if hf, err := NewGoFunc(name, goFunc); err != nil {
+		hf, err := NewGoFunc(name, goFunc)
+		if err != nil {
 			return nil, err
-		} else if function, err := s.addHostFunction(hostModule, hf); err != nil {
+		}
+
+		f := &FunctionInstance{
+			Name:           fmt.Sprintf("%s.%s", hostModule.Name, hf.wasmFunctionName),
+			HostFunction:   hf.goFunc,
+			FunctionKind:   hf.functionKind,
+			ModuleInstance: hostModule,
+		}
+		hostModule.Exports[hf.wasmFunctionName] = &ExportInstance{Type: ExternTypeFunc, Function: f}
+		hostModule.Functions = append(hostModule.Functions, f)
+		ret.NameToFunctionInstance[name] = f
+
+		if err = s.compileFunction(f, hf); err != nil {
 			return nil, err
-		} else {
-			ret.NameToFunctionInstance[name] = function
 		}
 	}
+
+	s.moduleInstances[moduleName] = hostModule
 	return ret, nil
 }
 
-// AddHostFunction exports a function so that it can be imported under the given module and name. If a function already
-// exists for this module and name it is ignored rather than overwritten.
-//
-// Note: The wasm.Memory of the fn will be from the importing module.
-func (s *Store) addHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
-	typeInstance, err := s.getTypeInstance(hf.functionType)
+func (s *Store) compileFunction(f *FunctionInstance, hf *GoFunc) (err error) {
+	f.FunctionType, err = s.getTypeInstance(hf.functionType)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	f := &FunctionInstance{
-		Name:           fmt.Sprintf("%s.%s", m.Name, hf.wasmFunctionName),
-		HostFunction:   hf.goFunc,
-		FunctionKind:   hf.functionKind,
-		FunctionType:   typeInstance,
-		ModuleInstance: m,
-	}
-
 	s.addFunctionInstances(f)
 
 	if err = s.engine.Compile(f); err != nil {
 		// On failure, we must release the function instance.
-		if err := s.releaseFunctionInstances(f); err != nil {
-			return nil, err
+		if err = s.releaseFunctionInstances(f); err != nil {
+			return err
 		}
-		return nil, fmt.Errorf("failed to compile %s: %v", f.Name, err)
+		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
-
-	m.Exports[hf.wasmFunctionName] = &ExportInstance{Type: ExternTypeFunc, Function: f}
-	m.Functions = append(m.Functions, f)
-	return f, nil
+	return nil
 }
 
 func (s *Store) requireModuleUnused(moduleName string) error {
