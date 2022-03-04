@@ -120,7 +120,7 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 		hostModule.Functions = append(hostModule.Functions, f)
 		ret.NameToFunctionInstance[name] = f
 
-		if err = s.compileFunction(f, hf); err != nil {
+		if err = s.compileHostFunction(f, hf); err != nil {
 			return nil, err
 		}
 	}

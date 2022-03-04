@@ -156,7 +156,7 @@ type (
 		// Name is for debugging purpose, and is used to argument the stack traces.
 		//
 		// When HostFunction is not nil, this returns dot-delimited parameters given to
-		// Store.AddHostFunction. Ex. something.realistic
+		// Store.NewHostModule. Ex. something.realistic
 		//
 		// Otherwise, this is the corresponding value in NameSection.FunctionNames or "unknown" if unavailable.
 		Name string
