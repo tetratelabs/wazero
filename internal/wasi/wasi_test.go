@@ -1147,11 +1147,19 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 		}
 	})
 
+	// Setup valid test memory
+	iovs, iovsCount := uint64(0), uint64(1)
+	memory := []byte{
+		8, 0, 0, 0, // = iovs[0].offset (where the data "hi" begins)
+		2, 0, 0, 0, // = iovs[0].length (how many bytes are in "hi")
+		'h', 'i', // iovs[0].length bytes
+	}
+
 	tests := []struct {
-		name                            string
-		fd, iovs, iovsCount, resultSize uint64
-		memory                          []byte
-		expectedErrno                   wasi.Errno
+		name           string
+		fd, resultSize uint64
+		memory         []byte
+		expectedErrno  wasi.Errno
 	}{
 		{
 			name:          "invalid fd",
@@ -1161,54 +1169,32 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 		{
 			name:          "out-of-memory reading iovs[0].offset",
 			fd:            validFD,
-			iovs:          1,
-			memory:        []byte{'?'},
+			memory:        []byte{},
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name: "out-of-memory reading iovs[0].length",
-			fd:   validFD,
-			iovs: 1, iovsCount: 1,
-			memory: []byte{
-				'?',        // `iovs` is after this
-				9, 0, 0, 0, // = iovs[0].offset
-			},
+			name:          "out-of-memory reading iovs[0].length",
+			fd:            validFD,
+			memory:        memory[0:4], // iovs[0].offset was 4 bytes and iovs[0].length next, but not enough mem!
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name: "iovs[0].offset is outside memory",
-			fd:   validFD,
-			iovs: 1, iovsCount: 1,
-			memory: []byte{
-				'?',        // `iovs` is after this
-				9, 0, 0, 0, // = iovs[0].offset = one past the size of this memory
-				1, 0, 0, 0, // = iovs[0].length
-			},
+			name:          "iovs[0].offset is outside memory",
+			fd:            validFD,
+			memory:        memory[0:8], // iovs[0].offset (where to read "hi") is outside memory.
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name: "length to write exceeds memory by 1",
-			fd:   validFD,
-			iovs: 1, iovsCount: 1,
-			memory: []byte{
-				'?',        // `iovs` is after this
-				9, 0, 0, 0, // = iovs[0].offset
-				2, 0, 0, 0, // = iovs[0].length = one past the size of this memory
-				'?',
-			},
+			name:          "length to read exceeds memory by 1",
+			fd:            validFD,
+			memory:        memory[0:9], // iovs[0].offset (where to read "hi") is in memory, but truncated.
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
-			name: "resultSize offset is outside memory",
-			fd:   validFD,
-			iovs: 1, iovsCount: 1,
-			resultSize: 10, // 1 past memory
-			memory: []byte{
-				'?',        // `iovs` is after this
-				9, 0, 0, 0, // = iovs[0].offset
-				1, 0, 0, 0, // = iovs[0].length
-				'?',
-			},
+			name:          "resultSize offset is outside memory",
+			fd:            validFD,
+			memory:        memory,
+			resultSize:    uint64(len(memory)), // read was ok, but there wasn't enough memory to write the result.
 			expectedErrno: wasi.ErrnoFault,
 		},
 	}
@@ -1216,12 +1202,9 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			offset := uint64(wasm.MemoryPagesToBytesNum(testMemoryPageSize)) - uint64(len(tc.memory))
+			mem.(*wasm.MemoryInstance).Buffer = tc.memory
 
-			memoryWriteOK := mem.Write(uint32(offset), tc.memory)
-			require.True(t, memoryWriteOK)
-
-			results, err := fn.Call(context.Background(), tc.fd, tc.iovs+offset, tc.iovsCount+offset, tc.resultSize+offset)
+			results, err := fn.Call(context.Background(), tc.fd, iovs, iovsCount, tc.resultSize)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
