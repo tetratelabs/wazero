@@ -1402,12 +1402,17 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 			},
 		}
 	})
+	validPath := uint64(0)    // arbitrary offset
+	validPathLen := uint64(6) // the length of "wazero"
+	mem.Write(uint32(validPath), []byte{
+		'w', 'a', 'z', 'e', 'r', 'o', // write to offset 0 (= validPath)
+	}) // wazero is the path to the file in the memFS
 
 	tests := []struct {
-		name                                                                                           string
-		fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd uint64
-		pathName                                                                                       string
-		expectedErrno                                                                                  wasi.Errno
+		name                              string
+		fd, path, pathLen, resultOpenedFd uint64
+		pathName                          string
+		expectedErrno                     wasi.Errno
 	}{
 		{
 			name:          "invalid fd",
@@ -1418,31 +1423,29 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 			name:          "out-of-memory reading path",
 			fd:            validFD,
 			path:          uint64(mem.Size()),
-			pathLen:       1, // arbitrary length
+			pathLen:       validPathLen,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory reading pathLen",
 			fd:            validFD,
-			path:          0, // pathLen is out-of-memory for this offset
-			pathLen:       uint64(mem.Size() + 1),
+			path:          validPath,
+			pathLen:       uint64(mem.Size() + 1), // path is in the valid memory range, but pathLen is out-of-memory for path
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "no such file exists",
 			fd:            validFD,
-			path:          0,      // abirtrary offset, pathname is here
-			pathLen:       4,      // length of "none"
-			pathName:      "none", // file that doesn't exist
+			path:          validPath,
+			pathLen:       validPathLen - 1, // this make the path "wazer", which doesn't exit
 			expectedErrno: wasi.ErrnoNoent,
 		},
 		{
 			name:           "out-of-memory writing resultOpenedFd",
 			fd:             validFD,
-			path:           0, // abirtrary offset, pathName is here
-			pathLen:        6, // length of "wazero"
-			resultOpenedFd: uint64(mem.Size()),
-			pathName:       "wazero", // the file that exists
+			path:           validPath,
+			pathLen:        validPathLen,
+			resultOpenedFd: uint64(mem.Size()), // path and pathLen correctly point to the right path, but where to write the opned FD is outside memory.
 			expectedErrno:  wasi.ErrnoFault,
 		},
 	}
@@ -1454,7 +1457,7 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 				mem.Write(uint32(tc.path), []byte(tc.pathName))
 			}
 
-			results, err := fn.Call(context.Background(), tc.fd, tc.dirflags, tc.path, tc.pathLen, tc.oflags, tc.fsRightsBase, tc.fsRightsInheriting, tc.fdFlags, tc.resultOpenedFd)
+			results, err := fn.Call(context.Background(), tc.fd, 0, tc.path, tc.pathLen, 0, 0, 0, 0, tc.resultOpenedFd)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
