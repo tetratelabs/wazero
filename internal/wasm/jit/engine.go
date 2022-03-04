@@ -1,7 +1,6 @@
 package jit
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"reflect"
@@ -891,8 +890,6 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
-
-	fmt.Println(hex.EncodeToString(code))
 
 	return &compiledFunction{
 		source:             f,

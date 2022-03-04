@@ -86,13 +86,10 @@ func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
-		i := i
 		go func() {
 			defer wg.Done()
 			_, err = fn.Call(ctx)
 			require.NoError(t, err)
-
-			fmt.Println(i)
 		}()
 	}
 	wg.Wait()
