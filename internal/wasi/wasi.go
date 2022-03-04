@@ -816,14 +816,15 @@ type SnapshotPreview1 interface {
 	// PathOpen is the WASI function to open a file or directory. This returns ErrnoBadf if the fd is invalid.
 	//
 	// * fd - the file descriptor of a directory that `path` is relative to
-	// * lookupFlags - flags to indicate how to resolve `path`
+	// * dirflags - flags to indicate how to resolve `path`
 	// * path - the offset in `ctx.Memory` to read the path string from
 	// * pathLen - the length of `path`
 	// * oFlags - the open flags to indicate the method by which to open the file
 	// * fsRightsBase - the rights of the newly created file descriptor for `path`
 	// * fsRightsInheriting - the rights of the file descriptors derived from the newly created file descriptor for `path`
 	// * fdFlags - the file descriptor flags
-	// * resultFD - the offset in `ctx.Memory` to write the newly created file descriptor to
+	// * resultOpenedFD - the offset in `ctx.Memory` to write the newly created file descriptor to.
+	//     * The result FD value is guaranteed to be less than 2**31
 	//
 	// For example, this function needs to first read `path` to determine the file to open.
 	//    If parameters `path` = 1, `pathLen` = 6, and the path is "wazero", PathOpen reads the path from `ctx.Memory`:
@@ -834,20 +835,21 @@ type SnapshotPreview1 interface {
 	//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
 	//        path --^
 	//
-	// Then, if parameters resultFD = 8, and this function opened a new file descriptor 3 with the given flags,
+	// Then, if parameters resultOpenedFD = 8, and this function opened a new file descriptor 3 with the given flags,
 	// this function writes the blow to `ctx.Memory`:
 	//
 	//                          uint32le
 	//                         +--------+
 	//                         |        |
 	//        []byte{ 0..6, ?, 4, 0, 0, 0, ?}
-	//              resultFD --^
+	//        resultOpenedFD --^
 	//
 	// Note: ImportPathOpen shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// Note: This is similar to `openat` in POSIX.
+	// Note: The returned file descriptor is not guaranteed to be the lowest-numbered file
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
 	// See https://linux.die.net/man/3/openat
-	PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase, fsRightsInheriting uint32, fdflags, resultOpenedFd uint32) wasi.Errno
+	PathOpen(ctx wasm.ModuleContext, fd, dirflags, pathString, pathLen, oflags uint32, fsRightsBase, fsRightsInheriting uint32, fdflags, resultOpenedFd uint32) wasi.Errno
 
 	// PathReadlink is the WASI function named FunctionPathReadlink
 	PathReadlink(ctx wasm.ModuleContext, fd, path, pathLen, buf, bufLen, resultBufused uint32) wasi.Errno

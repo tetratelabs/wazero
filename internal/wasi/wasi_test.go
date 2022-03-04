@@ -1424,7 +1424,7 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 		{
 			name:          "out-of-memory reading pathLen",
 			fd:            validFD,
-			pathString:    0, // pathLen is oof for this offset
+			pathString:    0, // pathLen is out-of-memory for this offset
 			pathLen:       uint64(mem.Size() + 1),
 			expectedErrno: wasi.ErrnoFault,
 		},
