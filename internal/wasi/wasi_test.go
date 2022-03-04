@@ -1334,7 +1334,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 	})
 
 	// TestSnapshotPreview1_PathOpen uses a matrix because setting up test files is complicated and has to be clean each time.
-	type pathOpenFn func(ctx publicwasm.ModuleContext, fd, dirflags, pathString, pathLen, oflags uint32,
+	type pathOpenFn func(ctx publicwasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32,
 		fsRightsBase, fsRightsInheriting uint64,
 		fdFlags, resultOpenedFD uint32) wasi.Errno
 	tests := []struct {
@@ -1404,10 +1404,10 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 	})
 
 	tests := []struct {
-		name                                                                                                 string
-		fd, dirflags, pathString, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFD uint64
-		pathName                                                                                             string
-		expectedErrno                                                                                        wasi.Errno
+		name                                                                                           string
+		fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFD uint64
+		pathName                                                                                       string
+		expectedErrno                                                                                  wasi.Errno
 	}{
 		{
 			name:          "invalid fd",
@@ -1417,21 +1417,21 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 		{
 			name:          "out-of-memory reading path",
 			fd:            validFD,
-			pathString:    uint64(mem.Size()),
+			path:          uint64(mem.Size()),
 			pathLen:       1, // arbitrary length
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "out-of-memory reading pathLen",
 			fd:            validFD,
-			pathString:    0, // pathLen is out-of-memory for this offset
+			path:          0, // pathLen is out-of-memory for this offset
 			pathLen:       uint64(mem.Size() + 1),
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "no such file exists",
 			fd:            validFD,
-			pathString:    0,      // abirtrary offset, pathname is here
+			path:          0,      // abirtrary offset, pathname is here
 			pathLen:       4,      // length of "none"
 			pathName:      "none", // file that doesn't exist
 			expectedErrno: wasi.ErrnoNoent,
@@ -1439,7 +1439,7 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 		{
 			name:           "out-of-memory writing resultOpenedFD",
 			fd:             validFD,
-			pathString:     0, // abirtrary offset, pathName is here
+			path:           0, // abirtrary offset, pathName is here
 			pathLen:        6, // length of "wazero"
 			resultOpenedFD: uint64(mem.Size()),
 			pathName:       "wazero", // the file that exists
@@ -1451,10 +1451,10 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.pathName != "" {
-				mem.Write(uint32(tc.pathString), []byte(tc.pathName))
+				mem.Write(uint32(tc.path), []byte(tc.pathName))
 			}
 
-			results, err := fn.Call(context.Background(), tc.fd, tc.dirflags, tc.pathString, tc.pathLen, tc.oflags, tc.fsRightsBase, tc.fsRightsInheriting, tc.fdFlags, tc.resultOpenedFD)
+			results, err := fn.Call(context.Background(), tc.fd, tc.dirflags, tc.path, tc.pathLen, tc.oflags, tc.fsRightsBase, tc.fsRightsInheriting, tc.fdFlags, tc.resultOpenedFD)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})

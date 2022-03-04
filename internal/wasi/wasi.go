@@ -849,7 +849,7 @@ type SnapshotPreview1 interface {
 	// Note: The returned file descriptor is not guaranteed to be the lowest-numbered file
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
 	// See https://linux.die.net/man/3/openat
-	PathOpen(ctx wasm.ModuleContext, fd, dirflags, pathString, pathLen, oflags uint32, fsRightsBase, fsRightsInheriting uint32, fdflags, resultOpenedFd uint32) wasi.Errno
+	PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase, fsRightsInheriting uint32, fdflags, resultOpenedFd uint32) wasi.Errno
 
 	// PathReadlink is the WASI function named FunctionPathReadlink
 	PathReadlink(ctx wasm.ModuleContext, fd, path, pathLen, buf, bufLen, resultBufused uint32) wasi.Errno
@@ -1296,14 +1296,14 @@ func (a *wasiAPI) PathLink(ctx wasm.ModuleContext, oldFd, oldFlags, oldPath, old
 }
 
 // PathOpen implements SnapshotPreview1.PathOpen
-func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, pathString, pathLen, oflags uint32, fsRightsBase,
+func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFD uint32) (errno wasi.Errno) {
 	dir, ok := a.opened[fd]
 	if !ok || dir.fileSys == nil {
 		return wasi.ErrnoBadf
 	}
 
-	b, ok := ctx.Memory().Read(pathString, pathLen)
+	b, ok := ctx.Memory().Read(path, pathLen)
 	if !ok {
 		return wasi.ErrnoFault
 	}
