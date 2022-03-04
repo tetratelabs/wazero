@@ -91,23 +91,24 @@ func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64
 }
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
-func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (publicwasm.HostModule, error) {
+func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (*HostModule, error) {
 	if err := s.requireModuleUnused(moduleName); err != nil {
 		return nil, err
 	}
 
 	exportCount := len(nameToGoFunc)
 
-	ret := &HostModule{NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
+	ret := &HostModule{name: moduleName, NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
 	hostModule := &ModuleInstance{
-		Name: moduleName, Exports: make(map[string]*ExportInstance, exportCount),
+		Name:       moduleName,
+		Exports:    make(map[string]*ExportInstance, exportCount),
 		hostModule: ret,
 	}
 	s.moduleInstances[moduleName] = hostModule
 	for name, goFunc := range nameToGoFunc {
 		if hf, err := NewGoFunc(name, goFunc); err != nil {
 			return nil, err
-		} else if function, err := s.AddHostFunction(hostModule, hf); err != nil {
+		} else if function, err := s.addHostFunction(hostModule, hf); err != nil {
 			return nil, err
 		} else {
 			ret.NameToFunctionInstance[name] = function
@@ -120,7 +121,7 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 // exists for this module and name it is ignored rather than overwritten.
 //
 // Note: The wasm.Memory of the fn will be from the importing module.
-func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
+func (s *Store) addHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstance, error) {
 	typeInstance, err := s.getTypeInstance(hf.functionType)
 	if err != nil {
 		return nil, err
@@ -144,14 +145,7 @@ func (s *Store) AddHostFunction(m *ModuleInstance, hf *GoFunc) (*FunctionInstanc
 		return nil, fmt.Errorf("failed to compile %s: %v", f.Name, err)
 	}
 
-	if err = m.addExport(hf.wasmFunctionName, &ExportInstance{Type: ExternTypeFunc, Function: f}); err != nil {
-		// On failure, we must release the function instance.
-		if err := s.releaseFunctionInstances(f); err != nil {
-			return nil, err
-		}
-		return nil, err
-	}
-
+	m.Exports[hf.wasmFunctionName] = &ExportInstance{Type: ExternTypeFunc, Function: f}
 	m.Functions = append(m.Functions, f)
 	return f, nil
 }
@@ -165,7 +159,14 @@ func (s *Store) requireModuleUnused(moduleName string) error {
 
 // HostModule implements wasm.HostModule
 type HostModule struct {
+	// name is for String and Store.ReleaseModuleInstance
+	name                   string
 	NameToFunctionInstance map[string]*FunctionInstance
+}
+
+// String implements fmt.Stringer
+func (m *HostModule) String() string {
+	return fmt.Sprintf("HostModule[%s]", m.name)
 }
 
 // ParamTypes implements wasm.HostFunction ParamTypes
@@ -188,6 +189,6 @@ func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) 
 }
 
 // Function implements wasm.HostModule Function
-func (g *HostModule) Function(name string) publicwasm.HostFunction {
-	return g.NameToFunctionInstance[name]
+func (m *HostModule) Function(name string) publicwasm.HostFunction {
+	return m.NameToFunctionInstance[name]
 }

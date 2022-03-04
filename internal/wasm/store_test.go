@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"math"
-	"os"
 	"strconv"
 	"testing"
 
@@ -86,18 +85,16 @@ func TestModuleInstance_Memory(t *testing.T) {
 	}
 }
 
-func TestStore_AddHostFunction(t *testing.T) {
+func TestStore_NewHostModule(t *testing.T) {
 	s := newStore()
 
-	hf, err := NewGoFunc("fn", func(wasm.ModuleContext) {})
-	require.NoError(t, err)
-
 	// Add the host module
-	hostModule := &ModuleInstance{Name: "test", Exports: make(map[string]*ExportInstance, 1)}
-	s.moduleInstances[hostModule.Name] = hostModule
-
-	_, err = s.AddHostFunction(hostModule, hf)
+	_, err := s.NewHostModule("test", map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
 	require.NoError(t, err)
+
+	// Ensure it was added to module instances
+	hm := s.moduleInstances["test"]
+	require.NotNil(t, hm)
 
 	// The function was added to the store, prefixed by the owning module name
 	require.Equal(t, 1, len(s.functions))
@@ -105,29 +102,67 @@ func TestStore_AddHostFunction(t *testing.T) {
 	require.Equal(t, "test.fn", fn.Name)
 
 	// The function was exported in the module
-	require.Equal(t, 1, len(hostModule.Exports))
-	exp, ok := hostModule.Exports["fn"]
+	require.Equal(t, 1, len(hm.Exports))
+	_, ok := hm.Exports["fn"]
 	require.True(t, ok)
 
 	// Trying to register it again should fail
-	_, err = s.AddHostFunction(hostModule, hf)
-	require.EqualError(t, err, `"fn" is already exported in module "test"`)
+	_, err = s.NewHostModule("test", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
+	require.EqualError(t, err, "module test has already been instantiated")
+}
 
-	// Any side effects should be reverted
-	require.Equal(t, []*FunctionInstance{fn, nil}, s.functions)
-	require.Equal(t, map[string]*ExportInstance{"fn": exp}, hostModule.Exports)
+func TestPublicModule_String(t *testing.T) {
+	s := newStore()
+
+	// Ensure paths that can create the host module can see the name.
+	m, err := s.Instantiate(&Module{}, "module")
+	require.NoError(t, err)
+	require.Equal(t, "Module[module]", m.String())
+	require.Equal(t, "Module[module]", s.Module(m.instance.Name).String())
+}
+
+func TestHostModule_String(t *testing.T) {
+	s := newStore()
+
+	// Ensure paths that can create the host module can see the name.
+	hm, err := s.NewHostModule("host", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
+	require.NoError(t, err)
+	require.Equal(t, "HostModule[host]", hm.String())
+}
+
+func TestStore_ReleaseModule(t *testing.T) {
+	s := newStore()
+
+	// Add the host module
+	hm, err := s.NewHostModule("", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
+	require.NoError(t, err)
+
+	t.Run("Module imports HostModule", func(t *testing.T) {
+		name := "test"
+		_, err = s.Instantiate(&Module{
+			TypeSection:   []*FunctionType{{}},
+			ImportSection: []*Import{{Type: ExternTypeFunc, Name: "host_fn", DescFunc: 0}},
+			MemorySection: []*MemoryType{{1, nil}},
+		}, name)
+		require.NoError(t, err)
+
+		// TODO: We shouldn't be able to release the host module as it is in use!
+		require.NoError(t, s.ReleaseModuleInstance(hm.name))
+
+		// Can release the importing module
+		require.NoError(t, s.ReleaseModuleInstance(name))
+		require.Nil(t, s.moduleInstances[name])
+
+		// Can re-release the importing module
+		require.NoError(t, s.ReleaseModuleInstance(name))
+	})
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
 	s := newStore()
 
-	hf, err := NewGoFunc("host_fn", func(wasm.ModuleContext) {})
-	require.NoError(t, err)
-
 	// Add the host module
-	hostModule := &ModuleInstance{Name: "", Exports: make(map[string]*ExportInstance, 1)}
-	s.moduleInstances[hostModule.Name] = hostModule
-	_, err = s.AddHostFunction(hostModule, hf)
+	_, err := s.NewHostModule("", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
 	require.NoError(t, err)
 
 	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
@@ -144,7 +179,6 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 
 		ei, err := mod.getExport("host.fn", ExternTypeFunc)
 		require.NoError(t, err)
-		os.Environ()
 		// We expect the host function to be called in context of the importing module.
 		// Otherwise, it would be the pseudo-module of the host, which only includes types and function definitions.
 		// Notably, this ensures the host function call context has the correct memory (from the importing module).
@@ -182,17 +216,11 @@ func TestFunctionInstance_Call(t *testing.T) {
 			engine := &catchContext{}
 			store := NewStore(storeCtx, engine, Features20191205)
 
-			// Define a fake host function
-			functionName := "fn"
-			hostFn := func(ctx wasm.ModuleContext) {
-			}
-			fn, err := NewGoFunc(functionName, hostFn)
-			require.NoError(t, err)
-
 			// Add the host module
-			hostModule := &ModuleInstance{Name: "host", Exports: map[string]*ExportInstance{}}
-			store.moduleInstances[hostModule.Name] = hostModule
-			_, err = store.AddHostFunction(hostModule, fn)
+			functionName := "fn"
+			hm, err := store.NewHostModule("host",
+				map[string]interface{}{functionName: func(wasm.ModuleContext) {}},
+			)
 			require.NoError(t, err)
 
 			// Make a module to import the function
@@ -200,7 +228,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 				TypeSection: []*FunctionType{{}},
 				ImportSection: []*Import{{
 					Type:     ExternTypeFunc,
-					Module:   hostModule.Name,
+					Module:   hm.name,
 					Name:     functionName,
 					DescFunc: 0,
 				}},

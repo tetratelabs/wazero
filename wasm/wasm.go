@@ -69,6 +69,8 @@ type Store interface {
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type Module interface {
+	fmt.Stringer
+
 	// Function returns a function exported from this module or nil if it wasn't.
 	Function(name string) Function
 
@@ -157,6 +159,8 @@ type MutableGlobal interface {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-hostfunc
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
 type HostModule interface {
+	fmt.Stringer
+
 	// Function returns a host function exported under this module name or nil if it wasn't.
 	Function(name string) HostFunction
 }
