@@ -823,7 +823,7 @@ type SnapshotPreview1 interface {
 	// * fsRightsBase - the rights of the newly created file descriptor for `path`
 	// * fsRightsInheriting - the rights of the file descriptors derived from the newly created file descriptor for `path`
 	// * fdFlags - the file descriptor flags
-	// * resultOpenedFD - the offset in `ctx.Memory` to write the newly created file descriptor to.
+	// * resultOpenedFd - the offset in `ctx.Memory` to write the newly created file descriptor to.
 	//     * The result FD value is guaranteed to be less than 2**31
 	//
 	// For example, this function needs to first read `path` to determine the file to open.
@@ -835,14 +835,14 @@ type SnapshotPreview1 interface {
 	//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
 	//        path --^
 	//
-	// Then, if parameters resultOpenedFD = 8, and this function opened a new file descriptor 3 with the given flags,
+	// Then, if parameters resultOpenedFd = 8, and this function opened a new file descriptor 3 with the given flags,
 	// this function writes the blow to `ctx.Memory`:
 	//
 	//                          uint32le
 	//                         +--------+
 	//                         |        |
 	//        []byte{ 0..6, ?, 4, 0, 0, 0, ?}
-	//        resultOpenedFD --^
+	//        resultOpenedFd --^
 	//
 	// Note: ImportPathOpen shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// Note: This is similar to `openat` in POSIX.
@@ -1297,7 +1297,7 @@ func (a *wasiAPI) PathLink(ctx wasm.ModuleContext, oldFd, oldFlags, oldPath, old
 
 // PathOpen implements SnapshotPreview1.PathOpen
 func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase,
-	fsRightsInheriting uint64, fdflags, resultOpenedFD uint32) (errno wasi.Errno) {
+	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
 	dir, ok := a.opened[fd]
 	if !ok || dir.fileSys == nil {
 		return wasi.ErrnoBadf
@@ -1329,7 +1329,7 @@ func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, 
 		file:    f,
 	}
 
-	if !ctx.Memory().WriteUint32Le(resultOpenedFD, newFD) {
+	if !ctx.Memory().WriteUint32Le(resultOpenedFd, newFD) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess

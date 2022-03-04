@@ -1310,24 +1310,24 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 	fsRightsBase := uint64(wasi.R_FD_READ)       // arbitrary right
 	fsRightsInheriting := uint64(wasi.R_FD_READ) // arbitrary right
 	fdFlags := uint32(0)
-	resultOpenedFD := uint32(8)
+	resultOpenedFd := uint32(8)
 	initialMemory := []byte{
 		'?',                          // `path` is after this
 		'w', 'a', 'z', 'e', 'r', 'o', // path
-		'?', // `resultOpenedFD` is after this
+		'?', // `resultOpenedFd` is after this
 	}
 	expectedMemory := append(
 		initialMemory,
-		4, 0, 0, 0, // resultOpenedFD
+		4, 0, 0, 0, // resultOpenedFd
 		'?',
 	)
-	expectedFd := uint32(4) // arbitrary expected FD
+	expectedFD := uint32(4) // arbitrary expected FD
 
 	var api *wasiAPI
 	mem, fn := instantiateModule(t, FunctionPathOpen, ImportPathOpen, moduleName, func(a *wasiAPI) {
 		// randSouce is used to determine the new fd. Fix it to the expectedFD for testing.
 		a.randSource = func(b []byte) error {
-			binary.LittleEndian.PutUint32(b, expectedFd)
+			binary.LittleEndian.PutUint32(b, expectedFD)
 			return nil
 		}
 		api = a // for later tests
@@ -1336,7 +1336,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 	// TestSnapshotPreview1_PathOpen uses a matrix because setting up test files is complicated and has to be clean each time.
 	type pathOpenFn func(ctx publicwasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32,
 		fsRightsBase, fsRightsInheriting uint64,
-		fdFlags, resultOpenedFD uint32) wasi.Errno
+		fdFlags, resultOpenedFd uint32) wasi.Errno
 	tests := []struct {
 		name     string
 		pathOpen func() pathOpenFn
@@ -1347,8 +1347,8 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		{FunctionPathOpen, func() pathOpenFn {
 			return func(ctx publicwasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32,
 				fsRightsBase, fsRightsInheriting uint64,
-				fdFlags, resultOpenedFD uint32) wasi.Errno {
-				ret, err := fn.Call(context.Background(), uint64(fd), uint64(dirflags), uint64(path), uint64(pathLen), uint64(oflags), uint64(fsRightsBase), uint64(fsRightsInheriting), uint64(fdFlags), uint64(resultOpenedFD))
+				fdFlags, resultOpenedFd uint32) wasi.Errno {
+				ret, err := fn.Call(context.Background(), uint64(fd), uint64(dirflags), uint64(path), uint64(pathLen), uint64(oflags), uint64(fsRightsBase), uint64(fsRightsInheriting), uint64(fdFlags), uint64(resultOpenedFd))
 				require.NoError(t, err)
 				return wasi.Errno(ret[0])
 			}
@@ -1375,13 +1375,13 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 			ok := mem.Write(0, initialMemory)
 			require.True(t, ok)
 
-			errno := tc.pathOpen()(ctx(mem), fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFD)
+			errno := tc.pathOpen()(ctx(mem), fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
 
 			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
-			require.Equal(t, "wazero", api.opened[expectedFd].path) // verify the file was actually opened
+			require.Equal(t, "wazero", api.opened[expectedFD].path) // verify the file was actually opened
 		})
 	}
 }
@@ -1405,7 +1405,7 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 
 	tests := []struct {
 		name                                                                                           string
-		fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFD uint64
+		fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd uint64
 		pathName                                                                                       string
 		expectedErrno                                                                                  wasi.Errno
 	}{
@@ -1437,11 +1437,11 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 			expectedErrno: wasi.ErrnoNoent,
 		},
 		{
-			name:           "out-of-memory writing resultOpenedFD",
+			name:           "out-of-memory writing resultOpenedFd",
 			fd:             validFD,
 			path:           0, // abirtrary offset, pathName is here
 			pathLen:        6, // length of "wazero"
-			resultOpenedFD: uint64(mem.Size()),
+			resultOpenedFd: uint64(mem.Size()),
 			pathName:       "wazero", // the file that exists
 			expectedErrno:  wasi.ErrnoFault,
 		},
@@ -1454,7 +1454,7 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 				mem.Write(uint32(tc.path), []byte(tc.pathName))
 			}
 
-			results, err := fn.Call(context.Background(), tc.fd, tc.dirflags, tc.path, tc.pathLen, tc.oflags, tc.fsRightsBase, tc.fsRightsInheriting, tc.fdFlags, tc.resultOpenedFD)
+			results, err := fn.Call(context.Background(), tc.fd, tc.dirflags, tc.path, tc.pathLen, tc.oflags, tc.fsRightsBase, tc.fsRightsInheriting, tc.fdFlags, tc.resultOpenedFd)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
