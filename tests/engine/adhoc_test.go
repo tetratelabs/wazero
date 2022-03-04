@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"math"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,7 +15,7 @@ import (
 )
 
 func requireJITSupported(t *testing.T) {
-	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+	if !wazero.JITSupported {
 		t.Skip()
 	}
 }
