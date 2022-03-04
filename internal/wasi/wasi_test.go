@@ -1604,10 +1604,10 @@ func instantiateModule(t *testing.T, wasiFunction, wasiImport, moduleName string
 )`, wasiFunction, wasiImport)), enabledFeatures)
 	require.NoError(t, err)
 
+	// The package `wazero` has a simpler interface for adding host modules, but we can't use that as it would create an
+	// import cycle. Instead, we export Store.NewHostModule and use it here.
 	store := wasm.NewStore(context.Background(), interpreter.NewEngine(), enabledFeatures)
-
-	snapshotPreview1Functions := SnapshotPreview1Functions(opts...)
-	_, err = store.NewHostModule(wasi.ModuleSnapshotPreview1, snapshotPreview1Functions)
+	_, err = store.NewHostModule(wasi.ModuleSnapshotPreview1, SnapshotPreview1Functions(opts...))
 	require.NoError(t, err)
 
 	instantiated, err := store.Instantiate(mem, moduleName)
