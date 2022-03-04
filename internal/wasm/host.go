@@ -129,7 +129,7 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 	return ret, nil
 }
 
-func (s *Store) compileFunction(f *FunctionInstance, hf *GoFunc) (err error) {
+func (s *Store) compileHostFunction(f *FunctionInstance, hf *GoFunc) (err error) {
 	f.FunctionType, err = s.getTypeInstance(hf.functionType)
 	if err != nil {
 		return err
