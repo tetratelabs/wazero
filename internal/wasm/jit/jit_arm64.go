@@ -398,10 +398,10 @@ func (c *arm64Compiler) String() (ret string) { return }
 
 // pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
 func (c *arm64Compiler) pushFunctionParams() {
-	if c.f == nil || c.f.FunctionType == nil {
+	if c.f == nil || c.f.Type == nil {
 		return
 	}
-	for _, t := range c.f.FunctionType.Params {
+	for _, t := range c.f.Type.Params {
 		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -1089,7 +1089,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.Module.Functions[o.FunctionIndex]
-	return c.compileCallImpl(target.Index, nilRegister, target.FunctionType)
+	return c.compileCallImpl(target.Index, nilRegister, target.Type)
 }
 
 // compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect for the arm64 architecture.
@@ -1429,14 +1429,14 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	)
 
 	// Check if table[offset].TypeID == targetFunctionType.
-	targetFunctionType := c.f.Module.Types[o.TypeIndex]
+	ti := c.f.Module.Types[o.TypeIndex]
 	// "tmp = table[offset].TypeID"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD, offset.register, tableElementFunctionTypeIDOffset,
 		tmp,
 	)
 	// "reservedRegisterForTemporary = targetFunctionType.TypeID"
-	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(targetFunctionType.TypeID), reservedRegisterForTemporary)
+	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(ti.TypeID), reservedRegisterForTemporary)
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, reservedRegisterForTemporary)
 	brIfTypeMatched := c.compilelBranchInstruction(arm64.ABEQ)
@@ -1468,7 +1468,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		offset.register,
 	)
 
-	if err := c.compileCallImpl(0, offset.register, targetFunctionType); err != nil {
+	if err := c.compileCallImpl(0, offset.register, ti.Type); err != nil {
 		return err
 	}
 
