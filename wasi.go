@@ -72,7 +72,10 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
 			opts = append(opts, internalwasi.Preopen(k, v))
 		}
 	}
-	return &HostModuleConfig{Name: wasi.ModuleSnapshotPreview1, Functions: internalwasi.SnapshotPreview1Functions(opts...)}
+	return &HostModuleConfig{
+		Name:      wasi.ModuleSnapshotPreview1,
+		Functions: internalwasi.SnapshotPreview1Functions(opts...),
+	}
 }
 
 // StartWASICommandFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or errs if
