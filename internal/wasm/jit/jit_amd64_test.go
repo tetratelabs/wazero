@@ -158,7 +158,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 	t.Run("deep call stack", func(t *testing.T) {
 		env := newJITEnvironment()
 		engine := env.engine()
-		vm := env.callEngine()
+		ce := env.callEngine()
 
 		// Push the call frames.
 		const callFrameNums = 10
@@ -193,8 +193,8 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 				returnStackBasePointer: uint64(funcaddr) * 5,
 				compiledFunction:       compiledFunction,
 			}
-			vm.callFrameStack[vm.globalContext.callFrameStackPointer] = frame
-			vm.globalContext.callFrameStackPointer++
+			ce.callFrameStack[ce.globalContext.callFrameStackPointer] = frame
+			ce.globalContext.callFrameStackPointer++
 
 			stackPointerToExpectedValue[frame.returnStackBasePointer] = expValue
 		}
@@ -202,7 +202,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		require.Equal(t, uint64(callFrameNums), env.callFrameStackPointer())
 
 		// Run codes.
-		env.exec(vm.callFrameTop().compiledFunction.codeSegment)
+		env.exec(ce.callFrameTop().compiledFunction.codeSegment)
 
 		// Check the exit status.
 		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
@@ -284,7 +284,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
-			vm := env.callEngine()
+			ce := env.callEngine()
 			compiler := env.requireNewCompiler(t)
 			compiler.initializeReservedStackBasePointer()
 			compiler.f.ModuleInstance = tc.moduleInstance
@@ -310,25 +310,25 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 
 			// Check if the fields of callEngine.moduleContext are updated.
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
-			require.Equal(t, bufSliceHeader.Data, vm.moduleContext.globalElement0Address)
+			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
 
 			if tc.moduleInstance.MemoryInstance != nil {
 				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.MemoryInstance.Buffer))
-				require.Equal(t, uint64(bufSliceHeader.Len), vm.moduleContext.memorySliceLen)
-				require.Equal(t, bufSliceHeader.Data, vm.moduleContext.memoryElement0Address)
+				require.Equal(t, uint64(bufSliceHeader.Len), ce.moduleContext.memorySliceLen)
+				require.Equal(t, bufSliceHeader.Data, ce.moduleContext.memoryElement0Address)
 			}
 
 			if tc.moduleInstance.TableInstance != nil {
 				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.TableInstance.Table))
-				require.Equal(t, uint64(tableHeader.Len), vm.moduleContext.tableSliceLen)
-				require.Equal(t, tableHeader.Data, vm.moduleContext.tableElement0Address)
+				require.Equal(t, uint64(tableHeader.Len), ce.moduleContext.tableSliceLen)
+				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 			}
 		})
 	}
 }
 
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
-	requireRunAndExpectedValueReturned := func(t *testing.T, c *amd64Compiler, expValue uint32) {
+	requireRunAndExpectedValueReturned := func(t *testing.T, env *jitEnv, c *amd64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
 		for returnValue := uint32(0); returnValue < 10; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
@@ -345,7 +345,6 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		require.NoError(t, err)
 
 		// Run codes
-		env := newJITEnvironment()
 		env.exec(code)
 
 		// Check the returned value.
@@ -503,7 +502,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, indexReg)
 						require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
 
-						requireRunAndExpectedValueReturned(t, compiler, tc.expectedValue)
+						requireRunAndExpectedValueReturned(t, env, compiler, tc.expectedValue)
 					})
 				}
 			})

@@ -16,30 +16,30 @@ import (
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.
 func TestVerifyOffsetValue(t *testing.T) {
-	var vm callEngine
+	var ce callEngine
 	// Offsets for callEngine.globalContext.
-	require.Equal(t, int(unsafe.Offsetof(vm.valueStackElement0Address)), callEngineGlobalContextValueStackElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.valueStackLen)), callEngineGlobalContextValueStackLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.callFrameStackElementZeroAddress)), callEngineGlobalContextCallFrameStackElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.compiledFunctionsElement0Address)), callEngineGlobalContextCompiledFunctionsElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.valueStackElement0Address)), callEngineGlobalContextValueStackElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.valueStackLen)), callEngineGlobalContextValueStackLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackElementZeroAddress)), callEngineGlobalContextCallFrameStackElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.compiledFunctionsElement0Address)), callEngineGlobalContextCompiledFunctionsElement0AddressOffset)
 
 	// Offsets for callEngine.moduleContext.
-	require.Equal(t, int(unsafe.Offsetof(vm.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.globalElement0Address)), callEngineModuleContextGlobalElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.memoryElement0Address)), callEngineModuleContextMemoryElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
 
 	// Offsets for callEngine.valueStackContext
-	require.Equal(t, int(unsafe.Offsetof(vm.stackPointer)), callEngineValueStackContextStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.stackBasePointer)), callEngineValueStackContextStackBasePointerOffset)
 
 	// Offsets for callEngine.exitContext.
-	require.Equal(t, int(unsafe.Offsetof(vm.statusCode)), callEngineExitContextJITCallStatusCodeOffset)
-	require.Equal(t, int(unsafe.Offsetof(vm.functionCallAddress)), callEngineExitContextFunctionCallAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextJITCallStatusCodeOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.functionCallAddress)), callEngineExitContextFunctionCallAddressOffset)
 
 	// Size and offsets for callFrame.
 	var frame callFrame
