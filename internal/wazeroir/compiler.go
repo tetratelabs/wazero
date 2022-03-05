@@ -157,7 +157,7 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 	c := compiler{controlFrames: &controlFrames{}, f: f, result: CompilationResult{LabelCallers: map[string]uint32{}}}
 
 	// Push function arguments.
-	for _, t := range f.FunctionType.Type.Params {
+	for _, t := range f.Type.Params {
 		c.stackPush(wasmValueTypeToUnsignedType(t))
 	}
 	// Emit const expressions for locals.
@@ -169,13 +169,13 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 	}
 
 	// Insert the function control frame.
-	returns := make([]UnsignedType, 0, len(f.FunctionType.Type.Results))
-	for _, t := range f.FunctionType.Type.Results {
+	returns := make([]UnsignedType, 0, len(f.Type.Results))
+	for _, t := range f.Type.Results {
 		returns = append(returns, wasmValueTypeToUnsignedType(t))
 	}
 	c.controlFrames.push(&controlFrame{
 		frameID:          c.nextID(),
-		originalStackLen: len(f.FunctionType.Type.Params),
+		originalStackLen: len(f.Type.Params),
 		returns:          returns,
 		kind:             controlFrameKindFunction,
 	})
@@ -220,7 +220,7 @@ operatorSwitch:
 	case wasm.OpcodeNop:
 		// Nop is noop!
 	case wasm.OpcodeBlock:
-		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
+		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types,
 			bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for block instruction: %w", err)
@@ -246,7 +246,7 @@ operatorSwitch:
 		c.controlFrames.push(frame)
 
 	case wasm.OpcodeLoop:
-		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
+		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types,
 			bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for loop instruction: %w", err)
@@ -284,7 +284,7 @@ operatorSwitch:
 		)
 
 	case wasm.OpcodeIf:
-		bt, num, err := wasm.DecodeBlockType(c.f.ModuleInstance.Types,
+		bt, num, err := wasm.DecodeBlockType(c.f.Module.Types,
 			bytes.NewReader(c.f.Body[c.pc+1:]))
 		if err != nil {
 			return fmt.Errorf("reading block type for if instruction: %w", err)

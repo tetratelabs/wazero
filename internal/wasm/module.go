@@ -398,8 +398,8 @@ func (m *Module) buildFunctionInstances() (functions []*FunctionInstance) {
 
 	importCount := m.ImportFuncCount()
 	n, nLen := 0, len(functionNames)
-	for codeIndex := range m.FunctionSection {
-		funcIdx := Index(importCount + uint32(len(functions)))
+	for codeIndex, typeIndex := range m.FunctionSection {
+		funcIdx := importCount + uint32(len(functions))
 		// Seek to see if there's a better name than "unknown"
 		name := "unknown"
 		for ; n < nLen; n++ {
@@ -413,10 +413,11 @@ func (m *Module) buildFunctionInstances() (functions []*FunctionInstance) {
 		}
 
 		f := &FunctionInstance{
-			Name:         name,
-			FunctionKind: FunctionKindWasm,
-			Body:         m.CodeSection[codeIndex].Body,
-			LocalTypes:   m.CodeSection[codeIndex].LocalTypes,
+			Name:       name,
+			Kind:       FunctionKindWasm,
+			Type:       m.TypeSection[typeIndex],
+			Body:       m.CodeSection[codeIndex].Body,
+			LocalTypes: m.CodeSection[codeIndex].LocalTypes,
 		}
 		functions = append(functions, f)
 	}
@@ -462,23 +463,37 @@ type FunctionType struct {
 	// Note: In WebAssembly 1.0 (20191205), there can be at most one result.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#result-types%E2%91%A0
 	Results []ValueType
+
+	// string is cached as it is used both for String and key
+	string string
 }
 
-func (t *FunctionType) String() (ret string) {
+// key gets or generates the key for Store.typeIDs. Ex. "i32_v" for one i32 parameter and no (void) result.
+func (t *FunctionType) key() string {
+	if t.string != "" {
+		return t.string
+	}
+	var ret string
 	for _, b := range t.Params {
 		ret += ValueTypeName(b)
 	}
 	if len(t.Params) == 0 {
-		ret += "null"
+		ret += "v"
 	}
 	ret += "_"
 	for _, b := range t.Results {
 		ret += ValueTypeName(b)
 	}
 	if len(t.Results) == 0 {
-		ret += "null"
+		ret += "v"
 	}
-	return
+	t.string = ret
+	return ret
+}
+
+// String implements fmt.Stringer.
+func (t *FunctionType) String() string {
+	return t.key()
 }
 
 // Import is the binary representation of an import indicated by Type

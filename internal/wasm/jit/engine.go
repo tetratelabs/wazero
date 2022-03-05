@@ -332,7 +332,7 @@ func (e *engine) Release(f *wasm.FunctionInstance) error {
 
 func (e *engine) Compile(f *wasm.FunctionInstance) (err error) {
 	var compiled *compiledFunction
-	if f.FunctionKind == wasm.FunctionKindWasm {
+	if f.Kind == wasm.FunctionKindWasm {
 		compiled, err = compileWasmFunction(f)
 	} else {
 		compiled, err = compileHostFunction(f)
@@ -359,7 +359,7 @@ func (e *engine) addCompiledFunction(index wasm.FunctionIndex, compiled *compile
 }
 
 func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	paramSignature := f.FunctionType.Type.Params
+	paramSignature := f.Type.Params
 	paramCount := len(params)
 	if len(paramSignature) != paramCount {
 		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
@@ -407,15 +407,15 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		return
 	}
 
-	if f.FunctionKind == wasm.FunctionKindWasm {
+	if f.Kind == wasm.FunctionKindWasm {
 		ce.execWasmFunction(ctx, compiled)
 	} else {
-		ce.execHostFunction(f.FunctionKind, compiled.source.HostFunction, ctx)
+		ce.execHostFunction(f.Kind, compiled.source.GoFunc, ctx)
 	}
 
 	// Note the top value is the tail of the results,
 	// so we assign them in reverse order.
-	results = make([]uint64, len(f.FunctionType.Type.Results))
+	results = make([]uint64, len(f.Type.Results))
 	for i := range results {
 		results[len(results)-1-i] = ce.popValue()
 	}
@@ -582,15 +582,15 @@ jitentry:
 			fn := ce.compiledFunctions[ce.exitContext.functionCallAddress]
 			callerCompiledFunction := ce.callFrameAt(1).compiledFunction
 			// A host function is invoked with the calling frame's memory, which may be different if in another module.
-			ce.execHostFunction(fn.source.FunctionKind, fn.source.HostFunction,
-				ctx.WithMemory(callerCompiledFunction.source.ModuleInstance.MemoryInstance),
+			ce.execHostFunction(fn.source.Kind, fn.source.GoFunc,
+				ctx.WithMemory(callerCompiledFunction.source.Module.MemoryInstance),
 			)
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch ce.exitContext.functionCallAddress {
 			case builtinFunctionIndexMemoryGrow:
 				callerCompiledFunction := ce.callFrameTop().compiledFunction
-				ce.builtinFunctionMemoryGrow(callerCompiledFunction.source.ModuleInstance.MemoryInstance)
+				ce.builtinFunctionMemoryGrow(callerCompiledFunction.source.Module.MemoryInstance)
 			case builtinFunctionIndexGrowValueStack:
 				callerCompiledFunction := ce.callFrameTop().compiledFunction
 				ce.builtinFunctionGrowValueStack(callerCompiledFunction.stackPointerCeil)
@@ -629,7 +629,7 @@ func (ce *callEngine) pushCallFrame(f *compiledFunction) {
 	//
 	// That maens the next stack base poitner is calculated as follows (note stack pointer is relative to base):
 	ce.valueStackContext.stackBasePointer =
-		ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer - uint64(len(f.source.FunctionType.Type.Params))
+		ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer - uint64(len(f.source.Type.Params))
 }
 
 func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
@@ -694,8 +694,8 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 		return nil, err
 	}
 
-	stackPointerCeil := uint64(len(f.FunctionType.Type.Params))
-	if res := uint64(len(f.FunctionType.Type.Results)); stackPointerCeil < res {
+	stackPointerCeil := uint64(len(f.Type.Params))
+	if res := uint64(len(f.Type.Results)); stackPointerCeil < res {
 		stackPointerCeil = res
 	}
 

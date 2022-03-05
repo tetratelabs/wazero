@@ -14,7 +14,7 @@ func newTypeParser(typeNamespace *indexNamespace, onType onType) *typeParser {
 
 type onType func(ft *wasm.FunctionType) tokenParser
 
-// typeParser parses a wasm.FunctionType from and dispatches to onType.
+// typeParser parses a wasm.Type from and dispatches to onType.
 //
 // Ex. `(module (type (func (param i32) (result i64)))`
 //      starts here --^                             ^

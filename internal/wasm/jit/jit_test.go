@@ -112,8 +112,8 @@ func (j *jitEnv) exec(code []byte) {
 		codeSegment:        code,
 		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 		source: &wasm.FunctionInstance{
-			FunctionKind: wasm.FunctionKindWasm,
-			FunctionType: &wasm.TypeInstance{Type: &wasm.FunctionType{}},
+			Kind: wasm.FunctionKindWasm,
+			Type: &wasm.FunctionType{},
 		},
 	}
 

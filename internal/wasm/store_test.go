@@ -130,7 +130,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 	_, err := s.NewHostModule("", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
 	require.NoError(t, err)
 
-	t.Run("ModuleInstance is the importing module", func(t *testing.T) {
+	t.Run("Module is the importing module", func(t *testing.T) {
 		_, err = s.Instantiate(&Module{
 			TypeSection:   []*FunctionType{{}},
 			ImportSection: []*Import{{Type: ExternTypeFunc, Name: "host_fn", DescFunc: 0}},
@@ -147,7 +147,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 		// We expect the host function to be called in context of the importing module.
 		// Otherwise, it would be the pseudo-module of the host, which only includes types and function definitions.
 		// Notably, this ensures the host function call context has the correct memory (from the importing module).
-		require.Equal(t, s.moduleInstances["test"], ei.Function.ModuleInstance)
+		require.Equal(t, s.moduleInstances["test"], ei.Function.Module)
 	})
 }
 
@@ -653,7 +653,7 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("signature mismatch", func(t *testing.T) {
 			s := newStore()
 			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Function: &FunctionInstance{FunctionType: &TypeInstance{Type: &FunctionType{}}},
+				Function: &FunctionInstance{Type: &FunctionType{}},
 			}}, Name: moduleName}
 			m := &Module{
 				TypeSection:   []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
@@ -661,11 +661,11 @@ func TestStore_resolveImports(t *testing.T) {
 			}
 			_, _, _, _, _, err := s.resolveImports(m)
 			require.Error(t, err)
-			require.Contains(t, err.Error(), "signature mimatch: null_f32 != null_null")
+			require.Contains(t, err.Error(), "signature mimatch: v_f32 != v_v")
 		})
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
-			f := &FunctionInstance{FunctionType: &TypeInstance{Type: &FunctionType{Results: []ValueType{ValueTypeF32}}}}
+			f := &FunctionInstance{Type: &FunctionType{Results: []ValueType{ValueTypeF32}}}
 			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Function: f,
 			}}, Name: moduleName}
@@ -903,8 +903,8 @@ func TestModuleInstance_applyElements(t *testing.T) {
 	}
 	targetAddr, targetOffset := uint32(1), byte(0)
 	targetAddr2, targetOffset2 := functionCounts-1, byte(0x8)
-	m.Functions[targetAddr] = &FunctionInstance{FunctionType: &TypeInstance{}, Index: FunctionIndex(targetAddr)}
-	m.Functions[targetAddr2] = &FunctionInstance{FunctionType: &TypeInstance{}, Index: FunctionIndex(targetAddr2)}
+	m.Functions[targetAddr] = &FunctionInstance{Type: &FunctionType{}, Index: FunctionIndex(targetAddr)}
+	m.Functions[targetAddr2] = &FunctionInstance{Type: &FunctionType{}, Index: FunctionIndex(targetAddr2)}
 	m.applyElements([]*ElementSegment{
 		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset}}, Init: []uint32{uint32(targetAddr)}},
 		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset2}}, Init: []uint32{targetAddr2}},

@@ -134,32 +134,42 @@ type (
 	// FunctionInstance represents a function instance in a Store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0
 	FunctionInstance struct {
-		// ModuleInstance holds the pointer to the module instance to which this function belongs.
-		ModuleInstance *ModuleInstance
-		// Body is the function body in WebAssembly Binary Format
-		Body []byte
-		// FunctionType holds the pointer to TypeInstance whose functionType field equals that of this function.
-		FunctionType *TypeInstance
-		// LocalTypes holds types of locals.
-		LocalTypes []ValueType
-		// FunctionKind describes how this function should be called.
-		FunctionKind FunctionKind
-		// HostFunction holds the runtime representation of host functions.
-		// This is nil when FunctionKind == FunctionKindWasm. Otherwise, all the above fields are ignored as they are
-		// specific to Wasm functions.
-		HostFunction *reflect.Value
-		// Index is the index of this function instance in store.Functions, and is exported because
-		// all function calls are made via funcaddr at runtime, not the index (scoped to a module).
-		//
-		// This is used by both host and non-host functions.
-		Index FunctionIndex
 		// Name is for debugging purpose, and is used to argument the stack traces.
 		//
-		// When HostFunction is not nil, this returns dot-delimited parameters given to
+		// When GoFunc is not nil, this returns dot-delimited parameters given to
 		// Store.NewHostModule. Ex. something.realistic
 		//
 		// Otherwise, this is the corresponding value in NameSection.FunctionNames or "unknown" if unavailable.
 		Name string
+
+		// Kind describes how this function should be called.
+		Kind FunctionKind
+
+		// Type is the signature of this function.
+		Type *FunctionType
+
+		// LocalTypes holds types of locals, set when Kind == FunctionKindWasm
+		LocalTypes []ValueType
+
+		// Body is the function body in WebAssembly Binary Format, set when Kind == FunctionKindWasm
+		Body []byte
+
+		// GoFunc holds the runtime representation of host functions.
+		// This is nil when Kind == FunctionKindWasm. Otherwise, all the above fields are ignored as they are
+		// specific to Wasm functions.
+		GoFunc *reflect.Value
+
+		// Fields above here are settable prior to instantiation. Below are set by the Store during instantiation.
+
+		// ModuleInstance holds the pointer to the module instance to which this function belongs.
+		Module *ModuleInstance
+		// TypeID is assigned by a store for FunctionType.
+		TypeID FunctionTypeID
+		// Index is the index of this function instance in Store.functions, and is exported because
+		// all function calls are made via funcaddr at runtime, not the index (scoped to a module).
+		//
+		// This is used by both host and non-host functions.
+		Index FunctionIndex
 	}
 
 	// TypeInstance is a store-specific representation of FunctionType where the function type
@@ -208,7 +218,7 @@ type (
 		// the target function instance in Store.FunctionInstances.
 		FunctionIndex FunctionIndex
 		// FunctionTypeID is the type ID of the target function's type, which
-		// equals store.Functions[FunctionIndex].FunctionType.TypeID.
+		// equals store.Functions[FunctionIndex].TypeID.
 		FunctionTypeID FunctionTypeID
 	}
 
@@ -262,8 +272,8 @@ func newModuleInstance(name string, module *Module, importedFunctions, functions
 	instance.Functions = append(instance.Functions, importedFunctions...)
 	for i, f := range functions {
 		// Associate each function with the type instance and the module instance's pointer.
-		f.FunctionType = typeInstances[module.FunctionSection[i]]
-		f.ModuleInstance = instance
+		f.Module = instance
+		f.TypeID = typeInstances[module.FunctionSection[i]].TypeID
 		instance.Functions = append(instance.Functions, f)
 	}
 
@@ -297,8 +307,8 @@ func (m *ModuleInstance) buildExportInstances(exports map[string]*Export) {
 			// The module instance of the host function is a fake that only includes the function and its types.
 			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
 			// available to the wasm.ModuleContext Memory.
-			if ei.Function.HostFunction != nil {
-				ei.Function.ModuleInstance = m
+			if ei.Function.GoFunc != nil {
+				ei.Function.Module = m
 			}
 		case ExternTypeGlobal:
 			ei = &ExportInstance{Type: exp.Type, Global: m.Globals[index]}
@@ -358,7 +368,7 @@ func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
 			targetFunc := m.Functions[elm]
 			table[pos] = TableElement{
 				FunctionIndex:  targetFunc.Index,
-				FunctionTypeID: targetFunc.FunctionType.TypeID,
+				FunctionTypeID: targetFunc.TypeID,
 			}
 		}
 	}
@@ -714,8 +724,8 @@ func (s *Store) resolveImports(module *Module) (
 			}
 			expectedType := module.TypeSection[typeIndex]
 			f := exp.Function
-			if !bytes.Equal(expectedType.Results, f.FunctionType.Type.Results) || !bytes.Equal(expectedType.Params, f.FunctionType.Type.Params) {
-				err = fmt.Errorf("signature mimatch: %s != %s", expectedType, f.FunctionType.Type)
+			if !bytes.Equal(expectedType.Results, f.Type.Results) || !bytes.Equal(expectedType.Params, f.Type.Params) {
+				err = fmt.Errorf("signature mimatch: %s != %s", expectedType, f.Type)
 				return
 			}
 			functions = append(functions, f)
