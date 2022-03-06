@@ -105,22 +105,23 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 	}
 
 	for name, goFunc := range nameToGoFunc {
-		hf, err := NewGoFunc(name, goFunc)
+		hf, err := newGoFunc(goFunc)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("func[%s] %w", name, err)
 		}
 
 		f := &FunctionInstance{
-			Name:           fmt.Sprintf("%s.%s", hostModule.Name, hf.wasmFunctionName),
-			HostFunction:   hf.goFunc,
-			FunctionKind:   hf.functionKind,
-			ModuleInstance: hostModule,
+			Module: hostModule,
+			Name:   fmt.Sprintf("%s.%s", hostModule.Name, name),
+			Kind:   hf.functionKind,
+			Type:   hf.functionType,
+			GoFunc: hf.goFunc,
 		}
-		hostModule.Exports[hf.wasmFunctionName] = &ExportInstance{Type: ExternTypeFunc, Function: f}
+		hostModule.Exports[name] = &ExportInstance{Type: ExternTypeFunc, Function: f}
 		hostModule.Functions = append(hostModule.Functions, f)
 		ret.NameToFunctionInstance[name] = f
 
-		if err = s.compileHostFunction(f, hf); err != nil {
+		if err = s.compileHostFunction(f); err != nil {
 			return nil, err
 		}
 	}
@@ -129,11 +130,12 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 	return ret, nil
 }
 
-func (s *Store) compileHostFunction(f *FunctionInstance, hf *GoFunc) (err error) {
-	f.FunctionType, err = s.getTypeInstance(hf.functionType)
+func (s *Store) compileHostFunction(f *FunctionInstance) (err error) {
+	ti, err := s.getTypeInstance(f.Type)
 	if err != nil {
 		return err
 	}
+	f.TypeID = ti.TypeID
 	s.addFunctionInstances(f)
 
 	if err = s.engine.Compile(f); err != nil {
@@ -167,12 +169,12 @@ func (m *HostModule) String() string {
 
 // ParamTypes implements wasm.HostFunction ParamTypes
 func (f *FunctionInstance) ParamTypes() []publicwasm.ValueType {
-	return f.FunctionType.Type.Params
+	return f.Type.Params
 }
 
 // ResultTypes implements wasm.HostFunction ResultTypes
 func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
-	return f.FunctionType.Type.Results
+	return f.Type.Results
 }
 
 // Call implements wasm.HostFunction Call

@@ -14,13 +14,13 @@ func TestFunctionType_String(t *testing.T) {
 		functype *FunctionType
 		exp      string
 	}{
-		{functype: &FunctionType{}, exp: "null_null"},
-		{functype: &FunctionType{Params: []ValueType{ValueTypeI32}}, exp: "i32_null"},
-		{functype: &FunctionType{Params: []ValueType{ValueTypeI32, ValueTypeF64}}, exp: "i32f64_null"},
-		{functype: &FunctionType{Params: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "f32i32f64_null"},
-		{functype: &FunctionType{Results: []ValueType{ValueTypeI64}}, exp: "null_i64"},
-		{functype: &FunctionType{Results: []ValueType{ValueTypeI64, ValueTypeF32}}, exp: "null_i64f32"},
-		{functype: &FunctionType{Results: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "null_f32i32f64"},
+		{functype: &FunctionType{}, exp: "v_v"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeI32}}, exp: "i32_v"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeI32, ValueTypeF64}}, exp: "i32f64_v"},
+		{functype: &FunctionType{Params: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "f32i32f64_v"},
+		{functype: &FunctionType{Results: []ValueType{ValueTypeI64}}, exp: "v_i64"},
+		{functype: &FunctionType{Results: []ValueType{ValueTypeI64, ValueTypeF32}}, exp: "v_i64f32"},
+		{functype: &FunctionType{Results: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "v_f32i32f64"},
 		{functype: &FunctionType{Params: []ValueType{ValueTypeI32}, Results: []ValueType{ValueTypeI64}}, exp: "i32_i64"},
 		{functype: &FunctionType{Params: []ValueType{ValueTypeI64, ValueTypeF32}, Results: []ValueType{ValueTypeI64, ValueTypeF32}}, exp: "i64f32_i64f32"},
 		{functype: &FunctionType{Params: []ValueType{ValueTypeI64, ValueTypeF32, ValueTypeF64}, Results: []ValueType{ValueTypeF32, ValueTypeI32, ValueTypeF64}}, exp: "i64f32f64_f32i32f64"},
@@ -28,6 +28,8 @@ func TestFunctionType_String(t *testing.T) {
 		tc := tc
 		t.Run(tc.functype.String(), func(t *testing.T) {
 			require.Equal(t, tc.exp, tc.functype.String())
+			require.Equal(t, tc.exp, tc.functype.key())
+			require.Equal(t, tc.exp, tc.functype.string)
 		})
 	}
 }

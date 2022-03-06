@@ -103,7 +103,7 @@ func TestGetFunctionType(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			rVal := reflect.ValueOf(tc.inputFunc)
-			fk, ft, hasErrorResult, err := GetFunctionType("fn", &rVal, tc.allowErrorResult)
+			fk, ft, hasErrorResult, err := getFunctionType(&rVal, tc.allowErrorResult)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedKind, fk)
 			require.Equal(t, tc.expectedType, ft)
@@ -122,42 +122,42 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 		{
 			name:        "not a func",
 			input:       struct{}{},
-			expectedErr: "fn is a struct, but should be a Func",
+			expectedErr: "kind != func: struct",
 		},
 		{
 			name:        "unsupported param",
 			input:       func(uint32, string) {},
-			expectedErr: "fn param[1] is unsupported: string",
+			expectedErr: "param[1] is unsupported: string",
 		},
 		{
 			name:        "unsupported result",
 			input:       func() string { return "" },
-			expectedErr: "fn result[0] is unsupported: string",
+			expectedErr: "result[0] is unsupported: string",
 		},
 		{
 			name:        "error result",
 			input:       func() error { return nil },
-			expectedErr: "fn result[0] is an error, which is unsupported",
+			expectedErr: "result[0] is an error, which is unsupported",
 		},
 		{
 			name:        "multiple results",
 			input:       func() (uint64, uint32) { return 0, 0 },
-			expectedErr: "fn has more than one result",
+			expectedErr: "multiple results are unsupported",
 		},
 		{
 			name:        "multiple context types",
 			input:       func(publicwasm.ModuleContext, context.Context) error { return nil },
-			expectedErr: "fn param[1] is a context.Context, which may be defined only once as param[0]",
+			expectedErr: "param[1] is a context.Context, which may be defined only once as param[0]",
 		},
 		{
 			name:        "multiple context.Context",
 			input:       func(context.Context, uint64, context.Context) error { return nil },
-			expectedErr: "fn param[2] is a context.Context, which may be defined only once as param[0]",
+			expectedErr: "param[2] is a context.Context, which may be defined only once as param[0]",
 		},
 		{
 			name:        "multiple wasm.ModuleContext",
 			input:       func(publicwasm.ModuleContext, uint64, publicwasm.ModuleContext) error { return nil },
-			expectedErr: "fn param[2] is a wasm.ModuleContext, which may be defined only once as param[0]",
+			expectedErr: "param[2] is a wasm.ModuleContext, which may be defined only once as param[0]",
 		},
 	}
 
@@ -166,7 +166,7 @@ func TestGetFunctionTypeErrors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			rVal := reflect.ValueOf(tc.input)
-			_, _, _, err := GetFunctionType("fn", &rVal, tc.allowErrorResult)
+			_, _, _, err := getFunctionType(&rVal, tc.allowErrorResult)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

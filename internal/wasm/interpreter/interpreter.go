@@ -144,7 +144,7 @@ func (e *engine) Release(f *wasm.FunctionInstance) error {
 func (e *engine) Compile(f *wasm.FunctionInstance) error {
 	funcIndex := f.Index
 	var compiled *compiledFunction
-	if f.FunctionKind == wasm.FunctionKindWasm {
+	if f.Kind == wasm.FunctionKindWasm {
 		ir, err := wazeroir.Compile(f)
 		if err != nil {
 			return fmt.Errorf("failed to compile Wasm to wazeroir: %w", err)
@@ -156,7 +156,7 @@ func (e *engine) Compile(f *wasm.FunctionInstance) error {
 		}
 	} else {
 		compiled = &compiledFunction{
-			hostFn: f.HostFunction, funcInstance: f,
+			hostFn: f.GoFunc, funcInstance: f,
 		}
 	}
 
@@ -266,13 +266,13 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 				}
 			}
 		case *wazeroir.OperationCall:
-			target := f.ModuleInstance.Functions[o.FunctionIndex]
+			target := f.Module.Functions[o.FunctionIndex]
 			op.us = make([]uint64, 1)
 			op.us[0] = uint64(target.Index)
 		case *wazeroir.OperationCallIndirect:
 			op.us = make([]uint64, 2)
 			op.us[0] = uint64(o.TableIndex)
-			op.us[1] = uint64(f.ModuleInstance.Types[o.TypeIndex].TypeID)
+			op.us[1] = uint64(f.Module.Types[o.TypeIndex].TypeID)
 		case *wazeroir.OperationDrop:
 			op.rs = make([]*wazeroir.InclusiveRange, 1)
 			op.rs[0] = o.Range
@@ -448,7 +448,7 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 
 // Call implements an interpreted wasm.Engine.
 func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	paramSignature := f.FunctionType.Type.Params
+	paramSignature := f.Type.Params
 	paramCount := len(params)
 	if len(paramSignature) != paramCount {
 		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
@@ -494,12 +494,12 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 	for _, param := range params {
 		vm.push(param)
 	}
-	if f.FunctionKind == wasm.FunctionKindWasm {
+	if f.Kind == wasm.FunctionKindWasm {
 		vm.callNativeFunc(ctx, compiled)
 	} else {
 		vm.callHostFunc(ctx, compiled)
 	}
-	results = make([]uint64, len(f.FunctionType.Type.Results))
+	results = make([]uint64, len(f.Type.Results))
 	for i := range results {
 		results[len(results)-1-i] = vm.pop()
 	}
@@ -511,7 +511,7 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 	in := make([]reflect.Value, tp.NumIn())
 
 	wasmParamOffset := 0
-	if f.funcInstance.FunctionKind != wasm.FunctionKindGoNoContext {
+	if f.funcInstance.Kind != wasm.FunctionKindGoNoContext {
 		wasmParamOffset = 1
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {
@@ -533,11 +533,11 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 
 	// A host function is invoked with the calling frame's memory, which may be different if in another module.
 	if len(vm.frames) > 0 {
-		ctx = ctx.WithMemory(vm.frames[len(vm.frames)-1].f.funcInstance.ModuleInstance.MemoryInstance)
+		ctx = ctx.WithMemory(vm.frames[len(vm.frames)-1].f.funcInstance.Module.MemoryInstance)
 	}
 
 	// Handle any special parameter zero
-	if val := wasm.GetHostFunctionCallContextValue(f.funcInstance.FunctionKind, ctx); val != nil {
+	if val := wasm.GetHostFunctionCallContextValue(f.funcInstance.Kind, ctx); val != nil {
 		in[0] = *val
 	}
 
@@ -562,7 +562,7 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 
 func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	frame := &callFrame{f: f}
-	moduleInst := f.funcInstance.ModuleInstance
+	moduleInst := f.funcInstance.Module
 	memoryInst := moduleInst.MemoryInstance
 	globals := moduleInst.Globals
 	table := moduleInst.TableInstance

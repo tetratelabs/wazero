@@ -2,6 +2,7 @@ package internalwasm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -24,20 +25,18 @@ const (
 	FunctionKindGoModuleContext
 )
 
-// GoFunc binds a WebAssembly 1.0 (20191205) Type Use to a Go func signature.
-type GoFunc struct {
-	wasmFunctionName string
+// goFunc binds a WebAssembly 1.0 (20191205) Type Use to a Go func signature.
+type goFunc struct {
 	// functionKind is never FunctionKindWasm
 	functionKind FunctionKind
 	functionType *FunctionType
 	goFunc       *reflect.Value
 }
 
-func NewGoFunc(wasmFunctionName string, goFunc interface{}) (hf *GoFunc, err error) {
-	hf = &GoFunc{wasmFunctionName: wasmFunctionName}
-	fn := reflect.ValueOf(goFunc)
-	hf.goFunc = &fn
-	hf.functionKind, hf.functionType, _, err = GetFunctionType(hf.wasmFunctionName, hf.goFunc, false)
+func newGoFunc(i interface{}) (hf *goFunc, err error) {
+	fn := reflect.ValueOf(i)
+	hf = &goFunc{goFunc: &fn}
+	hf.functionKind, hf.functionType, _, err = getFunctionType(hf.goFunc, false)
 	return
 }
 
@@ -63,13 +62,14 @@ func GetHostFunctionCallContextValue(fk FunctionKind, ctx *ModuleContext) *refle
 	return nil
 }
 
-// GetFunctionType returns the function type corresponding to the function signature or errs if invalid.
-func GetFunctionType(name string, fn *reflect.Value, allowErrorResult bool) (fk FunctionKind, ft *FunctionType, hasErrorResult bool, err error) {
+// getFunctionType returns the function type corresponding to the function signature or errs if invalid.
+func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind, ft *FunctionType, hasErrorResult bool, err error) {
+	p := fn.Type()
+
 	if fn.Kind() != reflect.Func {
-		err = fmt.Errorf("%s is a %s, but should be a Func", name, fn.Kind().String())
+		err = fmt.Errorf("kind != func: %s", fn.Kind().String())
 		return
 	}
-	p := fn.Type()
 
 	pOffset := 0
 	pCount := p.NumIn()
@@ -89,7 +89,7 @@ func GetFunctionType(name string, fn *reflect.Value, allowErrorResult bool) (fk 
 
 	rCount := p.NumOut()
 	if (allowErrorResult && rCount > 2) || (!allowErrorResult && rCount > 1) {
-		err = fmt.Errorf("%s has more than one result", name)
+		err = errors.New("multiple results are unsupported")
 		return
 	}
 
@@ -119,9 +119,9 @@ func GetFunctionType(name string, fn *reflect.Value, allowErrorResult bool) (fk 
 		}
 
 		if arg0Type != nil {
-			err = fmt.Errorf("%s param[%d] is a %s, which may be defined only once as param[0]", name, i+pOffset, arg0Type)
+			err = fmt.Errorf("param[%d] is a %s, which may be defined only once as param[0]", i+pOffset, arg0Type)
 		} else {
-			err = fmt.Errorf("%s param[%d] is unsupported: %s", name, i+pOffset, pI.Kind())
+			err = fmt.Errorf("param[%d] is unsupported: %s", i+pOffset, pI.Kind())
 		}
 		return
 	}
@@ -137,9 +137,9 @@ func GetFunctionType(name string, fn *reflect.Value, allowErrorResult bool) (fk 
 	}
 
 	if result.Implements(errorType) {
-		err = fmt.Errorf("%s result[0] is an error, which is unsupported", name)
+		err = errors.New("result[0] is an error, which is unsupported")
 	} else {
-		err = fmt.Errorf("%s result[0] is unsupported: %s", name, result.Kind())
+		err = fmt.Errorf("result[0] is unsupported: %s", result.Kind())
 	}
 	return
 }

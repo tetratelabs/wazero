@@ -398,10 +398,10 @@ func (c *arm64Compiler) String() (ret string) { return }
 
 // pushFunctionParams pushes any function parameters onto the stack, setting appropriate register types.
 func (c *arm64Compiler) pushFunctionParams() {
-	if c.f == nil || c.f.FunctionType == nil {
+	if c.f == nil || c.f.Type == nil {
 		return
 	}
-	for _, t := range c.f.FunctionType.Type.Params {
+	for _, t := range c.f.Type.Params {
 		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -702,7 +702,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	}
 
 	var intMov, floatMov obj.As = obj.ANOP, obj.ANOP
-	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
+	switch c.f.Module.Globals[o.Index].Type.ValType {
 	case wasm.ValueTypeI32:
 		intMov = arm64.AMOVWU
 	case wasm.ValueTypeI64:
@@ -750,7 +750,7 @@ func (c *arm64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	}
 
 	var mov obj.As
-	switch c.f.ModuleInstance.Globals[o.Index].Type.ValType {
+	switch c.f.Module.Globals[o.Index].Type.ValType {
 	case wasm.ValueTypeI32:
 		mov = arm64.AMOVWU
 	case wasm.ValueTypeI64:
@@ -1088,8 +1088,8 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
-	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	return c.compileCallImpl(target.Index, nilRegister, target.FunctionType.Type)
+	target := c.f.Module.Functions[o.FunctionIndex]
+	return c.compileCallImpl(target.Index, nilRegister, target.Type)
 }
 
 // compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect for the arm64 architecture.
@@ -1429,14 +1429,14 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	)
 
 	// Check if table[offset].TypeID == targetFunctionType.
-	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
+	ti := c.f.Module.Types[o.TypeIndex]
 	// "tmp = table[offset].TypeID"
 	c.compileMemoryToRegisterInstruction(
 		arm64.AMOVD, offset.register, tableElementFunctionTypeIDOffset,
 		tmp,
 	)
 	// "reservedRegisterForTemporary = targetFunctionType.TypeID"
-	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(targetFunctionType.TypeID), reservedRegisterForTemporary)
+	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(ti.TypeID), reservedRegisterForTemporary)
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, reservedRegisterForTemporary)
 	brIfTypeMatched := c.compilelBranchInstruction(arm64.ABEQ)
@@ -1468,7 +1468,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		offset.register,
 	)
 
-	if err := c.compileCallImpl(0, offset.register, targetFunctionType.Type); err != nil {
+	if err := c.compileCallImpl(0, offset.register, ti.Type); err != nil {
 		return err
 	}
 
@@ -3355,7 +3355,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 }
 
 func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
-	if c.f.ModuleInstance.MemoryInstance != nil {
+	if c.f.Module.MemoryInstance != nil {
 		// "reservedRegisterForMemory = ce.MemoryElement0Address"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
@@ -3380,7 +3380,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 
 	// Load the absolute address of the current function's module instance.
 	// Note: this should be modified to support Clone() functionality per #179.
-	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(uintptr(unsafe.Pointer(c.f.ModuleInstance))), moduleInstanceAddressRegister)
+	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(uintptr(unsafe.Pointer(c.f.Module))), moduleInstanceAddressRegister)
 
 	// "tmpX = ce.ModuleInstanceAddress"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, tmpX)
@@ -3402,7 +3402,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's global.get or set instruction in the function, the existence of the globals
 	// is ensured by function validation at module instantiation phase, and that's why it is ok to
 	// skip the initialization if the module's globals slice is empty.
-	if len(c.f.ModuleInstance.Globals) > 0 {
+	if len(c.f.Module.Globals) > 0 {
 		// "tmpX = &moduleInstance.Globals[0]"
 		c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 			moduleInstanceAddressRegister, moduleInstanceGlobalsOffset,
@@ -3421,7 +3421,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.f.ModuleInstance.MemoryInstance != nil {
+	if c.f.Module.MemoryInstance != nil {
 		// "tmpX = moduleInstance.Memory"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
@@ -3465,7 +3465,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if c.f.ModuleInstance.TableInstance != nil {
+	if c.f.Module.TableInstance != nil {
 		// "tmpX = &tables[0] (type of **wasm.TableInstance)"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,

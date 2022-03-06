@@ -135,15 +135,13 @@ func TestEngine_Call_HostFn(t *testing.T) {
 	module := &wasm.ModuleInstance{MemoryInstance: memory}
 	modCtx := wasm.NewModuleContext(context.Background(), e, module)
 	f := &wasm.FunctionInstance{
-		HostFunction: &hostFn,
-		FunctionKind: wasm.FunctionKindGoModuleContext,
-		FunctionType: &wasm.TypeInstance{
-			Type: &wasm.FunctionType{
-				Params:  []wasm.ValueType{wasm.ValueTypeI64},
-				Results: []wasm.ValueType{wasm.ValueTypeI64},
-			},
+		GoFunc: &hostFn,
+		Kind:   wasm.FunctionKindGoModuleContext,
+		Type: &wasm.FunctionType{
+			Params:  []wasm.ValueType{wasm.ValueTypeI64},
+			Results: []wasm.ValueType{wasm.ValueTypeI64},
 		},
-		ModuleInstance: module,
+		Module: module,
 	}
 	require.NoError(t, e.Compile(f))
 

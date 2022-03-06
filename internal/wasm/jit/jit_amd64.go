@@ -232,8 +232,8 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 }
 
 func (c *amd64Compiler) pushFunctionParams() {
-	if c.f != nil && c.f.FunctionType != nil {
-		for _, t := range c.f.FunctionType.Type.Params {
+	if c.f != nil && c.f.Type != nil {
+		for _, t := range c.f.Type.Params {
 			loc := c.locationStack.pushValueLocationOnStack()
 			switch t {
 			case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -403,7 +403,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
-	wasmType := c.f.ModuleInstance.Globals[o.Index].Type.ValType
+	wasmType := c.f.Module.Globals[o.Index].Type.ValType
 	switch wasmType {
 	case wasm.ValueTypeF32, wasm.ValueTypeF64:
 		valueReg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
@@ -929,18 +929,18 @@ func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 		return err
 	}
 
-	target := c.f.ModuleInstance.Functions[o.FunctionIndex]
-	if err := c.callFunctionFromConst(target.Index, target.FunctionType.Type); err != nil {
+	target := c.f.Module.Functions[o.FunctionIndex]
+	if err := c.callFunctionFromConst(target.Index, target.Type); err != nil {
 		return err
 	}
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(target.FunctionType.Type.Params); i++ {
+	for i := 0; i < len(target.Type.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range target.FunctionType.Type.Results {
+	for _, t := range target.Type.Results {
 		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -1001,14 +1001,15 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.addInstruction(movTableSliceAddress)
 
 	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset].
-	targetFunctionType := c.f.ModuleInstance.Types[o.TypeIndex]
+	ti := c.f.Module.Types[o.TypeIndex]
+	targetFunctionType := ti.Type
 	checkIfTypeMatch := c.newProg()
 	checkIfTypeMatch.As = x86.ACMPL // 32-bit as FunctionTypeID is in 32-bit unsigned integer.
 	checkIfTypeMatch.From.Type = obj.TYPE_MEM
 	checkIfTypeMatch.From.Reg = offset.register
 	checkIfTypeMatch.From.Offset = tableElementFunctionTypeIDOffset
 	checkIfTypeMatch.To.Type = obj.TYPE_CONST
-	checkIfTypeMatch.To.Offset = int64(targetFunctionType.TypeID)
+	checkIfTypeMatch.To.Offset = int64(ti.TypeID)
 	c.addInstruction(checkIfTypeMatch)
 
 	// Jump if the type matches.
@@ -1050,7 +1051,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	readValue.From.Reg = offset.register
 	c.addInstruction(readValue)
 
-	if err := c.callFunctionFromRegister(offset.register, targetFunctionType.Type); err != nil {
+	if err := c.callFunctionFromRegister(offset.register, targetFunctionType); err != nil {
 		return nil
 	}
 
@@ -1058,12 +1059,12 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.locationStack.markRegisterUnused(offset.register)
 
 	// We consumed the function parameters from the stack after call.
-	for i := 0; i < len(targetFunctionType.Type.Params); i++ {
+	for i := 0; i < len(targetFunctionType.Params); i++ {
 		c.locationStack.pop()
 	}
 
 	// Also, the function results were pushed by the call.
-	for _, t := range targetFunctionType.Type.Results {
+	for _, t := range targetFunctionType.Results {
 		loc := c.locationStack.pushValueLocationOnStack()
 		switch t {
 		case wasm.ValueTypeI32, wasm.ValueTypeI64:
@@ -5257,7 +5258,7 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 }
 
 func (c *amd64Compiler) initializeReservedMemoryPointer() {
-	if c.f.ModuleInstance.MemoryInstance != nil {
+	if c.f.Module.MemoryInstance != nil {
 		setupMemoryRegister := c.newProg()
 		setupMemoryRegister.As = x86.AMOVQ
 		setupMemoryRegister.To.Type = obj.TYPE_REG
@@ -5340,7 +5341,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	readModuleInstanceAddress.To.Type = obj.TYPE_REG
 	readModuleInstanceAddress.To.Reg = moduleInstanceAddressRegister
 	readModuleInstanceAddress.From.Type = obj.TYPE_CONST
-	readModuleInstanceAddress.From.Offset = int64(uintptr(unsafe.Pointer(c.f.ModuleInstance)))
+	readModuleInstanceAddress.From.Offset = int64(uintptr(unsafe.Pointer(c.f.Module)))
 	c.addInstruction(readModuleInstanceAddress)
 
 	// If the module instance address stays the same, we could skip the entire code below.
@@ -5385,7 +5386,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Note: if there's global.get or set instruction in the function, the existence of the globals
 	// is ensured by function validation at module instantiation phase, and that's why it is ok to
 	// skip the initialization if the module's globals slice is empty.
-	if len(c.f.ModuleInstance.Globals) > 0 {
+	if len(c.f.Module.Globals) > 0 {
 		// Since ModuleInstance.Globals is []*globalInstance, internally
 		// the address of the first item in the underlying array lies exactly on the globals offset.
 		// See https://go.dev/blog/slices-intro if unfamiliar.
@@ -5413,7 +5414,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if c.f.ModuleInstance.TableInstance != nil {
+	if c.f.Module.TableInstance != nil {
 		// First, we need to read the *wasm.TableInstance.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
@@ -5471,7 +5472,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.f.ModuleInstance.MemoryInstance != nil {
+	if c.f.Module.MemoryInstance != nil {
 		getMemoryInstanceAddress := c.newProg()
 		getMemoryInstanceAddress.As = x86.AMOVQ
 		getMemoryInstanceAddress.To.Type = obj.TYPE_REG

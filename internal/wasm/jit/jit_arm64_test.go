@@ -43,8 +43,8 @@ func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler *arm64Co
 
 func (j *jitEnv) requireNewCompiler(t *testing.T) *arm64Compiler {
 	cmp, done, err := newCompiler(&wasm.FunctionInstance{
-		ModuleInstance: j.moduleInstance,
-		FunctionKind:   wasm.FunctionKindWasm,
+		Module: j.moduleInstance,
+		Kind:   wasm.FunctionKindWasm,
 	}, nil)
 	require.NoError(t, err)
 	t.Cleanup(done)
@@ -1746,9 +1746,9 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
 					compiler := env.requireNewCompiler(t)
 					compiler.f = &wasm.FunctionInstance{
-						FunctionKind:   wasm.FunctionKindWasm,
-						FunctionType:   &wasm.TypeInstance{Type: targetFunctionType},
-						ModuleInstance: &wasm.ModuleInstance{},
+						Kind:   wasm.FunctionKindWasm,
+						Type:   targetFunctionType,
+						Module: &wasm.ModuleInstance{},
 					}
 
 					err := compiler.compilePreamble()
@@ -1769,7 +1769,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 						codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 					})
 					env.module().Functions = append(env.module().Functions,
-						&wasm.FunctionInstance{FunctionType: &wasm.TypeInstance{Type: targetFunctionType}, Index: index})
+						&wasm.FunctionInstance{Type: targetFunctionType, Index: index})
 				})
 			}
 
@@ -1830,8 +1830,8 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		targetOperation := &wazeroir.OperationCallIndirect{}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex.
 		compiler.f = &wasm.FunctionInstance{
-			FunctionKind:   wasm.FunctionKindWasm,
-			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
+			Kind:   wasm.FunctionKindWasm,
+			Module: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
 		}
 
 		// Place the offfset value.
@@ -1863,8 +1863,8 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		targetOffset := &wazeroir.OperationConstI32{Value: uint32(0)}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		compiler.f = &wasm.FunctionInstance{
-			ModuleInstance: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
-			FunctionKind:   wasm.FunctionKindWasm,
+			Module: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
+			Kind:   wasm.FunctionKindWasm,
 		}
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
 		table := make([]wasm.TableElement, 10)
@@ -1984,7 +1984,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 						err := compiler.compilePreamble()
 						require.NoError(t, err)
 
-						compiler.f = &wasm.FunctionInstance{ModuleInstance: moduleInstance, FunctionKind: wasm.FunctionKindWasm}
+						compiler.f = &wasm.FunctionInstance{Module: moduleInstance, Kind: wasm.FunctionKindWasm}
 
 						// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
@@ -2194,7 +2194,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t)
-			compiler.f.ModuleInstance = tc.moduleInstance
+			compiler.f.Module = tc.moduleInstance
 
 			// The assembler skips the first instruction so we intentionally add NOP here.
 			// TODO: delete after #233

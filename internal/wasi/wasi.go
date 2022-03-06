@@ -931,7 +931,7 @@ type wasiAPI struct {
 
 // SnapshotPreview1Functions returns all go functions that implement SnapshotPreview1.
 // These should be exported in the module named wasi.ModuleSnapshotPreview1.
-// See internalwasm.NewGoFunc
+// See internalwasm.newGoFunc
 func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interface{}) {
 	a := NewAPI(opts...)
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.

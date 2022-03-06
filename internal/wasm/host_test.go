@@ -477,6 +477,24 @@ func TestStore_NewHostModule(t *testing.T) {
 	require.EqualError(t, err, "module test has already been instantiated")
 }
 
+func TestStore_NewHostModule_Errors(t *testing.T) {
+	s := newStore()
+
+	t.Run("Adds export name to error message", func(t *testing.T) {
+		_, err := s.NewHostModule("test", map[string]interface{}{"fn": "hello"})
+		require.EqualError(t, err, "func[fn] kind != func: string")
+
+	})
+
+	t.Run("Fails if module name already in use", func(t *testing.T) {
+		_, err := s.NewHostModule("test", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
+		require.NoError(t, err)
+		// Trying to register it again should fail
+		_, err = s.NewHostModule("test", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
+		require.EqualError(t, err, "module test has already been instantiated")
+	})
+}
+
 func TestHostModule_String(t *testing.T) {
 	s := newStore()
 
