@@ -37,15 +37,9 @@ jobs:
             ~/go/bin
           key: check-${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum', 'Makefile') }}
 
-      - name: Lint (arm64)
-        run: make lint golangci_lint_goarch=arm64
-
-      - name: Lint (amd64)
-        run: make lint golangci_lint_goarch=amd64
+      - run: make check
 
       - run: make build.spectest
-
-      - run: make check
 
   test_amd64:
     name: amd64, ${{ matrix.os }}, Go-${{ matrix.go-version }}

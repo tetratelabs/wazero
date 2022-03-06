@@ -64,6 +64,8 @@ format:
 
 .PHONY: check
 check:
+	@$(MAKE) lint golangci_lint_goarch=arm64
+	@$(MAKE) lint golangci_lint_goarch=amd64
 	@$(MAKE) format
 	@go mod tidy
 	@if [ ! -z "`git status -s`" ]; then \
