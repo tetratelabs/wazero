@@ -57,11 +57,15 @@ type (
 		// a new instance is added in addFunctions.
 		releasedFunctionIndex map[FunctionIndex]struct{}
 
-		// The followings fields match the definition of Store in the specification.
-
 		// functions holds function instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr).
+		//
+		// Note: Functions are held by store as well as ModuleInstances, in contrast to other instances (memory, table, and globals)
+		// which are only owned by ModuleInstance. This is because the function call implementation in engines depend on storeIndex
+		// of function instance (FunctionIndex).
+		// TODO: decouple engine's function call implementation from store-wide context (in this case FunctionIndex), and remove
+		// the necessity to hold FunctionInstances in store in order to reduce the mutext usage.
 		functions []*FunctionInstance
 
 		// mux is used to guard the fields from concurrent access.
