@@ -55,22 +55,22 @@ type (
 		// releasedFunctionIndex holds reusable FunctionIndexes. An index is added when
 		// a function instance is released in releaseFunctionInstances, and is popped when
 		// a new instance is added in addFunctionInstances.
-		releasedFunctionIndex []FunctionIndex
+		releasedFunctionIndex map[FunctionIndex]struct{}
 
 		// releasedMemoryIndex holds reusable memoryIndexes. An index is added when
 		// an memory instance is released in releaseMemoryInstance, and is popped when
 		// a new instance is added in addMemoryInstance.
-		releasedMemoryIndex []memoryIndex
+		releasedMemoryIndex map[memoryIndex]struct{}
 
 		// releasedTableIndex holds reusable tableIndexes. An index is added when
 		// an table instance is released in releaseTableInstance, and is popped when
 		// a new instance is added in addTableInstance.
-		releasedTableIndex []tableIndex
+		releasedTableIndex map[tableIndex]struct{}
 
 		// releasedGlobalIndex holds reusable globalIndexes. An index is added when
 		// an global instance is released in releaseGlobalInstances, and is popped when
 		// a new instance is added in addGlobalInstances.
-		releasedGlobalIndex []globalIndex
+		releasedGlobalIndex map[globalIndex]struct{}
 
 		// The followings fields match the definition of Store in the specification.
 
@@ -392,13 +392,17 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 
 func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Store {
 	return &Store{
-		ctx:                  ctx,
-		engine:               engine,
-		EnabledFeatures:      enabledFeatures,
-		moduleInstances:      map[string]*ModuleInstance{},
-		typeIDs:              map[string]FunctionTypeID{},
-		maximumFunctionIndex: maximumFunctionIndex,
-		maximumFunctionTypes: maximumFunctionTypes,
+		ctx:                   ctx,
+		engine:                engine,
+		EnabledFeatures:       enabledFeatures,
+		moduleInstances:       map[string]*ModuleInstance{},
+		typeIDs:               map[string]FunctionTypeID{},
+		maximumFunctionIndex:  maximumFunctionIndex,
+		maximumFunctionTypes:  maximumFunctionTypes,
+		releasedFunctionIndex: map[FunctionIndex]struct{}{},
+		releasedMemoryIndex:   map[memoryIndex]struct{}{},
+		releasedTableIndex:    map[tableIndex]struct{}{},
+		releasedGlobalIndex:   map[globalIndex]struct{}{},
 	}
 }
 
@@ -570,7 +574,7 @@ func (s *Store) releaseFunctionInstances(lock bool, fs ...*FunctionInstance) err
 		s.functions[f.Index] = nil
 
 		// Append the address so that we can reuse it in order to avoid index space explosion.
-		s.releasedFunctionIndex = append(s.releasedFunctionIndex, f.Index)
+		s.releasedFunctionIndex[f.Index] = struct{}{}
 	}
 	return nil
 }
@@ -579,17 +583,19 @@ func (s *Store) addFunctionInstances(fs ...*FunctionInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	for _, f := range fs {
-		var addr FunctionIndex
+		var index FunctionIndex
 		if len(s.releasedFunctionIndex) > 0 {
-			id := len(s.releasedFunctionIndex) - 1
-			// Pop one address from releasedFunctionIndex slice.
-			addr, s.releasedFunctionIndex = s.releasedFunctionIndex[id], s.releasedFunctionIndex[:id]
-			s.functions[f.Index] = f
+			for popped := range s.releasedFunctionIndex {
+				index = popped
+				break
+			}
+			s.functions[index] = f
+			delete(s.releasedFunctionIndex, index)
 		} else {
-			addr = FunctionIndex(len(s.functions))
+			index = FunctionIndex(len(s.functions))
 			s.functions = append(s.functions, f)
 		}
-		f.Index = addr
+		f.Index = index
 	}
 }
 
@@ -599,7 +605,7 @@ func (s *Store) releaseGlobalInstances(gs ...*GlobalInstance) {
 		s.globals[g.index] = nil
 
 		// Append the address so that we can reuse it in order to avoid index space explosion.
-		s.releasedGlobalIndex = append(s.releasedGlobalIndex, g.index)
+		s.releasedGlobalIndex[g.index] = struct{}{}
 	}
 }
 
@@ -607,17 +613,19 @@ func (s *Store) addGlobalInstances(gs ...*GlobalInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	for _, g := range gs {
-		var addr globalIndex
+		var index globalIndex
 		if len(s.releasedGlobalIndex) > 0 {
-			id := len(s.releasedGlobalIndex) - 1
-			// Pop one address from releasedGlobalIndex slice.
-			addr, s.releasedGlobalIndex = s.releasedGlobalIndex[id], s.releasedGlobalIndex[:id]
-			s.globals[g.index] = g
+			for popped := range s.releasedGlobalIndex {
+				index = popped
+				break
+			}
+			s.globals[index] = g
+			delete(s.releasedGlobalIndex, index)
 		} else {
-			addr = globalIndex(len(s.globals))
+			index = globalIndex(len(s.globals))
 			s.globals = append(s.globals, g)
 		}
-		g.index = addr
+		g.index = index
 	}
 }
 
@@ -626,7 +634,7 @@ func (s *Store) releaseTableInstance(t *TableInstance) {
 	s.tables[t.index] = nil
 
 	// Append the index so that we can reuse it in order to avoid index space explosion.
-	s.releasedTableIndex = append(s.releasedTableIndex, t.index)
+	s.releasedTableIndex[t.index] = struct{}{}
 }
 
 func (s *Store) addTableInstance(t *TableInstance) {
@@ -637,17 +645,19 @@ func (s *Store) addTableInstance(t *TableInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	var addr tableIndex
+	var index tableIndex
 	if len(s.releasedTableIndex) > 0 {
-		id := len(s.releasedTableIndex) - 1
-		// Pop one index from releasedTableIndex slice.
-		addr, s.releasedTableIndex = s.releasedTableIndex[id], s.releasedTableIndex[:id]
-		s.tables[addr] = t
+		for popped := range s.releasedTableIndex {
+			index = popped
+			break
+		}
+		s.tables[index] = t
+		delete(s.releasedTableIndex, index)
 	} else {
-		addr = tableIndex(len(s.tables))
+		index = tableIndex(len(s.tables))
 		s.tables = append(s.tables, t)
 	}
-	t.index = addr
+	t.index = index
 }
 
 func (s *Store) releaseMemoryInstance(m *MemoryInstance) {
@@ -655,7 +665,7 @@ func (s *Store) releaseMemoryInstance(m *MemoryInstance) {
 	s.memories[m.index] = nil
 
 	// Append the index so that we can reuse it in order to avoid index space explosion.
-	s.releasedMemoryIndex = append(s.releasedMemoryIndex, m.index)
+	s.releasedMemoryIndex[m.index] = struct{}{}
 }
 
 func (s *Store) addMemoryInstance(m *MemoryInstance) {
@@ -666,17 +676,19 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	var addr memoryIndex
+	var index memoryIndex
 	if len(s.releasedMemoryIndex) > 0 {
-		id := len(s.releasedMemoryIndex) - 1
-		// Pop one index from releasedMemoryIndex slice.
-		addr, s.releasedMemoryIndex = s.releasedMemoryIndex[id], s.releasedMemoryIndex[:id]
-		s.memories[addr] = m
+		for popped := range s.releasedMemoryIndex {
+			index = popped
+			break
+		}
+		s.memories[index] = m
+		delete(s.releasedMemoryIndex, index)
 	} else {
-		addr = memoryIndex(len(s.memories))
+		index = memoryIndex(len(s.memories))
 		s.memories = append(s.memories, m)
 	}
-	m.index = addr
+	m.index = index
 }
 
 func (s *Store) addModuleInstance(m *ModuleInstance) {

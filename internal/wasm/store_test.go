@@ -98,6 +98,7 @@ func TestPublicModule_String(t *testing.T) {
 
 func TestStore_ReleaseModule(t *testing.T) {
 	const importedModuleName = "imported"
+	const importingModuleName = "test"
 
 	for _, tc := range []struct {
 		name        string
@@ -113,13 +114,12 @@ func TestStore_ReleaseModule(t *testing.T) {
 		{
 			name: "Module imports Moudle",
 			initializer: func(t *testing.T, s *Store) {
-				s.Instantiate(&Module{
+				_, err := s.Instantiate(&Module{
 					TypeSection:     []*FunctionType{{}},
 					FunctionSection: []uint32{0},
 					CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 					ExportSection:   map[string]*Export{"fn": {Type: ExternTypeFunc, Index: 0, Name: "fn"}},
 				}, importedModuleName)
-				_, err := s.NewHostModule("", map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
 				require.NoError(t, err)
 			},
 		},
@@ -127,26 +127,49 @@ func TestStore_ReleaseModule(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			s := newStore()
-
-			name := "test"
 			tc.initializer(t, s)
 
 			_, err := s.Instantiate(&Module{
 				TypeSection:   []*FunctionType{{}},
 				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection: []*MemoryType{{1, nil}},
-			}, name)
+				TableSection:  []*TableType{{Limit: &LimitsType{Min: 10}}},
+			}, importingModuleName)
 			require.NoError(t, err)
 
-			// We shouldn't be able to release the host module as it is in use!
+			// We shouldn't be able to release the imported module as it is in use!
 			require.Error(t, s.ReleaseModuleInstance(importedModuleName))
 
 			// Can release the importing module
-			require.NoError(t, s.ReleaseModuleInstance(name))
-			require.Nil(t, s.moduleInstances[name])
+			require.NoError(t, s.ReleaseModuleInstance(importingModuleName))
+			require.Nil(t, s.moduleInstances[importingModuleName])
+			require.NotContains(t, s.moduleInstances, importingModuleName)
 
 			// Can re-release the importing module
-			require.NoError(t, s.ReleaseModuleInstance(name))
+			require.NoError(t, s.ReleaseModuleInstance(importingModuleName))
+
+			// Now we should be able to release the imported module.
+			require.NoError(t, s.ReleaseModuleInstance(importedModuleName))
+			require.Nil(t, s.moduleInstances[importedModuleName])
+			require.NotContains(t, s.moduleInstances, importedModuleName)
+
+			// At this point, everything should be freed.
+			require.Len(t, s.moduleInstances, 0)
+			for _, m := range s.memories {
+				require.Nil(t, m)
+			}
+			for _, table := range s.tables {
+				require.Nil(t, table)
+			}
+			for _, f := range s.functions {
+				require.Nil(t, f)
+			}
+			for _, g := range s.globals {
+				require.Nil(t, g)
+			}
+
+			// One function instance was created and freed.
+			require.Len(t, s.releasedFunctionIndex, 1)
 		})
 	}
 }
@@ -405,11 +428,9 @@ func TestStore_releaseFunctionInstances(t *testing.T) {
 	s.functions[nonReleaseTargetAddr] = &FunctionInstance{} // Non-nil!
 
 	// Set up existing function instances.
-	var expectedReleasedAddr []FunctionIndex
 	fs := []*FunctionInstance{{Index: 1}, {Index: 2}, {Index: 3}, {Index: 4}, {Index: maxAddr}}
 	for _, f := range fs {
 		s.functions[f.Index] = &FunctionInstance{} // Non-nil!
-		expectedReleasedAddr = append(expectedReleasedAddr, f.Index)
 	}
 
 	err := s.releaseFunctionInstances(false, fs...)
@@ -418,9 +439,8 @@ func TestStore_releaseFunctionInstances(t *testing.T) {
 	// Ensure the release targets become nil.
 	for _, f := range fs {
 		require.Nil(t, s.functions[f.Index])
+		require.Contains(t, s.releasedFunctionIndex, f.Index)
 	}
-
-	require.Equal(t, s.releasedFunctionIndex, expectedReleasedAddr)
 
 	// Plus non-target should remain intact.
 	require.NotNil(t, s.functions[nonReleaseTargetAddr])
@@ -444,8 +464,7 @@ func TestStore_addFunctionInstances(t *testing.T) {
 	t.Run("reuse released index", func(t *testing.T) {
 		s := newStore()
 		expectedAddr := FunctionIndex(10)
-		s.releasedFunctionIndex = []FunctionIndex{1, expectedAddr}
-		expectedReleasedAddr := s.releasedFunctionIndex[:1]
+		s.releasedFunctionIndex[expectedAddr] = struct{}{}
 
 		maxAddr := expectedAddr * 10
 		tailInstance := &FunctionInstance{}
@@ -457,11 +476,12 @@ func TestStore_addFunctionInstances(t *testing.T) {
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, f.Index)
+		require.Equal(t, f, s.functions[expectedAddr])
 
 		// And the others must be intact.
 		require.Equal(t, tailInstance, s.functions[maxAddr])
 
-		require.Equal(t, expectedReleasedAddr, s.releasedFunctionIndex)
+		require.Len(t, s.releasedFunctionIndex, 0)
 	})
 }
 
@@ -474,11 +494,9 @@ func TestStore_releaseGlobalInstances(t *testing.T) {
 	s.globals[nonReleaseTargetAddr] = &GlobalInstance{} // Non-nil!
 
 	// Set up existing function instances.
-	var expectedReleasedAddr []globalIndex
 	gs := []*GlobalInstance{{index: 1}, {index: 2}, {index: 3}, {index: 4}, {index: maxAddr}}
 	for _, g := range gs {
 		s.globals[g.index] = &GlobalInstance{} // Non-nil!
-		expectedReleasedAddr = append(expectedReleasedAddr, g.index)
 	}
 
 	s.releaseGlobalInstances(gs...)
@@ -486,9 +504,8 @@ func TestStore_releaseGlobalInstances(t *testing.T) {
 	// Ensure the release targets become nil.
 	for _, g := range gs {
 		require.Nil(t, s.globals[g.index])
+		require.Contains(t, s.releasedGlobalIndex, g.index)
 	}
-
-	require.Equal(t, s.releasedGlobalIndex, expectedReleasedAddr)
 
 	// Plus non-target should remain intact.
 	require.NotNil(t, s.globals[nonReleaseTargetAddr])
@@ -512,8 +529,7 @@ func TestStore_addGlobalInstances(t *testing.T) {
 	t.Run("reuse released index", func(t *testing.T) {
 		s := newStore()
 		expectedAddr := globalIndex(10)
-		s.releasedGlobalIndex = []globalIndex{1, expectedAddr}
-		expectedReleasedGlobalIndex := s.releasedGlobalIndex[:1]
+		s.releasedGlobalIndex[expectedAddr] = struct{}{}
 
 		maxAddr := expectedAddr * 10
 		tailInstance := &GlobalInstance{}
@@ -525,11 +541,12 @@ func TestStore_addGlobalInstances(t *testing.T) {
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, g.index)
+		require.Equal(t, g, s.globals[expectedAddr])
 
 		// And the others must be intact.
 		require.Equal(t, tailInstance, s.globals[maxAddr])
 
-		require.Equal(t, expectedReleasedGlobalIndex, s.releasedGlobalIndex)
+		require.Len(t, s.releasedGlobalIndex, 0)
 	})
 }
 
@@ -572,8 +589,7 @@ func TestStore_addTableInstance(t *testing.T) {
 	t.Run("reuse released index", func(t *testing.T) {
 		s := newStore()
 		expectedAddr := tableIndex(10)
-		s.releasedTableIndex = []tableIndex{1000, expectedAddr}
-		expectedReleasedTableIndex := s.releasedTableIndex[:1]
+		s.releasedTableIndex[expectedAddr] = struct{}{}
 
 		maxAddr := expectedAddr * 10
 		tailInstance := &TableInstance{}
@@ -585,11 +601,12 @@ func TestStore_addTableInstance(t *testing.T) {
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, table.index)
+		require.Equal(t, table, s.tables[expectedAddr])
 
 		// And the others must be intact.
 		require.Equal(t, tailInstance, s.tables[maxAddr])
 
-		require.Equal(t, expectedReleasedTableIndex, s.releasedTableIndex)
+		require.Len(t, s.releasedTableIndex, 0)
 	})
 }
 
@@ -608,7 +625,7 @@ func TestStore_releaseMemoryInstance(t *testing.T) {
 	// Ensure the release targets become nil.
 	require.Nil(t, s.memories[mem.index])
 
-	require.Equal(t, s.releasedMemoryIndex, []memoryIndex{mem.index})
+	require.Contains(t, s.releasedMemoryIndex, mem.index)
 
 	// Plus non-target should remain intact.
 	require.NotNil(t, s.memories[nonReleaseTargetAddr])
@@ -632,8 +649,7 @@ func TestStore_addMemoryInstance(t *testing.T) {
 	t.Run("reuse released index", func(t *testing.T) {
 		s := newStore()
 		expectedAddr := memoryIndex(10)
-		s.releasedMemoryIndex = []memoryIndex{1000, expectedAddr}
-		expectedReleasedMemoryIndex := s.releasedMemoryIndex[:1]
+		s.releasedMemoryIndex[expectedAddr] = struct{}{}
 
 		maxAddr := expectedAddr * 10
 		tailInstance := &MemoryInstance{}
@@ -645,11 +661,12 @@ func TestStore_addMemoryInstance(t *testing.T) {
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, mem.index)
+		require.Equal(t, mem, s.memories[expectedAddr])
 
 		// And the others must be intact.
 		require.Equal(t, tailInstance, s.memories[maxAddr])
 
-		require.Equal(t, expectedReleasedMemoryIndex, s.releasedMemoryIndex)
+		require.Len(t, s.releasedMemoryIndex, 0)
 	})
 }
 
