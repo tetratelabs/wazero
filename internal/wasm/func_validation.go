@@ -698,8 +698,22 @@ func validateFunction(
 					return fmt.Errorf("cannot pop the operand for f64.reinterpret_i64: %v", err)
 				}
 				valueTypeStack.push(ValueTypeF64)
-			case OpcodeI32Extend8S, OpcodeI32Extend16S, OpcodeI64Extend8S, OpcodeI64Extend16S, OpcodeI64Extend32S:
-				return fmt.Errorf("%s invalid as %s is not yet supported. See #66", InstructionName(op), FeatureSignExtensionOps)
+			case OpcodeI32Extend8S, OpcodeI32Extend16S:
+				if err := features.Require(FeatureSignExtensionOps); err != nil {
+					return fmt.Errorf("%s invalid as %v", instructionNames[op], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", instructionNames[op], err)
+				}
+				valueTypeStack.push(ValueTypeI32)
+			case OpcodeI64Extend8S, OpcodeI64Extend16S, OpcodeI64Extend32S:
+				if err := features.Require(FeatureSignExtensionOps); err != nil {
+					return fmt.Errorf("%s invalid as %v", instructionNames[op], err)
+				}
+				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
+					return fmt.Errorf("cannot pop the operand for %s: %v", instructionNames[op], err)
+				}
+				valueTypeStack.push(ValueTypeI64)
 			default:
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}

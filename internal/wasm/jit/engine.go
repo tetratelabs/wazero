@@ -880,6 +880,16 @@ func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 			err = compiler.compileF64ReinterpretFromI64()
 		case *wazeroir.OperationExtend:
 			err = compiler.compileExtend(o)
+		case *wazeroir.OperationSignExtend32From8:
+			err = compiler.compileSignExtend32From8()
+		case *wazeroir.OperationSignExtend32From16:
+			err = compiler.compileSignExtend32From16()
+		case *wazeroir.OperationSignExtend64From8:
+			err = compiler.compileSignExtend64From8()
+		case *wazeroir.OperationSignExtend64From16:
+			err = compiler.compileSignExtend64From16()
+		case *wazeroir.OperationSignExtend64From32:
+			err = compiler.compileSignExtend64From32()
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile operation %s: %w", op.Kind().String(), err)

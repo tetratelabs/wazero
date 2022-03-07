@@ -335,6 +335,11 @@ const (
 	OperationKindF32ReinterpretFromI32
 	OperationKindF64ReinterpretFromI64
 	OperationKindExtend
+	OperationKindSignExtend32From8
+	OperationKindSignExtend32From16
+	OperationKindSignExtend64From8
+	OperationKindSignExtend64From16
+	OperationKindSignExtend64From32
 )
 
 type Label struct {
@@ -871,4 +876,34 @@ type OperationExtend struct{ Signed bool }
 
 func (o *OperationExtend) Kind() OperationKind {
 	return OperationKindExtend
+}
+
+type OperationSignExtend32From8 struct{}
+
+func (o *OperationSignExtend32From8) Kind() OperationKind {
+	return OperationKindSignExtend32From8
+}
+
+type OperationSignExtend32From16 struct{}
+
+func (o *OperationSignExtend32From16) Kind() OperationKind {
+	return OperationKindSignExtend32From16
+}
+
+type OperationSignExtend64From8 struct{}
+
+func (o *OperationSignExtend64From8) Kind() OperationKind {
+	return OperationKindSignExtend64From8
+}
+
+type OperationSignExtend64From16 struct{}
+
+func (o *OperationSignExtend64From16) Kind() OperationKind {
+	return OperationKindSignExtend64From16
+}
+
+type OperationSignExtend64From32 struct{}
+
+func (o *OperationSignExtend64From32) Kind() OperationKind {
+	return OperationKindSignExtend64From32
 }

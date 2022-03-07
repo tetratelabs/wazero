@@ -346,6 +346,10 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 		return signature_I32_F32, nil
 	case wasm.OpcodeF64ReinterpretI64:
 		return signature_I64_F64, nil
+	case wasm.OpcodeI32Extend8S, wasm.OpcodeI32Extend16S:
+		return signature_I32_I32, nil
+	case wasm.OpcodeI64Extend8S, wasm.OpcodeI64Extend16S, wasm.OpcodeI64Extend32S:
+		return signature_I64_I64, nil
 	default:
 		return nil, fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
 	}

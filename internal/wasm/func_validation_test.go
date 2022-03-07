@@ -38,39 +38,53 @@ func TestValidateFunction_valueStackLimit(t *testing.T) {
 }
 
 func TestValidateFunction_SignExtensionOps(t *testing.T) {
-	// TODO: actually support, guarded by FeatureSignExtensionOps flag which defaults to false #66
+	const maxStackHeight = 100 /* arbitrary */
 	tests := []struct {
-		input       Opcode
-		expectedErr string
+		input                Opcode
+		expectedErrOnDisable string
 	}{
 		{
-			input:       OpcodeI32Extend8S,
-			expectedErr: "i32.extend8_s invalid as sign-extension-ops is not yet supported. See #66",
+			input:                OpcodeI32Extend8S,
+			expectedErrOnDisable: "i32.extend8_s invalid as feature sign-extension-ops is disabled",
 		},
 		{
-			input:       OpcodeI32Extend16S,
-			expectedErr: "i32.extend16_s invalid as sign-extension-ops is not yet supported. See #66",
+			input:                OpcodeI32Extend16S,
+			expectedErrOnDisable: "i32.extend16_s invalid as feature sign-extension-ops is disabled",
 		},
 		{
-			input:       OpcodeI64Extend8S,
-			expectedErr: "i64.extend8_s invalid as sign-extension-ops is not yet supported. See #66",
+			input:                OpcodeI64Extend8S,
+			expectedErrOnDisable: "i64.extend8_s invalid as feature sign-extension-ops is disabled",
 		},
 		{
-			input:       OpcodeI64Extend16S,
-			expectedErr: "i64.extend16_s invalid as sign-extension-ops is not yet supported. See #66",
+			input:                OpcodeI64Extend16S,
+			expectedErrOnDisable: "i64.extend16_s invalid as feature sign-extension-ops is disabled",
 		},
 		{
-			input:       OpcodeI64Extend32S,
-			expectedErr: "i64.extend32_s invalid as sign-extension-ops is not yet supported. See #66",
+			input:                OpcodeI64Extend32S,
+			expectedErrOnDisable: "i64.extend32_s invalid as feature sign-extension-ops is disabled",
 		},
 	}
 
 	for _, tt := range tests {
 		tc := tt
-
 		t.Run(InstructionName(tc.input), func(t *testing.T) {
-			err := validateFunction(&FunctionType{}, []byte{tc.input}, nil, nil, nil, nil, nil, nil, 0, Features(0))
-			require.EqualError(t, err, tc.expectedErr)
+			t.Run("disabled", func(t *testing.T) {
+				err := validateFunction(&FunctionType{}, []byte{tc.input}, nil, nil, nil, nil, nil, nil, maxStackHeight, Features(0))
+				require.EqualError(t, err, tc.expectedErrOnDisable)
+			})
+			t.Run("enabled", func(t *testing.T) {
+				is32bit := tc.input == OpcodeI32Extend8S || tc.input == OpcodeI32Extend16S
+				var body []byte
+				if is32bit {
+					body = append(body, OpcodeI32Const)
+				} else {
+					body = append(body, OpcodeI64Const)
+				}
+				body = append(body, tc.input, 123, OpcodeDrop, OpcodeEnd)
+				fmt.Println(body)
+				err := validateFunction(&FunctionType{}, body, nil, nil, nil, nil, nil, nil, maxStackHeight, FeatureSignExtensionOps)
+				require.NoError(t, err)
+			})
 		})
 	}
 }

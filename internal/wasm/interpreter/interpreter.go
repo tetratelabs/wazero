@@ -430,6 +430,8 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 			if o.Signed {
 				op.b1 = 1
 			}
+		case *wazeroir.OperationSignExtend32From8, *wazeroir.OperationSignExtend32From16, *wazeroir.OperationSignExtend64From8,
+			*wazeroir.OperationSignExtend64From16, *wazeroir.OperationSignExtend64From32:
 		default:
 			return nil, fmt.Errorf("unreachable: a bug in wazeroir engine")
 		}
@@ -1488,6 +1490,37 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					v := uint64(uint32(ce.pop()))
 					ce.push(v)
 				}
+				frame.pc++
+			}
+
+		case wazeroir.OperationKindSignExtend32From8:
+			{
+				v := int32(int8(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend32From16:
+			{
+				v := int32(int16(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend64From8:
+			{
+				v := int64(int8(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend64From16:
+			{
+				v := int64(int16(ce.pop()))
+				ce.push(uint64(v))
+				frame.pc++
+			}
+		case wazeroir.OperationKindSignExtend64From32:
+			{
+				v := int64(int32(ce.pop()))
+				ce.push(uint64(v))
 				frame.pc++
 			}
 		}

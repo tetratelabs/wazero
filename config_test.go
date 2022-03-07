@@ -23,6 +23,14 @@ func TestRuntimeConfig_Features(t *testing.T) {
 				return c.WithFeatureMutableGlobal(v)
 			},
 		},
+		{
+			name:          "sign-extension-ops",
+			feature:       internalwasm.FeatureSignExtensionOps,
+			expectDefault: false,
+			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
+				return c.WithFeatureSignExtentionOps(v)
+			},
+		},
 	}
 
 	for _, tt := range tests {
