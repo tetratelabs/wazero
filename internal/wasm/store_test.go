@@ -157,25 +157,13 @@ func TestStore_ReleaseModule(t *testing.T) {
 
 			// At this point, everything should be freed.
 			require.Len(t, s.modules, 0)
-			for _, m := range s.memories {
-				require.Nil(t, m)
-			}
-			for _, table := range s.tables {
-				require.Nil(t, table)
-			}
 			for _, f := range s.functions {
 				require.Nil(t, f)
-			}
-			for _, g := range s.globals {
-				require.Nil(t, g)
 			}
 
 			// One function, globa, memory and table instance was created and freed,
 			// therefore, one released index must be captured by store.
 			require.Len(t, s.releasedFunctionIndex, 1)
-			require.Len(t, s.releasedTableIndex, 1)
-			require.Len(t, s.releasedMemoryIndex, 1)
-			require.Len(t, s.releasedGlobalIndex, 1)
 		})
 	}
 }
@@ -233,21 +221,6 @@ func TestStore_concurrent(t *testing.T) {
 		require.NotNil(t, f)
 	}
 
-	require.Len(t, s.tables, goroutines)
-	for _, table := range s.tables {
-		require.NotNil(t, table)
-	}
-
-	require.Len(t, s.globals, goroutines)
-	for _, g := range s.globals {
-		require.NotNil(t, g)
-	}
-
-	require.Len(t, s.memories, goroutines)
-	for _, m := range s.memories {
-		require.NotNil(t, m)
-	}
-
 	// Concurrent release.
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
@@ -259,7 +232,7 @@ func TestStore_concurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	// No all the importing instances were released, the imported module can be freed.
+	// Now all the importing instances were released, the imported module can be freed.
 	require.Zero(t, hm.dependentCount)
 	require.NoError(t, s.ReleaseModule(hm.Name))
 
@@ -678,191 +651,6 @@ func TestStore_addFunctionInstances(t *testing.T) {
 	})
 }
 
-func TestStore_releaseGlobalInstances(t *testing.T) {
-	s := newStore()
-	nonReleaseTargetAddr := globalIndex(0)
-	maxAddr := globalIndex(10)
-	s.globals = make([]*GlobalInstance, maxAddr+1)
-
-	s.globals[nonReleaseTargetAddr] = &GlobalInstance{} // Non-nil!
-
-	// Set up existing function instances.
-	gs := []*GlobalInstance{{index: 1}, {index: 2}, {index: 3}, {index: 4}, {index: maxAddr}}
-	for _, g := range gs {
-		s.globals[g.index] = &GlobalInstance{} // Non-nil!
-	}
-
-	s.releaseGlobal(gs...)
-
-	// Ensure the release targets become nil.
-	for _, g := range gs {
-		require.Nil(t, s.globals[g.index])
-		require.Contains(t, s.releasedGlobalIndex, g.index)
-	}
-
-	// Plus non-target should remain intact.
-	require.NotNil(t, s.globals[nonReleaseTargetAddr])
-}
-
-func TestStore_addGlobalInstances(t *testing.T) {
-	t.Run("no released index", func(t *testing.T) {
-		s := newStore()
-		prevMaxAddr := globalIndex(10)
-		s.globals = make([]*GlobalInstance, prevMaxAddr+1)
-
-		for i := globalIndex(0); i < 10; i++ {
-			expectedIndex := prevMaxAddr + 1 + i
-			g := &GlobalInstance{}
-			s.addGlobals(g)
-
-			// After adding function intance to store, an funcaddr must be assigned.
-			require.Equal(t, expectedIndex, g.index)
-		}
-	})
-	t.Run("reuse released index", func(t *testing.T) {
-		s := newStore()
-		expectedAddr := globalIndex(10)
-		s.releasedGlobalIndex[expectedAddr] = struct{}{}
-
-		maxAddr := expectedAddr * 10
-		tailInstance := &GlobalInstance{}
-		s.globals = make([]*GlobalInstance, maxAddr+1)
-		s.globals[maxAddr] = tailInstance
-
-		g := &GlobalInstance{}
-		s.addGlobals(g)
-
-		// Index must be reused.
-		require.Equal(t, expectedAddr, g.index)
-		require.Equal(t, g, s.globals[expectedAddr])
-
-		// And the others must be intact.
-		require.Equal(t, tailInstance, s.globals[maxAddr])
-
-		require.Len(t, s.releasedGlobalIndex, 0)
-	})
-}
-
-func TestStore_releaseTableInstance(t *testing.T) {
-	s := newStore()
-	nonReleaseTargetAddr := tableIndex(0)
-	maxAddr := tableIndex(10)
-	s.tables = make([]*TableInstance, maxAddr+1)
-
-	s.tables[nonReleaseTargetAddr] = &TableInstance{} // Non-nil!
-
-	table := &TableInstance{index: 1}
-
-	s.releaseTable(table)
-
-	// Ensure the release targets become nil.
-	require.Nil(t, s.tables[table.index])
-
-	require.Contains(t, s.releasedTableIndex, table.index)
-
-	// Plus non-target should remain intact.
-	require.NotNil(t, s.tables[nonReleaseTargetAddr])
-}
-
-func TestStore_addTableInstance(t *testing.T) {
-	t.Run("no released index", func(t *testing.T) {
-		s := newStore()
-		prevMaxAddr := tableIndex(10)
-		s.tables = make([]*TableInstance, prevMaxAddr+1)
-
-		for i := tableIndex(0); i < 10; i++ {
-			expectedIndex := prevMaxAddr + 1 + i
-			g := &TableInstance{}
-			s.addTable(g)
-
-			// After adding function intance to store, an funcaddr must be assigned.
-			require.Equal(t, expectedIndex, g.index)
-		}
-	})
-	t.Run("reuse released index", func(t *testing.T) {
-		s := newStore()
-		expectedAddr := tableIndex(10)
-		s.releasedTableIndex[expectedAddr] = struct{}{}
-
-		maxAddr := expectedAddr * 10
-		tailInstance := &TableInstance{}
-		s.tables = make([]*TableInstance, maxAddr+1)
-		s.tables[maxAddr] = tailInstance
-
-		table := &TableInstance{}
-		s.addTable(table)
-
-		// Index must be reused.
-		require.Equal(t, expectedAddr, table.index)
-		require.Equal(t, table, s.tables[expectedAddr])
-
-		// And the others must be intact.
-		require.Equal(t, tailInstance, s.tables[maxAddr])
-
-		require.Len(t, s.releasedTableIndex, 0)
-	})
-}
-
-func TestStore_releaseMemoryInstance(t *testing.T) {
-	s := newStore()
-	nonReleaseTargetAddr := memoryIndex(0)
-	releaseTargetAddr := memoryIndex(10)
-	s.memories = make([]*MemoryInstance, releaseTargetAddr+1)
-
-	s.memories[nonReleaseTargetAddr] = &MemoryInstance{} // Non-nil!
-	mem := &MemoryInstance{index: releaseTargetAddr}
-	s.memories[releaseTargetAddr] = mem // Non-nil!
-
-	s.releaseMemory(mem)
-
-	// Ensure the release targets become nil.
-	require.Nil(t, s.memories[mem.index])
-
-	require.Contains(t, s.releasedMemoryIndex, mem.index)
-
-	// Plus non-target should remain intact.
-	require.NotNil(t, s.memories[nonReleaseTargetAddr])
-}
-
-func TestStore_addMemoryInstance(t *testing.T) {
-	t.Run("no released index", func(t *testing.T) {
-		s := newStore()
-		prevMaxAddr := memoryIndex(10)
-		s.memories = make([]*MemoryInstance, prevMaxAddr+1)
-
-		for i := memoryIndex(0); i < 10; i++ {
-			expectedIndex := prevMaxAddr + 1 + i
-			mem := &MemoryInstance{}
-			s.addMemory(mem)
-
-			// After adding function intance to store, an funcaddr must be assigned.
-			require.Equal(t, expectedIndex, mem.index)
-		}
-	})
-	t.Run("reuse released index", func(t *testing.T) {
-		s := newStore()
-		expectedAddr := memoryIndex(10)
-		s.releasedMemoryIndex[expectedAddr] = struct{}{}
-
-		maxAddr := expectedAddr * 10
-		tailInstance := &MemoryInstance{}
-		s.memories = make([]*MemoryInstance, maxAddr+1)
-		s.memories[maxAddr] = tailInstance
-
-		mem := &MemoryInstance{}
-		s.addMemory(mem)
-
-		// Index must be reused.
-		require.Equal(t, expectedAddr, mem.index)
-		require.Equal(t, mem, s.memories[expectedAddr])
-
-		// And the others must be intact.
-		require.Equal(t, tailInstance, s.memories[maxAddr])
-
-		require.Len(t, s.releasedMemoryIndex, 0)
-	})
-}
-
 func TestStore_resolveImports(t *testing.T) {
 	const moduleName = "test"
 	const name = "target"
@@ -1144,7 +932,7 @@ func TestModuleInstance_applyElements(t *testing.T) {
 	require.Equal(t, FunctionIndex(targetAddr2), m.Table.Table[targetOffset2].FunctionIndex)
 }
 
-func TestModuleInstance_decImportedCount(t *testing.T) {
+func TestModuleInstance_decDependentCount(t *testing.T) {
 	count := 100
 	m := ModuleInstance{dependentCount: count}
 
@@ -1153,14 +941,14 @@ func TestModuleInstance_decImportedCount(t *testing.T) {
 	for i := 0; i < count; i++ {
 		go func() {
 			defer wg.Done()
-			m.decImportedCount()
+			m.decDependentCount()
 		}()
 	}
 	wg.Wait()
 	require.Zero(t, m.dependentCount)
 }
 
-func TestModuleInstance_incImportedCount(t *testing.T) {
+func TestModuleInstance_incDependentCount(t *testing.T) {
 	count := 100
 	m := ModuleInstance{}
 	wg := sync.WaitGroup{}
@@ -1168,7 +956,7 @@ func TestModuleInstance_incImportedCount(t *testing.T) {
 	for i := 0; i < count; i++ {
 		go func() {
 			defer wg.Done()
-			m.incImportedCount()
+			m.incDependentCount()
 		}()
 	}
 	wg.Wait()

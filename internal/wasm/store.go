@@ -57,36 +57,15 @@ type (
 		// a new instance is added in addFunctions.
 		releasedFunctionIndex map[FunctionIndex]struct{}
 
-		// releasedMemoryIndex holds reusable memoryIndexes. An index is added when a memory is released in
-		// releaseMemory, and is popped when a new instance is added in addMemory.
-		releasedMemoryIndex map[memoryIndex]struct{}
-
-		// releasedTableIndex holds reusable tableIndexes. An index is added when a table is released in releaseTable,
-		// and is popped when a new instance is added in addTable.
-		releasedTableIndex map[tableIndex]struct{}
-
-		// releasedGlobalIndex holds reusable globalIndexes. An index is added when a global is released in
-		// releaseGlobal, and is popped when a new instance is added in addGlobals.
-		releasedGlobalIndex map[globalIndex]struct{}
-
-		// The followings fields match the definition of Store in the specification.
-
 		// functions holds function instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr).
+		//
+		// Note: Functions are held by store as well as ModuleInstances, in contrast to other instances (memory, table, and globals)
+		// which are only owned by ModuleInstance. This is not only because the function call implementation in engines depend on
+		// store-scope funcaddr (FunctionIndex in wazero), but also call_indirect is specified to make function calls via funcaddr,
+		// which might end up calling a function outside of module-scope index space.
 		functions []*FunctionInstance
-		// globals holds global instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0),
-		// in this store.
-		// The slice index is to be interpreted as globaladdr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaladdr).
-		globals []*GlobalInstance
-		// memories holds memory instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0),
-		// in this store.
-		// The slice index is to be interpreted as memaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-memaddr).
-		memories []*MemoryInstance
-		// tables holds table instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0),
-		// in this store.
-		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-tableaddr).
-		tables []*TableInstance
 
 		// mux is used to guard the fields from concurrent access.
 		mux sync.RWMutex
@@ -192,8 +171,7 @@ type (
 	GlobalInstance struct {
 		Type *GlobalType
 		// Val holds a 64-bit representation of the actual value.
-		Val   uint64
-		index globalIndex
+		Val uint64
 	}
 
 	// TableInstance represents a table instance in a store.
@@ -213,7 +191,6 @@ type (
 		Max   *uint32
 		// Currently fixed to 0x70 (funcref type).
 		ElemType byte
-		index    tableIndex
 	}
 
 	// TableElement represents an item in a table instance.
@@ -238,21 +215,11 @@ type (
 		Buffer []byte
 		Min    uint32
 		Max    *uint32
-		index  memoryIndex
 	}
 
 	// FunctionIndex is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr),
 	// and the index to Store.Functions.
 	FunctionIndex storeIndex
-	// memoryIndex is memaddr in the spec(https://www.w3.org/TR/wasm-core-1/#syntax-memaddr),
-	// and the index to Store.Functions.
-	memoryIndex storeIndex
-	// globalIndex is memaddr (https://www.w3.org/TR/wasm-core-1/#syntax-globaladdr),
-	// and the index to Store.Globals.
-	globalIndex storeIndex
-	// tableIndex is tableaddr (https://www.w3.org/TR/wasm-core-1/#syntax-tableaddr),
-	// and the index to Store.Tables.
-	tableIndex storeIndex
 
 	// storeIndex represents the offset in of an instance in a store.
 	storeIndex uint64
@@ -403,9 +370,6 @@ func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Sto
 		maximumFunctionIndex:  maximumFunctionIndex,
 		maximumFunctionTypes:  maximumFunctionTypes,
 		releasedFunctionIndex: map[FunctionIndex]struct{}{},
-		releasedMemoryIndex:   map[memoryIndex]struct{}{},
-		releasedTableIndex:    map[tableIndex]struct{}{},
-		releasedGlobalIndex:   map[globalIndex]struct{}{},
 	}
 }
 
@@ -441,7 +405,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	defer func() {
 		if !moduleImportsFinalized {
 			for moduleImport := range moduleImports {
-				moduleImport.decImportedCount()
+				moduleImport.decDependentCount()
 			}
 		}
 	}()
@@ -482,10 +446,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	instance.applyElements(module.ElementSection)
 	instance.applyData(module.DataSection)
 
-	// Persist the instances except functions (which we already persisted before compilation).
-	s.addGlobals(globals...)
-	s.addTable(table)
-	s.addMemory(instance.Memory)
+	// Persist the module instance.
 	s.addModule(instance)
 
 	// Plus, we can finalize the module import reference count.
@@ -519,34 +480,24 @@ func (s *Store) ReleaseModule(moduleName string) error {
 	// TODO: check outstanding calls and wait until they exit.
 
 	for mod := range m.dependencies {
-		mod.decImportedCount()
+		mod.decDependentCount()
 	}
 
 	if err := s.releaseFunctions(m.Functions...); err != nil {
 		return fmt.Errorf("unable to release function instance: %w", err)
 	}
 
-	if m.Memory != nil {
-		s.releaseMemory(m.Memory)
-	}
-
-	if m.Table != nil {
-		s.releaseTable(m.Table)
-	}
-
-	s.releaseGlobal(m.Globals...)
-
 	s.deleteModule(m)
 	return nil
 }
 
-func (m *ModuleInstance) decImportedCount() {
+func (m *ModuleInstance) decDependentCount() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	m.dependentCount--
 }
 
-func (m *ModuleInstance) incImportedCount() {
+func (m *ModuleInstance) incDependentCount() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	m.dependentCount++
@@ -590,105 +541,6 @@ func (s *Store) addFunctions(fs ...*FunctionInstance) {
 	}
 }
 
-func (s *Store) releaseGlobal(gs ...*GlobalInstance) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	for _, g := range gs {
-		// Release reference to the global instance.
-		s.globals[g.index] = nil
-
-		// Append the address so that we can reuse it in order to avoid index space explosion.
-		s.releasedGlobalIndex[g.index] = struct{}{}
-	}
-}
-
-func (s *Store) addGlobals(gs ...*GlobalInstance) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	for _, g := range gs {
-		var index globalIndex
-		if len(s.releasedGlobalIndex) > 0 {
-			for popped := range s.releasedGlobalIndex {
-				index = popped
-				break
-			}
-			s.globals[index] = g
-			delete(s.releasedGlobalIndex, index)
-		} else {
-			index = globalIndex(len(s.globals))
-			s.globals = append(s.globals, g)
-		}
-		g.index = index
-	}
-}
-
-func (s *Store) releaseTable(t *TableInstance) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
-	// Release reference to the table instance.
-	s.tables[t.index] = nil
-
-	// Append the index so that we can reuse it in order to avoid index space explosion.
-	s.releasedTableIndex[t.index] = struct{}{}
-}
-
-func (s *Store) addTable(t *TableInstance) {
-	if t == nil {
-		return
-	}
-
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
-	var index tableIndex
-	if len(s.releasedTableIndex) > 0 {
-		for popped := range s.releasedTableIndex {
-			index = popped
-			break
-		}
-		s.tables[index] = t
-		delete(s.releasedTableIndex, index)
-	} else {
-		index = tableIndex(len(s.tables))
-		s.tables = append(s.tables, t)
-	}
-	t.index = index
-}
-
-func (s *Store) releaseMemory(m *MemoryInstance) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
-	// Release reference to the memory instance.
-	s.memories[m.index] = nil
-
-	// Append the index so that we can reuse it in order to avoid index space explosion.
-	s.releasedMemoryIndex[m.index] = struct{}{}
-}
-
-func (s *Store) addMemory(m *MemoryInstance) {
-	if m == nil {
-		return
-	}
-
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
-	var index memoryIndex
-	if len(s.releasedMemoryIndex) > 0 {
-		for popped := range s.releasedMemoryIndex {
-			index = popped
-			break
-		}
-		s.memories[index] = m
-		delete(s.releasedMemoryIndex, index)
-	} else {
-		index = memoryIndex(len(s.memories))
-		s.memories = append(s.memories, m)
-	}
-	m.index = index
-}
 func (s *Store) deleteModule(m *ModuleInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
@@ -772,7 +624,7 @@ func (s *Store) resolveImports(module *Module) (
 			return
 		}
 
-		m.incImportedCount()
+		m.incDependentCount() // TODO: check if the module is already released. See #293
 		moduleImports[m] = struct{}{}
 
 		var exp *ExportInstance
