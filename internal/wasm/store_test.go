@@ -384,7 +384,7 @@ func TestStore_releaseFunctionInstances(t *testing.T) {
 		expectedReleasedAddr = append(expectedReleasedAddr, f.Index)
 	}
 
-	err := s.releaseFunctionInstances(fs...)
+	err := s.releaseFunctionInstances(false, fs...)
 	require.NoError(t, err)
 
 	// Ensure the release targets become nil.

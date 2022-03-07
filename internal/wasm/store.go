@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -89,6 +90,8 @@ type (
 		// in this store.
 		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-tableaddr).
 		tables []*TableInstance
+
+		mux sync.RWMutex
 	}
 
 	// ModuleInstance represents instantiated wasm module.
@@ -114,7 +117,8 @@ type (
 		hostModule *HostModule
 
 		// TODO: https://github.com/tetratelabs/wazero/issues/293
-		refCount      int
+		mux           sync.Mutex
+		importedCount int
 		moduleImports map[*ModuleInstance]struct{}
 	}
 
@@ -400,6 +404,8 @@ func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Sto
 
 // checkFunctionIndexOverflow checks if there would be too many function instances in a store.
 func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
 	if len(s.functions) > int(s.maximumFunctionIndex)-newInstanceNum {
 		return fmt.Errorf("too many functions in a store")
 	}
@@ -407,6 +413,9 @@ func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
 }
 
 func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) {
+	// Note: we do not take lock here in order to enable conccurent instantiation and compilation
+	// of multiuple modules. When necessary, we take read or write locks in each method of store used here.
+
 	if err := s.requireModuleUnused(name); err != nil {
 		return nil, err
 	}
@@ -415,18 +424,26 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		return nil, err
 	}
 
+	types, err := s.getTypeInstances(module.TypeSection)
+	if err != nil {
+		return nil, err
+	}
+
+	moduleImportsFinalized := false
 	importedFunctions, importedGlobals, importedTable, importedMemory, moduleImports, err := s.resolveImports(module)
+	defer func() {
+		if !moduleImportsFinalized {
+			for moduleImport := range moduleImports {
+				moduleImport.decImportedCount()
+			}
+		}
+	}()
 	if err != nil {
 		return nil, err
 	}
 
 	functions, globals, table, memory :=
 		module.buildFunctionInstances(), module.buildGlobalInstances(importedGlobals), module.buildTableInstance(), module.buildMemoryInstance()
-
-	types, err := s.getTypeInstances(module.TypeSection)
-	if err != nil {
-		return nil, err
-	}
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	instance := newModuleInstance(name, module, importedFunctions, functions, importedGlobals,
@@ -443,9 +460,10 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	// Now we are ready to compile functions.
 	s.addFunctionInstances(functions...) // Need to assign funcaddr to each instance before compilation.
 	for i, f := range functions {
+		// TODO: maybe better consider spawning multiple goroutines for compilations to accelerate.
 		if err := s.engine.Compile(f); err != nil {
 			// On the failure, release the assigned funcaddr and already compiled functions.
-			if err := s.releaseFunctionInstances(functions...); err != nil {
+			if err := s.releaseFunctionInstances(true, functions[:i]...); err != nil {
 				return nil, err
 			}
 			idx := module.SectionElementCount(SectionIDFunction) - 1
@@ -457,20 +475,14 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	instance.applyElements(module.ElementSection)
 	instance.applyData(module.DataSection)
 
-	// Persist the instances other tha functions (which we already persisted before compilation).
+	// Persist the instances except functions (which we already persisted before compilation).
 	s.addGlobalInstances(globals...)
 	s.addTableInstance(table)
 	s.addMemoryInstance(instance.MemoryInstance)
+	s.addModuleInstance(instance)
 
-	// Increase the reference count of imported modules.
-	for imported := range instance.moduleImports {
-		imported.refCount++
-	}
-
-	// Build the default context for calls to this module.
-	instance.Ctx = NewModuleContext(s.ctx, s.engine, instance)
-
-	s.moduleInstances[instance.Name] = instance
+	// Plus, we can finalize the module import reference count.
+	moduleImportsFinalized = true
 
 	// Execute the start function.
 	if module.StartSection != nil {
@@ -484,28 +496,29 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 
 // ReleaseModuleInstance deallocates resources if a module with the given name exists.
 func (s *Store) ReleaseModuleInstance(moduleName string) error {
-	// TODO: none of this is goroutine safe
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	instance := s.moduleInstances[moduleName]
 	if instance == nil {
 		return nil // already released
 	}
 
-	instance.refCount--
-	if instance.refCount > 0 {
+	instance.mux.Lock()
+	defer instance.mux.Unlock()
+
+	if instance.importedCount > 0 {
 		// This case other modules are importing this module instance and still alive.
-		return fmt.Errorf("%d modules import this and need to be closed first", instance.refCount)
+		return fmt.Errorf("%d modules import this and need to be closed first", instance.importedCount)
 	}
 
 	// TODO: check outstanding calls and wait until they exit.
 
-	// Recursively release the imported instances.
 	for mod := range instance.moduleImports {
-		if err := s.ReleaseModuleInstance(mod.Name); err != nil {
-			return fmt.Errorf("unable to release imported module [%s]: %w", mod.Name, err)
-		}
+		mod.decImportedCount()
 	}
 
-	if err := s.releaseFunctionInstances(instance.Functions...); err != nil {
+	if err := s.releaseFunctionInstances(false, instance.Functions...); err != nil {
 		return fmt.Errorf("unable to release function instance: %w", err)
 	}
 
@@ -531,7 +544,23 @@ func (s *Store) ReleaseModuleInstance(moduleName string) error {
 	return nil
 }
 
-func (s *Store) releaseFunctionInstances(fs ...*FunctionInstance) error {
+func (instance *ModuleInstance) decImportedCount() {
+	instance.mux.Lock()
+	defer instance.mux.Unlock()
+	instance.importedCount--
+}
+
+func (instance *ModuleInstance) incImportedCount() {
+	instance.mux.Lock()
+	defer instance.mux.Unlock()
+	instance.importedCount--
+}
+
+func (s *Store) releaseFunctionInstances(lock bool, fs ...*FunctionInstance) error {
+	if lock {
+		s.mux.Lock()
+		defer s.mux.Unlock()
+	}
 	for _, f := range fs {
 		if err := s.engine.Release(f); err != nil {
 			return err
@@ -547,6 +576,8 @@ func (s *Store) releaseFunctionInstances(fs ...*FunctionInstance) error {
 }
 
 func (s *Store) addFunctionInstances(fs ...*FunctionInstance) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	for _, f := range fs {
 		var addr FunctionIndex
 		if len(s.releasedFunctionIndex) > 0 {
@@ -573,6 +604,8 @@ func (s *Store) releaseGlobalInstances(gs ...*GlobalInstance) {
 }
 
 func (s *Store) addGlobalInstances(gs ...*GlobalInstance) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	for _, g := range gs {
 		var addr globalIndex
 		if len(s.releasedGlobalIndex) > 0 {
@@ -601,6 +634,9 @@ func (s *Store) addTableInstance(t *TableInstance) {
 		return
 	}
 
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	var addr tableIndex
 	if len(s.releasedTableIndex) > 0 {
 		id := len(s.releasedTableIndex) - 1
@@ -627,6 +663,9 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 		return
 	}
 
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	var addr memoryIndex
 	if len(s.releasedMemoryIndex) > 0 {
 		id := len(s.releasedMemoryIndex) - 1
@@ -638,6 +677,15 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 		s.memories = append(s.memories, m)
 	}
 	m.index = addr
+}
+
+func (s *Store) addModuleInstance(m *ModuleInstance) {
+	// Build the default context for calls to this module.
+	m.Ctx = NewModuleContext(s.ctx, s.engine, m)
+
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	s.moduleInstances[m.Name] = m
 }
 
 // Module implements wasm.Store Module
@@ -689,6 +737,9 @@ func (s *Store) resolveImports(module *Module) (
 	moduleImports map[*ModuleInstance]struct{},
 	err error,
 ) {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+
 	moduleImports = map[*ModuleInstance]struct{}{}
 	for _, is := range module.ImportSection {
 		m, ok := s.moduleInstances[is.Module]
@@ -697,7 +748,7 @@ func (s *Store) resolveImports(module *Module) (
 			return
 		}
 
-		// Note: at this point we don't increase the ref count.
+		m.incImportedCount()
 		moduleImports[m] = struct{}{}
 
 		var exp *ExportInstance
@@ -802,6 +853,9 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 }
 
 func (s *Store) getTypeInstances(ts []*FunctionType) ([]*TypeInstance, error) {
+	// We take write-lock here as the follwing might end up mutating typeIDs map.
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	ret := make([]*TypeInstance, len(ts))
 	for i, t := range ts {
 		inst, err := s.getTypeInstance(t)
@@ -814,7 +868,6 @@ func (s *Store) getTypeInstances(ts []*FunctionType) ([]*TypeInstance, error) {
 }
 
 func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
-	// TODO: take mutex
 	key := t.String()
 	id, ok := s.typeIDs[key]
 	if !ok {

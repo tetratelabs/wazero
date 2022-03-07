@@ -140,7 +140,7 @@ func (s *Store) compileHostFunction(f *FunctionInstance) (err error) {
 
 	if err = s.engine.Compile(f); err != nil {
 		// On failure, we must release the function instance.
-		if err = s.releaseFunctionInstances(f); err != nil {
+		if err = s.releaseFunctionInstances(true, f); err != nil {
 			return err
 		}
 		return fmt.Errorf("failed to compile %s: %v", f.Name, err)
@@ -149,6 +149,8 @@ func (s *Store) compileHostFunction(f *FunctionInstance) (err error) {
 }
 
 func (s *Store) requireModuleUnused(moduleName string) error {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
 	if _, ok := s.moduleInstances[moduleName]; ok {
 		return fmt.Errorf("module %s has already been instantiated", moduleName)
 	}
