@@ -64,7 +64,7 @@ func (g globalI32) String() string {
 
 type globalI64 uint64
 
-// compile-time check to ensure globalI64 is a publicwasm.Global
+// compile-time check to ensure globalI64 is a publicwasm.ExportedGlobal
 var _ publicwasm.Global = globalI64(0)
 
 // Type implements wasm.Global Type
@@ -84,7 +84,7 @@ func (g globalI64) String() string {
 
 type globalF32 uint64
 
-// compile-time check to ensure globalF32 is a publicwasm.Global
+// compile-time check to ensure globalF32 is a publicwasm.ExportedGlobal
 var _ publicwasm.Global = globalF32(0)
 
 // Type implements wasm.Global Type
@@ -104,7 +104,7 @@ func (g globalF32) String() string {
 
 type globalF64 uint64
 
-// compile-time check to ensure globalF64 is a publicwasm.Global
+// compile-time check to ensure globalF64 is a publicwasm.ExportedGlobal
 var _ publicwasm.Global = globalF64(0)
 
 // Type implements wasm.Global Type
@@ -120,28 +120,4 @@ func (g globalF64) Get() uint64 {
 // String implements fmt.Stringer
 func (g globalF64) String() string {
 	return fmt.Sprintf("global(%f)", publicwasm.DecodeF64(g.Get()))
-}
-
-// Global implements wasm.Module Global
-func (m *PublicModule) Global(name string) publicwasm.Global {
-	exp, err := m.instance.getExport(name, ExternTypeGlobal)
-	if err != nil {
-		return nil
-	}
-	if exp.Global.Type.Mutable {
-		return &mutableGlobal{exp.Global}
-	}
-	valType := exp.Global.Type.ValType
-	switch valType {
-	case ValueTypeI32:
-		return globalI32(exp.Global.Val)
-	case ValueTypeI64:
-		return globalI64(exp.Global.Val)
-	case ValueTypeF32:
-		return globalF32(exp.Global.Val)
-	case ValueTypeF64:
-		return globalF64(exp.Global.Val)
-	default:
-		panic(fmt.Errorf("BUG: unknown value type %X", valType))
-	}
 }

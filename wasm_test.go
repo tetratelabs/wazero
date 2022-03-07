@@ -106,12 +106,12 @@ func TestDecodedModule_WithName(t *testing.T) {
 	m1, err := r.NewModule(base.WithName("1"))
 	require.NoError(t, err)
 	require.Nil(t, internal.Module("0"))
-	require.Equal(t, internal.Module("1"), m1.(*internalwasm.PublicModule))
+	require.Equal(t, internal.Module("1"), m1)
 
 	m2, err := r.NewModule(base.WithName("2"))
 	require.NoError(t, err)
 	require.Nil(t, internal.Module("0"))
-	require.Equal(t, internal.Module("2"), m2.(*internalwasm.PublicModule))
+	require.Equal(t, internal.Module("2"), m2)
 }
 
 // TestModule_Memory only covers a couple cases to avoid duplication of internal/wasm/runtime_test.go
@@ -145,7 +145,7 @@ func TestModule_Memory(t *testing.T) {
 			module, err := r.NewModule(decoded)
 			require.NoError(t, err)
 
-			mem := module.Memory("memory")
+			mem := module.ExportedMemory("memory")
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
@@ -219,7 +219,7 @@ func TestModule_Global(t *testing.T) {
 			module, err := r.NewModule(&DecodedModule{module: tc.module})
 			require.NoError(t, err)
 
-			global := module.Global("global")
+			global := module.ExportedGlobal("global")
 			if !tc.expected {
 				require.Nil(t, global)
 				return
@@ -269,7 +269,7 @@ func TestFunction_Context(t *testing.T) {
 			// Define a host function so that we can catch the context propagated from a module function call
 			functionName := "fn"
 			expectedResult := uint64(math.MaxUint64)
-			hostFn := func(ctx wasm.ModuleContext) uint64 {
+			hostFn := func(ctx wasm.Module) uint64 {
 				require.Equal(t, tc.expected, ctx.Context())
 				return expectedResult
 			}
@@ -283,7 +283,7 @@ func TestFunction_Context(t *testing.T) {
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
-			results, err := module.Function(functionName).Call(tc.ctx)
+			results, err := module.ExportedFunction(functionName).Call(module.WithContext(tc.ctx))
 			require.NoError(t, err)
 			require.Equal(t, expectedResult, results[0])
 		})
@@ -298,12 +298,12 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 
 	// Define a function that will be set as the start function
 	var calledStart bool
-	start := func(ctx wasm.ModuleContext) {
+	start := func(ctx wasm.Module) {
 		calledStart = true
 		require.Equal(t, runtimeCtx, ctx.Context())
 	}
 
-	_, err := r.NewHostModule(&HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	_, err := r.NewHostModuleFromConfig(&HostModuleConfig{Functions: map[string]interface{}{"start": start}})
 	require.NoError(t, err)
 
 	decoded, err := r.DecodeModule([]byte(`(module $runtime_test.go
@@ -319,8 +319,8 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 }
 
 // requireImportAndExportFunction re-module a host function because only host functions can see the propagated context.
-func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx wasm.ModuleContext) uint64, functionName string) []byte {
-	_, err := r.NewHostModule(&HostModuleConfig{
+func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx wasm.Module) uint64, functionName string) []byte {
+	_, err := r.NewHostModuleFromConfig(&HostModuleConfig{
 		Name: "host", Functions: map[string]interface{}{functionName: hostFn},
 	})
 	require.NoError(t, err)

@@ -249,7 +249,7 @@ func newWazeroFacIterBench(engine *wazero.RuntimeConfig) (wasm.Function, error) 
 		return nil, err
 	}
 
-	return m.Function("fac-iter"), nil
+	return m.ExportedFunction("fac-iter"), nil
 }
 
 // newWasmerForFacIterBench returns the store and instance that scope the factorial function.

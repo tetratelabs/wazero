@@ -20,29 +20,14 @@ const (
 	// FunctionKindGoContext is a function implemented in Go, with a signature matching FunctionType, except arg zero is
 	// a context.Context.
 	FunctionKindGoContext
-	// FunctionKindGoModuleContext is a function implemented in Go, with a signature matching FunctionType, except arg zero is
-	// a ModuleContext.
-	FunctionKindGoModuleContext
+	// FunctionKindGoModule is a function implemented in Go, with a signature matching FunctionType, except arg
+	// zero is a Module.
+	FunctionKindGoModule
 )
-
-// goFunc binds a WebAssembly 1.0 (20191205) Type Use to a Go func signature.
-type goFunc struct {
-	// functionKind is never FunctionKindWasm
-	functionKind FunctionKind
-	functionType *FunctionType
-	goFunc       *reflect.Value
-}
-
-func newGoFunc(i interface{}) (hf *goFunc, err error) {
-	fn := reflect.ValueOf(i)
-	hf = &goFunc{goFunc: &fn}
-	hf.functionKind, hf.functionType, _, err = getFunctionType(hf.goFunc, false)
-	return
-}
 
 // Below are reflection code to get the interface type used to parse functions and set values.
 
-var moduleContextType = reflect.TypeOf((*publicwasm.ModuleContext)(nil)).Elem()
+var moduleType = reflect.TypeOf((*publicwasm.Module)(nil)).Elem()
 var goContextType = reflect.TypeOf((*context.Context)(nil)).Elem()
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
@@ -54,8 +39,8 @@ func GetHostFunctionCallContextValue(fk FunctionKind, ctx *ModuleContext) *refle
 		val := reflect.New(goContextType).Elem()
 		val.Set(reflect.ValueOf(ctx.Context()))
 		return &val
-	case FunctionKindGoModuleContext:
-		val := reflect.New(moduleContextType).Elem()
+	case FunctionKindGoModule:
+		val := reflect.New(moduleType).Elem()
 		val.Set(reflect.ValueOf(ctx))
 		return &val
 	}
@@ -72,19 +57,8 @@ func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind,
 	}
 
 	pOffset := 0
-	pCount := p.NumIn()
-	fk = FunctionKindGoNoContext
-	if pCount > 0 && p.In(0).Kind() == reflect.Interface {
-		p0 := p.In(0)
-		if p0.Implements(moduleContextType) {
-			fk = FunctionKindGoModuleContext
-			pOffset = 1
-			pCount--
-		} else if p0.Implements(goContextType) {
-			fk = FunctionKindGoContext
-			pOffset = 1
-			pCount--
-		}
+	if fk = kind(p); fk != FunctionKindGoNoContext {
+		pOffset = 1
 	}
 
 	rCount := p.NumOut()
@@ -101,7 +75,7 @@ func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind,
 		}
 	}
 
-	ft = &FunctionType{Params: make([]ValueType, pCount), Results: make([]ValueType, rCount)}
+	ft = &FunctionType{Params: make([]ValueType, p.NumIn()-pOffset), Results: make([]ValueType, rCount)}
 
 	for i := 0; i < len(ft.Params); i++ {
 		pI := p.In(i + pOffset)
@@ -112,8 +86,8 @@ func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind,
 
 		// Now, we will definitely err, decide which message is best
 		var arg0Type reflect.Type
-		if hc := pI.Implements(moduleContextType); hc {
-			arg0Type = moduleContextType
+		if hc := pI.Implements(moduleType); hc {
+			arg0Type = moduleType
 		} else if gc := pI.Implements(goContextType); gc {
 			arg0Type = goContextType
 		}
@@ -142,6 +116,19 @@ func getFunctionType(fn *reflect.Value, allowErrorResult bool) (fk FunctionKind,
 		err = fmt.Errorf("result[0] is unsupported: %s", result.Kind())
 	}
 	return
+}
+
+func kind(p reflect.Type) FunctionKind {
+	pCount := p.NumIn()
+	if pCount > 0 && p.In(0).Kind() == reflect.Interface {
+		p0 := p.In(0)
+		if p0.Implements(moduleType) {
+			return FunctionKindGoModule
+		} else if p0.Implements(goContextType) {
+			return FunctionKindGoContext
+		}
+	}
+	return FunctionKindGoNoContext
 }
 
 func getTypeOf(kind reflect.Kind) (ValueType, bool) {

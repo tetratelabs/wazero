@@ -55,15 +55,6 @@ func ValueTypeName(t ValueType) string {
 	return "unknown"
 }
 
-// Store allows access to instantiated modules and host functions
-type Store interface {
-	// Module returns exports from an instantiated module or nil if there aren't any.
-	Module(moduleName string) Module
-
-	// HostModule returns exported host functions for the moduleName or nil if there aren't any.
-	HostModule(moduleName string) HostModule
-}
-
 // Module return functions exported in a module, post-instantiation.
 //
 // Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
@@ -71,20 +62,31 @@ type Store interface {
 type Module interface {
 	fmt.Stringer
 
-	// Function returns a function exported from this module or nil if it wasn't.
-	Function(name string) Function
+	// Context returns any propagated context from the Runtime or a prior function call.
+	//
+	// The returned context is always non-nil; it defaults to context.Background.
+	Context() context.Context
+
+	// WithContext allows callers to override the propagated context, for example, to add values to it.
+	WithContext(ctx context.Context) Module
+
+	// Memory returns a memory defined in this module or nil if there are none wasn't.
+	Memory() Memory
+
+	// ExportedFunction returns a function exported from this module or nil if it wasn't.
+	ExportedFunction(name string) Function
 
 	// TODO: Table
 
-	// Memory returns a memory exported from this module or nil if it wasn't.
+	// ExportedMemory returns a memory exported from this module or nil if it wasn't.
 	//
 	// Note: WASI modules require exporting a Memory named "memory". This means that a module successfully initialized
 	// as a WASI Command or Reactor will never return nil for this name.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-	Memory(name string) Memory
+	ExportedMemory(name string) Memory
 
-	// Global returns a global exported from this module or nil if it wasn't.
-	Global(name string) Global
+	// ExportedGlobal a global exported from this module or nil if it wasn't.
+	ExportedGlobal(name string) Global
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime NewModule).
@@ -105,27 +107,31 @@ type Function interface {
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
 	// including signature mismatch.
 	//
-	// If the `ctx` is nil, it defaults to the same context as the module was initialized with.
+	// If the `ctx` is nil, it defaults to the module the function was defined in.
 	//
-	// To ensure context propagation in a HostFunction body, use or derive `ctx` from ModuleContext.Context:
-	//
-	//	hostFunction := func(ctx wasm.ModuleContext, offset, byteCount uint32) uint32 {
-	//		fn, _ = ctx.Function("__read")
-	//		results, err := fn(ctx.Context(), offset, byteCount)
+	// To override context propagation, use Module.WithContext
+	//	fn = mod.ExportedFunction("fib")
+	//	results, err := fn(mod.WithContext(ctx), 5)
 	//	--snip--
-	Call(ctx context.Context, params ...uint64) ([]uint64, error)
+	//
+	// To ensure context propagation in a host function body, pass the `ctx` parameter:
+	//	hostFunction := func(ctx wasm.Module, offset, byteCount uint32) uint32 {
+	//		fn = ctx.ExportedFunction("__read")
+	//		results, err := fn(ctx, offset, byteCount)
+	//	--snip--
+	Call(ctx Module, params ...uint64) ([]uint64, error)
 }
 
 // Global is a WebAssembly 1.0 (20191205) global exported from an instantiated module (wazero.Runtime NewModule).
 //
 // Ex. If the value is not mutable, you can read it once:
 //
-//	offset := module.Global("memory.offset").Get()
+//	offset := module.ExportedGlobal("memory.offset").Get()
 //
 // Globals are allowed by specification to be mutable. However, this can be disabled by configuration. When in doubt,
 // safe cast to find out if the value can change. Ex.
 //
-//	offset := module.Global("memory.offset")
+//	offset := module.ExportedGlobal("memory.offset")
 //	if _, ok := offset.(wasm.MutableGlobal); ok {
 //		// value can change
 //	} else {
@@ -151,49 +157,6 @@ type MutableGlobal interface {
 	// Set updates the value of this global.
 	// See Global.Type for how to decode this value to a Go type.
 	Set(v uint64)
-}
-
-// HostModule return functions defined in Go, a.k.a. "Host Functions" in WebAssembly 1.0 (20191205).
-//
-// Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-hostfunc
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#external-types%E2%91%A0
-type HostModule interface {
-	fmt.Stringer
-
-	// Function returns a host function exported under this module name or nil if it wasn't.
-	Function(name string) HostFunction
-}
-
-// HostFunction is like a Function, except it is implemented in Go. This is a "Host Function" in WebAssembly 1.0 (20191205).
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-hostfunc
-type HostFunction interface {
-	// ParamTypes are documented as Function.ParamTypes
-	ParamTypes() []ValueType
-
-	// ResultTypes are documented as Function.ResultTypes
-	ResultTypes() []ValueType
-
-	// Call is the same as Function.Call, except it must be called from an importing module (ctx). The can also err if
-	// the module did not import this function!
-	Call(ctx ModuleContext, params ...uint64) ([]uint64, error)
-}
-
-// ModuleContext is the first argument of a HostFunction.
-//
-// Note: This is an interface for decoupling, not third-party implementations. All implementations are in wazero.
-type ModuleContext interface {
-	// Context returns the host call's context.
-	//
-	// The returned context is always non-nil; it defaults to the background context.
-	Context() context.Context
-
-	// Memory returns a potentially zero memory of the importing module
-	Memory() Memory
-
-	// Function returns a function exported from this module or nil if it wasn't.
-	Function(name string) Function
 }
 
 // Memory allows restricted access to a module's memory. Notably, this does not allow growing.

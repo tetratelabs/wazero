@@ -4,10 +4,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"strings"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestFunctionType_String(t *testing.T) {
@@ -53,6 +55,7 @@ func TestSectionIDName(t *testing.T) {
 		{"element", SectionIDElement, "element"},
 		{"code", SectionIDCode, "code"},
 		{"data", SectionIDData, "data"},
+		{"host_function", SectionIDHostFunction, "host_function"},
 		{"unknown", 100, "unknown"},
 	}
 
@@ -282,6 +285,8 @@ func TestValidateConstExpression(t *testing.T) {
 
 func TestModule_Validate_Errors(t *testing.T) {
 	zero := Index(0)
+	fn := reflect.ValueOf(func(wasm.Module) {})
+
 	tests := []struct {
 		name        string
 		input       *Module
@@ -296,6 +301,16 @@ func TestModule_Validate_Errors(t *testing.T) {
 				StartSection:    &zero,
 			},
 			expectedErr: "invalid start function: func[0] has an invalid type",
+		},
+		{
+			name: "CodeSection and HostFunctionSection",
+			input: &Module{
+				TypeSection:         []*FunctionType{{}},
+				FunctionSection:     []uint32{0},
+				CodeSection:         []*Code{{Body: []byte{OpcodeEnd}}},
+				HostFunctionSection: []*reflect.Value{&fn},
+			},
+			expectedErr: "cannot mix functions and host functions in the same module",
 		},
 	}
 
@@ -467,11 +482,7 @@ func TestModule_validateFunctions(t *testing.T) {
 		}
 		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
 		require.Error(t, err)
-
-		// go map keys do not iterate consistently
-		if !strings.Contains(err.Error(), `invalid function[0] (export "f1","f2"): cannot pop the 1st f32 operand`) {
-			require.Contains(t, err.Error(), `invalid function[0] (export "f2","f1"): cannot pop the 1st f32 operand`)
-		}
+		require.Contains(t, err.Error(), `invalid function[0] (export "f1","f2"): cannot pop the 1st f32 operand`)
 	})
 }
 

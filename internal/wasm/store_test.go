@@ -77,7 +77,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 			instance, err := s.Instantiate(tc.input, "test")
 			require.NoError(t, err)
 
-			mem := instance.Memory("memory")
+			mem := instance.ExportedMemory("memory")
 			if tc.expected {
 				require.Equal(t, tc.expectedLen, mem.Size())
 			} else {
@@ -94,7 +94,7 @@ func TestPublicModule_String(t *testing.T) {
 	m, err := s.Instantiate(&Module{}, "module")
 	require.NoError(t, err)
 	require.Equal(t, "Module[module]", m.String())
-	require.Equal(t, "Module[module]", s.Module(m.instance.Name).String())
+	require.Equal(t, "Module[module]", s.Module(m.Module.Name).String())
 }
 
 func TestStore_ReleaseModule(t *testing.T) {
@@ -108,12 +108,14 @@ func TestStore_ReleaseModule(t *testing.T) {
 		{
 			name: "Module imports HostModule",
 			initializer: func(t *testing.T, s *Store) {
-				_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+				m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.Module) {}})
+				require.NoError(t, err)
+				_, err = s.Instantiate(m, importedModuleName)
 				require.NoError(t, err)
 			},
 		},
 		{
-			name: "Module imports Moudle",
+			name: "Module imports Module",
 			initializer: func(t *testing.T, s *Store) {
 				_, err := s.Instantiate(&Module{
 					TypeSection:     []*FunctionType{{}},
@@ -172,10 +174,13 @@ func TestStore_concurrent(t *testing.T) {
 	const importedModuleName = "imported"
 	const goroutines = 1000
 
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.Module) {}})
+	require.NoError(t, err)
+
 	var wg sync.WaitGroup
 
 	s := newStore()
-	_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+	_, err = s.Instantiate(m, importedModuleName)
 	require.NoError(t, err)
 
 	hm, ok := s.modules[importedModuleName]
@@ -244,9 +249,22 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
+	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.Module) {}})
+	require.NoError(t, err)
+
+	t.Run("Fails if module name already in use", func(t *testing.T) {
+		s := newStore()
+		_, err = s.Instantiate(m, importedModuleName)
+		require.NoError(t, err)
+
+		// Trying to register it again should fail
+		_, err = s.Instantiate(m, importedModuleName)
+		require.EqualError(t, err, "module imported has already been instantiated")
+	})
+
 	t.Run("fail resolve import", func(t *testing.T) {
 		s := newStore()
-		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+		_, err = s.Instantiate(m, importedModuleName)
 		require.NoError(t, err)
 
 		hm := s.modules[importedModuleName]
@@ -272,7 +290,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		catch := s.engine.(*catchContext)
 		catch.compilationFailIndex = 3
 
-		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+		_, err = s.Instantiate(m, importedModuleName)
 		require.NoError(t, err)
 
 		hm := s.modules[importedModuleName]
@@ -308,7 +326,7 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		catch := s.engine.(*catchContext)
 		catch.callFailIndex = 1
 
-		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+		_, err = s.Instantiate(m, importedModuleName)
 		require.NoError(t, err)
 
 		hm := s.modules[importedModuleName]
@@ -332,10 +350,13 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
+	m, err := NewHostModule("", map[string]interface{}{"host_fn": func(wasm.Module) {}})
+	require.NoError(t, err)
+
 	s := newStore()
 
 	// Add the host module
-	_, err := s.NewHostModule("", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
+	_, err = s.Instantiate(m, "")
 	require.NoError(t, err)
 
 	t.Run("Module is the importing module", func(t *testing.T) {
@@ -362,8 +383,14 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 func TestFunctionInstance_Call(t *testing.T) {
 	type key string
 	storeCtx := context.WithValue(context.Background(), key("wa"), "zero")
-
 	notStoreCtx := context.WithValue(context.Background(), key("wazer"), "o")
+
+	// Add the host module
+	functionName := "fn"
+	m, err := NewHostModule("host",
+		map[string]interface{}{functionName: func(wasm.Module) {}},
+	)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -390,18 +417,15 @@ func TestFunctionInstance_Call(t *testing.T) {
 			store := NewStore(storeCtx, engine, Features20191205)
 
 			// Add the host module
-			functionName := "fn"
-			hm, err := store.NewHostModule("host",
-				map[string]interface{}{functionName: func(wasm.ModuleContext) {}},
-			)
+			hm, err := store.Instantiate(m, "host")
 			require.NoError(t, err)
 
 			// Make a module to import the function
-			instantiated, err := store.Instantiate(&Module{
+			mod, err := store.Instantiate(&Module{
 				TypeSection: []*FunctionType{{}},
 				ImportSection: []*Import{{
 					Type:     ExternTypeFunc,
-					Module:   hm.name,
+					Module:   hm.Module.Name,
 					Name:     functionName,
 					DescFunc: 0,
 				}},
@@ -411,7 +435,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
-			_, err = instantiated.Function(functionName).Call(tc.ctx)
+			_, err = mod.ExportedFunction(functionName).Call(mod.WithContext(tc.ctx))
 			require.NoError(t, err)
 			if tc.expected == nil {
 				require.Nil(t, engine.ctx)

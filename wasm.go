@@ -2,7 +2,6 @@ package wazero
 
 import (
 	"bytes"
-	"context"
 	"errors"
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -20,7 +19,8 @@ import (
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
 type Runtime interface {
-	wasm.Store
+	// Module returns exports from an instantiated module or nil if there aren't any.
+	Module(moduleName string) wasm.Module
 
 	// DecodeModule decodes the WebAssembly 1.0 (20191205) text or binary source or errs if invalid.
 	//
@@ -45,19 +45,16 @@ type Runtime interface {
 	//	decoded, _ := r.DecodeModule(source)
 	//	module, _ := r.NewModule(decoded)
 	//
-	// Note: The last value of RuntimeConfig.WithContext is used for any WebAssembly 1.0 (20191205) Start Function.
+	// Note: The last value of RuntimeConfig.WithContext is used for any WebAssembly 1.0 (20191205) Start ExportedFunction.
 	NewModule(module *DecodedModule) (wasm.Module, error)
 
-	// TODO: RemoveModule
-
-	// NewHostModule instantiates the module namespace from the host or errs if the configuration was invalid.
+	// NewHostModuleFromConfig instantiates the module namespace from the host or errs if the configuration was invalid.
 	//
 	// Ex.
-	//	r := wazero.NewRuntime()
-	//	wasiExports, _ := r.NewHostModule(wazero.WASISnapshotPreview1())
-	NewHostModule(hostModule *HostModuleConfig) (wasm.HostModule, error)
+	//	module, _ := wazero.NewRuntime().NewHostModuleFromConfig(wazero.WASISnapshotPreview1())
+	NewHostModuleFromConfig(hostModule *HostModuleConfig) (wasm.Module, error)
 
-	// TODO: RemoveHostModule
+	// TODO: RemoveModule
 }
 
 func NewRuntime() Runtime {
@@ -67,7 +64,6 @@ func NewRuntime() Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
-		ctx:             config.ctx,
 		store:           internalwasm.NewStore(config.ctx, config.engine, config.enabledFeatures),
 		enabledFeatures: config.enabledFeatures,
 	}
@@ -75,7 +71,6 @@ func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
-	ctx             context.Context
 	store           *internalwasm.Store
 	enabledFeatures internalwasm.Features
 }
@@ -83,11 +78,6 @@ type runtime struct {
 // Module implements wasm.Store Module
 func (r *runtime) Module(moduleName string) wasm.Module {
 	return r.store.Module(moduleName)
-}
-
-// HostModule implements wasm.Store HostModule
-func (r *runtime) HostModule(moduleName string) wasm.HostModule {
-	return r.store.HostModule(moduleName)
 }
 
 // DecodeModule implements Runtime.DecodeModule
@@ -139,7 +129,11 @@ func (r *runtime) NewModule(module *DecodedModule) (wasm.Module, error) {
 	return r.store.Instantiate(module.module, module.name)
 }
 
-// NewHostModule implements Runtime.NewHostModule
-func (r *runtime) NewHostModule(hostModule *HostModuleConfig) (wasm.HostModule, error) {
-	return r.store.NewHostModule(hostModule.Name, hostModule.Functions)
+// NewHostModuleFromConfig implements Runtime.NewHostModuleFromConfig
+func (r *runtime) NewHostModuleFromConfig(hostModule *HostModuleConfig) (wasm.Module, error) {
+	if m, err := internalwasm.NewHostModule(hostModule.Name, hostModule.Functions); err != nil {
+		return nil, err
+	} else {
+		return r.store.Instantiate(m, hostModule.Name)
+	}
 }

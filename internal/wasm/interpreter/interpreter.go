@@ -45,7 +45,7 @@ type callEngine struct {
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
-	// Function call stack.
+	// ExportedFunction call stack.
 	frames []*callFrame
 
 	// compiledFunctions is engine.functions at the time when this virtual machine was created.

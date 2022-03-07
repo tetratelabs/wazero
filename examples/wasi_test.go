@@ -14,12 +14,12 @@ import (
 
 func Test_WASI(t *testing.T) {
 	// built-in WASI function to write a random value to memory
-	randomGet := func(ctx wasm.ModuleContext, buf, bufLen uint32) wasi.Errno {
+	randomGet := func(ctx wasm.Module, buf, bufLen uint32) wasi.Errno {
 		panic("unimplemented")
 	}
 
 	stdout := new(bytes.Buffer)
-	goFunc := func(ctx wasm.ModuleContext) {
+	goFunc := func(ctx wasm.Module) {
 		// Write 8 random bytes to memory using WASI.
 		errno := randomGet(ctx, 0, 8)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
@@ -34,15 +34,15 @@ func Test_WASI(t *testing.T) {
 
 	// Host functions can be exported as any module name, including the empty string.
 	env := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"random": goFunc}}
-	_, err := r.NewHostModule(env)
+	_, err := r.NewHostModuleFromConfig(env)
 
 	// Configure WASI and implement the function to use it
-	we, err := r.NewHostModule(wazero.WASISnapshotPreview1())
+	we, err := r.NewHostModuleFromConfig(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
-	randomGetFn := we.Function("random_get")
+	randomGetFn := we.ExportedFunction("random_get")
 
 	// Implement the function pointer. This mainly shows how you can decouple a host function dependency.
-	randomGet = func(ctx wasm.ModuleContext, buf, bufLen uint32) wasi.Errno {
+	randomGet = func(ctx wasm.Module, buf, bufLen uint32) wasi.Errno {
 		res, err := randomGetFn.Call(ctx, uint64(buf), uint64(bufLen))
 		require.NoError(t, err)
 		return wasi.Errno(res[0])

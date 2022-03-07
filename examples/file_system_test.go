@@ -52,7 +52,7 @@ func Test_file_system(t *testing.T) {
 	require.NoError(t, err)
 
 	wasiConfig := &wazero.WASIConfig{Preopens: map[string]wasi.FS{".": memFS}}
-	_, err = r.NewHostModule(wazero.WASISnapshotPreview1WithConfig(wasiConfig))
+	_, err = r.NewHostModuleFromConfig(wazero.WASISnapshotPreview1WithConfig(wasiConfig))
 	require.NoError(t, err)
 
 	// Note: TinyGo binaries must be treated as WASI Commands to initialize memory.

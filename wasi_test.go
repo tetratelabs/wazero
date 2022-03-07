@@ -16,15 +16,15 @@ func TestStartWASICommand_UsesStoreContext(t *testing.T) {
 
 	// Define a function that will be re-exported as the WASI function: _start
 	var calledStart bool
-	start := func(ctx wasm.ModuleContext) {
+	start := func(ctx wasm.Module) {
 		calledStart = true
 		require.Equal(t, config.ctx, ctx.Context())
 	}
 
-	_, err := r.NewHostModule(&HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	_, err := r.NewHostModuleFromConfig(&HostModuleConfig{Functions: map[string]interface{}{"start": start}})
 	require.NoError(t, err)
 
-	_, err = r.NewHostModule(WASISnapshotPreview1())
+	_, err = r.NewHostModuleFromConfig(WASISnapshotPreview1())
 	require.NoError(t, err)
 
 	decoded, err := r.DecodeModule([]byte(`(module $wasi_test.go
