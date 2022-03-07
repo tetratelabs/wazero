@@ -37,8 +37,11 @@ type (
 		// EnabledFeatures are read-only to allow optimizations.
 		EnabledFeatures Features
 
+		// moduleNames ensures no race conditions instantiating two modules of the same name
+		moduleNames map[string]struct{} // guarded by mux
+
 		// modules holds the instantiated Wasm modules by module name from Instantiate.
-		modules map[string]*ModuleInstance
+		modules map[string]*ModuleInstance // guarded by mux
 
 		// typeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
 		// do type-checks on indirect function calls.
@@ -236,41 +239,41 @@ const (
 	maximumFunctionTypes = 1 << 27
 )
 
-// newModuleInstance bundles all the instances for a module and creates a new module instance.
-func newModuleInstance(name string, module *Module, importedFunctions, functions []*FunctionInstance,
+// addSections adds section elements to the ModuleInstance
+func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
 	importedGlobals, globals []*GlobalInstance, importedTable, table *TableInstance,
-	memory, importedMemory *MemoryInstance, typeInstances []*TypeInstance, moduleImports map[*ModuleInstance]struct{}) *ModuleInstance {
+	memory, importedMemory *MemoryInstance, typeInstances []*TypeInstance, moduleImports map[*ModuleInstance]struct{}) {
 
-	instance := &ModuleInstance{Name: name, Types: typeInstances, dependencies: moduleImports}
+	m.Types = typeInstances
+	m.dependencies = moduleImports
 
-	instance.Functions = append(instance.Functions, importedFunctions...)
+	m.Functions = append(m.Functions, importedFunctions...)
 	for i, f := range functions {
 		// Associate each function with the type instance and the module instance's pointer.
-		f.Module = instance
+		f.Module = m
 		f.TypeID = typeInstances[module.FunctionSection[i]].TypeID
-		instance.Functions = append(instance.Functions, f)
+		m.Functions = append(m.Functions, f)
 	}
 
-	instance.Globals = append(instance.Globals, importedGlobals...)
-	instance.Globals = append(instance.Globals, globals...)
+	m.Globals = append(m.Globals, importedGlobals...)
+	m.Globals = append(m.Globals, globals...)
 
 	if importedTable != nil {
-		instance.Table = importedTable
+		m.Table = importedTable
 	} else {
-		instance.Table = table
+		m.Table = table
 	}
 
 	if importedMemory != nil {
-		instance.Memory = importedMemory
+		m.Memory = importedMemory
 	} else {
-		instance.Memory = memory
+		m.Memory = memory
 	}
 
-	instance.buildExportInstances(module.ExportSection)
-	return instance
+	m.buildExports(module.ExportSection)
 }
 
-func (m *ModuleInstance) buildExportInstances(exports map[string]*Export) {
+func (m *ModuleInstance) buildExports(exports map[string]*Export) {
 	m.Exports = make(map[string]*ExportInstance, len(exports))
 	for _, exp := range exports {
 		index := exp.Index
@@ -365,6 +368,7 @@ func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Sto
 		ctx:                   ctx,
 		engine:                engine,
 		EnabledFeatures:       enabledFeatures,
+		moduleNames:           map[string]struct{}{},
 		modules:               map[string]*ModuleInstance{},
 		typeIDs:               map[string]FunctionTypeID{},
 		maximumFunctionIndex:  maximumFunctionIndex,
@@ -383,20 +387,23 @@ func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
 	return nil
 }
 
+// Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
+// different names safely and concurrently.
 func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) {
-	// Note: we do not take lock here in order to enable concurrent instantiation and compilation
-	// of multiuple modules. When necessary, we take read or write locks in each method of store used here.
-
-	if err := s.requireModuleUnused(name); err != nil {
+	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
 
+	// Note: we do not take lock here in order to enable concurrent instantiation and compilation
+	// of multiple modules. When necessary, we take read or write locks in each method of store used here.
 	if err := s.checkFunctionIndexOverflow(len(module.FunctionSection)); err != nil {
+		s.deleteModule(name)
 		return nil, err
 	}
 
 	types, err := s.getTypes(module.TypeSection)
 	if err != nil {
+		s.deleteModule(name)
 		return nil, err
 	}
 
@@ -410,6 +417,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		}
 	}()
 	if err != nil {
+		s.deleteModule(name)
 		return nil, err
 	}
 
@@ -417,14 +425,17 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		module.buildFunctions(), module.buildGlobals(importedGlobals), module.buildTable(), module.buildMemory()
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
-	instance := newModuleInstance(name, module, importedFunctions, functions, importedGlobals,
+	instance := &ModuleInstance{Name: name}
+	instance.addSections(module, importedFunctions, functions, importedGlobals,
 		globals, importedTable, table, importedMemory, memory, types, moduleImports)
 
 	if err = instance.validateElements(module.ElementSection); err != nil {
+		s.deleteModule(name)
 		return nil, err
 	}
 
-	if err := instance.validateData(module.DataSection); err != nil {
+	if err = instance.validateData(module.DataSection); err != nil {
+		s.deleteModule(name)
 		return nil, err
 	}
 
@@ -432,11 +443,10 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	s.addFunctions(functions...) // Need to assign funcaddr to each instance before compilation.
 	for i, f := range functions {
 		// TODO: maybe better consider spawning multiple goroutines for compilations to accelerate.
-		if err := s.engine.Compile(f); err != nil {
+		if err = s.engine.Compile(f); err != nil {
+			s.deleteModule(name)
 			// On the failure, release the assigned funcaddr and already compiled functions.
-			if err := s.releaseFunctions(functions[:i]...); err != nil {
-				return nil, err
-			}
+			_ = s.releaseFunctions(functions[:i]...) // ignore any release error so we can report the original one.
 			idx := module.SectionElementCount(SectionIDFunction) - 1
 			return nil, fmt.Errorf("compilation failed at index %d/%d: %w", i, idx, err)
 		}
@@ -446,8 +456,8 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	instance.applyElements(module.ElementSection)
 	instance.applyData(module.DataSection)
 
-	// Persist the module instance.
-	s.addModule(instance)
+	// Build the default context for calls to this module.
+	instance.Ctx = NewModuleContext(s.ctx, s.engine, instance)
 
 	// Plus, we can finalize the module import reference count.
 	moduleImportsFinalized = true
@@ -455,10 +465,14 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		if _, err := s.engine.Call(instance.Ctx, instance.Functions[funcIdx]); err != nil {
+		if _, err = s.engine.Call(instance.Ctx, instance.Functions[funcIdx]); err != nil {
+			s.deleteModule(name)
 			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
 		}
 	}
+
+	// Now that the instantiation is complete without error, add it. This makes it visible for import.
+	s.addModule(instance)
 	return &PublicModule{s: s, instance: instance}, nil
 }
 
@@ -487,7 +501,7 @@ func (s *Store) ReleaseModule(moduleName string) error {
 		return fmt.Errorf("unable to release function instance: %w", err)
 	}
 
-	s.deleteModule(m)
+	s.deleteModule(moduleName)
 	return nil
 }
 
@@ -541,16 +555,28 @@ func (s *Store) addFunctions(fs ...*FunctionInstance) {
 	}
 }
 
-func (s *Store) deleteModule(m *ModuleInstance) {
+// deleteModule makes the moduleName available for instantiation again.
+func (s *Store) deleteModule(moduleName string) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	delete(s.modules, m.Name)
+	delete(s.modules, moduleName)
+	delete(s.moduleNames, moduleName)
 }
 
-func (s *Store) addModule(m *ModuleInstance) {
-	// Build the default context for calls to this module.
-	m.Ctx = NewModuleContext(s.ctx, s.engine, m)
+// requireModuleName is a pre-flight check to reserve a module.
+// This must be reverted on error with deleteModule if initialization fails.
+func (s *Store) requireModuleName(moduleName string) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	if _, ok := s.moduleNames[moduleName]; ok {
+		return fmt.Errorf("module %s has already been instantiated", moduleName)
+	}
+	s.moduleNames[moduleName] = struct{}{}
+	return nil
+}
 
+// addModule makes the module visible for import
+func (s *Store) addModule(m *ModuleInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.modules[m.Name] = m
