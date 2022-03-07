@@ -3450,6 +3450,31 @@ func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	return c.compileExtendImpl(inst)
 }
 
+// compileSignExtend32From8 implements compiler.compileSignExtend32From8 for the amd64 architecture.
+func (c *amd64Compiler) compileSignExtend32From8() error {
+	return c.compileExtendImpl(x86.AMOVBLSX)
+}
+
+// compileSignExtend32From16 implements compiler.compileSignExtend32From16 for the amd64 architecture.
+func (c *amd64Compiler) compileSignExtend32From16() error {
+	return c.compileExtendImpl(x86.AMOVWLSX)
+}
+
+// compileSignExtend64From8 implements compiler.compileSignExtend64From8 for the amd64 architecture.
+func (c *amd64Compiler) compileSignExtend64From8() error {
+	return c.compileExtendImpl(x86.AMOVBQSX)
+}
+
+// compileSignExtend64From16 implements compiler.compileSignExtend64From16 for the amd64 architecture.
+func (c *amd64Compiler) compileSignExtend64From16() error {
+	return c.compileExtendImpl(x86.AMOVWQSX)
+}
+
+// compileSignExtend64From32 implements compiler.compileSignExtend64From32 for the amd64 architecture.
+func (c *amd64Compiler) compileSignExtend64From32() error {
+	return c.compileExtendImpl(x86.AMOVLQSX)
+}
+
 func (c *amd64Compiler) compileExtendImpl(inst obj.As) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {

@@ -62,6 +62,15 @@ func (r *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {
 	return &RuntimeConfig{engine: r.engine, ctx: r.ctx, enabledFeatures: enabledFeatures}
 }
 
+// WithFeatureSignExtensionOps enables sign-extend operations. This defaults to false as the feature was not finished in
+// WebAssembly 1.0 (20191205).
+//
+// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+func (r *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig {
+	enabledFeatures := r.enabledFeatures.Set(internalwasm.FeatureSignExtensionOps, enabled)
+	return &RuntimeConfig{engine: r.engine, ctx: r.ctx, enabledFeatures: enabledFeatures}
+}
+
 // DecodedModule is a WebAssembly 1.0 (20191205) text or binary encoded module to instantiate.
 type DecodedModule struct {
 	name   string

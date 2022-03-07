@@ -154,9 +154,32 @@ func (p *funcParser) beginInstruction(tokenBytes []byte) (next tokenParser, err 
 	case "call": // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#-hrefsyntax-instr-controlmathsfcallx
 		opCode = wasm.OpcodeCall
 		next = p.parseFuncIndex
+	case "i32.extend8_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+		opCode = wasm.OpcodeI32Extend8S
+		next = p.beginFieldOrInstruction
+	case "i32.extend16_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+		opCode = wasm.OpcodeI32Extend16S
+		next = p.beginFieldOrInstruction
+	case "i64.extend8_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+		opCode = wasm.OpcodeI64Extend8S
+		next = p.beginFieldOrInstruction
+	case "i64.extend16_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+		opCode = wasm.OpcodeI64Extend16S
+		next = p.beginFieldOrInstruction
+	case "i64.extend32_s": // See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+		opCode = wasm.OpcodeI64Extend32S
+		next = p.beginFieldOrInstruction
 	default:
 		return nil, fmt.Errorf("unsupported instruction: %s", tokenBytes)
 	}
+
+	// Guard >1.0 feature sign-extension-ops
+	if opCode >= wasm.OpcodeI32Extend8S && opCode <= wasm.OpcodeI64Extend32S {
+		if err = p.enabledFeatures.Require(wasm.FeatureSignExtensionOps); err != nil {
+			return nil, fmt.Errorf("%s invalid as %v", tokenBytes, err)
+		}
+	}
+
 	p.currentBody = append(p.currentBody, opCode)
 	return next, nil
 }

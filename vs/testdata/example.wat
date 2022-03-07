@@ -37,4 +37,7 @@
     ;; export a memory before it was defined, given its symbolic ID
     (export "mem" (memory $mem))
     (memory $mem 1 3)
+
+    ;; add >1.0 feature from https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+    (func (param i64) (result i64) local.get 0 i64.extend16_s)
 )

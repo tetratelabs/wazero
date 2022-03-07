@@ -12,6 +12,7 @@ var (
 	f32, i32, i64                   = wasm.ValueTypeF32, wasm.ValueTypeI32, wasm.ValueTypeI64
 	i32_v                           = &wasm.FunctionType{Params: []wasm.ValueType{i32}}
 	v_i32                           = &wasm.FunctionType{Results: []wasm.ValueType{i32}}
+	i64_i64                         = &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}
 	i32i64_v                        = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}}
 	i32i32_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}}
 	i32i64_i32                      = &wasm.FunctionType{Params: []wasm.ValueType{i32, i64}, Results: []wasm.ValueType{i32}}

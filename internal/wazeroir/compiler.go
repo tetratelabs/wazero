@@ -1362,6 +1362,26 @@ operatorSwitch:
 		c.emit(
 			&OperationF64ReinterpretFromI64{},
 		)
+	case wasm.OpcodeI32Extend8S:
+		c.emit(
+			&OperationSignExtend32From8{},
+		)
+	case wasm.OpcodeI32Extend16S:
+		c.emit(
+			&OperationSignExtend32From16{},
+		)
+	case wasm.OpcodeI64Extend8S:
+		c.emit(
+			&OperationSignExtend64From8{},
+		)
+	case wasm.OpcodeI64Extend16S:
+		c.emit(
+			&OperationSignExtend64From16{},
+		)
+	case wasm.OpcodeI64Extend32S:
+		c.emit(
+			&OperationSignExtend64From32{},
+		)
 	default:
 		return fmt.Errorf("unsupported instruction in wazeroir: 0x%x", op)
 	}

@@ -30,14 +30,17 @@ var exampleText []byte
 // exampleBinary is the exampleText encoded in the WebAssembly 1.0 binary format.
 var exampleBinary = binary.EncodeModule(example)
 
+var enabledFeatures = wasm.Features20191205.Set(wasm.FeatureSignExtensionOps, true)
+
 func newExample() *wasm.Module {
 	three := wasm.Index(3)
-	i32 := wasm.ValueTypeI32
+	i32, i64 := wasm.ValueTypeI32, wasm.ValueTypeI64
 	return &wasm.Module{
 		TypeSection: []*wasm.FunctionType{
 			{Params: []wasm.ValueType{i32, i32}, Results: []wasm.ValueType{i32}},
 			{},
 			{Params: []wasm.ValueType{i32, i32, i32, i32}, Results: []wasm.ValueType{i32}},
+			{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
 		},
 		ImportSection: []*wasm.Import{
 			{
@@ -50,11 +53,12 @@ func newExample() *wasm.Module {
 				DescFunc: 2,
 			},
 		},
-		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(1), wasm.Index(0)},
+		FunctionSection: []wasm.Index{wasm.Index(1), wasm.Index(1), wasm.Index(0), wasm.Index(3)},
 		CodeSection: []*wasm.Code{
 			{Body: []byte{wasm.OpcodeCall, 3, wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeEnd}},
 			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeLocalGet, 1, wasm.OpcodeI32Add, wasm.OpcodeEnd}},
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeI64Extend16S, wasm.OpcodeEnd}},
 		},
 		MemorySection: []*wasm.MemoryType{{Min: 1, Max: &three}},
 		ExportSection: map[string]*wasm.Export{
@@ -90,19 +94,19 @@ func newExample() *wasm.Module {
 
 func TestExampleUpToDate(t *testing.T) {
 	t.Run("binary.DecodeModule", func(t *testing.T) {
-		m, err := binary.DecodeModule(exampleBinary, wasm.Features20191205)
+		m, err := binary.DecodeModule(exampleBinary, enabledFeatures)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("text.DecodeModule", func(t *testing.T) {
-		m, err := text.DecodeModule(exampleText, wasm.Features20191205)
+		m, err := text.DecodeModule(exampleText, enabledFeatures)
 		require.NoError(t, err)
 		require.Equal(t, example, m)
 	})
 
 	t.Run("Executable", func(t *testing.T) {
-		r := wazero.NewRuntime()
+		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureSignExtensionOps(true))
 
 		// Add WASI to satisfy import tests
 		_, err := r.NewHostModule(wazero.WASISnapshotPreview1())
@@ -123,7 +127,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("binary.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := binary.DecodeModule(exampleBinary, wasm.Features20191205); err != nil {
+			if _, err := binary.DecodeModule(exampleBinary, enabledFeatures); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -137,7 +141,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("text.DecodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if _, err := text.DecodeModule(exampleText, wasm.Features20191205); err != nil {
+			if _, err := text.DecodeModule(exampleText, enabledFeatures); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -145,7 +149,7 @@ func BenchmarkCodecExample(b *testing.B) {
 	b.Run("wat2wasm via text.DecodeModule->binary.EncodeModule", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			if m, err := text.DecodeModule(exampleText, wasm.Features20191205); err != nil {
+			if m, err := text.DecodeModule(exampleText, enabledFeatures); err != nil {
 				b.Fatal(err)
 			} else {
 				_ = binary.EncodeModule(m)

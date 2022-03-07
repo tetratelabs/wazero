@@ -323,4 +323,19 @@ type compiler interface {
 	// compileConstI32 adds instruction to push the given constant f64 value onto the stack.
 	// See wasm.OpcodeF64Const
 	compileConstF64(o *wazeroir.OperationConstF64) error
+	// compileSignExtend32From8 adds instruction to sign-extends the first 8-bits of 32-bit in as signed 32-bit int.
+	// See wasm.OpcodeI32Extend8S
+	compileSignExtend32From8() error
+	// compileSignExtend32From16 adds instruction to sign-extends the first 16-bits of 32-bit in as signed 32-bit int.
+	// See wasm.OpcodeI32Extend16S
+	compileSignExtend32From16() error
+	// compileSignExtend64From8 adds instruction to sign-extends the first 8-bits of 64-bit in as signed 64-bit int.
+	// See wasm.OpcodeI64Extend8S
+	compileSignExtend64From8() error
+	// compileSignExtend64From16 adds instruction to sign-extends the first 16-bits of 64-bit in as signed 64-bit int.
+	// See wasm.OpcodeI64Extend16S
+	compileSignExtend64From16() error
+	// compileSignExtend64From32 adds instruction to sign-extends the first 32-bits of 64-bit in as signed 64-bit int.
+	// See wasm.OpcodeI64Extend32S
+	compileSignExtend64From32() error
 }

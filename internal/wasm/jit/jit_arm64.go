@@ -2552,6 +2552,31 @@ func (c *arm64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
 	}
 }
 
+// compileSignExtend32From8 implements compiler.compileSignExtend32From8 for the arm64 architecture.
+func (c *arm64Compiler) compileSignExtend32From8() error {
+	return c.compileSimpleUnop(arm64.ASXTBW)
+}
+
+// compileSignExtend32From16 implements compiler.compileSignExtend32From16 for the arm64 architecture.
+func (c *arm64Compiler) compileSignExtend32From16() error {
+	return c.compileSimpleUnop(arm64.ASXTHW)
+}
+
+// compileSignExtend64From8 implements compiler.compileSignExtend64From8 for the arm64 architecture.
+func (c *arm64Compiler) compileSignExtend64From8() error {
+	return c.compileSimpleUnop(arm64.ASXTB)
+}
+
+// compileSignExtend64From16 implements compiler.compileSignExtend64From16 for the arm64 architecture.
+func (c *arm64Compiler) compileSignExtend64From16() error {
+	return c.compileSimpleUnop(arm64.ASXTH)
+}
+
+// compileSignExtend64From32 implements compiler.compileSignExtend64From32 for the arm64 architecture.
+func (c *arm64Compiler) compileSignExtend64From32() error {
+	return c.compileSimpleUnop(arm64.ASXTW)
+}
+
 func (c *arm64Compiler) compileSimpleUnop(inst obj.As) error {
 	v, err := c.popValueOnRegister()
 	if err != nil {

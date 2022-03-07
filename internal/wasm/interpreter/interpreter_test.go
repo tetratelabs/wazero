@@ -2,6 +2,8 @@ package interpreter
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -9,6 +11,7 @@ import (
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/internal/wazeroir"
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
@@ -115,5 +118,115 @@ func TestEngine_Call_HostFn(t *testing.T) {
 	t.Run("errs when too many parameters", func(t *testing.T) {
 		_, err := e.Call(modCtx, f, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
+	})
+}
+
+func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
+	translateToIROperationKind := func(op wasm.Opcode) (kind wazeroir.OperationKind) {
+		switch op {
+		case wasm.OpcodeI32Extend8S:
+			kind = wazeroir.OperationKindSignExtend32From8
+		case wasm.OpcodeI32Extend16S:
+			kind = wazeroir.OperationKindSignExtend32From16
+		case wasm.OpcodeI64Extend8S:
+			kind = wazeroir.OperationKindSignExtend64From8
+		case wasm.OpcodeI64Extend16S:
+			kind = wazeroir.OperationKindSignExtend64From16
+		case wasm.OpcodeI64Extend32S:
+			kind = wazeroir.OperationKindSignExtend64From32
+		}
+		return
+	}
+	t.Run("32bit", func(t *testing.T) {
+		for _, tc := range []struct {
+			in       int32
+			expected int32
+			opcode   wasm.Opcode
+		}{
+			// https://github.com/WebAssembly/spec/blob/ee4a6c40afa22e3e4c58610ce75186aafc22344e/test/core/i32.wast#L270-L276
+			{in: 0, expected: 0, opcode: wasm.OpcodeI32Extend8S},
+			{in: 0x7f, expected: 127, opcode: wasm.OpcodeI32Extend8S},
+			{in: 0x80, expected: -128, opcode: wasm.OpcodeI32Extend8S},
+			{in: 0xff, expected: -1, opcode: wasm.OpcodeI32Extend8S},
+			{in: 0x012345_00, expected: 0, opcode: wasm.OpcodeI32Extend8S},
+			{in: -19088768 /* = 0xfedcba_80 bit pattern */, expected: -0x80, opcode: wasm.OpcodeI32Extend8S},
+			{in: -1, expected: -1, opcode: wasm.OpcodeI32Extend8S},
+
+			// https://github.com/WebAssembly/spec/blob/ee4a6c40afa22e3e4c58610ce75186aafc22344e/test/core/i32.wast#L278-L284
+			{in: 0, expected: 0, opcode: wasm.OpcodeI32Extend16S},
+			{in: 0x7fff, expected: 32767, opcode: wasm.OpcodeI32Extend16S},
+			{in: 0x8000, expected: -32768, opcode: wasm.OpcodeI32Extend16S},
+			{in: 0xffff, expected: -1, opcode: wasm.OpcodeI32Extend16S},
+			{in: 0x0123_0000, expected: 0, opcode: wasm.OpcodeI32Extend16S},
+			{in: -19103744 /* = 0xfedc_8000 bit pattern */, expected: -0x8000, opcode: wasm.OpcodeI32Extend16S},
+			{in: -1, expected: -1, opcode: wasm.OpcodeI32Extend16S},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%s(i32.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
+				ce := &callEngine{}
+				f := &compiledFunction{
+					funcInstance: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
+					body: []*interpreterOp{
+						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
+						{kind: translateToIROperationKind(tc.opcode)},
+						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
+					},
+				}
+				ce.callNativeFunc(&wasm.ModuleContext{}, f)
+				require.Equal(t, tc.expected, int32(uint32(ce.pop())))
+			})
+		}
+	})
+	t.Run("64bit", func(t *testing.T) {
+		for _, tc := range []struct {
+			in       int64
+			expected int64
+			opcode   wasm.Opcode
+		}{
+			// https://github.com/WebAssembly/spec/blob/ee4a6c40afa22e3e4c58610ce75186aafc22344e/test/core/i64.wast#L271-L277
+			{in: 0, expected: 0, opcode: wasm.OpcodeI64Extend8S},
+			{in: 0x7f, expected: 127, opcode: wasm.OpcodeI64Extend8S},
+			{in: 0x80, expected: -128, opcode: wasm.OpcodeI64Extend8S},
+			{in: 0xff, expected: -1, opcode: wasm.OpcodeI64Extend8S},
+			{in: 0x01234567_89abcd_00, expected: 0, opcode: wasm.OpcodeI64Extend8S},
+			{in: 81985529216486784 /* = 0xfedcba98_765432_80 bit pattern */, expected: -0x80, opcode: wasm.OpcodeI64Extend8S},
+			{in: -1, expected: -1, opcode: wasm.OpcodeI64Extend8S},
+
+			// https://github.com/WebAssembly/spec/blob/ee4a6c40afa22e3e4c58610ce75186aafc22344e/test/core/i64.wast#L279-L285
+			{in: 0, expected: 0, opcode: wasm.OpcodeI64Extend16S},
+			{in: 0x7fff, expected: 32767, opcode: wasm.OpcodeI64Extend16S},
+			{in: 0x8000, expected: -32768, opcode: wasm.OpcodeI64Extend16S},
+			{in: 0xffff, expected: -1, opcode: wasm.OpcodeI64Extend16S},
+			{in: 0x12345678_9abc_0000, expected: 0, opcode: wasm.OpcodeI64Extend16S},
+			{in: 81985529216466944 /* = 0xfedcba98_7654_8000 bit pattern */, expected: -0x8000, opcode: wasm.OpcodeI64Extend16S},
+			{in: -1, expected: -1, opcode: wasm.OpcodeI64Extend16S},
+
+			// https://github.com/WebAssembly/spec/blob/ee4a6c40afa22e3e4c58610ce75186aafc22344e/test/core/i64.wast#L287-L296
+			{in: 0, expected: 0, opcode: wasm.OpcodeI64Extend32S},
+			{in: 0x7fff, expected: 32767, opcode: wasm.OpcodeI64Extend32S},
+			{in: 0x8000, expected: 32768, opcode: wasm.OpcodeI64Extend32S},
+			{in: 0xffff, expected: 65535, opcode: wasm.OpcodeI64Extend32S},
+			{in: 0x7fffffff, expected: 0x7fffffff, opcode: wasm.OpcodeI64Extend32S},
+			{in: 0x80000000, expected: -0x80000000, opcode: wasm.OpcodeI64Extend32S},
+			{in: 0xffffffff, expected: -1, opcode: wasm.OpcodeI64Extend32S},
+			{in: 0x01234567_00000000, expected: 0, opcode: wasm.OpcodeI64Extend32S},
+			{in: -81985529054232576 /* = 0xfedcba98_80000000 bit pattern */, expected: -0x80000000, opcode: wasm.OpcodeI64Extend32S},
+			{in: -1, expected: -1, opcode: wasm.OpcodeI64Extend32S},
+		} {
+			tc := tc
+			t.Run(fmt.Sprintf("%s(i64.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
+				ce := &callEngine{}
+				f := &compiledFunction{
+					funcInstance: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
+					body: []*interpreterOp{
+						{kind: wazeroir.OperationKindConstI64, us: []uint64{uint64(tc.in)}},
+						{kind: translateToIROperationKind(tc.opcode)},
+						{kind: wazeroir.OperationKindBr, us: []uint64{math.MaxUint64}},
+					},
+				}
+				ce.callNativeFunc(&wasm.ModuleContext{}, f)
+				require.Equal(t, tc.expected, int64(ce.pop()))
+			})
+		}
 	})
 }
