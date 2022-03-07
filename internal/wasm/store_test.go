@@ -180,7 +180,7 @@ func TestStore_ReleaseModule(t *testing.T) {
 	}
 }
 
-func TestSotre_concurrent(t *testing.T) {
+func TestStore_concurrent(t *testing.T) {
 	const importedModuleName = "imported"
 	const goroutines = 1000
 
@@ -193,8 +193,20 @@ func TestSotre_concurrent(t *testing.T) {
 	hm, ok := s.moduleInstances[importedModuleName]
 	require.True(t, ok)
 
+	improtingModule := &Module{
+		TypeSection:     []*FunctionType{{}},
+		FunctionSection: []uint32{0},
+		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+		MemorySection:   []*MemoryType{{1, nil}},
+		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
+		TableSection:    []*TableType{{Limit: &LimitsType{Min: 10}}},
+		ImportSection: []*Import{
+			// Fisrt import resolve succeeds -> increment the hm.importedCount.
+			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
+		},
+	}
+
 	// Concurrent instantiation.
-	var modules []*ModuleInstance
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
 		if i == goroutines/2 {
@@ -204,19 +216,7 @@ func TestSotre_concurrent(t *testing.T) {
 		}
 		go func(i int) {
 			defer wg.Done()
-			mod, err := s.Instantiate(&Module{
-				TypeSection:     []*FunctionType{{}},
-				FunctionSection: []uint32{0},
-				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
-				MemorySection:   []*MemoryType{{1, nil}},
-				GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
-				TableSection:    []*TableType{{Limit: &LimitsType{Min: 10}}},
-				ImportSection: []*Import{
-					// Fisrt import resolve succeeds -> increment the hm.importedCount.
-					{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
-				},
-			}, strconv.Itoa(i))
-			modules = append(modules, mod.instance)
+			_, err := s.Instantiate(improtingModule, strconv.Itoa(i))
 			require.NoError(t, err)
 		}(i)
 	}
@@ -247,12 +247,12 @@ func TestSotre_concurrent(t *testing.T) {
 
 	// Concurrent release.
 	wg.Add(goroutines)
-	for _, m := range modules {
-		go func(m *ModuleInstance) {
+	for i := 0; i < goroutines; i++ {
+		go func(i int) {
 			defer wg.Done()
-			err := s.ReleaseModuleInstance(m.Name)
+			err := s.ReleaseModuleInstance(strconv.Itoa(i))
 			require.NoError(t, err)
-		}(m)
+		}(i)
 	}
 	wg.Wait()
 
