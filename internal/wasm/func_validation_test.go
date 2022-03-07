@@ -38,7 +38,7 @@ func TestValidateFunction_valueStackLimit(t *testing.T) {
 }
 
 func TestValidateFunction_SignExtensionOps(t *testing.T) {
-	const maxStackHeight = 100 /* arbitrary */
+	const maxStackHeight = 100 // arbitrary
 	tests := []struct {
 		input                Opcode
 		expectedErrOnDisable string

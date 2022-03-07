@@ -122,8 +122,6 @@ func TestEngine_Call_HostFn(t *testing.T) {
 }
 
 func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
-	v := uint64(0xfedcba98_80000000)
-	fmt.Println(int64(v))
 	translateToIROperationKind := func(op wasm.Opcode) (kind wazeroir.OperationKind) {
 		switch op {
 		case wasm.OpcodeI32Extend8S:
