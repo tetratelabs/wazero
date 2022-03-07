@@ -11,15 +11,17 @@ func TestJIT(t *testing.T) {
 	if !wazero.JITSupported {
 		t.Skip()
 	}
-	runPostMVPTests(t, wazero.NewRuntimeConfigJIT)
+	runOptionalFeatureTests(t, wazero.NewRuntimeConfigJIT)
 }
 
 func TestInterpreter(t *testing.T) {
-	runPostMVPTests(t, wazero.NewRuntimeConfigInterpreter)
+	runOptionalFeatureTests(t, wazero.NewRuntimeConfigInterpreter)
 }
 
-// runPostMVPTests tests features
+// runOptionalFeatureTests tests features enabled by feature flags (internalwasm.Features) as they were unfinished when
+// WebAssembly 1.0 (20191205) was released.
+//
 // See https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
-func runPostMVPTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func runOptionalFeatureTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	// TODO:
 }
