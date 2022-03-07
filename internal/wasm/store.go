@@ -319,7 +319,7 @@ func (m *ModuleInstance) buildExportInstances(exports map[string]*Export) {
 		}
 
 		// We already validated the duplicates during module validation phase.
-		_ = m.addExport(exp.Name, ei)
+		m.Exports[exp.Name] = ei
 	}
 }
 
@@ -372,15 +372,6 @@ func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
 			}
 		}
 	}
-}
-
-// addExport adds and indexes the given export or errs if the name is already exported.
-func (m *ModuleInstance) addExport(name string, e *ExportInstance) error {
-	if _, ok := m.Exports[name]; ok {
-		return fmt.Errorf("%q is already exported in module %q", name, m.Name)
-	}
-	m.Exports[name] = e
-	return nil
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
