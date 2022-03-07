@@ -209,15 +209,16 @@ func TestStore_concurrent(t *testing.T) {
 	// Concurrent instantiation.
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
-		if i == goroutines/2 {
-			// Trying to release the imported module concurrently, but should fail as it's in use.
-			err := s.ReleaseModuleInstance(importedModuleName)
-			require.Error(t, err)
-		}
 		go func(i int) {
 			defer wg.Done()
 			_, err := s.Instantiate(improtingModule, strconv.Itoa(i))
 			require.NoError(t, err)
+
+			if i == goroutines/2 {
+				// Trying to release the imported module concurrently, but should fail as it's in use.
+				err := s.ReleaseModuleInstance(importedModuleName)
+				require.Error(t, err)
+			}
 		}(i)
 	}
 	wg.Wait()
@@ -1172,10 +1173,6 @@ func TestModuleInstance_incImportedCount(t *testing.T) {
 	}
 	wg.Wait()
 	require.Equal(t, count, m.importedCount)
-}
-
-func Test_newModuleInstance(t *testing.T) {
-	// TODO
 }
 
 func newStore() *Store {
