@@ -472,7 +472,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		// TODO: maybe better consider spawning multiple goroutines for compilations to accelerate.
 		if err := s.engine.Compile(f); err != nil {
 			// On the failure, release the assigned funcaddr and already compiled functions.
-			if err := s.releaseFunctionInstances(true, functions[:i]...); err != nil {
+			if err := s.releaseFunctionInstances(functions[:i]...); err != nil {
 				return nil, err
 			}
 			idx := module.SectionElementCount(SectionIDFunction) - 1
@@ -505,10 +505,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 
 // ReleaseModuleInstance deallocates resources if a module with the given name exists.
 func (s *Store) ReleaseModuleInstance(moduleName string) error {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
-	instance := s.moduleInstances[moduleName]
+	instance := s.module(moduleName)
 	if instance == nil {
 		return nil // already released
 	}
@@ -527,7 +524,7 @@ func (s *Store) ReleaseModuleInstance(moduleName string) error {
 		mod.decImportedCount()
 	}
 
-	if err := s.releaseFunctionInstances(false, instance.Functions...); err != nil {
+	if err := s.releaseFunctionInstances(instance.Functions...); err != nil {
 		return fmt.Errorf("unable to release function instance: %w", err)
 	}
 
@@ -549,7 +546,7 @@ func (s *Store) ReleaseModuleInstance(moduleName string) error {
 	instance.MemoryInstance = nil
 	instance.Types = nil
 
-	delete(s.moduleInstances, instance.Name)
+	s.deleteModuleInstance(instance)
 	return nil
 }
 
@@ -565,11 +562,10 @@ func (instance *ModuleInstance) incImportedCount() {
 	instance.importedCount++
 }
 
-func (s *Store) releaseFunctionInstances(lock bool, fs ...*FunctionInstance) error {
-	if lock {
-		s.mux.Lock()
-		defer s.mux.Unlock()
-	}
+func (s *Store) releaseFunctionInstances(fs ...*FunctionInstance) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	for _, f := range fs {
 		if err := s.engine.Release(f); err != nil {
 			return err
@@ -605,6 +601,8 @@ func (s *Store) addFunctionInstances(fs ...*FunctionInstance) {
 }
 
 func (s *Store) releaseGlobalInstances(gs ...*GlobalInstance) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	for _, g := range gs {
 		// Release reference to the global instance.
 		s.globals[g.index] = nil
@@ -635,6 +633,9 @@ func (s *Store) addGlobalInstances(gs ...*GlobalInstance) {
 }
 
 func (s *Store) releaseTableInstance(t *TableInstance) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	// Release reference to the table instance.
 	s.tables[t.index] = nil
 
@@ -666,6 +667,9 @@ func (s *Store) addTableInstance(t *TableInstance) {
 }
 
 func (s *Store) releaseMemoryInstance(m *MemoryInstance) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
 	// Release reference to the memory instance.
 	s.memories[m.index] = nil
 
@@ -695,6 +699,11 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 	}
 	m.index = index
 }
+func (s *Store) deleteModuleInstance(m *ModuleInstance) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	delete(s.moduleInstances, m.Name)
+}
 
 func (s *Store) addModuleInstance(m *ModuleInstance) {
 	// Build the default context for calls to this module.
@@ -707,11 +716,17 @@ func (s *Store) addModuleInstance(m *ModuleInstance) {
 
 // Module implements wasm.Store Module
 func (s *Store) Module(moduleName string) publicwasm.Module {
-	if m, ok := s.moduleInstances[moduleName]; !ok {
-		return nil
-	} else {
+	if m := s.module(moduleName); m != nil {
 		return &PublicModule{s: s, instance: m}
+	} else {
+		return nil
 	}
+}
+
+func (s *Store) module(moduleName string) *ModuleInstance {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+	return s.moduleInstances[moduleName]
 }
 
 // PublicModule implements wasm.Module
@@ -745,6 +760,8 @@ func (m *PublicModule) Memory(name string) publicwasm.Memory {
 
 // HostModule implements wasm.Store HostModule
 func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
 	return s.moduleInstances[moduleName].hostModule
 }
 

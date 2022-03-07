@@ -142,7 +142,7 @@ func (s *Store) compileHostFunction(f *FunctionInstance) (err error) {
 
 	if err = s.engine.Compile(f); err != nil {
 		// On failure, we must release the function instance.
-		if err = s.releaseFunctionInstances(true, f); err != nil {
+		if err = s.releaseFunctionInstances(f); err != nil {
 			return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 		}
 	}

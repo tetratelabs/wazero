@@ -629,7 +629,7 @@ func TestStore_releaseFunctionInstances(t *testing.T) {
 		s.functions[f.Index] = &FunctionInstance{} // Non-nil!
 	}
 
-	err := s.releaseFunctionInstances(false, fs...)
+	err := s.releaseFunctionInstances(fs...)
 	require.NoError(t, err)
 
 	// Ensure the release targets become nil.
