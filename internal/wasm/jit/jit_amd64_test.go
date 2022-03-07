@@ -330,7 +330,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
 	requireRunAndExpectedValueReturned := func(t *testing.T, env *jitEnv, c *amd64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
-		for returnValue := uint32(0); returnValue < 7; returnValue++ {
+		for returnValue := uint32(0); returnValue < 10; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
 			c.ir.LabelCallers[label.String()] = 1
 			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
