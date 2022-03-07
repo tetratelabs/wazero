@@ -2222,14 +2222,14 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
 			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
 
-			if tc.moduleInstance.MemoryInstance != nil {
-				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.MemoryInstance.Buffer))
+			if tc.moduleInstance.Memory != nil {
+				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
 				require.Equal(t, uint64(bufSliceHeader.Len), ce.moduleContext.memorySliceLen)
 				require.Equal(t, bufSliceHeader.Data, ce.moduleContext.memoryElement0Address)
 			}
 
-			if tc.moduleInstance.TableInstance != nil {
-				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.TableInstance.Table))
+			if tc.moduleInstance.Table != nil {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Table.Table))
 				require.Equal(t, uint64(tableHeader.Len), ce.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 			}

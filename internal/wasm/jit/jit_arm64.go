@@ -3380,7 +3380,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 }
 
 func (c *arm64Compiler) compileReservedMemoryRegisterInitialization() {
-	if c.f.Module.MemoryInstance != nil {
+	if c.f.Module.Memory != nil {
 		// "reservedRegisterForMemory = ce.MemoryElement0Address"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
@@ -3446,7 +3446,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.f.Module.MemoryInstance != nil {
+	if c.f.Module.Memory != nil {
 		// "tmpX = moduleInstance.Memory"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
@@ -3490,7 +3490,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if c.f.Module.TableInstance != nil {
+	if c.f.Module.Table != nil {
 		// "tmpX = &tables[0] (type of **wasm.Table)"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
