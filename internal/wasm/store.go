@@ -402,7 +402,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	defer func() {
 		if !moduleImportsFinalized {
 			for moduleImport := range moduleImports {
-				moduleImport.decImportedCount()
+				moduleImport.decDependentCount()
 			}
 		}
 	}()
@@ -477,7 +477,7 @@ func (s *Store) ReleaseModule(moduleName string) error {
 	// TODO: check outstanding calls and wait until they exit.
 
 	for mod := range m.dependencies {
-		mod.decImportedCount()
+		mod.decDependentCount()
 	}
 
 	if err := s.releaseFunctions(m.Functions...); err != nil {
@@ -488,13 +488,13 @@ func (s *Store) ReleaseModule(moduleName string) error {
 	return nil
 }
 
-func (m *ModuleInstance) decImportedCount() {
+func (m *ModuleInstance) decDependentCount() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	m.dependentCount--
 }
 
-func (m *ModuleInstance) incImportedCount() {
+func (m *ModuleInstance) incDependentCount() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	m.dependentCount++
@@ -621,7 +621,7 @@ func (s *Store) resolveImports(module *Module) (
 			return
 		}
 
-		m.incImportedCount()
+		m.incDependentCount() // TODO: check if the module is already released. See #293
 		moduleImports[m] = struct{}{}
 
 		var exp *ExportInstance

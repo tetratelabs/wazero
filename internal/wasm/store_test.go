@@ -232,7 +232,7 @@ func TestStore_concurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	// No all the importing instances were released, the imported module can be freed.
+	// Now all the importing instances were released, the imported module can be freed.
 	require.Zero(t, hm.dependentCount)
 	require.NoError(t, s.ReleaseModule(hm.Name))
 
@@ -932,7 +932,7 @@ func TestModuleInstance_applyElements(t *testing.T) {
 	require.Equal(t, FunctionIndex(targetAddr2), m.Table.Table[targetOffset2].FunctionIndex)
 }
 
-func TestModuleInstance_decImportedCount(t *testing.T) {
+func TestModuleInstance_decDependentCount(t *testing.T) {
 	count := 100
 	m := ModuleInstance{dependentCount: count}
 
@@ -941,14 +941,14 @@ func TestModuleInstance_decImportedCount(t *testing.T) {
 	for i := 0; i < count; i++ {
 		go func() {
 			defer wg.Done()
-			m.decImportedCount()
+			m.decDependentCount()
 		}()
 	}
 	wg.Wait()
 	require.Zero(t, m.dependentCount)
 }
 
-func TestModuleInstance_incImportedCount(t *testing.T) {
+func TestModuleInstance_incDependentCount(t *testing.T) {
 	count := 100
 	m := ModuleInstance{}
 	wg := sync.WaitGroup{}
@@ -956,7 +956,7 @@ func TestModuleInstance_incImportedCount(t *testing.T) {
 	for i := 0; i < count; i++ {
 		go func() {
 			defer wg.Done()
-			m.incImportedCount()
+			m.incDependentCount()
 		}()
 	}
 	wg.Wait()
