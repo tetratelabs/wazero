@@ -259,6 +259,9 @@ func TestSotre_concurrent(t *testing.T) {
 	// No all the importing instances were released, the imported module can be freed.
 	require.Zero(t, hm.importedCount)
 	require.NoError(t, s.ReleaseModuleInstance(hm.Name))
+
+	// All instances are freed.
+	require.Len(t, s.moduleInstances, 0)
 }
 
 func TestSotre_Instantiate_Errors(t *testing.T) {
