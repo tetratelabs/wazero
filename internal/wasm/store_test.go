@@ -201,7 +201,6 @@ func TestStore_concurrent(t *testing.T) {
 		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
 		TableSection:    []*TableType{{Limit: &LimitsType{Min: 10}}},
 		ImportSection: []*Import{
-			// Fisrt import resolve succeeds -> increment the hm.importedCount.
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
 	}
@@ -283,7 +282,7 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(&Module{
 			TypeSection: []*FunctionType{{}},
 			ImportSection: []*Import{
-				// Fisrt import resolve succeeds -> increment the hm.importedCount.
+				// The fisrt import resolve succeeds -> increment hm.importedCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 				// But the second one tries to import uninitialized-module ->
 				{Type: ExternTypeFunc, Module: "non-exist", Name: "fn", DescFunc: 0},
@@ -320,7 +319,6 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 				{Body: []byte{OpcodeEnd}},
 			},
 			ImportSection: []*Import{
-				// Fisrt import resolve succeeds -> increment the hm.importedCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}, importingModuleName)
@@ -350,7 +348,6 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 			StartSection:    &startFuncIndex,
 			ImportSection: []*Import{
-				// Fisrt import resolve succeeds -> increment the hm.importedCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}, importingModuleName)
