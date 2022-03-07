@@ -413,7 +413,7 @@ func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
 }
 
 func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) {
-	// Note: we do not take lock here in order to enable conccurent instantiation and compilation
+	// Note: we do not take lock here in order to enable concurrent instantiation and compilation
 	// of multiuple modules. When necessary, we take read or write locks in each method of store used here.
 
 	if err := s.requireModuleUnused(name); err != nil {
@@ -553,7 +553,7 @@ func (instance *ModuleInstance) decImportedCount() {
 func (instance *ModuleInstance) incImportedCount() {
 	instance.mux.Lock()
 	defer instance.mux.Unlock()
-	instance.importedCount--
+	instance.importedCount++
 }
 
 func (s *Store) releaseFunctionInstances(lock bool, fs ...*FunctionInstance) error {

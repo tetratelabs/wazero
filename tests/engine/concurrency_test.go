@@ -12,13 +12,13 @@ func TestJITConcurrency(t *testing.T) {
 		t.Skip()
 	}
 	runAdhocTestsUnderHighConcurrency(t, wazero.NewRuntimeConfigJIT)
-	// TODO: Add conccurent instantiation, invocation and release on a single store test case in https://github.com/tetratelabs/wazero/issues/293
+	// TODO: Add concurrent instantiation, invocation and release on a single store test case in https://github.com/tetratelabs/wazero/issues/293
 
 }
 
 func TestInterpreterConcurrency(t *testing.T) {
 	runAdhocTestsUnderHighConcurrency(t, wazero.NewRuntimeConfigInterpreter)
-	// TODO: Add conccurent instantiation, invocation and release on a single store test case in https://github.com/tetratelabs/wazero/issues/293
+	// TODO: Add concurrent instantiation, invocation and release on a single store test case in https://github.com/tetratelabs/wazero/issues/293
 }
 
 func runAdhocTestsUnderHighConcurrency(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {

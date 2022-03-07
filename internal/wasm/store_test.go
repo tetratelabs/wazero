@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -96,31 +97,58 @@ func TestPublicModule_String(t *testing.T) {
 }
 
 func TestStore_ReleaseModule(t *testing.T) {
-	s := newStore()
+	const importedModuleName = "imported"
 
-	// Add the host module
-	hm, err := s.NewHostModule("", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
-	require.NoError(t, err)
+	for _, tc := range []struct {
+		name        string
+		initializer func(t *testing.T, s *Store)
+	}{
+		{
+			name: "Module imports HostModule",
+			initializer: func(t *testing.T, s *Store) {
+				_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "Module imports Moudle",
+			initializer: func(t *testing.T, s *Store) {
+				s.Instantiate(&Module{
+					TypeSection:     []*FunctionType{{}},
+					FunctionSection: []uint32{0},
+					CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+					ExportSection:   map[string]*Export{"fn": {Type: ExternTypeFunc, Index: 0, Name: "fn"}},
+				}, importedModuleName)
+				_, err := s.NewHostModule("", map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+				require.NoError(t, err)
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			s := newStore()
 
-	t.Run("Module imports HostModule", func(t *testing.T) {
-		name := "test"
-		_, err = s.Instantiate(&Module{
-			TypeSection:   []*FunctionType{{}},
-			ImportSection: []*Import{{Type: ExternTypeFunc, Name: "host_fn", DescFunc: 0}},
-			MemorySection: []*MemoryType{{1, nil}},
-		}, name)
-		require.NoError(t, err)
+			name := "test"
+			tc.initializer(t, s)
 
-		// TODO: We shouldn't be able to release the host module as it is in use!
-		require.NoError(t, s.ReleaseModuleInstance(hm.name))
+			_, err := s.Instantiate(&Module{
+				TypeSection:   []*FunctionType{{}},
+				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
+				MemorySection: []*MemoryType{{1, nil}},
+			}, name)
+			require.NoError(t, err)
 
-		// Can release the importing module
-		require.NoError(t, s.ReleaseModuleInstance(name))
-		require.Nil(t, s.moduleInstances[name])
+			// We shouldn't be able to release the host module as it is in use!
+			require.Error(t, s.ReleaseModuleInstance(importedModuleName))
 
-		// Can re-release the importing module
-		require.NoError(t, s.ReleaseModuleInstance(name))
-	})
+			// Can release the importing module
+			require.NoError(t, s.ReleaseModuleInstance(name))
+			require.Nil(t, s.moduleInstances[name])
+
+			// Can re-release the importing module
+			require.NoError(t, s.ReleaseModuleInstance(name))
+		})
+	}
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
@@ -677,6 +705,7 @@ func TestStore_resolveImports(t *testing.T) {
 			require.NoError(t, err)
 			require.Contains(t, moduleImports, s.moduleInstances[moduleName])
 			require.Contains(t, functions, f)
+			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
 		})
 	})
 	t.Run("global", func(t *testing.T) {
@@ -707,6 +736,7 @@ func TestStore_resolveImports(t *testing.T) {
 			_, globals, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.Type}}})
 			require.NoError(t, err)
 			require.Contains(t, globals, inst)
+			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
 		})
 	})
 	t.Run("table", func(t *testing.T) {
@@ -754,6 +784,7 @@ func TestStore_resolveImports(t *testing.T) {
 			_, _, table, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &TableType{Limit: &LimitsType{Max: &max}}}}})
 			require.NoError(t, err)
 			require.Equal(t, table, tableInst)
+			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
 		})
 	})
 	t.Run("memory", func(t *testing.T) {
@@ -791,6 +822,7 @@ func TestStore_resolveImports(t *testing.T) {
 			_, _, _, memory, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &MemoryType{Max: &max}}}})
 			require.NoError(t, err)
 			require.Equal(t, memory, memoryInst)
+			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
 		})
 	})
 }
@@ -913,12 +945,39 @@ func TestModuleInstance_applyElements(t *testing.T) {
 	require.Equal(t, FunctionIndex(targetAddr2), m.TableInstance.Table[targetOffset2].FunctionIndex)
 }
 
-func Test_newModuleInstance(t *testing.T) {
-	// TODO
+func TestModuleInstance_decImportedCount(t *testing.T) {
+	count := 100
+	m := ModuleInstance{importedCount: count}
+
+	wg := sync.WaitGroup{}
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		go func() {
+			defer wg.Done()
+			m.decImportedCount()
+		}()
+	}
+	wg.Wait()
+	require.Zero(t, m.importedCount)
 }
 
-func TestStore_releaseModuleInstance(t *testing.T) {
-	// TODO:
+func TestModuleInstance_incImportedCount(t *testing.T) {
+	count := 100
+	m := ModuleInstance{}
+	wg := sync.WaitGroup{}
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		go func() {
+			defer wg.Done()
+			m.incImportedCount()
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, count, m.importedCount)
+}
+
+func Test_newModuleInstance(t *testing.T) {
+	// TODO
 }
 
 func newStore() *Store {
