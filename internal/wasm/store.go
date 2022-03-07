@@ -91,6 +91,7 @@ type (
 		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-tableaddr).
 		tables []*TableInstance
 
+		// mux is used to guard the fields from concurrent access.
 		mux sync.RWMutex
 	}
 
@@ -116,9 +117,13 @@ type (
 		// hostModule holds HostModule if this is a "host module" which is created in store.NewHostModule.
 		hostModule *HostModule
 
-		// TODO: https://github.com/tetratelabs/wazero/issues/293
-		mux           sync.Mutex
+		// mux is used to guard the fields from concurrent access.
+		mux sync.Mutex
+		// importedCount equals the current number of modules which import this module instance.
+		// On store.ReleaseModuleInstance, this number must be zero otherwise it fails.
 		importedCount int
+		// moduleImports holds the module instances which this module instance imports.
+		// Used when releasing this moulde instance, and decrement importedCount of the imported modules.
 		moduleImports map[*ModuleInstance]struct{}
 	}
 
