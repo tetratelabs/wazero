@@ -3441,17 +3441,23 @@ func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 
 // compileExtend implements compiler.compileExtend for the amd64 architecture.
 func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
+	var inst obj.As
+	if o.Signed {
+		inst = x86.AMOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
+	} else {
+		inst = x86.AMOVQ
+	}
+	return c.compileExtendImpl(inst)
+}
+
+func (c *amd64Compiler) compileExtendImpl(inst obj.As) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.ensureOnGeneralPurposeRegister(target); err != nil {
 		return err
 	}
 
 	extend := c.newProg()
-	if o.Signed {
-		extend.As = x86.AMOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
-	} else {
-		extend.As = x86.AMOVQ
-	}
+	extend.As = inst
 	extend.From.Type = obj.TYPE_REG
 	extend.From.Reg = target.register
 	extend.To.Type = obj.TYPE_REG

@@ -452,7 +452,7 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 		return
 	}
 
-	err = mod.Validate()
+	err = mod.Validate(store.EnabledFeatures)
 	if err != nil {
 		return
 	}

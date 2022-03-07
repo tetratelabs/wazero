@@ -31,6 +31,7 @@ func validateFunction(
 	tables []*TableType,
 	types []*FunctionType,
 	maxStackValues int,
+	features Features,
 ) error {
 	// Note: In WebAssembly 1.0 (20191205), multiple memories are not allowed.
 	hasMemory := len(memories) > 0
@@ -503,8 +504,8 @@ func validateFunction(
 			for _, exp := range funcType.Results {
 				valueTypeStack.push(exp)
 			}
-		} else if OpcodeI32Eqz <= op && op <= OpcodeF64ReinterpretI64 {
-			switch Opcode(op) {
+		} else if OpcodeI32Eqz <= op && op <= LastOpcode {
+			switch op {
 			case OpcodeI32Eqz:
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 					return fmt.Errorf("cannot pop the operand for i32.eqz: %v", err)
@@ -697,6 +698,8 @@ func validateFunction(
 					return fmt.Errorf("cannot pop the operand for f64.reinterpret_i64: %v", err)
 				}
 				valueTypeStack.push(ValueTypeF64)
+			case OpcodeI32Extend8S, OpcodeI32Extend16S, OpcodeI64Extend8S, OpcodeI64Extend16S, OpcodeI64Extend32S:
+				return fmt.Errorf("%s invalid as %s is not yet supported. See #66", InstructionName(op), FeatureSignExtensionOps)
 			default:
 				return fmt.Errorf("invalid numeric instruction 0x%x", op)
 			}
@@ -814,8 +817,6 @@ func validateFunction(
 			// unreachable instruction is stack-polymorphic.
 			valueTypeStack.unreachable()
 		} else if op == OpcodeNop {
-		} else if OpcodeI32Extend8S <= op && op <= OpcodeI64Extend32S {
-			return fmt.Errorf("%s invalid as %s is not yet supported. See #66", InstructionName(op), FeatureSignExtensionOps)
 		} else {
 			return fmt.Errorf("invalid instruction 0x%x", op)
 		}

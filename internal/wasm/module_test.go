@@ -465,7 +465,7 @@ func TestModule_validateGlobals(t *testing.T) {
 func TestModule_validateFunctions(t *testing.T) {
 	t.Run("type index out of range", func(t *testing.T) {
 		m := Module{FunctionSection: []uint32{1000 /* arbitrary large */}}
-		err := m.validateFunctions(nil, nil, nil, nil)
+		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "function type index out of range")
 	})
@@ -475,7 +475,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			TypeSection:     []*FunctionType{{}},
 			// Code section not exists.
 		}
-		err := m.validateFunctions(nil, nil, nil, nil)
+		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "code index out of range")
 	})
@@ -487,7 +487,7 @@ func TestModule_validateFunctions(t *testing.T) {
 				{Body: []byte{OpcodeF32Abs}},
 			},
 		}
-		err := m.validateFunctions(nil, nil, nil, nil)
+		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid function (0/0): cannot pop the 1st f32 operand")
 	})
@@ -499,7 +499,7 @@ func TestModule_validateFunctions(t *testing.T) {
 				{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}},
 			},
 		}
-		err := m.validateFunctions(nil, nil, nil, nil)
+		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
 		require.NoError(t, err)
 	})
 }
