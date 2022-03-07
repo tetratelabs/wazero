@@ -1079,5 +1079,5 @@ func Test_newModuleInstance(t *testing.T) {
 }
 
 func newStore() *Store {
-	return NewStore(context.Background(), &catchContext{}, Features20191205)
+	return NewStore(context.Background(), &catchContext{compilationFailIndex: -1}, Features20191205)
 }
