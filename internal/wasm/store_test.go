@@ -180,11 +180,11 @@ func TestStore_ReleaseModule(t *testing.T) {
 	}
 }
 
-func TestSotre_Instantiate(t *testing.T) {
-	t.Run("fail resolve import", func(t *testing.T) {
-		const importedModuleName = "imported"
-		const importingModuleName = "test"
+func TestSotre_Instantiate_Errors(t *testing.T) {
+	const importedModuleName = "imported"
+	const importingModuleName = "test"
 
+	t.Run("fail resolve import", func(t *testing.T) {
 		s := newStore()
 		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
 		require.NoError(t, err)
@@ -209,8 +209,6 @@ func TestSotre_Instantiate(t *testing.T) {
 	})
 
 	t.Run("compilation failed", func(t *testing.T) {
-		const importedModuleName = "imported"
-		const importingModuleName = "test"
 		s := newStore()
 		catch := s.engine.(*catchContext)
 		catch.compilationFailIndex = 3
@@ -246,6 +244,35 @@ func TestSotre_Instantiate(t *testing.T) {
 		require.Zero(t, hm.importedCount)
 
 		require.Equal(t, catch.releasedCalledFunctionIndex, []FunctionIndex{0x1, 0x2})
+	})
+
+	t.Run("start func failed", func(t *testing.T) {
+		s := newStore()
+		catch := s.engine.(*catchContext)
+		catch.callFailIndex = 1
+
+		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+		require.NoError(t, err)
+
+		hm := s.moduleInstances[importedModuleName]
+		require.NotNil(t, hm)
+
+		startFuncIndex := uint32(1)
+		_, err = s.Instantiate(&Module{
+			TypeSection:     []*FunctionType{{}},
+			FunctionSection: []uint32{0},
+			CodeSection:     []*Code{{Body: []byte{OpcodeUnreachable}}},
+			StartSection:    &startFuncIndex,
+			ImportSection: []*Import{
+				// Fisrt import resolve succeeds -> increment the hm.importedCount.
+				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
+			},
+		}, importingModuleName)
+		require.Error(t, err)
+		require.Equal(t, err.Error(), "module[test] start function failed: call failed")
+
+		// hm.importedCount must stay incremented as the instantiation itself has already succeeded.
+		require.Equal(t, 1, hm.importedCount)
 	})
 }
 
@@ -341,12 +368,15 @@ func TestFunctionInstance_Call(t *testing.T) {
 }
 
 type catchContext struct {
-	ctx                         *ModuleContext
-	compilationFailIndex        int
-	releasedCalledFunctionIndex []FunctionIndex
+	ctx                                 *ModuleContext
+	compilationFailIndex, callFailIndex int
+	releasedCalledFunctionIndex         []FunctionIndex
 }
 
-func (e *catchContext) Call(ctx *ModuleContext, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+func (e *catchContext) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+	if e.callFailIndex >= 0 && f.Index == FunctionIndex(e.callFailIndex) {
+		return nil, fmt.Errorf("call failed")
+	}
 	e.ctx = ctx
 	return
 }
