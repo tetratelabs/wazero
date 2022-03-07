@@ -64,17 +64,17 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.MemoryInstance)), moduleInstanceMemoryOffset)
-	require.Equal(t, int(unsafe.Offsetof(moduleInstance.TableInstance)), moduleInstanceTableOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Table)), moduleInstanceTableOffset)
 
-	// Offsets for wasm.TableInstance.
+	// Offsets for wasm.Table.
 	var tableInstance wasm.TableInstance
 	require.Equal(t, int(unsafe.Offsetof(tableInstance.Table)), tableInstanceTableOffset)
 	// We add "+8" to get the length of Tables[0].Table
 	// since the slice header is laid out as {Data uintptr, Len int64, Cap int64} on memory.
 	require.Equal(t, int(unsafe.Offsetof(tableInstance.Table)+8), tableInstanceTableLenOffset)
 
-	// Offsets for wasm.MemoryInstance
+	// Offsets for wasm.Memory
 	var memoryInstance wasm.MemoryInstance
 	require.Equal(t, int(unsafe.Offsetof(memoryInstance.Buffer)), memoryInstanceBufferOffset)
 	// "+8" because the slice header is laid out as {Data uintptr, Len int64, Cap int64} on memory.
@@ -132,7 +132,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 	})
 
 	e := NewEngine()
-	module := &wasm.ModuleInstance{MemoryInstance: memory}
+	module := &wasm.ModuleInstance{Memory: memory}
 	modCtx := wasm.NewModuleContext(context.Background(), e, module)
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,

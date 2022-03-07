@@ -2142,47 +2142,47 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Globals:        []*wasm.GlobalInstance{{Val: 100}},
-				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:   &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:  &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Globals:       []*wasm.GlobalInstance{{Val: 100}},
-				TableInstance: &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Table:   &wasm.TableInstance{Table: make([]wasm.TableElement, 20)},
 			},
 		},
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
-				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				TableInstance:  &wasm.TableInstance{Table: nil},
-				Globals:        []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:   &wasm.TableInstance{Table: nil},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
-				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
-				Globals:        []*wasm.GlobalInstance{{Val: 100}},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:   &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
-				Globals:        []*wasm.GlobalInstance{{Val: 100}},
-				TableInstance:  &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
-				MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Table:   &wasm.TableInstance{Table: make([]wasm.TableElement, 0)},
+				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
 		{
@@ -2222,14 +2222,14 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
 			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
 
-			if tc.moduleInstance.MemoryInstance != nil {
-				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.MemoryInstance.Buffer))
+			if tc.moduleInstance.Memory != nil {
+				bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Memory.Buffer))
 				require.Equal(t, uint64(bufSliceHeader.Len), ce.moduleContext.memorySliceLen)
 				require.Equal(t, bufSliceHeader.Data, ce.moduleContext.memoryElement0Address)
 			}
 
-			if tc.moduleInstance.TableInstance != nil {
-				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.TableInstance.Table))
+			if tc.moduleInstance.Table != nil {
+				tableHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Table.Table))
 				require.Equal(t, uint64(tableHeader.Len), ce.moduleContext.tableSliceLen)
 				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 			}

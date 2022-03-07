@@ -535,7 +535,7 @@ func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 
 	// A host function is invoked with the calling frame's memory, which may be different if in another module.
 	if len(ce.frames) > 0 {
-		ctx = ctx.WithMemory(ce.frames[len(ce.frames)-1].f.funcInstance.Module.MemoryInstance)
+		ctx = ctx.WithMemory(ce.frames[len(ce.frames)-1].f.funcInstance.Module.Memory)
 	}
 
 	// Handle any special parameter zero
@@ -565,9 +565,9 @@ func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	frame := &callFrame{f: f}
 	moduleInst := f.funcInstance.Module
-	memoryInst := moduleInst.MemoryInstance
+	memoryInst := moduleInst.Memory
 	globals := moduleInst.Globals
-	table := moduleInst.TableInstance
+	table := moduleInst.Table
 	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
