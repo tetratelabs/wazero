@@ -15,8 +15,9 @@ func TestDecodeModule(t *testing.T) {
 	localGet0End := []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeEnd}
 
 	tests := []struct {
-		name, input string
-		expected    *wasm.Module
+		name, input     string
+		enabledFeatures wasm.Features
+		expected        *wasm.Module
 	}{
 		{
 			name:     "empty",
@@ -200,6 +201,20 @@ func TestDecodeModule(t *testing.T) {
 				FunctionSection: []wasm.Index{0, 0},
 				CodeSection: []*wasm.Code{
 					{Body: end}, {Body: []byte{wasm.OpcodeCall, 0x01, wasm.OpcodeEnd}},
+				},
+			},
+		},
+		{
+			name: "func sign-extension",
+			input: `(module
+			(func (param i64) (result i64) local.get 0 i64.extend16_s)
+		)`,
+			enabledFeatures: wasm.FeatureSignExtensionOps,
+			expected: &wasm.Module{
+				TypeSection:     []*wasm.FunctionType{i64_i64},
+				FunctionSection: []wasm.Index{0},
+				CodeSection: []*wasm.Code{
+					{Body: []byte{wasm.OpcodeLocalGet, 0x00, wasm.OpcodeI64Extend16S, wasm.OpcodeEnd}},
 				},
 			},
 		},
@@ -1493,7 +1508,10 @@ func TestDecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := DecodeModule([]byte(tc.input), wasm.Features20191205)
+			if tc.enabledFeatures == 0 {
+				tc.enabledFeatures = wasm.Features20191205
+			}
+			m, err := DecodeModule([]byte(tc.input), tc.enabledFeatures)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, m)
 		})
@@ -1501,7 +1519,11 @@ func TestDecodeModule(t *testing.T) {
 }
 
 func TestParseModule_Errors(t *testing.T) {
-	tests := []struct{ name, input, expectedErr string }{
+	tests := []struct {
+		name, input     string
+		enabledFeatures wasm.Features
+		expectedErr     string
+	}{
 		{
 			name:        "forgot parens",
 			input:       "module",
@@ -1939,6 +1961,13 @@ func TestParseModule_Errors(t *testing.T) {
 			expectedErr: "3:15: unknown ID $mein in module.code[1].body[1]",
 		},
 		{
+			name: "func sign-extension disabled",
+			input: `(module
+			(func (param i64) (result i64) local.get 0 i64.extend16_s)
+		)`,
+			expectedErr: "2:47: i64.extend16_s invalid as feature sign-extension-ops is disabled in module.func[0]",
+		},
+		{
 			name:        "second memory",
 			input:       "(module (memory 1) (memory 1))",
 			expectedErr: "1:21: at most one memory allowed in module",
@@ -2080,7 +2109,10 @@ func TestParseModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := DecodeModule([]byte(tc.input), wasm.Features20191205)
+			if tc.enabledFeatures == 0 {
+				tc.enabledFeatures = wasm.Features20191205
+			}
+			_, err := DecodeModule([]byte(tc.input), tc.enabledFeatures)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}

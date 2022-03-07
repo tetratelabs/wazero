@@ -40,6 +40,56 @@ func TestFuncParser(t *testing.T) {
 				wasm.OpcodeEnd,
 			}},
 		},
+		{
+			name:            "i32.extend8_s",
+			source:          "(func (param i32) local.get 0 i32.extend8_s)",
+			enabledFeatures: wasm.FeatureSignExtensionOps,
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeI32Extend8S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:            "i32.extend16_s",
+			source:          "(func (param i32) local.get 0 i32.extend16_s)",
+			enabledFeatures: wasm.FeatureSignExtensionOps,
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeI32Extend16S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:            "i64.extend8_s",
+			source:          "(func (param i64) local.get 0 i64.extend8_s)",
+			enabledFeatures: wasm.FeatureSignExtensionOps,
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeI64Extend8S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:            "i64.extend16_s",
+			source:          "(func (param i64) local.get 0 i64.extend16_s)",
+			enabledFeatures: wasm.FeatureSignExtensionOps,
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeI64Extend16S,
+				wasm.OpcodeEnd,
+			}},
+		},
+		{
+			name:            "i64.extend32_s",
+			source:          "(func (param i64) local.get 0 i64.extend32_s)",
+			enabledFeatures: wasm.FeatureSignExtensionOps,
+			expected: &wasm.Code{Body: []byte{
+				wasm.OpcodeLocalGet, 0x00,
+				wasm.OpcodeI64Extend32S,
+				wasm.OpcodeEnd,
+			}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -225,6 +275,31 @@ func TestFuncParser_Errors(t *testing.T) {
 			name:        "duplicate result",
 			source:      "(func (result i32) (result i32))",
 			expectedErr: "1:21: at most one result allowed",
+		},
+		{
+			name:        "i32.extend8_s disabled",
+			source:      "(func (param i32) local.get 0 i32.extend8_s)",
+			expectedErr: "1:31: i32.extend8_s invalid as feature sign-extension-ops is disabled",
+		},
+		{
+			name:        "i32.extend16_s disabled",
+			source:      "(func (param i32) local.get 0 i32.extend16_s)",
+			expectedErr: "1:31: i32.extend16_s invalid as feature sign-extension-ops is disabled",
+		},
+		{
+			name:        "i64.extend8_s disabled",
+			source:      "(func (param i64) local.get 0 i64.extend8_s)",
+			expectedErr: "1:31: i64.extend8_s invalid as feature sign-extension-ops is disabled",
+		},
+		{
+			name:        "i64.extend16_s disabled",
+			source:      "(func (param i64) local.get 0 i64.extend16_s)",
+			expectedErr: "1:31: i64.extend16_s invalid as feature sign-extension-ops is disabled",
+		},
+		{
+			name:        "i64.extend32_s disabled",
+			source:      "(func (param i64) local.get 0 i64.extend32_s)",
+			expectedErr: "1:31: i64.extend32_s invalid as feature sign-extension-ops is disabled",
 		},
 	}
 

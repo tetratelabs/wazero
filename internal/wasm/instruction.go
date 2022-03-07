@@ -217,10 +217,24 @@ const (
 
 	// Below are toggled with FeatureSignExtensionOps
 
-	OpcodeI32Extend8S  Opcode = 0xc0
+	// OpcodeI32Extend8S extends a signed 8-bit integer to a 32-bit integer.
+	// Note: This is dependent on the flag FeatureSignExtensionOps
+	OpcodeI32Extend8S Opcode = 0xc0
+
+	// OpcodeI32Extend16S extends a signed 16-bit integer to a 32-bit integer.
+	// Note: This is dependent on the flag FeatureSignExtensionOps
 	OpcodeI32Extend16S Opcode = 0xc1
-	OpcodeI64Extend8S  Opcode = 0xc2
+
+	// OpcodeI64Extend8S extends a signed 8-bit integer to a 64-bit integer.
+	// Note: This is dependent on the flag FeatureSignExtensionOps
+	OpcodeI64Extend8S Opcode = 0xc2
+
+	// OpcodeI64Extend16S extends a signed 16-bit integer to a 64-bit integer.
+	// Note: This is dependent on the flag FeatureSignExtensionOps
 	OpcodeI64Extend16S Opcode = 0xc3
+
+	// OpcodeI64Extend32S extends a signed 32-bit integer to a 64-bit integer.
+	// Note: This is dependent on the flag FeatureSignExtensionOps
 	OpcodeI64Extend32S Opcode = 0xc4
 
 	LastOpcode = OpcodeI64Extend32S

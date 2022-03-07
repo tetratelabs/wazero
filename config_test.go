@@ -28,7 +28,7 @@ func TestRuntimeConfig_Features(t *testing.T) {
 			feature:       internalwasm.FeatureSignExtensionOps,
 			expectDefault: false,
 			setFeature: func(c *RuntimeConfig, v bool) *RuntimeConfig {
-				return c.WithFeatureSignExtentionOps(v)
+				return c.WithFeatureSignExtensionOps(v)
 			},
 		},
 	}

@@ -27,16 +27,33 @@ func TestInterpreter(t *testing.T) {
 //
 // See https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md
 func runOptionalFeatureTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	t.Run("sign-extend", func(t *testing.T) {
-		testSignExtend(t, newRuntimeConfig)
+	t.Run("sign-extension-ops", func(t *testing.T) {
+		testSignExtensionOps(t, newRuntimeConfig)
 	})
 }
 
-// signExtend was compiled from sign_extend.wat
-//go:embed testdata/sign_extend.wasm
-var signExtend []byte
+// signExtend is a WebAssembly 1.0 (20191205) Text Format source, except that it uses opcodes from 'sign-extension-ops'.
+//
+// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
+var signExtend = []byte(`(module
+  (func $i32.extend8_s (param i32) (result i32) local.get 0 i32.extend8_s)
+  (export "i32.extend8_s" (func $i32.extend8_s))
 
-func testSignExtend(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+  (func $i32.extend16_s (param i32) (result i32) local.get 0 i32.extend16_s)
+  (export "i32.extend16_s" (func $i32.extend16_s))
+
+  (func $i64.extend8_s (param i64) (result i64) local.get 0 i64.extend8_s)
+  (export "i64.extend8_s" (func $i64.extend8_s))
+
+  (func $i64.extend16_s (param i64) (result i64) local.get 0 i64.extend16_s)
+  (export "i64.extend16_s" (func $i64.extend16_s))
+
+  (func $i64.extend32_s (param i64) (result i64) local.get 0 i64.extend32_s)
+  (export "i64.extend32_s" (func $i64.extend32_s))
+)
+`)
+
+func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	t.Run("disabled", func(t *testing.T) {
 		// Sign-extension is disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
@@ -44,7 +61,7 @@ func testSignExtend(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig)
 		require.Error(t, err)
 	})
 	t.Run("enabled", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(newRuntimeConfig().WithFeatureSignExtentionOps(true))
+		r := wazero.NewRuntimeWithConfig(newRuntimeConfig().WithFeatureSignExtensionOps(true))
 		module, err := r.NewModuleFromSource(signExtend)
 		require.NoError(t, err)
 
