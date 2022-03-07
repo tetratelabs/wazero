@@ -330,7 +330,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 func TestAmd64Compiler_compileBrTable(t *testing.T) {
 	requireRunAndExpectedValueReturned := func(t *testing.T, env *jitEnv, c *amd64Compiler, expValue uint32) {
 		// Emit code for each label which returns the frame ID.
-		for returnValue := uint32(0); returnValue < 10; returnValue++ {
+		for returnValue := uint32(0); returnValue < 7; returnValue++ {
 			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
 			c.ir.LabelCallers[label.String()] = 1
 			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
@@ -340,11 +340,9 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 			c.exit(jitCallStatusCodeReturned)
 		}
 
-		// Generate the code under test.
+		// Generate the code under test and run.
 		code, _, _, err := c.compile()
 		require.NoError(t, err)
-
-		// Run codes
 		env.exec(code)
 
 		// Check the returned value.
@@ -358,155 +356,138 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 		}
 	}
 
-	for _, indexReg := range unreservedGeneralPurposeIntRegisters {
-		for _, tmpReg := range unreservedGeneralPurposeIntRegisters {
-			if indexReg == tmpReg {
-				continue
-			}
-			indexReg := indexReg
-			tmpReg := tmpReg
-			t.Run(fmt.Sprintf("index_register=%d,tmpRegister=%d", indexReg, tmpReg), func(t *testing.T) {
-				for _, tc := range []struct {
-					name          string
-					index         int64
-					o             *wazeroir.OperationBrTable
-					expectedValue uint32
-				}{
-					{
-						name:          "only default with index 0",
-						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
-						index:         0,
-						expectedValue: 6,
-					},
-					{
-						name:          "only default with index 100",
-						o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
-						index:         100,
-						expectedValue: 6,
-					},
-					{
-						name: "select default with targets and good index",
-						o: &wazeroir.OperationBrTable{
-							Targets: []*wazeroir.BranchTargetDrop{
-								getBranchTargetDropFromFrameID(1),
-								getBranchTargetDropFromFrameID(2),
-							},
-							Default: getBranchTargetDropFromFrameID(6),
-						},
-						index:         3,
-						expectedValue: 6,
-					},
-					{
-						name: "select default with targets and huge index",
-						o: &wazeroir.OperationBrTable{
-							Targets: []*wazeroir.BranchTargetDrop{
-								getBranchTargetDropFromFrameID(1),
-								getBranchTargetDropFromFrameID(2),
-							},
-							Default: getBranchTargetDropFromFrameID(6),
-						},
-						index:         100000,
-						expectedValue: 6,
-					},
-					{
-						name: "select first with two targets",
-						o: &wazeroir.OperationBrTable{
-							Targets: []*wazeroir.BranchTargetDrop{
-								getBranchTargetDropFromFrameID(1),
-								getBranchTargetDropFromFrameID(2),
-							},
-							Default: getBranchTargetDropFromFrameID(5),
-						},
-						index:         0,
-						expectedValue: 1,
-					},
-					{
-						name: "select last with two targets",
-						o: &wazeroir.OperationBrTable{
-							Targets: []*wazeroir.BranchTargetDrop{
-								getBranchTargetDropFromFrameID(1),
-								getBranchTargetDropFromFrameID(2),
-							},
-							Default: getBranchTargetDropFromFrameID(6),
-						},
-						index:         1,
-						expectedValue: 2,
-					},
-					{
-						name: "select first with five targets",
-						o: &wazeroir.OperationBrTable{
-							Targets: []*wazeroir.BranchTargetDrop{
-								getBranchTargetDropFromFrameID(1),
-								getBranchTargetDropFromFrameID(2),
-								getBranchTargetDropFromFrameID(3),
-								getBranchTargetDropFromFrameID(4),
-								getBranchTargetDropFromFrameID(5),
-							},
-							Default: getBranchTargetDropFromFrameID(5),
-						},
-						index:         0,
-						expectedValue: 1,
-					},
-					{
-						name: "select middle with five targets",
-						o: &wazeroir.OperationBrTable{
-							Targets: []*wazeroir.BranchTargetDrop{
-								getBranchTargetDropFromFrameID(1),
-								getBranchTargetDropFromFrameID(2),
-								getBranchTargetDropFromFrameID(3),
-								getBranchTargetDropFromFrameID(4),
-								getBranchTargetDropFromFrameID(5),
-							},
-							Default: getBranchTargetDropFromFrameID(5),
-						},
-						index:         2,
-						expectedValue: 3,
-					},
-					{
-						name: "select last with five targets",
-						o: &wazeroir.OperationBrTable{
-							Targets: []*wazeroir.BranchTargetDrop{
-								getBranchTargetDropFromFrameID(1),
-								getBranchTargetDropFromFrameID(2),
-								getBranchTargetDropFromFrameID(3),
-								getBranchTargetDropFromFrameID(4),
-								getBranchTargetDropFromFrameID(5),
-							},
-							Default: getBranchTargetDropFromFrameID(5),
-						},
-						index:         4,
-						expectedValue: 5,
-					},
-				} {
-					tc := tc
-					t.Run(tc.name, func(t *testing.T) {
-						env := newJITEnvironment()
-						compiler := env.requireNewCompiler(t)
-						compiler.ir = &wazeroir.CompilationResult{LabelCallers: map[string]uint32{}}
+	for _, tc := range []struct {
+		name          string
+		index         int64
+		o             *wazeroir.OperationBrTable
+		expectedValue uint32
+	}{
+		{
+			name:          "only default with index 0",
+			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			index:         0,
+			expectedValue: 6,
+		},
+		{
+			name:          "only default with index 100",
+			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			index:         100,
+			expectedValue: 6,
+		},
+		{
+			name: "select default with targets and good index",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         3,
+			expectedValue: 6,
+		},
+		{
+			name: "select default with targets and huge index",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         100000,
+			expectedValue: 6,
+		},
+		{
+			name: "select first with two targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         0,
+			expectedValue: 1,
+		},
+		{
+			name: "select last with two targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         1,
+			expectedValue: 2,
+		},
+		{
+			name: "select first with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         0,
+			expectedValue: 1,
+		},
+		{
+			name: "select middle with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         2,
+			expectedValue: 3,
+		},
+		{
+			name: "select last with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         4,
+			expectedValue: 5,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t)
+			compiler.ir = &wazeroir.CompilationResult{LabelCallers: map[string]uint32{}}
 
-						err := compiler.compilePreamble()
-						require.NoError(t, err)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
 
-						for _, r := range unreservedGeneralPurposeIntRegisters {
-							if r != indexReg && r != tmpReg {
-								compiler.locationStack.markRegisterUsed(r)
-							}
-						}
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.index)})
+			require.NoError(t, err)
 
-						compiler.locationStack.pushValueLocationOnRegister(indexReg)
-						compiler.movIntConstToRegister(tc.index, indexReg)
+			err = compiler.compileBrTable(tc.o)
+			require.NoError(t, err)
 
-						err = compiler.compileBrTable(tc.o)
-						require.NoError(t, err)
+			require.Len(t, compiler.locationStack.usedRegisters, 0)
 
-						require.NotContains(t, compiler.locationStack.usedRegisters, indexReg)
-						require.NotContains(t, compiler.locationStack.usedRegisters, tmpReg)
-
-						requireRunAndExpectedValueReturned(t, env, compiler, tc.expectedValue)
-					})
-				}
-			})
-		}
+			requireRunAndExpectedValueReturned(t, env, compiler, tc.expectedValue)
+		})
 	}
 }
 
