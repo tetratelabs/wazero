@@ -536,14 +536,6 @@ func (s *Store) ReleaseModule(moduleName string) error {
 
 	s.releaseGlobal(m.Globals...)
 
-	// Explicitly assign nil so that we ensure this module no longer holds reference to instances.
-	m.Exports = nil
-	m.Globals = nil
-	m.Functions = nil
-	m.Table = nil
-	m.Memory = nil
-	m.Types = nil
-
 	s.deleteModule(m)
 	return nil
 }
