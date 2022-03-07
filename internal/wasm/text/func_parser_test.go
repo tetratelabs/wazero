@@ -11,8 +11,9 @@ import (
 
 func TestFuncParser(t *testing.T) {
 	tests := []struct {
-		name, source string
-		expected     *wasm.Code
+		name, source    string
+		enabledFeatures wasm.Features
+		expected        *wasm.Code
 	}{
 		{
 			name:     "empty",
@@ -52,7 +53,7 @@ func TestFuncParser(t *testing.T) {
 			}
 
 			module := &wasm.Module{}
-			fp := newFuncParser(&typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
+			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
@@ -62,6 +63,7 @@ func TestFuncParser(t *testing.T) {
 func TestFuncParser_Call_Unresolved(t *testing.T) {
 	tests := []struct {
 		name, source            string
+		enabledFeatures         wasm.Features
 		expectedCode            *wasm.Code
 		expectedUnresolvedIndex *unresolvedIndex
 	}{
@@ -110,7 +112,7 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 			}
 
 			module := &wasm.Module{}
-			fp := newFuncParser(&typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
+			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expectedCode, parsedCode)
 			require.Equal(t, []*unresolvedIndex{tc.expectedUnresolvedIndex}, fp.funcNamespace.unresolvedIndices)
@@ -120,8 +122,9 @@ func TestFuncParser_Call_Unresolved(t *testing.T) {
 
 func TestFuncParser_Call_Resolved(t *testing.T) {
 	tests := []struct {
-		name, source string
-		expected     *wasm.Code
+		name, source    string
+		enabledFeatures wasm.Features
+		expected        *wasm.Code
 	}{
 		{
 			name:     "index zero",
@@ -170,7 +173,7 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 				return parseErr, nil
 			}
 
-			fp := newFuncParser(&typeUseParser{module: &wasm.Module{}}, funcNamespace, setFunc)
+			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: &wasm.Module{}}, funcNamespace, setFunc)
 			require.NoError(t, parseFunc(fp, tc.source))
 			require.Equal(t, tc.expected, parsedCode)
 		})
@@ -179,7 +182,9 @@ func TestFuncParser_Call_Resolved(t *testing.T) {
 
 func TestFuncParser_Errors(t *testing.T) {
 	tests := []struct {
-		name, source, expectedErr string
+		name, source    string
+		enabledFeatures wasm.Features
+		expectedErr     string
 	}{
 		{
 			name:        "not field",
@@ -228,7 +233,7 @@ func TestFuncParser_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			module := &wasm.Module{}
-			fp := newFuncParser(&typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), failOnFunc)
+			fp := newFuncParser(tc.enabledFeatures, &typeUseParser{module: module}, newIndexNamespace(module.SectionElementCount), failOnFunc)
 			require.EqualError(t, parseFunc(fp, tc.source), tc.expectedErr)
 		})
 	}
