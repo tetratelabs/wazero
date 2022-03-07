@@ -674,7 +674,7 @@ func TestModule_buildGlobalInstances(t *testing.T) {
 		},
 	}}
 
-	globals := m.buildGlobalInstances(nil)
+	globals := m.buildGlobals(nil)
 	expectedGlobals := []*GlobalInstance{
 		{Type: &GlobalType{ValType: ValueTypeF64, Mutable: true}, Val: math.Float64bits(1.0)},
 		{Type: &GlobalType{ValType: ValueTypeI32, Mutable: false}, Val: uint64(1)},
@@ -701,7 +701,7 @@ func TestModule_buildFunctionInstances(t *testing.T) {
 		CodeSection: []*Code{nopCode, nopCode, nopCode, nopCode, nopCode},
 	}
 
-	actual := m.buildFunctionInstances()
+	actual := m.buildFunctions()
 	expectedNames := []string{"unknown", "two", "unknown", "four", "five"}
 	for i, f := range actual {
 		require.Equal(t, expectedNames[i], f.Name)
@@ -712,14 +712,14 @@ func TestModule_buildFunctionInstances(t *testing.T) {
 func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		m := Module{MemorySection: []*MemoryType{}}
-		mem := m.buildMemoryInstance()
+		mem := m.buildMemory()
 		require.Nil(t, mem)
 	})
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
 		max := uint32(10)
 		m := Module{MemorySection: []*MemoryType{&LimitsType{Min: min, Max: &max}}}
-		mem := m.buildMemoryInstance()
+		mem := m.buildMemory()
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, *mem.Max)
 	})
@@ -727,6 +727,6 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 
 func TestModule_buildTableInstance(t *testing.T) {
 	m := Module{TableSection: []*TableType{{Limit: &LimitsType{Min: 1}}}}
-	table := m.buildTableInstance()
+	table := m.buildTable()
 	require.Equal(t, uint32(1), table.Min)
 }

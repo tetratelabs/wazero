@@ -37,10 +37,10 @@ type (
 		// EnabledFeatures are read-only to allow optimizations.
 		EnabledFeatures Features
 
-		// ModuleInstances holds the instantiated Wasm modules by module name from Instantiate.
-		moduleInstances map[string]*ModuleInstance
+		// modules holds the instantiated Wasm modules by module name from Instantiate.
+		modules map[string]*ModuleInstance
 
-		// TypeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
+		// typeIDs maps each FunctionType.String() to a unique FunctionTypeID. This is used at runtime to
 		// do type-checks on indirect function calls.
 		typeIDs map[string]FunctionTypeID
 
@@ -53,40 +53,37 @@ type (
 		maximumFunctionTypes int
 
 		// releasedFunctionIndex holds reusable FunctionIndexes. An index is added when
-		// a function instance is released in releaseFunctionInstances, and is popped when
-		// a new instance is added in addFunctionInstances.
+		// a function instance is released in releaseFunctions, and is popped when
+		// a new instance is added in addFunctions.
 		releasedFunctionIndex map[FunctionIndex]struct{}
 
-		// releasedMemoryIndex holds reusable memoryIndexes. An index is added when
-		// an memory instance is released in releaseMemoryInstance, and is popped when
-		// a new instance is added in addMemoryInstance.
+		// releasedMemoryIndex holds reusable memoryIndexes. An index is added when a memory is released in
+		// releaseMemory, and is popped when a new instance is added in addMemory.
 		releasedMemoryIndex map[memoryIndex]struct{}
 
-		// releasedTableIndex holds reusable tableIndexes. An index is added when
-		// an table instance is released in releaseTableInstance, and is popped when
-		// a new instance is added in addTableInstance.
+		// releasedTableIndex holds reusable tableIndexes. An index is added when a table is released in releaseTable,
+		// and is popped when a new instance is added in addTable.
 		releasedTableIndex map[tableIndex]struct{}
 
-		// releasedGlobalIndex holds reusable globalIndexes. An index is added when
-		// an global instance is released in releaseGlobalInstances, and is popped when
-		// a new instance is added in addGlobalInstances.
+		// releasedGlobalIndex holds reusable globalIndexes. An index is added when a global is released in
+		// releaseGlobal, and is popped when a new instance is added in addGlobals.
 		releasedGlobalIndex map[globalIndex]struct{}
 
 		// The followings fields match the definition of Store in the specification.
 
-		// Functions holds function instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0),
+		// functions holds function instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr).
 		functions []*FunctionInstance
-		// Globals holds global instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0),
+		// globals holds global instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as globaladdr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-globaladdr).
 		globals []*GlobalInstance
-		// Memories holds memory instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0),
+		// memories holds memory instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as memaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-memaddr).
 		memories []*MemoryInstance
-		// Tables holds table instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0),
+		// tables holds table instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0),
 		// in this store.
 		// The slice index is to be interpreted as tableaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-tableaddr).
 		tables []*TableInstance
@@ -105,11 +102,10 @@ type (
 		Exports   map[string]*ExportInstance
 		Functions []*FunctionInstance
 		Globals   []*GlobalInstance
-		// MemoryInstance is set when Module.MemorySection had a memory, regardless of whether it was exported.
-		// Note: This avoids the name "Memory" which is an interface method name.
-		MemoryInstance *MemoryInstance
-		TableInstance  *TableInstance
-		Types          []*TypeInstance
+		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
+		Memory *MemoryInstance
+		Table  *TableInstance
+		Types  []*TypeInstance
 
 		// Ctx holds default function call context from this function instance.
 		Ctx *ModuleContext
@@ -119,12 +115,14 @@ type (
 
 		// mux is used to guard the fields from concurrent access.
 		mux sync.Mutex
-		// importedCount equals the current number of modules which import this module instance.
-		// On store.ReleaseModuleInstance, this number must be zero otherwise it fails.
-		importedCount int
-		// moduleImports holds the module instances which this module instance imports.
-		// Used when releasing this moulde instance, and decrement importedCount of the imported modules.
-		moduleImports map[*ModuleInstance]struct{}
+
+		// dependentCount is the current number of modules which import this module. On Store.ReleaseModule, this number
+		// must be zero otherwise it fails.
+		dependentCount int // guarded by mux
+
+		// dependencies holds imported modules. This is used when releasing this module instance, or decrementing the
+		// dependentCount of the imported modules.
+		dependencies map[*ModuleInstance]struct{}
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -276,7 +274,7 @@ func newModuleInstance(name string, module *Module, importedFunctions, functions
 	importedGlobals, globals []*GlobalInstance, importedTable, table *TableInstance,
 	memory, importedMemory *MemoryInstance, typeInstances []*TypeInstance, moduleImports map[*ModuleInstance]struct{}) *ModuleInstance {
 
-	instance := &ModuleInstance{Name: name, Types: typeInstances, moduleImports: moduleImports}
+	instance := &ModuleInstance{Name: name, Types: typeInstances, dependencies: moduleImports}
 
 	instance.Functions = append(instance.Functions, importedFunctions...)
 	for i, f := range functions {
@@ -290,15 +288,15 @@ func newModuleInstance(name string, module *Module, importedFunctions, functions
 	instance.Globals = append(instance.Globals, globals...)
 
 	if importedTable != nil {
-		instance.TableInstance = importedTable
+		instance.Table = importedTable
 	} else {
-		instance.TableInstance = table
+		instance.Table = table
 	}
 
 	if importedMemory != nil {
-		instance.MemoryInstance = importedMemory
+		instance.Memory = importedMemory
 	} else {
-		instance.MemoryInstance = memory
+		instance.Memory = memory
 	}
 
 	instance.buildExportInstances(module.ExportSection)
@@ -322,9 +320,9 @@ func (m *ModuleInstance) buildExportInstances(exports map[string]*Export) {
 		case ExternTypeGlobal:
 			ei = &ExportInstance{Type: exp.Type, Global: m.Globals[index]}
 		case ExternTypeMemory:
-			ei = &ExportInstance{Type: exp.Type, Memory: m.MemoryInstance}
+			ei = &ExportInstance{Type: exp.Type, Memory: m.Memory}
 		case ExternTypeTable:
-			ei = &ExportInstance{Type: exp.Type, Table: m.TableInstance}
+			ei = &ExportInstance{Type: exp.Type, Table: m.Table}
 		}
 
 		// We already validated the duplicates during module validation phase.
@@ -337,7 +335,7 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 		offset := int(executeConstExpression(m.Globals, d.OffsetExpression).(int32))
 
 		ceil := offset + len(d.Init)
-		if offset < 0 || ceil > len(m.MemoryInstance.Buffer) {
+		if offset < 0 || ceil > len(m.Memory.Buffer) {
 			return fmt.Errorf("out of bounds memory access")
 		}
 	}
@@ -347,7 +345,7 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 func (m *ModuleInstance) applyData(data []*DataSegment) {
 	for _, d := range data {
 		offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
-		copy(m.MemoryInstance.Buffer[offset:], d.Init)
+		copy(m.Memory.Buffer[offset:], d.Init)
 	}
 }
 
@@ -356,7 +354,7 @@ func (m *ModuleInstance) validateElements(elements []*ElementSegment) (err error
 		offset := int(executeConstExpression(m.Globals, elem.OffsetExpr).(int32))
 		ceil := offset + len(elem.Init)
 
-		if offset < 0 || ceil > len(m.TableInstance.Table) {
+		if offset < 0 || ceil > len(m.Table.Table) {
 			return fmt.Errorf("out of bounds table access")
 		}
 		for _, elm := range elem.Init {
@@ -371,7 +369,7 @@ func (m *ModuleInstance) validateElements(elements []*ElementSegment) (err error
 func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
 	for _, elem := range elements {
 		offset := int(executeConstExpression(m.Globals, elem.OffsetExpr).(int32))
-		table := m.TableInstance.Table
+		table := m.Table.Table
 		for i, elm := range elem.Init {
 			pos := i + offset
 			targetFunc := m.Functions[elm]
@@ -400,7 +398,7 @@ func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Sto
 		ctx:                   ctx,
 		engine:                engine,
 		EnabledFeatures:       enabledFeatures,
-		moduleInstances:       map[string]*ModuleInstance{},
+		modules:               map[string]*ModuleInstance{},
 		typeIDs:               map[string]FunctionTypeID{},
 		maximumFunctionIndex:  maximumFunctionIndex,
 		maximumFunctionTypes:  maximumFunctionTypes,
@@ -433,7 +431,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		return nil, err
 	}
 
-	types, err := s.getTypeInstances(module.TypeSection)
+	types, err := s.getTypes(module.TypeSection)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +450,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	}
 
 	functions, globals, table, memory :=
-		module.buildFunctionInstances(), module.buildGlobalInstances(importedGlobals), module.buildTableInstance(), module.buildMemoryInstance()
+		module.buildFunctions(), module.buildGlobals(importedGlobals), module.buildTable(), module.buildMemory()
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	instance := newModuleInstance(name, module, importedFunctions, functions, importedGlobals,
@@ -467,12 +465,12 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	}
 
 	// Now we are ready to compile functions.
-	s.addFunctionInstances(functions...) // Need to assign funcaddr to each instance before compilation.
+	s.addFunctions(functions...) // Need to assign funcaddr to each instance before compilation.
 	for i, f := range functions {
 		// TODO: maybe better consider spawning multiple goroutines for compilations to accelerate.
 		if err := s.engine.Compile(f); err != nil {
 			// On the failure, release the assigned funcaddr and already compiled functions.
-			if err := s.releaseFunctionInstances(functions[:i]...); err != nil {
+			if err := s.releaseFunctions(functions[:i]...); err != nil {
 				return nil, err
 			}
 			idx := module.SectionElementCount(SectionIDFunction) - 1
@@ -485,10 +483,10 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	instance.applyData(module.DataSection)
 
 	// Persist the instances except functions (which we already persisted before compilation).
-	s.addGlobalInstances(globals...)
-	s.addTableInstance(table)
-	s.addMemoryInstance(instance.MemoryInstance)
-	s.addModuleInstance(instance)
+	s.addGlobals(globals...)
+	s.addTable(table)
+	s.addMemory(instance.Memory)
+	s.addModule(instance)
 
 	// Plus, we can finalize the module import reference count.
 	moduleImportsFinalized = true
@@ -503,66 +501,66 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	return &PublicModule{s: s, instance: instance}, nil
 }
 
-// ReleaseModuleInstance deallocates resources if a module with the given name exists.
-func (s *Store) ReleaseModuleInstance(moduleName string) error {
-	instance := s.module(moduleName)
-	if instance == nil {
+// ReleaseModule deallocates resources if a module with the given name exists.
+func (s *Store) ReleaseModule(moduleName string) error {
+	m := s.module(moduleName)
+	if m == nil {
 		return nil // already released
 	}
 
-	instance.mux.Lock()
-	defer instance.mux.Unlock()
+	m.mux.Lock()
+	defer m.mux.Unlock()
 
-	if instance.importedCount > 0 {
+	if m.dependentCount > 0 {
 		// This case other modules are importing this module instance and still alive.
-		return fmt.Errorf("%d modules import this and need to be closed first", instance.importedCount)
+		return fmt.Errorf("%d modules import this and need to be closed first", m.dependentCount)
 	}
 
 	// TODO: check outstanding calls and wait until they exit.
 
-	for mod := range instance.moduleImports {
+	for mod := range m.dependencies {
 		mod.decImportedCount()
 	}
 
-	if err := s.releaseFunctionInstances(instance.Functions...); err != nil {
+	if err := s.releaseFunctions(m.Functions...); err != nil {
 		return fmt.Errorf("unable to release function instance: %w", err)
 	}
 
-	if instance.MemoryInstance != nil {
-		s.releaseMemoryInstance(instance.MemoryInstance)
+	if m.Memory != nil {
+		s.releaseMemory(m.Memory)
 	}
 
-	if instance.TableInstance != nil {
-		s.releaseTableInstance(instance.TableInstance)
+	if m.Table != nil {
+		s.releaseTable(m.Table)
 	}
 
-	s.releaseGlobalInstances(instance.Globals...)
+	s.releaseGlobal(m.Globals...)
 
-	// Explicitly assign nil so that we ensure this moduleInstance no longer holds reference to instances.
-	instance.Exports = nil
-	instance.Globals = nil
-	instance.Functions = nil
-	instance.TableInstance = nil
-	instance.MemoryInstance = nil
-	instance.Types = nil
+	// Explicitly assign nil so that we ensure this module no longer holds reference to instances.
+	m.Exports = nil
+	m.Globals = nil
+	m.Functions = nil
+	m.Table = nil
+	m.Memory = nil
+	m.Types = nil
 
-	s.deleteModuleInstance(instance)
+	s.deleteModule(m)
 	return nil
 }
 
-func (instance *ModuleInstance) decImportedCount() {
-	instance.mux.Lock()
-	defer instance.mux.Unlock()
-	instance.importedCount--
+func (m *ModuleInstance) decImportedCount() {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	m.dependentCount--
 }
 
-func (instance *ModuleInstance) incImportedCount() {
-	instance.mux.Lock()
-	defer instance.mux.Unlock()
-	instance.importedCount++
+func (m *ModuleInstance) incImportedCount() {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+	m.dependentCount++
 }
 
-func (s *Store) releaseFunctionInstances(fs ...*FunctionInstance) error {
+func (s *Store) releaseFunctions(fs ...*FunctionInstance) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -580,7 +578,7 @@ func (s *Store) releaseFunctionInstances(fs ...*FunctionInstance) error {
 	return nil
 }
 
-func (s *Store) addFunctionInstances(fs ...*FunctionInstance) {
+func (s *Store) addFunctions(fs ...*FunctionInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	for _, f := range fs {
@@ -600,7 +598,7 @@ func (s *Store) addFunctionInstances(fs ...*FunctionInstance) {
 	}
 }
 
-func (s *Store) releaseGlobalInstances(gs ...*GlobalInstance) {
+func (s *Store) releaseGlobal(gs ...*GlobalInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	for _, g := range gs {
@@ -612,7 +610,7 @@ func (s *Store) releaseGlobalInstances(gs ...*GlobalInstance) {
 	}
 }
 
-func (s *Store) addGlobalInstances(gs ...*GlobalInstance) {
+func (s *Store) addGlobals(gs ...*GlobalInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	for _, g := range gs {
@@ -632,7 +630,7 @@ func (s *Store) addGlobalInstances(gs ...*GlobalInstance) {
 	}
 }
 
-func (s *Store) releaseTableInstance(t *TableInstance) {
+func (s *Store) releaseTable(t *TableInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -643,7 +641,7 @@ func (s *Store) releaseTableInstance(t *TableInstance) {
 	s.releasedTableIndex[t.index] = struct{}{}
 }
 
-func (s *Store) addTableInstance(t *TableInstance) {
+func (s *Store) addTable(t *TableInstance) {
 	if t == nil {
 		return
 	}
@@ -666,7 +664,7 @@ func (s *Store) addTableInstance(t *TableInstance) {
 	t.index = index
 }
 
-func (s *Store) releaseMemoryInstance(m *MemoryInstance) {
+func (s *Store) releaseMemory(m *MemoryInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -677,7 +675,7 @@ func (s *Store) releaseMemoryInstance(m *MemoryInstance) {
 	s.releasedMemoryIndex[m.index] = struct{}{}
 }
 
-func (s *Store) addMemoryInstance(m *MemoryInstance) {
+func (s *Store) addMemory(m *MemoryInstance) {
 	if m == nil {
 		return
 	}
@@ -699,19 +697,19 @@ func (s *Store) addMemoryInstance(m *MemoryInstance) {
 	}
 	m.index = index
 }
-func (s *Store) deleteModuleInstance(m *ModuleInstance) {
+func (s *Store) deleteModule(m *ModuleInstance) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	delete(s.moduleInstances, m.Name)
+	delete(s.modules, m.Name)
 }
 
-func (s *Store) addModuleInstance(m *ModuleInstance) {
+func (s *Store) addModule(m *ModuleInstance) {
 	// Build the default context for calls to this module.
 	m.Ctx = NewModuleContext(s.ctx, s.engine, m)
 
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.moduleInstances[m.Name] = m
+	s.modules[m.Name] = m
 }
 
 // Module implements wasm.Store Module
@@ -726,7 +724,7 @@ func (s *Store) Module(moduleName string) publicwasm.Module {
 func (s *Store) module(moduleName string) *ModuleInstance {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
-	return s.moduleInstances[moduleName]
+	return s.modules[moduleName]
 }
 
 // PublicModule implements wasm.Module
@@ -762,7 +760,7 @@ func (m *PublicModule) Memory(name string) publicwasm.Memory {
 func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
-	return s.moduleInstances[moduleName].hostModule
+	return s.modules[moduleName].hostModule
 }
 
 func (s *Store) resolveImports(module *Module) (
@@ -776,7 +774,7 @@ func (s *Store) resolveImports(module *Module) (
 
 	moduleImports = map[*ModuleInstance]struct{}{}
 	for _, is := range module.ImportSection {
-		m, ok := s.moduleInstances[is.Module]
+		m, ok := s.modules[is.Module]
 		if !ok {
 			err = fmt.Errorf("module \"%s\" not instantiated", is.Module)
 			return
@@ -809,7 +807,7 @@ func (s *Store) resolveImports(module *Module) (
 			tableType := is.DescTable
 			table = exp.Table
 			if table.ElemType != tableType.ElemType {
-				err = fmt.Errorf("incompatible table improt: element type mismatch")
+				err = fmt.Errorf("incompatible table import: element type mismatch")
 				return
 			}
 			if table.Min < tableType.Limit.Min {
@@ -886,7 +884,7 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 	return
 }
 
-func (s *Store) getTypeInstances(ts []*FunctionType) ([]*TypeInstance, error) {
+func (s *Store) getTypes(ts []*FunctionType) ([]*TypeInstance, error) {
 	// We take write-lock here as the follwing might end up mutating typeIDs map.
 	s.mux.Lock()
 	defer s.mux.Unlock()

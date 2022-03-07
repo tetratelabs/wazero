@@ -14,7 +14,7 @@ func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstan
 	return &ModuleContext{
 		ctx:    ctx,
 		engine: engine,
-		memory: instance.MemoryInstance,
+		memory: instance.Memory,
 		Module: instance,
 	}
 }
@@ -92,14 +92,14 @@ func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
 //
-// TOOD: make this goroutine-safe like store.Instantiate.
+// TOOD(adrian): make this goroutine-safe like store.Instantiate.
 func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (*HostModule, error) {
 	if err := s.requireModuleUnused(moduleName); err != nil {
 		return nil, err
 	}
 
 	exportCount := len(nameToGoFunc)
-	ret := &HostModule{name: moduleName, NameToFunctionInstance: make(map[string]*FunctionInstance, exportCount)}
+	ret := &HostModule{name: moduleName, NameToFunction: make(map[string]*FunctionInstance, exportCount)}
 	hostModule := &ModuleInstance{
 		Name:       moduleName,
 		Exports:    make(map[string]*ExportInstance, exportCount),
@@ -121,14 +121,14 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 		}
 		hostModule.Exports[name] = &ExportInstance{Type: ExternTypeFunc, Function: f}
 		hostModule.Functions = append(hostModule.Functions, f)
-		ret.NameToFunctionInstance[name] = f
+		ret.NameToFunction[name] = f
 
 		if err = s.compileHostFunction(f); err != nil {
 			return nil, err
 		}
 	}
 
-	s.moduleInstances[moduleName] = hostModule
+	s.modules[moduleName] = hostModule
 	return ret, nil
 }
 
@@ -138,11 +138,11 @@ func (s *Store) compileHostFunction(f *FunctionInstance) (err error) {
 		return err
 	}
 	f.TypeID = ti.TypeID
-	s.addFunctionInstances(f)
+	s.addFunctions(f)
 
 	if err = s.engine.Compile(f); err != nil {
 		// On failure, we must release the function instance.
-		if err = s.releaseFunctionInstances(f); err != nil {
+		if err = s.releaseFunctions(f); err != nil {
 			return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 		}
 	}
@@ -152,7 +152,7 @@ func (s *Store) compileHostFunction(f *FunctionInstance) (err error) {
 func (s *Store) requireModuleUnused(moduleName string) error {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
-	if _, ok := s.moduleInstances[moduleName]; ok {
+	if _, ok := s.modules[moduleName]; ok {
 		return fmt.Errorf("module %s has already been instantiated", moduleName)
 	}
 	return nil
@@ -160,9 +160,9 @@ func (s *Store) requireModuleUnused(moduleName string) error {
 
 // HostModule implements wasm.HostModule
 type HostModule struct {
-	// name is for String and Store.ReleaseModuleInstance
-	name                   string
-	NameToFunctionInstance map[string]*FunctionInstance
+	// name is for String and Store.ReleaseModule
+	name           string
+	NameToFunction map[string]*FunctionInstance
 }
 
 // String implements fmt.Stringer
@@ -191,5 +191,5 @@ func (f *FunctionInstance) Call(ctx publicwasm.ModuleContext, params ...uint64) 
 
 // Function implements wasm.HostModule Function
 func (m *HostModule) Function(name string) publicwasm.HostFunction {
-	return m.NameToFunctionInstance[name]
+	return m.NameToFunction[name]
 }

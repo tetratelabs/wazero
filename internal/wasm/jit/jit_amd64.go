@@ -980,7 +980,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
 	// by 16 as the offset is the "length" of table in Go's "[]wasm.TableElement",
-	// and size of wasm.TableInstance equals 128 bit (64-bit wasm.FunctionIndex and 64-bit wasm.TypeID).
+	// and size of wasm.Table equals 128 bit (64-bit wasm.FunctionIndex and 64-bit wasm.TypeID).
 	getTypeInstanceAddress := c.newProg()
 	notLengthExceedJump.To.SetTarget(getTypeInstanceAddress)
 	getTypeInstanceAddress.As = x86.ASHLQ
@@ -990,7 +990,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	getTypeInstanceAddress.From.Offset = 4
 	c.addInstruction(getTypeInstanceAddress)
 
-	// Adds the address of wasm.TableInstance[0] stored as callEngine.tableSliceAddress to the offset.
+	// Adds the address of wasm.Table[0] stored as callEngine.tableSliceAddress to the offset.
 	movTableSliceAddress := c.newProg()
 	movTableSliceAddress.As = x86.AADDQ
 	movTableSliceAddress.To.Type = obj.TYPE_REG
@@ -1000,7 +1000,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.From.Offset = callEngineModuleContextTableElement0AddressOffset
 	c.addInstruction(movTableSliceAddress)
 
-	// At this point offset.register holds the address of wasm.TableElement at wasm.TableInstance[offset].
+	// At this point offset.register holds the address of wasm.TableElement at wasm.Table[offset].
 	ti := c.f.Module.Types[o.TypeIndex]
 	targetFunctionType := ti.Type
 	checkIfTypeMatch := c.newProg()
@@ -5289,7 +5289,7 @@ func (c *amd64Compiler) initializeReservedStackBasePointer() {
 }
 
 func (c *amd64Compiler) initializeReservedMemoryPointer() {
-	if c.f.Module.MemoryInstance != nil {
+	if c.f.Module.Memory != nil {
 		setupMemoryRegister := c.newProg()
 		setupMemoryRegister.As = x86.AMOVQ
 		setupMemoryRegister.To.Type = obj.TYPE_REG
@@ -5445,8 +5445,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Note: if there's table instruction in the function, the existence of the table
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
-	if c.f.Module.TableInstance != nil {
-		// First, we need to read the *wasm.TableInstance.
+	if c.f.Module.Table != nil {
+		// First, we need to read the *wasm.Table.
 		readTableInstancePointer := c.newProg()
 		readTableInstancePointer.As = x86.AMOVQ
 		readTableInstancePointer.To.Type = obj.TYPE_REG
@@ -5456,8 +5456,8 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		readTableInstancePointer.From.Offset = moduleInstanceTableOffset
 		c.addInstruction(readTableInstancePointer)
 
-		// At this point, tmpRegister holds the address of ModuleInstance.TableInstance.
-		// So we are ready to read and put the first item's address stored in TableInstance.Table.
+		// At this point, tmpRegister holds the address of ModuleInstance.Table.
+		// So we are ready to read and put the first item's address stored in Table.Table.
 		// Here we read the value into tmpRegister2.
 		readTableElement0Address := c.newProg()
 		readTableElement0Address.As = x86.AMOVQ // Note this is LEA instruction.
@@ -5503,7 +5503,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	// Note: if there's memory instruction in the function, memory instance must be non-nil.
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
-	if c.f.Module.MemoryInstance != nil {
+	if c.f.Module.Memory != nil {
 		getMemoryInstanceAddress := c.newProg()
 		getMemoryInstanceAddress.As = x86.AMOVQ
 		getMemoryInstanceAddress.To.Type = obj.TYPE_REG

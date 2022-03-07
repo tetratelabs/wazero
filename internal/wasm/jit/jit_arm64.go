@@ -473,7 +473,7 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 		math.MaxInt32,
 		tmpY,
 	)
-	// At this point of compilation, we don't know the value of stack pointe ceil,
+	// At this point of compilation, we don't know the value of stack point ceil,
 	// so we layzily resolve the value later.
 	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { loadStackPointerCeil.From.Offset = int64(stackPointerCeil) }
 
@@ -3491,7 +3491,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	// is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's table doesn't exist.
 	if c.f.Module.TableInstance != nil {
-		// "tmpX = &tables[0] (type of **wasm.TableInstance)"
+		// "tmpX = &tables[0] (type of **wasm.Table)"
 		c.compileMemoryToRegisterInstruction(
 			arm64.AMOVD,
 			moduleInstanceAddressRegister, moduleInstanceTableOffset,

@@ -100,9 +100,9 @@ type (
 		// i.e. &ModuleInstance.Globals[0] as uintptr.
 		globalElement0Address uintptr
 		// memoryElement0Address is the address of the first element in the global slice,
-		// i.e. &ModuleInstance.MemoryInstance.Buffer[0] as uintptr.
+		// i.e. &ModuleInstance.Memory.Buffer[0] as uintptr.
 		memoryElement0Address uintptr
-		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.MemoryInstance.Buffer).
+		// memorySliceLen is the length of the memory buffer, i.e. len(ModuleInstance.Memory.Buffer).
 		memorySliceLen uint64
 		// tableElement0Address is the address of the first item in the global slice,
 		// i.e. &ModuleInstance.Tables[0].Table[0] as uintptr.
@@ -235,11 +235,11 @@ const (
 	moduleInstanceMemoryOffset  = 72
 	moduleInstanceTableOffset   = 80
 
-	// Offsets for wasm.TableInstance.
+	// Offsets for wasm.Table.
 	tableInstanceTableOffset    = 0
 	tableInstanceTableLenOffset = 8
 
-	// Offsets for wasm.MemoryInstance.
+	// Offsets for wasm.Memory.
 	memoryInstanceBufferOffset    = 0
 	memoryInstanceBufferLenOffset = 8
 
@@ -583,14 +583,14 @@ jitentry:
 			callerCompiledFunction := ce.callFrameAt(1).compiledFunction
 			// A host function is invoked with the calling frame's memory, which may be different if in another module.
 			ce.execHostFunction(fn.source.Kind, fn.source.GoFunc,
-				ctx.WithMemory(callerCompiledFunction.source.Module.MemoryInstance),
+				ctx.WithMemory(callerCompiledFunction.source.Module.Memory),
 			)
 			goto jitentry
 		case jitCallStatusCodeCallBuiltInFunction:
 			switch ce.exitContext.functionCallAddress {
 			case builtinFunctionIndexMemoryGrow:
 				callerCompiledFunction := ce.callFrameTop().compiledFunction
-				ce.builtinFunctionMemoryGrow(callerCompiledFunction.source.Module.MemoryInstance)
+				ce.builtinFunctionMemoryGrow(callerCompiledFunction.source.Module.Memory)
 			case builtinFunctionIndexGrowValueStack:
 				callerCompiledFunction := ce.callFrameTop().compiledFunction
 				ce.builtinFunctionGrowValueStack(callerCompiledFunction.stackPointerCeil)

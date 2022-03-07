@@ -140,23 +140,23 @@ func TestStore_ReleaseModule(t *testing.T) {
 			require.NoError(t, err)
 
 			// We shouldn't be able to release the imported module as it is in use!
-			require.Error(t, s.ReleaseModuleInstance(importedModuleName))
+			require.Error(t, s.ReleaseModule(importedModuleName))
 
 			// Can release the importing module
-			require.NoError(t, s.ReleaseModuleInstance(importingModuleName))
-			require.Nil(t, s.moduleInstances[importingModuleName])
-			require.NotContains(t, s.moduleInstances, importingModuleName)
+			require.NoError(t, s.ReleaseModule(importingModuleName))
+			require.Nil(t, s.modules[importingModuleName])
+			require.NotContains(t, s.modules, importingModuleName)
 
 			// Can re-release the importing module
-			require.NoError(t, s.ReleaseModuleInstance(importingModuleName))
+			require.NoError(t, s.ReleaseModule(importingModuleName))
 
 			// Now we should be able to release the imported module.
-			require.NoError(t, s.ReleaseModuleInstance(importedModuleName))
-			require.Nil(t, s.moduleInstances[importedModuleName])
-			require.NotContains(t, s.moduleInstances, importedModuleName)
+			require.NoError(t, s.ReleaseModule(importedModuleName))
+			require.Nil(t, s.modules[importedModuleName])
+			require.NotContains(t, s.modules, importedModuleName)
 
 			// At this point, everything should be freed.
-			require.Len(t, s.moduleInstances, 0)
+			require.Len(t, s.modules, 0)
 			for _, m := range s.memories {
 				require.Nil(t, m)
 			}
@@ -190,10 +190,10 @@ func TestStore_concurrent(t *testing.T) {
 	_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
 	require.NoError(t, err)
 
-	hm, ok := s.moduleInstances[importedModuleName]
+	hm, ok := s.modules[importedModuleName]
 	require.True(t, ok)
 
-	improtingModule := &Module{
+	importingModule := &Module{
 		TypeSection:     []*FunctionType{{}},
 		FunctionSection: []uint32{0},
 		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
@@ -210,12 +210,12 @@ func TestStore_concurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(i int) {
 			defer wg.Done()
-			_, err := s.Instantiate(improtingModule, strconv.Itoa(i))
+			_, err := s.Instantiate(importingModule, strconv.Itoa(i))
 			require.NoError(t, err)
 
 			if i == goroutines/2 {
 				// Trying to release the imported module concurrently, but should fail as it's in use.
-				err := s.ReleaseModuleInstance(importedModuleName)
+				err := s.ReleaseModule(importedModuleName)
 				require.Error(t, err)
 			}
 		}(i)
@@ -225,8 +225,8 @@ func TestStore_concurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	// At this pointe 1000 modules import host modules.
-	require.Equal(t, goroutines, hm.importedCount)
+	// At this point 1000 modules import host modules.
+	require.Equal(t, goroutines, hm.dependentCount)
 
 	require.Len(t, s.functions, goroutines+1) // Instantiated + imported one.
 	for _, f := range s.functions {
@@ -253,18 +253,18 @@ func TestStore_concurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(i int) {
 			defer wg.Done()
-			err := s.ReleaseModuleInstance(strconv.Itoa(i))
+			err := s.ReleaseModule(strconv.Itoa(i))
 			require.NoError(t, err)
 		}(i)
 	}
 	wg.Wait()
 
 	// No all the importing instances were released, the imported module can be freed.
-	require.Zero(t, hm.importedCount)
-	require.NoError(t, s.ReleaseModuleInstance(hm.Name))
+	require.Zero(t, hm.dependentCount)
+	require.NoError(t, s.ReleaseModule(hm.Name))
 
 	// All instances are freed.
-	require.Len(t, s.moduleInstances, 0)
+	require.Len(t, s.modules, 0)
 }
 
 func TestSotre_Instantiate_Errors(t *testing.T) {
@@ -276,13 +276,13 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
 		require.NoError(t, err)
 
-		hm := s.moduleInstances[importedModuleName]
+		hm := s.modules[importedModuleName]
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(&Module{
 			TypeSection: []*FunctionType{{}},
 			ImportSection: []*Import{
-				// The fisrt import resolve succeeds -> increment hm.importedCount.
+				// The fisrt import resolve succeeds -> increment hm.dependentCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 				// But the second one tries to import uninitialized-module ->
 				{Type: ExternTypeFunc, Module: "non-exist", Name: "fn", DescFunc: 0},
@@ -290,8 +290,8 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		}, importingModuleName)
 		require.EqualError(t, err, "module \"non-exist\" not instantiated")
 
-		// hm.importedCount must be intact as the instantiation failed.
-		require.Zero(t, hm.importedCount)
+		// hm.dependentCount must be intact as the instantiation failed.
+		require.Zero(t, hm.dependentCount)
 	})
 
 	t.Run("compilation failed", func(t *testing.T) {
@@ -302,7 +302,7 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
 		require.NoError(t, err)
 
-		hm := s.moduleInstances[importedModuleName]
+		hm := s.modules[importedModuleName]
 		require.NotNil(t, hm)
 
 		_, err = s.Instantiate(&Module{
@@ -324,8 +324,8 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		}, importingModuleName)
 		require.EqualError(t, err, "compilation failed at index 2/2: compilation failed")
 
-		// hm.importedCount must be intact as the instantiation failed.
-		require.Zero(t, hm.importedCount)
+		// hm.dependentCount must be intact as the instantiation failed.
+		require.Zero(t, hm.dependentCount)
 
 		require.Equal(t, catch.releasedCalledFunctionIndex, []FunctionIndex{0x1, 0x2})
 	})
@@ -338,7 +338,7 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
 		require.NoError(t, err)
 
-		hm := s.moduleInstances[importedModuleName]
+		hm := s.modules[importedModuleName]
 		require.NotNil(t, hm)
 
 		startFuncIndex := uint32(1)
@@ -353,8 +353,8 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		}, importingModuleName)
 		require.EqualError(t, err, "module[test] start function failed: call failed")
 
-		// hm.importedCount must stay incremented as the instantiation itself has already succeeded.
-		require.Equal(t, 1, hm.importedCount)
+		// hm.dependentCount must stay incremented as the instantiation itself has already succeeded.
+		require.Equal(t, 1, hm.dependentCount)
 	})
 }
 
@@ -374,7 +374,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 		}, "test")
 		require.NoError(t, err)
 
-		mod, ok := s.moduleInstances["test"]
+		mod, ok := s.modules["test"]
 		require.True(t, ok)
 
 		ei, err := mod.getExport("host.fn", ExternTypeFunc)
@@ -382,7 +382,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 		// We expect the host function to be called in context of the importing module.
 		// Otherwise, it would be the pseudo-module of the host, which only includes types and function definitions.
 		// Notably, this ensures the host function call context has the correct memory (from the importing module).
-		require.Equal(t, s.moduleInstances["test"], ei.Function.Module)
+		require.Equal(t, s.modules["test"], ei.Function.Module)
 	})
 }
 
@@ -626,7 +626,7 @@ func TestStore_releaseFunctionInstances(t *testing.T) {
 		s.functions[f.Index] = &FunctionInstance{} // Non-nil!
 	}
 
-	err := s.releaseFunctionInstances(fs...)
+	err := s.releaseFunctions(fs...)
 	require.NoError(t, err)
 
 	// Ensure the release targets become nil.
@@ -648,7 +648,7 @@ func TestStore_addFunctionInstances(t *testing.T) {
 		for i := FunctionIndex(0); i < 10; i++ {
 			expectedIndex := prevMaxAddr + 1 + i
 			f := &FunctionInstance{}
-			s.addFunctionInstances(f)
+			s.addFunctions(f)
 
 			// After adding function intance to store, an funcaddr must be assigned.
 			require.Equal(t, expectedIndex, f.Index)
@@ -665,7 +665,7 @@ func TestStore_addFunctionInstances(t *testing.T) {
 		s.functions[maxAddr] = tailInstance
 
 		f := &FunctionInstance{}
-		s.addFunctionInstances(f)
+		s.addFunctions(f)
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, f.Index)
@@ -692,7 +692,7 @@ func TestStore_releaseGlobalInstances(t *testing.T) {
 		s.globals[g.index] = &GlobalInstance{} // Non-nil!
 	}
 
-	s.releaseGlobalInstances(gs...)
+	s.releaseGlobal(gs...)
 
 	// Ensure the release targets become nil.
 	for _, g := range gs {
@@ -713,7 +713,7 @@ func TestStore_addGlobalInstances(t *testing.T) {
 		for i := globalIndex(0); i < 10; i++ {
 			expectedIndex := prevMaxAddr + 1 + i
 			g := &GlobalInstance{}
-			s.addGlobalInstances(g)
+			s.addGlobals(g)
 
 			// After adding function intance to store, an funcaddr must be assigned.
 			require.Equal(t, expectedIndex, g.index)
@@ -730,7 +730,7 @@ func TestStore_addGlobalInstances(t *testing.T) {
 		s.globals[maxAddr] = tailInstance
 
 		g := &GlobalInstance{}
-		s.addGlobalInstances(g)
+		s.addGlobals(g)
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, g.index)
@@ -753,7 +753,7 @@ func TestStore_releaseTableInstance(t *testing.T) {
 
 	table := &TableInstance{index: 1}
 
-	s.releaseTableInstance(table)
+	s.releaseTable(table)
 
 	// Ensure the release targets become nil.
 	require.Nil(t, s.tables[table.index])
@@ -773,7 +773,7 @@ func TestStore_addTableInstance(t *testing.T) {
 		for i := tableIndex(0); i < 10; i++ {
 			expectedIndex := prevMaxAddr + 1 + i
 			g := &TableInstance{}
-			s.addTableInstance(g)
+			s.addTable(g)
 
 			// After adding function intance to store, an funcaddr must be assigned.
 			require.Equal(t, expectedIndex, g.index)
@@ -790,7 +790,7 @@ func TestStore_addTableInstance(t *testing.T) {
 		s.tables[maxAddr] = tailInstance
 
 		table := &TableInstance{}
-		s.addTableInstance(table)
+		s.addTable(table)
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, table.index)
@@ -813,7 +813,7 @@ func TestStore_releaseMemoryInstance(t *testing.T) {
 	mem := &MemoryInstance{index: releaseTargetAddr}
 	s.memories[releaseTargetAddr] = mem // Non-nil!
 
-	s.releaseMemoryInstance(mem)
+	s.releaseMemory(mem)
 
 	// Ensure the release targets become nil.
 	require.Nil(t, s.memories[mem.index])
@@ -833,7 +833,7 @@ func TestStore_addMemoryInstance(t *testing.T) {
 		for i := memoryIndex(0); i < 10; i++ {
 			expectedIndex := prevMaxAddr + 1 + i
 			mem := &MemoryInstance{}
-			s.addMemoryInstance(mem)
+			s.addMemory(mem)
 
 			// After adding function intance to store, an funcaddr must be assigned.
 			require.Equal(t, expectedIndex, mem.index)
@@ -850,7 +850,7 @@ func TestStore_addMemoryInstance(t *testing.T) {
 		s.memories[maxAddr] = tailInstance
 
 		mem := &MemoryInstance{}
-		s.addMemoryInstance(mem)
+		s.addMemory(mem)
 
 		// Index must be reused.
 		require.Equal(t, expectedAddr, mem.index)
@@ -874,20 +874,20 @@ func TestStore_resolveImports(t *testing.T) {
 	})
 	t.Run("export instance not found", func(t *testing.T) {
 		s := newStore()
-		s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{}, Name: moduleName}
+		s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{}, Name: moduleName}
 		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: "unknown"}}})
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
 	})
 	t.Run("func", func(t *testing.T) {
 		t.Run("unknwon type", func(t *testing.T) {
 			s := newStore()
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {}}, Name: moduleName}
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {}}, Name: moduleName}
 			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}})
 			require.EqualError(t, err, "unknown type for function import")
 		})
 		t.Run("signature mismatch", func(t *testing.T) {
 			s := newStore()
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Function: &FunctionInstance{Type: &FunctionType{}},
 			}}, Name: moduleName}
 			m := &Module{
@@ -900,7 +900,7 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			f := &FunctionInstance{Type: &FunctionType{Results: []ValueType{ValueTypeF32}}}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Function: f,
 			}}, Name: moduleName}
 			m := &Module{
@@ -909,15 +909,15 @@ func TestStore_resolveImports(t *testing.T) {
 			}
 			functions, _, _, _, moduleImports, err := s.resolveImports(m)
 			require.NoError(t, err)
-			require.Contains(t, moduleImports, s.moduleInstances[moduleName])
+			require.Contains(t, moduleImports, s.modules[moduleName])
 			require.Contains(t, functions, f)
-			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
+			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 	})
 	t.Run("global", func(t *testing.T) {
 		t.Run("mutability mismatch", func(t *testing.T) {
 			s := newStore()
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeGlobal,
 				Global: &GlobalInstance{Type: &GlobalType{Mutable: false}},
 			}}, Name: moduleName}
@@ -926,7 +926,7 @@ func TestStore_resolveImports(t *testing.T) {
 		})
 		t.Run("type mismatch", func(t *testing.T) {
 			s := newStore()
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeGlobal,
 				Global: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}},
 			}}, Name: moduleName}
@@ -936,27 +936,27 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			inst := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: inst}}, Name: moduleName}
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: inst}}, Name: moduleName}
 			_, globals, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.Type}}})
 			require.NoError(t, err)
 			require.Contains(t, globals, inst)
-			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
+			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 	})
 	t.Run("table", func(t *testing.T) {
 		t.Run("element type", func(t *testing.T) {
 			s := newStore()
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{ElemType: 0x00}, // Unknown!
 			}}, Name: moduleName}
 			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &TableType{ElemType: 0x1}}}})
-			require.EqualError(t, err, "incompatible table improt: element type mismatch")
+			require.EqualError(t, err, "incompatible table import: element type mismatch")
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
 			importTableType := &TableType{Limit: &LimitsType{Min: 2}}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
 			}}, Name: moduleName}
@@ -967,7 +967,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			importTableType := &TableType{Limit: &LimitsType{Max: &max}}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
 			}}, Name: moduleName}
@@ -978,21 +978,21 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			tableInst := &TableInstance{Max: &max}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
 				Table: tableInst,
 			}}, Name: moduleName}
 			_, _, table, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &TableType{Limit: &LimitsType{Max: &max}}}}})
 			require.NoError(t, err)
 			require.Equal(t, table, tableInst)
-			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
+			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 	})
 	t.Run("memory", func(t *testing.T) {
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
 			importMemoryType := &MemoryType{Min: 2}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{Min: importMemoryType.Min - 1},
 			}}, Name: moduleName}
@@ -1003,7 +1003,7 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			importMemoryType := &MemoryType{Max: &max}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{},
 			}}, Name: moduleName}
@@ -1014,20 +1014,20 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
 			memoryInst := &MemoryInstance{Max: &max}
-			s.moduleInstances[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: memoryInst,
 			}}, Name: moduleName}
 			_, _, _, memory, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &MemoryType{Max: &max}}}})
 			require.NoError(t, err)
 			require.Equal(t, memory, memoryInst)
-			require.Equal(t, 1, s.moduleInstances[moduleName].importedCount)
+			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 	})
 }
 
 func TestModuleInstance_validateData(t *testing.T) {
-	m := &ModuleInstance{MemoryInstance: &MemoryInstance{Buffer: make([]byte, 5)}}
+	m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 5)}}
 	for _, tc := range []struct {
 		name   string
 		data   []*DataSegment
@@ -1068,19 +1068,19 @@ func TestModuleInstance_validateData(t *testing.T) {
 }
 
 func TestModuleInstance_applyData(t *testing.T) {
-	m := &ModuleInstance{MemoryInstance: &MemoryInstance{Buffer: make([]byte, 10)}}
+	m := &ModuleInstance{Memory: &MemoryInstance{Buffer: make([]byte, 10)}}
 	m.applyData([]*DataSegment{
 		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x0}}, Init: []byte{0xa, 0xf}},
 		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x8}}, Init: []byte{0x1, 0x5}},
 	})
-	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.MemoryInstance.Buffer)
+	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
 }
 
 func TestModuleInstance_validateElements(t *testing.T) {
 	functionCounts := uint32(0xa)
 	m := &ModuleInstance{
-		TableInstance: &TableInstance{Table: make([]TableElement, 10)},
-		Functions:     make([]*FunctionInstance, 10),
+		Table:     &TableInstance{Table: make([]TableElement, 10)},
+		Functions: make([]*FunctionInstance, 10),
 	}
 	for _, tc := range []struct {
 		name     string
@@ -1129,8 +1129,8 @@ func TestModuleInstance_validateElements(t *testing.T) {
 func TestModuleInstance_applyElements(t *testing.T) {
 	functionCounts := uint32(0xa)
 	m := &ModuleInstance{
-		TableInstance: &TableInstance{Table: make([]TableElement, 10)},
-		Functions:     make([]*FunctionInstance, 10),
+		Table:     &TableInstance{Table: make([]TableElement, 10)},
+		Functions: make([]*FunctionInstance, 10),
 	}
 	targetAddr, targetOffset := uint32(1), byte(0)
 	targetAddr2, targetOffset2 := functionCounts-1, byte(0x8)
@@ -1140,13 +1140,13 @@ func TestModuleInstance_applyElements(t *testing.T) {
 		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset}}, Init: []uint32{uint32(targetAddr)}},
 		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset2}}, Init: []uint32{targetAddr2}},
 	})
-	require.Equal(t, FunctionIndex(targetAddr), m.TableInstance.Table[targetOffset].FunctionIndex)
-	require.Equal(t, FunctionIndex(targetAddr2), m.TableInstance.Table[targetOffset2].FunctionIndex)
+	require.Equal(t, FunctionIndex(targetAddr), m.Table.Table[targetOffset].FunctionIndex)
+	require.Equal(t, FunctionIndex(targetAddr2), m.Table.Table[targetOffset2].FunctionIndex)
 }
 
 func TestModuleInstance_decImportedCount(t *testing.T) {
 	count := 100
-	m := ModuleInstance{importedCount: count}
+	m := ModuleInstance{dependentCount: count}
 
 	wg := sync.WaitGroup{}
 	wg.Add(count)
@@ -1157,7 +1157,7 @@ func TestModuleInstance_decImportedCount(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	require.Zero(t, m.importedCount)
+	require.Zero(t, m.dependentCount)
 }
 
 func TestModuleInstance_incImportedCount(t *testing.T) {
@@ -1172,7 +1172,7 @@ func TestModuleInstance_incImportedCount(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	require.Equal(t, count, m.importedCount)
+	require.Equal(t, count, m.dependentCount)
 }
 
 func newStore() *Store {

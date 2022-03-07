@@ -367,7 +367,7 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 	return nil
 }
 
-func (m *Module) buildGlobalInstances(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
+func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
 	for _, gs := range m.GlobalSection {
 		var gv uint64
 		// Global's initialization constant expression can only reference the imported globals.
@@ -390,7 +390,7 @@ func (m *Module) buildGlobalInstances(importedGlobals []*GlobalInstance) (global
 	return
 }
 
-func (m *Module) buildFunctionInstances() (functions []*FunctionInstance) {
+func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 	var functionNames NameMap
 	if m.NameSection != nil {
 		functionNames = m.NameSection.FunctionNames
@@ -424,7 +424,7 @@ func (m *Module) buildFunctionInstances() (functions []*FunctionInstance) {
 	return
 }
 
-func (m *Module) buildMemoryInstance() (mem *MemoryInstance) {
+func (m *Module) buildMemory() (mem *MemoryInstance) {
 	for _, memSec := range m.MemorySection {
 		mem = &MemoryInstance{
 			Buffer: make([]byte, MemoryPagesToBytesNum(memSec.Min)),
@@ -435,7 +435,7 @@ func (m *Module) buildMemoryInstance() (mem *MemoryInstance) {
 	return
 }
 
-func (m *Module) buildTableInstance() (table *TableInstance) {
+func (m *Module) buildTable() (table *TableInstance) {
 	for _, tableSeg := range m.TableSection {
 		table = newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
 	}

@@ -40,7 +40,7 @@ func (j *jitEnv) stackTopAsFloat64() float64 {
 }
 
 func (j *jitEnv) memory() []byte {
-	return j.moduleInstance.MemoryInstance.Buffer
+	return j.moduleInstance.Memory.Buffer
 }
 
 func (j *jitEnv) stack() []uint64 {
@@ -76,7 +76,7 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 }
 
 func (j *jitEnv) setTable(table []wasm.TableElement) {
-	j.moduleInstance.TableInstance = &wasm.TableInstance{Table: table}
+	j.moduleInstance.Table = &wasm.TableInstance{Table: table}
 }
 
 func (j *jitEnv) callFrameStackPeek() *callFrame {
@@ -132,9 +132,9 @@ func newJITEnvironment() *jitEnv {
 	return &jitEnv{
 		eng: eng,
 		moduleInstance: &wasm.ModuleInstance{
-			MemoryInstance: &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
-			TableInstance:  &wasm.TableInstance{},
-			Globals:        []*wasm.GlobalInstance{},
+			Memory:  &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
+			Table:   &wasm.TableInstance{},
+			Globals: []*wasm.GlobalInstance{},
 		},
 		ce: eng.newCallEngine(),
 	}

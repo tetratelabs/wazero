@@ -459,7 +459,7 @@ func TestStore_NewHostModule(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure it was added to module instances
-	hm := s.moduleInstances["test"]
+	hm := s.modules["test"]
 	require.NotNil(t, hm)
 
 	// The function was added to the store, prefixed by the owning module name

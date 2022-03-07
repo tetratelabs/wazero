@@ -89,7 +89,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 	})
 
 	e := NewEngine()
-	module := &wasm.ModuleInstance{MemoryInstance: memory}
+	module := &wasm.ModuleInstance{Memory: memory}
 	modCtx := wasm.NewModuleContext(context.Background(), e, module)
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
