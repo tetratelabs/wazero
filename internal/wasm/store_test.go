@@ -3,6 +3,7 @@ package internalwasm
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"strconv"
 	"sync"
@@ -133,6 +134,7 @@ func TestStore_ReleaseModule(t *testing.T) {
 				TypeSection:   []*FunctionType{{}},
 				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
 				MemorySection: []*MemoryType{{1, nil}},
+				GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
 				TableSection:  []*TableType{{Limit: &LimitsType{Min: 10}}},
 			}, importingModuleName)
 			require.NoError(t, err)
@@ -168,10 +170,83 @@ func TestStore_ReleaseModule(t *testing.T) {
 				require.Nil(t, g)
 			}
 
-			// One function instance was created and freed.
+			// One function, globa, memory and table instance was created and freed,
+			// therefore, one released index must be captured by store.
 			require.Len(t, s.releasedFunctionIndex, 1)
+			require.Len(t, s.releasedTableIndex, 1)
+			require.Len(t, s.releasedMemoryIndex, 1)
+			require.Len(t, s.releasedGlobalIndex, 1)
 		})
 	}
+}
+
+func TestSotre_Instantiate(t *testing.T) {
+	t.Run("fail resolve import", func(t *testing.T) {
+		const importedModuleName = "imported"
+		const importingModuleName = "test"
+
+		s := newStore()
+		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+		require.NoError(t, err)
+
+		hm := s.moduleInstances[importedModuleName]
+		require.NotNil(t, hm)
+
+		_, err = s.Instantiate(&Module{
+			TypeSection: []*FunctionType{{}},
+			ImportSection: []*Import{
+				// Fisrt import resolve succeeds -> increment the hm.importedCount.
+				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
+				// But the second one tries to import uninitialized-module ->
+				{Type: ExternTypeFunc, Module: "non-exist!!!!!!!!!!!", Name: "fn", DescFunc: 0},
+			},
+		}, importingModuleName)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "module \"non-exist!!!!!!!!!!!\" not instantiated")
+
+		// hm.importedCount must be intact as the instantiation failed.
+		require.Zero(t, hm.importedCount)
+	})
+
+	t.Run("compilation failed", func(t *testing.T) {
+		const importedModuleName = "imported"
+		const importingModuleName = "test"
+		s := newStore()
+		catch := s.engine.(*catchContext)
+		catch.compilationFailIndex = 3
+
+		_, err := s.NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
+		require.NoError(t, err)
+
+		hm := s.moduleInstances[importedModuleName]
+		require.NotNil(t, hm)
+
+		_, err = s.Instantiate(&Module{
+			TypeSection:     []*FunctionType{{}},
+			FunctionSection: []uint32{0, 0, 0 /* compilation failing function */},
+			CodeSection: []*Code{
+				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 1
+				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 2
+				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 3 == compilation failing function.
+				// Functions after failrued must not be passed to engine.Release.
+				{Body: []byte{OpcodeEnd}},
+				{Body: []byte{OpcodeEnd}},
+				{Body: []byte{OpcodeEnd}},
+				{Body: []byte{OpcodeEnd}},
+			},
+			ImportSection: []*Import{
+				// Fisrt import resolve succeeds -> increment the hm.importedCount.
+				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
+			},
+		}, importingModuleName)
+		require.Error(t, err)
+		require.Equal(t, err.Error(), "compilation failed at index 2/2: compilation failed")
+
+		// hm.importedCount must be intact as the instantiation failed.
+		require.Zero(t, hm.importedCount)
+
+		require.Equal(t, catch.releasedCalledFunctionIndex, []FunctionIndex{0x1, 0x2})
+	})
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
@@ -266,7 +341,9 @@ func TestFunctionInstance_Call(t *testing.T) {
 }
 
 type catchContext struct {
-	ctx *ModuleContext
+	ctx                         *ModuleContext
+	compilationFailIndex        int
+	releasedCalledFunctionIndex []FunctionIndex
 }
 
 func (e *catchContext) Call(ctx *ModuleContext, _ *FunctionInstance, _ ...uint64) (results []uint64, err error) {
@@ -274,11 +351,15 @@ func (e *catchContext) Call(ctx *ModuleContext, _ *FunctionInstance, _ ...uint64
 	return
 }
 
-func (e *catchContext) Compile(_ *FunctionInstance) error {
+func (e *catchContext) Compile(f *FunctionInstance) error {
+	if e.compilationFailIndex >= 0 && f.Index == FunctionIndex(e.compilationFailIndex) {
+		return fmt.Errorf("compilation failed")
+	}
 	return nil
 }
 
-func (e *catchContext) Release(_ *FunctionInstance) error {
+func (e *catchContext) Release(f *FunctionInstance) error {
+	e.releasedCalledFunctionIndex = append(e.releasedCalledFunctionIndex, f.Index)
 	return nil
 }
 
