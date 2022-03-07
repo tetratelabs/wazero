@@ -65,7 +65,8 @@ type (
 		// which are only owned by ModuleInstance. This is because the function call implementation in engines depend on storeIndex
 		// of function instance (FunctionIndex).
 		// TODO: decouple engine's function call implementation from store-wide context (in this case FunctionIndex), and remove
-		// the necessity to hold FunctionInstances in store in order to reduce the mutext usage.
+		// the necessity to hold FunctionInstances in store in order to reduce the mutex usage. Note that this might come with
+		// the runtime overhead (e.g. adding additional instruction for each call instruction).
 		functions []*FunctionInstance
 
 		// mux is used to guard the fields from concurrent access.
