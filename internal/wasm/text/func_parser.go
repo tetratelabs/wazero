@@ -8,8 +8,8 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func newFuncParser(typeUseParser *typeUseParser, funcNamespace *indexNamespace, onFunc onFunc) *funcParser {
-	return &funcParser{typeUseParser: typeUseParser, funcNamespace: funcNamespace, onFunc: onFunc}
+func newFuncParser(enabledFeatures wasm.Features, typeUseParser *typeUseParser, funcNamespace *indexNamespace, onFunc onFunc) *funcParser {
+	return &funcParser{enabledFeatures: enabledFeatures, typeUseParser: typeUseParser, funcNamespace: funcNamespace, onFunc: onFunc}
 }
 
 type onFunc func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wasm.NameMap) (tokenParser, error)
@@ -22,6 +22,9 @@ type onFunc func(typeIdx wasm.Index, code *wasm.Code, name string, localNames wa
 //
 // Note: funcParser is reusable. The caller resets via begin.
 type funcParser struct {
+	// enabledFeatures should be set to moduleParser.enabledFeatures
+	enabledFeatures wasm.Features
+
 	// onFunc is called when complete parsing the body. Unless testing, this should be moduleParser.onFuncEnd
 	onFunc onFunc
 

@@ -48,6 +48,9 @@ type moduleParser struct {
 	// source is the entire WebAssembly text format source code being parsed.
 	source []byte
 
+	// enabledFeatures ensure parsing errs at the correct line and column number when a feature is disabled.
+	enabledFeatures wasm.Features
+
 	// module holds the fields incrementally parsed from tokens in the source.
 	module *wasm.Module
 
@@ -99,7 +102,7 @@ type moduleParser struct {
 
 // DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-format%E2%91%A0
-func DecodeModule(source []byte, _ wasm.Features) (result *wasm.Module, err error) {
+func DecodeModule(source []byte, enabledFeatures wasm.Features) (result *wasm.Module, err error) {
 	// TODO: when globals are supported, err on mutable globals if disabled
 
 	// names are the wasm.Module NameSection
@@ -109,7 +112,7 @@ func DecodeModule(source []byte, _ wasm.Features) (result *wasm.Module, err erro
 	// * LocalNames: nil when no imported or module-defined function had named (param) fields.
 	names := &wasm.NameSection{}
 	module := &wasm.Module{NameSection: names}
-	p := newModuleParser(module)
+	p := newModuleParser(module, enabledFeatures)
 	p.source = source
 
 	// A valid source must begin with the token '(', but it could be preceded by whitespace or comments. For this
@@ -138,15 +141,15 @@ func DecodeModule(source []byte, _ wasm.Features) (result *wasm.Module, err erro
 	return module, nil
 }
 
-func newModuleParser(module *wasm.Module) *moduleParser {
-	p := moduleParser{module: module,
+func newModuleParser(module *wasm.Module, enabledFeatures wasm.Features) *moduleParser {
+	p := moduleParser{module: module, enabledFeatures: enabledFeatures,
 		typeNamespace:   newIndexNamespace(module.SectionElementCount),
 		funcNamespace:   newIndexNamespace(module.SectionElementCount),
 		memoryNamespace: newIndexNamespace(module.SectionElementCount),
 	}
 	p.typeParser = newTypeParser(p.typeNamespace, p.onTypeEnd)
 	p.typeUseParser = newTypeUseParser(module, p.typeNamespace)
-	p.funcParser = newFuncParser(p.typeUseParser, p.funcNamespace, p.endFunc)
+	p.funcParser = newFuncParser(enabledFeatures, p.typeUseParser, p.funcNamespace, p.endFunc)
 	p.memoryParser = newMemoryParser(p.memoryNamespace, p.endMemory)
 	return &p
 }

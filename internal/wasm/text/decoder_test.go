@@ -2087,7 +2087,7 @@ func TestParseModule_Errors(t *testing.T) {
 }
 
 func TestModuleParser_ErrorContext(t *testing.T) {
-	p := newModuleParser(&wasm.Module{})
+	p := newModuleParser(&wasm.Module{}, 0)
 	tests := []struct {
 		input    string
 		pos      parserPosition
