@@ -60,23 +60,23 @@ func (e *engine) newCallEngine() *callEngine {
 	return &callEngine{compiledFunctions: e.compiledFunctions}
 }
 
-func (vm *callEngine) push(v uint64) {
-	vm.stack = append(vm.stack, v)
+func (ce *callEngine) push(v uint64) {
+	ce.stack = append(ce.stack, v)
 }
 
-func (vm *callEngine) pop() (v uint64) {
+func (ce *callEngine) pop() (v uint64) {
 	// No need to check stack bound
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
 	// at module validation phase
 	// and wazeroir translation
 	// before compilation.
-	v = vm.stack[len(vm.stack)-1]
-	vm.stack = vm.stack[:len(vm.stack)-1]
+	v = ce.stack[len(ce.stack)-1]
+	ce.stack = ce.stack[:len(ce.stack)-1]
 	return
 }
 
-func (vm *callEngine) drop(r *wazeroir.InclusiveRange) {
+func (ce *callEngine) drop(r *wazeroir.InclusiveRange) {
 	// No need to check stack bound
 	// as we can assume that all the operations
 	// are valid thanks to validateFunction
@@ -86,27 +86,27 @@ func (vm *callEngine) drop(r *wazeroir.InclusiveRange) {
 	if r == nil {
 		return
 	} else if r.Start == 0 {
-		vm.stack = vm.stack[:len(vm.stack)-1-r.End]
+		ce.stack = ce.stack[:len(ce.stack)-1-r.End]
 	} else {
-		newStack := vm.stack[:len(vm.stack)-1-r.End]
-		newStack = append(newStack, vm.stack[len(vm.stack)-r.Start:]...)
-		vm.stack = newStack
+		newStack := ce.stack[:len(ce.stack)-1-r.End]
+		newStack = append(newStack, ce.stack[len(ce.stack)-r.Start:]...)
+		ce.stack = newStack
 	}
 }
 
-func (vm *callEngine) pushFrame(frame *callFrame) {
-	if callStackCeiling <= len(vm.frames) {
+func (ce *callEngine) pushFrame(frame *callFrame) {
+	if callStackCeiling <= len(ce.frames) {
 		panic(wasm.ErrRuntimeCallStackOverflow)
 	}
-	vm.frames = append(vm.frames, frame)
+	ce.frames = append(ce.frames, frame)
 }
 
-func (vm *callEngine) popFrame() (frame *callFrame) {
+func (ce *callEngine) popFrame() (frame *callFrame) {
 	// No need to check stack bound as we can assume that all the operations are valid thanks to validateFunction at
 	// module validation phase and wazeroir translation before compilation.
-	oneLess := len(vm.frames) - 1
-	frame = vm.frames[oneLess]
-	vm.frames = vm.frames[:oneLess]
+	oneLess := len(ce.frames) - 1
+	frame = ce.frames[oneLess]
+	ce.frames = ce.frames[:oneLess]
 	return
 }
 
@@ -454,16 +454,16 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 		return nil, fmt.Errorf("expected %d params, but passed %d", len(paramSignature), paramCount)
 	}
 
-	vm := e.newCallEngine()
+	ce := e.newCallEngine()
 	defer func() {
 		if v := recover(); v != nil {
 			if buildoptions.IsDebugMode {
 				debug.PrintStack()
 			}
 
-			traces := make([]string, len(vm.frames))
+			traces := make([]string, len(ce.frames))
 			for i := 0; i < len(traces); i++ {
-				frame := vm.popFrame()
+				frame := ce.popFrame()
 				name := frame.f.funcInstance.Name
 				// TODO: include DWARF symbols. See #58
 				traces[i] = fmt.Sprintf("\t%d: %s", i, name)
@@ -492,21 +492,21 @@ func (e *engine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params 
 	}
 
 	for _, param := range params {
-		vm.push(param)
+		ce.push(param)
 	}
 	if f.Kind == wasm.FunctionKindWasm {
-		vm.callNativeFunc(ctx, compiled)
+		ce.callNativeFunc(ctx, compiled)
 	} else {
-		vm.callHostFunc(ctx, compiled)
+		ce.callHostFunc(ctx, compiled)
 	}
 	results = make([]uint64, len(f.Type.Results))
 	for i := range results {
-		results[len(results)-1-i] = vm.pop()
+		results[len(results)-1-i] = ce.pop()
 	}
 	return
 }
 
-func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
+func (ce *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	tp := f.hostFn.Type()
 	in := make([]reflect.Value, tp.NumIn())
 
@@ -516,7 +516,7 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 	}
 	for i := len(in) - 1; i >= wasmParamOffset; i-- {
 		val := reflect.New(tp.In(i)).Elem()
-		raw := vm.pop()
+		raw := ce.pop()
 		kind := tp.In(i).Kind()
 		switch kind {
 		case reflect.Float32:
@@ -532,8 +532,8 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 	}
 
 	// A host function is invoked with the calling frame's memory, which may be different if in another module.
-	if len(vm.frames) > 0 {
-		ctx = ctx.WithMemory(vm.frames[len(vm.frames)-1].f.funcInstance.Module.MemoryInstance)
+	if len(ce.frames) > 0 {
+		ctx = ctx.WithMemory(ce.frames[len(ce.frames)-1].f.funcInstance.Module.MemoryInstance)
 	}
 
 	// Handle any special parameter zero
@@ -542,31 +542,31 @@ func (vm *callEngine) callHostFunc(ctx *wasm.ModuleContext, f *compiledFunction)
 	}
 
 	frame := &callFrame{f: f}
-	vm.pushFrame(frame)
+	ce.pushFrame(frame)
 	for _, ret := range f.hostFn.Call(in) {
 		switch ret.Kind() {
 		case reflect.Float32:
-			vm.push(uint64(math.Float32bits(float32(ret.Float()))))
+			ce.push(uint64(math.Float32bits(float32(ret.Float()))))
 		case reflect.Float64:
-			vm.push(math.Float64bits(ret.Float()))
+			ce.push(math.Float64bits(ret.Float()))
 		case reflect.Uint32, reflect.Uint64:
-			vm.push(ret.Uint())
+			ce.push(ret.Uint())
 		case reflect.Int32, reflect.Int64:
-			vm.push(uint64(ret.Int()))
+			ce.push(uint64(ret.Int()))
 		default:
 			panic("invalid return type")
 		}
 	}
-	vm.popFrame()
+	ce.popFrame()
 }
 
-func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
+func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunction) {
 	frame := &callFrame{f: f}
 	moduleInst := f.funcInstance.Module
 	memoryInst := moduleInst.MemoryInstance
 	globals := moduleInst.Globals
 	table := moduleInst.TableInstance
-	vm.pushFrame(frame)
+	ce.pushFrame(frame)
 	bodyLen := uint64(len(frame.f.body))
 	for frame.pc < bodyLen {
 		op := frame.f.body[frame.pc]
@@ -582,38 +582,38 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindBrIf:
 			{
-				if vm.pop() > 0 {
-					vm.drop(op.rs[0])
+				if ce.pop() > 0 {
+					ce.drop(op.rs[0])
 					frame.pc = op.us[0]
 				} else {
-					vm.drop(op.rs[1])
+					ce.drop(op.rs[1])
 					frame.pc = op.us[1]
 				}
 			}
 		case wazeroir.OperationKindBrTable:
 			{
-				if v := int(vm.pop()); v < len(op.us)-1 {
-					vm.drop(op.rs[v+1])
+				if v := int(ce.pop()); v < len(op.us)-1 {
+					ce.drop(op.rs[v+1])
 					frame.pc = op.us[v+1]
 				} else {
 					// Default branch.
-					vm.drop(op.rs[0])
+					ce.drop(op.rs[0])
 					frame.pc = op.us[0]
 				}
 			}
 		case wazeroir.OperationKindCall:
 			{
-				f := vm.compiledFunctions[op.us[0]]
+				f := ce.compiledFunctions[op.us[0]]
 				if f.hostFn != nil {
-					vm.callHostFunc(ctx, f)
+					ce.callHostFunc(ctx, f)
 				} else {
-					vm.callNativeFunc(ctx, f)
+					ce.callNativeFunc(ctx, f)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindCallIndirect:
 			{
-				offset := vm.pop()
+				offset := ce.pop()
 				if offset >= uint64(len(table.Table)) {
 					panic(wasm.ErrRuntimeInvalidTableAccess)
 				}
@@ -625,115 +625,115 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					}
 					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)
 				}
-				target := vm.compiledFunctions[table.Table[offset].FunctionIndex]
+				target := ce.compiledFunctions[table.Table[offset].FunctionIndex]
 				// Call in.
 				if target.hostFn != nil {
-					vm.callHostFunc(ctx, target)
+					ce.callHostFunc(ctx, target)
 				} else {
-					vm.callNativeFunc(ctx, target)
+					ce.callNativeFunc(ctx, target)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindDrop:
 			{
-				vm.drop(op.rs[0])
+				ce.drop(op.rs[0])
 				frame.pc++
 			}
 		case wazeroir.OperationKindSelect:
 			{
-				c := vm.pop()
-				v2 := vm.pop()
+				c := ce.pop()
+				v2 := ce.pop()
 				if c == 0 {
-					_ = vm.pop()
-					vm.push(v2)
+					_ = ce.pop()
+					ce.push(v2)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindPick:
 			{
-				vm.push(vm.stack[len(vm.stack)-1-int(op.us[0])])
+				ce.push(ce.stack[len(ce.stack)-1-int(op.us[0])])
 				frame.pc++
 			}
 		case wazeroir.OperationKindSwap:
 			{
-				index := len(vm.stack) - 1 - int(op.us[0])
-				vm.stack[len(vm.stack)-1], vm.stack[index] = vm.stack[index], vm.stack[len(vm.stack)-1]
+				index := len(ce.stack) - 1 - int(op.us[0])
+				ce.stack[len(ce.stack)-1], ce.stack[index] = ce.stack[index], ce.stack[len(ce.stack)-1]
 				frame.pc++
 			}
 		case wazeroir.OperationKindGlobalGet:
 			{
 				g := globals[op.us[0]]
-				vm.push(g.Val)
+				ce.push(g.Val)
 				frame.pc++
 			}
 		case wazeroir.OperationKindGlobalSet:
 			{
 				g := globals[op.us[0]]
-				g.Val = vm.pop()
+				g.Val = ce.pop()
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad:
 			{
-				base := op.us[1] + vm.pop()
+				base := op.us[1] + ce.pop()
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 					if uint64(len(memoryInst.Buffer)) < base+4 {
 						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
-					vm.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
+					ce.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
 				case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
 					if uint64(len(memoryInst.Buffer)) < base+8 {
 						panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 					}
-					vm.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
+					ce.push(binary.LittleEndian.Uint64(memoryInst.Buffer[base:]))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad8:
 			{
-				base := op.us[1] + vm.pop()
+				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+1 {
 					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32, wazeroir.SignedInt64:
-					vm.push(uint64(int8(memoryInst.Buffer[base])))
+					ce.push(uint64(int8(memoryInst.Buffer[base])))
 				case wazeroir.SignedUint32, wazeroir.SignedUint64:
-					vm.push(uint64(uint8(memoryInst.Buffer[base])))
+					ce.push(uint64(uint8(memoryInst.Buffer[base])))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad16:
 			{
-				base := op.us[1] + vm.pop()
+				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+2 {
 					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32, wazeroir.SignedInt64:
-					vm.push(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
+					ce.push(uint64(int16(binary.LittleEndian.Uint16(memoryInst.Buffer[base:]))))
 				case wazeroir.SignedUint32, wazeroir.SignedUint64:
-					vm.push(uint64(binary.LittleEndian.Uint16(memoryInst.Buffer[base:])))
+					ce.push(uint64(binary.LittleEndian.Uint16(memoryInst.Buffer[base:])))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLoad32:
 			{
-				base := op.us[1] + vm.pop()
+				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+4 {
 					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
 				if op.b1 == 1 {
-					vm.push(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
+					ce.push(uint64(int32(binary.LittleEndian.Uint32(memoryInst.Buffer[base:]))))
 				} else {
-					vm.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
+					ce.push(uint64(binary.LittleEndian.Uint32(memoryInst.Buffer[base:])))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindStore:
 			{
-				val := vm.pop()
-				base := op.us[1] + vm.pop()
+				val := ce.pop()
+				base := op.us[1] + ce.pop()
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
 					if uint64(len(memoryInst.Buffer)) < base+4 {
@@ -750,8 +750,8 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindStore8:
 			{
-				val := byte(vm.pop())
-				base := op.us[1] + vm.pop()
+				val := byte(ce.pop())
+				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+1 {
 					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -760,8 +760,8 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindStore16:
 			{
-				val := uint16(vm.pop())
-				base := op.us[1] + vm.pop()
+				val := uint16(ce.pop())
+				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+2 {
 					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -770,8 +770,8 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindStore32:
 			{
-				val := uint32(vm.pop())
-				base := op.us[1] + vm.pop()
+				val := uint32(ce.pop())
+				base := op.us[1] + ce.pop()
 				if uint64(len(memoryInst.Buffer)) < base+4 {
 					panic(wasm.ErrRuntimeOutOfBoundsMemoryAccess)
 				}
@@ -780,20 +780,20 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			}
 		case wazeroir.OperationKindMemorySize:
 			{
-				vm.push(uint64(memoryInst.PageSize()))
+				ce.push(uint64(memoryInst.PageSize()))
 				frame.pc++
 			}
 		case wazeroir.OperationKindMemoryGrow:
 			{
-				n := vm.pop()
+				n := ce.pop()
 				res := memoryInst.Grow(uint32(n))
-				vm.push(uint64(res))
+				ce.push(uint64(res))
 				frame.pc++
 			}
 		case wazeroir.OperationKindConstI32, wazeroir.OperationKindConstI64,
 			wazeroir.OperationKindConstF32, wazeroir.OperationKindConstF64:
 			{
-				vm.push(op.us[0])
+				ce.push(op.us[0])
 				frame.pc++
 			}
 		case wazeroir.OperationKindEq:
@@ -801,19 +801,19 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				var b bool
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
-					v2, v1 := vm.pop(), vm.pop()
+					v2, v1 := ce.pop(), ce.pop()
 					b = v1 == v2
 				case wazeroir.UnsignedTypeF32:
-					v2, v1 := vm.pop(), vm.pop()
+					v2, v1 := ce.pop(), ce.pop()
 					b = math.Float32frombits(uint32(v2)) == math.Float32frombits(uint32(v1))
 				case wazeroir.UnsignedTypeF64:
-					v2, v1 := vm.pop(), vm.pop()
+					v2, v1 := ce.pop(), ce.pop()
 					b = math.Float64frombits(v2) == math.Float64frombits(v1)
 				}
 				if b {
-					vm.push(1)
+					ce.push(1)
 				} else {
-					vm.push(0)
+					ce.push(0)
 				}
 				frame.pc++
 			}
@@ -822,35 +822,35 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				var b bool
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeI64:
-					v2, v1 := vm.pop(), vm.pop()
+					v2, v1 := ce.pop(), ce.pop()
 					b = v1 != v2
 				case wazeroir.UnsignedTypeF32:
-					v2, v1 := vm.pop(), vm.pop()
+					v2, v1 := ce.pop(), ce.pop()
 					b = math.Float32frombits(uint32(v2)) != math.Float32frombits(uint32(v1))
 				case wazeroir.UnsignedTypeF64:
-					v2, v1 := vm.pop(), vm.pop()
+					v2, v1 := ce.pop(), ce.pop()
 					b = math.Float64frombits(v2) != math.Float64frombits(v1)
 				}
 				if b {
-					vm.push(1)
+					ce.push(1)
 				} else {
-					vm.push(0)
+					ce.push(0)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindEqz:
 			{
-				if vm.pop() == 0 {
-					vm.push(1)
+				if ce.pop() == 0 {
+					ce.push(1)
 				} else {
-					vm.push(0)
+					ce.push(0)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLt:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				var b bool
 				switch wazeroir.SignedType(op.b1) {
 				case wazeroir.SignedTypeInt32:
@@ -865,16 +865,16 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					b = math.Float64frombits(v1) < math.Float64frombits(v2)
 				}
 				if b {
-					vm.push(1)
+					ce.push(1)
 				} else {
-					vm.push(0)
+					ce.push(0)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindGt:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				var b bool
 				switch wazeroir.SignedType(op.b1) {
 				case wazeroir.SignedTypeInt32:
@@ -889,16 +889,16 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					b = math.Float64frombits(v1) > math.Float64frombits(v2)
 				}
 				if b {
-					vm.push(1)
+					ce.push(1)
 				} else {
-					vm.push(0)
+					ce.push(0)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindLe:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				var b bool
 				switch wazeroir.SignedType(op.b1) {
 				case wazeroir.SignedTypeInt32:
@@ -913,16 +913,16 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					b = math.Float64frombits(v1) <= math.Float64frombits(v2)
 				}
 				if b {
-					vm.push(1)
+					ce.push(1)
 				} else {
-					vm.push(0)
+					ce.push(0)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindGe:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				var b bool
 				switch wazeroir.SignedType(op.b1) {
 				case wazeroir.SignedTypeInt32:
@@ -937,100 +937,100 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					b = math.Float64frombits(v1) >= math.Float64frombits(v2)
 				}
 				if b {
-					vm.push(1)
+					ce.push(1)
 				} else {
-					vm.push(0)
+					ce.push(0)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindAdd:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32:
 					v := uint32(v1) + uint32(v2)
-					vm.push(uint64(v))
+					ce.push(uint64(v))
 				case wazeroir.UnsignedTypeI64:
-					vm.push(v1 + v2)
+					ce.push(v1 + v2)
 				case wazeroir.UnsignedTypeF32:
 					v := math.Float32frombits(uint32(v1)) + math.Float32frombits(uint32(v2))
-					vm.push(uint64(math.Float32bits(v)))
+					ce.push(uint64(math.Float32bits(v)))
 				case wazeroir.UnsignedTypeF64:
 					v := math.Float64frombits(v1) + math.Float64frombits(v2)
-					vm.push(math.Float64bits(v))
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindSub:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32:
-					vm.push(uint64(uint32(v1) - uint32(v2)))
+					ce.push(uint64(uint32(v1) - uint32(v2)))
 				case wazeroir.UnsignedTypeI64:
-					vm.push(v1 - v2)
+					ce.push(v1 - v2)
 				case wazeroir.UnsignedTypeF32:
 					v := math.Float32frombits(uint32(v1)) - math.Float32frombits(uint32(v2))
-					vm.push(uint64(math.Float32bits(v)))
+					ce.push(uint64(math.Float32bits(v)))
 				case wazeroir.UnsignedTypeF64:
 					v := math.Float64frombits(v1) - math.Float64frombits(v2)
-					vm.push(math.Float64bits(v))
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindMul:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				switch wazeroir.UnsignedType(op.b1) {
 				case wazeroir.UnsignedTypeI32:
-					vm.push(uint64(uint32(v1) * uint32(v2)))
+					ce.push(uint64(uint32(v1) * uint32(v2)))
 				case wazeroir.UnsignedTypeI64:
-					vm.push(v1 * v2)
+					ce.push(v1 * v2)
 				case wazeroir.UnsignedTypeF32:
 					v := math.Float32frombits(uint32(v2)) * math.Float32frombits(uint32(v1))
-					vm.push(uint64(math.Float32bits(v)))
+					ce.push(uint64(math.Float32bits(v)))
 				case wazeroir.UnsignedTypeF64:
 					v := math.Float64frombits(v2) * math.Float64frombits(v1)
-					vm.push(math.Float64bits(v))
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindClz:
 			{
-				v := vm.pop()
+				v := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(bits.LeadingZeros32(uint32(v))))
+					ce.push(uint64(bits.LeadingZeros32(uint32(v))))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(bits.LeadingZeros64(v)))
+					ce.push(uint64(bits.LeadingZeros64(v)))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindCtz:
 			{
-				v := vm.pop()
+				v := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(bits.TrailingZeros32(uint32(v))))
+					ce.push(uint64(bits.TrailingZeros32(uint32(v))))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(bits.TrailingZeros64(v)))
+					ce.push(uint64(bits.TrailingZeros64(v)))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindPopcnt:
 			{
-				v := vm.pop()
+				v := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(bits.OnesCount32(uint32(v))))
+					ce.push(uint64(bits.OnesCount32(uint32(v))))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(bits.OnesCount64(v)))
+					ce.push(uint64(bits.OnesCount64(v)))
 				}
 				frame.pc++
 			}
@@ -1038,37 +1038,37 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				switch wazeroir.SignedType(op.b1) {
 				case wazeroir.SignedTypeInt32:
-					v2 := int32(vm.pop())
-					v1 := int32(vm.pop())
+					v2 := int32(ce.pop())
+					v1 := int32(ce.pop())
 					if v1 == math.MinInt32 && v2 == -1 {
 						panic(wasm.ErrRuntimeIntegerOverflow)
 					}
-					vm.push(uint64(uint32(v1 / v2)))
+					ce.push(uint64(uint32(v1 / v2)))
 				case wazeroir.SignedTypeInt64:
-					v2 := int64(vm.pop())
-					v1 := int64(vm.pop())
+					v2 := int64(ce.pop())
+					v1 := int64(ce.pop())
 					if v1 == math.MinInt64 && v2 == -1 {
 						panic(wasm.ErrRuntimeIntegerOverflow)
 					}
-					vm.push(uint64(v1 / v2))
+					ce.push(uint64(v1 / v2))
 				case wazeroir.SignedTypeUint32:
-					v2 := uint32(vm.pop())
-					v1 := uint32(vm.pop())
-					vm.push(uint64(v1 / v2))
+					v2 := uint32(ce.pop())
+					v1 := uint32(ce.pop())
+					ce.push(uint64(v1 / v2))
 				case wazeroir.SignedTypeUint64:
-					v2 := vm.pop()
-					v1 := vm.pop()
-					vm.push(v1 / v2)
+					v2 := ce.pop()
+					v1 := ce.pop()
+					ce.push(v1 / v2)
 				case wazeroir.SignedTypeFloat32:
-					v2 := vm.pop()
-					v1 := vm.pop()
+					v2 := ce.pop()
+					v1 := ce.pop()
 					v := math.Float32frombits(uint32(v1)) / math.Float32frombits(uint32(v2))
-					vm.push(uint64(math.Float32bits(v)))
+					ce.push(uint64(math.Float32bits(v)))
 				case wazeroir.SignedTypeFloat64:
-					v2 := vm.pop()
-					v1 := vm.pop()
+					v2 := ce.pop()
+					v1 := ce.pop()
 					v := math.Float64frombits(v1) / math.Float64frombits(v2)
-					vm.push(uint64(math.Float64bits(v)))
+					ce.push(uint64(math.Float64bits(v)))
 				}
 				frame.pc++
 			}
@@ -1076,115 +1076,115 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32:
-					v2 := int32(vm.pop())
-					v1 := int32(vm.pop())
-					vm.push(uint64(uint32(v1 % v2)))
+					v2 := int32(ce.pop())
+					v1 := int32(ce.pop())
+					ce.push(uint64(uint32(v1 % v2)))
 				case wazeroir.SignedInt64:
-					v2 := int64(vm.pop())
-					v1 := int64(vm.pop())
-					vm.push(uint64(v1 % v2))
+					v2 := int64(ce.pop())
+					v1 := int64(ce.pop())
+					ce.push(uint64(v1 % v2))
 				case wazeroir.SignedUint32:
-					v2 := uint32(vm.pop())
-					v1 := uint32(vm.pop())
-					vm.push(uint64(v1 % v2))
+					v2 := uint32(ce.pop())
+					v1 := uint32(ce.pop())
+					ce.push(uint64(v1 % v2))
 				case wazeroir.SignedUint64:
-					v2 := vm.pop()
-					v1 := vm.pop()
-					vm.push(v1 % v2)
+					v2 := ce.pop()
+					v1 := ce.pop()
+					ce.push(v1 % v2)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindAnd:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(uint32(v2) & uint32(v1)))
+					ce.push(uint64(uint32(v2) & uint32(v1)))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(v2 & v1))
+					ce.push(uint64(v2 & v1))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindOr:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(uint32(v2) | uint32(v1)))
+					ce.push(uint64(uint32(v2) | uint32(v1)))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(v2 | v1))
+					ce.push(uint64(v2 | v1))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindXor:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(uint32(v2) ^ uint32(v1)))
+					ce.push(uint64(uint32(v2) ^ uint32(v1)))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(v2 ^ v1))
+					ce.push(uint64(v2 ^ v1))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindShl:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(uint32(v1) << (uint32(v2) % 32)))
+					ce.push(uint64(uint32(v1) << (uint32(v2) % 32)))
 				} else {
 					// UnsignedInt64
-					vm.push(v1 << (v2 % 64))
+					ce.push(v1 << (v2 % 64))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindShr:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				switch wazeroir.SignedInt(op.b1) {
 				case wazeroir.SignedInt32:
-					vm.push(uint64(int32(v1) >> (uint32(v2) % 32)))
+					ce.push(uint64(int32(v1) >> (uint32(v2) % 32)))
 				case wazeroir.SignedInt64:
-					vm.push(uint64(int64(v1) >> (v2 % 64)))
+					ce.push(uint64(int64(v1) >> (v2 % 64)))
 				case wazeroir.SignedUint32:
-					vm.push(uint64(uint32(v1) >> (uint32(v2) % 32)))
+					ce.push(uint64(uint32(v1) >> (uint32(v2) % 32)))
 				case wazeroir.SignedUint64:
-					vm.push(v1 >> (v2 % 64))
+					ce.push(v1 >> (v2 % 64))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindRotl:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(bits.RotateLeft32(uint32(v1), int(v2))))
+					ce.push(uint64(bits.RotateLeft32(uint32(v1), int(v2))))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(bits.RotateLeft64(v1, int(v2))))
+					ce.push(uint64(bits.RotateLeft64(v1, int(v2))))
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindRotr:
 			{
-				v2 := vm.pop()
-				v1 := vm.pop()
+				v2 := ce.pop()
+				v1 := ce.pop()
 				if op.b1 == 0 {
 					// UnsignedInt32
-					vm.push(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
+					ce.push(uint64(bits.RotateLeft32(uint32(v1), -int(v2))))
 				} else {
 					// UnsignedInt64
-					vm.push(uint64(bits.RotateLeft64(v1, -int(v2))))
+					ce.push(uint64(bits.RotateLeft64(v1, -int(v2))))
 				}
 				frame.pc++
 			}
@@ -1193,11 +1193,11 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				if op.b1 == 0 {
 					// Float32
 					const mask uint32 = 1 << 31
-					vm.push(uint64(uint32(vm.pop()) &^ mask))
+					ce.push(uint64(uint32(ce.pop()) &^ mask))
 				} else {
 					// Float64
 					const mask uint64 = 1 << 63
-					vm.push(uint64(vm.pop() &^ mask))
+					ce.push(uint64(ce.pop() &^ mask))
 				}
 				frame.pc++
 			}
@@ -1205,12 +1205,12 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v := -math.Float32frombits(uint32(vm.pop()))
-					vm.push(uint64(math.Float32bits(v)))
+					v := -math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(v)))
 				} else {
 					// Float64
-					v := -math.Float64frombits(vm.pop())
-					vm.push(math.Float64bits(v))
+					v := -math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
@@ -1218,12 +1218,12 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v := math.Ceil(float64(math.Float32frombits(uint32(vm.pop()))))
-					vm.push(uint64(math.Float32bits(float32(v))))
+					v := math.Ceil(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
 				} else {
 					// Float64
-					v := math.Ceil(float64(math.Float64frombits(vm.pop())))
-					vm.push(math.Float64bits(v))
+					v := math.Ceil(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
@@ -1231,12 +1231,12 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v := math.Floor(float64(math.Float32frombits(uint32(vm.pop()))))
-					vm.push(uint64(math.Float32bits(float32(v))))
+					v := math.Floor(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
 				} else {
 					// Float64
-					v := math.Floor(float64(math.Float64frombits(vm.pop())))
-					vm.push(math.Float64bits(v))
+					v := math.Floor(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
@@ -1244,12 +1244,12 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v := math.Trunc(float64(math.Float32frombits(uint32(vm.pop()))))
-					vm.push(uint64(math.Float32bits(float32(v))))
+					v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
 				} else {
 					// Float64
-					v := math.Trunc(float64(math.Float64frombits(vm.pop())))
-					vm.push(math.Float64bits(v))
+					v := math.Trunc(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
@@ -1257,12 +1257,12 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					f := math.Float32frombits(uint32(vm.pop()))
-					vm.push(uint64(math.Float32bits(moremath.WasmCompatNearestF32(f))))
+					f := math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(moremath.WasmCompatNearestF32(f))))
 				} else {
 					// Float64
-					f := math.Float64frombits(vm.pop())
-					vm.push(math.Float64bits(moremath.WasmCompatNearestF64(f)))
+					f := math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(moremath.WasmCompatNearestF64(f)))
 				}
 				frame.pc++
 			}
@@ -1270,12 +1270,12 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v := math.Sqrt(float64(math.Float32frombits(uint32(vm.pop()))))
-					vm.push(uint64(math.Float32bits(float32(v))))
+					v := math.Sqrt(float64(math.Float32frombits(uint32(ce.pop()))))
+					ce.push(uint64(math.Float32bits(float32(v))))
 				} else {
 					// Float64
-					v := math.Sqrt(float64(math.Float64frombits(vm.pop())))
-					vm.push(math.Float64bits(v))
+					v := math.Sqrt(float64(math.Float64frombits(ce.pop())))
+					ce.push(math.Float64bits(v))
 				}
 				frame.pc++
 			}
@@ -1283,13 +1283,13 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v2 := math.Float32frombits(uint32(vm.pop()))
-					v1 := math.Float32frombits(uint32(vm.pop()))
-					vm.push(uint64(math.Float32bits(float32(moremath.WasmCompatMin(float64(v1), float64(v2))))))
+					v2 := math.Float32frombits(uint32(ce.pop()))
+					v1 := math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(float32(moremath.WasmCompatMin(float64(v1), float64(v2))))))
 				} else {
-					v2 := math.Float64frombits(vm.pop())
-					v1 := math.Float64frombits(vm.pop())
-					vm.push(math.Float64bits(moremath.WasmCompatMin(v1, v2)))
+					v2 := math.Float64frombits(ce.pop())
+					v1 := math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(moremath.WasmCompatMin(v1, v2)))
 				}
 				frame.pc++
 			}
@@ -1298,14 +1298,14 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 
 				if op.b1 == 0 {
 					// Float32
-					v2 := math.Float32frombits(uint32(vm.pop()))
-					v1 := math.Float32frombits(uint32(vm.pop()))
-					vm.push(uint64(math.Float32bits(float32(moremath.WasmCompatMax(float64(v1), float64(v2))))))
+					v2 := math.Float32frombits(uint32(ce.pop()))
+					v1 := math.Float32frombits(uint32(ce.pop()))
+					ce.push(uint64(math.Float32bits(float32(moremath.WasmCompatMax(float64(v1), float64(v2))))))
 				} else {
 					// Float64
-					v2 := math.Float64frombits(vm.pop())
-					v1 := math.Float64frombits(vm.pop())
-					vm.push(math.Float64bits(moremath.WasmCompatMax(v1, v2)))
+					v2 := math.Float64frombits(ce.pop())
+					v1 := math.Float64frombits(ce.pop())
+					ce.push(math.Float64bits(moremath.WasmCompatMax(v1, v2)))
 				}
 				frame.pc++
 			}
@@ -1313,22 +1313,22 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 			{
 				if op.b1 == 0 {
 					// Float32
-					v2 := uint32(vm.pop())
-					v1 := uint32(vm.pop())
+					v2 := uint32(ce.pop())
+					v1 := uint32(ce.pop())
 					const signbit = 1 << 31
-					vm.push(uint64(v1&^signbit | v2&signbit))
+					ce.push(uint64(v1&^signbit | v2&signbit))
 				} else {
 					// Float64
-					v2 := vm.pop()
-					v1 := vm.pop()
+					v2 := ce.pop()
+					v1 := ce.pop()
 					const signbit = 1 << 63
-					vm.push(v1&^signbit | v2&signbit)
+					ce.push(v1&^signbit | v2&signbit)
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindI32WrapFromI64:
 			{
-				vm.push(uint64(uint32(vm.pop())))
+				ce.push(uint64(uint32(ce.pop())))
 				frame.pc++
 			}
 		case wazeroir.OperationKindITruncFromF:
@@ -1337,15 +1337,15 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 					// Float32
 					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
-						v := math.Trunc(float64(math.Float32frombits(uint32(vm.pop()))))
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(uint64(int32(v)))
+						ce.push(uint64(int32(v)))
 					case wazeroir.SignedInt64:
-						v := math.Trunc(float64(math.Float32frombits(uint32(vm.pop()))))
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						res := int64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
@@ -1354,17 +1354,17 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(uint64(res))
+						ce.push(uint64(res))
 					case wazeroir.SignedUint32:
-						v := math.Trunc(float64(math.Float32frombits(uint32(vm.pop()))))
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(uint64(uint32(v)))
+						ce.push(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
-						v := math.Trunc(float64(math.Float32frombits(uint32(vm.pop()))))
+						v := math.Trunc(float64(math.Float32frombits(uint32(ce.pop()))))
 						res := uint64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
@@ -1373,21 +1373,21 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(res)
+						ce.push(res)
 					}
 				} else {
 					// Float64
 					switch wazeroir.SignedInt(op.b2) {
 					case wazeroir.SignedInt32:
-						v := math.Trunc(math.Float64frombits(vm.pop()))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < math.MinInt32 || v > math.MaxInt32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(uint64(int32(v)))
+						ce.push(uint64(int32(v)))
 					case wazeroir.SignedInt64:
-						v := math.Trunc(math.Float64frombits(vm.pop()))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
 						res := int64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
@@ -1396,17 +1396,17 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(uint64(res))
+						ce.push(uint64(res))
 					case wazeroir.SignedUint32:
-						v := math.Trunc(math.Float64frombits(vm.pop()))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
 						} else if v < 0 || v > math.MaxUint32 {
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(uint64(uint32(v)))
+						ce.push(uint64(uint32(v)))
 					case wazeroir.SignedUint64:
-						v := math.Trunc(math.Float64frombits(vm.pop()))
+						v := math.Trunc(math.Float64frombits(ce.pop()))
 						res := uint64(v)
 						if math.IsNaN(v) { // NaN cannot be compared with themselves, so we have to use IsNaN
 							panic(wasm.ErrRuntimeInvalidConversionToInteger)
@@ -1415,7 +1415,7 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 							// and that's why we use '>=' not '>' to check overflow.
 							panic(wasm.ErrRuntimeIntegerOverflow)
 						}
-						vm.push(res)
+						ce.push(res)
 					}
 				}
 				frame.pc++
@@ -1426,71 +1426,71 @@ func (vm *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				case wazeroir.SignedInt32:
 					if op.b2 == 0 {
 						// Float32
-						v := float32(int32(vm.pop()))
-						vm.push(uint64(math.Float32bits(v)))
+						v := float32(int32(ce.pop()))
+						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := float64(int32(vm.pop()))
-						vm.push(math.Float64bits(v))
+						v := float64(int32(ce.pop()))
+						ce.push(math.Float64bits(v))
 					}
 				case wazeroir.SignedInt64:
 					if op.b2 == 0 {
 						// Float32
-						v := float32(int64(vm.pop()))
-						vm.push(uint64(math.Float32bits(v)))
+						v := float32(int64(ce.pop()))
+						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := float64(int64(vm.pop()))
-						vm.push(math.Float64bits(v))
+						v := float64(int64(ce.pop()))
+						ce.push(math.Float64bits(v))
 					}
 				case wazeroir.SignedUint32:
 					if op.b2 == 0 {
 						// Float32
-						v := float32(uint32(vm.pop()))
-						vm.push(uint64(math.Float32bits(v)))
+						v := float32(uint32(ce.pop()))
+						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := float64(uint32(vm.pop()))
-						vm.push(math.Float64bits(v))
+						v := float64(uint32(ce.pop()))
+						ce.push(math.Float64bits(v))
 					}
 				case wazeroir.SignedUint64:
 					if op.b2 == 0 {
 						// Float32
-						v := float32(vm.pop())
-						vm.push(uint64(math.Float32bits(v)))
+						v := float32(ce.pop())
+						ce.push(uint64(math.Float32bits(v)))
 					} else {
 						// Float64
-						v := float64(vm.pop())
-						vm.push(math.Float64bits(v))
+						v := float64(ce.pop())
+						ce.push(math.Float64bits(v))
 					}
 				}
 				frame.pc++
 			}
 		case wazeroir.OperationKindF32DemoteFromF64:
 			{
-				v := float32(math.Float64frombits(vm.pop()))
-				vm.push(uint64(math.Float32bits(v)))
+				v := float32(math.Float64frombits(ce.pop()))
+				ce.push(uint64(math.Float32bits(v)))
 				frame.pc++
 			}
 		case wazeroir.OperationKindF64PromoteFromF32:
 			{
-				v := float64(math.Float32frombits(uint32(vm.pop())))
-				vm.push(math.Float64bits(v))
+				v := float64(math.Float32frombits(uint32(ce.pop())))
+				ce.push(math.Float64bits(v))
 				frame.pc++
 			}
 		case wazeroir.OperationKindExtend:
 			{
 				if op.b1 == 1 {
 					// Signed.
-					v := int64(int32(vm.pop()))
-					vm.push(uint64(v))
+					v := int64(int32(ce.pop()))
+					ce.push(uint64(v))
 				} else {
-					v := uint64(uint32(vm.pop()))
-					vm.push(v)
+					v := uint64(uint32(ce.pop()))
+					ce.push(v)
 				}
 				frame.pc++
 			}
 		}
 	}
-	vm.popFrame()
+	ce.popFrame()
 }

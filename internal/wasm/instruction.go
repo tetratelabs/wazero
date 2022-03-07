@@ -217,11 +217,13 @@ const (
 
 	// Below are toggled with FeatureSignExtensionOps
 
-	OpcodeI32Extend8S  Opcode = 0xC0
-	OpcodeI32Extend16S Opcode = 0xC1
-	OpcodeI64Extend8S  Opcode = 0xC2
-	OpcodeI64Extend16S Opcode = 0xC3
-	OpcodeI64Extend32S Opcode = 0xC4
+	OpcodeI32Extend8S  Opcode = 0xc0
+	OpcodeI32Extend16S Opcode = 0xc1
+	OpcodeI64Extend8S  Opcode = 0xc2
+	OpcodeI64Extend16S Opcode = 0xc3
+	OpcodeI64Extend32S Opcode = 0xc4
+
+	LastOpcode = OpcodeI64Extend32S
 )
 
 var instructionNames = [256]string{

@@ -173,7 +173,7 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	return m.TypeSection[typeIdx]
 }
 
-func (m *Module) Validate() error {
+func (m *Module) Validate(features Features) error {
 	if err := m.validateStartSection(); err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (m *Module) Validate() error {
 		return err
 	}
 
-	if err := m.validateFunctions(functions, globals, memories, tables); err != nil {
+	if err := m.validateFunctions(functions, globals, memories, tables, features); err != nil {
 		return err
 	}
 
@@ -237,7 +237,7 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 	return nil
 }
 
-func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
+func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType, features Features) error {
 	// The wazero specific limitation described at RATIONALE.md.
 	const maximumValuesOnStack = 1 << 27
 
@@ -252,7 +252,7 @@ func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, mem
 			m.TypeSection[typeIndex],
 			m.CodeSection[codeIndex].Body,
 			m.CodeSection[codeIndex].LocalTypes,
-			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack); err != nil {
+			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack, features); err != nil {
 			idx := m.SectionElementCount(SectionIDFunction) - 1
 			return fmt.Errorf("invalid function (%d/%d): %v", codeIndex, idx, err)
 		}

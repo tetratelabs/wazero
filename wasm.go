@@ -111,7 +111,7 @@ func (r *runtime) DecodeModule(source []byte) (*DecodedModule, error) {
 	internal, err := decoder(source, r.enabledFeatures)
 	if err != nil {
 		return nil, err
-	} else if err = internal.Validate(); err != nil {
+	} else if err = internal.Validate(r.enabledFeatures); err != nil {
 		// TODO: decoders should validate before returning, as that allows
 		// them to err with the correct source position.
 		return nil, err
