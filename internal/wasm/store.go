@@ -62,11 +62,9 @@ type (
 		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr).
 		//
 		// Note: Functions are held by store as well as ModuleInstances, in contrast to other instances (memory, table, and globals)
-		// which are only owned by ModuleInstance. This is because the function call implementation in engines depend on storeIndex
-		// of function instance (FunctionIndex).
-		// TODO: decouple engine's function call implementation from store-wide context (in this case FunctionIndex), and remove
-		// the necessity to hold FunctionInstances in store in order to reduce the mutex usage. Note that this might come with
-		// the runtime overhead (e.g. adding additional instruction for each call instruction).
+		// which are only owned by ModuleInstance. This is not only because the function call implementation in engines depend on
+		// store-scope funcaddr (FunctionIndex in wazero), but also call_indirect is specified to make function calls via funcaddr,
+		// which might end up calling a function outside of module-scope index space.
 		functions []*FunctionInstance
 
 		// mux is used to guard the fields from concurrent access.
