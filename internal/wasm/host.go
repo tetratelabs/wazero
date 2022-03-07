@@ -91,6 +91,8 @@ func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64
 }
 
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
+//
+// TOOD: make this goroutine-safe like store.Instantiate.
 func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (*HostModule, error) {
 	if err := s.requireModuleUnused(moduleName); err != nil {
 		return nil, err

@@ -220,6 +220,9 @@ func TestStore_concurrent(t *testing.T) {
 				require.Error(t, err)
 			}
 		}(i)
+
+		// TODO: in addition to the normal instantiation, we should try to instantiate host module in conjunction.
+		// after making store.NewHostModule goroutine-safe.
 	}
 	wg.Wait()
 
