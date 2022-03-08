@@ -745,17 +745,17 @@ type SnapshotPreview1 interface {
 	//
 	// * fd: the file descriptor to move the offset of
 	// * offset: the number of bytes to move
-	// * whence: the position relative to which to set the offset of the file descriptor.
+	// * whence: the position relative to which to set the offset of the file descriptor
 	// * resultNewoffset: the offset in `ctx.Memory` to write the new offset to, relative to start of the file
 	//
 	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
 	// * wasi.ErrnoBadf - if `fd` is invalid
-	// * wasi.ErrnoFault - if `resultNewoffset` is an invalid offset due to the memory constraint
+	// * wasi.ErrnoFault - if `resultNewoffset` is an invalid offset in `ctx.Memory` due to the memory constraint
 	// * wasi.ErrnoInval - if `whence` is an invalid value
-	// * wasi.ErrnoIo - if other error happens during the operation of the underying file system.
+	// * wasi.ErrnoIo - if other error happens during the operation of the underying file system
 	//
 	// For example, if fd 3 is a file with offset 0, and
-	//   parameters fd=3, offset=4, whence=1, which means io.SeekStart, resultNewOffset=1,
+	//   parameters fd=3, offset=4, whence=0 (=io.SeekStart), resultNewOffset=1,
 	//   this function writes the below to `ctx.Memory`:
 	//
 	//                             uint64le

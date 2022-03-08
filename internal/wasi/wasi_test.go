@@ -1018,7 +1018,7 @@ func TestSnapshotPreview1_FdRenumber(t *testing.T) {
 func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	fd := uint32(3)              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 	offset := uint64(4)          // arbitrary value for the offset parameter
-	whence := uint32(1)          // arbitrary whence. We chose 1 here, which means io.SeekStart.
+	whence := uint32(0)          // arbitrary whence. We chose 0 here, which means the offset from the star of file.
 	resultNewoffset := uint32(1) // arbitrary offset in `ctx.Memory` for the new offset value
 	expectedMemory := []byte{
 		'?',        // resultNewoffset is after this
@@ -1097,7 +1097,7 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 		{
 			name:          "invalid whence",
 			fd:            validFD,
-			whence:        3, // invalid whence, maximum valid whence io.SeekEnd(2) + 1
+			whence:        3, // invalid whence, the largest whence io.SeekEnd(2) + 1
 			expectedErrno: wasi.ErrnoInval,
 		},
 		{
