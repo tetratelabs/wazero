@@ -721,7 +721,7 @@ INLINED:
 		// A type can be defined after its type use. Ex. (module (func (param i32)) (type (func (param i32)))
 		// This uses an inner loop to avoid creating a large map for an edge case.
 		for realIdx, t := range p.module.TypeSection {
-			if funcTypeEquals(t, inlined.Params, inlined.Results) {
+			if t.EqualsSignature(inlined.Params, inlined.Results) {
 				inlinedToRealIdx[inlinedIdx] = wasm.Index(realIdx)
 				continue INLINED
 			}

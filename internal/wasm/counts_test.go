@@ -213,12 +213,12 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{},
 		},
 		{
-			name:     "only name section",
+			name:     "NameSection",
 			input:    &Module{NameSection: &NameSection{ModuleName: "simple"}},
 			expected: map[string]uint32{"custom": 1},
 		},
 		{
-			name: "type section",
+			name: "TypeSection",
 			input: &Module{
 				TypeSection: []*FunctionType{
 					{},
@@ -229,7 +229,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"type": 3},
 		},
 		{
-			name: "type and import section",
+			name: "TypeSection and ImportSection",
 			input: &Module{
 				TypeSection: []*FunctionType{
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
@@ -250,7 +250,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"import": 2, "type": 2},
 		},
 		{
-			name: "type function and start section",
+			name: "TypeSection, FunctionSection, CodeSection, ExportSection and StartSection",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
 				FunctionSection: []Index{0},
@@ -265,7 +265,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"code": 1, "export": 1, "function": 1, "start": 1, "type": 1},
 		},
 		{
-			name: "memory and data",
+			name: "MemorySection and DataSection",
 			input: &Module{
 				MemorySection: []*MemoryType{{Min: 1}},
 				DataSection:   []*DataSegment{{MemoryIndex: 0, OffsetExpression: empty}},
@@ -273,7 +273,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"data": 1, "memory": 1},
 		},
 		{
-			name: "table and element",
+			name: "TableSection and ElementSection",
 			input: &Module{
 				TableSection:   []*TableType{{ElemType: 0x70, Limit: &LimitsType{Min: 1}}},
 				ElementSection: []*ElementSegment{{TableIndex: 0, OffsetExpr: empty}},

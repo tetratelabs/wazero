@@ -31,7 +31,7 @@ func validateFunction(
 	tables []*TableType,
 	types []*FunctionType,
 	maxStackValues int,
-	features Features,
+	enabledFeatures Features,
 ) error {
 	// Note: In WebAssembly 1.0 (20191205), multiple memories are not allowed.
 	hasMemory := len(memories) > 0
@@ -39,7 +39,7 @@ func validateFunction(
 	hasTable := len(tables) > 0
 
 	// We start with the outermost control block which is for function return if the code branches into it.
-	controlBloclStack := []*controlBlock{{blockType: functionType}}
+	controlBlockStack := []*controlBlock{{blockType: functionType}}
 	// Create the valueTypeStack to track the state of Wasm value stacks at anypoint of execution.
 	valueTypeStack := &valueTypeStack{}
 
@@ -348,12 +348,12 @@ func validateFunction(
 			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
-			} else if int(index) >= len(controlBloclStack) {
+			} else if int(index) >= len(controlBlockStack) {
 				return fmt.Errorf("invalid br operation: index out of range")
 			}
 			pc += num - 1
 			// Check type soundness.
-			target := controlBloclStack[len(controlBloclStack)-int(index)-1]
+			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
 			targetResultType := target.blockType.Results
 			if target.isLoop {
 				// Loop operation doesn't require results since the continuation is
@@ -370,17 +370,17 @@ func validateFunction(
 			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
-			} else if int(index) >= len(controlBloclStack) {
+			} else if int(index) >= len(controlBlockStack) {
 				return fmt.Errorf(
 					"invalid ln param given for br_if: index=%d with %d for the current lable stack length",
-					index, len(controlBloclStack))
+					index, len(controlBlockStack))
 			}
 			pc += num - 1
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the required operand for br_if")
 			}
 			// Check type soundness.
-			target := controlBloclStack[len(controlBloclStack)-int(index)-1]
+			target := controlBlockStack[len(controlBlockStack)-int(index)-1]
 			targetResultType := target.blockType.Results
 			if target.isLoop {
 				// Loop operation doesn't require results since the continuation is
@@ -414,17 +414,17 @@ func validateFunction(
 			ln, n, err := leb128.DecodeUint32(r)
 			if err != nil {
 				return fmt.Errorf("read immediate: %w", err)
-			} else if int(ln) >= len(controlBloclStack) {
+			} else if int(ln) >= len(controlBlockStack) {
 				return fmt.Errorf(
 					"invalid ln param given for br_table: ln=%d with %d for the current lable stack length",
-					ln, len(controlBloclStack))
+					ln, len(controlBlockStack))
 			}
 			pc += n + num - 1
 			// Check type soundness.
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the required operand for br_table")
 			}
-			lnLabel := controlBloclStack[len(controlBloclStack)-1-int(ln)]
+			lnLabel := controlBlockStack[len(controlBlockStack)-1-int(ln)]
 			expType := lnLabel.blockType.Results
 			if lnLabel.isLoop {
 				// Loop operation doesn't require results since the continuation is
@@ -432,10 +432,10 @@ func validateFunction(
 				expType = []ValueType{}
 			}
 			for _, l := range list {
-				if int(l) >= len(controlBloclStack) {
+				if int(l) >= len(controlBlockStack) {
 					return fmt.Errorf("invalid l param given for br_table")
 				}
-				label := controlBloclStack[len(controlBloclStack)-1-int(l)]
+				label := controlBlockStack[len(controlBlockStack)-1-int(l)]
 				expType2 := label.blockType.Results
 				if label.isLoop {
 					// Loop operation doesn't require results since the continuation is
@@ -699,7 +699,7 @@ func validateFunction(
 				}
 				valueTypeStack.push(ValueTypeF64)
 			case OpcodeI32Extend8S, OpcodeI32Extend16S:
-				if err := features.Require(FeatureSignExtensionOps); err != nil {
+				if err := enabledFeatures.Require(FeatureSignExtensionOps); err != nil {
 					return fmt.Errorf("%s invalid as %v", instructionNames[op], err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
@@ -707,7 +707,7 @@ func validateFunction(
 				}
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Extend8S, OpcodeI64Extend16S, OpcodeI64Extend32S:
-				if err := features.Require(FeatureSignExtensionOps); err != nil {
+				if err := enabledFeatures.Require(FeatureSignExtensionOps); err != nil {
 					return fmt.Errorf("%s invalid as %v", instructionNames[op], err)
 				}
 				if err := valueTypeStack.popAndVerifyType(ValueTypeI64); err != nil {
@@ -722,7 +722,7 @@ func validateFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			controlBloclStack = append(controlBloclStack, &controlBlock{
+			controlBlockStack = append(controlBlockStack, &controlBlock{
 				startAt:        pc,
 				blockType:      bt,
 				blockTypeBytes: num,
@@ -734,7 +734,7 @@ func validateFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			controlBloclStack = append(controlBloclStack, &controlBlock{
+			controlBlockStack = append(controlBlockStack, &controlBlock{
 				startAt:        pc,
 				blockType:      bt,
 				blockTypeBytes: num,
@@ -747,7 +747,7 @@ func validateFunction(
 			if err != nil {
 				return fmt.Errorf("read block: %w", err)
 			}
-			controlBloclStack = append(controlBloclStack, &controlBlock{
+			controlBlockStack = append(controlBlockStack, &controlBlock{
 				startAt:        pc,
 				blockType:      bt,
 				blockTypeBytes: num,
@@ -759,7 +759,7 @@ func validateFunction(
 			valueTypeStack.pushStackLimit()
 			pc += num
 		} else if op == OpcodeElse {
-			bl := controlBloclStack[len(controlBloclStack)-1]
+			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.elseAt = pc
 			// Check the type soundness of the instructions *before*　 entering this Eles Op.
 			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
@@ -769,9 +769,9 @@ func validateFunction(
 			// then block.
 			valueTypeStack.resetAtStackLimit()
 		} else if op == OpcodeEnd {
-			bl := controlBloclStack[len(controlBloclStack)-1]
+			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.endAt = pc
-			controlBloclStack = controlBloclStack[:len(controlBloclStack)-1]
+			controlBlockStack = controlBlockStack[:len(controlBlockStack)-1]
 			if bl.isIf && bl.elseAt <= bl.startAt {
 				if len(bl.blockType.Results) > 0 {
 					return fmt.Errorf("type mismatch between then and else blocks")
@@ -836,7 +836,7 @@ func validateFunction(
 		}
 	}
 
-	if len(controlBloclStack) > 0 {
+	if len(controlBlockStack) > 0 {
 		return fmt.Errorf("ill-nested block exists")
 	}
 	if valueTypeStack.maximumStackPointer > maxStackValues {

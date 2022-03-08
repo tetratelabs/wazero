@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -186,106 +187,6 @@ func TestModule_allDeclarations(t *testing.T) {
 	}
 }
 
-func TestModule_SectionSize(t *testing.T) {
-	i32, f32 := ValueTypeI32, ValueTypeF32
-	zero := uint32(0)
-	empty := &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x00}}
-
-	tests := []struct {
-		name     string
-		input    *Module
-		expected map[string]uint32
-	}{
-		{
-			name:     "empty",
-			input:    &Module{},
-			expected: map[string]uint32{},
-		},
-		{
-			name:     "only name section",
-			input:    &Module{NameSection: &NameSection{ModuleName: "simple"}},
-			expected: map[string]uint32{"custom": 1},
-		},
-		{
-			name: "type section",
-			input: &Module{
-				TypeSection: []*FunctionType{
-					{},
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
-					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
-				},
-			},
-			expected: map[string]uint32{"type": 3},
-		},
-		{
-			name: "type and import section",
-			input: &Module{
-				TypeSection: []*FunctionType{
-					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
-					{Params: []ValueType{f32, f32}, Results: []ValueType{f32}},
-				},
-				ImportSection: []*Import{
-					{
-						Module: "Math", Name: "Mul",
-						Type:     ExternTypeFunc,
-						DescFunc: 1,
-					}, {
-						Module: "Math", Name: "Add",
-						Type:     ExternTypeFunc,
-						DescFunc: 0,
-					},
-				},
-			},
-			expected: map[string]uint32{"import": 2, "type": 2},
-		},
-		{
-			name: "type function and start section",
-			input: &Module{
-				TypeSection:     []*FunctionType{{}},
-				FunctionSection: []Index{0},
-				CodeSection: []*Code{
-					{Body: []byte{OpcodeLocalGet, 0, OpcodeLocalGet, 1, OpcodeI32Add, OpcodeEnd}},
-				},
-				ExportSection: map[string]*Export{
-					"AddInt": {Name: "AddInt", Type: ExternTypeFunc, Index: Index(0)},
-				},
-				StartSection: &zero,
-			},
-			expected: map[string]uint32{"code": 1, "export": 1, "function": 1, "start": 1, "type": 1},
-		},
-		{
-			name: "memory and data",
-			input: &Module{
-				MemorySection: []*MemoryType{{Min: 1}},
-				DataSection:   []*DataSegment{{MemoryIndex: 0, OffsetExpression: empty}},
-			},
-			expected: map[string]uint32{"data": 1, "memory": 1},
-		},
-		{
-			name: "table and element",
-			input: &Module{
-				TableSection:   []*TableType{{ElemType: 0x70, Limit: &LimitsType{Min: 1}}},
-				ElementSection: []*ElementSegment{{TableIndex: 0, OffsetExpr: empty}},
-			},
-			expected: map[string]uint32{"element": 1, "table": 1},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			actual := map[string]uint32{}
-			for i := SectionID(0); i <= SectionIDData; i++ {
-				if size := tc.input.SectionElementCount(i); size > 0 {
-					actual[SectionIDName(i)] = size
-				}
-			}
-			require.Equal(t, tc.expected, actual)
-		})
-	}
-}
-
 func TestValidateConstExpression(t *testing.T) {
 	t.Run("invalid opcode", func(t *testing.T) {
 		expr := &ConstantExpression{Opcode: OpcodeNop}
@@ -379,6 +280,35 @@ func TestValidateConstExpression(t *testing.T) {
 	})
 }
 
+func TestModule_Validate_Errors(t *testing.T) {
+	zero := Index(0)
+	tests := []struct {
+		name        string
+		input       *Module
+		expectedErr string
+	}{
+		{
+			name: "StartSection points to an invalid func",
+			input: &Module{
+				TypeSection:     nil,
+				FunctionSection: []uint32{0},
+				CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+				StartSection:    &zero,
+			},
+			expectedErr: "invalid start function: func[0] has an invalid type",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.input.Validate(Features20191205)
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
 func TestModule_validateStartSection(t *testing.T) {
 	t.Run("no start section", func(t *testing.T) {
 		m := Module{}
@@ -463,44 +393,85 @@ func TestModule_validateGlobals(t *testing.T) {
 }
 
 func TestModule_validateFunctions(t *testing.T) {
-	t.Run("type index out of range", func(t *testing.T) {
-		m := Module{FunctionSection: []uint32{1000 /* arbitrary large */}}
-		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "function type index out of range")
-	})
-	t.Run("insufficient code section", func(t *testing.T) {
-		m := Module{
-			FunctionSection: []uint32{0},
-			TypeSection:     []*FunctionType{{}},
-			// Code section not exists.
-		}
-		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "code index out of range")
-	})
-	t.Run("invalid function", func(t *testing.T) {
-		m := Module{
-			FunctionSection: []uint32{0},
-			TypeSection:     []*FunctionType{{}},
-			CodeSection: []*Code{
-				{Body: []byte{OpcodeF32Abs}},
-			},
-		}
-		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid function (0/0): cannot pop the 1st f32 operand")
-	})
 	t.Run("ok", func(t *testing.T) {
 		m := Module{
-			FunctionSection: []uint32{0},
 			TypeSection:     []*FunctionType{{}},
-			CodeSection: []*Code{
-				{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}},
+			FunctionSection: []uint32{0},
+			CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}}},
+		}
+		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
+		require.NoError(t, err)
+	})
+	t.Run("function, but no code", func(t *testing.T) {
+		m := Module{
+			TypeSection:     []*FunctionType{{}},
+			FunctionSection: []Index{0},
+			CodeSection:     nil,
+		}
+		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
+		require.Error(t, err)
+		require.EqualError(t, err, "code count (0) != function count (1)")
+	})
+	t.Run("function out of range of code", func(t *testing.T) {
+		m := Module{
+			TypeSection:     []*FunctionType{{}},
+			FunctionSection: []Index{1},
+			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
+		}
+		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
+		require.Error(t, err)
+		require.EqualError(t, err, "invalid function[0]: type section index 1 out of range")
+	})
+	t.Run("invalid", func(t *testing.T) {
+		m := Module{
+			TypeSection:     []*FunctionType{{}},
+			FunctionSection: []Index{0},
+			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+		}
+		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid function[0]: cannot pop the 1st f32 operand")
+	})
+	t.Run("invalid - exported", func(t *testing.T) {
+		m := Module{
+			TypeSection:     []*FunctionType{{}},
+			FunctionSection: []Index{0},
+			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+			ExportSection:   map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0}},
+		}
+		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `invalid function[0] (export "f1"): cannot pop the 1st f32 operand`)
+	})
+	t.Run("invalid - exported after import", func(t *testing.T) {
+		m := Module{
+			TypeSection:     []*FunctionType{{}},
+			ImportSection:   []*Import{{Type: ExternTypeFunc}},
+			FunctionSection: []Index{0},
+			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+			ExportSection:   map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 1}},
+		}
+		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), `invalid function[0] (export "f1"): cannot pop the 1st f32 operand`)
+	})
+	t.Run("invalid - exported twice", func(t *testing.T) {
+		m := Module{
+			TypeSection:     []*FunctionType{{}},
+			FunctionSection: []Index{0},
+			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
+			ExportSection: map[string]*Export{
+				"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0},
+				"f2": {Name: "f2", Type: ExternTypeFunc, Index: 0},
 			},
 		}
-		err := m.validateFunctions(nil, nil, nil, nil, Features(0))
-		require.NoError(t, err)
+		err := m.validateFunctions(nil, nil, nil, nil, Features20191205)
+		require.Error(t, err)
+
+		// go map keys do not iterate consistently
+		if !strings.Contains(err.Error(), `invalid function[0] (export "f1","f2"): cannot pop the 1st f32 operand`) {
+			require.Contains(t, err.Error(), `invalid function[0] (export "f2","f1"): cannot pop the 1st f32 operand`)
+		}
 	})
 }
 
@@ -718,7 +689,7 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
 		max := uint32(10)
-		m := Module{MemorySection: []*MemoryType{&LimitsType{Min: min, Max: &max}}}
+		m := Module{MemorySection: []*MemoryType{{Min: min, Max: &max}}}
 		mem := m.buildMemory()
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, *mem.Max)
