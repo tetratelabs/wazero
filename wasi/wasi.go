@@ -28,6 +28,8 @@ const (
 	R_FD_WRITE
 )
 
+// File is an interface for an opened file similar to fs.File, but it supports addtional operations such as Write.
+// The parameter values and semantics match those of os.File. This allows os.File to satisfy this interface.
 type File interface {
 	Read([]byte) (int, error)
 	Write([]byte) (int, error)
