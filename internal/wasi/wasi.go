@@ -1249,8 +1249,8 @@ func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint3
 		return wasi.ErrnoBadf
 	}
 
-	// Note: Golang's whence and WASI's whence are compatible.
-	if whence > io.SeekEnd /* exceeds the maximum valid whence */ {
+	// Note: WASI's whence values and io package's seek whence constants, such as io.SeekEnd, are compatible.
+	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
 		return wasi.ErrnoInval
 	}
 	newOffst, err := f.file.Seek(int64(offset), int(whence))
