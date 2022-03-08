@@ -66,7 +66,7 @@ func (m *MemFS) OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, 
 		}
 	}
 
-	ret := &memFile{buf: buf, offset: 0}
+	ret := &memFile{buf: buf}
 
 	if fsRights&wasi.R_FD_WRITE != 0 {
 		ret.flush = func(bts []byte) {

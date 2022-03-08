@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"testing"
 
@@ -1060,6 +1059,8 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 			}
 			maskMemory(t, mod, len(expectedMemory))
 
+			require.Equal(t, int64(0), file.offset) // verify the offset is 0 first.
+
 			errno := tc.fdSeek()(mod, fd, offset, whence, resultNewoffset)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
 
@@ -1300,12 +1301,10 @@ func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
 	f, err := memFS.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
 	require.NoError(t, err)
 
-	_, err = f.Write(contents)
-	require.NoError(t, err)
-	_, err = f.Seek(0, io.SeekStart)
-	require.NoError(t, err)
+	memFile := f.(*memFile)
+	memFile.buf = append([]byte{}, contents...)
 
-	return f.(*memFile), memFS
+	return memFile, memFS
 }
 
 // TestSnapshotPreview1_PathCreateDirectory only tests it is stubbed for GrainLang per #271
