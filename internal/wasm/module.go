@@ -2,7 +2,11 @@ package internalwasm
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
@@ -26,8 +30,9 @@ type EncodeModule func(m *Module) (bytes []byte)
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#modules%E2%91%A8
 //
 // Differences from the specification:
-// * The NameSection is decoded, so not present as a key "name" in CustomSections.
-// * The ExportSection is represented as a map for lookup convenience.
+// * NameSection is the only key ("name") decoded from the SectionIDCustom.
+// * ExportSection is represented as a map for lookup convenience.
+// * HostFunctionSection is a custom section that contains any go `func`s. It may be present when CodeSection is not.
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
@@ -123,6 +128,7 @@ type Module struct {
 	ElementSection []*ElementSegment
 
 	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
+	// When present, the HostFunctionSection must be nil.
 	//
 	// Note: In the Binary Format, this is SectionIDCode.
 	//
@@ -140,6 +146,13 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	NameSection *NameSection
+
+	// HostFunctionSection is index-correlated with FunctionSection and contains a host function defined in Go.
+	// When present, the CodeSection must be nil.
+	//
+	// Note: This section currently has no serialization format, so is not encodable.
+	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A2
+	HostFunctionSection []*reflect.Value
 }
 
 // TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
@@ -173,9 +186,13 @@ func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	return m.TypeSection[typeIdx]
 }
 
-func (m *Module) Validate(features Features) error {
+func (m *Module) Validate(enabledFeatures Features) error {
 	if err := m.validateStartSection(); err != nil {
 		return err
+	}
+
+	if m.SectionElementCount(SectionIDCode) > 0 && m.SectionElementCount(SectionIDHostFunction) > 0 {
+		return errors.New("cannot mix functions and host functions in the same module")
 	}
 
 	functions, globals, memories, tables := m.allDeclarations()
@@ -194,8 +211,14 @@ func (m *Module) Validate(features Features) error {
 		return err
 	}
 
-	if err := m.validateFunctions(functions, globals, memories, tables, features); err != nil {
-		return err
+	if m.CodeSection != nil {
+		if err := m.validateFunctions(functions, globals, memories, tables, enabledFeatures); err != nil {
+			return err
+		}
+	} else {
+		if err := m.validateHostFunctions(); err != nil {
+			return err
+		}
 	}
 
 	if err := m.validateExports(functions, globals, memories, tables); err != nil {
@@ -212,10 +235,10 @@ func (m *Module) validateStartSection() error {
 		startIndex := *m.StartSection
 		ft := m.TypeOfFunction(startIndex)
 		if ft == nil { // TODO: move this check to decoder so that a module can never be decoded invalidly
-			return fmt.Errorf("start function has an invalid type")
+			return fmt.Errorf("invalid start function: func[%d] has an invalid type", startIndex)
 		}
 		if len(ft.Params) > 0 || len(ft.Results) > 0 {
-			return fmt.Errorf("start function must have an empty (nullary) signature: %s", ft.String())
+			return fmt.Errorf("invalid start function: func[%d] must have an empty (nullary) signature: %s", startIndex, ft)
 		}
 	}
 	return nil
@@ -226,7 +249,7 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 		return fmt.Errorf("too many globals in a module")
 	}
 
-	// Global's initialization constant expression can only reference the imported globals.
+	// Global initialization constant expression can only reference the imported globals.
 	// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 	importedGlobals := globals[:m.ImportGlobalCount()]
 	for _, g := range m.GlobalSection {
@@ -237,27 +260,52 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 	return nil
 }
 
-func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType, features Features) error {
+func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType, enabledFeatures Features) error {
+	functionCount := m.SectionElementCount(SectionIDFunction)
+	codeCount := m.SectionElementCount(SectionIDCode)
+	if functionCount == 0 && codeCount == 0 {
+		return nil
+	}
+
+	typeCount := m.SectionElementCount(SectionIDType)
+	if codeCount != functionCount {
+		return fmt.Errorf("code count (%d) != function count (%d)", codeCount, functionCount)
+	}
+
 	// The wazero specific limitation described at RATIONALE.md.
 	const maximumValuesOnStack = 1 << 27
-
-	for codeIndex, typeIndex := range m.FunctionSection {
-		if typeIndex >= m.SectionElementCount(SectionIDType) {
-			return fmt.Errorf("function type index out of range")
-		} else if uint32(codeIndex) >= m.SectionElementCount(SectionIDCode) {
-			return fmt.Errorf("code index out of range")
+	for idx, typeIndex := range m.FunctionSection {
+		if typeIndex >= typeCount {
+			return fmt.Errorf("invalid %s: type section index %d out of range", m.funcDesc(SectionIDFunction, Index(idx)), typeIndex)
 		}
 
 		if err := validateFunction(
 			m.TypeSection[typeIndex],
-			m.CodeSection[codeIndex].Body,
-			m.CodeSection[codeIndex].LocalTypes,
-			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack, features); err != nil {
-			idx := m.SectionElementCount(SectionIDFunction) - 1
-			return fmt.Errorf("invalid function (%d/%d): %v", codeIndex, idx, err)
+			m.CodeSection[idx].Body,
+			m.CodeSection[idx].LocalTypes,
+			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack, enabledFeatures); err != nil {
+
+			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
 	}
 	return nil
+}
+
+func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
+	// Try to improve the error message by collecting any exports:
+	var exportNames []string
+	funcIdx := sectionIndex + m.importCount(ExternTypeFunc)
+	for _, e := range m.ExportSection {
+		if e.Index == funcIdx && e.Type == ExternTypeFunc {
+			exportNames = append(exportNames, fmt.Sprintf("%q", e.Name))
+		}
+	}
+	sectionIDName := SectionIDName(sectionID)
+	if exportNames == nil {
+		return fmt.Sprintf("%s[%d]", sectionIDName, sectionIndex)
+	}
+	sort.Strings(exportNames) // go map keys do not iterate consistently
+	return fmt.Sprintf("%s[%d] (export %s)", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
 func (m *Module) validateTables(tables []*TableType, globals []*GlobalType) error {
@@ -370,7 +418,7 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
 	for _, gs := range m.GlobalSection {
 		var gv uint64
-		// Global's initialization constant expression can only reference the imported globals.
+		// Global initialization constant expression can only reference the imported globals.
 		// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case int32:
@@ -466,6 +514,11 @@ type FunctionType struct {
 
 	// string is cached as it is used both for String and key
 	string string
+}
+
+// EqualsSignature returns true if the function type has the same parameters and results.
+func (t *FunctionType) EqualsSignature(params []ValueType, results []ValueType) bool {
+	return bytes.Equal(t.Params, params) && bytes.Equal(t.Results, results)
 }
 
 // key gets or generates the key for Store.typeIDs. Ex. "i32_v" for one i32 parameter and no (void) result.
@@ -684,6 +737,11 @@ const (
 	SectionIDData
 )
 
+// SectionIDHostFunction is a pseudo-section ID for host functions.
+//
+// Note: This is not defined in the WebAssembly 1.0 (20191205) Binary Format.
+const SectionIDHostFunction = SectionID(0xff)
+
 // SectionIDName returns the canonical name of a module section.
 // https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 func SectionIDName(sectionID SectionID) string {
@@ -712,6 +770,8 @@ func SectionIDName(sectionID SectionID) string {
 		return "code"
 	case SectionIDData:
 		return "data"
+	case SectionIDHostFunction:
+		return "host_function"
 	}
 	return "unknown"
 }

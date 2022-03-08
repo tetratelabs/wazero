@@ -129,8 +129,8 @@ func StartWASICommand(r Runtime, module *DecodedModule) (wasm.Module, error) {
 		return nil, err
 	}
 
-	start := mod.Function(internalwasi.FunctionStart)
-	if _, err = start.Call(internal.ctx); err != nil {
+	start := mod.ExportedFunction(internalwasi.FunctionStart)
+	if _, err = start.Call(nil); err != nil {
 		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
 	}
 	return mod, nil

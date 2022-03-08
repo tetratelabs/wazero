@@ -61,21 +61,21 @@ func TestEngine_Call(t *testing.T) {
 	mod, err := store.Instantiate(m, "")
 	require.NoError(t, err)
 
-	fn := mod.Function("fn")
+	fn := mod.ExportedFunction("fn")
 	require.NotNil(t, fn)
 
 	// ensure base case doesn't fail
-	results, err := fn.Call(context.Background(), 3)
+	results, err := fn.Call(nil, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := fn.Call(context.Background())
+		_, err := fn.Call(nil)
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := fn.Call(context.Background(), 1, 2)
+		_, err := fn.Call(nil, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
@@ -83,7 +83,7 @@ func TestEngine_Call(t *testing.T) {
 func TestEngine_Call_HostFn(t *testing.T) {
 	memory := &wasm.MemoryInstance{}
 	var ctxMemory publicwasm.Memory
-	hostFn := reflect.ValueOf(func(ctx publicwasm.ModuleContext, v uint64) uint64 {
+	hostFn := reflect.ValueOf(func(ctx publicwasm.Module, v uint64) uint64 {
 		ctxMemory = ctx.Memory()
 		return v
 	})
@@ -93,7 +93,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 	modCtx := wasm.NewModuleContext(context.Background(), e, module)
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
-		Kind:   wasm.FunctionKindGoModuleContext,
+		Kind:   wasm.FunctionKindGoModule,
 		Type: &wasm.FunctionType{
 			Params:  []wasm.ValueType{wasm.ValueTypeI64},
 			Results: []wasm.ValueType{wasm.ValueTypeI64},

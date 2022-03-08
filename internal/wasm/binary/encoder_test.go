@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -168,4 +169,12 @@ func TestModule_Encode(t *testing.T) {
 			require.Equal(t, tc.expected, bytes)
 		})
 	}
+}
+
+func TestModule_Encode_HostFunctionSection_Unsupported(t *testing.T) {
+	// We don't currently have an approach to serialize reflect.Value pointers
+	fn := reflect.ValueOf(func(wasm.Module) {})
+	require.Panics(t, func() {
+		EncodeModule(&wasm.Module{HostFunctionSection: []*reflect.Value{&fn}})
+	})
 }

@@ -92,9 +92,6 @@ type (
 		// Ctx holds default function call context from this function instance.
 		Ctx *ModuleContext
 
-		// hostModule holds HostModule if this is a "host module" which is created in store.NewHostModule.
-		hostModule *HostModule
-
 		// mux is used to guard the fields from concurrent access.
 		mux sync.Mutex
 
@@ -209,17 +206,6 @@ type (
 		FunctionTypeID FunctionTypeID
 	}
 
-	// MemoryInstance represents a memory instance in a store, and implements wasm.Memory.
-	//
-	// Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means the precise memory is always
-	// wasm.Store Memories index zero: `store.Memories[0]`
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
-	MemoryInstance struct {
-		Buffer []byte
-		Min    uint32
-		Max    *uint32
-	}
-
 	// FunctionIndex is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr),
 	// and the index to Store.Functions.
 	FunctionIndex storeIndex
@@ -283,7 +269,7 @@ func (m *ModuleInstance) buildExports(exports map[string]*Export) {
 			ei = &ExportInstance{Type: exp.Type, Function: m.Functions[index]}
 			// The module instance of the host function is a fake that only includes the function and its types.
 			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
-			// available to the wasm.ModuleContext Memory.
+			// available to the wasm.Module Memory.
 			if ei.Function.GoFunc != nil {
 				ei.Function.Module = m
 			}
@@ -389,7 +375,7 @@ func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
 
 // Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
 // different names safely and concurrently.
-func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) {
+func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
 	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
@@ -421,20 +407,30 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		return nil, err
 	}
 
-	functions, globals, table, memory :=
-		module.buildFunctions(), module.buildGlobals(importedGlobals), module.buildTable(), module.buildMemory()
+	globals, table, memory := module.buildGlobals(importedGlobals), module.buildTable(), module.buildMemory()
+
+	// If there are no module-defined functions, assume this is a host module.
+	var functions []*FunctionInstance
+	var funcSection SectionID
+	if module.HostFunctionSection == nil {
+		funcSection = SectionIDFunction
+		functions = module.buildFunctions()
+	} else {
+		funcSection = SectionIDHostFunction
+		functions = module.buildHostFunctionInstances()
+	}
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
-	instance := &ModuleInstance{Name: name}
-	instance.addSections(module, importedFunctions, functions, importedGlobals,
+	m := &ModuleInstance{Name: name}
+	m.addSections(module, importedFunctions, functions, importedGlobals,
 		globals, importedTable, table, importedMemory, memory, types, moduleImports)
 
-	if err = instance.validateElements(module.ElementSection); err != nil {
+	if err = m.validateElements(module.ElementSection); err != nil {
 		s.deleteModule(name)
 		return nil, err
 	}
 
-	if err = instance.validateData(module.DataSection); err != nil {
+	if err = m.validateData(module.DataSection); err != nil {
 		s.deleteModule(name)
 		return nil, err
 	}
@@ -446,18 +442,17 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		if err = s.engine.Compile(f); err != nil {
 			s.deleteModule(name)
 			// On the failure, release the assigned funcaddr and already compiled functions.
-			_ = s.releaseFunctions(functions[:i]...) // ignore any release error so we can report the original one.
-			idx := module.SectionElementCount(SectionIDFunction) - 1
-			return nil, fmt.Errorf("compilation failed at index %d/%d: %w", i, idx, err)
+			_ = s.releaseFunctions(functions[:i]...) // ignore any release error, so we can report the original one.
+			return nil, fmt.Errorf("%s compilation failed: %w", module.funcDesc(funcSection, Index(i)), err)
 		}
 	}
 
 	// Now all the validation passes, we are safe to mutate memory/table instances (possibly imported ones).
-	instance.applyElements(module.ElementSection)
-	instance.applyData(module.DataSection)
+	m.applyElements(module.ElementSection)
+	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	instance.Ctx = NewModuleContext(s.ctx, s.engine, instance)
+	m.Ctx = NewModuleContext(s.ctx, s.engine, m)
 
 	// Plus, we can finalize the module import reference count.
 	moduleImportsFinalized = true
@@ -465,15 +460,15 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		if _, err = s.engine.Call(instance.Ctx, instance.Functions[funcIdx]); err != nil {
+		if _, err = s.engine.Call(m.Ctx, m.Functions[funcIdx]); err != nil {
 			s.deleteModule(name)
-			return nil, fmt.Errorf("module[%s] start function failed: %w", name, err)
+			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}
 	}
 
 	// Now that the instantiation is complete without error, add it. This makes it visible for import.
-	s.addModule(instance)
-	return &PublicModule{s: s, instance: instance}, nil
+	s.addModule(m)
+	return m.Ctx, nil
 }
 
 // ReleaseModule deallocates resources if a module with the given name exists.
@@ -582,10 +577,10 @@ func (s *Store) addModule(m *ModuleInstance) {
 	s.modules[m.Name] = m
 }
 
-// Module implements wasm.Store Module
+// Module implements wazero.Runtime Module
 func (s *Store) Module(moduleName string) publicwasm.Module {
 	if m := s.module(moduleName); m != nil {
-		return &PublicModule{s: s, instance: m}
+		return m.Ctx
 	} else {
 		return nil
 	}
@@ -597,45 +592,9 @@ func (s *Store) module(moduleName string) *ModuleInstance {
 	return s.modules[moduleName]
 }
 
-// PublicModule implements wasm.Module
-type PublicModule struct {
-	s        *Store
-	instance *ModuleInstance
-}
-
-// String implements fmt.Stringer
-func (m *PublicModule) String() string {
-	return fmt.Sprintf("Module[%s]", m.instance.Name)
-}
-
-// Function implements wasm.Module Function
-func (m *PublicModule) Function(name string) publicwasm.Function {
-	exp, err := m.instance.getExport(name, ExternTypeFunc)
-	if err != nil {
-		return nil
-	}
-	return &exportedFunction{module: m.instance.Ctx, function: exp.Function}
-}
-
-// Memory implements wasm.Module Memory
-func (m *PublicModule) Memory(name string) publicwasm.Memory {
-	exp, err := m.instance.getExport(name, ExternTypeMemory)
-	if err != nil {
-		return nil
-	}
-	return exp.Memory
-}
-
-// HostModule implements wasm.Store HostModule
-func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-	return s.modules[moduleName].hostModule
-}
-
 func (s *Store) resolveImports(module *Module) (
-	functions []*FunctionInstance, globals []*GlobalInstance,
-	table *TableInstance, memory *MemoryInstance,
+	importedFunctions []*FunctionInstance, importedGlobals []*GlobalInstance,
+	importedTable *TableInstance, importedMemory *MemoryInstance,
 	moduleImports map[*ModuleInstance]struct{},
 	err error,
 ) {
@@ -643,87 +602,119 @@ func (s *Store) resolveImports(module *Module) (
 	defer s.mux.RUnlock()
 
 	moduleImports = map[*ModuleInstance]struct{}{}
-	for _, is := range module.ImportSection {
-		m, ok := s.modules[is.Module]
+	for idx, i := range module.ImportSection {
+		m, ok := s.modules[i.Module]
 		if !ok {
-			err = fmt.Errorf("module \"%s\" not instantiated", is.Module)
+			err = fmt.Errorf("module[%s] not instantiated", i.Module)
 			return
 		}
 
 		m.incDependentCount() // TODO: check if the module is already released. See #293
 		moduleImports[m] = struct{}{}
 
-		var exp *ExportInstance
-		exp, err = m.getExport(is.Name, is.Type)
+		var imported *ExportInstance
+		imported, err = m.getExport(i.Name, i.Type)
 		if err != nil {
 			return
 		}
 
-		switch is.Type {
+		switch i.Type {
 		case ExternTypeFunc:
-			typeIndex := is.DescFunc
+			typeIndex := i.DescFunc
+			// TODO: this shouldn't be possible as invalid should fail validate
 			if int(typeIndex) >= len(module.TypeSection) {
-				err = fmt.Errorf("unknown type for function import")
+				err = errorInvalidImport(i, idx, fmt.Errorf("function type out of range"))
 				return
 			}
-			expectedType := module.TypeSection[typeIndex]
-			f := exp.Function
-			if !bytes.Equal(expectedType.Results, f.Type.Results) || !bytes.Equal(expectedType.Params, f.Type.Params) {
-				err = fmt.Errorf("signature mimatch: %s != %s", expectedType, f.Type)
-				return
-			}
-			functions = append(functions, f)
-		case ExternTypeTable:
-			tableType := is.DescTable
-			table = exp.Table
-			if table.ElemType != tableType.ElemType {
-				err = fmt.Errorf("incompatible table import: element type mismatch")
-				return
-			}
-			if table.Min < tableType.Limit.Min {
-				err = fmt.Errorf("incompatible table import: minimum size mismatch")
+			expectedType := module.TypeSection[i.DescFunc]
+			importedFunction := imported.Function
+
+			actualType := importedFunction.Type
+			if !expectedType.EqualsSignature(actualType.Params, actualType.Results) {
+				err = errorInvalidImport(i, idx, fmt.Errorf("signature mismatch: %s != %s", expectedType, actualType))
 				return
 			}
 
-			if tableType.Limit.Max != nil {
-				if table.Max == nil {
-					err = fmt.Errorf("incompatible table import: maximum size mismatch")
+			importedFunctions = append(importedFunctions, importedFunction)
+		case ExternTypeTable:
+			expected := i.DescTable
+			importedTable = imported.Table
+
+			if importedTable.ElemType != expected.ElemType {
+				err = errorInvalidImport(i, idx, fmt.Errorf("element type mismatch: %s != %s",
+					ValueTypeName(expected.ElemType), ValueTypeName(importedTable.ElemType)))
+				return
+			}
+
+			if expected.Limit.Min > importedTable.Min {
+				err = errorMinSizeMismatch(i, idx, expected.Limit.Min, importedTable.Min)
+				return
+			}
+
+			if expected.Limit.Max != nil {
+				expectedMax := *expected.Limit.Max
+				if importedTable.Max == nil {
+					err = errorNoMax(i, idx, expectedMax)
 					return
-				} else if *table.Max > *tableType.Limit.Max {
-					err = fmt.Errorf("incompatible table import: maximum size mismatch")
+				} else if expectedMax < *importedTable.Max {
+					err = errorMaxSizeMismatch(i, idx, expectedMax, *importedTable.Max)
 					return
 				}
 			}
 		case ExternTypeMemory:
-			memoryType := is.DescMem
-			memory = exp.Memory
-			if memory.Min < memoryType.Min {
-				err = fmt.Errorf("incompatible memory import: minimum size mismatch")
+			expected := i.DescMem
+			importedMemory = imported.Memory
+
+			if expected.Min > importedMemory.Min {
+				err = errorMinSizeMismatch(i, idx, expected.Min, importedMemory.Min)
 				return
 			}
-			if memoryType.Max != nil {
-				if memory.Max == nil {
-					err = fmt.Errorf("incompatible memory import: maximum size mismatch")
+
+			if expected.Max != nil {
+				expectedMax := *expected.Max
+				if importedMemory.Max == nil {
+					err = errorNoMax(i, idx, expectedMax)
 					return
-				} else if *memory.Max > *memoryType.Max {
-					err = fmt.Errorf("incompatible memory import: maximum size mismatch")
+				} else if expectedMax < *importedMemory.Max {
+					err = errorMaxSizeMismatch(i, idx, expectedMax, *importedMemory.Max)
 					return
 				}
 			}
 		case ExternTypeGlobal:
-			globalType := is.DescGlobal
-			g := exp.Global
-			if globalType.Mutable != g.Type.Mutable {
-				err = fmt.Errorf("incompatible global import: mutability mismatch")
-				return
-			} else if globalType.ValType != g.Type.ValType {
-				err = fmt.Errorf("incompatible global import: value type mismatch")
+			expected := i.DescGlobal
+			importedGlobal := imported.Global
+
+			if expected.Mutable != importedGlobal.Type.Mutable {
+				err = errorInvalidImport(i, idx, fmt.Errorf("mutability mismatch: %t != %t",
+					expected.Mutable, importedGlobal.Type.Mutable))
 				return
 			}
-			globals = append(globals, g)
+
+			if expected.ValType != importedGlobal.Type.ValType {
+				err = errorInvalidImport(i, idx, fmt.Errorf("value type mismatch: %s != %s",
+					ValueTypeName(expected.ValType), ValueTypeName(importedGlobal.Type.ValType)))
+				return
+			}
+			importedGlobals = append(importedGlobals, importedGlobal)
 		}
 	}
 	return
+}
+
+func errorMinSizeMismatch(i *Import, idx int, expected, actual uint32) error {
+	return errorInvalidImport(i, idx, fmt.Errorf("minimum size mismatch: %d > %d", expected, actual))
+}
+
+func errorNoMax(i *Import, idx int, expected uint32) error {
+	return errorInvalidImport(i, idx, fmt.Errorf("maximum size mismatch: %d, but actual has no max", expected))
+}
+
+func errorMaxSizeMismatch(i *Import, idx int, expected, actual uint32) error {
+	return errorInvalidImport(i, idx, fmt.Errorf("maximum size mismatch: %d < %d", expected, actual))
+}
+
+func errorInvalidImport(i *Import, idx int, err error) error {
+	return fmt.Errorf("import[%d] %s[%s.%s]: %w", idx, ExternTypeName(i.Type), i.Module, i.Name, err)
 }
 
 func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {

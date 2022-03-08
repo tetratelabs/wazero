@@ -5,7 +5,6 @@
 package vs
 
 import (
-	"context"
 	_ "embed"
 	"testing"
 
@@ -109,7 +108,7 @@ func TestExampleUpToDate(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureSignExtensionOps(true))
 
 		// Add WASI to satisfy import tests
-		_, err := r.NewHostModule(wazero.WASISnapshotPreview1())
+		_, err := r.NewHostModuleFromConfig(wazero.WASISnapshotPreview1())
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
@@ -117,7 +116,7 @@ func TestExampleUpToDate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		results, err := module.Function("AddInt").Call(context.Background(), 1, 2)
+		results, err := module.ExportedFunction("AddInt").Call(nil, 1, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 	})

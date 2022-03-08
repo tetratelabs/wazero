@@ -363,7 +363,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							}
 							module := store.Module(moduleName)
 							require.NotNil(t, module)
-							global := module.Global(c.Action.Field)
+							global := module.ExportedGlobal(c.Action.Field)
 							require.NotNil(t, global)
 							var expType wasm.ValueType
 							switch c.Exps[0].ValType {
@@ -504,7 +504,7 @@ func requireValueEq(t *testing.T, actual, expected uint64, valType wasm.ValueTyp
 // callFunction is inlined here as the spectest needs to validate the signature was correct
 // TODO: This is likely already covered with unit tests!
 func callFunction(s *wasm.Store, moduleName, funcName string, params ...uint64) ([]uint64, []wasm.ValueType, error) {
-	fn := s.Module(moduleName).Function(funcName)
-	results, err := fn.Call(context.Background(), params...)
+	fn := s.Module(moduleName).ExportedFunction(funcName)
+	results, err := fn.Call(nil, params...)
 	return results, fn.ResultTypes(), err
 }

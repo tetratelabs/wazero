@@ -21,7 +21,7 @@ func main() {
 	module, _ := wazero.NewRuntime().NewModuleFromSource(source)
 
 	// Discover 7! is 5040
-	fmt.Println(module.Function("fac").Call(context.Background(), 7))
+	fmt.Println(module.ExportedFunction("fac").Call(nil, 7))
 }
 ```
 

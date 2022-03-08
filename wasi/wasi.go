@@ -166,7 +166,7 @@ const (
 	ErrnoNoprotoopt
 	// ErrnoNospc No space left on device.
 	ErrnoNospc
-	// ErrnoNosys Function not supported.
+	// ErrnoNosys ExportedFunction not supported.
 	ErrnoNosys
 	// ErrnoNotconn The socket is not connected.
 	ErrnoNotconn
@@ -304,7 +304,7 @@ var errnoToString = [...]string{
 // In wazero, if ProcExit is called, the calling function returns immediately, returning the given exit code as the error.
 // You can get the exit code by casting the error as follows.
 //
-//   wasmFunction := m.Function(/* omitted */)  // Some function which may call proc_exit
+//   wasmFunction := m.ExportedFunction(/* omitted */)  // Some function which may call proc_exit
 //   err := wasmFunction()
 //   var exitCode wasi.ExitCode
 //   if errors.As(err, &exitCode) {

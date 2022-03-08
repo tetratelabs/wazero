@@ -1,9 +1,12 @@
 package internalwasm
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/wasm"
 )
 
 func TestModule_ImportFuncCount(t *testing.T) {
@@ -201,6 +204,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 	i32, f32 := ValueTypeI32, ValueTypeF32
 	zero := uint32(0)
 	empty := &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x00}}
+	fn := reflect.ValueOf(func(wasm.Module) {})
 
 	tests := []struct {
 		name     string
@@ -213,12 +217,22 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{},
 		},
 		{
-			name:     "only name section",
+			name:     "NameSection",
 			input:    &Module{NameSection: &NameSection{ModuleName: "simple"}},
 			expected: map[string]uint32{"custom": 1},
 		},
 		{
-			name: "type section",
+			name:     "HostFunctionSection",
+			input:    &Module{HostFunctionSection: []*reflect.Value{&fn}},
+			expected: map[string]uint32{"host_function": 1},
+		},
+		{
+			name:     "NameSection and HostFunctionSection",
+			input:    &Module{NameSection: &NameSection{ModuleName: "simple"}, HostFunctionSection: []*reflect.Value{&fn}},
+			expected: map[string]uint32{"custom": 1, "host_function": 1},
+		},
+		{
+			name: "TypeSection",
 			input: &Module{
 				TypeSection: []*FunctionType{
 					{},
@@ -229,7 +243,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"type": 3},
 		},
 		{
-			name: "type and import section",
+			name: "TypeSection and ImportSection",
 			input: &Module{
 				TypeSection: []*FunctionType{
 					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
@@ -250,7 +264,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"import": 2, "type": 2},
 		},
 		{
-			name: "type function and start section",
+			name: "TypeSection, FunctionSection, CodeSection, ExportSection and StartSection",
 			input: &Module{
 				TypeSection:     []*FunctionType{{}},
 				FunctionSection: []Index{0},
@@ -265,7 +279,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"code": 1, "export": 1, "function": 1, "start": 1, "type": 1},
 		},
 		{
-			name: "memory and data",
+			name: "MemorySection and DataSection",
 			input: &Module{
 				MemorySection: []*MemoryType{{Min: 1}},
 				DataSection:   []*DataSegment{{MemoryIndex: 0, OffsetExpression: empty}},
@@ -273,7 +287,7 @@ func TestModule_SectionElementCount(t *testing.T) {
 			expected: map[string]uint32{"data": 1, "memory": 1},
 		},
 		{
-			name: "table and element",
+			name: "TableSection and ElementSection",
 			input: &Module{
 				TableSection:   []*TableType{{ElemType: 0x70, Limit: &LimitsType{Min: 1}}},
 				ElementSection: []*ElementSegment{{TableIndex: 0, OffsetExpr: empty}},
@@ -291,6 +305,11 @@ func TestModule_SectionElementCount(t *testing.T) {
 				if size := tc.input.SectionElementCount(i); size > 0 {
 					actual[SectionIDName(i)] = size
 				}
+			}
+
+			// SectionIDHostFunction is intentionally not after data
+			if size := tc.input.SectionElementCount(SectionIDHostFunction); size > 0 {
+				actual[SectionIDName(SectionIDHostFunction)] = size
 			}
 			require.Equal(t, tc.expected, actual)
 		})

@@ -262,7 +262,7 @@ func TestPublicModule_Global(t *testing.T) {
 			module, err := s.Instantiate(tc.module, "")
 			require.NoError(t, err)
 
-			if global := module.Global("global"); tc.expected != nil {
+			if global := module.ExportedGlobal("global"); tc.expected != nil {
 				require.Equal(t, tc.expected, global)
 			} else {
 				require.Nil(t, global)

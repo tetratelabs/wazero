@@ -1,7 +1,6 @@
 package text
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -390,7 +389,7 @@ func (p *typeUseParser) end(pos callbackPosition, tok tokenType, tokenBytes []by
 func (p *typeUseParser) inlinedTypeIndex() wasm.Index {
 	it := p.currentInlinedType
 	for i, t := range p.module.TypeSection {
-		if funcTypeEquals(t, it.Params, it.Results) {
+		if t.EqualsSignature(it.Params, it.Results) {
 			return wasm.Index(i)
 		}
 	}
@@ -424,7 +423,7 @@ func (p *typeUseParser) typeFieldIndex() (wasm.Index, error) {
 // it didn't already exist.
 func (p *typeUseParser) maybeAddInlinedType(it *wasm.FunctionType) {
 	for i, t := range p.inlinedTypes {
-		if funcTypeEquals(t, it.Params, it.Results) {
+		if t.EqualsSignature(it.Params, it.Results) {
 			p.recordInlinedType(wasm.Index(i))
 			return
 		}
@@ -452,12 +451,8 @@ func (p *typeUseParser) recordInlinedType(inlinedIdx wasm.Index) {
 //	>> If inline declarations are given, then their types must match the referenced function type.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#type-uses%E2%91%A0
 func requireInlinedMatchesReferencedType(typeSection []*wasm.FunctionType, index wasm.Index, params, results []wasm.ValueType) error {
-	if !funcTypeEquals(typeSection[index], params, results) {
+	if !typeSection[index].EqualsSignature(params, results) {
 		return fmt.Errorf("inlined type doesn't match module.type[%d].func", index)
 	}
 	return nil
-}
-
-func funcTypeEquals(f *wasm.FunctionType, params []wasm.ValueType, results []wasm.ValueType) bool {
-	return bytes.Equal(f.Params, params) && bytes.Equal(f.Results, results)
 }

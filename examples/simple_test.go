@@ -21,7 +21,7 @@ func Test_Simple(t *testing.T) {
 
 	// Host functions can be exported as any module name, including the empty string.
 	env := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"hello": goFunc}}
-	_, err := r.NewHostModule(env)
+	_, err := r.NewHostModuleFromConfig(env)
 	require.NoError(t, err)
 
 	// The "hello" function was imported as $hello in Wasm. Since it was marked as the start
