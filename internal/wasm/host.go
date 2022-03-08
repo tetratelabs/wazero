@@ -94,10 +94,6 @@ func (f *exportedFunction) Call(ctx context.Context, params ...uint64) ([]uint64
 //
 // TOOD(adrian): make this goroutine-safe like store.Instantiate.
 func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interface{}) (*HostModule, error) {
-	if err := s.requireModuleUnused(moduleName); err != nil {
-		return nil, err
-	}
-
 	exportCount := len(nameToGoFunc)
 	ret := &HostModule{name: moduleName, NameToFunction: make(map[string]*FunctionInstance, exportCount)}
 	hostModule := &ModuleInstance{
@@ -106,9 +102,14 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 		hostModule: ret,
 	}
 
+	if err := s.requireModuleName(moduleName); err != nil {
+		return nil, err
+	}
+
 	for name, goFunc := range nameToGoFunc {
 		hf, err := newGoFunc(goFunc)
 		if err != nil {
+			s.deleteModule(moduleName)
 			return nil, fmt.Errorf("func[%s] %w", name, err)
 		}
 
@@ -124,11 +125,13 @@ func (s *Store) NewHostModule(moduleName string, nameToGoFunc map[string]interfa
 		ret.NameToFunction[name] = f
 
 		if err = s.compileHostFunction(f); err != nil {
+			s.deleteModule(moduleName)
 			return nil, err
 		}
 	}
 
-	s.modules[moduleName] = hostModule
+	// Now that the instantiation is complete without error, add it. This makes it visible for import.
+	s.addModule(hostModule)
 	return ret, nil
 }
 
@@ -145,15 +148,6 @@ func (s *Store) compileHostFunction(f *FunctionInstance) (err error) {
 		if err = s.releaseFunctions(f); err != nil {
 			return fmt.Errorf("failed to compile %s: %v", f.Name, err)
 		}
-	}
-	return nil
-}
-
-func (s *Store) requireModuleUnused(moduleName string) error {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-	if _, ok := s.modules[moduleName]; ok {
-		return fmt.Errorf("module %s has already been instantiated", moduleName)
 	}
 	return nil
 }
