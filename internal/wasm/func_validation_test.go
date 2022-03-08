@@ -26,11 +26,11 @@ func TestValidateFunction_valueStackLimit(t *testing.T) {
 	body = append(body, OpcodeEnd)
 
 	t.Run("not exceed", func(t *testing.T) {
-		err := validateFunction(&FunctionType{}, body, nil, nil, nil, nil, nil, nil, max+1, Features(0))
+		err := validateFunction(&FunctionType{}, body, nil, nil, nil, nil, nil, nil, max+1, Features20191205)
 		require.NoError(t, err)
 	})
 	t.Run("exceed", func(t *testing.T) {
-		err := validateFunction(&FunctionType{}, body, nil, nil, nil, nil, nil, nil, max, Features(0))
+		err := validateFunction(&FunctionType{}, body, nil, nil, nil, nil, nil, nil, max, Features20191205)
 		require.Error(t, err)
 		expMsg := fmt.Sprintf("function may have %d stack values, which exceeds limit %d", valuesNum, max)
 		require.Equal(t, expMsg, err.Error())
@@ -69,7 +69,7 @@ func TestValidateFunction_SignExtensionOps(t *testing.T) {
 		tc := tt
 		t.Run(InstructionName(tc.input), func(t *testing.T) {
 			t.Run("disabled", func(t *testing.T) {
-				err := validateFunction(&FunctionType{}, []byte{tc.input}, nil, nil, nil, nil, nil, nil, maxStackHeight, Features(0))
+				err := validateFunction(&FunctionType{}, []byte{tc.input}, nil, nil, nil, nil, nil, nil, maxStackHeight, Features20191205)
 				require.EqualError(t, err, tc.expectedErrOnDisable)
 			})
 			t.Run("enabled", func(t *testing.T) {

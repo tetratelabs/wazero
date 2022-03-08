@@ -240,7 +240,7 @@ func TestStore_concurrent(t *testing.T) {
 	require.Len(t, s.modules, 0)
 }
 
-func TestSotre_Instantiate_Errors(t *testing.T) {
+func TestStore_Instantiate_Errors(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
@@ -255,13 +255,13 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 		_, err = s.Instantiate(&Module{
 			TypeSection: []*FunctionType{{}},
 			ImportSection: []*Import{
-				// The fisrt import resolve succeeds -> increment hm.dependentCount.
+				// The first import resolve succeeds -> increment hm.dependentCount.
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 				// But the second one tries to import uninitialized-module ->
 				{Type: ExternTypeFunc, Module: "non-exist", Name: "fn", DescFunc: 0},
 			},
 		}, importingModuleName)
-		require.EqualError(t, err, "module \"non-exist\" not instantiated")
+		require.EqualError(t, err, "module[non-exist] not instantiated")
 
 		// hm.dependentCount must be intact as the instantiation failed.
 		require.Zero(t, hm.dependentCount)
@@ -285,7 +285,7 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 1
 				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 2
 				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 3 == compilation failing function.
-				// Functions after failrued must not be passed to engine.Release.
+				// Functions after failure must not be passed to engine.Release.
 				{Body: []byte{OpcodeEnd}},
 				{Body: []byte{OpcodeEnd}},
 				{Body: []byte{OpcodeEnd}},
@@ -295,7 +295,7 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}, importingModuleName)
-		require.EqualError(t, err, "compilation failed at index 2/2: compilation failed")
+		require.EqualError(t, err, "function[2] compilation failed: compilation failed")
 
 		// hm.dependentCount must be intact as the instantiation failed.
 		require.Zero(t, hm.dependentCount)
@@ -324,7 +324,7 @@ func TestSotre_Instantiate_Errors(t *testing.T) {
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}, importingModuleName)
-		require.EqualError(t, err, "module[test] start function failed: call failed")
+		require.EqualError(t, err, "start function[1] failed: call failed")
 
 		// hm.dependentCount must stay incremented as the instantiation itself has already succeeded.
 		require.Equal(t, 1, hm.dependentCount)
@@ -658,7 +658,7 @@ func TestStore_resolveImports(t *testing.T) {
 	t.Run("module not instantiated", func(t *testing.T) {
 		s := newStore()
 		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: "unknown", Name: "unknown"}}})
-		require.EqualError(t, err, "module \"unknown\" not instantiated")
+		require.EqualError(t, err, "module[unknown] not instantiated")
 	})
 	t.Run("export instance not found", func(t *testing.T) {
 		s := newStore()
@@ -667,24 +667,6 @@ func TestStore_resolveImports(t *testing.T) {
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
 	})
 	t.Run("func", func(t *testing.T) {
-		t.Run("unknwon type", func(t *testing.T) {
-			s := newStore()
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}})
-			require.EqualError(t, err, "unknown type for function import")
-		})
-		t.Run("signature mismatch", func(t *testing.T) {
-			s := newStore()
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Function: &FunctionInstance{Type: &FunctionType{}},
-			}}, Name: moduleName}
-			m := &Module{
-				TypeSection:   []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
-				ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
-			}
-			_, _, _, _, _, err := s.resolveImports(m)
-			require.EqualError(t, err, "signature mimatch: v_f32 != v_v")
-		})
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			f := &FunctionInstance{Type: &FunctionType{Results: []ValueType{ValueTypeF32}}}
@@ -701,26 +683,26 @@ func TestStore_resolveImports(t *testing.T) {
 			require.Contains(t, functions, f)
 			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
+		t.Run("type out of range", func(t *testing.T) {
+			s := newStore()
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {}}, Name: moduleName}
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}})
+			require.EqualError(t, err, "import[0] func[test.target]: function type out of range")
+		})
+		t.Run("signature mismatch", func(t *testing.T) {
+			s := newStore()
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+				Function: &FunctionInstance{Type: &FunctionType{}},
+			}}, Name: moduleName}
+			m := &Module{
+				TypeSection:   []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
+				ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
+			}
+			_, _, _, _, _, err := s.resolveImports(m)
+			require.EqualError(t, err, "import[0] func[test.target]: signature mismatch: v_f32 != v_v")
+		})
 	})
 	t.Run("global", func(t *testing.T) {
-		t.Run("mutability mismatch", func(t *testing.T) {
-			s := newStore()
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:   ExternTypeGlobal,
-				Global: &GlobalInstance{Type: &GlobalType{Mutable: false}},
-			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: true}}}})
-			require.EqualError(t, err, "incompatible global import: mutability mismatch")
-		})
-		t.Run("type mismatch", func(t *testing.T) {
-			s := newStore()
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:   ExternTypeGlobal,
-				Global: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}},
-			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeF64}}}})
-			require.EqualError(t, err, "incompatible global import: value type mismatch")
-		})
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			inst := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
@@ -730,38 +712,26 @@ func TestStore_resolveImports(t *testing.T) {
 			require.Contains(t, globals, inst)
 			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
+		t.Run("mutability mismatch", func(t *testing.T) {
+			s := newStore()
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+				Type:   ExternTypeGlobal,
+				Global: &GlobalInstance{Type: &GlobalType{Mutable: false}},
+			}}, Name: moduleName}
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: true}}}})
+			require.EqualError(t, err, "import[0] global[test.target]: mutability mismatch: true != false")
+		})
+		t.Run("type mismatch", func(t *testing.T) {
+			s := newStore()
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+				Type:   ExternTypeGlobal,
+				Global: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}},
+			}}, Name: moduleName}
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeF64}}}})
+			require.EqualError(t, err, "import[0] global[test.target]: value type mismatch: f64 != i32")
+		})
 	})
 	t.Run("table", func(t *testing.T) {
-		t.Run("element type", func(t *testing.T) {
-			s := newStore()
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:  ExternTypeTable,
-				Table: &TableInstance{ElemType: 0x00}, // Unknown!
-			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &TableType{ElemType: 0x1}}}})
-			require.EqualError(t, err, "incompatible table import: element type mismatch")
-		})
-		t.Run("minimum size mismatch", func(t *testing.T) {
-			s := newStore()
-			importTableType := &TableType{Limit: &LimitsType{Min: 2}}
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:  ExternTypeTable,
-				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
-			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
-			require.EqualError(t, err, "incompatible table import: minimum size mismatch")
-		})
-		t.Run("maximum size mismatch", func(t *testing.T) {
-			s := newStore()
-			max := uint32(10)
-			importTableType := &TableType{Limit: &LimitsType{Max: &max}}
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:  ExternTypeTable,
-				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
-			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
-			require.EqualError(t, err, "incompatible table import: maximum size mismatch")
-		})
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
@@ -775,29 +745,38 @@ func TestStore_resolveImports(t *testing.T) {
 			require.Equal(t, table, tableInst)
 			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
-	})
-	t.Run("memory", func(t *testing.T) {
+		t.Run("element type", func(t *testing.T) {
+			s := newStore()
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+				Type:  ExternTypeTable,
+				Table: &TableInstance{ElemType: 0x00}, // Unknown!
+			}}, Name: moduleName}
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &TableType{ElemType: 0x1}}}})
+			require.EqualError(t, err, "import[0] table[test.target]: element type mismatch: unknown != unknown")
+		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
-			importMemoryType := &MemoryType{Min: 2}
+			importTableType := &TableType{Limit: &LimitsType{Min: 2}}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:   ExternTypeMemory,
-				Memory: &MemoryInstance{Min: importMemoryType.Min - 1},
+				Type:  ExternTypeTable,
+				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
-			require.EqualError(t, err, "incompatible memory import: minimum size mismatch")
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
+			require.EqualError(t, err, "import[0] table[test.target]: minimum size mismatch: 2 > 1")
 		})
 		t.Run("maximum size mismatch", func(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
-			importMemoryType := &MemoryType{Max: &max}
+			importTableType := &TableType{Limit: &LimitsType{Max: &max}}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:   ExternTypeMemory,
-				Memory: &MemoryInstance{},
+				Type:  ExternTypeTable,
+				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
-			require.EqualError(t, err, "incompatible memory import: maximum size mismatch")
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
+			require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")
 		})
+	})
+	t.Run("memory", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
@@ -810,6 +789,27 @@ func TestStore_resolveImports(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, memory, memoryInst)
 			require.Equal(t, 1, s.modules[moduleName].dependentCount)
+		})
+		t.Run("minimum size mismatch", func(t *testing.T) {
+			s := newStore()
+			importMemoryType := &MemoryType{Min: 2}
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+				Type:   ExternTypeMemory,
+				Memory: &MemoryInstance{Min: importMemoryType.Min - 1},
+			}}, Name: moduleName}
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
+			require.EqualError(t, err, "import[0] memory[test.target]: minimum size mismatch: 2 > 1")
+		})
+		t.Run("maximum size mismatch", func(t *testing.T) {
+			s := newStore()
+			max := uint32(10)
+			importMemoryType := &MemoryType{Max: &max}
+			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
+				Type:   ExternTypeMemory,
+				Memory: &MemoryInstance{},
+			}}, Name: moduleName}
+			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
+			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10, but actual has no max")
 		})
 	})
 }
