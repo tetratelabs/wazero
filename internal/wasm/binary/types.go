@@ -76,7 +76,7 @@ var encodedOneResult = map[wasm.ValueType][]byte{
 
 // encodeFunctionType returns the internalwasm.FunctionType encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
-// Note: ExportedFunction types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
+// Note: Function types are encoded by the byte 0x60 followed by the respective vectors of parameter and result types.
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-types%E2%91%A4
 func encodeFunctionType(t *wasm.FunctionType) []byte {
 	paramCount, resultCount := len(t.Params), len(t.Results)
