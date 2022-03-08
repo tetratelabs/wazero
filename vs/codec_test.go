@@ -5,7 +5,6 @@
 package vs
 
 import (
-	"context"
 	_ "embed"
 	"testing"
 
@@ -117,7 +116,7 @@ func TestExampleUpToDate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test
-		results, err := module.ExportedFunction("AddInt").Call(context.Background(), 1, 2)
+		results, err := module.ExportedFunction("AddInt").Call(nil, 1, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 	})

@@ -29,7 +29,6 @@ var facWasm []byte
 
 // TestFacIter ensures that the code in BenchmarkFacIter works as expected.
 func TestFacIter(t *testing.T) {
-	ctx := context.Background()
 	const in = 30
 	expValue := uint64(0x865df5dd54000000)
 
@@ -38,7 +37,7 @@ func TestFacIter(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			res, err := fn.Call(ctx, in)
+			res, err := fn.Call(nil, in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -49,7 +48,7 @@ func TestFacIter(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 10000; i++ {
-			res, err := fn.Call(ctx, in)
+			res, err := fn.Call(nil, in)
 			require.NoError(t, err)
 			require.Equal(t, expValue, res[0])
 		}
@@ -194,7 +193,7 @@ func interpreterFacIterInvoke(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(ctx, facIterArgumentU64); err != nil {
+		if _, err = fn.Call(nil, facIterArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -207,7 +206,7 @@ func jitFacIterInvoke(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err = fn.Call(ctx, facIterArgumentU64); err != nil {
+		if _, err = fn.Call(nil, facIterArgumentU64); err != nil {
 			b.Fatal(err)
 		}
 	}
