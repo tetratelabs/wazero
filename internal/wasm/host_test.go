@@ -1,189 +1,76 @@
 package internalwasm
 
 import (
-	"math"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestMemoryInstance_HasLen(t *testing.T) {
-	memory := &MemoryInstance{Buffer: make([]byte, 100)}
-
-	tests := []struct {
-		name        string
-		offset      uint32
-		sizeInBytes uint64
-		expected    bool
-	}{
-		{
-			name:        "simple valid arguments",
-			offset:      0, // arbitrary valid offset
-			sizeInBytes: 8, // arbitrary valid size
-			expected:    true,
-		},
-		{
-			name:        "maximum valid sizeInBytes",
-			offset:      memory.Size() - 8,
-			sizeInBytes: 8,
-			expected:    true,
-		},
-		{
-			name:        "sizeInBytes exceeds the valid size by 1",
-			offset:      100, // arbitrary valid offset
-			sizeInBytes: uint64(memory.Size() - 99),
-			expected:    false,
-		},
-		{
-			name:        "offset exceeds the memory size",
-			offset:      memory.Size(),
-			sizeInBytes: 1, // arbitrary size
-			expected:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, memory.hasSize(tc.offset, uint32(tc.sizeInBytes)))
-		})
-	}
+// wasiAPI simulates the real WASI api
+type wasiAPI struct {
 }
 
-func TestMemoryInstance_ReadUint32Le(t *testing.T) {
-	tests := []struct {
-		name       string
-		memory     []byte
-		offset     uint32
-		expected   uint32
-		expectedOk bool
-	}{
-		{
-			name:       "valid offset with an endian-insensitive v",
-			memory:     []byte{0xff, 0xff, 0xff, 0xff},
-			offset:     0, // arbitrary valid offset.
-			expected:   math.MaxUint32,
-			expectedOk: true,
-		},
-		{
-			name:       "valid offset with an endian-sensitive v",
-			memory:     []byte{0xfe, 0xff, 0xff, 0xff},
-			offset:     0, // arbitrary valid offset.
-			expected:   math.MaxUint32 - 1,
-			expectedOk: true,
-		},
-		{
-			name:       "maximum boundary valid offset",
-			offset:     1,
-			memory:     []byte{0x00, 0x1, 0x00, 0x00, 0x00},
-			expected:   1, // arbitrary valid v
-			expectedOk: true,
-		},
-		{
-			name:   "offset exceeds the maximum valid offset by 1",
-			memory: []byte{0xff, 0xff, 0xff, 0xff},
-			offset: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			memory := &MemoryInstance{Buffer: tc.memory}
-
-			v, ok := memory.ReadUint32Le(tc.offset)
-			require.Equal(t, tc.expectedOk, ok)
-			require.Equal(t, tc.expected, v)
-		})
-	}
+func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize uint32) wasi.Errno {
+	return 0
 }
 
-func TestMemoryInstance_ReadUint64Le(t *testing.T) {
-	tests := []struct {
-		name       string
-		memory     []byte
-		offset     uint32
-		expected   uint64
-		expectedOk bool
-	}{
-		{
-			name:       "valid offset with an endian-insensitive v",
-			memory:     []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-			offset:     0, // arbitrary valid offset.
-			expected:   math.MaxUint64,
-			expectedOk: true,
-		},
-		{
-			name:       "valid offset with an endian-sensitive v",
-			memory:     []byte{0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-			offset:     0, // arbitrary valid offset.
-			expected:   math.MaxUint64 - 1,
-			expectedOk: true,
-		},
-		{
-			name:       "maximum boundary valid offset",
-			offset:     1,
-			memory:     []byte{0x00, 0x1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-			expected:   1, // arbitrary valid v
-			expectedOk: true,
-		},
-		{
-			name:   "offset exceeds the maximum valid offset by 1",
-			memory: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-			offset: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			memory := &MemoryInstance{Buffer: tc.memory}
-
-			v, ok := memory.ReadUint64Le(tc.offset)
-			require.Equal(t, tc.expectedOk, ok)
-			require.Equal(t, tc.expected, v)
-		})
-	}
+func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
+	return 0
 }
 
-func TestMemoryInstance_ReadFloat32Le(t *testing.T) {
+func TestNewHostModule(t *testing.T) {
+	i32 := ValueTypeI32
+
+	a := wasiAPI{}
+	functionArgsSizesGet := "args_sizes_get"
+	fnArgsSizesGet := reflect.ValueOf(a.ArgsSizesGet)
+	functionFdWrite := "fd_write"
+	fnFdWrite := reflect.ValueOf(a.FdWrite)
+
 	tests := []struct {
-		name       string
-		memory     []byte
-		offset     uint32
-		expected   float32
-		expectedOk bool
+		name, moduleName string
+		goFuncs          map[string]interface{}
+		expected         *Module
 	}{
 		{
-			name:       "valid offset with an endian-insensitive v",
-			memory:     []byte{0xff, 0x00, 0x00, 0xff},
-			offset:     0, // arbitrary valid offset.
-			expected:   math.Float32frombits(uint32(0xff0000ff)),
-			expectedOk: true,
+			name:     "empty",
+			expected: &Module{},
 		},
 		{
-			name:       "valid offset with an endian-sensitive v",
-			memory:     []byte{0xfe, 0x00, 0x00, 0xff},
-			offset:     0, // arbitrary valid offset.
-			expected:   math.Float32frombits(uint32(0xff0000fe)),
-			expectedOk: true,
+			name:       "only name",
+			moduleName: "test",
+			expected:   &Module{NameSection: &NameSection{ModuleName: "test"}},
 		},
 		{
-			name:       "maximum boundary valid offset",
-			offset:     1,
-			memory:     []byte{0x00, 0xcd, 0xcc, 0xcc, 0x3d},
-			expected:   0.1, // arbitrary valid v
-			expectedOk: true,
-		},
-		{
-			name:   "offset exceeds the maximum valid offset by 1",
-			memory: []byte{0xff, 0xff, 0xff, 0xff},
-			offset: 1,
+			name:       "two struct funcs",
+			moduleName: wasi.ModuleSnapshotPreview1,
+			goFuncs: map[string]interface{}{
+				functionArgsSizesGet: a.ArgsSizesGet,
+				functionFdWrite:      a.FdWrite,
+			},
+			expected: &Module{
+				TypeSection: []*FunctionType{
+					{Params: []ValueType{i32, i32}, Results: []ValueType{i32}},
+					{Params: []ValueType{i32, i32, i32, i32}, Results: []ValueType{i32}},
+				},
+				FunctionSection:     []Index{0, 1},
+				HostFunctionSection: []*reflect.Value{&fnArgsSizesGet, &fnFdWrite},
+				ExportSection: map[string]*Export{
+					"args_sizes_get": {Name: "args_sizes_get", Type: ExternTypeFunc, Index: 0},
+					"fd_write":       {Name: "fd_write", Type: ExternTypeFunc, Index: 1},
+				},
+				NameSection: &NameSection{
+					ModuleName: wasi.ModuleSnapshotPreview1,
+					FunctionNames: NameMap{
+						{Index: 0, Name: "args_sizes_get"},
+						{Index: 1, Name: "fd_write"},
+					},
+				},
+			},
 		},
 	}
 
@@ -191,315 +78,137 @@ func TestMemoryInstance_ReadFloat32Le(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			memory := &MemoryInstance{Buffer: tc.memory}
+			m, e := NewHostModule(tc.moduleName, tc.goFuncs)
+			require.NoError(t, e)
 
-			v, ok := memory.ReadFloat32Le(tc.offset)
-			require.Equal(t, tc.expectedOk, ok)
-			require.Equal(t, tc.expected, v)
-		})
-	}
-}
+			// `require.Equal(t, tc.expected, m)` fails reflect pointers don't match, so brute compare:
+			require.Equal(t, tc.expected.TypeSection, m.TypeSection)
+			require.Equal(t, tc.expected.ImportSection, m.ImportSection)
+			require.Equal(t, tc.expected.FunctionSection, m.FunctionSection)
+			require.Equal(t, tc.expected.TableSection, m.TableSection)
+			require.Equal(t, tc.expected.MemorySection, m.MemorySection)
+			require.Equal(t, tc.expected.GlobalSection, m.GlobalSection)
+			require.Equal(t, tc.expected.ExportSection, m.ExportSection)
+			require.Equal(t, tc.expected.StartSection, m.StartSection)
+			require.Equal(t, tc.expected.ElementSection, m.ElementSection)
+			require.Nil(t, m.CodeSection) // Host functions are implemented in Go, not Wasm!
+			require.Equal(t, tc.expected.DataSection, m.DataSection)
+			require.Equal(t, tc.expected.NameSection, m.NameSection)
 
-func TestMemoryInstance_ReadFloat64Le(t *testing.T) {
-	tests := []struct {
-		name       string
-		memory     []byte
-		offset     uint32
-		expected   float64
-		expectedOk bool
-	}{
-		{
-			name:       "valid offset with an endian-insensitive v",
-			memory:     []byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff},
-			offset:     0, // arbitrary valid offset.
-			expected:   math.Float64frombits(uint64(0xff000000000000ff)),
-			expectedOk: true,
-		},
-		{
-			name:       "valid offset with an endian-sensitive v",
-			memory:     []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0x7f},
-			offset:     0,               // arbitrary valid offset.
-			expected:   math.MaxFloat64, // arbitrary valid v
-			expectedOk: true,
-		},
-		{
-			name:       "maximum boundary valid offset",
-			offset:     1,
-			memory:     []byte{0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0x7f},
-			expected:   math.MaxFloat64, // arbitrary valid v
-			expectedOk: true,
-		},
-		{
-			name:   "offset exceeds the maximum valid offset by 1",
-			memory: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-			offset: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			memory := &MemoryInstance{Buffer: tc.memory}
-
-			v, ok := memory.ReadFloat64Le(tc.offset)
-			require.Equal(t, tc.expectedOk, ok)
-			require.Equal(t, tc.expected, v)
-		})
-	}
-}
-
-func TestMemoryInstance_WriteUint32Le(t *testing.T) {
-	memory := &MemoryInstance{Buffer: make([]byte, 100)}
-
-	tests := []struct {
-		name          string
-		offset        uint32
-		v             uint32
-		expectedOk    bool
-		expectedBytes []byte
-	}{
-		{
-			name:          "valid offset with an endian-insensitive v",
-			offset:        0, // arbitrary valid offset.
-			v:             math.MaxUint32,
-			expectedOk:    true,
-			expectedBytes: []byte{0xff, 0xff, 0xff, 0xff},
-		},
-		{
-			name:          "valid offset with an endian-sensitive v",
-			offset:        0, // arbitrary valid offset.
-			v:             math.MaxUint32 - 1,
-			expectedOk:    true,
-			expectedBytes: []byte{0xfe, 0xff, 0xff, 0xff},
-		},
-		{
-			name:          "maximum boundary valid offset",
-			offset:        memory.Size() - 4, // 4 is the size of uint32
-			v:             1,                 // arbitrary valid v
-			expectedOk:    true,
-			expectedBytes: []byte{0x1, 0x00, 0x00, 0x00},
-		},
-		{
-			name:          "offset exceeds the maximum valid offset by 1",
-			offset:        memory.Size() - 4 + 1, // 4 is the size of uint32
-			v:             1,                     // arbitrary valid v
-			expectedBytes: []byte{0xff, 0xff, 0xff, 0xff},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteUint32Le(tc.offset, tc.v))
-			if tc.expectedOk {
-				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+4]) // 4 is the size of uint32
+			// Special case because reflect.Value can't be compared with Equals
+			require.Equal(t, len(tc.expected.HostFunctionSection), len(m.HostFunctionSection))
+			for i := range tc.expected.HostFunctionSection {
+				require.Equal(t, (*tc.expected.HostFunctionSection[i]).Type(), (*m.HostFunctionSection[i]).Type())
 			}
 		})
 	}
 }
 
-func TestMemoryInstance_WriteUint64Le(t *testing.T) {
-	memory := &MemoryInstance{Buffer: make([]byte, 100)}
-	tests := []struct {
-		name          string
-		offset        uint32
-		v             uint64
-		expectedOk    bool
-		expectedBytes []byte
-	}{
-		{
-			name:          "valid offset with an endian-insensitive v",
-			offset:        0, // arbitrary valid offset.
-			v:             math.MaxUint64,
-			expectedOk:    true,
-			expectedBytes: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-		},
-		{
-			name:          "valid offset with an endian-sensitive v",
-			offset:        0, // arbitrary valid offset.
-			v:             math.MaxUint64 - 1,
-			expectedOk:    true,
-			expectedBytes: []byte{0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-		},
-		{
-			name:          "maximum boundary valid offset",
-			offset:        memory.Size() - 8, // 8 is the size of uint64
-			v:             1,                 // arbitrary valid v
-			expectedOk:    true,
-			expectedBytes: []byte{0x1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		},
-		{
-			name:       "offset exceeds the maximum valid offset by 1",
-			offset:     memory.Size() - 8 + 1, // 8 is the size of uint64
-			v:          1,                     // arbitrary valid v
-			expectedOk: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteUint64Le(tc.offset, tc.v))
-			if tc.expectedOk {
-				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+8]) // 8 is the size of uint64
-			}
-		})
-	}
-}
-
-func TestMemoryInstance_WriteFloat32Le(t *testing.T) {
-	memory := &MemoryInstance{Buffer: make([]byte, 100)}
-
-	tests := []struct {
-		name          string
-		offset        uint32
-		v             float32
-		expectedOk    bool
-		expectedBytes []byte
-	}{
-		{
-			name:          "valid offset with an endian-insensitive v",
-			offset:        0, // arbitrary valid offset.
-			v:             math.Float32frombits(uint32(0xff0000ff)),
-			expectedOk:    true,
-			expectedBytes: []byte{0xff, 0x00, 0x00, 0xff},
-		},
-		{
-			name:          "valid offset with an endian-sensitive v",
-			offset:        0,                                        // arbitrary valid offset.
-			v:             math.Float32frombits(uint32(0xff0000fe)), // arbitrary valid v
-			expectedOk:    true,
-			expectedBytes: []byte{0xfe, 0x00, 0x00, 0xff},
-		},
-		{
-			name:          "maximum boundary valid offset",
-			offset:        memory.Size() - 4, // 4 is the size of float32
-			v:             0.1,               // arbitrary valid v
-			expectedOk:    true,
-			expectedBytes: []byte{0xcd, 0xcc, 0xcc, 0x3d},
-		},
-		{
-			name:          "offset exceeds the maximum valid offset by 1",
-			offset:        memory.Size() - 4 + 1, // 4 is the size of float32
-			v:             math.MaxFloat32,       // arbitrary valid v
-			expectedBytes: []byte{0xff, 0xff, 0xff, 0xff},
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteFloat32Le(tc.offset, tc.v))
-			if tc.expectedOk {
-				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+4]) // 4 is the size of float32
-			}
-		})
-	}
-}
-
-func TestMemoryInstance_WriteFloat64Le(t *testing.T) {
-	memory := &MemoryInstance{Buffer: make([]byte, 100)}
-	tests := []struct {
-		name          string
-		offset        uint32
-		v             float64
-		expectedOk    bool
-		expectedBytes []byte
-	}{
-		{
-			name:          "valid offset with an endian-insensitive v",
-			offset:        0, // arbitrary valid offset.
-			v:             math.Float64frombits(uint64(0xff000000000000ff)),
-			expectedOk:    true,
-			expectedBytes: []byte{0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff},
-		},
-		{
-			name:          "valid offset with an endian-sensitive v",
-			offset:        0,               // arbitrary valid offset.
-			v:             math.MaxFloat64, // arbitrary valid v
-			expectedOk:    true,
-			expectedBytes: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0x7f},
-		},
-		{
-			name:          "maximum boundary valid offset",
-			offset:        memory.Size() - 8, // 8 is the size of float64
-			v:             math.MaxFloat64,   // arbitrary valid v
-			expectedOk:    true,
-			expectedBytes: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0x7f},
-		},
-		{
-			name:       "offset exceeds the maximum valid offset by 1",
-			offset:     memory.Size() - 8 + 1, // 8 is the size of float64
-			v:          math.MaxFloat64,       // arbitrary valid v
-			expectedOk: false,
-		},
-	}
-
-	for _, tt := range tests {
-		tc := tt
-
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedOk, memory.WriteFloat64Le(tc.offset, tc.v))
-			if tc.expectedOk {
-				require.Equal(t, tc.expectedBytes, memory.Buffer[tc.offset:tc.offset+8]) // 8 is the size of float64
-			}
-		})
-	}
-}
-
-func TestStore_NewHostModule(t *testing.T) {
-	s := newStore()
-
-	// Add the host module
-	_, err := s.NewHostModule("test", map[string]interface{}{"fn": func(wasm.ModuleContext) {}})
-	require.NoError(t, err)
-
-	// Ensure it was added to module instances
-	hm := s.modules["test"]
-	require.NotNil(t, hm)
-
-	// The function was added to the store, prefixed by the owning module name
-	require.Equal(t, 1, len(s.functions))
-	fn := s.functions[0]
-	require.Equal(t, "test.fn", fn.Name)
-
-	// The function was exported in the module
-	require.Equal(t, 1, len(hm.Exports))
-	_, ok := hm.Exports["fn"]
-	require.True(t, ok)
-
-	// Trying to register it again should fail
-	_, err = s.NewHostModule("test", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
-	require.EqualError(t, err, "module test has already been instantiated")
-}
-
-func TestStore_NewHostModule_Errors(t *testing.T) {
-	s := newStore()
-
+func TestNewHostModule_Errors(t *testing.T) {
 	t.Run("Adds export name to error message", func(t *testing.T) {
-		_, err := s.NewHostModule("test", map[string]interface{}{"fn": "hello"})
+		_, err := NewHostModule("test", map[string]interface{}{"fn": "hello"})
 		require.EqualError(t, err, "func[fn] kind != func: string")
-
-	})
-
-	t.Run("Fails if module name already in use", func(t *testing.T) {
-		_, err := s.NewHostModule("test", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
-		require.NoError(t, err)
-		// Trying to register it again should fail
-		_, err = s.NewHostModule("test", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
-		require.EqualError(t, err, "module test has already been instantiated")
 	})
 }
 
-func TestHostModule_String(t *testing.T) {
-	s := newStore()
+func TestModule_validateHostFunctions(t *testing.T) {
+	notFn := reflect.ValueOf(t)
+	fn := reflect.ValueOf(func(wasm.Module) {})
 
-	// Ensure paths that can create the host module can see the name.
-	hm, err := s.NewHostModule("host", map[string]interface{}{"host_fn": func(wasm.ModuleContext) {}})
-	require.NoError(t, err)
-	require.Equal(t, "HostModule[host]", hm.String())
+	t.Run("ok", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{}},
+			FunctionSection:     []uint32{0},
+			HostFunctionSection: []*reflect.Value{&fn},
+		}
+		err := m.validateHostFunctions()
+		require.NoError(t, err)
+	})
+	t.Run("function, but no host function", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{}},
+			FunctionSection:     []Index{0},
+			HostFunctionSection: nil,
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, "host function count (0) != function count (1)")
+	})
+	t.Run("function out of range of host functions", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{}},
+			FunctionSection:     []Index{1},
+			HostFunctionSection: []*reflect.Value{&fn},
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, "host_function[0] type section index out of range: 1")
+	})
+	t.Run("mismatch params", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{Params: []ValueType{ValueTypeF32}}},
+			FunctionSection:     []Index{0},
+			HostFunctionSection: []*reflect.Value{&fn},
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, "host_function[0] signature doesn't match type section: v_v != f32_v")
+	})
+	t.Run("mismatch results", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
+			FunctionSection:     []Index{0},
+			HostFunctionSection: []*reflect.Value{&fn},
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, "host_function[0] signature doesn't match type section: v_v != v_f32")
+	})
+	t.Run("not a function", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{}},
+			FunctionSection:     []Index{0},
+			HostFunctionSection: []*reflect.Value{&notFn},
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, "host_function[0] is not a valid go func: kind != func: ptr")
+	})
+	t.Run("not a function - exported", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{}},
+			FunctionSection:     []Index{0},
+			HostFunctionSection: []*reflect.Value{&notFn},
+			ExportSection:       map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0}},
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, `host_function[0] (export "f1") is not a valid go func: kind != func: ptr`)
+	})
+	t.Run("not a function  - exported after import", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{}},
+			ImportSection:       []*Import{{Type: ExternTypeFunc}},
+			FunctionSection:     []Index{1},
+			HostFunctionSection: []*reflect.Value{&notFn},
+			ExportSection:       map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 1}},
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, `host_function[0] (export "f1") is not a valid go func: kind != func: ptr`)
+	})
+	t.Run("not a function - exported twice", func(t *testing.T) {
+		m := Module{
+			TypeSection:         []*FunctionType{{}},
+			FunctionSection:     []Index{0},
+			HostFunctionSection: []*reflect.Value{&notFn},
+			ExportSection: map[string]*Export{
+				"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0},
+				"f2": {Name: "f2", Type: ExternTypeFunc, Index: 0},
+			},
+		}
+		err := m.validateHostFunctions()
+		require.Error(t, err)
+		require.EqualError(t, err, `host_function[0] (export "f1","f2") is not a valid go func: kind != func: ptr`)
+	})
 }

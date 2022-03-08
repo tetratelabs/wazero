@@ -17,6 +17,17 @@ const (
 	MemoryPageSizeInBits = 16
 )
 
+// MemoryInstance represents a memory instance in a store, and implements wasm.Memory.
+//
+// Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means the precise memory is always
+// wasm.Store Memories index zero: `store.Memories[0]`
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
+type MemoryInstance struct {
+	Buffer []byte
+	Min    uint32
+	Max    *uint32
+}
+
 // Size implements wasm.Memory Size
 func (m *MemoryInstance) Size() uint32 {
 	return uint32(len(m.Buffer))

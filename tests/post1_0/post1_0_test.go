@@ -1,7 +1,6 @@
 package post1_0
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"testing"
@@ -92,10 +91,10 @@ func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeC
 			} {
 				tc := tc
 				t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
-					fn := module.Function(tc.funcname)
+					fn := module.ExportedFunction(tc.funcname)
 					require.NotNil(t, fn)
 
-					actual, err := fn.Call(context.Background(), uint64(uint32(tc.in)))
+					actual, err := fn.Call(nil, uint64(uint32(tc.in)))
 					require.NoError(t, err)
 					require.Equal(t, tc.expected, int32(actual[0]))
 				})
@@ -140,10 +139,10 @@ func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeC
 			} {
 				tc := tc
 				t.Run(fmt.Sprintf("0x%x", tc.in), func(t *testing.T) {
-					fn := module.Function(tc.funcname)
+					fn := module.ExportedFunction(tc.funcname)
 					require.NotNil(t, fn)
 
-					actual, err := fn.Call(context.Background(), uint64(tc.in))
+					actual, err := fn.Call(nil, uint64(tc.in))
 					require.NoError(t, err)
 					require.Equal(t, tc.expected, int64(actual[0]))
 				})

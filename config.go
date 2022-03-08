@@ -40,7 +40,7 @@ type RuntimeConfig struct {
 //
 // Notes:
 // * If the Module defines a start function, this is used to invoke it.
-// * This is the outer-most ancestor of wasm.ModuleContext Context() during wasm.HostFunction invocations.
+// * This is the outer-most ancestor of wasm.Module Context() during wasm.Function invocations.
 // * This is the default context of wasm.Function when callers pass nil.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-function%E2%91%A0
@@ -100,7 +100,7 @@ type HostModuleConfig struct {
 	//		return x + y
 	//	}
 	//
-	// Host functions may also have an initial parameter (param[0]) of type context.Context or wasm.ModuleContext.
+	// Host functions may also have an initial parameter (param[0]) of type context.Context or wasm.Module.
 	//
 	// Ex. This uses a Go Context:
 	//
@@ -109,13 +109,13 @@ type HostModuleConfig struct {
 	//		return x + y + ctx.Value(extraKey).(uint32)
 	//	}
 	//
-	// The most sophisticated context is wasm.ModuleContext, which allows access to the Go context, but also
+	// The most sophisticated context is wasm.Module, which allows access to the Go context, but also
 	// allows writing to memory. This is important because there are only numeric types in Wasm. The only way to share other
 	// data is via writing memory and sharing offsets.
 	//
 	// Ex. This reads the parameters from!
 	//
-	//	addInts := func(ctx wasm.ModuleContext, offset uint32) uint32 {
+	//	addInts := func(ctx wasm.Module, offset uint32) uint32 {
 	//		x, _ := ctx.Memory().ReadUint32Le(offset)
 	//		y, _ := ctx.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
 	//		return x + y

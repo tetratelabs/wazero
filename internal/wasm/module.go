@@ -2,7 +2,10 @@ package internalwasm
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/tetratelabs/wazero/internal/ieee754"
@@ -29,6 +32,7 @@ type EncodeModule func(m *Module) (bytes []byte)
 // Differences from the specification:
 // * NameSection is the only key ("name") decoded from the SectionIDCustom.
 // * ExportSection is represented as a map for lookup convenience.
+// * HostFunctionSection is a custom section that contains any go `func`s. It may be present when CodeSection is not.
 type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
@@ -124,6 +128,7 @@ type Module struct {
 	ElementSection []*ElementSegment
 
 	// CodeSection is index-correlated with FunctionSection and contains each function's locals and body.
+	// When present, the HostFunctionSection must be nil.
 	//
 	// Note: In the Binary Format, this is SectionIDCode.
 	//
@@ -141,6 +146,13 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	NameSection *NameSection
+
+	// HostFunctionSection is index-correlated with FunctionSection and contains a host function defined in Go.
+	// When present, the CodeSection must be nil.
+	//
+	// Note: This section currently has no serialization format, so is not encodable.
+	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A2
+	HostFunctionSection []*reflect.Value
 }
 
 // TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
@@ -179,6 +191,10 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
+	if m.SectionElementCount(SectionIDCode) > 0 && m.SectionElementCount(SectionIDHostFunction) > 0 {
+		return errors.New("cannot mix functions and host functions in the same module")
+	}
+
 	functions, globals, memories, tables := m.allDeclarations()
 
 	// The wazero specific limitation described at RATIONALE.md.
@@ -195,8 +211,14 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
-	if err := m.validateFunctions(functions, globals, memories, tables, enabledFeatures); err != nil {
-		return err
+	if m.CodeSection != nil {
+		if err := m.validateFunctions(functions, globals, memories, tables, enabledFeatures); err != nil {
+			return err
+		}
+	} else {
+		if err := m.validateHostFunctions(); err != nil {
+			return err
+		}
 	}
 
 	if err := m.validateExports(functions, globals, memories, tables); err != nil {
@@ -227,7 +249,7 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 		return fmt.Errorf("too many globals in a module")
 	}
 
-	// Global's initialization constant expression can only reference the imported globals.
+	// Global initialization constant expression can only reference the imported globals.
 	// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 	importedGlobals := globals[:m.ImportGlobalCount()]
 	for _, g := range m.GlobalSection {
@@ -239,9 +261,13 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 }
 
 func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType, enabledFeatures Features) error {
-	typeCount := m.SectionElementCount(SectionIDType)
-	codeCount := m.SectionElementCount(SectionIDCode)
 	functionCount := m.SectionElementCount(SectionIDFunction)
+	codeCount := m.SectionElementCount(SectionIDCode)
+	if functionCount == 0 && codeCount == 0 {
+		return nil
+	}
+
+	typeCount := m.SectionElementCount(SectionIDType)
 	if codeCount != functionCount {
 		return fmt.Errorf("code count (%d) != function count (%d)", codeCount, functionCount)
 	}
@@ -278,6 +304,7 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	if exportNames == nil {
 		return fmt.Sprintf("%s[%d]", sectionIDName, sectionIndex)
 	}
+	sort.Strings(exportNames) // go map keys do not iterate consistently
 	return fmt.Sprintf("%s[%d] (export %s)", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
@@ -391,7 +418,7 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
 	for _, gs := range m.GlobalSection {
 		var gv uint64
-		// Global's initialization constant expression can only reference the imported globals.
+		// Global initialization constant expression can only reference the imported globals.
 		// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case int32:
@@ -710,6 +737,11 @@ const (
 	SectionIDData
 )
 
+// SectionIDHostFunction is a pseudo-section ID for host functions.
+//
+// Note: This is not defined in the WebAssembly 1.0 (20191205) Binary Format.
+const SectionIDHostFunction = SectionID(0xff)
+
 // SectionIDName returns the canonical name of a module section.
 // https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#sections%E2%91%A0
 func SectionIDName(sectionID SectionID) string {
@@ -738,6 +770,8 @@ func SectionIDName(sectionID SectionID) string {
 		return "code"
 	case SectionIDData:
 		return "data"
+	case SectionIDHostFunction:
+		return "host_function"
 	}
 	return "unknown"
 }

@@ -92,9 +92,6 @@ type (
 		// Ctx holds default function call context from this function instance.
 		Ctx *ModuleContext
 
-		// hostModule holds HostModule if this is a "host module" which is created in store.NewHostModule.
-		hostModule *HostModule
-
 		// mux is used to guard the fields from concurrent access.
 		mux sync.Mutex
 
@@ -209,17 +206,6 @@ type (
 		FunctionTypeID FunctionTypeID
 	}
 
-	// MemoryInstance represents a memory instance in a store, and implements wasm.Memory.
-	//
-	// Note: In WebAssembly 1.0 (20191205), there may be up to one Memory per store, which means the precise memory is always
-	// wasm.Store Memories index zero: `store.Memories[0]`
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-instances%E2%91%A0.
-	MemoryInstance struct {
-		Buffer []byte
-		Min    uint32
-		Max    *uint32
-	}
-
 	// FunctionIndex is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr),
 	// and the index to Store.Functions.
 	FunctionIndex storeIndex
@@ -283,7 +269,7 @@ func (m *ModuleInstance) buildExports(exports map[string]*Export) {
 			ei = &ExportInstance{Type: exp.Type, Function: m.Functions[index]}
 			// The module instance of the host function is a fake that only includes the function and its types.
 			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
-			// available to the wasm.ModuleContext Memory.
+			// available to the wasm.Module Memory.
 			if ei.Function.GoFunc != nil {
 				ei.Function.Module = m
 			}
@@ -389,7 +375,7 @@ func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
 
 // Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
 // different names safely and concurrently.
-func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) {
+func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
 	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
@@ -421,8 +407,18 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		return nil, err
 	}
 
-	functions, globals, table, memory :=
-		module.buildFunctions(), module.buildGlobals(importedGlobals), module.buildTable(), module.buildMemory()
+	globals, table, memory := module.buildGlobals(importedGlobals), module.buildTable(), module.buildMemory()
+
+	// If there are no module-defined functions, assume this is a host module.
+	var functions []*FunctionInstance
+	var funcSection SectionID
+	if module.HostFunctionSection == nil {
+		funcSection = SectionIDFunction
+		functions = module.buildFunctions()
+	} else {
+		funcSection = SectionIDHostFunction
+		functions = module.buildHostFunctionInstances()
+	}
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m := &ModuleInstance{Name: name}
@@ -447,7 +443,7 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 			s.deleteModule(name)
 			// On the failure, release the assigned funcaddr and already compiled functions.
 			_ = s.releaseFunctions(functions[:i]...) // ignore any release error, so we can report the original one.
-			return nil, fmt.Errorf("%s compilation failed: %w", module.funcDesc(SectionIDFunction, Index(i)), err)
+			return nil, fmt.Errorf("%s compilation failed: %w", module.funcDesc(funcSection, Index(i)), err)
 		}
 	}
 
@@ -466,13 +462,13 @@ func (s *Store) Instantiate(module *Module, name string) (*PublicModule, error) 
 		funcIdx := *module.StartSection
 		if _, err = s.engine.Call(m.Ctx, m.Functions[funcIdx]); err != nil {
 			s.deleteModule(name)
-			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(SectionIDFunction, funcIdx), err)
+			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}
 	}
 
 	// Now that the instantiation is complete without error, add it. This makes it visible for import.
 	s.addModule(m)
-	return &PublicModule{s: s, instance: m}, nil
+	return m.Ctx, nil
 }
 
 // ReleaseModule deallocates resources if a module with the given name exists.
@@ -581,10 +577,10 @@ func (s *Store) addModule(m *ModuleInstance) {
 	s.modules[m.Name] = m
 }
 
-// Module implements wasm.Store Module
+// Module implements wazero.Runtime Module
 func (s *Store) Module(moduleName string) publicwasm.Module {
 	if m := s.module(moduleName); m != nil {
-		return &PublicModule{s: s, instance: m}
+		return m.Ctx
 	} else {
 		return nil
 	}
@@ -594,42 +590,6 @@ func (s *Store) module(moduleName string) *ModuleInstance {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 	return s.modules[moduleName]
-}
-
-// PublicModule implements wasm.Module
-type PublicModule struct {
-	s        *Store
-	instance *ModuleInstance
-}
-
-// String implements fmt.Stringer
-func (m *PublicModule) String() string {
-	return fmt.Sprintf("Module[%s]", m.instance.Name)
-}
-
-// Function implements wasm.Module Function
-func (m *PublicModule) Function(name string) publicwasm.Function {
-	exp, err := m.instance.getExport(name, ExternTypeFunc)
-	if err != nil {
-		return nil
-	}
-	return &exportedFunction{module: m.instance.Ctx, function: exp.Function}
-}
-
-// Memory implements wasm.Module Memory
-func (m *PublicModule) Memory(name string) publicwasm.Memory {
-	exp, err := m.instance.getExport(name, ExternTypeMemory)
-	if err != nil {
-		return nil
-	}
-	return exp.Memory
-}
-
-// HostModule implements wasm.Store HostModule
-func (s *Store) HostModule(moduleName string) publicwasm.HostModule {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-	return s.modules[moduleName].hostModule
 }
 
 func (s *Store) resolveImports(module *Module) (

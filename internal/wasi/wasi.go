@@ -427,7 +427,7 @@ const (
 type SnapshotPreview1 interface {
 	// ArgsGet is the WASI function that reads command-line argument data (Args).
 	//
-	// There are two parameters. Both are offsets in wasm.ModuleContext Memory. If either are invalid due to
+	// There are two parameters. Both are offsets in wasm.Module Memory. If either are invalid due to
 	// memory constraints, this returns ErrnoFault.
 	//
 	// * argv - is the offset to begin writing argument offsets in uint32 little-endian encoding.
@@ -451,12 +451,12 @@ type SnapshotPreview1 interface {
 	// See ArgsSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsGet(ctx wasm.ModuleContext, argv, argvBuf uint32) wasi.Errno
+	ArgsGet(ctx wasm.Module, argv, argvBuf uint32) wasi.Errno
 
 	// ArgsSizesGet is the WASI function named FunctionArgsSizesGet that reads command-line argument data (Args)
 	// sizes.
 	//
-	// There are two result parameters: these are offsets in the wasm.ModuleContext Memory to write
+	// There are two result parameters: these are offsets in the wasm.Module Memory to write
 	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
 	// returns ErrnoFault.
 	//
@@ -479,11 +479,11 @@ type SnapshotPreview1 interface {
 	// See ArgsGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	ArgsSizesGet(ctx wasm.ModuleContext, resultArgc, resultArgvBufSize uint32) wasi.Errno
+	ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize uint32) wasi.Errno
 
 	// EnvironGet is the WASI function named FunctionEnvironGet that reads environment variables. (Environ)
 	//
-	// There are two parameters. Both are offsets in wasm.ModuleContext Memory. If either are invalid due to
+	// There are two parameters. Both are offsets in wasm.Module Memory. If either are invalid due to
 	// memory constraints, this returns ErrnoFault.
 	//
 	// * environ - is the offset to begin writing environment variables offsets in uint32 little-endian encoding.
@@ -507,12 +507,12 @@ type SnapshotPreview1 interface {
 	// See EnvironSizesGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironGet(ctx wasm.ModuleContext, environ, environBuf uint32) wasi.Errno
+	EnvironGet(ctx wasm.Module, environ, environBuf uint32) wasi.Errno
 
 	// EnvironSizesGet is the WASI function named FunctionEnvironSizesGet that reads environment variable
 	// (Environ) sizes.
 	//
-	// There are two result parameters: these are offsets in the wasi.ModuleContext Memory to write
+	// There are two result parameters: these are offsets in the wasi.Module Memory to write
 	// corresponding sizes in uint32 little-endian encoding. If either are invalid due to memory constraints, this
 	// returns ErrnoFault.
 	//
@@ -536,10 +536,10 @@ type SnapshotPreview1 interface {
 	// See EnvironGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 	// See https://en.wikipedia.org/wiki/Null-terminated_string
-	EnvironSizesGet(ctx wasm.ModuleContext, resultEnvironc, resultEnvironBufSize uint32) wasi.Errno
+	EnvironSizesGet(ctx wasm.Module, resultEnvironc, resultEnvironBufSize uint32) wasi.Errno
 
 	// ClockResGet is the WASI function named FunctionClockResGet and is stubbed for GrainLang per #271
-	ClockResGet(ctx wasm.ModuleContext, id uint32, resultResolution uint32) wasi.Errno
+	ClockResGet(ctx wasm.Module, id uint32, resultResolution uint32) wasi.Errno
 
 	// ClockTimeGet is the WASI function named FunctionClockTimeGet that returns the time value of a clock (time.Now).
 	//
@@ -561,13 +561,13 @@ type SnapshotPreview1 interface {
 	// Note: This is similar to `clock_gettime` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-clock_time_getid-clockid-precision-timestamp---errno-timestamp
 	// See https://linux.die.net/man/3/clock_gettime
-	ClockTimeGet(ctx wasm.ModuleContext, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno
+	ClockTimeGet(ctx wasm.Module, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno
 
 	// FdAdvise is the WASI function named FunctionFdAdvise and is stubbed for GrainLang per #271
-	FdAdvise(ctx wasm.ModuleContext, fd uint32, offset, len uint64, resultAdvice uint32) wasi.Errno
+	FdAdvise(ctx wasm.Module, fd uint32, offset, len uint64, resultAdvice uint32) wasi.Errno
 
 	// FdAllocate is the WASI function named FunctionFdAllocate and is stubbed for GrainLang per #271
-	FdAllocate(ctx wasm.ModuleContext, fd uint32, offset, len uint64, resultAdvice uint32) wasi.Errno
+	FdAllocate(ctx wasm.Module, fd uint32, offset, len uint64, resultAdvice uint32) wasi.Errno
 
 	// FdClose is the WASI function to close a file descriptor. This returns ErrnoBadf if the fd is invalid.
 	//
@@ -577,10 +577,10 @@ type SnapshotPreview1 interface {
 	// Note: This is similar to `close` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_close
 	// See https://linux.die.net/man/3/close
-	FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno
+	FdClose(ctx wasm.Module, fd uint32) wasi.Errno
 
 	// FdDatasync is the WASI function named FunctionFdDatasync and is stubbed for GrainLang per #271
-	FdDatasync(ctx wasm.ModuleContext, fd uint32) wasi.Errno
+	FdDatasync(ctx wasm.Module, fd uint32) wasi.Errno
 
 	// FdFdstatGet is the WASI function to return the attributes of a file descriptor.
 	//
@@ -614,25 +614,25 @@ type SnapshotPreview1 interface {
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fdstat
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_fdstat_get
 	// See https://linux.die.net/man/3/fsync
-	FdFdstatGet(ctx wasm.ModuleContext, fd, resultFdstat uint32) wasi.Errno
+	FdFdstatGet(ctx wasm.Module, fd, resultFdstat uint32) wasi.Errno
 
 	// FdFdstatSetFlags is the WASI function named FunctionFdFdstatSetFlags and is stubbed for GrainLang per #271
-	FdFdstatSetFlags(ctx wasm.ModuleContext, fd uint32, flags uint32) wasi.Errno
+	FdFdstatSetFlags(ctx wasm.Module, fd uint32, flags uint32) wasi.Errno
 
 	// FdFdstatSetRights is the WASI function named FunctionFdFdstatSetRights and is stubbed for GrainLang per #271
-	FdFdstatSetRights(ctx wasm.ModuleContext, fd uint32, fsRightsBase, fsRightsInheriting uint64) wasi.Errno
+	FdFdstatSetRights(ctx wasm.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) wasi.Errno
 
 	// FdFilestatGet is the WASI function named FunctionFdFilestatGet
-	FdFilestatGet(ctx wasm.ModuleContext, fd uint32, resultBuf uint32) wasi.Errno
+	FdFilestatGet(ctx wasm.Module, fd uint32, resultBuf uint32) wasi.Errno
 
 	// FdFilestatSetSize is the WASI function named FunctionFdFilestatSetSize
-	FdFilestatSetSize(ctx wasm.ModuleContext, fd uint32, size uint64) wasi.Errno
+	FdFilestatSetSize(ctx wasm.Module, fd uint32, size uint64) wasi.Errno
 
 	// FdFilestatSetTimes is the WASI function named FunctionFdFilestatSetTimes
-	FdFilestatSetTimes(ctx wasm.ModuleContext, fd uint32, atim, mtim uint64, fstFlags uint32) wasi.Errno
+	FdFilestatSetTimes(ctx wasm.Module, fd uint32, atim, mtim uint64, fstFlags uint32) wasi.Errno
 
 	// FdPread is the WASI function named FunctionFdPread
-	FdPread(ctx wasm.ModuleContext, fd, iovs uint32, offset uint64, resultNread uint32) wasi.Errno
+	FdPread(ctx wasm.Module, fd, iovs uint32, offset uint64, resultNread uint32) wasi.Errno
 
 	// FdPrestatGet is the WASI function to return the prestat data of a file descriptor.
 	// This returns wasi.ErrnoBadf if the fd is invalid.
@@ -658,7 +658,7 @@ type SnapshotPreview1 interface {
 	// See FdPrestatDirName
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#prestat
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#fd_prestat_get
-	FdPrestatGet(ctx wasm.ModuleContext, fd uint32, resultPrestat uint32) wasi.Errno
+	FdPrestatGet(ctx wasm.Module, fd uint32, resultPrestat uint32) wasi.Errno
 
 	// FdPrestatDirName is the WASI function to return the path of the pre-opened directory of a file descriptor.
 	//
@@ -684,11 +684,11 @@ type SnapshotPreview1 interface {
 	// Note: ImportFdPrestatDirName shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See FdPrestatGet
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_dir_name
-	FdPrestatDirName(ctx wasm.ModuleContext, fd, path, pathLen uint32) wasi.Errno
+	FdPrestatDirName(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno
 	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
 
 	// FdPwrite is the WASI function named FunctionFdPwrite
-	FdPwrite(ctx wasm.ModuleContext, fd, iovs uint32, offset uint64, resultNwritten uint32) wasi.Errno
+	FdPwrite(ctx wasm.Module, fd, iovs uint32, offset uint64, resultNwritten uint32) wasi.Errno
 
 	// FdRead is the WASI function to read from a file descriptor.
 	//
@@ -733,22 +733,22 @@ type SnapshotPreview1 interface {
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#iovec
 	// See https://linux.die.net/man/3/readv
-	FdRead(ctx wasm.ModuleContext, fd, iovs, iovsCount, resultSize uint32) wasi.Errno
+	FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno
 
 	// FdReaddir is the WASI function named FunctionFdReaddir
-	FdReaddir(ctx wasm.ModuleContext, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) wasi.Errno
+	FdReaddir(ctx wasm.Module, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) wasi.Errno
 
 	// FdRenumber is the WASI function named FunctionFdRenumber
-	FdRenumber(ctx wasm.ModuleContext, fd, to uint32) wasi.Errno
+	FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno
 
 	// FdSeek is the WASI function named FunctionFdSeek
-	FdSeek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno
+	FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno
 
 	// FdSync is the WASI function named FunctionFdSync
-	FdSync(ctx wasm.ModuleContext, fd uint32) wasi.Errno
+	FdSync(ctx wasm.Module, fd uint32) wasi.Errno
 
 	// FdTell is the WASI function named FunctionFdTell
-	FdTell(ctx wasm.ModuleContext, fd, resultOffset uint32) wasi.Errno
+	FdTell(ctx wasm.Module, fd, resultOffset uint32) wasi.Errno
 
 	// FdWrite is the WASI function to write to a file descriptor.
 	//
@@ -799,19 +799,19 @@ type SnapshotPreview1 interface {
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#ciovec
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_write
 	// See https://linux.die.net/man/3/writev
-	FdWrite(ctx wasm.ModuleContext, fd, iovs, iovsCount, resultSize uint32) wasi.Errno
+	FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno
 
 	// PathCreateDirectory is the WASI function named FunctionPathCreateDirectory
-	PathCreateDirectory(ctx wasm.ModuleContext, fd, path, pathLen uint32) wasi.Errno
+	PathCreateDirectory(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno
 
 	// PathFilestatGet is the WASI function named FunctionPathFilestatGet
-	PathFilestatGet(ctx wasm.ModuleContext, fd, flags, path, pathLen, resultBuf uint32) wasi.Errno
+	PathFilestatGet(ctx wasm.Module, fd, flags, path, pathLen, resultBuf uint32) wasi.Errno
 
 	// PathFilestatSetTimes is the WASI function named FunctionPathFilestatSetTimes
-	PathFilestatSetTimes(ctx wasm.ModuleContext, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) wasi.Errno
+	PathFilestatSetTimes(ctx wasm.Module, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) wasi.Errno
 
 	// PathLink is the WASI function named FunctionPathLink
-	PathLink(ctx wasm.ModuleContext, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno
+	PathLink(ctx wasm.Module, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno
 
 	// PathOpen is the WASI function to open a file or directory. This returns ErrnoBadf if the fd is invalid.
 	//
@@ -849,25 +849,25 @@ type SnapshotPreview1 interface {
 	// Note: The returned file descriptor is not guaranteed to be the lowest-numbered file
 	// See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#path_open
 	// See https://linux.die.net/man/3/openat
-	PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase, fsRightsInheriting uint32, fdflags, resultOpenedFd uint32) wasi.Errno
+	PathOpen(ctx wasm.Module, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase, fsRightsInheriting uint32, fdflags, resultOpenedFd uint32) wasi.Errno
 
 	// PathReadlink is the WASI function named FunctionPathReadlink
-	PathReadlink(ctx wasm.ModuleContext, fd, path, pathLen, buf, bufLen, resultBufused uint32) wasi.Errno
+	PathReadlink(ctx wasm.Module, fd, path, pathLen, buf, bufLen, resultBufused uint32) wasi.Errno
 
 	// PathRemoveDirectory is the WASI function named FunctionPathRemoveDirectory
-	PathRemoveDirectory(ctx wasm.ModuleContext, fd, path, pathLen uint32) wasi.Errno
+	PathRemoveDirectory(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno
 
 	// PathRename is the WASI function named FunctionPathRename
-	PathRename(ctx wasm.ModuleContext, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno
+	PathRename(ctx wasm.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno
 
 	// PathSymlink is the WASI function named FunctionPathSymlink
-	PathSymlink(ctx wasm.ModuleContext, oldPath, oldPathLen, fd, newFd, newPath, newPathLen uint32) wasi.Errno
+	PathSymlink(ctx wasm.Module, oldPath, oldPathLen, fd, newFd, newPath, newPathLen uint32) wasi.Errno
 
 	// PathUnlinkFile is the WASI function named FunctionPathUnlinkFile
-	PathUnlinkFile(ctx wasm.ModuleContext, fd, path, pathLen uint32) wasi.Errno
+	PathUnlinkFile(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno
 
 	// PollOneoff is the WASI function named FunctionPollOneoff
-	PollOneoff(ctx wasm.ModuleContext, in, out, nsubscriptions, resultNevents uint32) wasi.Errno
+	PollOneoff(ctx wasm.Module, in, out, nsubscriptions, resultNevents uint32) wasi.Errno
 
 	// ProcExit is the WASI function that terminates the execution of the module with an exit code.
 	// An exit code of 0 indicates successful termination. The meanings of other values are not defined by WASI.
@@ -883,10 +883,10 @@ type SnapshotPreview1 interface {
 	ProcExit(rval uint32)
 
 	// ProcRaise is the WASI function named FunctionProcRaise
-	ProcRaise(ctx wasm.ModuleContext, sig uint32) wasi.Errno
+	ProcRaise(ctx wasm.Module, sig uint32) wasi.Errno
 
 	// SchedYield is the WASI function named FunctionSchedYield
-	SchedYield(ctx wasm.ModuleContext) wasi.Errno
+	SchedYield(ctx wasm.Module) wasi.Errno
 
 	// RandomGet is the WASI function named FunctionRandomGet that write random data in buffer (rand.Read()).
 	//
@@ -903,16 +903,16 @@ type SnapshotPreview1 interface {
 	//
 	// Note: ImportRandomGet shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-	RandomGet(ctx wasm.ModuleContext, buf, bufLen uint32) wasi.Errno
+	RandomGet(ctx wasm.Module, buf, bufLen uint32) wasi.Errno
 
 	// SockRecv is the WASI function named FunctionSockRecv
-	SockRecv(ctx wasm.ModuleContext, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) wasi.Errno
+	SockRecv(ctx wasm.Module, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) wasi.Errno
 
 	// SockSend is the WASI function named FunctionSockSend
-	SockSend(ctx wasm.ModuleContext, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) wasi.Errno
+	SockSend(ctx wasm.Module, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) wasi.Errno
 
 	// SockShutdown is the WASI function named FunctionSockShutdown
-	SockShutdown(ctx wasm.ModuleContext, fd, how uint32) wasi.Errno
+	SockShutdown(ctx wasm.Module, fd, how uint32) wasi.Errno
 }
 
 type wasiAPI struct {
@@ -931,7 +931,7 @@ type wasiAPI struct {
 
 // SnapshotPreview1Functions returns all go functions that implement SnapshotPreview1.
 // These should be exported in the module named wasi.ModuleSnapshotPreview1.
-// See internalwasm.newGoFunc
+// See internalwasm.NewHostModule
 func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interface{}) {
 	a := NewAPI(opts...)
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
@@ -987,7 +987,7 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 }
 
 // ArgsGet implements SnapshotPreview1.ArgsGet
-func (a *wasiAPI) ArgsGet(ctx wasm.ModuleContext, argv, argvBuf uint32) wasi.Errno {
+func (a *wasiAPI) ArgsGet(ctx wasm.Module, argv, argvBuf uint32) wasi.Errno {
 	for _, arg := range a.args.nullTerminatedValues {
 		if !ctx.Memory().WriteUint32Le(argv, argvBuf) {
 			return wasi.ErrnoFault
@@ -1003,7 +1003,7 @@ func (a *wasiAPI) ArgsGet(ctx wasm.ModuleContext, argv, argvBuf uint32) wasi.Err
 }
 
 // ArgsSizesGet implements SnapshotPreview1.ArgsSizesGet
-func (a *wasiAPI) ArgsSizesGet(ctx wasm.ModuleContext, resultArgc, resultArgvBufSize uint32) wasi.Errno {
+func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize uint32) wasi.Errno {
 	if !ctx.Memory().WriteUint32Le(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
 		return wasi.ErrnoFault
 	}
@@ -1014,7 +1014,7 @@ func (a *wasiAPI) ArgsSizesGet(ctx wasm.ModuleContext, resultArgc, resultArgvBuf
 }
 
 // EnvironGet implements SnapshotPreview1.EnvironGet
-func (a *wasiAPI) EnvironGet(ctx wasm.ModuleContext, environ uint32, environBuf uint32) wasi.Errno {
+func (a *wasiAPI) EnvironGet(ctx wasm.Module, environ uint32, environBuf uint32) wasi.Errno {
 	// w.environ holds the environment variables in the form of "key=val\x00", so just copies it to the linear memory.
 	for _, env := range a.environ.nullTerminatedValues {
 		if !ctx.Memory().WriteUint32Le(environ, environBuf) {
@@ -1031,7 +1031,7 @@ func (a *wasiAPI) EnvironGet(ctx wasm.ModuleContext, environ uint32, environBuf 
 }
 
 // EnvironSizesGet implements SnapshotPreview1.EnvironSizesGet
-func (a *wasiAPI) EnvironSizesGet(ctx wasm.ModuleContext, resultEnvironc uint32, resultEnvironBufSize uint32) wasi.Errno {
+func (a *wasiAPI) EnvironSizesGet(ctx wasm.Module, resultEnvironc uint32, resultEnvironBufSize uint32) wasi.Errno {
 	if !ctx.Memory().WriteUint32Le(resultEnvironc, uint32(len(a.environ.nullTerminatedValues))) {
 		return wasi.ErrnoFault
 	}
@@ -1043,12 +1043,12 @@ func (a *wasiAPI) EnvironSizesGet(ctx wasm.ModuleContext, resultEnvironc uint32,
 }
 
 // ClockResGet implements SnapshotPreview1.ClockResGet
-func (a *wasiAPI) ClockResGet(ctx wasm.ModuleContext, id uint32, resultResolution uint32) wasi.Errno {
+func (a *wasiAPI) ClockResGet(ctx wasm.Module, id uint32, resultResolution uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // ClockTimeGet implements SnapshotPreview1.ClockTimeGet
-func (a *wasiAPI) ClockTimeGet(ctx wasm.ModuleContext, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno {
+func (a *wasiAPI) ClockTimeGet(ctx wasm.Module, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno {
 	// TODO: id and precision are currently ignored.
 	if !ctx.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
 		return wasi.ErrnoFault
@@ -1057,17 +1057,17 @@ func (a *wasiAPI) ClockTimeGet(ctx wasm.ModuleContext, id uint32, precision uint
 }
 
 // FdAdvise implements SnapshotPreview1.FdAdvise
-func (a *wasiAPI) FdAdvise(ctx wasm.ModuleContext, fd uint32, offset, len uint64, resultAdvice uint32) wasi.Errno {
+func (a *wasiAPI) FdAdvise(ctx wasm.Module, fd uint32, offset, len uint64, resultAdvice uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdAllocate implements SnapshotPreview1.FdAllocate
-func (a *wasiAPI) FdAllocate(ctx wasm.ModuleContext, fd uint32, offset, len uint64) wasi.Errno {
+func (a *wasiAPI) FdAllocate(ctx wasm.Module, fd uint32, offset, len uint64) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdClose implements SnapshotPreview1.FdClose
-func (a *wasiAPI) FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
+func (a *wasiAPI) FdClose(ctx wasm.Module, fd uint32) wasi.Errno {
 	f, ok := a.opened[fd]
 	if !ok {
 		return wasi.ErrnoBadf
@@ -1083,13 +1083,13 @@ func (a *wasiAPI) FdClose(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
 }
 
 // FdDatasync implements SnapshotPreview1.FdDatasync
-func (a *wasiAPI) FdDatasync(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
+func (a *wasiAPI) FdDatasync(ctx wasm.Module, fd uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFdstatGet implements SnapshotPreview1.FdFdstatGet
 // TODO: Currently FdFdstatget implements nothing except returning fake fs_right_inheriting
-func (a *wasiAPI) FdFdstatGet(ctx wasm.ModuleContext, fd uint32, resultStat uint32) wasi.Errno {
+func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) wasi.Errno {
 	if _, ok := a.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
@@ -1101,7 +1101,7 @@ func (a *wasiAPI) FdFdstatGet(ctx wasm.ModuleContext, fd uint32, resultStat uint
 
 // FdPrestatGet implements SnapshotPreview1.FdPrestatGet
 // TODO: Currently FdPrestatGet implements nothing except returning ErrnoBadf
-func (a *wasiAPI) FdPrestatGet(ctx wasm.ModuleContext, fd uint32, bufPtr uint32) wasi.Errno {
+func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, bufPtr uint32) wasi.Errno {
 	if _, ok := a.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
@@ -1109,37 +1109,37 @@ func (a *wasiAPI) FdPrestatGet(ctx wasm.ModuleContext, fd uint32, bufPtr uint32)
 }
 
 // FdFdstatSetFlags implements SnapshotPreview1.FdFdstatSetFlags
-func (a *wasiAPI) FdFdstatSetFlags(ctx wasm.ModuleContext, fd uint32, flags uint32) wasi.Errno {
+func (a *wasiAPI) FdFdstatSetFlags(ctx wasm.Module, fd uint32, flags uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFdstatSetRights implements SnapshotPreview1.FdFdstatSetRights
-func (a *wasiAPI) FdFdstatSetRights(ctx wasm.ModuleContext, fd uint32, fsRightsBase, fsRightsInheriting uint64) wasi.Errno {
+func (a *wasiAPI) FdFdstatSetRights(ctx wasm.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFilestatGet implements SnapshotPreview1.FdFilestatGet
-func (a *wasiAPI) FdFilestatGet(ctx wasm.ModuleContext, fd uint32, resultBuf uint32) wasi.Errno {
+func (a *wasiAPI) FdFilestatGet(ctx wasm.Module, fd uint32, resultBuf uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFilestatSetSize implements SnapshotPreview1.FdFilestatSetSize
-func (a *wasiAPI) FdFilestatSetSize(ctx wasm.ModuleContext, fd uint32, size uint64) wasi.Errno {
+func (a *wasiAPI) FdFilestatSetSize(ctx wasm.Module, fd uint32, size uint64) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdFilestatSetTimes implements SnapshotPreview1.FdFilestatSetTimes
-func (a *wasiAPI) FdFilestatSetTimes(ctx wasm.ModuleContext, fd uint32, atim, mtim uint64, fstFlags uint32) wasi.Errno {
+func (a *wasiAPI) FdFilestatSetTimes(ctx wasm.Module, fd uint32, atim, mtim uint64, fstFlags uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdPread implements SnapshotPreview1.FdPread
-func (a *wasiAPI) FdPread(ctx wasm.ModuleContext, fd, iovs uint32, offset uint64, resultNread uint32) wasi.Errno {
+func (a *wasiAPI) FdPread(ctx wasm.Module, fd, iovs uint32, offset uint64, resultNread uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdPrestatDirName implements SnapshotPreview1.FdPrestatDirName
-func (a *wasiAPI) FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
+func (a *wasiAPI) FdPrestatDirName(ctx wasm.Module, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
 	f, ok := a.opened[fd]
 	if !ok {
 		return wasi.ErrnoBadf
@@ -1158,12 +1158,12 @@ func (a *wasiAPI) FdPrestatDirName(ctx wasm.ModuleContext, fd uint32, pathPtr ui
 }
 
 // FdPwrite implements SnapshotPreview1.FdPwrite
-func (a *wasiAPI) FdPwrite(ctx wasm.ModuleContext, fd, iovs uint32, offset uint64, resultNwritten uint32) wasi.Errno {
+func (a *wasiAPI) FdPwrite(ctx wasm.Module, fd, iovs uint32, offset uint64, resultNwritten uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdRead implements SnapshotPreview1.FdRead
-func (a *wasiAPI) FdRead(ctx wasm.ModuleContext, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
+func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
 	var reader io.Reader
 
 	switch fd {
@@ -1207,32 +1207,32 @@ func (a *wasiAPI) FdRead(ctx wasm.ModuleContext, fd, iovs, iovsCount, resultSize
 }
 
 // FdReaddir implements SnapshotPreview1.FdReaddir
-func (a *wasiAPI) FdReaddir(ctx wasm.ModuleContext, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) wasi.Errno {
+func (a *wasiAPI) FdReaddir(ctx wasm.Module, fd, buf, bufLen uint32, cookie uint64, resultBufused uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdRenumber implements SnapshotPreview1.FdRenumber
-func (a *wasiAPI) FdRenumber(ctx wasm.ModuleContext, fd, to uint32) wasi.Errno {
+func (a *wasiAPI) FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdSeek implements SnapshotPreview1.FdSeek
-func (a *wasiAPI) FdSeek(ctx wasm.ModuleContext, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno {
+func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdSync implements SnapshotPreview1.FdSync
-func (a *wasiAPI) FdSync(ctx wasm.ModuleContext, fd uint32) wasi.Errno {
+func (a *wasiAPI) FdSync(ctx wasm.Module, fd uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdTell implements SnapshotPreview1.FdTell
-func (a *wasiAPI) FdTell(ctx wasm.ModuleContext, fd, resultOffset uint32) wasi.Errno {
+func (a *wasiAPI) FdTell(ctx wasm.Module, fd, resultOffset uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // FdWrite implements SnapshotPreview1.FdWrite
-func (a *wasiAPI) FdWrite(ctx wasm.ModuleContext, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
+func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
 	var writer io.Writer
 
 	switch fd {
@@ -1276,27 +1276,27 @@ func (a *wasiAPI) FdWrite(ctx wasm.ModuleContext, fd, iovs, iovsCount, resultSiz
 }
 
 // PathCreateDirectory implements SnapshotPreview1.PathCreateDirectory
-func (a *wasiAPI) PathCreateDirectory(ctx wasm.ModuleContext, fd, path, pathLen uint32) wasi.Errno {
+func (a *wasiAPI) PathCreateDirectory(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathFilestatGet implements SnapshotPreview1.PathFilestatGet
-func (a *wasiAPI) PathFilestatGet(ctx wasm.ModuleContext, fd, flags, path, pathLen, resultBuf uint32) wasi.Errno {
+func (a *wasiAPI) PathFilestatGet(ctx wasm.Module, fd, flags, path, pathLen, resultBuf uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathFilestatSetTimes implements SnapshotPreview1.PathFilestatSetTimes
-func (a *wasiAPI) PathFilestatSetTimes(ctx wasm.ModuleContext, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) wasi.Errno {
+func (a *wasiAPI) PathFilestatSetTimes(ctx wasm.Module, fd, flags, path, pathLen uint32, atim, mtime uint64, fstFlags uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathLink implements SnapshotPreview1.PathLink
-func (a *wasiAPI) PathLink(ctx wasm.ModuleContext, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno {
+func (a *wasiAPI) PathLink(ctx wasm.Module, oldFd, oldFlags, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathOpen implements SnapshotPreview1.PathOpen
-func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase,
+func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
 	dir, ok := a.opened[fd]
 	if !ok || dir.fileSys == nil {
@@ -1336,32 +1336,32 @@ func (a *wasiAPI) PathOpen(ctx wasm.ModuleContext, fd, dirflags, path, pathLen, 
 }
 
 // PathReadlink implements SnapshotPreview1.PathReadlink
-func (a *wasiAPI) PathReadlink(ctx wasm.ModuleContext, fd, path, pathLen, buf, bufLen, resultBufused uint32) wasi.Errno {
+func (a *wasiAPI) PathReadlink(ctx wasm.Module, fd, path, pathLen, buf, bufLen, resultBufused uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathRemoveDirectory implements SnapshotPreview1.PathRemoveDirectory
-func (a *wasiAPI) PathRemoveDirectory(ctx wasm.ModuleContext, fd, path, pathLen uint32) wasi.Errno {
+func (a *wasiAPI) PathRemoveDirectory(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathRename implements SnapshotPreview1.PathRename
-func (a *wasiAPI) PathRename(ctx wasm.ModuleContext, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno {
+func (a *wasiAPI) PathRename(ctx wasm.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathSymlink implements SnapshotPreview1.PathSymlink
-func (a *wasiAPI) PathSymlink(ctx wasm.ModuleContext, oldPath, oldPathLen, fd, newFd, newPath, newPathLen uint32) wasi.Errno {
+func (a *wasiAPI) PathSymlink(ctx wasm.Module, oldPath, oldPathLen, fd, newFd, newPath, newPathLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PathUnlinkFile implements SnapshotPreview1.PathUnlinkFile
-func (a *wasiAPI) PathUnlinkFile(ctx wasm.ModuleContext, fd, path, pathLen uint32) wasi.Errno {
+func (a *wasiAPI) PathUnlinkFile(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // PollOneoff implements SnapshotPreview1.PollOneoff
-func (a *wasiAPI) PollOneoff(ctx wasm.ModuleContext, in, out, nsubscriptions, resultNevents uint32) wasi.Errno {
+func (a *wasiAPI) PollOneoff(ctx wasm.Module, in, out, nsubscriptions, resultNevents uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1373,17 +1373,17 @@ func (a *wasiAPI) ProcExit(exitCode uint32) {
 }
 
 // ProcRaise implements SnapshotPreview1.ProcRaise
-func (a *wasiAPI) ProcRaise(ctx wasm.ModuleContext, sig uint32) wasi.Errno {
+func (a *wasiAPI) ProcRaise(ctx wasm.Module, sig uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // SchedYield implements SnapshotPreview1.SchedYield
-func (a *wasiAPI) SchedYield(ctx wasm.ModuleContext) wasi.Errno {
+func (a *wasiAPI) SchedYield(ctx wasm.Module) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // RandomGet implements SnapshotPreview1.RandomGet
-func (a *wasiAPI) RandomGet(ctx wasm.ModuleContext, buf uint32, bufLen uint32) (errno wasi.Errno) {
+func (a *wasiAPI) RandomGet(ctx wasm.Module, buf uint32, bufLen uint32) (errno wasi.Errno) {
 	randomBytes := make([]byte, bufLen)
 	err := a.randSource(randomBytes)
 	if err != nil {
@@ -1399,17 +1399,17 @@ func (a *wasiAPI) RandomGet(ctx wasm.ModuleContext, buf uint32, bufLen uint32) (
 }
 
 // SockRecv implements SnapshotPreview1.SockRecv
-func (a *wasiAPI) SockRecv(ctx wasm.ModuleContext, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) wasi.Errno {
+func (a *wasiAPI) SockRecv(ctx wasm.Module, fd, riData, riDataCount, riFlags, resultRoDataLen, resultRoFlags uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // SockSend implements SnapshotPreview1.SockSend
-func (a *wasiAPI) SockSend(ctx wasm.ModuleContext, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) wasi.Errno {
+func (a *wasiAPI) SockSend(ctx wasm.Module, fd, siData, siDataCount, siFlags, resultSoDataLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
 // SockShutdown implements SnapshotPreview1.SockShutdown
-func (a *wasiAPI) SockShutdown(ctx wasm.ModuleContext, fd, how uint32) wasi.Errno {
+func (a *wasiAPI) SockShutdown(ctx wasm.Module, fd, how uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 

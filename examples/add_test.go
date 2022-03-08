@@ -1,7 +1,6 @@
 package examples
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,15 +23,15 @@ func Test_AddInt(t *testing.T) {
 )`))
 	require.NoError(t, err)
 
-	addInt := module.Function("AddInt")
+	addInt := module.ExportedFunction("AddInt")
 
 	for _, c := range []struct {
-		value1, value2, expected uint64 // i32i32_i32 sig, but wasm.Function params and results are uint64
+		value1, value2, expected uint64 // i32i32_i32 sig, but wasm.ExportedFunction params and results are uint64
 	}{
 		{value1: 1, value2: 2, expected: 3},
 		{value1: 5, value2: 5, expected: 10},
 	} {
-		results, err := addInt.Call(context.Background(), c.value1, c.value2)
+		results, err := addInt.Call(nil, c.value1, c.value2)
 		require.NoError(t, err)
 		require.Equal(t, c.expected, results[0])
 	}

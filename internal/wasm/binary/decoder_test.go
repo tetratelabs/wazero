@@ -93,6 +93,7 @@ func TestDecodeModule(t *testing.T) {
 			require.Equal(t, tc.input, m)
 		})
 	}
+
 	t.Run("skips custom section", func(t *testing.T) {
 		input := append(append(Magic, version...),
 			wasm.SectionIDCustom, 0xf, // 15 bytes in this section
@@ -102,6 +103,7 @@ func TestDecodeModule(t *testing.T) {
 		require.NoError(t, e)
 		require.Equal(t, &wasm.Module{}, m)
 	})
+
 	t.Run("skips custom section, but not name", func(t *testing.T) {
 		input := append(append(Magic, version...),
 			wasm.SectionIDCustom, 0xf, // 15 bytes in this section

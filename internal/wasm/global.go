@@ -121,27 +121,3 @@ func (g globalF64) Get() uint64 {
 func (g globalF64) String() string {
 	return fmt.Sprintf("global(%f)", publicwasm.DecodeF64(g.Get()))
 }
-
-// Global implements wasm.Module Global
-func (m *PublicModule) Global(name string) publicwasm.Global {
-	exp, err := m.instance.getExport(name, ExternTypeGlobal)
-	if err != nil {
-		return nil
-	}
-	if exp.Global.Type.Mutable {
-		return &mutableGlobal{exp.Global}
-	}
-	valType := exp.Global.Type.ValType
-	switch valType {
-	case ValueTypeI32:
-		return globalI32(exp.Global.Val)
-	case ValueTypeI64:
-		return globalI64(exp.Global.Val)
-	case ValueTypeF32:
-		return globalF32(exp.Global.Val)
-	case ValueTypeF64:
-		return globalF64(exp.Global.Val)
-	default:
-		panic(fmt.Errorf("BUG: unknown value type %X", valType))
-	}
-}

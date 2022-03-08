@@ -42,6 +42,7 @@ func (m *Module) importCount(et ExternType) (res uint32) {
 // For example...
 // * SectionIDType returns the count of FunctionType
 // * SectionIDCustom returns one if the NameSection is present
+// * SectionIDHostFunction returns the count of HostFunctionSection
 // * SectionIDExport returns the count of unique export names
 func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as in vector elements!
 	switch sectionID {
@@ -75,6 +76,8 @@ func (m *Module) SectionElementCount(sectionID SectionID) uint32 { // element as
 		return uint32(len(m.CodeSection))
 	case SectionIDData:
 		return uint32(len(m.DataSection))
+	case SectionIDHostFunction:
+		return uint32(len(m.HostFunctionSection))
 	default:
 		panic(fmt.Errorf("BUG: unknown section: %d", sectionID))
 	}
