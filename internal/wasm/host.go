@@ -97,6 +97,7 @@ func (m *Module) buildHostFunctionInstances() (functions []*FunctionInstance) {
 			Kind:   kind(fn.Type()),
 			Type:   m.TypeSection[typeIndex],
 			GoFunc: fn,
+			Index:  Index(idx),
 		}
 		functions = append(functions, f)
 	}

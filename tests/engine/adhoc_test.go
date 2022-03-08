@@ -93,9 +93,6 @@ func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 }
 
 func testFac(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-	module, err := r.InstantiateModuleFromSource(facWasm)
-	require.NoError(t, err)
 	for _, name := range []string{
 		"fac-rec",
 		"fac-iter",
@@ -104,18 +101,23 @@ func testFac(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 		"fac-opt",
 	} {
 		name := name
-
-		fac := module.ExportedFunction("fac")
-
 		t.Run(name, func(t *testing.T) {
-			results, err := fac.Call(nil, 25)
+			r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+			module, err := r.InstantiateModuleFromSource(facWasm)
+			require.NoError(t, err)
+
+			results, err := module.ExportedFunction(name).Call(nil, 25)
 			require.NoError(t, err)
 			require.Equal(t, uint64(7034535277573963776), results[0])
 		})
 	}
 
 	t.Run("fac-rec - stack overflow", func(t *testing.T) {
-		_, err := module.ExportedFunction("fac-rec").Call(nil, 1073741824)
+		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+		module, err := r.InstantiateModuleFromSource(facWasm)
+		require.NoError(t, err)
+
+		_, err = module.ExportedFunction("fac-rec").Call(nil, 1073741824)
 		require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow)
 	})
 }

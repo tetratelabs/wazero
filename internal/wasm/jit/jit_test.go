@@ -11,7 +11,7 @@ import (
 )
 
 type jitEnv struct {
-	eng            *engine
+	me             *moduleEngine
 	ce             *callEngine
 	moduleInstance *wasm.ModuleInstance
 }
@@ -51,8 +51,8 @@ func (j *jitEnv) jitStatus() jitCallStatusCode {
 	return j.ce.exitContext.statusCode
 }
 
-func (j *jitEnv) functionCallAddress() wasm.FunctionIndex {
-	return j.ce.exitContext.functionCallAddress
+func (j *jitEnv) builtinFunctionCallAddress() wasm.Index {
+	return j.ce.exitContext.builtinFunctionCallIndex
 }
 
 func (j *jitEnv) stackPointer() uint64 {
@@ -75,7 +75,7 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 	return j.moduleInstance.Globals[index].Val
 }
 
-func (j *jitEnv) setTable(table []wasm.TableElement) {
+func (j *jitEnv) setTable(table []uintptr) {
 	j.moduleInstance.Table = &wasm.TableInstance{Table: table}
 }
 
@@ -99,8 +99,8 @@ func (j *jitEnv) module() *wasm.ModuleInstance {
 	return j.moduleInstance
 }
 
-func (j *jitEnv) engine() *engine {
-	return j.eng
+func (j *jitEnv) moduleEngine() *moduleEngine {
+	return j.me
 }
 
 func (j *jitEnv) callEngine() *callEngine {
@@ -112,8 +112,9 @@ func (j *jitEnv) exec(code []byte) {
 		codeSegment:        code,
 		codeInitialAddress: uintptr(unsafe.Pointer(&code[0])),
 		source: &wasm.FunctionInstance{
-			Kind: wasm.FunctionKindWasm,
-			Type: &wasm.FunctionType{},
+			Kind:   wasm.FunctionKindWasm,
+			Type:   &wasm.FunctionType{},
+			Module: j.moduleInstance,
 		},
 	}
 
@@ -128,15 +129,16 @@ func (j *jitEnv) exec(code []byte) {
 const defaultMemoryPageNumInTest = 2
 
 func newJITEnvironment() *jitEnv {
-	eng := newEngine()
+	me := &moduleEngine{}
 	return &jitEnv{
-		eng: eng,
+		me: me,
 		moduleInstance: &wasm.ModuleInstance{
 			Memory:  &wasm.MemoryInstance{Buffer: make([]byte, wasm.MemoryPageSize*defaultMemoryPageNumInTest)},
 			Table:   &wasm.TableInstance{},
 			Globals: []*wasm.GlobalInstance{},
+			Engine:  me,
 		},
-		ce: eng.newCallEngine(),
+		ce: me.newCallEngine(),
 	}
 }
 

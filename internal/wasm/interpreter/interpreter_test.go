@@ -100,23 +100,25 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		},
 		Module: module,
 	}
-	require.NoError(t, e.Compile(f))
+
+	modEngine, err := e.Compile(nil, []*wasm.FunctionInstance{f})
+	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		results, err := e.Call(modCtx, f, 3)
+		results, err := modEngine.Call(modCtx, f, 3)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 		require.Same(t, memory, ctxMemory)
 	})
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := e.Call(modCtx, f)
+		_, err := modEngine.Call(modCtx, f)
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := e.Call(modCtx, f, 1, 2)
+		_, err := modEngine.Call(modCtx, f, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
@@ -165,6 +167,7 @@ func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
 			t.Run(fmt.Sprintf("%s(i32.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
 				f := &compiledFunction{
+					moduleEngine: &moduleEngine{},
 					funcInstance: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
 					body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI32, us: []uint64{uint64(uint32(tc.in))}},
@@ -217,6 +220,7 @@ func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
 			t.Run(fmt.Sprintf("%s(i64.const(0x%x))", wasm.InstructionName(tc.opcode), tc.in), func(t *testing.T) {
 				ce := &callEngine{}
 				f := &compiledFunction{
+					moduleEngine: &moduleEngine{},
 					funcInstance: &wasm.FunctionInstance{Module: &wasm.ModuleInstance{}},
 					body: []*interpreterOp{
 						{kind: wazeroir.OperationKindConstI64, us: []uint64{uint64(tc.in)}},

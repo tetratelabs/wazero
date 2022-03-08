@@ -94,7 +94,7 @@ func TestPublicModule_String(t *testing.T) {
 	m, err := s.Instantiate(&Module{}, "module")
 	require.NoError(t, err)
 	require.Equal(t, "Module[module]", m.String())
-	require.Equal(t, "Module[module]", s.Module(m.Module.Name).String())
+	require.Equal(t, "Module[module]", s.Module(m.module.Name).String())
 }
 
 func TestStore_ReleaseModule(t *testing.T) {
@@ -156,16 +156,6 @@ func TestStore_ReleaseModule(t *testing.T) {
 			require.NoError(t, s.ReleaseModule(importedModuleName))
 			require.Nil(t, s.modules[importedModuleName])
 			require.NotContains(t, s.modules, importedModuleName)
-
-			// At this point, everything should be freed.
-			require.Len(t, s.modules, 0)
-			for _, f := range s.functions {
-				require.Nil(t, f)
-			}
-
-			// One function, globa, memory and table instance was created and freed,
-			// therefore, one released index must be captured by store.
-			require.Len(t, s.releasedFunctionIndex, 1)
 		})
 	}
 }
@@ -220,11 +210,6 @@ func TestStore_concurrent(t *testing.T) {
 
 	// At this point 1000 modules import host modules.
 	require.Equal(t, goroutines, hm.dependentCount)
-
-	require.Len(t, s.functions, goroutines+1) // Instantiated + imported one.
-	for _, f := range s.functions {
-		require.NotNil(t, f)
-	}
 
 	// Concurrent release.
 	wg.Add(goroutines)
@@ -287,8 +272,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 
 	t.Run("compilation failed", func(t *testing.T) {
 		s := newStore()
-		catch := s.engine.(*catchContext)
-		catch.compilationFailIndex = 3
 
 		_, err = s.Instantiate(m, importedModuleName)
 		require.NoError(t, err)
@@ -296,16 +279,13 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 		hm := s.modules[importedModuleName]
 		require.NotNil(t, hm)
 
+		engine := s.engine.(*mockEngine)
+		engine.shouldCompileFail = true
+
 		_, err = s.Instantiate(&Module{
 			TypeSection:     []*FunctionType{{}},
-			FunctionSection: []uint32{0, 0, 0 /* compilation failing function */},
+			FunctionSection: []uint32{0, 0},
 			CodeSection: []*Code{
-				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 1
-				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 2
-				{Body: []byte{OpcodeEnd}}, // FunctionIndex = 3 == compilation failing function.
-				// Functions after failure must not be passed to engine.Release.
-				{Body: []byte{OpcodeEnd}},
-				{Body: []byte{OpcodeEnd}},
 				{Body: []byte{OpcodeEnd}},
 				{Body: []byte{OpcodeEnd}},
 			},
@@ -313,18 +293,16 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 				{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 			},
 		}, importingModuleName)
-		require.EqualError(t, err, "function[2] compilation failed: compilation failed")
+		require.EqualError(t, err, "compilation failed: some compilation error")
 
 		// hm.dependentCount must be intact as the instantiation failed.
 		require.Zero(t, hm.dependentCount)
-
-		require.Equal(t, catch.releasedCalledFunctionIndex, []FunctionIndex{0x1, 0x2})
 	})
 
 	t.Run("start func failed", func(t *testing.T) {
 		s := newStore()
-		catch := s.engine.(*catchContext)
-		catch.callFailIndex = 1
+		engine := s.engine.(*mockEngine)
+		engine.callFailIndex = 1
 
 		_, err = s.Instantiate(m, importedModuleName)
 		require.NoError(t, err)
@@ -413,8 +391,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			engine := &catchContext{callFailIndex: -1, compilationFailIndex: -1}
-			store := NewStore(storeCtx, engine, Features20191205)
+			store := NewStore(storeCtx, &mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
 
 			// Add the host module
 			hm, err := store.Instantiate(m, "host")
@@ -425,7 +402,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 				TypeSection: []*FunctionType{{}},
 				ImportSection: []*Import{{
 					Type:     ExternTypeFunc,
-					Module:   hm.Module.Name,
+					Module:   hm.module.Name,
 					Name:     functionName,
 					DescFunc: 0,
 				}},
@@ -437,56 +414,52 @@ func TestFunctionInstance_Call(t *testing.T) {
 			// This fails if the function wasn't invoked, or had an unexpected context.
 			_, err = mod.ExportedFunction(functionName).Call(mod.WithContext(tc.ctx))
 			require.NoError(t, err)
+
+			modEngine := store.modules["test"].Engine.(*mockModuleEngine)
 			if tc.expected == nil {
-				require.Nil(t, engine.ctx)
+				require.Nil(t, modEngine.ctx)
 			} else {
-				require.Equal(t, tc.expected, engine.ctx.Context())
+				require.Equal(t, tc.expected, modEngine.ctx.Context())
 			}
 		})
 	}
 }
 
-type catchContext struct {
-	ctx                                 *ModuleContext
-	compilationFailIndex, callFailIndex int
-	releasedCalledFunctionIndex         []FunctionIndex
+type mockEngine struct {
+	shouldCompileFail bool
+	callFailIndex     int
 }
 
-func (e *catchContext) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
-	if e.callFailIndex >= 0 && f.Index == FunctionIndex(e.callFailIndex) {
+type mockModuleEngine struct {
+	ctx           *ModuleContext
+	callFailIndex int
+}
+
+func newStore() *Store {
+	return NewStore(context.Background(), &mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
+}
+
+func (e *mockEngine) Compile(_, _ []*FunctionInstance) (ModuleEngine, error) {
+	if e.shouldCompileFail {
+		return nil, fmt.Errorf("some compilation error")
+	}
+	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
+}
+
+func (e *mockModuleEngine) CompiledFunctionAddress(index Index) uintptr {
+	return uintptr(index)
+}
+
+func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
+	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
 		return nil, fmt.Errorf("call failed")
 	}
 	e.ctx = ctx
 	return
 }
 
-func (e *catchContext) Compile(f *FunctionInstance) error {
-	if e.compilationFailIndex >= 0 && f.Index == FunctionIndex(e.compilationFailIndex) {
-		return fmt.Errorf("compilation failed")
-	}
+func (e *mockModuleEngine) Release() error {
 	return nil
-}
-
-func (e *catchContext) Release(f *FunctionInstance) error {
-	e.releasedCalledFunctionIndex = append(e.releasedCalledFunctionIndex, f.Index)
-	return nil
-}
-
-func TestStore_checkFuncAddrOverflow(t *testing.T) {
-	t.Run("too many functions", func(t *testing.T) {
-		s := newStore()
-		const max = 10
-		s.maximumFunctionIndex = max
-		err := s.checkFunctionIndexOverflow(max + 1)
-		require.Error(t, err)
-	})
-	t.Run("ok", func(t *testing.T) {
-		s := newStore()
-		const max = 10
-		s.maximumFunctionIndex = max
-		err := s.checkFunctionIndexOverflow(max)
-		require.NoError(t, err)
-	})
 }
 
 func TestStore_getTypeInstance(t *testing.T) {
@@ -606,72 +579,6 @@ func TestExecuteConstExpression(t *testing.T) {
 				}
 			})
 		}
-	})
-}
-
-func TestStore_releaseFunctionInstances(t *testing.T) {
-	s := newStore()
-	nonReleaseTargetAddr := FunctionIndex(0)
-	maxAddr := FunctionIndex(10)
-	s.functions = make([]*FunctionInstance, maxAddr+1)
-
-	s.functions[nonReleaseTargetAddr] = &FunctionInstance{} // Non-nil!
-
-	// Set up existing function instances.
-	fs := []*FunctionInstance{{Index: 1}, {Index: 2}, {Index: 3}, {Index: 4}, {Index: maxAddr}}
-	for _, f := range fs {
-		s.functions[f.Index] = &FunctionInstance{} // Non-nil!
-	}
-
-	err := s.releaseFunctions(fs...)
-	require.NoError(t, err)
-
-	// Ensure the release targets become nil.
-	for _, f := range fs {
-		require.Nil(t, s.functions[f.Index])
-		require.Contains(t, s.releasedFunctionIndex, f.Index)
-	}
-
-	// Plus non-target should remain intact.
-	require.NotNil(t, s.functions[nonReleaseTargetAddr])
-}
-
-func TestStore_addFunctionInstances(t *testing.T) {
-	t.Run("no released index", func(t *testing.T) {
-		s := newStore()
-		prevMaxAddr := FunctionIndex(10)
-		s.functions = make([]*FunctionInstance, prevMaxAddr+1)
-
-		for i := FunctionIndex(0); i < 10; i++ {
-			expectedIndex := prevMaxAddr + 1 + i
-			f := &FunctionInstance{}
-			s.addFunctions(f)
-
-			// After adding function intance to store, an funcaddr must be assigned.
-			require.Equal(t, expectedIndex, f.Index)
-		}
-	})
-	t.Run("reuse released index", func(t *testing.T) {
-		s := newStore()
-		expectedAddr := FunctionIndex(10)
-		s.releasedFunctionIndex[expectedAddr] = struct{}{}
-
-		maxAddr := expectedAddr * 10
-		tailInstance := &FunctionInstance{}
-		s.functions = make([]*FunctionInstance, maxAddr+1)
-		s.functions[maxAddr] = tailInstance
-
-		f := &FunctionInstance{}
-		s.addFunctions(f)
-
-		// Index must be reused.
-		require.Equal(t, expectedAddr, f.Index)
-		require.Equal(t, f, s.functions[expectedAddr])
-
-		// And the others must be intact.
-		require.Equal(t, tailInstance, s.functions[maxAddr])
-
-		require.Len(t, s.releasedFunctionIndex, 0)
 	})
 }
 
@@ -891,7 +798,7 @@ func TestModuleInstance_applyData(t *testing.T) {
 func TestModuleInstance_validateElements(t *testing.T) {
 	functionCounts := uint32(0xa)
 	m := &ModuleInstance{
-		Table:     &TableInstance{Table: make([]TableElement, 10)},
+		Table:     &TableInstance{Table: make([]uintptr, 10)},
 		Functions: make([]*FunctionInstance, 10),
 	}
 	for _, tc := range []struct {
@@ -941,19 +848,20 @@ func TestModuleInstance_validateElements(t *testing.T) {
 func TestModuleInstance_applyElements(t *testing.T) {
 	functionCounts := uint32(0xa)
 	m := &ModuleInstance{
-		Table:     &TableInstance{Table: make([]TableElement, 10)},
+		Table:     &TableInstance{Table: make([]uintptr, 10)},
 		Functions: make([]*FunctionInstance, 10),
+		Engine:    &mockModuleEngine{},
 	}
-	targetAddr, targetOffset := uint32(1), byte(0)
-	targetAddr2, targetOffset2 := functionCounts-1, byte(0x8)
-	m.Functions[targetAddr] = &FunctionInstance{Type: &FunctionType{}, Index: FunctionIndex(targetAddr)}
-	m.Functions[targetAddr2] = &FunctionInstance{Type: &FunctionType{}, Index: FunctionIndex(targetAddr2)}
+	targetIndex, targetOffset := uint32(1), byte(0)
+	targetIndex2, targetOffset2 := functionCounts-1, byte(0x8)
+	m.Functions[targetIndex] = &FunctionInstance{Type: &FunctionType{}, Index: Index(targetIndex)}
+	m.Functions[targetIndex2] = &FunctionInstance{Type: &FunctionType{}, Index: Index(targetIndex2)}
 	m.applyElements([]*ElementSegment{
-		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset}}, Init: []uint32{uint32(targetAddr)}},
-		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset2}}, Init: []uint32{targetAddr2}},
+		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset}}, Init: []uint32{targetIndex}},
+		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset2}}, Init: []uint32{targetIndex2}},
 	})
-	require.Equal(t, FunctionIndex(targetAddr), m.Table.Table[targetOffset].FunctionIndex)
-	require.Equal(t, FunctionIndex(targetAddr2), m.Table.Table[targetOffset2].FunctionIndex)
+	require.Equal(t, uintptr(targetIndex), m.Table.Table[targetOffset])
+	require.Equal(t, uintptr(targetIndex2), m.Table.Table[targetOffset2])
 }
 
 func TestModuleInstance_decDependentCount(t *testing.T) {
@@ -985,8 +893,4 @@ func TestModuleInstance_incDependentCount(t *testing.T) {
 	}
 	wg.Wait()
 	require.Equal(t, count, m.dependentCount)
-}
-
-func newStore() *Store {
-	return NewStore(context.Background(), &catchContext{compilationFailIndex: -1, callFailIndex: -1}, Features20191205)
 }

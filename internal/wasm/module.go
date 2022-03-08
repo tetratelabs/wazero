@@ -155,6 +155,12 @@ type Module struct {
 	HostFunctionSection []*reflect.Value
 }
 
+// The wazero specific limitation described at RATIONALE.md.
+const (
+	maximumGlobals       = 1 << 27
+	maximumFunctionIndex = 1 << 27
+)
+
 // TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
 // Note: The function index namespace is preceded by imported functions.
 // TODO: Returning nil should be impossible when decode results are validated. Validate decode before backfilling tests.
@@ -197,8 +203,6 @@ func (m *Module) Validate(enabledFeatures Features) error {
 
 	functions, globals, memories, tables := m.allDeclarations()
 
-	// The wazero specific limitation described at RATIONALE.md.
-	const maximumGlobals = 1 << 27
 	if err := m.validateGlobals(globals, maximumGlobals); err != nil {
 		return err
 	}
@@ -212,7 +216,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 	}
 
 	if m.CodeSection != nil {
-		if err := m.validateFunctions(enabledFeatures, functions, globals, memories, tables); err != nil {
+		if err := m.validateFunctions(enabledFeatures, functions, globals, memories, tables, maximumFunctionIndex); err != nil {
 			return err
 		}
 	} else {
@@ -264,7 +268,11 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 	return nil
 }
 
-func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
+func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType, maximumFunctionIndex int) error {
+	if len(functions) > maximumFunctionIndex {
+		return fmt.Errorf("too many functions in a store")
+	}
+
 	functionCount := m.SectionElementCount(SectionIDFunction)
 	codeCount := m.SectionElementCount(SectionIDCode)
 	if functionCount == 0 && codeCount == 0 {
@@ -492,6 +500,7 @@ func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 			Type:       m.TypeSection[typeIndex],
 			Body:       m.CodeSection[codeIndex].Body,
 			LocalTypes: m.CodeSection[codeIndex].LocalTypes,
+			Index:      Index(importCount + uint32(codeIndex)),
 		}
 		functions = append(functions, f)
 	}
@@ -511,7 +520,12 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 
 func (m *Module) buildTable() (table *TableInstance) {
 	for _, tableSeg := range m.TableSection {
-		table = newTableInstance(tableSeg.Limit.Min, tableSeg.Limit.Max)
+		table = &TableInstance{
+			Table:    make([]uintptr, tableSeg.Limit.Min),
+			Min:      tableSeg.Limit.Min,
+			Max:      tableSeg.Limit.Max,
+			ElemType: 0x70, // funcref
+		}
 	}
 	return
 }

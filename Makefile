@@ -8,6 +8,7 @@ bench:
 
 .PHONY: bench.check
 bench.check:
+	@go test -run=NONE -benchmem -bench=. ./tests/...
 	@cd vs && go test -benchmem -bench=. . -ldflags '-X github.com/tetratelabs/wazero/vs.ensureJITFastest=true'
 
 bench_testdata_dir := tests/bench/testdata

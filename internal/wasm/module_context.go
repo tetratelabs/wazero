@@ -13,20 +13,16 @@ var _ publicwasm.Module = &ModuleContext{}
 func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstance) *ModuleContext {
 	return &ModuleContext{
 		ctx:    ctx,
-		engine: engine,
 		memory: instance.Memory,
-		Module: instance,
+		module: instance,
 	}
 }
 
 // ModuleContext implements wasm.Module
 type ModuleContext struct {
 	// ctx is returned by Context and overridden WithContext
-	ctx context.Context
-	// engine is used to implement function.Call
-	engine Engine
-	// Module is exported for spectests
-	Module *ModuleInstance
+	ctx    context.Context
+	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory publicwasm.Memory
 }
@@ -35,14 +31,14 @@ type ModuleContext struct {
 func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	// only re-allocate if it will change the effective memory
 	if m.memory == nil || (memory != nil && memory.Max != nil && *memory.Max > 0 && memory != m.memory) {
-		return &ModuleContext{engine: m.engine, Module: m.Module, memory: memory, ctx: m.ctx}
+		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx}
 	}
 	return m
 }
 
 // String implements fmt.Stringer
 func (m *ModuleContext) String() string {
-	return fmt.Sprintf("Module[%s]", m.Module.Name)
+	return fmt.Sprintf("Module[%s]", m.module.Name)
 }
 
 // Context implements wasm.Module Context
@@ -54,19 +50,19 @@ func (m *ModuleContext) Context() context.Context {
 func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 	// only re-allocate if it will change the effective context
 	if ctx != nil && ctx != m.ctx {
-		return &ModuleContext{engine: m.engine, Module: m.Module, memory: m.memory, ctx: ctx}
+		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx}
 	}
 	return m
 }
 
 // Memory implements wasm.Module Memory
 func (m *ModuleContext) Memory() publicwasm.Memory {
-	return m.Module.Memory
+	return m.module.Memory
 }
 
 // ExportedMemory implements wasm.Module ExportedMemory
 func (m *ModuleContext) ExportedMemory(name string) publicwasm.Memory {
-	exp, err := m.Module.getExport(name, ExternTypeMemory)
+	exp, err := m.module.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
 	}
@@ -75,7 +71,7 @@ func (m *ModuleContext) ExportedMemory(name string) publicwasm.Memory {
 
 // ExportedFunction implements wasm.Module ExportedFunction
 func (m *ModuleContext) ExportedFunction(name string) publicwasm.Function {
-	exp, err := m.Module.getExport(name, ExternTypeFunc)
+	exp, err := m.module.getExport(name, ExternTypeFunc)
 	if err != nil {
 		return nil
 	}
@@ -95,15 +91,15 @@ func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
 // Call implements wasm.Function Call
 func (f *FunctionInstance) Call(ctx publicwasm.Module, params ...uint64) ([]uint64, error) {
 	if modCtx, ok := ctx.(*ModuleContext); !ok { // allow nil to substitute for the defining module
-		return f.Module.Ctx.engine.Call(f.Module.Ctx, f, params...)
+		return f.Module.Engine.Call(f.Module.Ctx, f, params...)
 	} else { // TODO: check if the importing context is correct
-		return modCtx.engine.Call(modCtx, f, params...)
+		return f.Module.Engine.Call(modCtx, f, params...)
 	}
 }
 
 // ExportedGlobal implements wasm.Module ExportedGlobal
 func (m *ModuleContext) ExportedGlobal(name string) publicwasm.Global {
-	exp, err := m.Module.getExport(name, ExternTypeGlobal)
+	exp, err := m.module.getExport(name, ExternTypeGlobal)
 	if err != nil {
 		return nil
 	}
