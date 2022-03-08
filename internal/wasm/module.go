@@ -302,9 +302,9 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	}
 	sectionIDName := SectionIDName(sectionID)
 	if exportNames == nil {
-		sort.Strings(exportNames) // go map keys do not iterate consistently
 		return fmt.Sprintf("%s[%d]", sectionIDName, sectionIndex)
 	}
+	sort.Strings(exportNames) // go map keys do not iterate consistently
 	return fmt.Sprintf("%s[%d] (export %s)", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
