@@ -99,8 +99,8 @@ type (
 		// must be zero otherwise it fails.
 		dependentCount int // guarded by mux
 
-		// dependencies holds actual modules. This is used when releasing this module instance, or decrementing the
-		// dependentCount of the actual modules.
+		// dependencies holds imported modules. This is used when releasing this module instance, or decrementing the
+		// dependentCount of the imported modules.
 		dependencies map[*ModuleInstance]struct{}
 	}
 

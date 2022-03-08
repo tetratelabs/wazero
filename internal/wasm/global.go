@@ -64,7 +64,7 @@ func (g globalI32) String() string {
 
 type globalI64 uint64
 
-// compile-time check to ensure globalI64 is a publicwasm.ExportedGlobal
+// compile-time check to ensure globalI64 is a publicwasm.Global
 var _ publicwasm.Global = globalI64(0)
 
 // Type implements wasm.Global Type
@@ -84,7 +84,7 @@ func (g globalI64) String() string {
 
 type globalF32 uint64
 
-// compile-time check to ensure globalF32 is a publicwasm.ExportedGlobal
+// compile-time check to ensure globalF32 is a publicwasm.Global
 var _ publicwasm.Global = globalF32(0)
 
 // Type implements wasm.Global Type
@@ -104,7 +104,7 @@ func (g globalF32) String() string {
 
 type globalF64 uint64
 
-// compile-time check to ensure globalF64 is a publicwasm.ExportedGlobal
+// compile-time check to ensure globalF64 is a publicwasm.Global
 var _ publicwasm.Global = globalF64(0)
 
 // Type implements wasm.Global Type
