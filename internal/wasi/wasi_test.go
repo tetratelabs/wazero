@@ -1,7 +1,6 @@
 package internalwasi
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"encoding/binary"
@@ -1021,19 +1020,108 @@ func TestSnapshotPreview1_FdRenumber(t *testing.T) {
 	})
 }
 
-// TestSnapshotPreview1_FdSeek only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdSeek(t *testing.T) {
-	mem, fn := instantiateModule(t, FunctionFdSeek, ImportFdSeek, moduleName)
+	fd := uint32(3)              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	offset := uint64(4)          // arbitrary value for the offset parameter
+	whence := uint32(1)          // arbitrary whence. We chose 1 here, which means io.SeekStart.
+	resultNewoffset := uint32(1) // arbitrary offset in `ctx.Memory` for the new offset value
+	expectedMemory := []byte{
+		'?',        // resultNewoffset is after this
+		4, 0, 0, 0, // = offset
+	}
 
-	t.Run("SnapshotPreview1.FdSeek", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, NewAPI().FdSeek(ctx(mem), 0, 0, 0, 0))
+	var api *wasiAPI
+	mem, fn := instantiateModule(t, FunctionFdSeek, ImportFdSeek, moduleName, func(a *wasiAPI) {
+		api = a // for later tests
 	})
 
-	t.Run(FunctionFdSeek, func(t *testing.T) {
-		results, err := fn.Call(context.Background(), 0, 0, 0, 0)
-		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+	// TestSnapshotPreview1_FdSeek uses a matrix because setting up test files is complicated and has to be clean each time.
+	type fdSeekFn func(ctx publicwasm.ModuleContext, fd uint32, offset uint64, whence, resultNewOffset uint32) wasi.Errno
+	tests := []struct {
+		name   string
+		fdSeek func() fdSeekFn
+	}{
+		{"SnapshotPreview1.FdSeek", func() fdSeekFn {
+			return api.FdSeek
+		}},
+		{FunctionFdSeek, func() fdSeekFn {
+			return func(ctx publicwasm.ModuleContext, fd uint32, offset uint64, whence, resultNewoffset uint32) wasi.Errno {
+				ret, err := fn.Call(context.Background(), uint64(fd), uint64(offset), uint64(whence), uint64(resultNewoffset))
+				require.NoError(t, err)
+				return wasi.Errno(ret[0])
+			}
+		}},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a fresh file with 0 seek offset
+			file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
+			api.opened[fd] = fileEntry{
+				path:    "test_path",
+				fileSys: memFS,
+				file:    file,
+			}
+			maskMemory(t, mem, len(expectedMemory))
+
+			errno := tc.fdSeek()(ctx(mem), fd, offset, whence, resultNewoffset)
+			require.Equal(t, wasi.ErrnoSuccess, errno)
+
+			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
+			require.True(t, ok)
+			require.Equal(t, expectedMemory, actual)
+
+			require.Equal(t, offset, uint64(file.offset)) // test that the offset of file is acutally updated.
+		})
+	}
+}
+
+func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
+	validFD := uint64(3)                                        // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
+	file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary valid file with non-empty contents
+	mem, fn := instantiateModule(t, FunctionFdSeek, ImportFdSeek, moduleName, func(a *wasiAPI) {
+		a.opened[uint32(validFD)] = fileEntry{
+			path:    "test_path",
+			fileSys: memFS,
+			file:    file,
+		}
 	})
+	memorySize := mem.Size()
+
+	tests := []struct {
+		name                                string
+		fd, offset, whence, resultNewoffset uint64
+		expectedErrno                       wasi.Errno
+	}{
+		{
+			name:          "invalid fd",
+			fd:            42, // arbitrary invalid fd
+			expectedErrno: wasi.ErrnoBadf,
+		},
+		{
+			name:          "invalid whence",
+			fd:            validFD,
+			whence:        3, // invalid whence, maximum valid whence io.SeekEnd(2) + 1
+			expectedErrno: wasi.ErrnoInval,
+		},
+		{
+			name:            "out-of-memory writing resultNewoffset",
+			fd:              validFD,
+			resultNewoffset: uint64(memorySize),
+			expectedErrno:   wasi.ErrnoFault,
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := fn.Call(context.Background(), tc.fd, tc.offset, tc.whence, tc.resultNewoffset)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+
 }
 
 // TestSnapshotPreview1_FdSync only tests it is stubbed for GrainLang per #271
@@ -1132,7 +1220,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			actual, ok := mem.Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
-			require.Equal(t, []byte("wazero"), file.buf.Bytes()) // verify the file was actually written
+			require.Equal(t, []byte("wazero"), file.buf) // verify the file was actually written
 		})
 	}
 }
@@ -1217,9 +1305,10 @@ func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
 	f, err := memFS.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
 	require.NoError(t, err)
 
-	if _, err := io.Copy(f, bytes.NewBuffer(contents)); err != nil {
-		require.NoError(t, err)
-	}
+	_, err = f.Write(contents)
+	require.NoError(t, err)
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err)
 
 	return f.(*memFile), memFS
 }

@@ -31,6 +31,7 @@ const (
 type File interface {
 	Read([]byte) (int, error)
 	Write([]byte) (int, error)
+	Seek(offset int64, whence int) (int64, error)
 	Close() error
 }
 

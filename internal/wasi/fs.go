@@ -1,7 +1,8 @@
 package internalwasi
 
 import (
-	"bytes"
+	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"runtime"
@@ -65,11 +66,11 @@ func (m *MemFS) OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, 
 		}
 	}
 
-	ret := &memFile{buf: bytes.NewBuffer(buf)}
+	ret := &memFile{buf: buf, offset: 0}
 
 	if fsRights&wasi.R_FD_WRITE != 0 {
 		ret.flush = func(bts []byte) {
-			m.Files[path] = bts
+			m.Files[path] = append([]byte{}, bts...)
 		}
 	}
 
@@ -77,21 +78,49 @@ func (m *MemFS) OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, 
 }
 
 type memFile struct {
-	buf   *bytes.Buffer
-	flush func(bts []byte)
+	buf    []byte
+	offset int64
+	flush  func(bts []byte)
 }
 
+// Read implements wasi.File.Read
 func (f *memFile) Read(p []byte) (int, error) {
-	return f.buf.Read(p)
+	// Read must return 0, io.EOF when it reaches the end-of-file
+	if f.offset == int64(len(f.buf)) {
+		return 0, io.EOF
+	}
+	nread := copy(p, f.buf[f.offset:])
+	f.offset += int64(nread)
+	return nread, nil
 }
 
+// Write implements wasi.File.Write
 func (f *memFile) Write(p []byte) (int, error) {
-	return f.buf.Write(p)
+	nwritten := copy(f.buf[f.offset:], p)
+	f.buf = append(f.buf, p[nwritten:]...)
+	f.offset += int64(len(p))
+	return len(p), nil
 }
 
+// Seek implements wasi.File.Seek
+func (f *memFile) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		f.offset = offset
+	case io.SeekCurrent:
+		f.offset += offset
+	case io.SeekEnd:
+		f.offset = int64(len(f.buf)) + offset
+	default:
+		return 0, fmt.Errorf("invalid whence: %d", whence)
+	}
+	return f.offset, nil
+}
+
+// Close implements wasi.File.Close
 func (f *memFile) Close() error {
 	if f.flush != nil {
-		f.flush(f.buf.Bytes())
+		f.flush(f.buf)
 	}
 	return nil
 }
