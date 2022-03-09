@@ -293,7 +293,7 @@ func TestModule_Validate_Errors(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "StartSection points to an infunc",
+			name: "StartSection points to an invalid func",
 			input: &Module{
 				TypeSection:     nil,
 				FunctionSection: []uint32{0},
