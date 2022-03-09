@@ -33,7 +33,7 @@ func Test_WASI(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	// Host functions can be exported as any module name, including the empty string.
-	_, err := r.NewModuleBuilder("").ExportFunction("random", random).InstantiateModule()
+	_, err := r.NewModuleBuilder("").ExportFunction("random", random).Instantiate()
 	require.NoError(t, err)
 
 	// Configure WASI and implement the function to use it

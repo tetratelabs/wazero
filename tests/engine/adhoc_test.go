@@ -127,7 +127,7 @@ func testUnreachable(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig
 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).InstantiateModule()
+	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate()
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromSource(unreachableWasm)
@@ -184,7 +184,7 @@ func testRecursiveEntry(t *testing.T, newRuntimeConfig func() *wazero.RuntimeCon
 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).InstantiateModule()
+	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate()
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromSource(recursiveWasm)
@@ -209,7 +209,7 @@ func testImportedAndExportedFunc(t *testing.T, newRuntimeConfig func() *wazero.R
 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-	_, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).InstantiateModule()
+	_, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate()
 	require.NoError(t, err)
 
 	module, err := r.InstantiateModuleFromSource([]byte(`(module $test
@@ -276,7 +276,7 @@ func testHostFunctions(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConf
 	} {
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-		_, err := r.NewModuleBuilder("host").ExportFunctions(v).InstantiateModule()
+		_, err := r.NewModuleBuilder("host").ExportFunctions(v).Instantiate()
 		require.NoError(t, err)
 
 		m, err = r.InstantiateModuleFromSource([]byte(`(module $test

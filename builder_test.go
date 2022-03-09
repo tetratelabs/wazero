@@ -167,7 +167,7 @@ func TestNewModuleBuilder_Build(t *testing.T) {
 // TestNewModuleBuilder_InstantiateModule ensures Runtime.InstantiateModule is called on success.
 func TestNewModuleBuilder_InstantiateModule(t *testing.T) {
 	r := NewRuntime()
-	m, err := r.NewModuleBuilder("env").InstantiateModule()
+	m, err := r.NewModuleBuilder("env").Instantiate()
 	require.NoError(t, err)
 
 	// If this was instantiated, it would be added to the store under the same name
@@ -177,10 +177,10 @@ func TestNewModuleBuilder_InstantiateModule(t *testing.T) {
 // TestNewModuleBuilder_InstantiateModule_Errors ensures errors propagate from Runtime.InstantiateModule
 func TestNewModuleBuilder_InstantiateModule_Errors(t *testing.T) {
 	r := NewRuntime()
-	_, err := r.NewModuleBuilder("env").InstantiateModule()
+	_, err := r.NewModuleBuilder("env").Instantiate()
 	require.NoError(t, err)
 
-	_, err = r.NewModuleBuilder("env").InstantiateModule()
+	_, err = r.NewModuleBuilder("env").Instantiate()
 	require.EqualError(t, err, "module env has already been instantiated")
 }
 

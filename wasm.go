@@ -26,7 +26,7 @@ type Runtime interface {
 	//	hello := func() {
 	//		fmt.Fprintln(stdout, "hello!")
 	//	}
-	//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).InstantiateModule()
+	//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate()
 	NewModuleBuilder(moduleName string) ModuleBuilder
 
 	// Module returns exports from an instantiated module or nil if there aren't any.

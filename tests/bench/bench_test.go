@@ -131,7 +131,7 @@ func instantiateHostFunctionModuleWithEngine(b *testing.B, engine *wazero.Runtim
 
 	r := wazero.NewRuntimeWithConfig(engine)
 
-	_, err := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).InstantiateModule()
+	_, err := r.NewModuleBuilder("env").ExportFunction("get_random_string", getRandomString).Instantiate()
 	if err != nil {
 		b.Fatal(err)
 	}

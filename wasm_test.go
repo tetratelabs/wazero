@@ -303,7 +303,7 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 		require.Equal(t, runtimeCtx, ctx.Context())
 	}
 
-	_, err := r.NewModuleBuilder("").ExportFunction("start", start).InstantiateModule()
+	_, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
 
 	decoded, err := r.DecodeModule([]byte(`(module $runtime_test.go
@@ -320,7 +320,7 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 
 // requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
 func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx wasm.Module) uint64, functionName string) []byte {
-	_, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).InstantiateModule()
+	_, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate()
 	require.NoError(t, err)
 
 	return []byte(fmt.Sprintf(

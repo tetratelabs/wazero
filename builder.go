@@ -12,7 +12,7 @@ import (
 //	hello := func() {
 //		fmt.Fprintln(stdout, "hello!")
 //	}
-//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).InstantiateModule()
+//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).Instantiate()
 //
 // If the same module may be instantiated multiple times, it is more efficient to separate steps. Ex.
 //
@@ -70,8 +70,8 @@ type ModuleBuilder interface {
 	// Build returns a Module to instantiate, or returns an error if any of the configuration is invalid.
 	Build() (*Module, error)
 
-	// InstantiateModule is a convenience that calls Build, then Runtime.InstantiateModule
-	InstantiateModule() (wasm.Module, error)
+	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
+	Instantiate() (wasm.Module, error)
 }
 
 // moduleBuilder implements ModuleBuilder
@@ -115,7 +115,7 @@ func (b *moduleBuilder) Build() (*Module, error) {
 }
 
 // InstantiateModule implements ModuleBuilder.InstantiateModule
-func (b *moduleBuilder) InstantiateModule() (wasm.Module, error) {
+func (b *moduleBuilder) Instantiate() (wasm.Module, error) {
 	if module, err := b.Build(); err != nil {
 		return nil, err
 	} else {

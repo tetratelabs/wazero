@@ -21,7 +21,7 @@ func TestStartWASICommand_UsesStoreContext(t *testing.T) {
 		require.Equal(t, config.ctx, ctx.Context())
 	}
 
-	_, err := r.NewModuleBuilder("").ExportFunction("start", start).InstantiateModule()
+	_, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
 
 	_, err = r.InstantiateModule(WASISnapshotPreview1())
