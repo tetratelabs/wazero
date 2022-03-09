@@ -31,7 +31,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		bytes = append(bytes, encodeMemorySection(m.MemorySection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDGlobal) > 0 {
-		panic("TODO: GlobalSection")
+		bytes = append(bytes, encodeGlobalSection(m.GlobalSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDExport) > 0 {
 		bytes = append(bytes, encodeExportSection(m.ExportSection)...)

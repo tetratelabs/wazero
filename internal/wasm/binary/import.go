@@ -41,7 +41,7 @@ func decodeImport(r *bytes.Reader, idx uint32, features wasm.Features) (i *wasm.
 	return
 }
 
-// encodeImport returns the wasm.Import encoded in WebAssembly 1.0 (20191205) Binary Format.
+// encodeImport returns the internalwasm.Import encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-import
 func encodeImport(i *wasm.Import) []byte {
@@ -56,7 +56,12 @@ func encodeImport(i *wasm.Import) []byte {
 	case wasm.ExternTypeMemory:
 		panic("TODO: encodeExternTypeMemory")
 	case wasm.ExternTypeGlobal:
-		panic("TODO: encodeExternTypeGlobal")
+		g := i.DescGlobal
+		var mutable byte
+		if g.Mutable {
+			mutable = 1
+		}
+		data = append(data, g.ValType, mutable)
 	default:
 		panic(fmt.Errorf("invalid externtype: %s", wasm.ExternTypeName(i.Type)))
 	}

@@ -159,6 +159,29 @@ func TestModule_Encode(t *testing.T) {
 				0x01, 0x07, 'v', 'a', 'l', 'u', 'e', '_', '2', // index 1, size of "value_2", "value_2"
 			),
 		},
+		{
+			name: "exported global var",
+			input: &wasm.Module{
+				GlobalSection: []*wasm.Global{
+					{
+						Type: &wasm.GlobalType{ValType: i32, Mutable: true},
+						Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeI32Const, Data: []byte{0}},
+					},
+				},
+				ExportSection: map[string]*wasm.Export{
+					"sp": {Name: "sp", Type: wasm.ExternTypeGlobal, Index: wasm.Index(0)},
+				},
+			},
+			expected: append(append(Magic, version...),
+				wasm.SectionIDGlobal, 0x06, // 6 bytes in this section
+				0x01, wasm.ValueTypeI32, 0x01, // 1 global i32 mutable
+				wasm.OpcodeI32Const, 0x00, wasm.OpcodeEnd, // arbitrary init to zero
+				wasm.SectionIDExport, 0x06, // 6 bytes in this section
+				0x01,           // 1 export
+				0x02, 's', 'p', // size of "sp", "sp"
+				wasm.ExternTypeGlobal, 0x00, // global[0]
+			),
+		},
 	}
 
 	for _, tt := range tests {

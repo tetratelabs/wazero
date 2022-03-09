@@ -16,9 +16,10 @@ type Features uint64
 const Features20191205 = FeatureMutableGlobal
 
 const (
-	// FeatureMutableGlobal decides if parsing should succeed on internalwasm.GlobalType Mutable
+	// FeatureMutableGlobal decides if global vars are allowed to be imported or exported (ExternTypeGlobal)
 	// See https://github.com/WebAssembly/mutable-global
 	FeatureMutableGlobal Features = 1 << iota
+
 	// FeatureSignExtensionOps decides if parsing should succeed on internalwasm.GlobalType Mutable
 	// See https://github.com/WebAssembly/spec/blob/main/proposals/sign-extension-ops/Overview.md
 	FeatureSignExtensionOps

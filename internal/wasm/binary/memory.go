@@ -28,7 +28,7 @@ func decodeMemoryType(r *bytes.Reader) (*wasm.MemoryType, error) {
 	return ret, nil
 }
 
-// encodeMemoryType returns the wasm.MemoryType encoded in WebAssembly 1.0 (20191205) Binary Format.
+// encodeMemoryType returns the internalwasm.MemoryType encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
 func encodeMemoryType(i *wasm.MemoryType) []byte {

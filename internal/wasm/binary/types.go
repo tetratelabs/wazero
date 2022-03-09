@@ -44,11 +44,8 @@ func decodeGlobalType(r *bytes.Reader, features wasm.Features) (*wasm.GlobalType
 	}
 
 	switch mut := b; mut {
-	case 0x00:
-	case 0x01:
-		if err = features.Require(wasm.FeatureMutableGlobal); err != nil {
-			return nil, err
-		}
+	case 0x00: // not mutable
+	case 0x01: // mutable
 		ret.Mutable = true
 	default:
 		return nil, fmt.Errorf("%w for mutability: %#x != 0x00 or 0x01", ErrInvalidByte, mut)

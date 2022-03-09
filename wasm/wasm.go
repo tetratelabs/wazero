@@ -150,7 +150,7 @@ type Global interface {
 	Get() uint64
 }
 
-// MutableGlobal is a Global whose value can be updated at runtime.
+// MutableGlobal is a Global whose value can be updated at runtime (variable).
 type MutableGlobal interface {
 	Global
 

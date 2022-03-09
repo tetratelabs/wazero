@@ -103,7 +103,7 @@ type moduleParser struct {
 // DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#text-format%E2%91%A0
 func DecodeModule(source []byte, enabledFeatures wasm.Features) (result *wasm.Module, err error) {
-	// TODO: when globals are supported, err on mutable globals if disabled
+	// TODO: when globals are supported, err on global vars if disabled
 
 	// names are the wasm.Module NameSection
 	//

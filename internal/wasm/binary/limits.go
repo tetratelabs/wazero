@@ -40,7 +40,7 @@ func decodeLimitsType(r *bytes.Reader) (*wasm.LimitsType, error) {
 	return ret, nil
 }
 
-// encodeLimitsType returns the wasm.LimitsType encoded in WebAssembly 1.0 (20191205) Binary Format.
+// encodeLimitsType returns the internalwasm.LimitsType encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#limits%E2%91%A6
 func encodeLimitsType(l *wasm.LimitsType) []byte {

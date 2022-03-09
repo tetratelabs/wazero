@@ -20,7 +20,7 @@ import (
 // * result is the module parsed or nil on error
 // * err is a FormatError invoking the parser, dangling block comments or unexpected characters.
 // See binary.DecodeModule and text.DecodeModule
-type DecodeModule func(source []byte, features Features) (result *Module, err error)
+type DecodeModule func(source []byte, enabledFeatures Features) (result *Module, err error)
 
 // EncodeModule encodes the given module into a byte slice depending on the format of the implementation.
 // See binary.EncodeModule
@@ -37,7 +37,7 @@ type Module struct {
 	// TypeSection contains the unique FunctionType of functions imported or defined in this module.
 	//
 	// Note: Currently, there is no type ambiguity in the index as WebAssembly 1.0 only defines function type.
-	// In the future, other types may be introduced to support features such as module linking.
+	// In the future, other types may be introduced to support Features such as module linking.
 	//
 	// Note: In the Binary Format, this is SectionIDType.
 	//
@@ -212,7 +212,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 	}
 
 	if m.CodeSection != nil {
-		if err := m.validateFunctions(functions, globals, memories, tables, enabledFeatures); err != nil {
+		if err := m.validateFunctions(enabledFeatures, functions, globals, memories, tables); err != nil {
 			return err
 		}
 	} else {
@@ -221,7 +221,11 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		}
 	}
 
-	if err := m.validateExports(functions, globals, memories, tables); err != nil {
+	if err := m.validateImports(enabledFeatures); err != nil {
+		return err
+	}
+
+	if err := m.validateExports(enabledFeatures, functions, globals, memories, tables); err != nil {
 		return err
 	}
 
@@ -260,7 +264,7 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 	return nil
 }
 
-func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType, enabledFeatures Features) error {
+func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
 	functionCount := m.SectionElementCount(SectionIDFunction)
 	codeCount := m.SectionElementCount(SectionIDCode)
 	if functionCount == 0 && codeCount == 0 {
@@ -280,10 +284,11 @@ func (m *Module) validateFunctions(functions []Index, globals []*GlobalType, mem
 		}
 
 		if err := validateFunction(
+			enabledFeatures,
 			m.TypeSection[typeIndex],
 			m.CodeSection[idx].Body,
 			m.CodeSection[idx].LocalTypes,
-			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack, enabledFeatures); err != nil {
+			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack); err != nil {
 
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
@@ -305,7 +310,7 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 		return fmt.Sprintf("%s[%d]", sectionIDName, sectionIndex)
 	}
 	sort.Strings(exportNames) // go map keys do not iterate consistently
-	return fmt.Sprintf("%s[%d] (export %s)", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
+	return fmt.Sprintf("%s[%d] export[%s]", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
 func (m *Module) validateTables(tables []*TableType, globals []*GlobalType) error {
@@ -343,25 +348,46 @@ func (m *Module) validateMemories(memories []*MemoryType, globals []*GlobalType)
 	return nil
 }
 
-func (m *Module) validateExports(functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
+func (m *Module) validateImports(enabledFeatures Features) error {
+	for _, i := range m.ImportSection {
+		switch i.Type {
+		case ExternTypeGlobal:
+			if !i.DescGlobal.Mutable {
+				continue
+			}
+			if err := enabledFeatures.Require(FeatureMutableGlobal); err != nil {
+				return fmt.Errorf("invalid import[%q.%q] global: %w", i.Module, i.Name, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Module) validateExports(enabledFeatures Features, functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
 	for name, exp := range m.ExportSection {
 		index := exp.Index
 		switch exp.Type {
 		case ExternTypeFunc:
 			if index >= uint32(len(functions)) {
-				return fmt.Errorf("unknown function for export[%s]", name)
+				return fmt.Errorf("unknown function for export[%q]", name)
 			}
 		case ExternTypeGlobal:
 			if index >= uint32(len(globals)) {
-				return fmt.Errorf("unknown global for export[%s]", name)
+				return fmt.Errorf("unknown global for export[%q]", name)
+			}
+			if !globals[index].Mutable {
+				continue
+			}
+			if err := enabledFeatures.Require(FeatureMutableGlobal); err != nil {
+				return fmt.Errorf("invalid export[%q] global[%d]: %w", name, index, err)
 			}
 		case ExternTypeMemory:
 			if index != 0 || len(memories) == 0 {
-				return fmt.Errorf("unknown memory for export[%s]", name)
+				return fmt.Errorf("unknown memory for export[%q]", name)
 			}
 		case ExternTypeTable:
 			if index >= uint32(len(tables)) {
-				return fmt.Errorf("unknown table for export[%s]", name)
+				return fmt.Errorf("unknown table for export[%q]", name)
 			}
 		}
 	}

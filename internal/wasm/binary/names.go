@@ -150,7 +150,8 @@ func decodeFunctionCount(r *bytes.Reader, subsectionID uint8) (uint32, error) {
 	return functionCount, nil
 }
 
-// encodeNameSectionData serializes the data for the "name" key in SectionIDCustom according to the standard:
+// encodeNameSectionData serializes the data for the "name" key in internalwasm.SectionIDCustom according to the
+// standard:
 //
 // Note: The result can be nil because this does not encode empty subsections
 //

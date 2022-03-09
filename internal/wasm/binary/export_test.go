@@ -50,6 +50,41 @@ func TestEncodeExport(t *testing.T) {
 			},
 		},
 		{
+			name: "global no name, index 0",
+			input: &wasm.Export{ // Ex. (export "" (global 0)))
+				Type:  wasm.ExternTypeGlobal,
+				Name:  "",
+				Index: 0,
+			},
+			expected: []byte{0x00, wasm.ExternTypeGlobal, 0x00},
+		},
+		{
+			name: "global name, global index 0",
+			input: &wasm.Export{ // Ex. (export "pi" (global 0))
+				Type:  wasm.ExternTypeGlobal,
+				Name:  "pi",
+				Index: 0,
+			},
+			expected: []byte{
+				0x02, 'p', 'i',
+				wasm.ExternTypeGlobal,
+				0x00,
+			},
+		},
+		{
+			name: "global name, index 10",
+			input: &wasm.Export{ // Ex. (export "pi" (global 10))
+				Type:  wasm.ExternTypeGlobal,
+				Name:  "pi",
+				Index: 10,
+			},
+			expected: []byte{
+				0x02, 'p', 'i',
+				wasm.ExternTypeGlobal,
+				0x0a,
+			},
+		},
+		{
 			name: "memory no name, index 0",
 			input: &wasm.Export{ // Ex. (export "" (memory 0)))
 				Type:  wasm.ExternTypeMemory,

@@ -22,6 +22,7 @@ import (
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
 func validateFunction(
+	enabledFeatures Features,
 	functionType *FunctionType,
 	body []byte,
 	localTypes []ValueType,
@@ -31,7 +32,6 @@ func validateFunction(
 	tables []*TableType,
 	types []*FunctionType,
 	maxStackValues int,
-	enabledFeatures Features,
 ) error {
 	// Note: In WebAssembly 1.0 (20191205), multiple memories are not allowed.
 	hasMemory := len(memories) > 0
@@ -337,7 +337,7 @@ func validateFunction(
 				if index >= uint32(len(globals)) {
 					return fmt.Errorf("invalid global index")
 				} else if !globals[index].Mutable {
-					return fmt.Errorf("globa.set on immutable global type")
+					return fmt.Errorf("global.set when not mutable")
 				} else if err := valueTypeStack.popAndVerifyType(
 					globals[index].ValType); err != nil {
 					return err
