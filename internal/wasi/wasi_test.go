@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"testing"
 
@@ -1016,22 +1017,22 @@ func TestSnapshotPreview1_FdRenumber(t *testing.T) {
 
 func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	fd := uint32(3)              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	offset := uint64(4)          // arbitrary value for the offset parameter
-	whence := uint32(0)          // arbitrary whence. We chose 0 here, which means the offset from the star of file.
 	resultNewoffset := uint32(1) // arbitrary offset in `ctx.Memory` for the new offset value
-	expectedMemory := []byte{
-		'?',        // resultNewoffset is after this
-		4, 0, 0, 0, // = offset
-	}
 
 	var api *wasiAPI
 	mod, fn := instantiateModule(t, FunctionFdSeek, ImportFdSeek, moduleName, func(a *wasiAPI) {
 		api = a // for later tests
 	})
+	file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
+	api.opened[fd] = fileEntry{
+		path:    "test_path",
+		fileSys: memFS,
+		file:    file,
+	}
 
 	// TestSnapshotPreview1_FdSeek uses a matrix because setting up test files is complicated and has to be clean each time.
 	type fdSeekFn func(ctx publicwasm.Module, fd uint32, offset uint64, whence, resultNewOffset uint32) wasi.Errno
-	tests := []struct {
+	seekFns := []struct {
 		name   string
 		fdSeek func() fdSeekFn
 	}{
@@ -1047,28 +1048,64 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 		}},
 	}
 
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			// Create a fresh file with 0 seek offset
-			file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
-			api.opened[fd] = fileEntry{
-				path:    "test_path",
-				fileSys: memFS,
-				file:    file,
+	tests := []struct {
+		name           string
+		offset         int64
+		whence         int
+		expectedOffset int64
+		expectedMemory []byte
+	}{
+		{
+			name:           "SeekStart",
+			offset:         4, // arbitrary offset
+			whence:         io.SeekStart,
+			expectedOffset: 4, // = offset
+			expectedMemory: []byte{
+				'?',        // resultNewoffset is after this
+				4, 0, 0, 0, // = expectedOffset
+			},
+		},
+		{
+			name:           "SeekCurrent",
+			offset:         1, // arbitrary offset
+			whence:         io.SeekCurrent,
+			expectedOffset: 2, // = 1 (the initial offset of the test file) + 1 (offset)
+			expectedMemory: []byte{
+				'?',        // resultNewoffset is after this
+				2, 0, 0, 0, // = expectedOffset
+			},
+		},
+		{
+			name:           "SeekEnd",
+			offset:         -1, // arbitrary offset
+			whence:         io.SeekEnd,
+			expectedOffset: 5, // = 6 (the size of the test file with content "wazero") + -1 (offset)
+			expectedMemory: []byte{
+				'?',        // resultNewoffset is after this
+				5, 0, 0, 0, // = expectedOffset
+			},
+		},
+	}
+
+	for _, seekFn := range seekFns {
+		sf := seekFn
+		t.Run(sf.name, func(t *testing.T) {
+			for _, tt := range tests {
+				tc := tt
+				t.Run(tc.name, func(t *testing.T) {
+					maskMemory(t, mod, len(tc.expectedMemory))
+					file.offset = 1 // set the initial offset of the file to 1
+
+					errno := sf.fdSeek()(mod, fd, uint64(tc.offset), uint32(tc.whence), resultNewoffset)
+					require.Equal(t, wasi.ErrnoSuccess, errno)
+
+					actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
+					require.True(t, ok)
+					require.Equal(t, tc.expectedMemory, actual)
+
+					require.Equal(t, tc.expectedOffset, file.offset) // test that the offset of file is acutally updated.
+				})
 			}
-			maskMemory(t, mod, len(expectedMemory))
-
-			require.Equal(t, int64(0), file.offset) // verify the offset is 0 first.
-
-			errno := tc.fdSeek()(mod, fd, offset, whence, resultNewoffset)
-			require.Equal(t, wasi.ErrnoSuccess, errno)
-
-			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
-			require.True(t, ok)
-			require.Equal(t, expectedMemory, actual)
-
-			require.Equal(t, offset, uint64(file.offset)) // test that the offset of file is acutally updated.
 		})
 	}
 }
