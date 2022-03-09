@@ -114,7 +114,7 @@ func (b *moduleBuilder) Build() (*Module, error) {
 	}
 }
 
-// InstantiateModule implements ModuleBuilder.InstantiateModule
+// Instantiate implements ModuleBuilder.Instantiate
 func (b *moduleBuilder) Instantiate() (wasm.Module, error) {
 	if module, err := b.Build(); err != nil {
 		return nil, err

@@ -27,7 +27,7 @@ func TestStartWASICommand_UsesStoreContext(t *testing.T) {
 	_, err = r.InstantiateModule(WASISnapshotPreview1())
 	require.NoError(t, err)
 
-	decoded, err := r.DecodeModule([]byte(`(module $wasi_test.go
+	decoded, err := r.CompileModule([]byte(`(module $wasi_test.go
 	(import "" "start" (func $start))
 	(memory 1)
 	(export "_start" (func $start))
