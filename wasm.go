@@ -14,7 +14,7 @@ import (
 //
 // Ex.
 //	r := wazero.NewRuntime()
-//	decoded, _ := r.DecodeModule(source)
+//	decoded, _ := r.CompileModule(source)
 //	module, _ := r.InstantiateModule(decoded)
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
@@ -32,11 +32,12 @@ type Runtime interface {
 	// Module returns exports from an instantiated module or nil if there aren't any.
 	Module(moduleName string) wasm.Module
 
-	// DecodeModule decodes the WebAssembly 1.0 (20191205) text or binary source or errs if invalid.
+	// CompileModule decodes the WebAssembly 1.0 (20191205) text or binary source or errs if invalid.
+	// Any pre-compilation done after decoding the source is dependent on the RuntimeConfig.
 	//
-	// Note: the name defaults to what was decoded from the custom name section.
+	// Note: The resulting module name defaults to what was decoded from the custom name section.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	DecodeModule(source []byte) (*Module, error)
+	CompileModule(source []byte) (*Module, error)
 
 	// InstantiateModuleFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or
 	// errs if invalid.
@@ -44,15 +45,15 @@ type Runtime interface {
 	// Ex.
 	//	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
 	//
-	// Note: This is a convenience utility that chains DecodeModule with InstantiateModule. To instantiate the same source
-	// multiple times, use DecodeModule as InstantiateModule avoids redundant decoding and/or compilation.
+	// Note: This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
+	// source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
 	InstantiateModuleFromSource(source []byte) (wasm.Module, error)
 
 	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 	//
 	// Ex.
 	//	r := wazero.NewRuntime()
-	//	decoded, _ := r.DecodeModule(source)
+	//	decoded, _ := r.CompileModule(source)
 	//	module, _ := r.InstantiateModule(decoded)
 	//
 	// Note: The last value of RuntimeConfig.WithContext is used for any WebAssembly 1.0 (20191205) Start ExportedFunction.
@@ -84,8 +85,8 @@ func (r *runtime) Module(moduleName string) wasm.Module {
 	return r.store.Module(moduleName)
 }
 
-// DecodeModule implements Runtime.DecodeModule
-func (r *runtime) DecodeModule(source []byte) (*Module, error) {
+// CompileModule implements Runtime.CompileModule
+func (r *runtime) CompileModule(source []byte) (*Module, error) {
 	if source == nil {
 		return nil, errors.New("source == nil")
 	}
@@ -121,7 +122,7 @@ func (r *runtime) DecodeModule(source []byte) (*Module, error) {
 
 // InstantiateModuleFromSource implements Runtime.InstantiateModuleFromSource
 func (r *runtime) InstantiateModuleFromSource(source []byte) (wasm.Module, error) {
-	if decoded, err := r.DecodeModule(source); err != nil {
+	if decoded, err := r.CompileModule(source); err != nil {
 		return nil, err
 	} else {
 		return r.InstantiateModule(decoded)

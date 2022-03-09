@@ -52,7 +52,7 @@ func TestRuntime_DecodeModule(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			decoded, err := r.DecodeModule(tc.source)
+			decoded, err := r.CompileModule(tc.source)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedName, decoded.name)
 		})
@@ -86,7 +86,7 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := r.DecodeModule(tc.source)
+			_, err := r.CompileModule(tc.source)
 			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
@@ -96,7 +96,7 @@ func TestRuntime_DecodeModule_Errors(t *testing.T) {
 // names. This pattern is used in wapc-go.
 func TestDecodedModule_WithName(t *testing.T) {
 	r := NewRuntime()
-	base, err := r.DecodeModule([]byte(`(module $0 (memory 1))`))
+	base, err := r.CompileModule([]byte(`(module $0 (memory 1))`))
 	require.NoError(t, err)
 
 	require.Equal(t, "0", base.name)
@@ -138,7 +138,7 @@ func TestModule_Memory(t *testing.T) {
 
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
-			decoded, err := r.DecodeModule([]byte(tc.wat))
+			decoded, err := r.CompileModule([]byte(tc.wat))
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above hostFn
@@ -276,7 +276,7 @@ func TestFunction_Context(t *testing.T) {
 			source := requireImportAndExportFunction(t, r, hostFn, functionName)
 
 			// Instantiate the module and get the export of the above hostFn
-			decoded, err := r.DecodeModule(source)
+			decoded, err := r.CompileModule(source)
 			require.NoError(t, err)
 
 			module, err := r.InstantiateModule(decoded)
@@ -306,7 +306,7 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 	_, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
 
-	decoded, err := r.DecodeModule([]byte(`(module $runtime_test.go
+	decoded, err := r.CompileModule([]byte(`(module $runtime_test.go
 	(import "" "start" (func $start))
 	(start $start)
 )`))

@@ -88,9 +88,9 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *Module {
 //	wasi, _ := r.NewHostModule(wazero.WASISnapshotPreview1())
 //	module, _ := StartWASICommandFromSource(r, source)
 //
-// Note: This is a convenience utility that chains Runtime.DecodeModule with StartWASICommand.
+// Note: This is a convenience utility that chains Runtime.CompileModule with StartWASICommand.
 func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
-	if decoded, err := r.DecodeModule(source); err != nil {
+	if decoded, err := r.CompileModule(source); err != nil {
 		return nil, err
 	} else {
 		return StartWASICommand(r, decoded)
@@ -104,7 +104,7 @@ func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
 // Ex.
 //	r := wazero.NewRuntime()
 //	wasi, _ := r.NewHostModule(wazero.WASISnapshotPreview1())
-//	decoded, _ := r.DecodeModule(source)
+//	decoded, _ := r.CompileModule(source)
 //	module, _ := StartWASICommand(r, decoded)
 //
 // Prerequisites of the "Current Unstable ABI" from wasi.ModuleSnapshotPreview1:
