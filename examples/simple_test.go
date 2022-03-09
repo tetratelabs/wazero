@@ -13,20 +13,19 @@ import (
 // Test_Simple implements a basic function in go: hello. This is imported as the Wasm name "$hello" and run on start.
 func Test_Simple(t *testing.T) {
 	stdout := new(bytes.Buffer)
-	goFunc := func() {
+	hello := func() {
 		_, _ = fmt.Fprintln(stdout, "hello!")
 	}
 
 	r := wazero.NewRuntime()
 
 	// Host functions can be exported as any module name, including the empty string.
-	env := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"hello": goFunc}}
-	_, err := r.NewHostModuleFromConfig(env)
+	_, err := r.NewModuleBuilder("").ExportFunction("hello", hello).InstantiateModule()
 	require.NoError(t, err)
 
 	// The "hello" function was imported as $hello in Wasm. Since it was marked as the start
 	// function, it is invoked on instantiation. Ensure that worked: "hello" was called!
-	_, err = r.NewModuleFromSource([]byte(`(module $test
+	_, err = r.InstantiateModuleFromSource([]byte(`(module $test
 	(import "" "hello" (func $hello))
 	(start $hello)
 )`))

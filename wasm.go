@@ -15,10 +15,20 @@ import (
 // Ex.
 //	r := wazero.NewRuntime()
 //	decoded, _ := r.DecodeModule(source)
-//	module, _ := r.NewModule(decoded)
+//	module, _ := r.InstantiateModule(decoded)
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
 type Runtime interface {
+	// NewModuleBuilder lets you create modules out of functions defined in Go.
+	//
+	// Ex. Below defines and instantiates a module named "env" with one function:
+	//
+	//	hello := func() {
+	//		fmt.Fprintln(stdout, "hello!")
+	//	}
+	//	_, err := r.NewModuleBuilder("env").ExportFunction("hello", hello).InstantiateModule()
+	NewModuleBuilder(moduleName string) ModuleBuilder
+
 	// Module returns exports from an instantiated module or nil if there aren't any.
 	Module(moduleName string) wasm.Module
 
@@ -26,33 +36,27 @@ type Runtime interface {
 	//
 	// Note: the name defaults to what was decoded from the custom name section.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
-	DecodeModule(source []byte) (*DecodedModule, error)
+	DecodeModule(source []byte) (*Module, error)
 
-	// NewModuleFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or errs if
-	// invalid.
+	// InstantiateModuleFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or
+	// errs if invalid.
 	//
 	// Ex.
-	//	module, _ := wazero.NewRuntime().NewModuleFromSource(source)
+	//	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
 	//
-	// Note: This is a convenience utility that chains DecodeModule with NewModule. To instantiate the same source
-	// multiple times, use DecodeModule as NewModule avoids redundant decoding and/or compilation.
-	NewModuleFromSource(source []byte) (wasm.Module, error)
+	// Note: This is a convenience utility that chains DecodeModule with InstantiateModule. To instantiate the same source
+	// multiple times, use DecodeModule as InstantiateModule avoids redundant decoding and/or compilation.
+	InstantiateModuleFromSource(source []byte) (wasm.Module, error)
 
-	// NewModule instantiates the module namespace or errs if the configuration was invalid.
+	// InstantiateModule instantiates the module namespace or errs if the configuration was invalid.
 	//
 	// Ex.
 	//	r := wazero.NewRuntime()
 	//	decoded, _ := r.DecodeModule(source)
-	//	module, _ := r.NewModule(decoded)
+	//	module, _ := r.InstantiateModule(decoded)
 	//
 	// Note: The last value of RuntimeConfig.WithContext is used for any WebAssembly 1.0 (20191205) Start ExportedFunction.
-	NewModule(module *DecodedModule) (wasm.Module, error)
-
-	// NewHostModuleFromConfig instantiates the module namespace from the host or errs if the configuration was invalid.
-	//
-	// Ex.
-	//	module, _ := wazero.NewRuntime().NewHostModuleFromConfig(wazero.WASISnapshotPreview1())
-	NewHostModuleFromConfig(hostModule *HostModuleConfig) (wasm.Module, error)
+	InstantiateModule(module *Module) (wasm.Module, error)
 
 	// TODO: RemoveModule
 }
@@ -75,13 +79,13 @@ type runtime struct {
 	enabledFeatures internalwasm.Features
 }
 
-// Module implements wasm.Store Module
+// Module implements Runtime.Module
 func (r *runtime) Module(moduleName string) wasm.Module {
 	return r.store.Module(moduleName)
 }
 
 // DecodeModule implements Runtime.DecodeModule
-func (r *runtime) DecodeModule(source []byte) (*DecodedModule, error) {
+func (r *runtime) DecodeModule(source []byte) (*Module, error) {
 	if source == nil {
 		return nil, errors.New("source == nil")
 	}
@@ -107,7 +111,7 @@ func (r *runtime) DecodeModule(source []byte) (*DecodedModule, error) {
 		return nil, err
 	}
 
-	result := &DecodedModule{module: internal}
+	result := &Module{module: internal}
 	if internal.NameSection != nil {
 		result.name = internal.NameSection.ModuleName
 	}
@@ -115,25 +119,16 @@ func (r *runtime) DecodeModule(source []byte) (*DecodedModule, error) {
 	return result, nil
 }
 
-// NewModuleFromSource implements Runtime.NewModuleFromSource
-func (r *runtime) NewModuleFromSource(source []byte) (wasm.Module, error) {
+// InstantiateModuleFromSource implements Runtime.InstantiateModuleFromSource
+func (r *runtime) InstantiateModuleFromSource(source []byte) (wasm.Module, error) {
 	if decoded, err := r.DecodeModule(source); err != nil {
 		return nil, err
 	} else {
-		return r.NewModule(decoded)
+		return r.InstantiateModule(decoded)
 	}
 }
 
-// NewModule implements Runtime.NewModule
-func (r *runtime) NewModule(module *DecodedModule) (wasm.Module, error) {
+// InstantiateModule implements Runtime.InstantiateModule
+func (r *runtime) InstantiateModule(module *Module) (wasm.Module, error) {
 	return r.store.Instantiate(module.module, module.name)
-}
-
-// NewHostModuleFromConfig implements Runtime.NewHostModuleFromConfig
-func (r *runtime) NewHostModuleFromConfig(hostModule *HostModuleConfig) (wasm.Module, error) {
-	if m, err := internalwasm.NewHostModule(hostModule.Name, hostModule.Functions); err != nil {
-		return nil, err
-	} else {
-		return r.store.Instantiate(m, hostModule.Name)
-	}
 }

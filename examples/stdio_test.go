@@ -24,7 +24,7 @@ func Test_stdio(t *testing.T) {
 
 	// Configure WASI host functions with the IO buffers
 	wasiConfig := &wazero.WASIConfig{Stdin: stdinBuf, Stdout: stdoutBuf, Stderr: stderrBuf}
-	_, err := r.NewHostModuleFromConfig(wazero.WASISnapshotPreview1WithConfig(wasiConfig))
+	_, err := r.InstantiateModule(wazero.WASISnapshotPreview1WithConfig(wasiConfig))
 	require.NoError(t, err)
 
 	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to

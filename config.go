@@ -71,56 +71,13 @@ func (r *RuntimeConfig) WithFeatureSignExtensionOps(enabled bool) *RuntimeConfig
 	return &RuntimeConfig{engine: r.engine, ctx: r.ctx, enabledFeatures: enabledFeatures}
 }
 
-// DecodedModule is a WebAssembly 1.0 (20191205) text or binary encoded module to instantiate.
-type DecodedModule struct {
+// Module is a WebAssembly 1.0 (20191205) module to instantiate.
+type Module struct {
 	name   string
 	module *internalwasm.Module
 }
 
 // WithName returns a new instance which overrides the name.
-func (m *DecodedModule) WithName(moduleName string) *DecodedModule {
-	return &DecodedModule{name: moduleName, module: m.module}
-}
-
-// HostModuleConfig are WebAssembly 1.0 (20191205) exports from the host bound to a module name used by InstantiateHostModule.
-type HostModuleConfig struct {
-	// Name is the module name that these exports can be imported with. Ex. wasi.ModuleSnapshotPreview1
-	Name string
-
-	// Functions adds functions written in Go, which a WebAssembly Module can import.
-	//
-	// The key is the name to export and the value is the func. Ex. WASISnapshotPreview1
-	//
-	// Noting a context exception described later, all parameters or result types must match WebAssembly 1.0 (20191205) value
-	// types. This means uint32, uint64, float32 or float64. Up to one result can be returned.
-	//
-	// Ex. This is a valid host function:
-	//
-	//	addInts := func(x uint32, uint32) uint32 {
-	//		return x + y
-	//	}
-	//
-	// Host functions may also have an initial parameter (param[0]) of type context.Context or wasm.Module.
-	//
-	// Ex. This uses a Go Context:
-	//
-	//	addInts := func(ctx context.Context, x uint32, uint32) uint32 {
-	//		// add a little extra if we put some in the context!
-	//		return x + y + ctx.Value(extraKey).(uint32)
-	//	}
-	//
-	// The most sophisticated context is wasm.Module, which allows access to the Go context, but also
-	// allows writing to memory. This is important because there are only numeric types in Wasm. The only way to share other
-	// data is via writing memory and sharing offsets.
-	//
-	// Ex. This reads the parameters from!
-	//
-	//	addInts := func(ctx wasm.Module, offset uint32) uint32 {
-	//		x, _ := ctx.Memory().ReadUint32Le(offset)
-	//		y, _ := ctx.Memory().ReadUint32Le(offset + 4) // 32 bits == 4 bytes!
-	//		return x + y
-	//	}
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
-	Functions map[string]interface{}
+func (m *Module) WithName(moduleName string) *Module {
+	return &Module{name: moduleName, module: m.module}
 }

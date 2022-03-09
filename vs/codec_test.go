@@ -108,11 +108,11 @@ func TestExampleUpToDate(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithFeatureSignExtensionOps(true))
 
 		// Add WASI to satisfy import tests
-		_, err := r.NewHostModuleFromConfig(wazero.WASISnapshotPreview1())
+		_, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
 		require.NoError(t, err)
 
 		// Decode and instantiate the module
-		module, err := r.NewModuleFromSource(exampleBinary)
+		module, err := r.InstantiateModuleFromSource(exampleBinary)
 		require.NoError(t, err)
 
 		// Call the add function as a smoke test

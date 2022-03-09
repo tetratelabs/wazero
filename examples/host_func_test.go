@@ -56,13 +56,12 @@ func Test_hostFunc(t *testing.T) {
 
 	r := wazero.NewRuntime()
 
-	env := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"get_random_bytes": getRandomBytes}}
-	_, err := r.NewHostModuleFromConfig(env)
+	_, err := r.NewModuleBuilder("env").ExportFunction("get_random_bytes", getRandomBytes).InstantiateModule()
 	require.NoError(t, err)
 
 	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
 	stdout := bytes.NewBuffer(nil)
-	_, err = r.NewHostModuleFromConfig(wazero.WASISnapshotPreview1WithConfig(&wazero.WASIConfig{Stdout: stdout}))
+	_, err = r.InstantiateModule(wazero.WASISnapshotPreview1WithConfig(&wazero.WASIConfig{Stdout: stdout}))
 	require.NoError(t, err)
 
 	module, err := wazero.StartWASICommandFromSource(r, hostFuncWasm)

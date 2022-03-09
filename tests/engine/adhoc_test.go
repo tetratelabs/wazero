@@ -69,7 +69,7 @@ func runAdhocTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 
 func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-	module, err := r.NewModuleFromSource(hugestackWasm)
+	module, err := r.InstantiateModuleFromSource(hugestackWasm)
 	require.NoError(t, err)
 
 	fn := module.ExportedFunction("main")
@@ -81,7 +81,7 @@ func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 
 func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-	module, err := r.NewModuleFromSource(fibWasm)
+	module, err := r.InstantiateModuleFromSource(fibWasm)
 	require.NoError(t, err)
 
 	fib := module.ExportedFunction("fib")
@@ -94,7 +94,7 @@ func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 
 func testFac(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-	module, err := r.NewModuleFromSource(facWasm)
+	module, err := r.InstantiateModuleFromSource(facWasm)
 	require.NoError(t, err)
 	for _, name := range []string{
 		"fac-rec",
@@ -127,11 +127,10 @@ func testUnreachable(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig
 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-	hostModule := &wazero.HostModuleConfig{Name: "host", Functions: map[string]interface{}{"cause_unreachable": callUnreachable}}
-	_, err := r.NewHostModuleFromConfig(hostModule)
+	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).InstantiateModule()
 	require.NoError(t, err)
 
-	module, err := r.NewModuleFromSource(unreachableWasm)
+	module, err := r.InstantiateModuleFromSource(unreachableWasm)
 	require.NoError(t, err)
 
 	_, err = module.ExportedFunction("main").Call(nil)
@@ -146,7 +145,7 @@ wasm backtrace:
 
 func testMemory(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-	module, err := r.NewModuleFromSource(memoryWasm)
+	module, err := r.InstantiateModuleFromSource(memoryWasm)
 	require.NoError(t, err)
 
 	size := module.ExportedFunction("size")
@@ -185,11 +184,10 @@ func testRecursiveEntry(t *testing.T, newRuntimeConfig func() *wazero.RuntimeCon
 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-	hostModule := &wazero.HostModuleConfig{Name: "env", Functions: map[string]interface{}{"host_func": hostfunc}}
-	_, err := r.NewHostModuleFromConfig(hostModule)
+	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).InstantiateModule()
 	require.NoError(t, err)
 
-	module, err := r.NewModuleFromSource(recursiveWasm)
+	module, err := r.InstantiateModuleFromSource(recursiveWasm)
 	require.NoError(t, err)
 
 	_, err = module.ExportedFunction("main").Call(nil, 1)
@@ -211,11 +209,10 @@ func testImportedAndExportedFunc(t *testing.T, newRuntimeConfig func() *wazero.R
 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-	hostModule := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"store_int": storeInt}}
-	_, err := r.NewHostModuleFromConfig(hostModule)
+	_, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).InstantiateModule()
 	require.NoError(t, err)
 
-	module, err := r.NewModuleFromSource([]byte(`(module $test
+	module, err := r.InstantiateModuleFromSource([]byte(`(module $test
 		(import "" "store_int"
 			(func $store_int (param $offset i32) (param $val i64) (result (;errno;) i32)))
 		(memory $memory 1 1)
@@ -279,11 +276,10 @@ func testHostFunctions(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConf
 	} {
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
-		hostModule := &wazero.HostModuleConfig{Name: "host", Functions: v}
-		_, err := r.NewHostModuleFromConfig(hostModule)
+		_, err := r.NewModuleBuilder("host").ExportFunctions(v).InstantiateModule()
 		require.NoError(t, err)
 
-		m, err = r.NewModuleFromSource([]byte(`(module $test
+		m, err = r.InstantiateModuleFromSource([]byte(`(module $test
 	;; these imports return the input param
 	(import "host" "identity_f32" (func $test.identity_f32 (param f32) (result f32)))
 	(import "host" "identity_f64" (func $test.identity_f64 (param f64) (result f64)))

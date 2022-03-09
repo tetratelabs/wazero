@@ -21,10 +21,10 @@ func TestStartWASICommand_UsesStoreContext(t *testing.T) {
 		require.Equal(t, config.ctx, ctx.Context())
 	}
 
-	_, err := r.NewHostModuleFromConfig(&HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	_, err := r.NewModuleBuilder("").ExportFunction("start", start).InstantiateModule()
 	require.NoError(t, err)
 
-	_, err = r.NewHostModuleFromConfig(WASISnapshotPreview1())
+	_, err = r.InstantiateModule(WASISnapshotPreview1())
 	require.NoError(t, err)
 
 	decoded, err := r.DecodeModule([]byte(`(module $wasi_test.go

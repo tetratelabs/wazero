@@ -80,27 +80,30 @@ func TestNewHostModule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m, e := NewHostModule(tc.moduleName, tc.goFuncs)
 			require.NoError(t, e)
-
-			// `require.Equal(t, tc.expected, m)` fails reflect pointers don't match, so brute compare:
-			require.Equal(t, tc.expected.TypeSection, m.TypeSection)
-			require.Equal(t, tc.expected.ImportSection, m.ImportSection)
-			require.Equal(t, tc.expected.FunctionSection, m.FunctionSection)
-			require.Equal(t, tc.expected.TableSection, m.TableSection)
-			require.Equal(t, tc.expected.MemorySection, m.MemorySection)
-			require.Equal(t, tc.expected.GlobalSection, m.GlobalSection)
-			require.Equal(t, tc.expected.ExportSection, m.ExportSection)
-			require.Equal(t, tc.expected.StartSection, m.StartSection)
-			require.Equal(t, tc.expected.ElementSection, m.ElementSection)
-			require.Nil(t, m.CodeSection) // Host functions are implemented in Go, not Wasm!
-			require.Equal(t, tc.expected.DataSection, m.DataSection)
-			require.Equal(t, tc.expected.NameSection, m.NameSection)
-
-			// Special case because reflect.Value can't be compared with Equals
-			require.Equal(t, len(tc.expected.HostFunctionSection), len(m.HostFunctionSection))
-			for i := range tc.expected.HostFunctionSection {
-				require.Equal(t, (*tc.expected.HostFunctionSection[i]).Type(), (*m.HostFunctionSection[i]).Type())
-			}
+			requireHostModuleEquals(t, tc.expected, m)
 		})
+	}
+}
+
+func requireHostModuleEquals(t *testing.T, expected, actual *Module) {
+	// `require.Equal(t, expected, actual)` fails reflect pointers don't match, so brute compare:
+	require.Equal(t, expected.TypeSection, actual.TypeSection)
+	require.Equal(t, expected.ImportSection, actual.ImportSection)
+	require.Equal(t, expected.FunctionSection, actual.FunctionSection)
+	require.Equal(t, expected.TableSection, actual.TableSection)
+	require.Equal(t, expected.MemorySection, actual.MemorySection)
+	require.Equal(t, expected.GlobalSection, actual.GlobalSection)
+	require.Equal(t, expected.ExportSection, actual.ExportSection)
+	require.Equal(t, expected.StartSection, actual.StartSection)
+	require.Equal(t, expected.ElementSection, actual.ElementSection)
+	require.Nil(t, actual.CodeSection) // Host functions are implemented in Go, not Wasm!
+	require.Equal(t, expected.DataSection, actual.DataSection)
+	require.Equal(t, expected.NameSection, actual.NameSection)
+
+	// Special case because reflect.Value can't be compared with Equals
+	require.Equal(t, len(expected.HostFunctionSection), len(actual.HostFunctionSection))
+	for i := range expected.HostFunctionSection {
+		require.Equal(t, (*expected.HostFunctionSection[i]).Type(), (*actual.HostFunctionSection[i]).Type())
 	}
 }
 
