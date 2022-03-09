@@ -761,9 +761,9 @@ type SnapshotPreview1 interface {
 	//   parameters fd=3, offset=4, whence=0 (=io.SeekStart), resultNewOffset=1,
 	//   this function writes the below to `ctx.Memory`:
 	//
-	//                             uint64le
-	//                    +-----------------------+
-	//                    |                       |
+	//                           uint64le
+	//                    +--------------------+
+	//                    |                    |
 	//          []byte{?, 4, 0, 0, 0, 0, 0, 0, 0, ? }
 	//  resultNewoffset --^
 	//

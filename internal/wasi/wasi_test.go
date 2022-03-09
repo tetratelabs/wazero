@@ -1063,6 +1063,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 			expectedMemory: []byte{
 				'?',        // resultNewoffset is after this
 				4, 0, 0, 0, // = expectedOffset
+				'?',
 			},
 		},
 		{
@@ -1073,6 +1074,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 			expectedMemory: []byte{
 				'?',        // resultNewoffset is after this
 				2, 0, 0, 0, // = expectedOffset
+				'?',
 			},
 		},
 		{
@@ -1083,6 +1085,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 			expectedMemory: []byte{
 				'?',        // resultNewoffset is after this
 				5, 0, 0, 0, // = expectedOffset
+				'?',
 			},
 		},
 	}
