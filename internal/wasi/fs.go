@@ -70,7 +70,7 @@ func (m *MemFS) OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, 
 
 	if fsRights&wasi.R_FD_WRITE != 0 {
 		ret.flush = func(bts []byte) {
-			m.Files[path] = append([]byte{}, bts...)
+			m.Files[path] = bts
 		}
 	}
 
