@@ -744,8 +744,11 @@ type SnapshotPreview1 interface {
 	// FdSeek is the WASI function to move the offset of a file descriptor.
 	//
 	// * fd: the file descriptor to move the offset of
-	// * offset: the number of bytes to move
-	// * whence: the position relative to which to set the offset of the file descriptor
+	// * offset: the signed input argument in bytes to `whence`, which results in a new offset
+	// * whence: the operator that creates the new offset, given `offset` bytes
+	//   * If io.SeekStart, new offset == `offset`.
+	//   * If io.SeekCurrent, new offset == existing offset + `offset`.
+	//   * If io.SeekEnd, new offset == file size of `fd` + `offset`.
 	// * resultNewoffset: the offset in `ctx.Memory` to write the new offset to, relative to start of the file
 	//
 	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
@@ -764,6 +767,7 @@ type SnapshotPreview1 interface {
 	//          []byte{?, 4, 0, 0, 0, 0, 0, 0, 0, ? }
 	//  resultNewoffset --^
 	//
+	// See io.Seeker
 	// Note: ImportFdSeek shows this signature in the WebAssembly 1.0 (20191205) Text Format.
 	// Note: This is similar to `lseek` in POSIX.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
@@ -1249,7 +1253,6 @@ func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint3
 		return wasi.ErrnoBadf
 	}
 
-	// Note: WASI's whence values and io package's seek whence constants, such as io.SeekEnd, are compatible.
 	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
 		return wasi.ErrnoInval
 	}

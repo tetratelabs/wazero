@@ -77,15 +77,16 @@ func (m *MemFS) OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, 
 	return ret, nil
 }
 
+// memFile implements wasi.File
 type memFile struct {
 	buf    []byte
 	offset int64
 	flush  func(bts []byte)
 }
 
-// Read implements wasi.File.Read
+// Read implements io.Reader
 func (f *memFile) Read(p []byte) (int, error) {
-	// Read must return 0, io.EOF when it reaches the end-of-file
+	// In memFile, the end of the buffer is the end of the file.
 	if f.offset == int64(len(f.buf)) {
 		return 0, io.EOF
 	}
@@ -94,7 +95,7 @@ func (f *memFile) Read(p []byte) (int, error) {
 	return nread, nil
 }
 
-// Write implements wasi.File.Write
+// Write implements io.Writer
 func (f *memFile) Write(p []byte) (int, error) {
 	nwritten := copy(f.buf[f.offset:], p)
 	f.buf = append(f.buf, p[nwritten:]...)
@@ -102,7 +103,7 @@ func (f *memFile) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Seek implements wasi.File.Seek
+// Seek implements io.Seeker
 func (f *memFile) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case io.SeekStart:
@@ -117,7 +118,7 @@ func (f *memFile) Seek(offset int64, whence int) (int64, error) {
 	return f.offset, nil
 }
 
-// Close implements wasi.File.Close
+// Close implements io.Closer
 func (f *memFile) Close() error {
 	if f.flush != nil {
 		f.flush(f.buf)
