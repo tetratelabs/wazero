@@ -46,12 +46,6 @@ type (
 		// do type-checks on indirect function calls.
 		typeIDs map[string]FunctionTypeID
 
-		// maximumFunctionIndex represents the limit on the number of function addresses (= function instances) in a store.
-		// Note: this is fixed to 2^27 but have this a field for testability.
-		//
-		// TODO: Enforce this at module-level.
-		// maximumFunctionIndex FunctionIndex
-
 		//  maximumFunctionTypes represents the limit on the number of function types in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionTypes int
@@ -78,8 +72,7 @@ type (
 		// Ctx holds default function call context from this function instance.
 		Ctx *ModuleContext
 
-		// Engine holds ModuleEngine for this module instance and can be used to
-		// make function calls.
+		// Engine implements function calls for this module.
 		Engine ModuleEngine
 
 		// mux is used to guard the fields from concurrent access.
@@ -139,6 +132,7 @@ type (
 
 		// ModuleInstance holds the pointer to the module instance to which this function belongs.
 		Module *ModuleInstance
+
 		// TypeID is assigned by a store for FunctionType.
 		TypeID FunctionTypeID
 
@@ -232,7 +226,8 @@ func (m *ModuleInstance) buildExports(exports map[string]*Export) {
 			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
 			// available to the wasm.ModuleContext Memory.
 			//
-			// TODO: shouldn't this be race if multiple modules re-exporting? maybe we should limit this to only tests.
+			// TODO(adrian): shouldn't this be race if multiple modules re-exporting?
+			// maybe we should limit this to only tests.
 			if ei.Function.GoFunc != nil {
 				ei.Function.Module = m
 				ei.Function.Index = index
@@ -292,7 +287,7 @@ func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
 		table := m.Table.Table
 		for i, elm := range elem.Init {
 			pos := i + offset
-			table[pos] = m.Engine.CompiledFunctionAddress(elm)
+			table[pos] = m.Engine.FunctionAddress(elm)
 		}
 	}
 }

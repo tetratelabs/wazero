@@ -446,7 +446,7 @@ func (e *mockEngine) Compile(_, _ []*FunctionInstance) (ModuleEngine, error) {
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
-func (e *mockModuleEngine) CompiledFunctionAddress(index Index) uintptr {
+func (e *mockModuleEngine) FunctionAddress(index Index) uintptr {
 	return uintptr(index)
 }
 

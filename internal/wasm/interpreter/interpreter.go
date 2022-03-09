@@ -32,8 +32,8 @@ func NewEngine() wasm.Engine {
 }
 
 func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
-	e.mux.RLock()
-	defer e.mux.RUnlock()
+	e.mux.Lock()
+	defer e.mux.Lock()
 	delete(e.compiledFunctions, f)
 }
 
@@ -70,7 +70,7 @@ type callEngine struct {
 	frames []*callFrame
 }
 
-func (e *moduleEngine) newCallEngine() *callEngine {
+func (me *moduleEngine) newCallEngine() *callEngine {
 	return &callEngine{}
 }
 
@@ -148,14 +148,14 @@ type interpreterOp struct {
 }
 
 // Release implements wasm.Engine Release
-func (e *moduleEngine) Release() error {
-	for _, cf := range e.compiledFunctions {
-		e.parentEngine.deleteCompiledFunction(cf.funcInstance)
+func (me *moduleEngine) Release() error {
+	for _, cf := range me.compiledFunctions {
+		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
 	}
 	return nil
 }
 
-// Compile Implements wasm.Engine for engine.
+// Compile implements internalwasm.Engine Compile
 func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (me wasm.ModuleEngine, err error) {
 	compiledFunctions := make([]*compiledFunction, len(importedFunctions)+len(moduleFunctions))
 	for i, f := range importedFunctions {
@@ -464,11 +464,12 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 	return ret, nil
 }
 
-func (me *moduleEngine) CompiledFunctionAddress(index wasm.Index) uintptr {
+// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress.
+func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
-// Call implements wasm.ModuleEngine Call.
+// Call implements internalwasm.ModuleEngine Call.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	compiled := me.compiledFunctions[f.Index]
 	if compiled == nil {

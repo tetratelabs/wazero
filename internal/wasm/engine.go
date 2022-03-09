@@ -1,18 +1,19 @@
 package internalwasm
 
-// Engine is the interface implemented by interpreter and JIT.
-// This is per-store specific instance.
+// Engine is a Store-scoped mechanism to compile functions declared or imported by a module.
+// This is a top-level type implemented by an interpreter or JIT compiler.
 type Engine interface {
-	// Compile compiles down the function instances in a module,
-	// and returns ModuleEngine for the module.
+	// Compile compiles down the function instances in a module, and returns ModuleEngine for the module.
 	Compile(importedFunctions, moduleFunctions []*FunctionInstance) (ModuleEngine, error)
 }
 
-// ModuleEngine is the interface implemented by interpreters.
+// ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
-	// CompiledFunctionAddress returns the absolute address of the compiled function for index.
-	// The returned address is stored and used as a table element.
-	CompiledFunctionAddress(index Index) uintptr
+	// FunctionAddress returns the absolute address of the compiled function for index.
+	// The returned address is stored and used as a TableInstance.Table element.
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr
+	FunctionAddress(index Index) uintptr
 
 	// Call invokes a function instance f with given parameters.
 	// Returns the results from the function.

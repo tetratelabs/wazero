@@ -645,10 +645,14 @@ type Export struct {
 	Index Index
 }
 
+// ElementSegment are initialization instructions for a TableInstance
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-elem
 type ElementSegment struct {
 	TableIndex Index
 	OffsetExpr *ConstantExpression
-	Init       []uint32
+	// Init are positions in the function index namespace.
+	Init []Index
 }
 
 // Code is an entry in the Module.CodeSection containing the locals and body of the function.
@@ -657,6 +661,7 @@ type Code struct {
 	// LocalTypes are any function-scoped variables in insertion order.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-local
 	LocalTypes []ValueType
+
 	// Body is a sequence of expressions ending in OpcodeEnd
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-expr
 	Body []byte

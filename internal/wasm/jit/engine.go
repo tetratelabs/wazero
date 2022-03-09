@@ -313,6 +313,7 @@ func (s jitCallStatusCode) String() (ret string) {
 	return
 }
 
+// String implements fmt.Stringer
 func (c *callFrame) String() string {
 	return fmt.Sprintf(
 		"[%s: return address=0x%x, return stack base pointer=%d]",
@@ -320,7 +321,7 @@ func (c *callFrame) String() string {
 	)
 }
 
-// Release implements wasm.Engine Compile
+// Compile implements internalwasm.Engine Compile
 func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (me wasm.ModuleEngine, err error) {
 	imported := len(importedFunctions)
 	compiledFunctions := make([]*compiledFunction, imported+len(moduleFunctions))
@@ -368,23 +369,23 @@ func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunc
 	return
 }
 
-// CompiledFunctionAddress implements wasm.ModuleEngine CompiledFunctionAddress
-func (e *moduleEngine) CompiledFunctionAddress(index wasm.Index) uintptr {
-	return uintptr(unsafe.Pointer(e.compiledFunctions[index]))
+// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress
+func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
+	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
-// Release implements wasm.ModuleEngine Release
-func (e *moduleEngine) Release() error {
-	for _, cf := range e.compiledFunctions {
+// Release implements internalwasm.ModuleEngine Release
+func (me *moduleEngine) Release() error {
+	for _, cf := range me.compiledFunctions {
 		if err := munmapCodeSegment(cf.codeSegment); err != nil {
 			return err
 		}
-		e.parentEngine.deleteCompiledFunction(cf.source)
+		me.parentEngine.deleteCompiledFunction(cf.source)
 	}
 	return nil
 }
 
-// Call implements wasm.ModuleEngine Call
+// Call implements internalwasm.ModuleEngine Call
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	compiled := me.compiledFunctions[f.Index]
 	if compiled == nil {
