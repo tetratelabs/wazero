@@ -186,7 +186,7 @@ func TestModule_validateHostFunctions(t *testing.T) {
 		}
 		err := m.validateHostFunctions()
 		require.Error(t, err)
-		require.EqualError(t, err, `host_function[0] (export "f1") is not a valid go func: kind != func: ptr`)
+		require.EqualError(t, err, `host_function[0] export["f1"] is not a valid go func: kind != func: ptr`)
 	})
 	t.Run("not a function  - exported after import", func(t *testing.T) {
 		m := Module{
@@ -198,7 +198,7 @@ func TestModule_validateHostFunctions(t *testing.T) {
 		}
 		err := m.validateHostFunctions()
 		require.Error(t, err)
-		require.EqualError(t, err, `host_function[0] (export "f1") is not a valid go func: kind != func: ptr`)
+		require.EqualError(t, err, `host_function[0] export["f1"] is not a valid go func: kind != func: ptr`)
 	})
 	t.Run("not a function - exported twice", func(t *testing.T) {
 		m := Module{
@@ -212,6 +212,6 @@ func TestModule_validateHostFunctions(t *testing.T) {
 		}
 		err := m.validateHostFunctions()
 		require.Error(t, err)
-		require.EqualError(t, err, `host_function[0] (export "f1","f2") is not a valid go func: kind != func: ptr`)
+		require.EqualError(t, err, `host_function[0] export["f1","f2"] is not a valid go func: kind != func: ptr`)
 	})
 }

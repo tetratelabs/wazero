@@ -54,7 +54,7 @@ func (r *RuntimeConfig) WithContext(ctx context.Context) *RuntimeConfig {
 // WithFeatureMutableGlobal allows globals to be mutable. This defaults to true as the feature was finished in
 // WebAssembly 1.0 (20191205).
 //
-// When false, a wasm.Global can never be cast to a wasm.MutableGlobal, and any source that includes mutable globals
+// When false, a wasm.Global can never be cast to a wasm.MutableGlobal, and any source that includes global vars
 // will fail to parse.
 //
 func (r *RuntimeConfig) WithFeatureMutableGlobal(enabled bool) *RuntimeConfig {

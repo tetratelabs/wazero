@@ -69,6 +69,36 @@ func TestEncodeImport(t *testing.T) {
 				0x0a,
 			},
 		},
+		{
+			name: "global const",
+			input: &wasm.Import{
+				Type:       wasm.ExternTypeGlobal,
+				Module:     "math",
+				Name:       "pi",
+				DescGlobal: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
+			},
+			expected: []byte{
+				0x04, 'm', 'a', 't', 'h',
+				0x02, 'p', 'i',
+				wasm.ExternTypeGlobal,
+				wasm.ValueTypeF64, 0x00, // 0 == const
+			},
+		},
+		{
+			name: "global var",
+			input: &wasm.Import{
+				Type:       wasm.ExternTypeGlobal,
+				Module:     "math",
+				Name:       "pi",
+				DescGlobal: &wasm.GlobalType{ValType: wasm.ValueTypeF64, Mutable: true},
+			},
+			expected: []byte{
+				0x04, 'm', 'a', 't', 'h',
+				0x02, 'p', 'i',
+				wasm.ExternTypeGlobal,
+				wasm.ValueTypeF64, 0x01, // 1 == var
+			},
+		},
 	}
 
 	for _, tt := range tests {

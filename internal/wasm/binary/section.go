@@ -215,7 +215,8 @@ func encodeSection(sectionID wasm.SectionID, contents []byte) []byte {
 	return append([]byte{sectionID}, encodeSizePrefixed(contents)...)
 }
 
-// encodeTypeSection encodes a SectionIDType for the given imports in WebAssembly 1.0 (20191205) Binary Format.
+// encodeTypeSection encodes a internalwasm.SectionIDType for the given imports in WebAssembly 1.0 (20191205) Binary
+// Format.
 //
 // See encodeFunctionType
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#type-section%E2%91%A0
@@ -227,7 +228,8 @@ func encodeTypeSection(types []*wasm.FunctionType) []byte {
 	return encodeSection(wasm.SectionIDType, contents)
 }
 
-// encodeImportSection encodes a SectionIDImport for the given imports in WebAssembly 1.0 (20191205) Binary Format.
+// encodeImportSection encodes a internalwasm.SectionIDImport for the given imports in WebAssembly 1.0 (20191205) Binary
+// Format.
 //
 // See encodeImport
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#import-section%E2%91%A0
@@ -239,8 +241,8 @@ func encodeImportSection(imports []*wasm.Import) []byte {
 	return encodeSection(wasm.SectionIDImport, contents)
 }
 
-// encodeFunctionSection encodes a SectionIDFunction for the type indices associated with module-defined functions in
-// WebAssembly 1.0 (20191205) Binary Format.
+// encodeFunctionSection encodes a internalwasm.SectionIDFunction for the type indices associated with module-defined
+// functions in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-section%E2%91%A0
 func encodeFunctionSection(typeIndices []wasm.Index) []byte {
@@ -251,7 +253,8 @@ func encodeFunctionSection(typeIndices []wasm.Index) []byte {
 	return encodeSection(wasm.SectionIDFunction, contents)
 }
 
-// encodeCodeSection encodes a SectionIDCode for the module-defined function in WebAssembly 1.0 (20191205) Binary Format.
+// encodeCodeSection encodes a internalwasm.SectionIDCode for the module-defined function in WebAssembly 1.0 (20191205)
+// Binary Format.
 //
 // See encodeCode
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#code-section%E2%91%A0
@@ -263,7 +266,8 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 	return encodeSection(wasm.SectionIDCode, contents)
 }
 
-// encodeMemorySection encodes a SectionIDMemory for the module-defined function in WebAssembly 1.0 (20191205) Binary Format.
+// encodeMemorySection encodes a internalwasm.SectionIDMemory for the module-defined function in WebAssembly 1.0
+// (20191205) Binary Format.
 //
 // See encodeMemoryType
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
@@ -275,7 +279,21 @@ func encodeMemorySection(memories []*wasm.MemoryType) []byte {
 	return encodeSection(wasm.SectionIDMemory, contents)
 }
 
-// encodeExportSection encodes a SectionIDExport for the given exports in WebAssembly 1.0 (20191205) Binary Format.
+// encodeGlobalSection encodes a internalwasm.SectionIDGlobal for the given globals in WebAssembly 1.0 (20191205) Binary
+// Format.
+//
+// See encodeGlobal
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#global-section%E2%91%A0
+func encodeGlobalSection(globals []*wasm.Global) []byte {
+	contents := leb128.EncodeUint32(uint32(len(globals)))
+	for _, g := range globals {
+		contents = append(contents, encodeGlobal(g)...)
+	}
+	return encodeSection(wasm.SectionIDGlobal, contents)
+}
+
+// encodeExportSection encodes a internalwasm.SectionIDExport for the given exports in WebAssembly 1.0 (20191205) Binary
+// Format.
 //
 // See encodeExport
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#export-section%E2%91%A0
@@ -287,7 +305,8 @@ func encodeExportSection(exports map[string]*wasm.Export) []byte {
 	return encodeSection(wasm.SectionIDExport, contents)
 }
 
-// encodeStartSection encodes a SectionIDStart for the given function index in WebAssembly 1.0 (20191205) Binary Format.
+// encodeStartSection encodes a internalwasm.SectionIDStart for the given function index in WebAssembly 1.0 (20191205)
+// Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#start-section%E2%91%A0
 func encodeStartSection(funcidx wasm.Index) []byte {

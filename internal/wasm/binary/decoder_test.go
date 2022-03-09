@@ -1,7 +1,6 @@
 package binary
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -147,26 +146,6 @@ func TestDecodeModule_Errors(t *testing.T) {
 				0x04, 'n', 'a', 'm', 'e',
 				subsectionIDModuleName, 0x02, 0x01, 'x'),
 			expectedErr: "section custom: redundant custom section name",
-		},
-		{
-			name:     fmt.Sprintf("define mutable global when %s disabled", wasm.FeatureMutableGlobal),
-			features: wasm.Features20191205.Set(wasm.FeatureMutableGlobal, false),
-			input: append(append(Magic, version...),
-				wasm.SectionIDGlobal, 0x06, // 6 bytes in this section
-				0x01, wasm.ValueTypeI32, 0x01, // 1 global i32 mutable
-				wasm.OpcodeI32Const, 0x00, wasm.OpcodeEnd, // arbitrary init to zero
-			),
-			expectedErr: "global[0]: feature mutable-global is disabled",
-		},
-		{
-			name:     fmt.Sprintf("import mutable global when %s disabled", wasm.FeatureMutableGlobal),
-			features: wasm.Features20191205.Set(wasm.FeatureMutableGlobal, false),
-			input: append(append(Magic, version...),
-				wasm.SectionIDImport, 0x08, // 8 bytes in this section
-				0x01, 0x01, 'a', 0x01, 'b', wasm.ExternTypeGlobal, // 1 import a.b of type global
-				wasm.ValueTypeI32, 0x01, // 1 global i32 mutable
-			),
-			expectedErr: "import[0] global[a.b]: feature mutable-global is disabled",
 		},
 	}
 
