@@ -744,7 +744,7 @@ type SnapshotPreview1 interface {
 	// FdSeek is the WASI function to move the offset of a file descriptor.
 	//
 	// * fd: the file descriptor to move the offset of
-	// * offset: the signed input argument in bytes to `whence`, which results in a new offset
+	// * offset: the signed int64, which is encoded as uint64, input argument to `whence`, which results in a new offset
 	// * whence: the operator that creates the new offset, given `offset` bytes
 	//   * If io.SeekStart, new offset == `offset`.
 	//   * If io.SeekCurrent, new offset == existing offset + `offset`.

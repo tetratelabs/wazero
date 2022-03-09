@@ -1077,7 +1077,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 		},
 		{
 			name:           "SeekEnd",
-			offset:         -1, // arbitrary offset
+			offset:         -1, // arbitrary offset, note that offset can be negative
 			whence:         io.SeekEnd,
 			expectedOffset: 5, // = 6 (the size of the test file with content "wazero") + -1 (offset)
 			expectedMemory: []byte{
