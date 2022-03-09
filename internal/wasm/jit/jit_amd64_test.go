@@ -6063,11 +6063,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
 					compiler := env.requireNewCompiler(t)
-					compiler.f = &wasm.FunctionInstance{
-						Kind:   wasm.FunctionKindWasm,
-						Type:   targetFunctionType,
-						Module: &wasm.ModuleInstance{Engine: me},
-					}
+					compiler.f.Type = targetFunctionType
 
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
