@@ -6048,7 +6048,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 			}
 
 			// Emit the call target function.
-			const numCalls = 5
+			const numCalls = 3
 			targetFunctionType := &wasm.FunctionType{
 				Params:  []wasm.ValueType{wasm.ValueTypeI32},
 				Results: []wasm.ValueType{wasm.ValueTypeI32},
