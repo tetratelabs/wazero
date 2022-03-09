@@ -741,7 +741,37 @@ type SnapshotPreview1 interface {
 	// FdRenumber is the WASI function named FunctionFdRenumber
 	FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno
 
-	// FdSeek is the WASI function named FunctionFdSeek
+	// FdSeek is the WASI function to move the offset of a file descriptor.
+	//
+	// * fd: the file descriptor to move the offset of
+	// * offset: the signed int64, which is encoded as uint64, input argument to `whence`, which results in a new offset
+	// * whence: the operator that creates the new offset, given `offset` bytes
+	//   * If io.SeekStart, new offset == `offset`.
+	//   * If io.SeekCurrent, new offset == existing offset + `offset`.
+	//   * If io.SeekEnd, new offset == file size of `fd` + `offset`.
+	// * resultNewoffset: the offset in `ctx.Memory` to write the new offset to, relative to start of the file
+	//
+	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+	// * wasi.ErrnoBadf - if `fd` is invalid
+	// * wasi.ErrnoFault - if `resultNewoffset` is an invalid offset in `ctx.Memory` due to the memory constraint
+	// * wasi.ErrnoInval - if `whence` is an invalid value
+	// * wasi.ErrnoIo - if other error happens during the operation of the underying file system
+	//
+	// For example, if fd 3 is a file with offset 0, and
+	//   parameters fd=3, offset=4, whence=0 (=io.SeekStart), resultNewOffset=1,
+	//   this function writes the below to `ctx.Memory`:
+	//
+	//                           uint64le
+	//                    +--------------------+
+	//                    |                    |
+	//          []byte{?, 4, 0, 0, 0, 0, 0, 0, 0, ? }
+	//  resultNewoffset --^
+	//
+	// See io.Seeker
+	// Note: ImportFdSeek shows this signature in the WebAssembly 1.0 (20191205) Text Format.
+	// Note: This is similar to `lseek` in POSIX.
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_seek
+	// See https://linux.die.net/man/3/lseek
 	FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno
 
 	// FdSync is the WASI function named FunctionFdSync
@@ -1218,7 +1248,24 @@ func (a *wasiAPI) FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno {
 
 // FdSeek implements SnapshotPreview1.FdSeek
 func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno {
-	return wasi.ErrnoNosys // stubbed for GrainLang per #271
+	f, ok := a.opened[fd]
+	if !ok || f.file == nil {
+		return wasi.ErrnoBadf
+	}
+
+	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
+		return wasi.ErrnoInval
+	}
+	newOffst, err := f.file.Seek(int64(offset), int(whence))
+	if err != nil {
+		return wasi.ErrnoIo
+	}
+
+	if !ctx.Memory().WriteUint32Le(resultNewoffset, uint32(newOffst)) {
+		return wasi.ErrnoFault
+	}
+
+	return wasi.ErrnoSuccess
 }
 
 // FdSync implements SnapshotPreview1.FdSync

@@ -1,7 +1,10 @@
 // Package wasi includes constants and interfaces used by both public and internal APIs.
 package wasi
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
 
 const (
 	// ModuleSnapshotPreview1 is the module name WASI functions are exported into
@@ -28,10 +31,12 @@ const (
 	R_FD_WRITE
 )
 
+// File combines file I/O interfaces supported by ModuleSnapshotPreview1.
 type File interface {
-	Read([]byte) (int, error)
-	Write([]byte) (int, error)
-	Close() error
+	io.Reader
+	io.Writer
+	io.Seeker
+	io.Closer
 }
 
 // FS is an interface for a preopened directory.
