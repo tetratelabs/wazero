@@ -103,12 +103,12 @@ func TestDecodedModule_WithName(t *testing.T) {
 
 	// Use the same runtime to instantiate multiple modules
 	internal := r.(*runtime).store
-	m1, err := r.NewModule(base.WithName("1"))
+	m1, err := r.InstantiateModule(base.WithName("1"))
 	require.NoError(t, err)
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("1"), m1)
 
-	m2, err := r.NewModule(base.WithName("2"))
+	m2, err := r.InstantiateModule(base.WithName("2"))
 	require.NoError(t, err)
 	require.Nil(t, internal.Module("0"))
 	require.Equal(t, internal.Module("2"), m2)
@@ -142,7 +142,7 @@ func TestModule_Memory(t *testing.T) {
 			require.NoError(t, err)
 
 			// Instantiate the module and get the export of the above hostFn
-			module, err := r.NewModule(decoded)
+			module, err := r.InstantiateModule(decoded)
 			require.NoError(t, err)
 
 			mem := module.ExportedMemory("memory")
@@ -216,7 +216,7 @@ func TestModule_Global(t *testing.T) {
 		r := NewRuntime()
 		t.Run(tc.name, func(t *testing.T) {
 			// Instantiate the module and get the export of the above global
-			module, err := r.NewModule(&DecodedModule{module: tc.module})
+			module, err := r.InstantiateModule(&Module{module: tc.module})
 			require.NoError(t, err)
 
 			global := module.ExportedGlobal("global")
@@ -279,7 +279,7 @@ func TestFunction_Context(t *testing.T) {
 			decoded, err := r.DecodeModule(source)
 			require.NoError(t, err)
 
-			module, err := r.NewModule(decoded)
+			module, err := r.InstantiateModule(decoded)
 			require.NoError(t, err)
 
 			// This fails if the function wasn't invoked, or had an unexpected context.
@@ -303,7 +303,7 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 		require.Equal(t, runtimeCtx, ctx.Context())
 	}
 
-	_, err := r.NewHostModuleFromConfig(&HostModuleConfig{Functions: map[string]interface{}{"start": start}})
+	_, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
 
 	decoded, err := r.DecodeModule([]byte(`(module $runtime_test.go
@@ -313,16 +313,14 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 	require.NoError(t, err)
 
 	// Instantiate the module, which calls the start function. This will fail if the context wasn't as intended.
-	_, err = r.NewModule(decoded)
+	_, err = r.InstantiateModule(decoded)
 	require.NoError(t, err)
 	require.True(t, calledStart)
 }
 
-// requireImportAndExportFunction re-module a host function because only host functions can see the propagated context.
+// requireImportAndExportFunction re-exports a host function because only host functions can see the propagated context.
 func requireImportAndExportFunction(t *testing.T, r Runtime, hostFn func(ctx wasm.Module) uint64, functionName string) []byte {
-	_, err := r.NewHostModuleFromConfig(&HostModuleConfig{
-		Name: "host", Functions: map[string]interface{}{functionName: hostFn},
-	})
+	_, err := r.NewModuleBuilder("host").ExportFunction(functionName, hostFn).Instantiate()
 	require.NoError(t, err)
 
 	return []byte(fmt.Sprintf(

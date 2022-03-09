@@ -243,7 +243,7 @@ func wasmtimeGoFacIterInvoke(b *testing.B) {
 func newWazeroFacIterBench(engine *wazero.RuntimeConfig) (wasm.Function, error) {
 	r := wazero.NewRuntimeWithConfig(engine)
 
-	m, err := r.NewModuleFromSource(facWasm)
+	m, err := r.InstantiateModuleFromSource(facWasm)
 	if err != nil {
 		return nil, err
 	}

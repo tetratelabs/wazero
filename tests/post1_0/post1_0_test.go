@@ -56,12 +56,12 @@ func testSignExtensionOps(t *testing.T, newRuntimeConfig func() *wazero.RuntimeC
 	t.Run("disabled", func(t *testing.T) {
 		// Sign-extension is disabled by default.
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-		_, err := r.NewModuleFromSource(signExtend)
+		_, err := r.InstantiateModuleFromSource(signExtend)
 		require.Error(t, err)
 	})
 	t.Run("enabled", func(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig().WithFeatureSignExtensionOps(true))
-		module, err := r.NewModuleFromSource(signExtend)
+		module, err := r.InstantiateModuleFromSource(signExtend)
 		require.NoError(t, err)
 
 		signExtend32from8Name, signExtend32from16Name := "i32.extend8_s", "i32.extend16_s"

@@ -18,7 +18,7 @@ func main() {
 	source, _ := os.ReadFile("./tests/engine/testdata/fac.wasm")
 
 	// Instantiate the module and return its exported functions
-	module, _ := wazero.NewRuntime().NewModuleFromSource(source)
+	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
 
 	// Discover 7! is 5040
 	fmt.Println(module.ExportedFunction("fac").Call(nil, 7))

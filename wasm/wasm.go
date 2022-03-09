@@ -89,7 +89,7 @@ type Module interface {
 	ExportedGlobal(name string) Global
 }
 
-// Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime NewModule).
+// Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime InstantiateModule).
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-func
 type Function interface {
 	// ParamTypes are the possibly empty sequence of value types accepted by a function with this signature.
@@ -122,7 +122,7 @@ type Function interface {
 	Call(ctx Module, params ...uint64) ([]uint64, error)
 }
 
-// Global is a WebAssembly 1.0 (20191205) global exported from an instantiated module (wazero.Runtime NewModule).
+// Global is a WebAssembly 1.0 (20191205) global exported from an instantiated module (wazero.Runtime InstantiateModule).
 //
 // Ex. If the value is not mutable, you can read it once:
 //

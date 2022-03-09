@@ -5,6 +5,7 @@ import (
 	"io"
 
 	internalwasi "github.com/tetratelabs/wazero/internal/wasi"
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/wasi"
 	"github.com/tetratelabs/wazero/wasm"
 )
@@ -32,12 +33,12 @@ type WASIConfig struct {
 }
 
 // WASISnapshotPreview1 are functions importable as the module name wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1() *HostModuleConfig {
+func WASISnapshotPreview1() *Module {
 	return WASISnapshotPreview1WithConfig(&WASIConfig{})
 }
 
 // WASISnapshotPreview1WithConfig are functions importable as the module name wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
+func WASISnapshotPreview1WithConfig(c *WASIConfig) *Module {
 	// TODO: delete the internalwasi.Option types as they are not accessible as they are internal!
 	var opts []internalwasi.Option
 	if c.Stdin != nil {
@@ -72,10 +73,11 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *HostModuleConfig {
 			opts = append(opts, internalwasi.Preopen(k, v))
 		}
 	}
-	return &HostModuleConfig{
-		Name:      wasi.ModuleSnapshotPreview1,
-		Functions: internalwasi.SnapshotPreview1Functions(opts...),
+	m, err := internalwasm.NewHostModule(wasi.ModuleSnapshotPreview1, internalwasi.SnapshotPreview1Functions(opts...))
+	if err != nil {
+		panic(fmt.Errorf("BUG: %w", err))
 	}
+	return &Module{name: wasi.ModuleSnapshotPreview1, module: m}
 }
 
 // StartWASICommandFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or errs if
@@ -114,7 +116,7 @@ func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
 // Note: The wasm.Functions return value does not restrict exports after "_start" as allowed in the specification.
 // Note: All TinyGo Wasm are WASI commands. They initialize memory on "_start" and import "fd_write" to implement panic.
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-func StartWASICommand(r Runtime, module *DecodedModule) (wasm.Module, error) {
+func StartWASICommand(r Runtime, module *Module) (wasm.Module, error) {
 	if err := internalwasi.ValidateWASICommand(module.module, module.name); err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ func Test_WASI(t *testing.T) {
 	}
 
 	stdout := new(bytes.Buffer)
-	goFunc := func(ctx wasm.Module) {
+	random := func(ctx wasm.Module) {
 		// Write 8 random bytes to memory using WASI.
 		errno := randomGet(ctx, 0, 8)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
@@ -33,11 +33,11 @@ func Test_WASI(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	// Host functions can be exported as any module name, including the empty string.
-	env := &wazero.HostModuleConfig{Name: "", Functions: map[string]interface{}{"random": goFunc}}
-	_, err := r.NewHostModuleFromConfig(env)
+	_, err := r.NewModuleBuilder("").ExportFunction("random", random).Instantiate()
+	require.NoError(t, err)
 
 	// Configure WASI and implement the function to use it
-	we, err := r.NewHostModuleFromConfig(wazero.WASISnapshotPreview1())
+	we, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 	randomGetFn := we.ExportedFunction("random_get")
 
@@ -50,7 +50,7 @@ func Test_WASI(t *testing.T) {
 
 	// The "random" function was imported as $random in Wasm. Since it was marked as the start
 	// function, it is invoked on instantiation. Ensure that worked: "random" was called!
-	_, err = r.NewModuleFromSource([]byte(`(module $wasi
+	_, err = r.InstantiateModuleFromSource([]byte(`(module $wasi
 	(import "wasi_snapshot_preview1" "random_get"
 		(func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))
 	(import "" "random" (func $random))
