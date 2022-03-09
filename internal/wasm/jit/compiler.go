@@ -1,7 +1,6 @@
 package jit
 
 import (
-	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -19,7 +18,7 @@ type compiler interface {
 	compile() (code []byte, staticData compiledFunctionStaticData, stackPointerCeil uint64, err error)
 	// compileHostFunction emits the trampoline code from which native code can jump into the host function.
 	// TODO: maybe we wouldn't need to have trampoline for host functions.
-	compileHostFunction(address wasm.FunctionIndex) error
+	compileHostFunction() error
 	// compileLabel notify compilers of the beginning of a label.
 	// Return true if the compiler decided to skip the entire label.
 	// See wazeroir.OperationLabel

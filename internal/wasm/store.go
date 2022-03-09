@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math"
 	"reflect"
 	"sync"
 
@@ -47,28 +46,9 @@ type (
 		// do type-checks on indirect function calls.
 		typeIDs map[string]FunctionTypeID
 
-		// maximumFunctionIndex represents the limit on the number of function addresses (= function instances) in a store.
-		// Note: this is fixed to 2^27 but have this a field for testability.
-		maximumFunctionIndex FunctionIndex
-
 		//  maximumFunctionTypes represents the limit on the number of function types in a store.
 		// Note: this is fixed to 2^27 but have this a field for testability.
 		maximumFunctionTypes int
-
-		// releasedFunctionIndex holds reusable FunctionIndexes. An index is added when
-		// a function instance is released in releaseFunctions, and is popped when
-		// a new instance is added in addFunctions.
-		releasedFunctionIndex map[FunctionIndex]struct{}
-
-		// functions holds function instances (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#function-instances%E2%91%A0),
-		// in this store.
-		// The slice index is to be interpreted as funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr).
-		//
-		// Note: Functions are held by store as well as ModuleInstances, in contrast to other instances (memory, table, and globals)
-		// which are only owned by ModuleInstance. This is not only because the function call implementation in engines depend on
-		// store-scope funcaddr (FunctionIndex in wazero), but also call_indirect is specified to make function calls via funcaddr,
-		// which might end up calling a function outside of module-scope index space.
-		functions []*FunctionInstance
 
 		// mux is used to guard the fields from concurrent access.
 		mux sync.RWMutex
@@ -91,6 +71,9 @@ type (
 
 		// Ctx holds default function call context from this function instance.
 		Ctx *ModuleContext
+
+		// Engine implements function calls for this module.
+		Engine ModuleEngine
 
 		// mux is used to guard the fields from concurrent access.
 		mux sync.Mutex
@@ -149,13 +132,12 @@ type (
 
 		// ModuleInstance holds the pointer to the module instance to which this function belongs.
 		Module *ModuleInstance
+
 		// TypeID is assigned by a store for FunctionType.
 		TypeID FunctionTypeID
-		// Index is the index of this function instance in Store.functions, and is exported because
-		// all function calls are made via funcaddr at runtime, not the index (scoped to a module).
-		//
-		// This is used by both host and non-host functions.
-		Index FunctionIndex
+
+		// Index holds the index of this function instance in Module.
+		Index Index
 	}
 
 	// TypeInstance is a store-specific representation of FunctionType where the function type
@@ -180,38 +162,12 @@ type (
 	// Note this is fixed to function type until post 20191205 reference type is implemented.
 	TableInstance struct {
 		// Table holds the table elements managed by this table instance.
-		//
-		// Note: we intentionally use "[]TableElement", not "[]*TableElement",
-		// because the JIT Engine accesses this slice directly from assembly.
-		// If pointer type is used, the access becomes two level indirection (two hops of pointer jumps)
-		// which is a bit costly. TableElement is 96 bit (32 and 64 bit fields) so the cost of using value type
-		// would be ignorable.
-		Table []TableElement
+		Table []uintptr
 		Min   uint32
 		Max   *uint32
 		// Currently fixed to 0x70 (funcref type).
 		ElemType byte
 	}
-
-	// TableElement represents an item in a table instance.
-	//
-	// Note: this is fixed to function type as it is the only supported type in WebAssembly 1.0 (20191205)
-	TableElement struct {
-		// FunctionIndex is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr)
-		// of the target function instance. More precisely, this equals the index of
-		// the target function instance in Store.FunctionInstances.
-		FunctionIndex FunctionIndex
-		// FunctionTypeID is the type ID of the target function's type, which
-		// equals store.Functions[FunctionIndex].TypeID.
-		FunctionTypeID FunctionTypeID
-	}
-
-	// FunctionIndex is funcaddr (https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr),
-	// and the index to Store.Functions.
-	FunctionIndex storeIndex
-
-	// storeIndex represents the offset in of an instance in a store.
-	storeIndex uint64
 
 	// FunctionTypeID is a uniquely assigned integer for a function type.
 	// This is wazero specific runtime object and specific to a store,
@@ -221,7 +177,6 @@ type (
 
 // The wazero specific limitations described at RATIONALE.md.
 const (
-	maximumFunctionIndex = 1 << 27
 	maximumFunctionTypes = 1 << 27
 )
 
@@ -269,9 +224,13 @@ func (m *ModuleInstance) buildExports(exports map[string]*Export) {
 			ei = &ExportInstance{Type: exp.Type, Function: m.Functions[index]}
 			// The module instance of the host function is a fake that only includes the function and its types.
 			// We need to assign the ModuleInstance when re-exporting so that any memory defined in the target is
-			// available to the wasm.Module Memory.
+			// available to the wasm.ModuleContext Memory.
+			//
+			// TODO(adrian): shouldn't this be race if multiple modules re-exporting?
+			// maybe we should limit this to only tests.
 			if ei.Function.GoFunc != nil {
 				ei.Function.Module = m
+				ei.Function.Index = index
 			}
 		case ExternTypeGlobal:
 			ei = &ExportInstance{Type: exp.Type, Global: m.Globals[index]}
@@ -328,11 +287,7 @@ func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
 		table := m.Table.Table
 		for i, elm := range elem.Init {
 			pos := i + offset
-			targetFunc := m.Functions[elm]
-			table[pos] = TableElement{
-				FunctionIndex:  targetFunc.Index,
-				FunctionTypeID: targetFunc.TypeID,
-			}
+			table[pos] = m.Engine.FunctionAddress(elm)
 		}
 	}
 }
@@ -351,39 +306,20 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 
 func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Store {
 	return &Store{
-		ctx:                   ctx,
-		engine:                engine,
-		EnabledFeatures:       enabledFeatures,
-		moduleNames:           map[string]struct{}{},
-		modules:               map[string]*ModuleInstance{},
-		typeIDs:               map[string]FunctionTypeID{},
-		maximumFunctionIndex:  maximumFunctionIndex,
-		maximumFunctionTypes:  maximumFunctionTypes,
-		releasedFunctionIndex: map[FunctionIndex]struct{}{},
+		ctx:                  ctx,
+		engine:               engine,
+		EnabledFeatures:      enabledFeatures,
+		moduleNames:          map[string]struct{}{},
+		modules:              map[string]*ModuleInstance{},
+		typeIDs:              map[string]FunctionTypeID{},
+		maximumFunctionTypes: maximumFunctionTypes,
 	}
-}
-
-// checkFunctionIndexOverflow checks if there would be too many function instances in a store.
-func (s *Store) checkFunctionIndexOverflow(newInstanceNum int) error {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-	if len(s.functions) > int(s.maximumFunctionIndex)-newInstanceNum {
-		return fmt.Errorf("too many functions in a store")
-	}
-	return nil
 }
 
 // Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
 // different names safely and concurrently.
 func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
 	if err := s.requireModuleName(name); err != nil {
-		return nil, err
-	}
-
-	// Note: we do not take lock here in order to enable concurrent instantiation and compilation
-	// of multiple modules. When necessary, we take read or write locks in each method of store used here.
-	if err := s.checkFunctionIndexOverflow(len(module.FunctionSection)); err != nil {
-		s.deleteModule(name)
 		return nil, err
 	}
 
@@ -425,6 +361,12 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	m.addSections(module, importedFunctions, functions, importedGlobals,
 		globals, importedTable, table, importedMemory, memory, types, moduleImports)
 
+	// Plus we are ready to compile functions.
+	m.Engine, err = s.engine.Compile(importedFunctions, functions)
+	if err != nil {
+		return nil, fmt.Errorf("compilation failed: %w", err)
+	}
+
 	if err = m.validateElements(module.ElementSection); err != nil {
 		s.deleteModule(name)
 		return nil, err
@@ -433,18 +375,6 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	if err = m.validateData(module.DataSection); err != nil {
 		s.deleteModule(name)
 		return nil, err
-	}
-
-	// Now we are ready to compile functions.
-	s.addFunctions(functions...) // Need to assign funcaddr to each instance before compilation.
-	for i, f := range functions {
-		// TODO: maybe better consider spawning multiple goroutines for compilations to accelerate.
-		if err = s.engine.Compile(f); err != nil {
-			s.deleteModule(name)
-			// On the failure, release the assigned funcaddr and already compiled functions.
-			_ = s.releaseFunctions(functions[:i]...) // ignore any release error, so we can report the original one.
-			return nil, fmt.Errorf("%s compilation failed: %w", module.funcDesc(funcSection, Index(i)), err)
-		}
 	}
 
 	// Now all the validation passes, we are safe to mutate memory/table instances (possibly imported ones).
@@ -460,7 +390,8 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		if _, err = s.engine.Call(m.Ctx, m.Functions[funcIdx]); err != nil {
+		f := m.Functions[funcIdx]
+		if _, err := f.Module.Engine.Call(m.Ctx, f); err != nil {
 			s.deleteModule(name)
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}
@@ -492,7 +423,7 @@ func (s *Store) ReleaseModule(moduleName string) error {
 		mod.decDependentCount()
 	}
 
-	if err := s.releaseFunctions(m.Functions...); err != nil {
+	if err := m.Engine.Release(); err != nil {
 		return fmt.Errorf("unable to release function instance: %w", err)
 	}
 
@@ -510,44 +441,6 @@ func (m *ModuleInstance) incDependentCount() {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	m.dependentCount++
-}
-
-func (s *Store) releaseFunctions(fs ...*FunctionInstance) error {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
-	for _, f := range fs {
-		if err := s.engine.Release(f); err != nil {
-			return err
-		}
-
-		// Release reference to the function instance.
-		s.functions[f.Index] = nil
-
-		// Append the address so that we can reuse it in order to avoid index space explosion.
-		s.releasedFunctionIndex[f.Index] = struct{}{}
-	}
-	return nil
-}
-
-func (s *Store) addFunctions(fs ...*FunctionInstance) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	for _, f := range fs {
-		var index FunctionIndex
-		if len(s.releasedFunctionIndex) > 0 {
-			for popped := range s.releasedFunctionIndex {
-				index = popped
-				break
-			}
-			s.functions[index] = f
-			delete(s.releasedFunctionIndex, index)
-		} else {
-			index = FunctionIndex(len(s.functions))
-			s.functions = append(s.functions, f)
-		}
-		f.Index = index
-	}
 }
 
 // deleteModule makes the moduleName available for instantiation again.
@@ -773,21 +666,3 @@ func (s *Store) getTypeInstance(t *FunctionType) (*TypeInstance, error) {
 	}
 	return &TypeInstance{Type: t, TypeID: id}, nil
 }
-
-func newTableInstance(min uint32, max *uint32) *TableInstance {
-	tableInst := &TableInstance{
-		Table:    make([]TableElement, min),
-		Min:      min,
-		Max:      max,
-		ElemType: 0x70, // funcref
-	}
-	for i := range tableInst.Table {
-		tableInst.Table[i] = TableElement{
-			FunctionTypeID: UninitializedTableElementTypeID,
-		}
-	}
-	return tableInst
-}
-
-// UninitializedTableElementTypeID math.MaxUint32 to represent the uninitialized elements.
-const UninitializedTableElementTypeID FunctionTypeID = math.MaxUint32

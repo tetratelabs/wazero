@@ -81,7 +81,7 @@ func TestValidateFunction_SignExtensionOps(t *testing.T) {
 					body = append(body, OpcodeI64Const)
 				}
 				body = append(body, tc.input, 123, OpcodeDrop, OpcodeEnd)
-				err := validateFunction(Features20191205, &FunctionType{}, body, nil, nil, nil, nil, nil, nil, maxStackHeight)
+				err := validateFunction(FeatureSignExtensionOps, &FunctionType{}, body, nil, nil, nil, nil, nil, nil, maxStackHeight)
 				require.NoError(t, err)
 			})
 		})

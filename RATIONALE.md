@@ -94,9 +94,9 @@ WebAssembly 1.0 (20191205) specification allows runtimes to [limit certain aspec
 
 wazero limitations are imposed pragmatically and described below.
 
-### Number of functions in a store
+### Number of functions in a module
 
-The possible number of function instances in [a store](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0) is not specified in the WebAssembly specifications since [`funcaddr`](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr) corresponding to a function instance can be arbitrary number.
+The possible number of function instances in [a module](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#module-instances%E2%91%A0) is not specified in the WebAssembly specifications since [`funcaddr`](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr) corresponding to a function instance in a store can be arbitrary number.
 wazero limits the maximum function instances to 2^27 as even that number would occupy 1GB in function pointers.
 
 That is because not only we _believe_ that all use cases are fine with the limitation, but also we have no way to test wazero runtimes under these unusual circumstances.

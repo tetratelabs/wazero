@@ -16,6 +16,9 @@ import (
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.
 func TestVerifyOffsetValue(t *testing.T) {
+	var me moduleEngine
+	require.Equal(t, int(unsafe.Offsetof(me.compiledFunctions)), moduleEngineCompiledFunctionsOffset)
+
 	var ce callEngine
 	// Offsets for callEngine.globalContext.
 	require.Equal(t, int(unsafe.Offsetof(ce.valueStackElement0Address)), callEngineGlobalContextValueStackElement0AddressOffset)
@@ -23,7 +26,6 @@ func TestVerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackElementZeroAddress)), callEngineGlobalContextCallFrameStackElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackLen)), callEngineGlobalContextCallFrameStackLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.callFrameStackPointer)), callEngineGlobalContextCallFrameStackPointerOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.compiledFunctionsElement0Address)), callEngineGlobalContextCompiledFunctionsElement0AddressOffset)
 
 	// Offsets for callEngine.moduleContext.
 	require.Equal(t, int(unsafe.Offsetof(ce.moduleInstanceAddress)), callEngineModuleContextModuleInstanceAddressOffset)
@@ -32,6 +34,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ce.memorySliceLen)), callEngineModuleContextMemorySliceLenOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.tableElement0Address)), callEngineModuleContextTableElement0AddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(ce.tableSliceLen)), callEngineModuleContextTableSliceLenOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.compiledFunctionsElement0Address)), callEngineModuleContextCompiledFunctionsElement0AddressOffset)
 
 	// Offsets for callEngine.valueStackContext
 	require.Equal(t, int(unsafe.Offsetof(ce.stackPointer)), callEngineValueStackContextStackPointerOffset)
@@ -39,7 +42,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 
 	// Offsets for callEngine.exitContext.
 	require.Equal(t, int(unsafe.Offsetof(ce.statusCode)), callEngineExitContextJITCallStatusCodeOffset)
-	require.Equal(t, int(unsafe.Offsetof(ce.functionCallAddress)), callEngineExitContextFunctionCallAddressOffset)
+	require.Equal(t, int(unsafe.Offsetof(ce.builtinFunctionCallIndex)), callEngineExitContextBuiltinFunctionCallAddressOffset)
 
 	// Size and offsets for callFrame.
 	var frame callFrame
@@ -55,17 +58,17 @@ func TestVerifyOffsetValue(t *testing.T) {
 	var compiledFunc compiledFunction
 	require.Equal(t, int(unsafe.Offsetof(compiledFunc.codeInitialAddress)), compiledFunctionCodeInitialAddressOffset)
 	require.Equal(t, int(unsafe.Offsetof(compiledFunc.stackPointerCeil)), compiledFunctionStackPointerCeilOffset)
-
-	// Offsets for wasm.TableElement.
-	var tableElement wasm.TableElement
-	require.Equal(t, int(unsafe.Offsetof(tableElement.FunctionIndex)), tableElementFunctionIndexOffset)
-	require.Equal(t, int(unsafe.Offsetof(tableElement.FunctionTypeID)), tableElementFunctionTypeIDOffset)
+	require.Equal(t, int(unsafe.Offsetof(compiledFunc.source)), compiledFunctionSourceOffset)
 
 	// Offsets for wasm.ModuleInstance.
 	var moduleInstance wasm.ModuleInstance
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Globals)), moduleInstanceGlobalsOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Memory)), moduleInstanceMemoryOffset)
 	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Table)), moduleInstanceTableOffset)
+	require.Equal(t, int(unsafe.Offsetof(moduleInstance.Engine)), moduleInstanceEngineOffset)
+
+	var functionInstance wasm.FunctionInstance
+	require.Equal(t, int(unsafe.Offsetof(functionInstance.TypeID)), functionInstanceTypeIDOffset)
 
 	// Offsets for wasm.Table.
 	var tableInstance wasm.TableInstance
@@ -83,6 +86,15 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Offsets for wasm.GlobalInstance
 	var globalInstance wasm.GlobalInstance
 	require.Equal(t, int(unsafe.Offsetof(globalInstance.Val)), globalInstanceValueOffset)
+
+	// Offsets for Go's interface.
+	// The underlying struct is not exposed in the public API, so we simulate it here.
+	// https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
+	var eface struct {
+		_type *struct{}
+		data  unsafe.Pointer
+	}
+	require.Equal(t, int(unsafe.Offsetof(eface.data)), interfaceDataOffset)
 }
 
 func TestEngine_Call(t *testing.T) {
@@ -143,23 +155,25 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		},
 		Module: module,
 	}
-	require.NoError(t, e.Compile(f))
+
+	modEngine, err := e.Compile(nil, []*wasm.FunctionInstance{f})
+	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		results, err := e.Call(modCtx, f, 3)
+		results, err := modEngine.Call(modCtx, f, 3)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 		require.Same(t, memory, ctxMemory)
 	})
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := e.Call(modCtx, f)
+		_, err := modEngine.Call(modCtx, f)
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := e.Call(modCtx, f, 1, 2)
+		_, err := modEngine.Call(modCtx, f, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
