@@ -32,6 +32,8 @@ type (
 
 		// parentEngine holds *engine from which this module engine is created from.
 		parentEngine *engine
+
+		importedFunctionCounts int
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -324,13 +326,18 @@ func (c *callFrame) String() string {
 // Compile implements internalwasm.Engine Compile
 func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (me wasm.ModuleEngine, err error) {
 	imported := len(importedFunctions)
-	compiledFunctions := make([]*compiledFunction, imported+len(moduleFunctions))
-	for i, f := range importedFunctions {
+	modEngine := &moduleEngine{
+		compiledFunctions:      make([]*compiledFunction, 0, imported+len(moduleFunctions)),
+		parentEngine:           e,
+		importedFunctionCounts: imported,
+	}
+
+	for _, f := range importedFunctions {
 		cf, ok := e.getCompiledFunction(f)
 		if !ok {
-			return nil, fmt.Errorf("uncompiled imported function: %s", f.Name)
+			return nil, fmt.Errorf("uncompiled imported function: %s.%s", f.Module.Name, f.Name)
 		}
-		compiledFunctions[i] = cf
+		modEngine.compiledFunctions = append(modEngine.compiledFunctions, cf)
 	}
 
 	for i, f := range moduleFunctions {
@@ -341,13 +348,16 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 			compiled, err = compileHostFunction(f)
 		}
 		if err != nil {
-			// TODO: Unmamp already compiled functions.
+			_ = modEngine.Release()
 			return nil, fmt.Errorf("function[%d/%d] %w", i, len(moduleFunctions)-1, err)
 		}
-		compiledFunctions[imported+i] = compiled
+		modEngine.compiledFunctions = append(modEngine.compiledFunctions, compiled)
+
+		// Add the compiled function to the store-wide engine as well so that
+		// the future importing module can refer the function instance.
 		e.addCompiledFunction(f, compiled)
 	}
-	return &moduleEngine{compiledFunctions: compiledFunctions, parentEngine: e}, nil
+	return modEngine, nil
 }
 
 func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
@@ -376,7 +386,8 @@ func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 
 // Release implements internalwasm.ModuleEngine Release
 func (me *moduleEngine) Release() error {
-	for _, cf := range me.compiledFunctions {
+	// Release all the function instances declared in this module.
+	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
 		if err := munmapCodeSegment(cf.codeSegment); err != nil {
 			return err
 		}

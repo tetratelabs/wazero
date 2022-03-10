@@ -183,7 +183,7 @@ func Compile(f *wasm.FunctionInstance) (*CompilationResult, error) {
 	// Now enter the function body.
 	for !c.controlFrames.empty() {
 		if err := c.handleInstruction(); err != nil {
-			return nil, fmt.Errorf("handling instruction: %w\ndisassemble: %v", err, Format(c.result.Operations))
+			return nil, fmt.Errorf("handling instruction: %w", err)
 		}
 	}
 	return &c.result, nil
@@ -205,9 +205,8 @@ func (c *compiler) handleInstruction() error {
 	// applyToStack and advance c.pc inside the function.
 	index, err := c.applyToStack(op)
 	if err != nil {
-		return fmt.Errorf("apply stack failed for 0x%x: %w: stack: %s", op, err, c.stackDump())
+		return fmt.Errorf("apply stack failed for %s: %w", wasm.InstructionName(op), err)
 	}
-
 	// Now we handle each instruction, and
 	// emit the corresponding wazeroir operations to the results.
 operatorSwitch:
