@@ -30,10 +30,6 @@ func runAdhocTestsUnderHighConcurrency(t *testing.T, newRuntimeConfig func() *wa
 		t.Parallel()
 		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testFibonacci)
 	})
-	t.Run("fac", func(t *testing.T) {
-		t.Parallel()
-		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testFac)
-	})
 	t.Run("unreachable", func(t *testing.T) {
 		t.Parallel()
 		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testUnreachable)
