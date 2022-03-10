@@ -189,7 +189,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := newEngine()
 		_, err := e.Compile([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
-		require.EqualError(t, err, "uncompiled imported function: uncompiled.fn")
+		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
 	})
 
 	t.Run("release on compilation error", func(t *testing.T) {
