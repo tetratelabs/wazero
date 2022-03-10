@@ -31,8 +31,7 @@ type (
 		compiledFunctions []*compiledFunction
 
 		// parentEngine holds *engine from which this module engine is created from.
-		parentEngine *engine
-
+		parentEngine           *engine
 		importedFunctionCounts int
 	}
 
