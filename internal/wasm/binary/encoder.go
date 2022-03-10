@@ -25,7 +25,7 @@ func EncodeModule(m *wasm.Module) (bytes []byte) {
 		bytes = append(bytes, encodeFunctionSection(m.FunctionSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDTable) > 0 {
-		panic("TODO: TableSection")
+		bytes = append(bytes, encodeTableSection(m.TableSection)...)
 	}
 	if m.SectionElementCount(wasm.SectionIDMemory) > 0 {
 		bytes = append(bytes, encodeMemorySection(m.MemorySection)...)

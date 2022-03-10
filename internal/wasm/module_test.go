@@ -95,8 +95,8 @@ func TestModule_allDeclarations(t *testing.T) {
 		module            *Module
 		expectedFunctions []Index
 		expectedGlobals   []*GlobalType
-		expectedMemories  []*MemoryType
-		expectedTables    []*TableType
+		expectedMemory    *Memory
+		expectedTable     *Table
 	}{
 		// Functions.
 		{
@@ -141,51 +141,38 @@ func TestModule_allDeclarations(t *testing.T) {
 		// Memories.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeMemory, DescMem: &LimitsType{Min: 1}}},
-				MemorySection: []*MemoryType{{Min: 100}},
+				ImportSection: []*Import{{Type: ExternTypeMemory, DescMem: &limitsType{Min: 1}}},
 			},
-			expectedMemories: []*MemoryType{{Min: 1}, {Min: 100}},
+			expectedMemory: &Memory{Min: 1},
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeMemory, DescMem: &LimitsType{Min: 1}}},
+				MemorySection: &Memory{Min: 100},
 			},
-			expectedMemories: []*MemoryType{{Min: 1}},
-		},
-		{
-			module: &Module{
-				MemorySection: []*MemoryType{{Min: 100}},
-			},
-			expectedMemories: []*MemoryType{{Min: 100}},
+			expectedMemory: &Memory{Min: 100},
 		},
 		// Tables.
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
-				TableSection:  []*TableType{{Limit: &LimitsType{Min: 10}}},
+				ImportSection: []*Import{{Type: ExternTypeTable, DescTable: &Table{Min: 1}}},
 			},
-			expectedTables: []*TableType{{Limit: &LimitsType{Min: 1}}, {Limit: &LimitsType{Min: 10}}},
+			expectedTable: &Table{Min: 1},
 		},
 		{
 			module: &Module{
-				ImportSection: []*Import{{Type: ExternTypeTable, DescTable: &TableType{Limit: &LimitsType{Min: 1}}}},
+				TableSection: &Table{Min: 10},
 			},
-			expectedTables: []*TableType{{Limit: &LimitsType{Min: 1}}},
-		},
-		{
-			module: &Module{
-				TableSection: []*TableType{{Limit: &LimitsType{Min: 10}}},
-			},
-			expectedTables: []*TableType{{Limit: &LimitsType{Min: 10}}},
+			expectedTable: &Table{Min: 10},
 		},
 	} {
 		tc := tc
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			functions, globals, memories, tables := tc.module.allDeclarations()
+			functions, globals, memory, table, err := tc.module.allDeclarations()
+			require.NoError(t, err)
 			require.Equal(t, tc.expectedFunctions, functions)
 			require.Equal(t, tc.expectedGlobals, globals)
-			require.Equal(t, tc.expectedTables, tables)
-			require.Equal(t, tc.expectedMemories, memories)
+			require.Equal(t, tc.expectedTable, table)
+			require.Equal(t, tc.expectedMemory, memory)
 		})
 	}
 }
@@ -414,7 +401,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []uint32{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeI32Const, 0, OpcodeDrop, OpcodeEnd}}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, maximumFunctionIndex)
+		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.NoError(t, err)
 	})
 	t.Run("too many functions", func(t *testing.T) {
@@ -429,7 +416,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []Index{0},
 			CodeSection:     nil,
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, maximumFunctionIndex)
+		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.EqualError(t, err, "code count (0) != function count (1)")
 	})
@@ -439,7 +426,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []Index{1},
 			CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, maximumFunctionIndex)
+		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.EqualError(t, err, "invalid function[0]: type section index 1 out of range")
 	})
@@ -449,7 +436,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			FunctionSection: []Index{0},
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, maximumFunctionIndex)
+		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid function[0]: cannot pop the 1st f32 operand")
 	})
@@ -460,7 +447,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 0}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, maximumFunctionIndex)
+		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), `invalid function[0] export["f1"]: cannot pop the 1st f32`)
 	})
@@ -472,7 +459,7 @@ func TestModule_validateFunctions(t *testing.T) {
 			CodeSection:     []*Code{{Body: []byte{OpcodeF32Abs}}},
 			ExportSection:   map[string]*Export{"f1": {Name: "f1", Type: ExternTypeFunc, Index: 1}},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, maximumFunctionIndex)
+		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), `invalid function[0] export["f1"]: cannot pop the 1st f32`)
 	})
@@ -486,87 +473,60 @@ func TestModule_validateFunctions(t *testing.T) {
 				"f2": {Name: "f2", Type: ExternTypeFunc, Index: 0},
 			},
 		}
-		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, maximumFunctionIndex)
+		err := m.validateFunctions(Features20191205, nil, nil, nil, nil, MaximumFunctionIndex)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), `invalid function[0] export["f1","f2"]: cannot pop the 1st f32`)
 	})
 }
 
-func TestModule_validateTables(t *testing.T) {
-	t.Run("multiple tables", func(t *testing.T) {
-		m := Module{}
-		err := m.validateTables(make([]*TableType, 10), nil)
-		require.Error(t, err)
-		require.EqualError(t, err, "multiple tables are not supported")
-	})
-	t.Run("table index out of range", func(t *testing.T) {
-		m := Module{ElementSection: []*ElementSegment{{TableIndex: 1000}}}
-		err := m.validateTables(make([]*TableType, 1), nil)
-		require.Error(t, err)
-		require.EqualError(t, err, "table index out of range")
-	})
+func TestModule_validateTable(t *testing.T) {
 	t.Run("invalid const expr", func(t *testing.T) {
 		m := Module{ElementSection: []*ElementSegment{{
-			TableIndex: 0,
 			OffsetExpr: &ConstantExpression{
 				Opcode: OpcodeUnreachable, // Invalid!
 			},
 		}}}
-		err := m.validateTables(make([]*TableType, 1), nil)
+		err := m.validateTable(&Table{}, nil)
 		require.Error(t, err)
 		require.EqualError(t, err, "invalid const expression for element: invalid opcode for const expression: 0x0")
 	})
 	t.Run("ok", func(t *testing.T) {
 		m := Module{ElementSection: []*ElementSegment{{
-			TableIndex: 0,
 			OffsetExpr: &ConstantExpression{
 				Opcode: OpcodeI32Const,
 				Data:   []byte{0x1},
 			},
 		}}}
-		err := m.validateTables(make([]*TableType, 1), nil)
+		err := m.validateTable(&Table{}, nil)
 		require.NoError(t, err)
 	})
 }
 
-func TestModule_validateMemories(t *testing.T) {
-	t.Run("multiple memory", func(t *testing.T) {
-		m := Module{}
-		err := m.validateMemories(make([]*LimitsType, 10), nil)
-		require.Error(t, err)
-		require.EqualError(t, err, "multiple memories are not supported")
-	})
+func TestModule_validateMemory(t *testing.T) {
 	t.Run("data section exits but memory not declared", func(t *testing.T) {
 		m := Module{DataSection: make([]*DataSegment, 1)}
-		err := m.validateMemories(nil, nil)
+		err := m.validateMemory(nil, nil)
 		require.Error(t, err)
 		require.Contains(t, "unknown memory", err.Error())
 	})
-	t.Run("non zero memory index data", func(t *testing.T) {
-		m := Module{DataSection: []*DataSegment{{MemoryIndex: 1}}}
-		err := m.validateMemories(make([]*LimitsType, 1), nil)
-		require.Error(t, err)
-		require.EqualError(t, err, "memory index must be zero")
-	})
 	t.Run("invalid const expr", func(t *testing.T) {
 		m := Module{DataSection: []*DataSegment{{
-			MemoryIndex: 0,
 			OffsetExpression: &ConstantExpression{
 				Opcode: OpcodeUnreachable, // Invalid!
 			},
 		}}}
-		err := m.validateMemories(make([]*LimitsType, 1), nil)
+		err := m.validateMemory(&Memory{}, nil)
 		require.EqualError(t, err, "calculate offset: invalid opcode for const expression: 0x0")
 	})
 	t.Run("ok", func(t *testing.T) {
 		m := Module{DataSection: []*DataSegment{{
-			MemoryIndex: 0, Init: []byte{0x1},
+			Init: []byte{0x1},
 			OffsetExpression: &ConstantExpression{
 				Opcode: OpcodeI32Const,
 				Data:   []byte{0x1},
 			},
 		}}}
-		err := m.validateMemories(make([]*LimitsType, 1), nil)
+		err := m.validateMemory(&Memory{}, nil)
 		require.NoError(t, err)
 	})
 }
@@ -602,7 +562,7 @@ func TestModule_validateImports(t *testing.T) {
 				Module:    "m",
 				Name:      "n",
 				Type:      ExternTypeTable,
-				DescTable: &TableType{ElemType: 0x70 /* funcref */, Limit: &LimitsType{Min: 1}},
+				DescTable: &Table{Min: 1},
 			},
 		},
 		{
@@ -612,7 +572,7 @@ func TestModule_validateImports(t *testing.T) {
 				Module:  "m",
 				Name:    "n",
 				Type:    ExternTypeMemory,
-				DescMem: &MemoryType{Min: 1},
+				DescMem: &Memory{Min: 1},
 			},
 		},
 	} {
@@ -639,8 +599,8 @@ func TestModule_validateExports(t *testing.T) {
 		exportSection   map[string]*Export
 		functions       []Index
 		globals         []*GlobalType
-		memories        []*MemoryType
-		tables          []*TableType
+		memory          *Memory
+		table           *Table
 		expectedErr     string
 	}{
 		{name: "empty export section", exportSection: map[string]*Export{}},
@@ -687,40 +647,33 @@ func TestModule_validateExports(t *testing.T) {
 			name:            "table",
 			enabledFeatures: Features20191205,
 			exportSection:   map[string]*Export{"e1": {Type: ExternTypeTable, Index: 0}},
-			tables:          []*TableType{{}},
+			table:           &Table{},
 		},
 		{
 			name:            "table out of range",
 			enabledFeatures: Features20191205,
 			exportSection:   map[string]*Export{"e1": {Type: ExternTypeTable, Index: 1}},
-			tables:          []*TableType{{}},
-			expectedErr:     `unknown table for export["e1"]`,
+			table:           &Table{},
+			expectedErr:     `table for export["e1"] out of range`,
 		},
 		{
 			name:            "memory",
 			enabledFeatures: Features20191205,
 			exportSection:   map[string]*Export{"e1": {Type: ExternTypeMemory, Index: 0}},
-			memories:        []*MemoryType{{}},
+			memory:          &Memory{},
 		},
 		{
 			name:            "memory out of range",
 			enabledFeatures: Features20191205,
 			exportSection:   map[string]*Export{"e1": {Type: ExternTypeMemory, Index: 0}},
-			expectedErr:     `unknown memory for export["e1"]`,
-		},
-		{
-			name:            "second memory unknown",
-			enabledFeatures: Features20191205,
-			exportSection:   map[string]*Export{"e1": {Type: ExternTypeMemory, Index: 1}},
-			// Multiple memories are not valid.
-			memories:    []*MemoryType{{}, {}},
-			expectedErr: `unknown memory for export["e1"]`,
+			table:           &Memory{},
+			expectedErr:     `memory for export["e1"] out of range`,
 		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			m := Module{ExportSection: tc.exportSection}
-			err := m.validateExports(tc.enabledFeatures, tc.functions, tc.globals, tc.memories, tc.tables)
+			err := m.validateExports(tc.enabledFeatures, tc.functions, tc.globals, tc.memory, tc.table)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {
@@ -783,14 +736,14 @@ func TestModule_buildFunctionInstances(t *testing.T) {
 
 func TestModule_buildMemoryInstance(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
-		m := Module{MemorySection: []*MemoryType{}}
+		m := Module{}
 		mem := m.buildMemory()
 		require.Nil(t, mem)
 	})
 	t.Run("non-nil", func(t *testing.T) {
 		min := uint32(1)
 		max := uint32(10)
-		m := Module{MemorySection: []*MemoryType{{Min: min, Max: &max}}}
+		m := Module{MemorySection: &Memory{Min: min, Max: &max}}
 		mem := m.buildMemory()
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, *mem.Max)
@@ -798,7 +751,7 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 }
 
 func TestModule_buildTableInstance(t *testing.T) {
-	m := Module{TableSection: []*TableType{{Limit: &LimitsType{Min: 1}}}}
+	m := Module{TableSection: &Table{Min: 1}}
 	table := m.buildTable()
 	require.Equal(t, uint32(1), table.Min)
 }

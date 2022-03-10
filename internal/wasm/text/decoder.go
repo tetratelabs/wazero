@@ -97,7 +97,7 @@ type moduleParser struct {
 
 	// field counts can be different from the count in a section when abbreviated imports exist. To give an accurate
 	// errorContext, we count explicitly.
-	fieldCountFunc, fieldCountMemory uint32
+	fieldCountFunc uint32
 }
 
 // DecodeModule implements internalwasm.DecodeModule for the WebAssembly 1.0 (20191205) Text Format
@@ -192,7 +192,7 @@ func (p *moduleParser) beginModuleField(tok tokenType, tokenBytes []byte, _, _ u
 		case wasm.ExternTypeTableName:
 			return nil, fmt.Errorf("TODO: %s", tokenBytes)
 		case wasm.ExternTypeMemoryName:
-			if p.memoryNamespace.count > 0 {
+			if p.module.SectionElementCount(wasm.SectionIDMemory) > 0 {
 				return nil, moreThanOneInvalidInSection(wasm.SectionIDMemory)
 			}
 			p.pos = positionMemory
@@ -450,11 +450,7 @@ func (p *moduleParser) endFunc(typeIdx wasm.Index, code *wasm.Code, name string,
 // endMemory adds the limits for the current memory, and increments memoryNamespace as it is shared across imported and
 // module-defined memories. Finally, this returns parseModule to prepare for the next field.
 func (p *moduleParser) endMemory(min uint32, max *uint32) tokenParser {
-	p.module.MemorySection = append(p.module.MemorySection, &wasm.MemoryType{Min: min, Max: max})
-
-	// Multiple memories are allowed, so advance in case there's a next.
-	p.memoryNamespace.count++
-	p.fieldCountMemory++
+	p.module.MemorySection = &wasm.Memory{Min: min, Max: max}
 	p.pos = positionModule
 	return p.parseModule
 }
@@ -754,7 +750,7 @@ func (p *moduleParser) errorContext() string {
 		idx := p.fieldCountFunc
 		return fmt.Sprintf("module.%s[%d]%s", wasm.ExternTypeFuncName, idx, p.typeUseParser.errorContext())
 	case positionMemory:
-		return fmt.Sprintf("module.%s[%d]", wasm.ExternTypeMemoryName, p.fieldCountMemory)
+		return fmt.Sprintf("module.%s[0]", wasm.ExternTypeMemoryName)
 	case positionExport, positionExportFunc: // TODO: table, memory or global
 		idx := p.module.SectionElementCount(wasm.SectionIDExport)
 		if p.pos == positionExport {

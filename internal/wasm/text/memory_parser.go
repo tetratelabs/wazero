@@ -13,7 +13,7 @@ func newMemoryParser(memoryNamespace *indexNamespace, onMemory onMemory) *memory
 
 type onMemory func(min uint32, max *uint32) tokenParser
 
-// memoryParser parses a wasm.MemoryType from and dispatches to onMemory.
+// memoryParser parses a wasm.Memory from and dispatches to onMemory.
 //
 // Ex. `(module (memory 0 1024))`
 //        starts here --^     ^

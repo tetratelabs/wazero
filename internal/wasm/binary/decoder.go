@@ -81,7 +81,7 @@ func DecodeModule(binary []byte, features wasm.Features) (*wasm.Module, error) {
 		case wasm.SectionIDMemory:
 			m.MemorySection, err = decodeMemorySection(r)
 		case wasm.SectionIDGlobal:
-			if m.GlobalSection, err = decodeGlobalSection(r, features); err != nil {
+			if m.GlobalSection, err = decodeGlobalSection(r); err != nil {
 				return nil, err // avoid re-wrapping the error.
 			}
 		case wasm.SectionIDExport:

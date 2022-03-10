@@ -80,7 +80,7 @@ type Module struct {
 	// Note: In the Binary Format, this is SectionIDTable.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
-	TableSection []*TableType
+	TableSection *Table
 
 	// MemorySection contains each memory defined in this module.
 	//
@@ -88,13 +88,13 @@ type Module struct {
 	// For example, if there are two imported memories and one defined in this module, the memory Index 3 is defined in
 	// this module at TableSection[0].
 	//
-	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory definition per module, so the length of
-	// the MemorySection can be zero or one, and can only be one if there is no imported memory.
+	// Note: Version 1.0 (20191205) of the WebAssembly spec allows at most one memory definition per module, so the
+	// length of the MemorySection can be zero or one, and can only be one if there is no imported memory.
 	//
 	// Note: In the Binary Format, this is SectionIDMemory.
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
-	MemorySection []*MemoryType
+	MemorySection *Memory
 
 	// GlobalSection contains each global defined in this module.
 	//
@@ -156,9 +156,10 @@ type Module struct {
 }
 
 // The wazero specific limitation described at RATIONALE.md.
+// TL;DR; We multiply by 8 (to get offsets in bytes) and the multiplication result must be less than 32bit max
 const (
-	maximumGlobals       = 1 << 27
-	maximumFunctionIndex = 1 << 27
+	MaximumGlobals       = uint32(1 << 27)
+	MaximumFunctionIndex = uint32(1 << 27)
 )
 
 // TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
@@ -201,35 +202,38 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return errors.New("cannot mix functions and host functions in the same module")
 	}
 
-	functions, globals, memories, tables := m.allDeclarations()
-
-	if err := m.validateGlobals(globals, maximumGlobals); err != nil {
+	functions, globals, memory, table, err := m.allDeclarations()
+	if err != nil {
 		return err
 	}
 
-	if err := m.validateTables(tables, globals); err != nil {
+	if err = m.validateGlobals(globals, MaximumGlobals); err != nil {
 		return err
 	}
 
-	if err := m.validateMemories(memories, globals); err != nil {
+	if err = m.validateMemory(memory, globals); err != nil {
+		return err
+	}
+
+	if err = m.validateTable(table, globals); err != nil {
 		return err
 	}
 
 	if m.CodeSection != nil {
-		if err := m.validateFunctions(enabledFeatures, functions, globals, memories, tables, maximumFunctionIndex); err != nil {
+		if err = m.validateFunctions(enabledFeatures, functions, globals, memory, table, MaximumFunctionIndex); err != nil {
 			return err
 		}
 	} else {
-		if err := m.validateHostFunctions(); err != nil {
+		if err = m.validateHostFunctions(); err != nil {
 			return err
 		}
 	}
 
-	if err := m.validateImports(enabledFeatures); err != nil {
+	if err = m.validateImports(enabledFeatures); err != nil {
 		return err
 	}
 
-	if err := m.validateExports(enabledFeatures, functions, globals, memories, tables); err != nil {
+	if err = m.validateExports(enabledFeatures, functions, globals, memory, table); err != nil {
 		return err
 	}
 
@@ -252,8 +256,8 @@ func (m *Module) validateStartSection() error {
 	return nil
 }
 
-func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
-	if len(globals) > maxGlobals {
+func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals uint32) error {
+	if uint32(len(globals)) > maxGlobals {
 		return fmt.Errorf("too many globals in a module")
 	}
 
@@ -268,8 +272,8 @@ func (m *Module) validateGlobals(globals []*GlobalType, maxGlobals int) error {
 	return nil
 }
 
-func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType, maximumFunctionIndex int) error {
-	if len(functions) > maximumFunctionIndex {
+func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, table *Table, maximumFunctionIndex uint32) error {
+	if uint32(len(functions)) > maximumFunctionIndex {
 		return fmt.Errorf("too many functions in a store")
 	}
 
@@ -296,7 +300,7 @@ func (m *Module) validateFunctions(enabledFeatures Features, functions []Index, 
 			m.TypeSection[typeIndex],
 			m.CodeSection[idx].Body,
 			m.CodeSection[idx].LocalTypes,
-			functions, globals, memories, tables, m.TypeSection, maximumValuesOnStack); err != nil {
+			functions, globals, memory, table, m.TypeSection, maximumValuesOnStack); err != nil {
 
 			return fmt.Errorf("invalid %s: %w", m.funcDesc(SectionIDFunction, Index(idx)), err)
 		}
@@ -321,13 +325,9 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	return fmt.Sprintf("%s[%d] export[%s]", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
-func (m *Module) validateTables(tables []*TableType, globals []*GlobalType) error {
-	if len(tables) > 1 {
-		return fmt.Errorf("multiple tables are not supported")
-	}
-
+func (m *Module) validateTable(table *Table, globals []*GlobalType) error {
 	for _, elem := range m.ElementSection {
-		if int(elem.TableIndex) >= len(tables) {
+		if table == nil {
 			return fmt.Errorf("table index out of range")
 		}
 		err := validateConstExpression(globals, elem.OffsetExpr, ValueTypeI32)
@@ -338,17 +338,12 @@ func (m *Module) validateTables(tables []*TableType, globals []*GlobalType) erro
 	return nil
 }
 
-func (m *Module) validateMemories(memories []*MemoryType, globals []*GlobalType) error {
-	if len(memories) > 1 {
-		return fmt.Errorf("multiple memories are not supported")
-	} else if len(m.DataSection) > 0 && len(memories) == 0 {
+func (m *Module) validateMemory(memory *Memory, globals []*GlobalType) error {
+	if len(m.DataSection) > 0 && memory == nil {
 		return fmt.Errorf("unknown memory")
 	}
 
 	for _, d := range m.DataSection {
-		if d.MemoryIndex != 0 {
-			return fmt.Errorf("memory index must be zero")
-		}
 		if err := validateConstExpression(globals, d.OffsetExpression, ValueTypeI32); err != nil {
 			return fmt.Errorf("calculate offset: %w", err)
 		}
@@ -371,7 +366,7 @@ func (m *Module) validateImports(enabledFeatures Features) error {
 	return nil
 }
 
-func (m *Module) validateExports(enabledFeatures Features, functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) error {
+func (m *Module) validateExports(enabledFeatures Features, functions []Index, globals []*GlobalType, memory *Memory, table *Table) error {
 	for name, exp := range m.ExportSection {
 		index := exp.Index
 		switch exp.Type {
@@ -390,12 +385,12 @@ func (m *Module) validateExports(enabledFeatures Features, functions []Index, gl
 				return fmt.Errorf("invalid export[%q] global[%d]: %w", name, index, err)
 			}
 		case ExternTypeMemory:
-			if index != 0 || len(memories) == 0 {
-				return fmt.Errorf("unknown memory for export[%q]", name)
+			if index > 0 || memory == nil {
+				return fmt.Errorf("memory for export[%q] out of range", name)
 			}
 		case ExternTypeTable:
-			if index >= uint32(len(tables)) {
-				return fmt.Errorf("unknown table for export[%q]", name)
+			if index > 0 || table == nil {
+				return fmt.Errorf("table for export[%q] out of range", name)
 			}
 		}
 	}
@@ -452,8 +447,6 @@ func validateConstExpression(globals []*GlobalType, expr *ConstantExpression, ex
 func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
 	for _, gs := range m.GlobalSection {
 		var gv uint64
-		// Global initialization constant expression can only reference the imported globals.
-		// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case int32:
 			gv = uint64(v)
@@ -508,23 +501,12 @@ func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 }
 
 func (m *Module) buildMemory() (mem *MemoryInstance) {
-	for _, memSec := range m.MemorySection {
+	memSec := m.MemorySection
+	if memSec != nil {
 		mem = &MemoryInstance{
 			Buffer: make([]byte, MemoryPagesToBytesNum(memSec.Min)),
 			Min:    memSec.Min,
 			Max:    memSec.Max,
-		}
-	}
-	return
-}
-
-func (m *Module) buildTable() (table *TableInstance) {
-	for _, tableSeg := range m.TableSection {
-		table = &TableInstance{
-			Table:    make([]uintptr, tableSeg.Limit.Min),
-			Min:      tableSeg.Limit.Min,
-			Max:      tableSeg.Limit.Max,
-			ElemType: 0x70, // funcref
 		}
 	}
 	return
@@ -599,25 +581,24 @@ type Import struct {
 	Name string
 	// DescFunc is the index in Module.TypeSection when Type equals ExternTypeFunc
 	DescFunc Index
-	// DescTable is the inlined TableType when Type equals ExternTypeTable
-	DescTable *TableType
-	// DescMem is the inlined MemoryType when Type equals ExternTypeMemory
-	DescMem *MemoryType
+	// DescTable is the inlined Table when Type equals ExternTypeTable
+	DescTable *Table
+	// DescMem is the inlined Memory when Type equals ExternTypeMemory
+	DescMem *Memory
 	// DescGlobal is the inlined GlobalType when Type equals ExternTypeGlobal
 	DescGlobal *GlobalType
 }
 
-type LimitsType struct {
+type limitsType struct {
 	Min uint32
 	Max *uint32
 }
 
-type TableType struct {
-	ElemType byte
-	Limit    *LimitsType
-}
+// Table describes the limits of (function) elements in a table.
+type Table = limitsType
 
-type MemoryType = LimitsType
+// Memory describes the limits of pages (64KB) in a memory.
+type Memory = limitsType
 
 type GlobalType struct {
 	ValType ValueType
@@ -638,8 +619,10 @@ type ConstantExpression struct {
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-export
 type Export struct {
 	Type ExternType
+
 	// Name is what the host refers to this definition as.
 	Name string
+
 	// Index is the index of the definition to export, the index namespace is by Type
 	// Ex. If ExternTypeFunc, this is a position in the function index namespace.
 	Index Index
@@ -649,9 +632,12 @@ type Export struct {
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-elem
 type ElementSegment struct {
-	TableIndex Index
+	// OffsetExpr returns the table element offset to apply to Init indices.
+	// Note: This can be validated prior to instantiation unless it includes OpcodeGlobalGet (an imported global).
 	OffsetExpr *ConstantExpression
-	// Init are positions in the function index namespace.
+
+	// Init indices are table elements relative to the result of OffsetExpr. The values are positions in the function
+	// index namespace that initialize the corresponding element.
 	Init []Index
 }
 
@@ -668,7 +654,6 @@ type Code struct {
 }
 
 type DataSegment struct {
-	MemoryIndex      Index // supposed to be zero
 	OffsetExpression *ConstantExpression
 	Init             []byte
 }
@@ -735,7 +720,7 @@ type NameMapAssoc struct {
 }
 
 // allDeclarations returns all declarations for functions, globals, memories and tables in a module including imported ones.
-func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memories []*MemoryType, tables []*TableType) {
+func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, memory *Memory, table *Table, err error) {
 	for _, imp := range m.ImportSection {
 		switch imp.Type {
 		case ExternTypeFunc:
@@ -743,9 +728,9 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 		case ExternTypeGlobal:
 			globals = append(globals, imp.DescGlobal)
 		case ExternTypeMemory:
-			memories = append(memories, imp.DescMem)
+			memory = imp.DescMem
 		case ExternTypeTable:
-			tables = append(tables, imp.DescTable)
+			table = imp.DescTable
 		}
 	}
 
@@ -753,8 +738,20 @@ func (m *Module) allDeclarations() (functions []Index, globals []*GlobalType, me
 	for _, g := range m.GlobalSection {
 		globals = append(globals, g.Type)
 	}
-	memories = append(memories, m.MemorySection...)
-	tables = append(tables, m.TableSection...)
+	if m.MemorySection != nil {
+		if memory != nil { // shouldn't be possible due to Validate
+			err = errors.New("at most one table allowed in module")
+			return
+		}
+		memory = m.MemorySection
+	}
+	if m.TableSection != nil {
+		if table != nil { // shouldn't be possible due to Validate
+			err = errors.New("at most one table allowed in module")
+			return
+		}
+		table = m.TableSection
+	}
 	return
 }
 
@@ -835,6 +832,13 @@ const (
 func ValueTypeName(t ValueType) string {
 	return publicwasm.ValueTypeName(t)
 }
+
+// ElemType is fixed to ElemTypeFuncref until post 20191205 reference type is implemented.
+type ElemType = byte
+
+const (
+	ElemTypeFuncref ElemType = 0x70
+)
 
 // ExternType classifies imports and exports with their respective types.
 //

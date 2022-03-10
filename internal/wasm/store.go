@@ -158,15 +158,15 @@ type (
 
 	// TableInstance represents a table instance in a store.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
-	//
-	// Note this is fixed to function type until post 20191205 reference type is implemented.
 	TableInstance struct {
 		// Table holds the table elements managed by this table instance.
 		Table []uintptr
-		Min   uint32
-		Max   *uint32
-		// Currently fixed to 0x70 (funcref type).
-		ElemType byte
+
+		// Min is the minimum (function) elements in this table.
+		Min uint32
+
+		// Max if present is the maximum (function) elements in this table, or nil if unbounded.
+		Max *uint32
 	}
 
 	// FunctionTypeID is a uniquely assigned integer for a function type.
@@ -533,19 +533,13 @@ func (s *Store) resolveImports(module *Module) (
 			expected := i.DescTable
 			importedTable = imported.Table
 
-			if importedTable.ElemType != expected.ElemType {
-				err = errorInvalidImport(i, idx, fmt.Errorf("element type mismatch: %s != %s",
-					ValueTypeName(expected.ElemType), ValueTypeName(importedTable.ElemType)))
+			if expected.Min > importedTable.Min {
+				err = errorMinSizeMismatch(i, idx, expected.Min, importedTable.Min)
 				return
 			}
 
-			if expected.Limit.Min > importedTable.Min {
-				err = errorMinSizeMismatch(i, idx, expected.Limit.Min, importedTable.Min)
-				return
-			}
-
-			if expected.Limit.Max != nil {
-				expectedMax := *expected.Limit.Max
+			if expected.Max != nil {
+				expectedMax := *expected.Max
 				if importedTable.Max == nil {
 					err = errorNoMax(i, idx, expectedMax)
 					return
@@ -610,6 +604,8 @@ func errorInvalidImport(i *Import, idx int, err error) error {
 	return fmt.Errorf("import[%d] %s[%s.%s]: %w", idx, ExternTypeName(i.Type), i.Module, i.Name, err)
 }
 
+// Global initialization constant expression can only reference the imported globals.
+// See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
 	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {

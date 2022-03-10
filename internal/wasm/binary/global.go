@@ -2,12 +2,16 @@ package binary
 
 import (
 	"bytes"
+	"fmt"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-func decodeGlobal(r *bytes.Reader, features wasm.Features) (*wasm.Global, error) {
-	gt, err := decodeGlobalType(r, features)
+// decodeGlobal returns the wasm.Global decoded with the WebAssembly 1.0 (20191205) Binary Format.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-global
+func decodeGlobal(r *bytes.Reader) (*wasm.Global, error) {
+	gt, err := decodeGlobalType(r)
 	if err != nil {
 		return nil, err
 	}
@@ -18,6 +22,34 @@ func decodeGlobal(r *bytes.Reader, features wasm.Features) (*wasm.Global, error)
 	}
 
 	return &wasm.Global{Type: gt, Init: init}, nil
+}
+
+// decodeGlobalType returns the wasm.GlobalType decoded with the WebAssembly 1.0 (20191205) Binary Format.
+//
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-globaltype
+func decodeGlobalType(r *bytes.Reader) (*wasm.GlobalType, error) {
+	vt, err := decodeValueTypes(r, 1)
+	if err != nil {
+		return nil, fmt.Errorf("read value type: %w", err)
+	}
+
+	ret := &wasm.GlobalType{
+		ValType: vt[0],
+	}
+
+	b, err := r.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("read mutablity: %w", err)
+	}
+
+	switch mut := b; mut {
+	case 0x00: // not mutable
+	case 0x01: // mutable
+		ret.Mutable = true
+	default:
+		return nil, fmt.Errorf("%w for mutability: %#x != 0x00 or 0x01", ErrInvalidByte, mut)
+	}
+	return ret, nil
 }
 
 // encodeGlobal returns the internalwasm.Global encoded in WebAssembly 1.0 (20191205) Binary Format.

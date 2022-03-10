@@ -14,44 +14,44 @@ func TestMemoryParser(t *testing.T) {
 	tests := []struct {
 		name       string
 		input      string
-		expected   *wasm.MemoryType
+		expected   *wasm.Memory
 		expectedID string
 	}{
 		{
 			name:     "min 0",
 			input:    "(memory 0)",
-			expected: &wasm.MemoryType{},
+			expected: &wasm.Memory{},
 		},
 		{
 			name:     "min 0, max 0",
 			input:    "(memory 0 0)",
-			expected: &wasm.MemoryType{Max: &zero},
+			expected: &wasm.Memory{Max: &zero},
 		},
 		{
 			name:     "min largest",
 			input:    "(memory 65536)",
-			expected: &wasm.MemoryType{Min: max},
+			expected: &wasm.Memory{Min: max},
 		},
 		{
 			name:       "min largest - ID",
 			input:      "(memory $mem 65536)",
-			expected:   &wasm.MemoryType{Min: max},
+			expected:   &wasm.Memory{Min: max},
 			expectedID: "mem",
 		},
 		{
 			name:     "min 0, max largest",
 			input:    "(memory 0 65536)",
-			expected: &wasm.MemoryType{Max: &max},
+			expected: &wasm.Memory{Max: &max},
 		},
 		{
 			name:     "min largest max largest",
 			input:    "(memory 65536 65536)",
-			expected: &wasm.MemoryType{Min: max, Max: &max},
+			expected: &wasm.Memory{Min: max, Max: &max},
 		},
 		{
 			name:       "min largest max largest - ID",
 			input:      "(memory $mem 65536 65536)",
-			expected:   &wasm.MemoryType{Min: max, Max: &max},
+			expected:   &wasm.Memory{Min: max, Max: &max},
 			expectedID: "mem",
 		},
 	}
@@ -161,10 +161,10 @@ func TestMemoryParser_Errors(t *testing.T) {
 	})
 }
 
-func parseMemoryType(memoryNamespace *indexNamespace, input string) (*wasm.MemoryType, *memoryParser, error) {
-	var parsed *wasm.MemoryType
+func parseMemoryType(memoryNamespace *indexNamespace, input string) (*wasm.Memory, *memoryParser, error) {
+	var parsed *wasm.Memory
 	var setFunc onMemory = func(min uint32, max *uint32) tokenParser {
-		parsed = &wasm.MemoryType{Min: min, Max: max}
+		parsed = &wasm.Memory{Min: min, Max: max}
 		return parseErr
 	}
 	tp := newMemoryParser(memoryNamespace, setFunc)

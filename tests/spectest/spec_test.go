@@ -244,11 +244,11 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x40, 0x84, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}},
 			},
 		},
-		MemorySection: []*wasm.LimitsType{{
+		MemorySection: &wasm.Memory{
 			Min: 1, Max: &memoryLimitMax,
-		}},
-		TableSection: []*wasm.TableType{
-			{Limit: &wasm.LimitsType{Min: 10, Max: &tableLimitMax}},
+		},
+		TableSection: &wasm.Table{
+			Min: 10, Max: &tableLimitMax,
 		},
 		ExportSection: map[string]*wasm.Export{
 			"print":         {Name: "print", Index: 0, Type: wasm.ExternTypeFunc},
