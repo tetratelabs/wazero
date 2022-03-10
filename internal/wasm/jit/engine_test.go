@@ -225,7 +225,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 	})
 }
 
-func TestRelase(t *testing.T) {
+func TestRelease(t *testing.T) {
 	newFunctionInstance := func(id int) *wasm.FunctionInstance {
 		return &wasm.FunctionInstance{
 			Name: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}

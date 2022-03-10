@@ -165,10 +165,10 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 		importedFunctionCounts: len(importedFunctions),
 	}
 
-	for _, f := range importedFunctions {
+	for idx, f := range importedFunctions {
 		cf, ok := e.getCompiledFunction(f)
 		if !ok {
-			return nil, fmt.Errorf("uncompiled imported function: %s.%s", f.Module.Name, f.Name)
+			return nil, fmt.Errorf("import[%d] func[%s.%s]: uncompiled", idx, f.Module.Name, f.Name)
 		}
 		modEngine.compiledFunctions = append(modEngine.compiledFunctions, cf)
 	}
@@ -179,6 +179,7 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 			ir, err := wazeroir.Compile(f)
 			if err != nil {
 				_ = modEngine.Release()
+				// TODO(Adrian): extract Module.funcDesc so that errors here have more context
 				return nil, fmt.Errorf("function[%d/%d] failed to lower to wazeroir: %w", i, len(moduleFunctions)-1, err)
 			}
 
