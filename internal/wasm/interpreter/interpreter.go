@@ -9,7 +9,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -464,9 +463,9 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 	return ret, nil
 }
 
-// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress.
-func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
-	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
+// FunctionPointer implements internalwasm.ModuleEngine FunctionPointer.
+func (me *moduleEngine) FunctionPointer(index wasm.Index) interface{} {
+	return me.compiledFunctions[index]
 }
 
 // Call implements internalwasm.ModuleEngine Call.
@@ -641,8 +640,8 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				if offset >= uint64(len(table.Table)) {
 					panic(wasm.ErrRuntimeInvalidTableAccess)
 				}
-				targetCompiledFunction := (*compiledFunction)(unsafe.Pointer(table.Table[offset]))
-				if targetCompiledFunction == nil {
+				targetCompiledFunction, ok := table.Table[offset].(*compiledFunction)
+				if !ok {
 					panic(wasm.ErrRuntimeInvalidTableAccess)
 				} else if uint64(targetCompiledFunction.funcInstance.TypeID) != op.us[1] {
 					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)

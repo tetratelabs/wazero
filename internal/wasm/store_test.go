@@ -446,8 +446,8 @@ func (e *mockEngine) Compile(_, _ []*FunctionInstance) (ModuleEngine, error) {
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
-func (e *mockModuleEngine) FunctionAddress(index Index) uintptr {
-	return uintptr(index)
+func (e *mockModuleEngine) FunctionPointer(index Index) interface{} {
+	return index
 }
 
 func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
@@ -798,7 +798,7 @@ func TestModuleInstance_applyData(t *testing.T) {
 func TestModuleInstance_validateElements(t *testing.T) {
 	functionCounts := uint32(0xa)
 	m := &ModuleInstance{
-		Table:     &TableInstance{Table: make([]uintptr, 10)},
+		Table:     &TableInstance{Table: make([]interface{}, 10)},
 		Functions: make([]*FunctionInstance, 10),
 	}
 	for _, tc := range []struct {
@@ -848,7 +848,7 @@ func TestModuleInstance_validateElements(t *testing.T) {
 func TestModuleInstance_applyElements(t *testing.T) {
 	functionCounts := uint32(0xa)
 	m := &ModuleInstance{
-		Table:     &TableInstance{Table: make([]uintptr, 10)},
+		Table:     &TableInstance{Table: make([]interface{}, 10)},
 		Functions: make([]*FunctionInstance, 10),
 		Engine:    &mockModuleEngine{},
 	}
@@ -860,8 +860,8 @@ func TestModuleInstance_applyElements(t *testing.T) {
 		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset}}, Init: []uint32{targetIndex}},
 		{OffsetExpr: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{targetOffset2}}, Init: []uint32{targetIndex2}},
 	})
-	require.Equal(t, uintptr(targetIndex), m.Table.Table[targetOffset])
-	require.Equal(t, uintptr(targetIndex2), m.Table.Table[targetOffset2])
+	require.Equal(t, targetIndex, m.Table.Table[targetOffset])
+	require.Equal(t, targetIndex2, m.Table.Table[targetOffset2])
 }
 
 func TestModuleInstance_decDependentCount(t *testing.T) {

@@ -230,7 +230,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Engine:  modEngine,
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -238,7 +238,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Engine:  modEngine,
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -246,7 +246,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
 				Engine:  modEngine,
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
@@ -265,7 +265,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Engine:  modEngine,
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 0)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 0)},
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
@@ -291,7 +291,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Engine: modEngine,
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:  &wasm.TableInstance{Table: make([]uintptr, 20)},
+				Table:  &wasm.TableInstance{Table: make([]interface{}, 20)},
 			},
 		},
 	} {
@@ -6137,7 +6137,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
-		env.setTable(make([]uintptr, 10))
+		env.setTable(make([]interface{}, 10))
 		compiler := env.requireNewCompiler(t)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -6181,9 +6181,9 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 			Kind:   wasm.FunctionKindWasm,
 		}
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
-		table := make([]uintptr, 10)
+		table := make([]interface{}, 10)
 		env.setTable(table)
-		table[0] = 0
+		table[0] = nil
 
 		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
@@ -6213,11 +6213,10 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		env.module().Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
-		table := make([]uintptr, 10)
+		table := make([]interface{}, 10)
 		env.setTable(table)
 
-		cf := &compiledFunction{source: &wasm.FunctionInstance{TypeID: 50}}
-		table[0] = uintptr(unsafe.Pointer(cf))
+		table[0] = &compiledFunction{source: &wasm.FunctionInstance{TypeID: 50}}
 
 		// Place the offfset value.
 		err = compiler.compileConstI32(targetOffset)
@@ -6252,7 +6251,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 				moduleInstance := &wasm.ModuleInstance{Types: make([]*wasm.TypeInstance, 100), Engine: &moduleEngine{compiledFunctions: []*compiledFunction{}}}
 				moduleInstance.Types[operation.TableIndex] = &wasm.TypeInstance{Type: targetType, TypeID: targetTypeID}
 
-				table := make([]uintptr, 10)
+				table := make([]interface{}, 10)
 				env := newJITEnvironment()
 				env.setTable(table)
 				me := env.moduleEngine()
@@ -6285,7 +6284,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 							},
 						}
 						me.compiledFunctions = append(me.compiledFunctions, cf)
-						table[i] = uintptr(unsafe.Pointer(cf))
+						table[i] = cf
 					})
 				}
 

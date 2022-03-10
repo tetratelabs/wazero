@@ -369,9 +369,9 @@ func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunc
 	return
 }
 
-// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress
-func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
-	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
+// FunctionPointer implements internalwasm.ModuleEngine FunctionPointer
+func (me *moduleEngine) FunctionPointer(index wasm.Index) interface{} {
+	return me.compiledFunctions[index]
 }
 
 // Release implements internalwasm.ModuleEngine Release

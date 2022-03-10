@@ -9,11 +9,9 @@ type Engine interface {
 
 // ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
-	// FunctionAddress returns the absolute address of the compiled function for index.
-	// The returned address is stored and used as a TableInstance.Table element.
-	//
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-funcaddr
-	FunctionAddress(index Index) uintptr
+	// FunctionPointer returns the pointer the compiled function for index as interface{}.
+	// The returned interface is stored and used as a TableInstance.Table element.
+	FunctionPointer(index Index) interface{}
 
 	// Call invokes a function instance f with given parameters.
 	// Returns the results from the function.

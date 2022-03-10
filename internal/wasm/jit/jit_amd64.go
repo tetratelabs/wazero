@@ -997,15 +997,15 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
-	// by 8 as the offset is the "length" of table in Go's "[]uintptr",
-	// and size of uintptr equals 64 bit.
+	// by 16 as the offset is the "length" of table in Go's "[]interface{}",
+	// and size of interface{} equals 16 bytes == (2^4).
 	getTypeInstanceAddress := c.newProg()
 	notLengthExceedJump.To.SetTarget(getTypeInstanceAddress)
 	getTypeInstanceAddress.As = x86.ASHLQ
 	getTypeInstanceAddress.To.Type = obj.TYPE_REG
 	getTypeInstanceAddress.To.Reg = offset.register
 	getTypeInstanceAddress.From.Type = obj.TYPE_CONST
-	getTypeInstanceAddress.From.Offset = 3
+	getTypeInstanceAddress.From.Offset = 4
 	c.addInstruction(getTypeInstanceAddress)
 
 	// Adds the address of wasm.Table[0] stored as callEngine.tableElement0Address to the offset.
@@ -1025,6 +1025,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	derefCompiledFunctionPointer.To.Reg = offset.register
 	derefCompiledFunctionPointer.From.Type = obj.TYPE_MEM
 	derefCompiledFunctionPointer.From.Reg = offset.register
+	derefCompiledFunctionPointer.From.Offset = interfaceDataOffset
 	c.addInstruction(derefCompiledFunctionPointer)
 
 	// At this point offset.register holds the address of *compiledFunction (as uintptr) at wasm.Table[offset].

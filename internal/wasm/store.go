@@ -162,7 +162,9 @@ type (
 	// Note this is fixed to function type until post 20191205 reference type is implemented.
 	TableInstance struct {
 		// Table holds the table elements managed by this table instance.
-		Table []uintptr
+		// The content of interface{} depends on the engine implementation,
+		// and set via ModuleEngine.
+		Table []interface{}
 		Min   uint32
 		Max   *uint32
 		// Currently fixed to 0x70 (funcref type).
@@ -287,7 +289,7 @@ func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
 		table := m.Table.Table
 		for i, elm := range elem.Init {
 			pos := i + offset
-			table[pos] = m.Engine.FunctionAddress(elm)
+			table[pos] = m.Engine.FunctionPointer(elm)
 		}
 	}
 }

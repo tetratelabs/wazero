@@ -521,7 +521,7 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 func (m *Module) buildTable() (table *TableInstance) {
 	for _, tableSeg := range m.TableSection {
 		table = &TableInstance{
-			Table:    make([]uintptr, tableSeg.Limit.Min),
+			Table:    make([]interface{}, tableSeg.Limit.Min),
 			Min:      tableSeg.Limit.Min,
 			Max:      tableSeg.Limit.Max,
 			ElemType: 0x70, // funcref
