@@ -7,7 +7,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/leb128"
 )
 
-// decodeLimitsType returns the wasm.limitsType decoded with the WebAssembly 1.0 (20191205) Binary Format.
+// decodeLimitsType returns the `limitsType` (min, max) decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#limits%E2%91%A6
 func decodeLimitsType(r *bytes.Reader) (min uint32, max *uint32, err error) {
@@ -41,7 +41,7 @@ func decodeLimitsType(r *bytes.Reader) (min uint32, max *uint32, err error) {
 	return
 }
 
-// encodeLimitsType returns the internalwasm.limitsType encoded in WebAssembly 1.0 (20191205) Binary Format.
+// encodeLimitsType returns the `limitsType` (min, max) encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#limits%E2%91%A6
 func encodeLimitsType(min uint32, max *uint32) []byte {
