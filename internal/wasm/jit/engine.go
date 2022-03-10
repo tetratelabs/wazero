@@ -331,10 +331,10 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 		importedFunctionCounts: imported,
 	}
 
-	for _, f := range importedFunctions {
+	for idx, f := range importedFunctions {
 		cf, ok := e.getCompiledFunction(f)
 		if !ok {
-			return nil, fmt.Errorf("uncompiled imported function: %s.%s", f.Module.Name, f.Name)
+			return nil, fmt.Errorf("import[%d] func[%s.%s]: uncompiled", idx, f.Module.Name, f.Name)
 		}
 		modEngine.compiledFunctions = append(modEngine.compiledFunctions, cf)
 	}
