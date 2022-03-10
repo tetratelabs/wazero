@@ -116,6 +116,7 @@ type compiler struct {
 }
 
 // For debugging only.
+//nolint
 func (c *compiler) stackDump() string {
 	strs := make([]string, 0, len(c.stack))
 	for _, s := range c.stack {
