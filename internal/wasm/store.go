@@ -163,7 +163,7 @@ type (
 	TableInstance struct {
 		// Table holds the table elements managed by this table instance.
 		// The content of interface{} depends on the engine implementation,
-		// and set via ModuleEngine.
+		// and is set via ModuleEngine.FunctionPointer.
 		Table []interface{}
 		Min   uint32
 		Max   *uint32
