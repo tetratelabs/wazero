@@ -300,7 +300,7 @@ func TestArm64Compiler_releaseRegisterToStack(t *testing.T) {
 
 			// Run native code after growing the value stack.
 			env.callEngine().builtinFunctionGrowValueStack(tc.stackPointer)
-			env.callEngine().resetValueStackElement0Address()
+			env.callEngine().reloadGlobalContext()
 			env.exec(code)
 
 			// JIT status must be returned and stack pointer must end up the specified one.
@@ -383,7 +383,7 @@ func TestArm64Compiler_compileLoadValueOnStackToRegister(t *testing.T) {
 
 			// Run native code after growing the value stack, and place the original value.
 			env.callEngine().builtinFunctionGrowValueStack(tc.stackPointer)
-			env.callEngine().resetValueStackElement0Address()
+			env.callEngine().reloadGlobalContext()
 			env.stack()[tc.stackPointer] = val
 			env.exec(code)
 

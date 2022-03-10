@@ -499,11 +499,14 @@ func (ce *callEngine) popValue() (ret uint64) {
 	return
 }
 
-func (ce *callEngine) reloadGlobalContextRawPointers() {
+func (ce *callEngine) reloadGlobalContext() {
 	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
 	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
+	ce.globalContext.valueStackLen = uint64(valueStackHeader.Len)
+
 	callFrameStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.callFrameStack))
 	ce.globalContext.callFrameStackElementZeroAddress = callFrameStackHeader.Data
+	ce.globalContext.callFrameStackLen = uint64(callFrameStackHeader.Len)
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -607,7 +610,7 @@ jitentry:
 		// Seems like even if not using "append", accessing the slice might lead to relocation by Go runtime on amd64.
 		// For safety, we reload the cached addresses.
 		// TODO: investigate the root cause and ideally we should be able to remove this function call.
-		ce.reloadGlobalContextRawPointers()
+		ce.reloadGlobalContext()
 
 		// Call into the JIT code.
 		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)))
