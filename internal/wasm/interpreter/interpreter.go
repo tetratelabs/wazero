@@ -33,7 +33,7 @@ func NewEngine() wasm.Engine {
 
 func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
 	e.mux.Lock()
-	defer e.mux.Lock()
+	defer e.mux.Unlock()
 	delete(e.compiledFunctions, f)
 }
 
@@ -57,7 +57,8 @@ type moduleEngine struct {
 	compiledFunctions []*compiledFunction
 
 	// parentEngine holds *engine from which this module engine is created from.
-	parentEngine *engine
+	parentEngine           *engine
+	importedFunctionCounts int
 }
 
 // callEngine holds context per moduleEngine.Call, and shared across all the
@@ -149,7 +150,8 @@ type interpreterOp struct {
 
 // Release implements wasm.Engine Release
 func (me *moduleEngine) Release() error {
-	for _, cf := range me.compiledFunctions {
+	// Release all the function instances declared in this module.
+	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
 		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
 	}
 	return nil
@@ -157,37 +159,46 @@ func (me *moduleEngine) Release() error {
 
 // Compile implements internalwasm.Engine Compile
 func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (me wasm.ModuleEngine, err error) {
-	compiledFunctions := make([]*compiledFunction, len(importedFunctions)+len(moduleFunctions))
-	for i, f := range importedFunctions {
-		cf, ok := e.getCompiledFunction(f)
-		if !ok {
-			return nil, fmt.Errorf("uncompiled imported function: %s", f.Name)
-		}
-		compiledFunctions[i] = cf
+	modEngine := &moduleEngine{
+		compiledFunctions:      make([]*compiledFunction, 0, len(importedFunctions)+len(moduleFunctions)),
+		parentEngine:           e,
+		importedFunctionCounts: len(importedFunctions),
 	}
 
-	ret := &moduleEngine{compiledFunctions: compiledFunctions, parentEngine: e}
-	for _, f := range moduleFunctions {
+	for idx, f := range importedFunctions {
+		cf, ok := e.getCompiledFunction(f)
+		if !ok {
+			return nil, fmt.Errorf("import[%d] func[%s.%s]: uncompiled", idx, f.Module.Name, f.Name)
+		}
+		modEngine.compiledFunctions = append(modEngine.compiledFunctions, cf)
+	}
+
+	for i, f := range moduleFunctions {
 		var compiled *compiledFunction
 		if f.Kind == wasm.FunctionKindWasm {
 			ir, err := wazeroir.Compile(f)
 			if err != nil {
-				return nil, fmt.Errorf("failed to compile Wasm to wazeroir: %w", err)
+				_ = modEngine.Release()
+				// TODO(Adrian): extract Module.funcDesc so that errors here have more context
+				return nil, fmt.Errorf("function[%d/%d] failed to lower to wazeroir: %w", i, len(moduleFunctions)-1, err)
 			}
 
 			compiled, err = e.lowerIROps(f, ir.Operations)
 			if err != nil {
-				return nil, fmt.Errorf("failed to convert wazeroir operations to engine ones: %w", err)
+				_ = modEngine.Release()
+				return nil, fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(moduleFunctions)-1, err)
 			}
 		} else {
 			compiled = &compiledFunction{hostFn: f.GoFunc, funcInstance: f}
 		}
+		compiled.moduleEngine = modEngine
+		modEngine.compiledFunctions = append(modEngine.compiledFunctions, compiled)
 
-		compiled.moduleEngine = ret
-		compiledFunctions[f.Index] = compiled
+		// Add the compiled function to the store-wide engine as well so that
+		// the future importing module can refer the function instance.
 		e.addCompiledFunction(f, compiled)
 	}
-	return ret, nil
+	return modEngine, nil
 }
 
 // Lowers the wazeroir operations to engine friendly struct.

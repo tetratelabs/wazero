@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -233,4 +234,103 @@ func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestEngineCompile_Errors(t *testing.T) {
+	t.Run("invalid import", func(t *testing.T) {
+		e := NewEngine().(*engine)
+		_, err := e.Compile([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
+		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
+	})
+
+	t.Run("release on compilation error", func(t *testing.T) {
+		e := NewEngine().(*engine)
+
+		importedFunctions := []*wasm.FunctionInstance{
+			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+		}
+		_, err := e.Compile(nil, importedFunctions)
+		require.NoError(t, err)
+
+		require.Len(t, e.compiledFunctions, len(importedFunctions))
+
+		moduleFunctions := []*wasm.FunctionInstance{
+			{Name: "ok1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "ok2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "invalid code", Type: &wasm.FunctionType{}, Body: []byte{
+				wasm.OpcodeCall, // Call instruction without immediate for call target index is invalid and should fail to compile.
+			}, Module: &wasm.ModuleInstance{}},
+		}
+
+		_, err = e.Compile(importedFunctions, moduleFunctions)
+		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
+
+		// On the compilation failrue, all the compiled functions including suceeded ones must be released.
+		require.Len(t, e.compiledFunctions, len(importedFunctions))
+		for _, f := range moduleFunctions {
+			require.NotContains(t, e.compiledFunctions, f)
+		}
+	})
+}
+
+func TestRelease(t *testing.T) {
+	newFunctionInstance := func(id int) *wasm.FunctionInstance {
+		return &wasm.FunctionInstance{
+			Name: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
+	}
+
+	for _, tc := range []struct {
+		name                               string
+		importedFunctions, moduleFunctions []*wasm.FunctionInstance
+	}{
+		{
+			name:            "no imports",
+			moduleFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
+		},
+		{
+			name:              "only imports",
+			importedFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
+		},
+		{
+			name:              "mix",
+			importedFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
+			moduleFunctions:   []*wasm.FunctionInstance{newFunctionInstance(100), newFunctionInstance(200), newFunctionInstance(300)},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			e := NewEngine().(*engine)
+			if len(tc.importedFunctions) > 0 {
+				modEngine, err := e.Compile(nil, tc.importedFunctions)
+				require.NoError(t, err)
+				require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
+			}
+
+			modEngine, err := e.Compile(tc.importedFunctions, tc.moduleFunctions)
+			require.NoError(t, err)
+			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+
+			require.Len(t, e.compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+			for _, f := range tc.importedFunctions {
+				require.Contains(t, e.compiledFunctions, f)
+			}
+			for _, f := range tc.moduleFunctions {
+				require.Contains(t, e.compiledFunctions, f)
+			}
+
+			err = modEngine.Release()
+			require.NoError(t, err)
+
+			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
+			for _, f := range tc.importedFunctions {
+				require.Contains(t, e.compiledFunctions, f)
+			}
+			for i, f := range tc.moduleFunctions {
+				require.NotContains(t, e.compiledFunctions, f, i)
+			}
+		})
+	}
 }
