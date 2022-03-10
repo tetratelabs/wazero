@@ -1018,7 +1018,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	movTableSliceAddress.From.Offset = callEngineModuleContextTableElement0AddressOffset
 	c.addInstruction(movTableSliceAddress)
 
-	// "offset = *offset (== table[offset] == *compiledFunction type)"
+	// "offset = (*offset+interfaceDataOffset) (== (table[offset] + interfaceDataOffset) == *compiledFunction type)"
 	derefCompiledFunctionPointer := c.newProg()
 	derefCompiledFunctionPointer.As = x86.AMOVQ
 	derefCompiledFunctionPointer.To.Type = obj.TYPE_REG
