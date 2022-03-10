@@ -27,23 +27,23 @@ func TestModuleInstance_Memory(t *testing.T) {
 		},
 		{
 			name:  "memory not exported",
-			input: &Module{MemorySection: []*MemoryType{{1, nil}}},
+			input: &Module{MemorySection: &Memory{Min: 1}},
 		},
 		{
 			name:  "memory not exported, one page",
-			input: &Module{MemorySection: []*MemoryType{{1, nil}}},
+			input: &Module{MemorySection: &Memory{Min: 1}},
 		},
 		{
 			name: "memory exported, different name",
 			input: &Module{
-				MemorySection: []*MemoryType{{1, nil}},
+				MemorySection: &Memory{Min: 1},
 				ExportSection: map[string]*Export{"momory": {Type: ExternTypeMemory, Name: "momory", Index: 0}},
 			},
 		},
 		{
 			name: "memory exported, but zero length",
 			input: &Module{
-				MemorySection: []*MemoryType{{0, nil}},
+				MemorySection: &Memory{},
 				ExportSection: map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected: true,
@@ -51,7 +51,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 		{
 			name: "memory exported, one page",
 			input: &Module{
-				MemorySection: []*MemoryType{{1, nil}},
+				MemorySection: &Memory{Min: 1},
 				ExportSection: map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
@@ -60,7 +60,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 		{
 			name: "memory exported, two pages",
 			input: &Module{
-				MemorySection: []*MemoryType{{2, nil}},
+				MemorySection: &Memory{Min: 2},
 				ExportSection: map[string]*Export{"memory": {Type: ExternTypeMemory, Name: "memory", Index: 0}},
 			},
 			expected:    true,
@@ -135,9 +135,9 @@ func TestStore_ReleaseModule(t *testing.T) {
 			_, err := s.Instantiate(&Module{
 				TypeSection:   []*FunctionType{{}},
 				ImportSection: []*Import{{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0}},
-				MemorySection: []*MemoryType{{1, nil}},
+				MemorySection: &Memory{Min: 1},
 				GlobalSection: []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
-				TableSection:  []*TableType{{Limit: &LimitsType{Min: 10}}},
+				TableSection:  &Table{Min: 10},
 			}, importingModuleName)
 			require.NoError(t, err)
 
@@ -180,9 +180,9 @@ func TestStore_concurrent(t *testing.T) {
 		TypeSection:     []*FunctionType{{}},
 		FunctionSection: []uint32{0},
 		CodeSection:     []*Code{{Body: []byte{OpcodeEnd}}},
-		MemorySection:   []*MemoryType{{1, nil}},
+		MemorySection:   &Memory{Min: 1},
 		GlobalSection:   []*Global{{Type: &GlobalType{}, Init: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x1}}}},
-		TableSection:    []*TableType{{Limit: &LimitsType{Min: 10}}},
+		TableSection:    &Table{Min: 10},
 		ImportSection: []*Import{
 			{Type: ExternTypeFunc, Module: importedModuleName, Name: "fn", DescFunc: 0},
 		},
@@ -341,7 +341,7 @@ func TestStore_ExportImportedHostFunction(t *testing.T) {
 		_, err = s.Instantiate(&Module{
 			TypeSection:   []*FunctionType{{}},
 			ImportSection: []*Import{{Type: ExternTypeFunc, Name: "host_fn", DescFunc: 0}},
-			MemorySection: []*MemoryType{{1, nil}},
+			MemorySection: &Memory{Min: 1},
 			ExportSection: map[string]*Export{"host.fn": {Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
 		}, "test")
 		require.NoError(t, err)
@@ -406,7 +406,7 @@ func TestFunctionInstance_Call(t *testing.T) {
 					Name:     functionName,
 					DescFunc: 0,
 				}},
-				MemorySection: []*MemoryType{{1, nil}},
+				MemorySection: &Memory{Min: 1},
 				ExportSection: map[string]*Export{functionName: {Type: ExternTypeFunc, Name: functionName, Index: 0}},
 			}, "test")
 			require.NoError(t, err)
@@ -671,26 +671,17 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:  ExternTypeTable,
 				Table: tableInst,
 			}}, Name: moduleName}
-			_, _, table, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &TableType{Limit: &LimitsType{Max: &max}}}}})
+			_, _, table, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &Table{Max: &max}}}})
 			require.NoError(t, err)
 			require.Equal(t, table, tableInst)
 			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
-		t.Run("element type", func(t *testing.T) {
-			s := newStore()
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Type:  ExternTypeTable,
-				Table: &TableInstance{ElemType: 0x00}, // Unknown!
-			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &TableType{ElemType: 0x1}}}})
-			require.EqualError(t, err, "import[0] table[test.target]: element type mismatch: unknown != unknown")
-		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
-			importTableType := &TableType{Limit: &LimitsType{Min: 2}}
+			importTableType := &Table{Min: 2}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
-				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
+				Table: &TableInstance{Min: importTableType.Min - 1},
 			}}, Name: moduleName}
 			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
 			require.EqualError(t, err, "import[0] table[test.target]: minimum size mismatch: 2 > 1")
@@ -698,10 +689,10 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("maximum size mismatch", func(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
-			importTableType := &TableType{Limit: &LimitsType{Max: &max}}
+			importTableType := &Table{Max: &max}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:  ExternTypeTable,
-				Table: &TableInstance{Min: importTableType.Limit.Min - 1},
+				Table: &TableInstance{Min: importTableType.Min - 1},
 			}}, Name: moduleName}
 			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
 			require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")
@@ -716,14 +707,14 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:   ExternTypeMemory,
 				Memory: memoryInst,
 			}}, Name: moduleName}
-			_, _, _, memory, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &MemoryType{Max: &max}}}})
+			_, _, _, memory, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: &max}}}})
 			require.NoError(t, err)
 			require.Equal(t, memory, memoryInst)
 			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
-			importMemoryType := &MemoryType{Min: 2}
+			importMemoryType := &Memory{Min: 2}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{Min: importMemoryType.Min - 1},
@@ -734,7 +725,7 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("maximum size mismatch", func(t *testing.T) {
 			s := newStore()
 			max := uint32(10)
-			importMemoryType := &MemoryType{Max: &max}
+			importMemoryType := &Memory{Max: &max}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{},

@@ -1170,14 +1170,14 @@ func TestDecodeModule(t *testing.T) {
 			name:  "memory",
 			input: "(module (memory 1))",
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 1}},
+				MemorySection: &wasm.Memory{Min: 1},
 			},
 		},
 		{
 			name:  "memory ID",
 			input: "(module (memory $mem 1))",
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 1}},
+				MemorySection: &wasm.Memory{Min: 1},
 			},
 		},
 		{
@@ -1364,7 +1364,7 @@ func TestDecodeModule(t *testing.T) {
 	(export "foo" (memory 0))
 )`,
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 0}},
+				MemorySection: &wasm.Memory{Min: 0},
 				ExportSection: map[string]*wasm.Export{
 					"foo": {Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -1377,7 +1377,7 @@ func TestDecodeModule(t *testing.T) {
 	(memory 0)
 )`,
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 0}},
+				MemorySection: &wasm.Memory{Min: 0},
 				ExportSection: map[string]*wasm.Export{
 					"foo": {Name: "foo", Type: wasm.ExternTypeMemory, Index: 0},
 				},
@@ -1409,7 +1409,7 @@ func TestDecodeModule(t *testing.T) {
     (export "memory" (memory $mem))
 )`,
 			expected: &wasm.Module{
-				MemorySection: []*wasm.MemoryType{{Min: 1}},
+				MemorySection: &wasm.Memory{Min: 1},
 				ExportSection: map[string]*wasm.Export{
 					"memory": {Name: "memory", Type: wasm.ExternTypeMemory, Index: 0},
 				},

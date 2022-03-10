@@ -91,37 +91,31 @@ func decodeFunctionSection(r *bytes.Reader) ([]uint32, error) {
 	return result, err
 }
 
-func decodeTableSection(r *bytes.Reader) ([]*wasm.TableType, error) {
+func decodeTableSection(r *bytes.Reader) (*wasm.Table, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get size of vector: %w", err)
+		return nil, fmt.Errorf("error reading size")
+	}
+	if vs > 1 {
+		return nil, fmt.Errorf("at most one table allowed in module, but read %d", vs)
 	}
 
-	result := make([]*wasm.TableType, vs)
-	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeTableType(r); err != nil {
-			return nil, fmt.Errorf("read table type: %w", err)
-		}
-	}
-	return result, nil
+	return decodeTable(r)
 }
 
-func decodeMemorySection(r *bytes.Reader) ([]*wasm.MemoryType, error) {
+func decodeMemorySection(r *bytes.Reader) (*wasm.Memory, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
-		return nil, fmt.Errorf("get size of vector: %w", err)
+		return nil, fmt.Errorf("error reading size")
+	}
+	if vs > 1 {
+		return nil, fmt.Errorf("at most one memory allowed in module, but read %d", vs)
 	}
 
-	result := make([]*wasm.MemoryType, vs)
-	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeMemoryType(r); err != nil {
-			return nil, fmt.Errorf("read memory type: %w", err)
-		}
-	}
-	return result, nil
+	return decodeMemory(r)
 }
 
-func decodeGlobalSection(r *bytes.Reader, features wasm.Features) ([]*wasm.Global, error) {
+func decodeGlobalSection(r *bytes.Reader) ([]*wasm.Global, error) {
 	vs, _, err := leb128.DecodeUint32(r)
 	if err != nil {
 		return nil, fmt.Errorf("get size of vector: %w", err)
@@ -129,7 +123,7 @@ func decodeGlobalSection(r *bytes.Reader, features wasm.Features) ([]*wasm.Globa
 
 	result := make([]*wasm.Global, vs)
 	for i := uint32(0); i < vs; i++ {
-		if result[i], err = decodeGlobal(r, features); err != nil {
+		if result[i], err = decodeGlobal(r); err != nil {
 			return nil, fmt.Errorf("global[%d]: %w", i, err)
 		}
 	}
@@ -266,16 +260,23 @@ func encodeCodeSection(code []*wasm.Code) []byte {
 	return encodeSection(wasm.SectionIDCode, contents)
 }
 
+// encodeTableSection encodes a internalwasm.SectionIDTable for the module-defined function in WebAssembly 1.0
+// (20191205) Binary Format.
+//
+// See encodeTable
+// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-section%E2%91%A0
+func encodeTableSection(table *wasm.Table) []byte {
+	contents := append([]byte{1}, encodeTable(table)...)
+	return encodeSection(wasm.SectionIDTable, contents)
+}
+
 // encodeMemorySection encodes a internalwasm.SectionIDMemory for the module-defined function in WebAssembly 1.0
 // (20191205) Binary Format.
 //
-// See encodeMemoryType
+// See encodeMemory
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memory-section%E2%91%A0
-func encodeMemorySection(memories []*wasm.MemoryType) []byte {
-	contents := leb128.EncodeUint32(uint32(len(memories)))
-	for _, i := range memories {
-		contents = append(contents, encodeMemoryType(i)...)
-	}
+func encodeMemorySection(memory *wasm.Memory) []byte {
+	contents := append([]byte{1}, encodeMemory(memory)...)
 	return encodeSection(wasm.SectionIDMemory, contents)
 }
 

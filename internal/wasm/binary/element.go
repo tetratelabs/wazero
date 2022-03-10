@@ -13,6 +13,9 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get table index: %w", err)
 	}
+	if ti > 0 {
+		return nil, fmt.Errorf("at most one table allowed in module, but read index %d", ti)
+	}
 
 	expr, err := decodeConstantExpression(r)
 	if err != nil {
@@ -33,9 +36,5 @@ func decodeElementSegment(r *bytes.Reader) (*wasm.ElementSegment, error) {
 		init[i] = fIDx
 	}
 
-	return &wasm.ElementSegment{
-		TableIndex: ti,
-		OffsetExpr: expr,
-		Init:       init,
-	}, nil
+	return &wasm.ElementSegment{OffsetExpr: expr, Init: init}, nil
 }

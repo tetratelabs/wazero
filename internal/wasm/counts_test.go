@@ -67,7 +67,7 @@ func TestModule_ImportTableCount(t *testing.T) {
 		},
 		{
 			name:  "none with table section",
-			input: &Module{TableSection: []*TableType{{0x70, &LimitsType{1, nil}}}},
+			input: &Module{TableSection: &Table{1, nil}},
 		},
 		{
 			name:     "one",
@@ -78,7 +78,7 @@ func TestModule_ImportTableCount(t *testing.T) {
 			name: "one with table section",
 			input: &Module{
 				ImportSection: []*Import{{Type: ExternTypeTable}},
-				TableSection:  []*TableType{{0x70, &LimitsType{1, nil}}},
+				TableSection:  &Table{1, nil},
 			},
 			expected: 1,
 		},
@@ -116,7 +116,7 @@ func TestModule_ImportMemoryCount(t *testing.T) {
 		},
 		{
 			name:  "none with memory section",
-			input: &Module{MemorySection: []*MemoryType{{Min: 1}}},
+			input: &Module{MemorySection: &Memory{Min: 1}},
 		},
 		{
 			name:     "one",
@@ -127,7 +127,7 @@ func TestModule_ImportMemoryCount(t *testing.T) {
 			name: "one with memory section",
 			input: &Module{
 				ImportSection: []*Import{{Type: ExternTypeMemory}},
-				MemorySection: []*MemoryType{{Min: 1}},
+				MemorySection: &Memory{Min: 1},
 			},
 			expected: 1,
 		},
@@ -281,16 +281,16 @@ func TestModule_SectionElementCount(t *testing.T) {
 		{
 			name: "MemorySection and DataSection",
 			input: &Module{
-				MemorySection: []*MemoryType{{Min: 1}},
-				DataSection:   []*DataSegment{{MemoryIndex: 0, OffsetExpression: empty}},
+				MemorySection: &Memory{Min: 1},
+				DataSection:   []*DataSegment{{OffsetExpression: empty}},
 			},
 			expected: map[string]uint32{"data": 1, "memory": 1},
 		},
 		{
 			name: "TableSection and ElementSection",
 			input: &Module{
-				TableSection:   []*TableType{{ElemType: 0x70, Limit: &LimitsType{Min: 1}}},
-				ElementSection: []*ElementSegment{{TableIndex: 0, OffsetExpr: empty}},
+				TableSection:   &Table{Min: 1},
+				ElementSection: []*ElementSegment{{OffsetExpr: empty}},
 			},
 			expected: map[string]uint32{"element": 1, "table": 1},
 		},

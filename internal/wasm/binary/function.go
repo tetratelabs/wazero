@@ -1,57 +1,8 @@
 package binary
 
 import (
-	"bytes"
-	"fmt"
-
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
-
-func decodeTableType(r *bytes.Reader) (*wasm.TableType, error) {
-	b, err := r.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("read leading byte: %v", err)
-	}
-
-	if b != 0x70 {
-		return nil, fmt.Errorf("%w: invalid element type %#x != %#x", ErrInvalidByte, b, 0x70)
-	}
-
-	lm, err := decodeLimitsType(r)
-	if err != nil {
-		return nil, fmt.Errorf("read limits: %v", err)
-	}
-
-	return &wasm.TableType{
-		ElemType: 0x70, // funcref
-		Limit:    lm,
-	}, nil
-}
-
-func decodeGlobalType(r *bytes.Reader, features wasm.Features) (*wasm.GlobalType, error) {
-	vt, err := decodeValueTypes(r, 1)
-	if err != nil {
-		return nil, fmt.Errorf("read value type: %w", err)
-	}
-
-	ret := &wasm.GlobalType{
-		ValType: vt[0],
-	}
-
-	b, err := r.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("read mutablity: %w", err)
-	}
-
-	switch mut := b; mut {
-	case 0x00: // not mutable
-	case 0x01: // mutable
-		ret.Mutable = true
-	default:
-		return nil, fmt.Errorf("%w for mutability: %#x != 0x00 or 0x01", ErrInvalidByte, mut)
-	}
-	return ret, nil
-}
 
 var nullary = []byte{0x60, 0, 0}
 

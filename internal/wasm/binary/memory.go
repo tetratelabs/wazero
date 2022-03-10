@@ -7,30 +7,30 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
-// decodeMemoryType returns the wasm.MemoryType decoded with the WebAssembly 1.0 (20191205) Binary Format.
+// decodeMemory returns the wasm.Memory decoded with the WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
-func decodeMemoryType(r *bytes.Reader) (*wasm.MemoryType, error) {
-	ret, err := decodeLimitsType(r)
+func decodeMemory(r *bytes.Reader) (*wasm.Memory, error) {
+	min, max, err := decodeLimitsType(r)
 	if err != nil {
 		return nil, err
 	}
-	if ret.Min > wasm.MemoryMaxPages {
+	if min > wasm.MemoryMaxPages {
 		return nil, fmt.Errorf("memory min must be at most 65536 pages (4GiB)")
 	}
-	if ret.Max != nil {
-		if *ret.Max < ret.Min {
+	if max != nil {
+		if *max < min {
 			return nil, fmt.Errorf("memory size minimum must not be greater than maximum")
-		} else if *ret.Max > wasm.MemoryMaxPages {
+		} else if *max > wasm.MemoryMaxPages {
 			return nil, fmt.Errorf("memory max must be at most 65536 pages (4GiB)")
 		}
 	}
-	return ret, nil
+	return &wasm.Memory{Min: min, Max: max}, nil
 }
 
-// encodeMemoryType returns the internalwasm.MemoryType encoded in WebAssembly 1.0 (20191205) Binary Format.
+// encodeMemory returns the internalwasm.Memory encoded in WebAssembly 1.0 (20191205) Binary Format.
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#binary-memory
-func encodeMemoryType(i *wasm.MemoryType) []byte {
-	return encodeLimitsType(i)
+func encodeMemory(i *wasm.Memory) []byte {
+	return encodeLimitsType(i.Min, i.Max)
 }

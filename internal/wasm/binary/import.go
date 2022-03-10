@@ -27,11 +27,11 @@ func decodeImport(r *bytes.Reader, idx uint32, features wasm.Features) (i *wasm.
 	case wasm.ExternTypeFunc:
 		i.DescFunc, _, err = leb128.DecodeUint32(r)
 	case wasm.ExternTypeTable:
-		i.DescTable, err = decodeTableType(r)
+		i.DescTable, err = decodeTable(r)
 	case wasm.ExternTypeMemory:
-		i.DescMem, err = decodeMemoryType(r)
+		i.DescMem, err = decodeMemory(r)
 	case wasm.ExternTypeGlobal:
-		i.DescGlobal, err = decodeGlobalType(r, features)
+		i.DescGlobal, err = decodeGlobalType(r)
 	default:
 		err = fmt.Errorf("%w: invalid byte for importdesc: %#x", ErrInvalidByte, b)
 	}

@@ -106,6 +106,21 @@ func TestModule_Encode(t *testing.T) {
 			),
 		},
 		{
+			name: "table and memory section",
+			input: &wasm.Module{
+				TableSection:  &wasm.Table{Min: 3},
+				MemorySection: &wasm.Memory{Min: 1},
+			},
+			expected: append(append(Magic, version...),
+				wasm.SectionIDTable, 0x04, // 4 bytes in this section
+				0x01,                            // 1 table
+				wasm.ElemTypeFuncref, 0x0, 0x03, // func, only min: 3
+				wasm.SectionIDMemory, 0x03, // 3 bytes in this section
+				0x01,      // 1 memory
+				0x0, 0x01, // only min: 01
+			),
+		},
+		{
 			name: "exported func with instructions",
 			input: &wasm.Module{
 				TypeSection: []*wasm.FunctionType{

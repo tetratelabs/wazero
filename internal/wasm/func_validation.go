@@ -28,16 +28,11 @@ func validateFunction(
 	localTypes []ValueType,
 	functions []Index,
 	globals []*GlobalType,
-	memories []*MemoryType,
-	tables []*TableType,
+	memory *Memory,
+	table *Table,
 	types []*FunctionType,
 	maxStackValues int,
 ) error {
-	// Note: In WebAssembly 1.0 (20191205), multiple memories are not allowed.
-	hasMemory := len(memories) > 0
-	// Note: In WebAssembly 1.0 (20191205), multiple tables are not allowed.
-	hasTable := len(tables) > 0
-
 	// We start with the outermost control block which is for function return if the code branches into it.
 	controlBlockStack := []*controlBlock{{blockType: functionType}}
 	// Create the valueTypeStack to track the state of Wasm value stacks at anypoint of execution.
@@ -48,7 +43,7 @@ func validateFunction(
 	for pc := uint64(0); pc < uint64(len(body)); pc++ {
 		op := body[pc]
 		if OpcodeI32Load <= op && op <= OpcodeI64Store32 {
-			if !hasMemory {
+			if memory == nil {
 				return fmt.Errorf("unknown memory access")
 			}
 			pc++
@@ -236,7 +231,7 @@ func validateFunction(
 			}
 			pc += num - 1
 		} else if OpcodeMemorySize <= op && op <= OpcodeMemoryGrow {
-			if !hasMemory {
+			if memory == nil {
 				return fmt.Errorf("unknown memory access")
 			}
 			pc++
@@ -486,7 +481,7 @@ func validateFunction(
 			if body[pc] != 0x00 {
 				return fmt.Errorf("call_indirect reserved bytes not zero but got %d", body[pc])
 			}
-			if !hasTable {
+			if table == nil {
 				return fmt.Errorf("table not given while having call_indirect")
 			}
 			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {

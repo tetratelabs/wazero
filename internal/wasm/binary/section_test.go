@@ -9,21 +9,75 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 )
 
+func TestTableSection(t *testing.T) {
+	three := uint32(3)
+	tests := []struct {
+		name     string
+		input    []byte
+		expected *wasm.Table
+	}{
+		{
+			name: "min and min with max",
+			input: []byte{
+				0x01,                             // 1 table
+				wasm.ElemTypeFuncref, 0x01, 2, 3, // (table 2 3)
+			},
+			expected: &wasm.Table{Min: 2, Max: &three},
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			tables, err := decodeTableSection(bytes.NewReader(tc.input))
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, tables)
+		})
+	}
+}
+
+func TestTableSection_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       []byte
+		expectedErr string
+	}{
+		{
+			name: "min and min with max",
+			input: []byte{
+				0x02,                             // 2 tables
+				wasm.ElemTypeFuncref, 0x00, 0x01, // (table 1)
+				wasm.ElemTypeFuncref, 0x01, 0x02, 0x03, // (table 2 3)
+			},
+			expectedErr: "at most one table allowed in module, but read 2",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := decodeTableSection(bytes.NewReader(tc.input))
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
 func TestMemorySection(t *testing.T) {
 	three := uint32(3)
 	tests := []struct {
 		name     string
 		input    []byte
-		expected []*wasm.MemoryType
+		expected *wasm.Memory
 	}{
 		{
 			name: "min and min with max",
 			input: []byte{
-				0x02,    // 2 memories
-				0x00, 1, // (memory 1)
-				0x01, 2, 3, // (memory 2, 3)
+				0x01,             // 1 memory
+				0x01, 0x02, 0x03, // (memory 2 3)
 			},
-			expected: []*wasm.MemoryType{{Min: 1}, {Min: 2, Max: &three}},
+			expected: &wasm.Memory{Min: 2, Max: &three},
 		},
 	}
 
@@ -34,6 +88,33 @@ func TestMemorySection(t *testing.T) {
 			memories, err := decodeMemorySection(bytes.NewReader(tc.input))
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, memories)
+		})
+	}
+}
+
+func TestMemorySection_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       []byte
+		expectedErr string
+	}{
+		{
+			name: "min and min with max",
+			input: []byte{
+				0x02,       // 2 memories
+				0x01,       // (memory 1)
+				0x02, 0x03, // (memory 2 3)
+			},
+			expectedErr: "at most one memory allowed in module, but read 2",
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := decodeMemorySection(bytes.NewReader(tc.input))
+			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }
