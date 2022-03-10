@@ -253,12 +253,14 @@ func TestRelase(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newEngine()
 			if len(tc.importedFunctions) > 0 {
-				_, err := e.Compile(nil, tc.importedFunctions)
+				modEngine, err := e.Compile(nil, tc.importedFunctions)
 				require.NoError(t, err)
+				require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
 			}
 
 			modEngine, err := e.Compile(tc.importedFunctions, tc.moduleFunctions)
 			require.NoError(t, err)
+			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 			for _, f := range tc.importedFunctions {
