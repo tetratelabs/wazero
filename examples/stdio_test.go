@@ -3,6 +3,7 @@ package examples
 import (
 	"bytes"
 	_ "embed"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -16,6 +17,11 @@ import (
 var stdioWasm []byte
 
 func Test_stdio(t *testing.T) {
+	go func() {
+		for {
+			runtime.GC()
+		}
+	}()
 	r := wazero.NewRuntime()
 
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
