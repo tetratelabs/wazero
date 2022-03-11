@@ -283,3 +283,96 @@ func TestRelease(t *testing.T) {
 		})
 	}
 }
+
+// Ensures that value stack and callframe stack are allocated on heap which
+// allows us to safely access to their data region from native code.
+// See comments on initialValueStackSize and initialCallFrameStackSize.
+func TestSliceAllocatedOnHeap(t *testing.T) {
+	e := newEngine()
+	store := wasm.NewStore(context.Background(), e, wasm.Features20191205)
+
+	const hostModuleName = "env"
+	const hostFnName = "grow_and_shrink_goroutine_stack"
+	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func() {
+		// This function aggressively grow the goroutine stack by recursively
+		// calling the function many times.
+		var callNum = 1000
+		var growGoroutineStack func()
+		growGoroutineStack = func() {
+			if callNum != 0 {
+				callNum--
+				growGoroutineStack()
+			}
+		}
+		growGoroutineStack()
+
+		// Trigger relocation of goroutine stack because at this point we have majority of
+		// goroutine stack unused after recursive call.
+		runtime.GC()
+	}})
+	require.NoError(t, err)
+
+	_, err = store.Instantiate(hm, hostModuleName)
+	require.NoError(t, err)
+
+	const valueStackCorruption = "value_stack_corruption"
+	const callStackCorruption = "call_stack_corruption"
+	const expectedReturnValue = 0x1
+	m := &wasm.Module{
+		TypeSection: []*wasm.FunctionType{
+			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}},
+		},
+		FunctionSection: []wasm.Index{
+			wasm.Index(0),
+			wasm.Index(0),
+			wasm.Index(0),
+		},
+		CodeSection: []*wasm.Code{
+			{
+				// value_stack_corruption
+				Body: []byte{
+					wasm.OpcodeCall, 0, // Call host function to shrink Goroutine stack
+					// We expect this value is returned, but if the stack is allocated on
+					// goroutine stack, we write this expected value into the old-location of
+					// stack.
+					wasm.OpcodeI32Const, expectedReturnValue,
+					wasm.OpcodeEnd,
+				},
+			},
+			{
+				// call_stack_corruption
+				Body: []byte{
+					wasm.OpcodeCall, 3, // Call the wasm function below.
+					// At this point, call stack's memory looks like [call_stack_corruption, index3]
+					// With this function call it should end up [call_stack_corruption, host func]
+					// but if the callframe stack is allocated on goroutine stack, we exit the native code
+					// with  [call_stack_corruption, index3] (old call frame stack) with HostCall status code,
+					// and end up trying to call index3 as a host function which results in nil pointer exception.
+					wasm.OpcodeCall, 0,
+					wasm.OpcodeI32Const, expectedReturnValue,
+					wasm.OpcodeEnd,
+				},
+			},
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
+		},
+		ImportSection: []*wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 1}},
+		ExportSection: map[string]*wasm.Export{
+			valueStackCorruption: {Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
+			callStackCorruption:  {Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
+		},
+	}
+
+	mi, err := store.Instantiate(m, "")
+	require.NoError(t, err)
+
+	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {
+		fnName := fnName
+		t.Run(fnName, func(t *testing.T) {
+			ret, err := mi.ExportedFunction(fnName).Call(nil)
+			require.NoError(t, err)
+
+			require.Equal(t, uint32(expectedReturnValue), uint32(ret[0]))
+		})
+	}
+}

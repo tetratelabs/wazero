@@ -468,8 +468,34 @@ func newEngine() *engine {
 	return &engine{compiledFunctions: map[*wasm.FunctionInstance]*compiledFunction{}}
 }
 
-// TODO: better make them configurable?
-const (
+// Do not make these variables as constants, otherwise there would be
+// dangerous memory accees from native code.
+//
+// Background: Go has a mechanism called "goroutine stack-shrink" where Go
+// runtime shrinks Gorotuine's stack when it is GCing. Shrinking means that
+// all the contents on the goroutine stack will be relocated by runtime,
+// Therefore, the memory address of these contents change undeterministically.
+// Not only shrinks, but also Goruntime grows the goroutine stack at any point
+// of function call entries, which also might end up relcating contents.
+//
+// On the other hand, we hold pointers to the data region of value stack and
+// callframe stack slices and use these raw pointers from native code.
+// Therefore, it is dangerous if these two stacks are allocated on stack
+// as these stack's address might be changed by Goruntime which we cannot
+// detect.
+//
+// By declaring theses values as `var`, slices created via `make([]..., var)`
+// will never be allocated on stack [1]. This means accessing these slices via
+// raw pointers is safe: As of version 1.18, Go's garbage collectornever relocates
+// heap-allocated objects (aka no compilation of memory [2]).
+//
+// On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/wasm/jit/...`.
+//
+// [1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
+// [2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
+// [3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
+// [4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
+var (
 	initialValueStackSize     = 64
 	initialCallFrameStackSize = 16
 )
@@ -497,12 +523,6 @@ func (ce *callEngine) popValue() (ret uint64) {
 	ce.valueStackContext.stackPointer--
 	ret = ce.valueStack[ce.valueStackTopIndex()]
 	return
-}
-
-func (ce *callEngine) resetValueStackElement0Address() {
-	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
-	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
-	ce.globalContext.valueStackLen = uint64(valueStackHeader.Len)
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -603,11 +623,6 @@ jitentry:
 				frame.String(), ce.valueStackContext.stackBasePointer, ce.valueStackContext.stackPointer)
 		}
 
-		// Seems like even not using "append", accessing the slice might lead to relocation by Go runtime on amd64.
-		// For safety, we reset the cached addresses and length here.
-		// TODO: investigate the root cause.
-		ce.resetValueStackElement0Address()
-
 		// Call into the JIT code.
 		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)))
 
@@ -678,6 +693,9 @@ func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
 	top := ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer
 	copy(newStack[:top], ce.valueStack[:top])
 	ce.valueStack = newStack
+	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
+	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
+	ce.globalContext.valueStackLen = uint64(valueStackHeader.Len)
 }
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)
