@@ -284,26 +284,35 @@ func TestRelease(t *testing.T) {
 	}
 }
 
+// Ensures that value stack and callframe stack are allocated on heap which
+// allows us to safely access to their data region from native code.
+// See comments on initialValueStackSize and initialCallFrameStackSize.
 func TestSliceAllocatedOnHeap(t *testing.T) {
 	e := newEngine()
 	store := wasm.NewStore(context.Background(), e, wasm.Features20191205)
 
-	hm, err := wasm.NewHostModule("env", map[string]interface{}{
-		"grow_stack": func() {
-			var growGoroutineStack func(int)
-			growGoroutineStack = func(num int) {
-				if num == 0 {
-					return
-				}
-				growGoroutineStack(num - 1)
+	const hostModuleName = "env"
+	const hostFnName = "grow_and_shrink_goroutine_stack"
+	hm, err := wasm.NewHostModule(hostModuleName, map[string]interface{}{hostFnName: func() {
+		// This function aggressively grow the goroutine stack by recursively
+		// calling the function many times.
+		var callNum = 1000
+		var growGoroutineStack func()
+		growGoroutineStack = func() {
+			if callNum != 0 {
+				callNum--
+				growGoroutineStack()
 			}
-			growGoroutineStack(1000)
-			runtime.GC()
-		},
-	})
+		}
+		growGoroutineStack()
+
+		// Trigger relocation of goroutine stack because at this point we have majority of
+		// goroutine stack unused after recursive call.
+		runtime.GC()
+	}})
 	require.NoError(t, err)
 
-	_, err = store.Instantiate(hm, "env")
+	_, err = store.Instantiate(hm, hostModuleName)
 	require.NoError(t, err)
 
 	const valueStackCorruption = "value_stack_corruption"
@@ -324,6 +333,9 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 				// value_stack_corruption
 				Body: []byte{
 					wasm.OpcodeCall, 0, // Call host function to shrink Goroutine stack
+					// We expect this value is returned, but if the stack is allocated on
+					// goroutine stack, we write this expected value into the old-location of
+					// stack.
 					wasm.OpcodeI32Const, expectedReturnValue,
 					wasm.OpcodeEnd,
 				},
@@ -331,7 +343,12 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 			{
 				// call_stack_corruption
 				Body: []byte{
-					wasm.OpcodeCall, 3,
+					wasm.OpcodeCall, 3, // Call the wasm function below.
+					// At this point, call stack's memory looks like [call_stack_corruption, index3]
+					// With this function call it should up  [call_stack_corruption, index0 (grow_and_shrink_goroutine_stack)]
+					// but if the callframe stack is allocated on goroutine stack, we exit the native code
+					// with  [call_stack_corruption, index3] (old call frame stack) with HostCall status code,
+					// and end up trying to call index3 as a host function which results in nil pointer exception.
 					wasm.OpcodeCall, 0,
 					wasm.OpcodeI32Const, expectedReturnValue,
 					wasm.OpcodeEnd,
@@ -339,7 +356,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 			},
 			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
 		},
-		ImportSection: []*wasm.Import{{Module: "env", Name: "grow_stack", DescFunc: 1}},
+		ImportSection: []*wasm.Import{{Module: hostModuleName, Name: hostFnName, DescFunc: 1}},
 		ExportSection: map[string]*wasm.Export{
 			valueStackCorruption: {Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
 			callStackCorruption:  {Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
