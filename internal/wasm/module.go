@@ -325,19 +325,6 @@ func (m *Module) funcDesc(sectionID SectionID, sectionIndex Index) string {
 	return fmt.Sprintf("%s[%d] export[%s]", sectionIDName, sectionIndex, strings.Join(exportNames, ","))
 }
 
-func (m *Module) validateTable(table *Table, globals []*GlobalType) error {
-	for _, elem := range m.ElementSection {
-		if table == nil {
-			return fmt.Errorf("table index out of range")
-		}
-		err := validateConstExpression(globals, elem.OffsetExpr, ValueTypeI32)
-		if err != nil {
-			return fmt.Errorf("invalid const expression for element: %w", err)
-		}
-	}
-	return nil
-}
-
 func (m *Module) validateMemory(memory *Memory, globals []*GlobalType) error {
 	if len(m.DataSection) > 0 && memory == nil {
 		return fmt.Errorf("unknown memory")
@@ -457,10 +444,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 		case float64:
 			gv = publicwasm.EncodeF64(v)
 		}
-		globals = append(globals, &GlobalInstance{
-			Type: gs.Type,
-			Val:  gv,
-		})
+		globals = append(globals, &GlobalInstance{Type: gs.Type, Val: gv})
 	}
 	return
 }
@@ -594,9 +578,6 @@ type limitsType struct {
 	Max *uint32
 }
 
-// Table describes the limits of (function) elements in a table.
-type Table = limitsType
-
 // Memory describes the limits of pages (64KB) in a memory.
 type Memory = limitsType
 
@@ -626,19 +607,6 @@ type Export struct {
 	// Index is the index of the definition to export, the index namespace is by Type
 	// Ex. If ExternTypeFunc, this is a position in the function index namespace.
 	Index Index
-}
-
-// ElementSegment are initialization instructions for a TableInstance
-//
-// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-elem
-type ElementSegment struct {
-	// OffsetExpr returns the table element offset to apply to Init indices.
-	// Note: This can be validated prior to instantiation unless it includes OpcodeGlobalGet (an imported global).
-	OffsetExpr *ConstantExpression
-
-	// Init indices are table elements relative to the result of OffsetExpr. The values are positions in the function
-	// index namespace that initialize the corresponding element.
-	Init []Index
 }
 
 // Code is an entry in the Module.CodeSection containing the locals and body of the function.

@@ -1,5 +1,3 @@
-//go:build amd64
-
 package jit
 
 // This file implements the compiler for amd64/x86_64 target.
@@ -924,7 +922,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 		cb(labelBegin)
 	}
 
-	// Clear for debuggin purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
+	// Clear for debugging purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
 	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
@@ -4876,7 +4874,7 @@ func (c *amd64Compiler) callFunction(index wasm.Index, compiledFunctionAddressRe
 	// Due to the change to callEngine.valueStackContext.stackBasePointer.
 	c.initializeReservedStackBasePointer()
 	// Due to the change to callEngine.moduleContext.moduleInstanceAddress.
-	if err := c.initializeModuleContext(); err != nil {
+	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
 	// Due to the change to callEngine.moduleContext.moduleInstanceAddress as that might result in
@@ -5269,7 +5267,7 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 
 	// Once the stack base pointer is initialized and the size of stack is ok,
 	// initialize the module context next.
-	if err := c.initializeModuleContext(); err != nil {
+	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
 
@@ -5359,13 +5357,13 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	subStackBasePointer.From.Offset = callEngineValueStackContextStackBasePointerOffset
 	c.addInstruction(subStackBasePointer)
 
-	// If stack base pointer + max stack poitner > valueStackLen, we need to grow the stack.
+	// If stack base pointer + max stack pointer > valueStackLen, we need to grow the stack.
 	cmpWithStackPointerCeil := c.newProg()
 	cmpWithStackPointerCeil.As = x86.ACMPQ
 	cmpWithStackPointerCeil.From.Type = obj.TYPE_REG
 	cmpWithStackPointerCeil.From.Reg = tmpRegister
 	cmpWithStackPointerCeil.To.Type = obj.TYPE_CONST
-	// We don't yet know the max stack poitner at this point.
+	// We don't yet know the max stack pointer at this point.
 	// The max stack pointer is determined after emitting all the instructions.
 	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { cmpWithStackPointerCeil.To.Offset = int64(stackPointerCeil) }
 	c.addInstruction(cmpWithStackPointerCeil)
@@ -5385,10 +5383,10 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	return nil
 }
 
-// initializeModuleContext adds instruction to initialize callEngine.ModuleContext's fields based on
+// compileModuleContextInitialization adds instructions to initialize callEngine.ModuleContext's fields based on
 // callEngine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
-func (c *amd64Compiler) initializeModuleContext() error {
+func (c *amd64Compiler) compileModuleContextInitialization() error {
 
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
@@ -5615,14 +5613,14 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		c.addInstruction(readCompiledFunctionsElement0Address)
 
 		// "callEngine.moduleContext.compiledFunctionsElement0Address = tmpRegister".
-		writeCompiledFunctionsElement0AddresssIntoCallEngine := c.newProg()
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.As = x86.AMOVQ
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.To.Type = obj.TYPE_MEM
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.To.Reg = reservedRegisterForCallEngine
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.To.Offset = callEngineModuleContextCompiledFunctionsElement0AddressOffset
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.From.Type = obj.TYPE_REG
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.From.Reg = tmpRegister
-		c.addInstruction(writeCompiledFunctionsElement0AddresssIntoCallEngine)
+		writeCompiledFunctionsElement0AddressIntoCallEngine := c.newProg()
+		writeCompiledFunctionsElement0AddressIntoCallEngine.As = x86.AMOVQ
+		writeCompiledFunctionsElement0AddressIntoCallEngine.To.Type = obj.TYPE_MEM
+		writeCompiledFunctionsElement0AddressIntoCallEngine.To.Reg = reservedRegisterForCallEngine
+		writeCompiledFunctionsElement0AddressIntoCallEngine.To.Offset = callEngineModuleContextCompiledFunctionsElement0AddressOffset
+		writeCompiledFunctionsElement0AddressIntoCallEngine.From.Type = obj.TYPE_REG
+		writeCompiledFunctionsElement0AddressIntoCallEngine.From.Reg = tmpRegister
+		c.addInstruction(writeCompiledFunctionsElement0AddressIntoCallEngine)
 	}
 
 	c.locationStack.markRegisterUnused(regs...)

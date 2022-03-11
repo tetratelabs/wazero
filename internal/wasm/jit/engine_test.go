@@ -157,7 +157,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		Module: module,
 	}
 
-	modEngine, err := e.Compile(nil, []*wasm.FunctionInstance{f})
+	modEngine, err := e.NewModuleEngine(nil, []*wasm.FunctionInstance{f})
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
@@ -188,7 +188,7 @@ func requireSupportedOSArch(t *testing.T) {
 func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := newEngine()
-		_, err := e.Compile([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
+		_, err := e.NewModuleEngine([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
 		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
 	})
 
@@ -201,7 +201,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
-		_, err := e.Compile(nil, importedFunctions)
+		_, err := e.NewModuleEngine(nil, importedFunctions)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -214,7 +214,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.Compile(importedFunctions, moduleFunctions)
+		_, err = e.NewModuleEngine(importedFunctions, moduleFunctions)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failrue, all the compiled functions including suceeded ones must be released.
@@ -253,12 +253,12 @@ func TestRelease(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newEngine()
 			if len(tc.importedFunctions) > 0 {
-				modEngine, err := e.Compile(nil, tc.importedFunctions)
+				modEngine, err := e.NewModuleEngine(nil, tc.importedFunctions)
 				require.NoError(t, err)
 				require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
 			}
 
-			modEngine, err := e.Compile(tc.importedFunctions, tc.moduleFunctions)
+			modEngine, err := e.NewModuleEngine(tc.importedFunctions, tc.moduleFunctions)
 			require.NoError(t, err)
 			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 

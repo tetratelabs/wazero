@@ -484,7 +484,7 @@ func validateFunction(
 			if table == nil {
 				return fmt.Errorf("table not given while having call_indirect")
 			}
-			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the in table index's type for call_indirect")
 			}
 			if int(typeIndex) >= len(types) {
@@ -492,7 +492,7 @@ func validateFunction(
 			}
 			funcType := types[typeIndex]
 			for i := 0; i < len(funcType.Params); i++ {
-				if err := valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
+				if err = valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
 					return fmt.Errorf("type mismatch on call_indirect operation input type")
 				}
 			}

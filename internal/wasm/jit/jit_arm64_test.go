@@ -1,5 +1,3 @@
-//go:build arm64
-
 package jit
 
 import (
@@ -2135,7 +2133,6 @@ func TestArm64Compiler_compileSwap(t *testing.T) {
 }
 
 func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
-	modEngine := &moduleEngine{compiledFunctions: make([]*compiledFunction, 100)}
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -2143,7 +2140,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
@@ -2152,7 +2148,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine: modEngine,
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Table:  &wasm.TableInstance{Table: make([]uintptr, 20)},
 			},
@@ -2160,7 +2155,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
 			},
@@ -2168,41 +2162,35 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: nil},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:  &wasm.TableInstance{Table: nil},
 			},
 		},
 		{
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 0)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Table: &wasm.TableInstance{Table: make([]uintptr, 0)},
 			},
 		},
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 0)},
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
 		{
-			name: "all nil except mod engine",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine: modEngine,
-			},
+			name:           "all nil except mod engine",
+			moduleInstance: &wasm.ModuleInstance{},
 		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
+			ce := env.callEngine()
+
 			compiler := env.requireNewCompiler(t)
+			me := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
+			tc.moduleInstance.Engine = me
 			compiler.f.Module = tc.moduleInstance
 
 			// The assembler skips the first instruction so we intentionally add NOP here.
@@ -2226,8 +2214,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 
 			// Check if the fields of callEngine.moduleContext are updated.
-			ce := env.callEngine()
-
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
 			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
 
@@ -2243,7 +2229,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 			}
 
-			require.Equal(t, uintptr(unsafe.Pointer(&modEngine.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
+			require.Equal(t, uintptr(unsafe.Pointer(&me.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
 		})
 	}
 }

@@ -1,5 +1,3 @@
-//go:build arm64
-
 package jit
 
 import "github.com/twitchyliquid64/golang-asm/obj/arm64"

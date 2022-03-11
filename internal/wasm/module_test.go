@@ -479,29 +479,6 @@ func TestModule_validateFunctions(t *testing.T) {
 	})
 }
 
-func TestModule_validateTable(t *testing.T) {
-	t.Run("invalid const expr", func(t *testing.T) {
-		m := Module{ElementSection: []*ElementSegment{{
-			OffsetExpr: &ConstantExpression{
-				Opcode: OpcodeUnreachable, // Invalid!
-			},
-		}}}
-		err := m.validateTable(&Table{}, nil)
-		require.Error(t, err)
-		require.EqualError(t, err, "invalid const expression for element: invalid opcode for const expression: 0x0")
-	})
-	t.Run("ok", func(t *testing.T) {
-		m := Module{ElementSection: []*ElementSegment{{
-			OffsetExpr: &ConstantExpression{
-				Opcode: OpcodeI32Const,
-				Data:   []byte{0x1},
-			},
-		}}}
-		err := m.validateTable(&Table{}, nil)
-		require.NoError(t, err)
-	})
-}
-
 func TestModule_validateMemory(t *testing.T) {
 	t.Run("data section exits but memory not declared", func(t *testing.T) {
 		m := Module{DataSection: make([]*DataSegment, 1)}
@@ -748,10 +725,4 @@ func TestModule_buildMemoryInstance(t *testing.T) {
 		require.Equal(t, min, mem.Min)
 		require.Equal(t, max, *mem.Max)
 	})
-}
-
-func TestModule_buildTableInstance(t *testing.T) {
-	m := Module{TableSection: &Table{Min: 1}}
-	table := m.buildTable()
-	require.Equal(t, uint32(1), table.Min)
 }

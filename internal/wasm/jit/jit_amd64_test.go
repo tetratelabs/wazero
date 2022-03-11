@@ -1,5 +1,3 @@
-//go:build amd64
-
 package jit
 
 import (
@@ -144,7 +142,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		code, _, _, err := compiler.compile()
 		require.NoError(t, err)
 
-		// See the previous call frame stack poitner to verify the correctness of exit decision.
+		// See the previous call frame stack pointer to verify the correctness of exit decision.
 		env.setCallFrameStackPointerLen(1)
 
 		// Run codes
@@ -220,7 +218,6 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 }
 
 func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
-	modEngine := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -228,83 +225,63 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 		{
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-			},
-		},
-		{
-			name: "memory nil",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-			},
-		},
-		{
-			name: "memory zero length",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
-			},
-		},
-		{
-			name: "table length zero",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: nil},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-			},
-		},
-		{
-			name: "table length zero part2",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 0)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-			},
-		},
-		{
-			name: "table nil",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-			},
-		},
-		{
-			name: "table nil part2",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine: modEngine,
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Table:  &wasm.TableInstance{Table: make([]uintptr, 20)},
 			},
+		},
+		{
+			name: "memory nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
+			},
+		},
+		{
+			name: "table nil",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:  &wasm.TableInstance{Table: nil},
+			},
+		},
+		{
+			name: "table empty",
+			moduleInstance: &wasm.ModuleInstance{
+				Table: &wasm.TableInstance{Table: make([]uintptr, 0)},
+			},
+		},
+		{
+			name: "memory zero length",
+			moduleInstance: &wasm.ModuleInstance{
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+			},
+		},
+		{
+			name:           "all nil except mod engine",
+			moduleInstance: &wasm.ModuleInstance{},
 		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
 			ce := env.callEngine()
+
 			compiler := env.requireNewCompiler(t)
-			compiler.initializeReservedStackBasePointer()
+			me := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
+			tc.moduleInstance.Engine = me
 			compiler.f.Module = tc.moduleInstance
 
+			compiler.initializeReservedStackBasePointer()
+
 			require.Empty(t, compiler.locationStack.usedRegisters)
-			err := compiler.initializeModuleContext()
+			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
 
 			require.Empty(t, compiler.locationStack.usedRegisters)
@@ -338,7 +315,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 			}
 
-			require.Equal(t, uintptr(unsafe.Pointer(&modEngine.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
+			require.Equal(t, uintptr(unsafe.Pointer(&me.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
 		})
 	}
 }
