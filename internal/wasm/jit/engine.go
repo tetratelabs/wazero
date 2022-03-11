@@ -489,6 +489,8 @@ func newEngine() *engine {
 //
 // [1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
 // [2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
+// [3] https://mayurwadekar2.medium.com/escape-analysis-in-golang-ee40a1c064c1
+// [4] https://medium.com/@yulang.chu/go-stack-or-heap-2-slices-which-keep-in-stack-have-limitation-of-size-b3f3adfd6190
 var (
 	initialValueStackSize     = 64
 	initialCallFrameStackSize = 16
