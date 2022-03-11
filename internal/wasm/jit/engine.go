@@ -474,21 +474,22 @@ func newEngine() *engine {
 // Background: Go has a mechanism called "goroutine stack-shrink" where Go
 // runtime shrinks Gorotuine's stack when it is GCing. Shrinking means that
 // all the contents on the goroutine stack will be relocated by runtime,
-// therefore the memory address of these contents change undeterministically.
+// Therefore, the memory address of these contents change undeterministically.
 // Not only shrinks, but also Goruntime grows the goroutine stack at any point
 // of function call entries, which also might end up relcating contents.
 //
 // On the other hand, we hold pointers to the data region of value stack and
-// callframe stack slices and use these raw pointers from  native code.
+// callframe stack slices and use these raw pointers from native code.
 // Therefore, it is dangerous if these two stacks are allocated on stack
 // as these stack's address might be changed by Goruntime which we cannot
 // detect.
 //
-// By declaring thses values as values, slices created via make([]..., var) will
-// never be allocated on stack [1], therefore we can ensure that accessing these
-// slices via raw pointers is safe because Go's GC never relocate heap-allocated
-// objects (aka no compation of memory [2]). We can actually check how go compiler
-// does escape analysis on these variables lile 'go build -gcflags='-m' ./internal/wasm/jit/...'.
+// By declaring theses values as `var`, slices created via `make([]..., var)`
+// will never be allocated on stack [1]. This means accessing these slices via
+// raw pointers is safe: As of version 1.18, Go's garbage collectornever relocates
+// heap-allocated objects (aka no compilation of memory [2]).
+//
+// On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/wasm/jit/...`.
 //
 // [1] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/cmd/compile/internal/escape/utils.go#L206-L208
 // [2] https://github.com/golang/go/blob/68ecdc2c70544c303aa923139a5f16caf107d955/src/runtime/mgc.go#L9
