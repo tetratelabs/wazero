@@ -284,7 +284,7 @@ func TestRelease(t *testing.T) {
 	}
 }
 
-func TestSliceConsistency(t *testing.T) {
+func TestSliceAllocatedOnHeap(t *testing.T) {
 	e := newEngine()
 	store := wasm.NewStore(context.Background(), e, wasm.Features20191205)
 
