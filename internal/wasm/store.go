@@ -363,7 +363,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	m.Ctx = NewModuleContext(s.ctx, s.engine, m)
+	m.Ctx = NewModuleContext(s.ctx, s, m)
 
 	// Execute the start function.
 	if module.StartSection != nil {

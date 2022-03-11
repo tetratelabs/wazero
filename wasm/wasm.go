@@ -87,6 +87,10 @@ type Module interface {
 
 	// ExportedGlobal a global exported from this module or nil if it wasn't.
 	ExportedGlobal(name string) Global
+
+	// Close releases resources allocated for this Module. Using this while having outstanding function calls is
+	// safe. After calling this function, re-instantiating a module for the same name is allowed.
+	Close()
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime InstantiateModule).
