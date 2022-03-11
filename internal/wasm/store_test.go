@@ -141,33 +141,23 @@ func TestStore_CloseModule(t *testing.T) {
 			}, importingModuleName)
 			require.NoError(t, err)
 
-			importedMod, ok := s.modules[importedModuleName]
+			_, ok := s.modules[importedModuleName]
 			require.True(t, ok)
 
-			importingMod, ok := s.modules[importingModuleName]
+			_, ok = s.modules[importingModuleName]
 			require.True(t, ok)
-
-			// Make sure modules are not closed yet.
-			require.False(t, importingMod.closed)
-			require.False(t, importedMod.closed)
 
 			// Release the importing module
 			require.NoError(t, s.CloseModule(importingModuleName))
-			require.NotContains(t, s.modules, importingMod.Name)
-			require.True(t, importingMod.closed) // only importing one is closed.
-			require.False(t, importedMod.closed)
+			require.NotContains(t, s.modules, importingModuleName)
 
 			// Can re-release the importing module
 			require.NoError(t, s.CloseModule(importingModuleName))
-			require.True(t, importingMod.closed)
-			require.False(t, importedMod.closed)
 
 			// Now we release the imported module.
 			require.NoError(t, s.CloseModule(importedModuleName))
 			require.Nil(t, s.modules[importedModuleName])
 			require.NotContains(t, s.modules, importedModuleName)
-			require.True(t, importingMod.closed)
-			require.True(t, importedMod.closed)
 		})
 	}
 }

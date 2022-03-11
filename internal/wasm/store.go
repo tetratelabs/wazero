@@ -74,8 +74,6 @@ type (
 
 		// Engine implements function calls for this module.
 		Engine ModuleEngine
-
-		closed bool // guarded by mux
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -389,22 +387,9 @@ func (s *Store) CloseModule(moduleName string) error {
 		return nil // already closed
 	}
 
-	if err := m.Close(); err != nil {
-		return err
-	}
+	m.Engine.Close()
 
 	s.deleteModule(moduleName)
-	return nil
-}
-
-func (m *ModuleInstance) Close() error {
-	// Closing multiple times is safe!
-	if m.closed {
-		return nil // already closed
-	}
-
-	m.Engine.Close()
-	m.closed = true
 	return nil
 }
 
