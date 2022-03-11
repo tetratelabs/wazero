@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -33,6 +34,8 @@ type (
 		// parentEngine holds *engine from which this module engine is created from.
 		parentEngine           *engine
 		importedFunctionCounts int
+
+		closed uint32 // use uint32 instead of bool for atomic operation.
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -385,14 +388,17 @@ func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 
 // Close implements internalwasm.ModuleEngine Close
 func (me *moduleEngine) Close() {
-	// Release all the function instances declared in this module.
-	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
-		runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
-			if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
-				panic(err) // mumap failure cannot recover.
-			}
-		})
-		me.parentEngine.deleteCompiledFunction(cf.source)
+	// Setting finalizer multiple times result in panic, so we guard with CAS.
+	if atomic.CompareAndSwapUint32(&me.closed, 0, 1) {
+		// Release all the function instances declared in this module.
+		for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+			runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
+				if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
+					panic(err) // mumap failure cannot recover.
+				}
+			})
+			me.parentEngine.deleteCompiledFunction(cf.source)
+		}
 	}
 }
 

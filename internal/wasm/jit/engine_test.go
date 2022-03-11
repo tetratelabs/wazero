@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"sync"
 	"testing"
 	"unsafe"
 
@@ -252,10 +253,12 @@ func TestRelease(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			e := newEngine()
+			var importedModuleEngine *moduleEngine
 			if len(tc.importedFunctions) > 0 {
-				modEngine, err := e.Compile(nil, tc.importedFunctions)
+				eng, err := e.Compile(nil, tc.importedFunctions)
 				require.NoError(t, err)
-				require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
+				importedModuleEngine = eng.(*moduleEngine)
+				require.Len(t, importedModuleEngine.compiledFunctions, len(tc.importedFunctions))
 			}
 
 			modEngine, err := e.Compile(tc.importedFunctions, tc.moduleFunctions)
@@ -263,23 +266,59 @@ func TestRelease(t *testing.T) {
 			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+
+			var importedMappedRegions [][]byte
 			for _, f := range tc.importedFunctions {
 				require.Contains(t, e.compiledFunctions, f)
+				importedMappedRegions = append(importedMappedRegions, e.compiledFunctions[f].codeSegment)
 			}
+			var mappedRegions [][]byte
 			for _, f := range tc.moduleFunctions {
 				require.Contains(t, e.compiledFunctions, f)
+				mappedRegions = append(mappedRegions, e.compiledFunctions[f].codeSegment)
 			}
 
-			modEngine.Close()
+			const goroutines = 100
+			var wg sync.WaitGroup
+			wg.Add(goroutines)
+			for i := 0; i < goroutines; i++ {
+				go func() {
+					defer wg.Done()
+					modEngine.Close() // concurrent mutliple execution of Close must be guarded by atomic.
+				}()
+			}
+			wg.Wait()
 
-			// Check finalizer setup.
-
+			require.True(t, modEngine.(*moduleEngine).closed == 1)
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
 			for _, f := range tc.importedFunctions {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 			for i, f := range tc.moduleFunctions {
 				require.NotContains(t, e.compiledFunctions, f, i)
+			}
+
+			// Release the reference to ModuleEngine -> *compiledFunctions for non-imported compiledFunctions
+			// must be munmapped.
+			modEngine = nil
+			runtime.GC()
+
+			for _, mappedRegion := range mappedRegions {
+				// munmap twice should result in error.
+				err = munmapCodeSegment(mappedRegion)
+				require.Error(t, err)
+			}
+
+			if len(tc.importedFunctions) > 0 {
+				importedModuleEngine.Close()
+				importedModuleEngine = nil
+				runtime.GC()
+
+				for _, mappedRegion := range importedMappedRegions {
+					// munmap twice should result in error.
+					err = munmapCodeSegment(mappedRegion)
+					require.Error(t, err)
+				}
 			}
 		})
 	}
