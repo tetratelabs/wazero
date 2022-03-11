@@ -26,21 +26,9 @@ func runAdhocTestsUnderHighConcurrency(t *testing.T, newRuntimeConfig func() *wa
 		t.Parallel()
 		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testHugeStack)
 	})
-	t.Run("fibonacci", func(t *testing.T) {
-		t.Parallel()
-		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testFibonacci)
-	})
-	t.Run("fac", func(t *testing.T) {
-		t.Parallel()
-		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testFac)
-	})
 	t.Run("unreachable", func(t *testing.T) {
 		t.Parallel()
 		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testUnreachable)
-	})
-	t.Run("memory", func(t *testing.T) {
-		t.Parallel()
-		runAdhocTestUnderHighConcurrency(t, newRuntimeConfig, testMemory)
 	})
 	t.Run("recursive entry", func(t *testing.T) {
 		t.Parallel()

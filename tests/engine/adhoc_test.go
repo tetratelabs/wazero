@@ -26,14 +26,8 @@ func TestInterpreterAdhoc(t *testing.T) {
 }
 
 var (
-	//go:embed testdata/fib.wasm
-	fibWasm []byte
-	//go:embed testdata/fac.wasm
-	facWasm []byte
 	//go:embed testdata/unreachable.wasm
 	unreachableWasm []byte
-	//go:embed testdata/memory.wasm
-	memoryWasm []byte
 	//go:embed testdata/recursive.wasm
 	recursiveWasm []byte
 	//go:embed testdata/hugestack.wasm
@@ -44,17 +38,8 @@ func runAdhocTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	t.Run("huge stack", func(t *testing.T) {
 		testHugeStack(t, newRuntimeConfig)
 	})
-	t.Run("fibonacci", func(t *testing.T) {
-		testFibonacci(t, newRuntimeConfig)
-	})
-	t.Run("fac", func(t *testing.T) {
-		testFac(t, newRuntimeConfig)
-	})
 	t.Run("unreachable", func(t *testing.T) {
 		testUnreachable(t, newRuntimeConfig)
-	})
-	t.Run("memory", func(t *testing.T) {
-		testMemory(t, newRuntimeConfig)
 	})
 	t.Run("recursive entry", func(t *testing.T) {
 		testRecursiveEntry(t, newRuntimeConfig)
@@ -79,49 +64,6 @@ func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	require.NoError(t, err)
 }
 
-func testFibonacci(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-	module, err := r.InstantiateModuleFromSource(fibWasm)
-	require.NoError(t, err)
-
-	fib := module.ExportedFunction("fib")
-	require.NotNil(t, fib)
-
-	results, err := fib.Call(nil, 20)
-	require.NoError(t, err)
-	require.Equal(t, uint64(10946), results[0])
-}
-
-func testFac(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	for _, name := range []string{
-		"fac-rec",
-		"fac-iter",
-		"fac-rec-named",
-		"fac-iter-named",
-		"fac-opt",
-	} {
-		name := name
-		t.Run(name, func(t *testing.T) {
-			r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-			module, err := r.InstantiateModuleFromSource(facWasm)
-			require.NoError(t, err)
-
-			results, err := module.ExportedFunction(name).Call(nil, 25)
-			require.NoError(t, err)
-			require.Equal(t, uint64(7034535277573963776), results[0])
-		})
-	}
-
-	t.Run("fac-rec - stack overflow", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-		module, err := r.InstantiateModuleFromSource(facWasm)
-		require.NoError(t, err)
-
-		_, err = module.ExportedFunction("fac-rec").Call(nil, 1073741824)
-		require.ErrorIs(t, err, wasm.ErrRuntimeCallStackOverflow)
-	})
-}
-
 func testUnreachable(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	callUnreachable := func(nil publicwasm.Module) {
 		panic("panic in host function")
@@ -143,39 +85,6 @@ wasm backtrace:
 	2: one
 	3: main`
 	require.Equal(t, exp, err.Error())
-}
-
-func testMemory(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-	module, err := r.InstantiateModuleFromSource(memoryWasm)
-	require.NoError(t, err)
-
-	size := module.ExportedFunction("size")
-
-	// First, we have zero-length memory instance.
-	results, err := size.Call(nil)
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), results[0])
-
-	grow := module.ExportedFunction("grow")
-
-	// Then grow the memory.
-	newPages := uint64(10)
-	results, err = grow.Call(nil, newPages)
-	require.NoError(t, err)
-
-	// Grow returns the previous number of memory pages, namely zero.
-	require.Equal(t, uint64(0), results[0])
-
-	// Now size should return the new pages -- 10.
-	results, err = size.Call(nil)
-	require.NoError(t, err)
-	require.Equal(t, newPages, results[0])
-
-	// Growing memory with zero pages is valid but should be noop.
-	results, err = grow.Call(nil, 0)
-	require.NoError(t, err)
-	require.Equal(t, newPages, results[0])
 }
 
 func testRecursiveEntry(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
