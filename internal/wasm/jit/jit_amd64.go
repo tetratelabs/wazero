@@ -1057,16 +1057,16 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
-	// by 8 as the offset is the "length" of table in Go's "[]uintptr",
-	// and size of uintptr equals 64 bit.
-	c.compileConstToRegisterInstruction(x86.ASHLQ, 3, offset.register)
+	// by 16 as the offset is the "length" of table in Go's "[]interface{}",
+	// and size of interface{} equals 16 bytes == (2^4).
+	c.compileConstToRegisterInstruction(x86.ASHLQ, 4, offset.register)
 
 	// Adds the address of wasm.Table[0] stored as callEngine.tableElement0Address to the offset.
 	c.compileMemoryToRegisterInstruction(x86.AADDQ,
 		reservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset, offset.register)
 
-	// "offset = *offset (== table[offset] == *compiledFunction type)"
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, offset.register, 0, offset.register)
+	// "offset = (*offset) + interfaceDataOffset (== table[offset] + interfaceDataOffset == *compiledFunction type)"
+	c.compileMemoryToRegisterInstruction(x86.AMOVQ, offset.register, interfaceDataOffset, offset.register)
 
 	// At this point offset.register holds the address of *compiledFunction (as uintptr) at wasm.Table[offset].
 	//
@@ -1097,7 +1097,7 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.addSetJmpOrigins(jumpIfTypeMatch)
-	if err := c.compileCallFunctionImpl(0, offset.register, targetFunctionType); err != nil {
+	if err = c.compileCallFunctionImpl(0, offset.register, targetFunctionType); err != nil {
 		return nil
 	}
 
@@ -3545,7 +3545,7 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 		return err
 	}
 
-	c.compileConstToRegisterInstruction(x86.AMOVL, int64(uint64(math.Float32bits(o.Value))), tmpReg)
+	c.compileConstToRegisterInstruction(x86.AMOVL, int64(math.Float32bits(o.Value)), tmpReg)
 	c.compileRegisterToRegister(x86.AMOVL, tmpReg, reg)
 	return nil
 }
@@ -3801,7 +3801,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 	}
 
 	// 2) Set callEngine.valueStackContext.stackBasePointer for the next function.
-	if offset := (int64(c.locationStack.sp) - int64(len(functype.Params))); offset > 0 {
+	if offset := int64(c.locationStack.sp) - int64(len(functype.Params)); offset > 0 {
 		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
 		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 		// See the comments in callEngine.pushCallFrame which does exactly the same calculation in Go.

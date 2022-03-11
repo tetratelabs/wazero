@@ -32,7 +32,14 @@ var encodeCache = [0x80][]byte{
 // EncodeUint32 encodes the value into a buffer in LEB128 format
 //
 // See https://en.wikipedia.org/wiki/LEB128#Encode_unsigned_integer
-func EncodeUint32(value uint32) (buf []byte) {
+func EncodeUint32(value uint32) []byte {
+	return EncodeUint64(uint64(value))
+}
+
+// EncodeUint64 encodes the value into a buffer in LEB128 format
+//
+// See https://en.wikipedia.org/wiki/LEB128#Encode_unsigned_integer
+func EncodeUint64(value uint64) (buf []byte) {
 	if value < 0x80 {
 		return encodeCache[value]
 	}

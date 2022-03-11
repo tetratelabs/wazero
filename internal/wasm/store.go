@@ -153,8 +153,8 @@ const (
 
 // addSections adds section elements to the ModuleInstance
 func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
-	importedGlobals, globals []*GlobalInstance, importedTable, table *TableInstance,
-	memory, importedMemory *MemoryInstance, typeInstances []*TypeInstance) {
+	importedGlobals, globals []*GlobalInstance, table *TableInstance, memory, importedMemory *MemoryInstance,
+	typeInstances []*TypeInstance) {
 
 	m.Types = typeInstances
 
@@ -169,11 +169,7 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	m.Globals = append(m.Globals, importedGlobals...)
 	m.Globals = append(m.Globals, globals...)
 
-	if importedTable != nil {
-		m.Table = importedTable
-	} else {
-		m.Table = table
-	}
+	m.Table = table
 
 	if importedMemory != nil {
 		m.Memory = importedMemory
@@ -280,7 +276,12 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*
 		return nil, err
 	}
 
-	globals, table, memory := module.buildGlobals(importedGlobals), module.buildTable(), module.buildMemory()
+	table, tableInit, err := module.buildTable(importedTable, importedGlobals)
+	if err != nil {
+		s.deleteModule(name)
+		return nil, err
+	}
+	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
 
 	// If there are no module-defined functions, assume this is a host module.
 	var functions []*FunctionInstance
@@ -295,28 +296,20 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m := &ModuleInstance{Name: name}
-	m.addSections(module, importedFunctions, functions, importedGlobals,
-		globals, importedTable, table, importedMemory, memory, types)
-
-	// Plus we are ready to compile functions.
-	m.Engine, err = s.engine.NewModuleEngine(name, importedFunctions, functions)
-	if err != nil {
-		s.deleteModule(name)
-		return nil, fmt.Errorf("compilation failed: %w", err)
-	}
-
-	if err = m.validateElements(module.ElementSection); err != nil {
-		s.deleteModule(name)
-		return nil, err
-	}
+	m.addSections(module, importedFunctions, functions, importedGlobals, globals, table, importedMemory, memory, types)
 
 	if err = m.validateData(module.DataSection); err != nil {
 		s.deleteModule(name)
 		return nil, err
 	}
 
-	// Now all the validation passes, we are safe to mutate memory/table instances (possibly imported ones).
-	m.applyElements(module.ElementSection)
+	// Plus we are ready to compile functions.
+	m.Engine, err = s.engine.NewModuleEngine(name, importedFunctions, functions, table, tableInit)
+	if err != nil {
+		return nil, fmt.Errorf("compilation failed: %w", err)
+	}
+
+	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.

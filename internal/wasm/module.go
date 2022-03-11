@@ -153,6 +153,13 @@ type Module struct {
 	// Note: This section currently has no serialization format, so is not encodable.
 	// See https://www.w3.org/TR/wasm-core-1/#host-functions%E2%91%A2
 	HostFunctionSection []*reflect.Value
+
+	// elementSegments are built on Validate when SectionIDElement is non-empty and all inputs are valid.
+	//
+	// Note: elementSegments retain Module.ElementSection order. Since an ElementSegment can overlap with another, order
+	// preservation ensures a consistent initialization result.
+	// See https://www.w3.org/TR/wasm-core-1/#table-instances%E2%91%A0
+	validatedElementSegments []*validatedElementSegment
 }
 
 // The wazero specific limitation described at RATIONALE.md.
@@ -207,15 +214,15 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		return err
 	}
 
+	if err = m.validateImports(enabledFeatures); err != nil {
+		return err
+	}
+
 	if err = m.validateGlobals(globals, MaximumGlobals); err != nil {
 		return err
 	}
 
 	if err = m.validateMemory(memory, globals); err != nil {
-		return err
-	}
-
-	if err = m.validateTable(table, globals); err != nil {
 		return err
 	}
 
@@ -229,7 +236,7 @@ func (m *Module) Validate(enabledFeatures Features) error {
 		}
 	}
 
-	if err = m.validateImports(enabledFeatures); err != nil {
+	if _, err = m.validateTable(); err != nil {
 		return err
 	}
 

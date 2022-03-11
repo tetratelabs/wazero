@@ -332,7 +332,7 @@ func (c *callFrame) String() string {
 }
 
 // NewModuleEngine implements internalwasm.Engine NewModuleEngine
-func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := len(importedFunctions)
 	me := &moduleEngine{
 		name:                   name,
@@ -368,12 +368,10 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 		e.addCompiledFunction(f, compiled)
 	}
 
+	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
+		table.Table[elemIdx] = me.compiledFunctions[funcidx]
+	}
 	return me, nil
-}
-
-// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress
-func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
-	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
 // Close implements io.Closer

@@ -1401,17 +1401,17 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		reservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset,
 		tmp,
 	)
-	// "offset = tmp + (offset << 3) (== &table[offset])"
-	// Here we left shifting by 3 in order to get the offset in bytes,
-	// and the table element type is uintptr which is 8 bytes.
+	// "offset = tmp + (offset << 4) (== &table[offset])"
+	// Here we left shifting by 4 in order to get the offset in bytes,
+	// and the table element type is interface which is 16 bytes (two pointers).
 	c.compileAddInstructionWithLeftShiftedRegister(
-		offset.register, 3,
+		offset.register, 4,
 		tmp,
 		offset.register,
 	)
 
-	// "offset = *offset (== table[offset] == *compiledFunction type)"
-	c.compileMemoryToRegisterInstruction(arm64.AMOVD, offset.register, 0, offset.register)
+	// "offset = (*offset) + interfaceDataOffset (== table[offset] + interfaceDataOffset == *compiledFunction type)"
+	c.compileMemoryToRegisterInstruction(arm64.AMOVD, offset.register, interfaceDataOffset, offset.register)
 
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, zeroRegister, offset.register)
