@@ -458,6 +458,10 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	for i := range results {
 		results[len(results)-1-i] = ce.popValue()
 	}
+
+	// Keep all the compiledFunctions alive until we completely exit from the execution
+	// in order to prevent "freeing code while execution".
+	runtime.KeepAlive(ce)
 	return
 }
 
