@@ -601,17 +601,27 @@ func TestStore_resolveImports(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
 			s := newStore()
 			f := &FunctionInstance{Type: &FunctionType{Results: []ValueType{ValueTypeF32}}}
-			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {
-				Function: f,
-			}}, Name: moduleName}
+			g := &FunctionInstance{Type: &FunctionType{Results: []ValueType{ValueTypeI32}}}
+			s.modules[moduleName] = &ModuleInstance{
+				Exports: map[string]*ExportInstance{
+					name: {Function: f},
+					"":   {Function: g},
+				},
+				Name: moduleName,
+			}
 			m := &Module{
-				TypeSection:   []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
-				ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
+				TypeSection: []*FunctionType{{Results: []ValueType{ValueTypeF32}}, {Results: []ValueType{ValueTypeI32}}},
+				ImportSection: []*Import{
+					{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0},
+					{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1},
+				},
 			}
 			functions, _, _, _, moduleImports, err := s.resolveImports(m)
 			require.NoError(t, err)
 			require.Contains(t, moduleImports, s.modules[moduleName])
 			require.Contains(t, functions, f)
+			require.Contains(t, functions, g)
+			// DependentCount must be one even when importing two instances.
 			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 		t.Run("type out of range", func(t *testing.T) {

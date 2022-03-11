@@ -502,8 +502,10 @@ func (s *Store) resolveImports(module *Module) (
 			return
 		}
 
-		m.incDependentCount() // TODO: check if the module is already released. See #293
-		moduleImports[m] = struct{}{}
+		if _, ok := moduleImports[m]; !ok {
+			m.incDependentCount() // TODO: check if the module is already released. See #293
+			moduleImports[m] = struct{}{}
+		}
 
 		var imported *ExportInstance
 		imported, err = m.getExport(i.Name, i.Type)
