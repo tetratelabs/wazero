@@ -26,14 +26,8 @@ func TestInterpreterAdhoc(t *testing.T) {
 }
 
 var (
-	//go:embed testdata/fib.wasm
-	fibWasm []byte
-	//go:embed testdata/fac.wasm
-	facWasm []byte
 	//go:embed testdata/unreachable.wasm
 	unreachableWasm []byte
-	//go:embed testdata/memory.wasm
-	memoryWasm []byte
 	//go:embed testdata/recursive.wasm
 	recursiveWasm []byte
 	//go:embed testdata/hugestack.wasm
