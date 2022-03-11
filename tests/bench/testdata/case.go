@@ -78,7 +78,6 @@ func reverseArray(size uint32) {
 }
 
 //export random_mat_mul
-//goland:noinspection SpellCheckingInspection
 func randomMatMul(n uint32) {
 	var a, b, result [][]int
 	for i := uint32(0); i < n; i++ {
