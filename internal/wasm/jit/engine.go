@@ -473,8 +473,11 @@ func newEngine() *engine {
 //
 // Background: Go has a mechanism called "goroutine stack-shrink" where Go
 // runtime shrinks Gorotuine's stack when it is GCing. Shrinking means that
-// all the contents on the goroutine stack will be relocated by runtime,/
+// all the contents on the goroutine stack will be relocated by runtime,
 // therefore the memory address of these contents change undeterministically.
+// Not only shrinks, but also Goruntime grows the goroutine stack at any point
+// of function call entries, which also might end up relcating contents.
+//
 // On the other hand, we hold pointers to the data region of value stack and
 // callframe stack slices and use these raw pointers from  native code.
 // Therefore, it is dangerous if these two stacks are allocated on stack
