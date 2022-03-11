@@ -90,10 +90,11 @@ func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
 
 // Call implements wasm.Function Call
 func (f *FunctionInstance) Call(ctx publicwasm.Module, params ...uint64) ([]uint64, error) {
+	mod := f.Module
 	if modCtx, ok := ctx.(*ModuleContext); !ok { // allow nil to substitute for the defining module
-		return f.Module.Engine.Call(f.Module.Ctx, f, params...)
+		return mod.Engine.Call(mod.Ctx, f, params...)
 	} else { // TODO: check if the importing context is correct
-		return f.Module.Engine.Call(modCtx, f, params...)
+		return mod.Engine.Call(modCtx, f, params...)
 	}
 }
 

@@ -148,13 +148,12 @@ type interpreterOp struct {
 	rs     []*wazeroir.InclusiveRange
 }
 
-// Release implements wasm.Engine Release
-func (me *moduleEngine) Release() error {
+// Close implements wasm.Engine Close
+func (me *moduleEngine) Close() {
 	// Release all the function instances declared in this module.
 	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
 		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
 	}
-	return nil
 }
 
 // Compile implements internalwasm.Engine Compile
@@ -178,14 +177,14 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 		if f.Kind == wasm.FunctionKindWasm {
 			ir, err := wazeroir.Compile(f)
 			if err != nil {
-				_ = modEngine.Release()
+				modEngine.Close()
 				// TODO(Adrian): extract Module.funcDesc so that errors here have more context
 				return nil, fmt.Errorf("function[%d/%d] failed to lower to wazeroir: %w", i, len(moduleFunctions)-1, err)
 			}
 
 			compiled, err = e.lowerIROps(f, ir.Operations)
 			if err != nil {
-				_ = modEngine.Release()
+				modEngine.Close()
 				return nil, fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(moduleFunctions)-1, err)
 			}
 		} else {

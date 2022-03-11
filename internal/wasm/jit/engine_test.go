@@ -270,8 +270,9 @@ func TestRelease(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			err = modEngine.Release()
-			require.NoError(t, err)
+			modEngine.Close()
+
+			// Check finalizer setup.
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
 			for _, f := range tc.importedFunctions {

@@ -347,7 +347,7 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 			compiled, err = compileHostFunction(f)
 		}
 		if err != nil {
-			_ = modEngine.Release()
+			modEngine.Close()
 			return nil, fmt.Errorf("function[%d/%d] %w", i, len(moduleFunctions)-1, err)
 		}
 		modEngine.compiledFunctions = append(modEngine.compiledFunctions, compiled)
@@ -383,16 +383,17 @@ func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
-// Release implements internalwasm.ModuleEngine Release
-func (me *moduleEngine) Release() error {
+// Close implements internalwasm.ModuleEngine Close
+func (me *moduleEngine) Close() {
 	// Release all the function instances declared in this module.
 	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
-		if err := munmapCodeSegment(cf.codeSegment); err != nil {
-			return err
-		}
+		runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
+			if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
+				panic(err) // mumap failure cannot recover.
+			}
+		})
 		me.parentEngine.deleteCompiledFunction(cf.source)
 	}
-	return nil
 }
 
 // Call implements internalwasm.ModuleEngine Call

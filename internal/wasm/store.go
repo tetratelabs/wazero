@@ -78,6 +78,8 @@ type (
 		// mux is used to guard the fields from concurrent access.
 		mux sync.Mutex
 
+		closed bool // guarded by mux
+
 		// dependentCount is the current number of modules which import this module. On Store.ReleaseModule, this number
 		// must be zero otherwise it fails.
 		dependentCount int // guarded by mux
@@ -364,6 +366,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	// Plus we are ready to compile functions.
 	m.Engine, err = s.engine.Compile(importedFunctions, functions)
 	if err != nil {
+		s.deleteModule(name)
 		return nil, fmt.Errorf("compilation failed: %w", err)
 	}
 
@@ -402,32 +405,41 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	return m.Ctx, nil
 }
 
-// ReleaseModule deallocates resources if a module with the given name exists.
-func (s *Store) ReleaseModule(moduleName string) error {
+// CloseModule deallocates resources if a module with the given name exists.
+func (s *Store) CloseModule(moduleName string) error {
 	m := s.module(moduleName)
 	if m == nil {
-		return nil // already released
+		return nil // already closed
 	}
 
+	if err := m.Close(); err != nil {
+		return err
+	}
+
+	s.deleteModule(moduleName)
+	return nil
+}
+
+func (m *ModuleInstance) Close() error {
 	m.mux.Lock()
 	defer m.mux.Unlock()
+
+	if m.closed {
+		return nil // already closed
+	}
 
 	if m.dependentCount > 0 {
 		// This case other modules are importing this module instance and still alive.
 		return fmt.Errorf("%d modules import this and need to be closed first", m.dependentCount)
 	}
 
-	// TODO: check outstanding calls and wait until they exit.
-
 	for mod := range m.dependencies {
 		mod.decDependentCount()
 	}
 
-	if err := m.Engine.Release(); err != nil {
-		return fmt.Errorf("unable to release function instance: %w", err)
-	}
+	m.Engine.Close()
 
-	s.deleteModule(moduleName)
+	m.closed = true
 	return nil
 }
 
@@ -437,10 +449,14 @@ func (m *ModuleInstance) decDependentCount() {
 	m.dependentCount--
 }
 
-func (m *ModuleInstance) incDependentCount() {
+func (m *ModuleInstance) incDependentCount() bool {
 	m.mux.Lock()
 	defer m.mux.Unlock()
+	if m.closed {
+		return false
+	}
 	m.dependentCount++
+	return true
 }
 
 // deleteModule makes the moduleName available for instantiation again.
@@ -503,7 +519,11 @@ func (s *Store) resolveImports(module *Module) (
 		}
 
 		if _, ok := moduleImports[m]; !ok {
-			m.incDependentCount() // TODO: check if the module is already released. See #293
+			if !m.incDependentCount() {
+				// The module is already closed.
+				err = fmt.Errorf("trying to import module[%s] but is already closed", m.Name)
+				return
+			}
 			moduleImports[m] = struct{}{}
 		}
 

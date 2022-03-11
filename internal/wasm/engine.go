@@ -20,6 +20,6 @@ type ModuleEngine interface {
 	// The ctx's context.Context will be the outer-most ancestor of the argument to wasm.FunctionVoidReturn, etc.
 	Call(ctx *ModuleContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
 
-	// Release releases the resources allocated by functions in this ModuleEngine.
-	Release() error
+	// Close releases the resources allocated by functions in this ModuleEngine.
+	Close()
 }

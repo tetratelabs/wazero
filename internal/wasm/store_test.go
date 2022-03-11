@@ -97,7 +97,7 @@ func TestPublicModule_String(t *testing.T) {
 	require.Equal(t, "Module[module]", s.Module(m.module.Name).String())
 }
 
-func TestStore_ReleaseModule(t *testing.T) {
+func TestStore_CloseModule(t *testing.T) {
 	const importedModuleName = "imported"
 	const importingModuleName = "test"
 
@@ -141,21 +141,36 @@ func TestStore_ReleaseModule(t *testing.T) {
 			}, importingModuleName)
 			require.NoError(t, err)
 
+			importedMod, ok := s.modules[importedModuleName]
+			require.True(t, ok)
+
+			importingMod, ok := s.modules[importingModuleName]
+			require.True(t, ok)
+
 			// We shouldn't be able to release the imported module as it is in use!
-			require.Error(t, s.ReleaseModule(importedModuleName))
+			require.Error(t, s.CloseModule(importedModuleName))
+
+			// Make sure modules are not closed yet.
+			require.False(t, importingMod.closed)
+			require.False(t, importedMod.closed)
 
 			// Can release the importing module
-			require.NoError(t, s.ReleaseModule(importingModuleName))
-			require.Nil(t, s.modules[importingModuleName])
-			require.NotContains(t, s.modules, importingModuleName)
+			require.NoError(t, s.CloseModule(importingModuleName))
+			require.NotContains(t, s.modules, importingMod.Name)
+			require.True(t, importingMod.closed) // only importing one is closed.
+			require.False(t, importedMod.closed)
 
 			// Can re-release the importing module
-			require.NoError(t, s.ReleaseModule(importingModuleName))
+			require.NoError(t, s.CloseModule(importingModuleName))
+			require.True(t, importingMod.closed)
+			require.False(t, importedMod.closed)
 
 			// Now we should be able to release the imported module.
-			require.NoError(t, s.ReleaseModule(importedModuleName))
+			require.NoError(t, s.CloseModule(importedModuleName))
 			require.Nil(t, s.modules[importedModuleName])
 			require.NotContains(t, s.modules, importedModuleName)
+			require.True(t, importingMod.closed)
+			require.True(t, importedMod.closed)
 		})
 	}
 }
@@ -198,7 +213,7 @@ func TestStore_concurrent(t *testing.T) {
 
 			if i == goroutines/2 {
 				// Trying to release the imported module concurrently, but should fail as it's in use.
-				err := s.ReleaseModule(importedModuleName)
+				err := s.CloseModule(importedModuleName)
 				require.Error(t, err)
 			}
 		}(i)
@@ -216,7 +231,7 @@ func TestStore_concurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(i int) {
 			defer wg.Done()
-			err := s.ReleaseModule(strconv.Itoa(i))
+			err := s.CloseModule(strconv.Itoa(i))
 			require.NoError(t, err)
 		}(i)
 	}
@@ -224,7 +239,7 @@ func TestStore_concurrent(t *testing.T) {
 
 	// Now all the importing instances were released, the imported module can be freed.
 	require.Zero(t, hm.dependentCount)
-	require.NoError(t, s.ReleaseModule(hm.Name))
+	require.NoError(t, s.CloseModule(hm.Name))
 
 	// All instances are freed.
 	require.Len(t, s.modules, 0)
@@ -458,9 +473,7 @@ func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...ui
 	return
 }
 
-func (e *mockModuleEngine) Release() error {
-	return nil
-}
+func (e *mockModuleEngine) Close() {}
 
 func TestStore_getTypeInstance(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {
@@ -596,6 +609,17 @@ func TestStore_resolveImports(t *testing.T) {
 		s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{}, Name: moduleName}
 		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: "unknown"}}})
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
+	})
+	t.Run("imported module closed while resolving imports", func(t *testing.T) {
+		s := newStore()
+		m := &ModuleInstance{Exports: map[string]*ExportInstance{"export": {Function: &FunctionInstance{Type: &FunctionType{Results: []ValueType{}}}}}, Name: moduleName}
+		s.modules[moduleName] = m
+		m.closed = true
+		_, _, _, _, _, err := s.resolveImports(&Module{
+			TypeSection:   []*FunctionType{{}},
+			ImportSection: []*Import{{Module: moduleName, DescFunc: 0, Name: "export"}}},
+		)
+		require.EqualError(t, err, "trying to import module[test] but is already closed")
 	})
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
