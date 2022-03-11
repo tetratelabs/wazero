@@ -147,14 +147,11 @@ func TestStore_CloseModule(t *testing.T) {
 			importingMod, ok := s.modules[importingModuleName]
 			require.True(t, ok)
 
-			// We shouldn't be able to release the imported module as it is in use!
-			require.Error(t, s.CloseModule(importedModuleName))
-
 			// Make sure modules are not closed yet.
 			require.False(t, importingMod.closed)
 			require.False(t, importedMod.closed)
 
-			// Can release the importing module
+			// Release the importing module
 			require.NoError(t, s.CloseModule(importingModuleName))
 			require.NotContains(t, s.modules, importingMod.Name)
 			require.True(t, importingMod.closed) // only importing one is closed.
@@ -165,7 +162,7 @@ func TestStore_CloseModule(t *testing.T) {
 			require.True(t, importingMod.closed)
 			require.False(t, importedMod.closed)
 
-			// Now we should be able to release the imported module.
+			// Now we release the imported module.
 			require.NoError(t, s.CloseModule(importedModuleName))
 			require.Nil(t, s.modules[importedModuleName])
 			require.NotContains(t, s.modules, importedModuleName)
@@ -210,21 +207,9 @@ func TestStore_concurrent(t *testing.T) {
 			defer wg.Done()
 			_, err := s.Instantiate(importingModule, strconv.Itoa(i))
 			require.NoError(t, err)
-
-			if i == goroutines/2 {
-				// Trying to release the imported module concurrently, but should fail as it's in use.
-				err := s.CloseModule(importedModuleName)
-				require.Error(t, err)
-			}
 		}(i)
-
-		// TODO: in addition to the normal instantiation, we should try to instantiate host module in conjunction.
-		// after making store.NewHostModule goroutine-safe.
 	}
 	wg.Wait()
-
-	// At this point 1000 modules import host modules.
-	require.Equal(t, goroutines, hm.dependentCount)
 
 	// Concurrent release.
 	wg.Add(goroutines)
@@ -237,8 +222,6 @@ func TestStore_concurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Now all the importing instances were released, the imported module can be freed.
-	require.Zero(t, hm.dependentCount)
 	require.NoError(t, s.CloseModule(hm.Name))
 
 	// All instances are freed.
@@ -280,9 +263,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 			},
 		}, importingModuleName)
 		require.EqualError(t, err, "module[non-exist] not instantiated")
-
-		// hm.dependentCount must be intact as the instantiation failed.
-		require.Zero(t, hm.dependentCount)
 	})
 
 	t.Run("compilation failed", func(t *testing.T) {
@@ -309,9 +289,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 			},
 		}, importingModuleName)
 		require.EqualError(t, err, "compilation failed: some compilation error")
-
-		// hm.dependentCount must be intact as the instantiation failed.
-		require.Zero(t, hm.dependentCount)
 	})
 
 	t.Run("start func failed", func(t *testing.T) {
@@ -336,9 +313,6 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 			},
 		}, importingModuleName)
 		require.EqualError(t, err, "start function[1] failed: call failed")
-
-		// hm.dependentCount must stay incremented as the instantiation itself has already succeeded.
-		require.Equal(t, 1, hm.dependentCount)
 	})
 }
 
@@ -601,25 +575,14 @@ func TestStore_resolveImports(t *testing.T) {
 
 	t.Run("module not instantiated", func(t *testing.T) {
 		s := newStore()
-		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: "unknown", Name: "unknown"}}})
+		_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: "unknown", Name: "unknown"}}})
 		require.EqualError(t, err, "module[unknown] not instantiated")
 	})
 	t.Run("export instance not found", func(t *testing.T) {
 		s := newStore()
 		s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{}, Name: moduleName}
-		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: "unknown"}}})
+		_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: "unknown"}}})
 		require.EqualError(t, err, "\"unknown\" is not exported in module \"test\"")
-	})
-	t.Run("imported module closed while resolving imports", func(t *testing.T) {
-		s := newStore()
-		m := &ModuleInstance{Exports: map[string]*ExportInstance{"export": {Function: &FunctionInstance{Type: &FunctionType{Results: []ValueType{}}}}}, Name: moduleName}
-		s.modules[moduleName] = m
-		m.closed = true
-		_, _, _, _, _, err := s.resolveImports(&Module{
-			TypeSection:   []*FunctionType{{}},
-			ImportSection: []*Import{{Module: moduleName, DescFunc: 0, Name: "export"}}},
-		)
-		require.EqualError(t, err, "trying to import module[test] but is already closed")
 	})
 	t.Run("func", func(t *testing.T) {
 		t.Run("ok", func(t *testing.T) {
@@ -640,18 +603,15 @@ func TestStore_resolveImports(t *testing.T) {
 					{Module: moduleName, Name: "", Type: ExternTypeFunc, DescFunc: 1},
 				},
 			}
-			functions, _, _, _, moduleImports, err := s.resolveImports(m)
+			functions, _, _, _, err := s.resolveImports(m)
 			require.NoError(t, err)
-			require.Contains(t, moduleImports, s.modules[moduleName])
 			require.Contains(t, functions, f)
 			require.Contains(t, functions, g)
-			// DependentCount must be one even when importing two instances.
-			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 		t.Run("type out of range", func(t *testing.T) {
 			s := newStore()
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}})
+			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 100}}})
 			require.EqualError(t, err, "import[0] func[test.target]: function type out of range")
 		})
 		t.Run("signature mismatch", func(t *testing.T) {
@@ -663,7 +623,7 @@ func TestStore_resolveImports(t *testing.T) {
 				TypeSection:   []*FunctionType{{Results: []ValueType{ValueTypeF32}}},
 				ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeFunc, DescFunc: 0}},
 			}
-			_, _, _, _, _, err := s.resolveImports(m)
+			_, _, _, _, err := s.resolveImports(m)
 			require.EqualError(t, err, "import[0] func[test.target]: signature mismatch: v_f32 != v_v")
 		})
 	})
@@ -672,10 +632,9 @@ func TestStore_resolveImports(t *testing.T) {
 			s := newStore()
 			inst := &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}}
 			s.modules[moduleName] = &ModuleInstance{Exports: map[string]*ExportInstance{name: {Type: ExternTypeGlobal, Global: inst}}, Name: moduleName}
-			_, globals, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.Type}}})
+			_, globals, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: inst.Type}}})
 			require.NoError(t, err)
 			require.Contains(t, globals, inst)
-			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 		t.Run("mutability mismatch", func(t *testing.T) {
 			s := newStore()
@@ -683,7 +642,7 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:   ExternTypeGlobal,
 				Global: &GlobalInstance{Type: &GlobalType{Mutable: false}},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: true}}}})
+			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{Mutable: true}}}})
 			require.EqualError(t, err, "import[0] global[test.target]: mutability mismatch: true != false")
 		})
 		t.Run("type mismatch", func(t *testing.T) {
@@ -692,7 +651,7 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:   ExternTypeGlobal,
 				Global: &GlobalInstance{Type: &GlobalType{ValType: ValueTypeI32}},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeF64}}}})
+			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeGlobal, DescGlobal: &GlobalType{ValType: ValueTypeF64}}}})
 			require.EqualError(t, err, "import[0] global[test.target]: value type mismatch: f64 != i32")
 		})
 	})
@@ -705,10 +664,9 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:  ExternTypeTable,
 				Table: tableInst,
 			}}, Name: moduleName}
-			_, _, table, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &Table{Max: &max}}}})
+			_, _, table, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &Table{Max: &max}}}})
 			require.NoError(t, err)
 			require.Equal(t, table, tableInst)
-			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
@@ -717,7 +675,7 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{Min: importTableType.Min - 1},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
+			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
 			require.EqualError(t, err, "import[0] table[test.target]: minimum size mismatch: 2 > 1")
 		})
 		t.Run("maximum size mismatch", func(t *testing.T) {
@@ -728,7 +686,7 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:  ExternTypeTable,
 				Table: &TableInstance{Min: importTableType.Min - 1},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
+			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
 			require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")
 		})
 	})
@@ -741,10 +699,9 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:   ExternTypeMemory,
 				Memory: memoryInst,
 			}}, Name: moduleName}
-			_, _, _, memory, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: &max}}}})
+			_, _, _, memory, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: &Memory{Max: &max}}}})
 			require.NoError(t, err)
 			require.Equal(t, memory, memoryInst)
-			require.Equal(t, 1, s.modules[moduleName].dependentCount)
 		})
 		t.Run("minimum size mismatch", func(t *testing.T) {
 			s := newStore()
@@ -753,7 +710,7 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{Min: importMemoryType.Min - 1},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
+			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
 			require.EqualError(t, err, "import[0] memory[test.target]: minimum size mismatch: 2 > 1")
 		})
 		t.Run("maximum size mismatch", func(t *testing.T) {
@@ -764,7 +721,7 @@ func TestStore_resolveImports(t *testing.T) {
 				Type:   ExternTypeMemory,
 				Memory: &MemoryInstance{},
 			}}, Name: moduleName}
-			_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
+			_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeMemory, DescMem: importMemoryType}}})
 			require.EqualError(t, err, "import[0] memory[test.target]: maximum size mismatch: 10, but actual has no max")
 		})
 	})
@@ -887,35 +844,4 @@ func TestModuleInstance_applyElements(t *testing.T) {
 	})
 	require.Equal(t, uintptr(targetIndex), m.Table.Table[targetOffset])
 	require.Equal(t, uintptr(targetIndex2), m.Table.Table[targetOffset2])
-}
-
-func TestModuleInstance_decDependentCount(t *testing.T) {
-	count := 100
-	m := ModuleInstance{dependentCount: count}
-
-	wg := sync.WaitGroup{}
-	wg.Add(count)
-	for i := 0; i < count; i++ {
-		go func() {
-			defer wg.Done()
-			m.decDependentCount()
-		}()
-	}
-	wg.Wait()
-	require.Zero(t, m.dependentCount)
-}
-
-func TestModuleInstance_incDependentCount(t *testing.T) {
-	count := 100
-	m := ModuleInstance{}
-	wg := sync.WaitGroup{}
-	wg.Add(count)
-	for i := 0; i < count; i++ {
-		go func() {
-			defer wg.Done()
-			m.incDependentCount()
-		}()
-	}
-	wg.Wait()
-	require.Equal(t, count, m.dependentCount)
 }

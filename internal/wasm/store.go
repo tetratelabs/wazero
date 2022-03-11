@@ -75,18 +75,7 @@ type (
 		// Engine implements function calls for this module.
 		Engine ModuleEngine
 
-		// mux is used to guard the fields from concurrent access.
-		mux sync.Mutex
-
 		closed bool // guarded by mux
-
-		// dependentCount is the current number of modules which import this module. On Store.ReleaseModule, this number
-		// must be zero otherwise it fails.
-		dependentCount int // guarded by mux
-
-		// dependencies holds imported modules. This is used when releasing this module instance, or decrementing the
-		// dependentCount of the imported modules.
-		dependencies map[*ModuleInstance]struct{}
 	}
 
 	// ExportInstance represents an exported instance in a Store.
@@ -185,10 +174,9 @@ const (
 // addSections adds section elements to the ModuleInstance
 func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
 	importedGlobals, globals []*GlobalInstance, importedTable, table *TableInstance,
-	memory, importedMemory *MemoryInstance, typeInstances []*TypeInstance, moduleImports map[*ModuleInstance]struct{}) {
+	memory, importedMemory *MemoryInstance, typeInstances []*TypeInstance) {
 
 	m.Types = typeInstances
-	m.dependencies = moduleImports
 
 	m.Functions = append(m.Functions, importedFunctions...)
 	for i, f := range functions {
@@ -331,15 +319,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 		return nil, err
 	}
 
-	moduleImportsFinalized := false
-	importedFunctions, importedGlobals, importedTable, importedMemory, moduleImports, err := s.resolveImports(module)
-	defer func() {
-		if !moduleImportsFinalized {
-			for moduleImport := range moduleImports {
-				moduleImport.decDependentCount()
-			}
-		}
-	}()
+	importedFunctions, importedGlobals, importedTable, importedMemory, err := s.resolveImports(module)
 	if err != nil {
 		s.deleteModule(name)
 		return nil, err
@@ -361,7 +341,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
 	m := &ModuleInstance{Name: name}
 	m.addSections(module, importedFunctions, functions, importedGlobals,
-		globals, importedTable, table, importedMemory, memory, types, moduleImports)
+		globals, importedTable, table, importedMemory, memory, types)
 
 	// Plus we are ready to compile functions.
 	m.Engine, err = s.engine.Compile(importedFunctions, functions)
@@ -386,9 +366,6 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 
 	// Build the default context for calls to this module.
 	m.Ctx = NewModuleContext(s.ctx, s.engine, m)
-
-	// Plus, we can finalize the module import reference count.
-	moduleImportsFinalized = true
 
 	// Execute the start function.
 	if module.StartSection != nil {
@@ -421,42 +398,14 @@ func (s *Store) CloseModule(moduleName string) error {
 }
 
 func (m *ModuleInstance) Close() error {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
+	// Closing multiple times is safe!
 	if m.closed {
 		return nil // already closed
 	}
 
-	if m.dependentCount > 0 {
-		// This case other modules are importing this module instance and still alive.
-		return fmt.Errorf("%d modules import this and need to be closed first", m.dependentCount)
-	}
-
-	for mod := range m.dependencies {
-		mod.decDependentCount()
-	}
-
 	m.Engine.Close()
-
 	m.closed = true
 	return nil
-}
-
-func (m *ModuleInstance) decDependentCount() {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-	m.dependentCount--
-}
-
-func (m *ModuleInstance) incDependentCount() bool {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-	if m.closed {
-		return false
-	}
-	m.dependentCount++
-	return true
 }
 
 // deleteModule makes the moduleName available for instantiation again.
@@ -504,27 +453,16 @@ func (s *Store) module(moduleName string) *ModuleInstance {
 func (s *Store) resolveImports(module *Module) (
 	importedFunctions []*FunctionInstance, importedGlobals []*GlobalInstance,
 	importedTable *TableInstance, importedMemory *MemoryInstance,
-	moduleImports map[*ModuleInstance]struct{},
 	err error,
 ) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
-	moduleImports = map[*ModuleInstance]struct{}{}
 	for idx, i := range module.ImportSection {
 		m, ok := s.modules[i.Module]
 		if !ok {
 			err = fmt.Errorf("module[%s] not instantiated", i.Module)
 			return
-		}
-
-		if _, ok := moduleImports[m]; !ok {
-			if !m.incDependentCount() {
-				// The module is already closed.
-				err = fmt.Errorf("trying to import module[%s] but is already closed", m.Name)
-				return
-			}
-			moduleImports[m] = struct{}{}
 		}
 
 		var imported *ExportInstance
