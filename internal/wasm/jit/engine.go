@@ -469,7 +469,7 @@ func newEngine() *engine {
 }
 
 // TODO: better make them configurable?
-const (
+var (
 	initialValueStackSize     = 64
 	initialCallFrameStackSize = 16
 )
@@ -497,12 +497,6 @@ func (ce *callEngine) popValue() (ret uint64) {
 	ce.valueStackContext.stackPointer--
 	ret = ce.valueStack[ce.valueStackTopIndex()]
 	return
-}
-
-func (ce *callEngine) resetValueStackElement0Address() {
-	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
-	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
-	ce.globalContext.valueStackLen = uint64(valueStackHeader.Len)
 }
 
 func (ce *callEngine) pushValue(v uint64) {
@@ -603,11 +597,6 @@ jitentry:
 				frame.String(), ce.valueStackContext.stackBasePointer, ce.valueStackContext.stackPointer)
 		}
 
-		// Seems like even not using "append", accessing the slice might lead to relocation by Go runtime on amd64.
-		// For safety, we reset the cached addresses and length here.
-		// TODO: investigate the root cause.
-		ce.resetValueStackElement0Address()
-
 		// Call into the JIT code.
 		jitcall(frame.returnAddress, uintptr(unsafe.Pointer(ce)))
 
@@ -678,6 +667,9 @@ func (ce *callEngine) builtinFunctionGrowValueStack(stackPointerCeil uint64) {
 	top := ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer
 	copy(newStack[:top], ce.valueStack[:top])
 	ce.valueStack = newStack
+	valueStackHeader := (*reflect.SliceHeader)(unsafe.Pointer(&ce.valueStack))
+	ce.globalContext.valueStackElement0Address = valueStackHeader.Data
+	ce.globalContext.valueStackLen = uint64(valueStackHeader.Len)
 }
 
 var callStackCeiling = uint64(buildoptions.CallStackCeiling)

@@ -283,3 +283,79 @@ func TestRelease(t *testing.T) {
 		})
 	}
 }
+
+func TestSliceConsistency(t *testing.T) {
+	e := newEngine()
+	store := wasm.NewStore(context.Background(), e, wasm.Features20191205)
+
+	hm, err := wasm.NewHostModule("env", map[string]interface{}{
+		"grow_stack": func() {
+			var growGoroutineStack func(int)
+			growGoroutineStack = func(num int) {
+				if num == 0 {
+					return
+				}
+				growGoroutineStack(num - 1)
+			}
+			growGoroutineStack(1000)
+			runtime.GC()
+		},
+	})
+	require.NoError(t, err)
+
+	_, err = store.Instantiate(hm, "env")
+	require.NoError(t, err)
+
+	const valueStackCorruption = "value_stack_corruption"
+	const callStackCorruption = "call_stack_corruption"
+	const expectedReturnValue = 0x1
+	m := &wasm.Module{
+		TypeSection: []*wasm.FunctionType{
+			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{wasm.ValueTypeI32}},
+			{Params: []wasm.ValueType{}, Results: []wasm.ValueType{}},
+		},
+		FunctionSection: []wasm.Index{
+			wasm.Index(0),
+			wasm.Index(0),
+			wasm.Index(0),
+		},
+		CodeSection: []*wasm.Code{
+			{
+				// value_stack_corruption
+				Body: []byte{
+					wasm.OpcodeCall, 0, // Call host function to shrink Goroutine stack
+					wasm.OpcodeI32Const, expectedReturnValue,
+					wasm.OpcodeEnd,
+				},
+			},
+			{
+				// call_stack_corruption
+				Body: []byte{
+					wasm.OpcodeCall, 3,
+					wasm.OpcodeCall, 0,
+					wasm.OpcodeI32Const, expectedReturnValue,
+					wasm.OpcodeEnd,
+				},
+			},
+			{Body: []byte{wasm.OpcodeCall, 0, wasm.OpcodeEnd}},
+		},
+		ImportSection: []*wasm.Import{{Module: "env", Name: "grow_stack", DescFunc: 1}},
+		ExportSection: map[string]*wasm.Export{
+			valueStackCorruption: {Type: wasm.ExternTypeFunc, Index: 1, Name: valueStackCorruption},
+			callStackCorruption:  {Type: wasm.ExternTypeFunc, Index: 2, Name: callStackCorruption},
+		},
+	}
+
+	mi, err := store.Instantiate(m, "")
+	require.NoError(t, err)
+
+	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {
+		fnName := fnName
+		t.Run(fnName, func(t *testing.T) {
+			ret, err := mi.ExportedFunction(fnName).Call(nil)
+			require.NoError(t, err)
+
+			require.Equal(t, uint32(expectedReturnValue), uint32(ret[0]))
+		})
+	}
+}
