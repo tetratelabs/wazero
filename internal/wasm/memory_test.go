@@ -40,7 +40,7 @@ func TestMemoryInstance_Grow_Size(t *testing.T) {
 		// so trying to grow two pages should result in failure.
 		require.Equal(t, int32(-1), int32(m.Grow(2)))
 		require.Equal(t, uint32(9), m.PageSize())
-		// But growing one page is still perimitted.
+		// But growing one page is still permitted.
 		require.Equal(t, uint32(9), m.Grow(1))
 		// Ensure that the current page size equals the max.
 		require.Equal(t, max, m.PageSize())

@@ -1,5 +1,3 @@
-//go:build amd64
-
 package jit
 
 // This file implements the compiler for amd64/x86_64 target.
@@ -41,13 +39,13 @@ var (
 	float64SignBitMaskAddress                     uintptr
 	float64RestBitMaskAddress                     uintptr
 	float32ForMinimumSigned32bitInteger           float32 = math.Float32frombits(0xCF00_0000)
-	float32ForMinimumSigned32bitIntegerAdddress   uintptr
+	float32ForMinimumSigned32bitIntegerAddress    uintptr
 	float64ForMinimumSigned32bitInteger           float64 = math.Float64frombits(0xC1E0_0000_0020_0000)
-	float64ForMinimumSigned32bitIntegerAdddress   uintptr
+	float64ForMinimumSigned32bitIntegerAddress    uintptr
 	float32ForMinimumSigned64bitInteger           float32 = math.Float32frombits(0xDF00_0000)
-	float32ForMinimumSigned64bitIntegerAdddress   uintptr
+	float32ForMinimumSigned64bitIntegerAddress    uintptr
 	float64ForMinimumSigned64bitInteger           float64 = math.Float64frombits(0xC3E0_0000_0000_0000)
-	float64ForMinimumSigned64bitIntegerAdddress   uintptr
+	float64ForMinimumSigned64bitIntegerAddress    uintptr
 	float32ForMaximumSigned32bitIntPlusOne        float32 = math.Float32frombits(0x4F00_0000)
 	float32ForMaximumSigned32bitIntPlusOneAddress uintptr
 	float64ForMaximumSigned32bitIntPlusOne        float64 = math.Float64frombits(0x41E0_0000_0000_0000)
@@ -66,10 +64,10 @@ func init() {
 	float32RestBitMaskAddress = uintptr(unsafe.Pointer(&float32RestBitMask))
 	float64SignBitMaskAddress = uintptr(unsafe.Pointer(&float64SignBitMask))
 	float64RestBitMaskAddress = uintptr(unsafe.Pointer(&float64RestBitMask))
-	float32ForMinimumSigned32bitIntegerAdddress = uintptr(unsafe.Pointer(&float32ForMinimumSigned32bitInteger))
-	float64ForMinimumSigned32bitIntegerAdddress = uintptr(unsafe.Pointer(&float64ForMinimumSigned32bitInteger))
-	float32ForMinimumSigned64bitIntegerAdddress = uintptr(unsafe.Pointer(&float32ForMinimumSigned64bitInteger))
-	float64ForMinimumSigned64bitIntegerAdddress = uintptr(unsafe.Pointer(&float64ForMinimumSigned64bitInteger))
+	float32ForMinimumSigned32bitIntegerAddress = uintptr(unsafe.Pointer(&float32ForMinimumSigned32bitInteger))
+	float64ForMinimumSigned32bitIntegerAddress = uintptr(unsafe.Pointer(&float64ForMinimumSigned32bitInteger))
+	float32ForMinimumSigned64bitIntegerAddress = uintptr(unsafe.Pointer(&float32ForMinimumSigned64bitInteger))
+	float64ForMinimumSigned64bitIntegerAddress = uintptr(unsafe.Pointer(&float64ForMinimumSigned64bitInteger))
 	float32ForMaximumSigned32bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float32ForMaximumSigned32bitIntPlusOne))
 	float64ForMaximumSigned32bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float64ForMaximumSigned32bitIntPlusOne))
 	float32ForMaximumSigned64bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float32ForMaximumSigned64bitIntPlusOne))
@@ -205,7 +203,7 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	}
 
 	// Now that the max stack pointer is determined, we are invoking the callback.
-	// Note this MUST be called before Assemble() befolow.
+	// Note this MUST be called before Assemble() below.
 	if c.onStackPointerCeilDeterminedCallBack != nil {
 		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
 	}
@@ -234,7 +232,7 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 		for key, l := range c.labels {
 			if len(l.labelBeginningCallbacks) > 0 {
 				// Meaning that some instruction is trying to jump to this label,
-				// but initialStack is not set. There must be a bug at the callsite of br or br_if.
+				// but initialStack is not set. There must be a bug at the call-site of br or br_if.
 				panic(fmt.Sprintf("labelBeginningCallbacks must be called for label %s\n", key))
 			}
 		}
@@ -616,7 +614,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	c.addInstruction(jmpWithCond)
 	thenTarget, elseTarget := o.Then, o.Else
 
-	// Here's the diagram of how we organize the instructions necessarly for brif operation.
+	// Here's the diagram of how we organize the instructions necessarily for brif operation.
 	//
 	// jmp_with_cond -> jmp (.Else) -> Then operations...
 	//    |---------(satisfied)------------^^^
@@ -857,7 +855,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 				// current implementation.
 				return fmt.Errorf("too large br_table")
 			}
-			// We store the offset from the beiggning of the L0's initial instruction.
+			// We store the offset from the beginning of the L0's initial instruction.
 			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
 		}
 		return nil
@@ -924,7 +922,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 		cb(labelBegin)
 	}
 
-	// Clear for debuggin purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
+	// Clear for debugging purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
 	labelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
@@ -1376,7 +1374,7 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 //
 // So, we have to ensure that
 // 1) Previously located value on DX must be saved to memory stack. That is because
-//    the existing value will be overriden after the mul execution.
+//    the existing value will be overridden after the mul execution.
 // 2) One of the operands (x1 or x2) must be on AX register.
 // See https://www.felixcloutier.com/x86/mul#description for detail semantics.
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) error {
@@ -1767,7 +1765,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		return err
 	}
 
-	// Ensures that previous values on thses registers are saved to memory.
+	// Ensures that previous values on these registers are saved to memory.
 	c.onValueReleaseRegisterToStack(quotientRegister)
 	c.onValueReleaseRegisterToStack(remainderRegister)
 
@@ -1783,7 +1781,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	}
 
 	// Now we successfully place x2 on a temp register, so we no longer need to
-	// mark these regiseters used.
+	// mark these registers used.
 	c.locationStack.markRegisterUnused(quotientRegister)
 	c.locationStack.markRegisterUnused(remainderRegister)
 
@@ -1890,7 +1888,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		// Set the normal case's jump target.
 		c.addSetJmpOrigins(okJmp)
 	} else if isSignedDiv {
-		// For sigined division, we have to have branches for "math.MinInt{32,64} / -1"
+		// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
 		// case which results in the floating point exception via division error as
 		// the resulting value exceeds the maximum of signed int.
 
@@ -2603,7 +2601,7 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 
 // compileITruncFromF implements compiler.compileITruncFromF for the amd64 architecture.
 //
-// Note: in the follwoing implementations, we use CVTSS2SI and CVTSD2SI to convert floats to signed integers.
+// Note: in the following implementation, we use CVTSS2SI and CVTSD2SI to convert floats to signed integers.
 // According to the Intel manual ([1],[2]), if the source float value is either +-Inf or NaN, or it exceeds representative ranges
 // of target signed integer, then the instruction returns "masked" response float32SignBitMask (or float64SignBitMask for 64 bit case).
 // [1] Chapter 11.5.2, SIMD Floating-Point Exception Conditions in "Vol 1, Intel® 64 and IA-32 Architectures Manual"
@@ -2695,7 +2693,7 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfMinusOrMinusInf.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfMinusOrMinusInf)
 
-	// Otherwise, the valus is valid.
+	// Otherwise, the values is valid.
 	okJmpForLessThanMaxInt32PlusOne := c.newProg()
 	okJmpForLessThanMaxInt32PlusOne.As = obj.AJMP
 	okJmpForLessThanMaxInt32PlusOne.To.Type = obj.TYPE_BRANCH
@@ -2845,7 +2843,7 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfMinusOrMinusInf.To.Type = obj.TYPE_BRANCH
 	c.addInstruction(jmpIfMinusOrMinusInf)
 
-	// Otherwise, the valus is valid.
+	// Otherwise, the values is valid.
 	okJmpForLessThanMaxInt64PlusOne := c.newProg()
 	okJmpForLessThanMaxInt64PlusOne.As = obj.AJMP
 	okJmpForLessThanMaxInt64PlusOne.To.Type = obj.TYPE_BRANCH
@@ -2957,8 +2955,8 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 
 	// We compare the conversion result with the sign bit mask to check if it is either
 	// 1) the source float value is either +-Inf or NaN, or it exceeds representative ranges of 32bit signed integer, or
-	// 2) the source equals the minimum signed 32-bit (=-2147483648.000000) whose bit pattern is float32ForMinimumSigned32bitIntegerAdddress for 32 bit flaot
-	// 	  or float64ForMinimumSigned32bitIntegerAdddress for 64bit float.
+	// 2) the source equals the minimum signed 32-bit (=-2147483648.000000) whose bit pattern is float32ForMinimumSigned32bitIntegerAddress for 32 bit float
+	// 	  or float64ForMinimumSigned32bitIntegerAddress for 64bit float.
 	cmpResult := c.newProg()
 	cmpResult.As = x86.ACMPL
 	cmpResult.From.Type = obj.TYPE_MEM
@@ -3002,10 +3000,10 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfNotNaN.To.SetTarget(checkIfExceedsLowerBound)
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
-		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned32bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned32bitIntegerAddress)
 	} else {
 		checkIfExceedsLowerBound.As = x86.AUCOMISD
-		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSigned32bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSigned32bitIntegerAddress)
 	}
 	checkIfExceedsLowerBound.From.Type = obj.TYPE_MEM
 	checkIfExceedsLowerBound.To.Type = obj.TYPE_REG
@@ -3082,8 +3080,8 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 
 	// We compare the conversion result with the sign bit mask to check if it is either
 	// 1) the source float value is either +-Inf or NaN, or it exceeds representative ranges of 32bit signed integer, or
-	// 2) the source equals the minimum signed 32-bit (=-9223372036854775808.0) whose bit pattern is float32ForMinimumSigned64bitIntegerAdddress for 32 bit flaot
-	// 	  or float64ForMinimumSigned64bitIntegerAdddress for 64bit float.
+	// 2) the source equals the minimum signed 32-bit (=-9223372036854775808.0) whose bit pattern is float32ForMinimumSigned64bitIntegerAddress for 32 bit float
+	// 	  or float64ForMinimumSigned64bitIntegerAddress for 64bit float.
 	cmpResult := c.newProg()
 	cmpResult.As = x86.ACMPQ
 	cmpResult.From.Type = obj.TYPE_MEM
@@ -3126,10 +3124,10 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 	jmpIfNotNaN.To.SetTarget(checkIfExceedsLowerBound)
 	if isFloat32Bit {
 		checkIfExceedsLowerBound.As = x86.AUCOMISS
-		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned64bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float32ForMinimumSigned64bitIntegerAddress)
 	} else {
 		checkIfExceedsLowerBound.As = x86.AUCOMISD
-		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSigned64bitIntegerAdddress)
+		checkIfExceedsLowerBound.From.Offset = int64(float64ForMinimumSigned64bitIntegerAddress)
 	}
 	checkIfExceedsLowerBound.From.Type = obj.TYPE_MEM
 	checkIfExceedsLowerBound.To.Type = obj.TYPE_REG
@@ -4465,7 +4463,7 @@ func (c *amd64Compiler) moveStackToRegister(loc *valueLocation) {
 
 // maybeMoveTopConditionalToFreeGeneralPurposeRegister moves the top value on the stack
 // if the value is located on a conditional register. This is usually called at the beginning of
-// amd64Compiler.compile* functions where we possibly emit istructions without saving the conditional
+// amd64Compiler.compile* functions where we possibly emit instructions without saving the conditional
 // register value. The compile* functions without calling this function is saving the conditional
 // value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
 func (c *amd64Compiler) maybeMoveTopConditionalToFreeGeneralPurposeRegister() (err error) {
@@ -4652,8 +4650,8 @@ func (c *amd64Compiler) callFunction(index wasm.Index, compiledFunctionAddressRe
 
 	// Otherwise, we have to make the builtin function call to grow the call frame stack.
 	if !isNilRegister(compiledFunctionAddressRegister) {
-		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack,
-		// as the register is not saved across function calls.
+		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing the
+		// call-frame stack, as the register is not saved across function calls.
 		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(compiledFunctionAddressRegister)
 		c.releaseRegisterToStack(savedOffsetLocation)
 	}
@@ -4677,7 +4675,7 @@ func (c *amd64Compiler) callFunction(index wasm.Index, compiledFunctionAddressRe
 	// Also we have to re-read the call frame stack pointer into callFrameStackPointerRegister.
 	c.getCallFrameStackPointer(callFrameStackPointerRegister)
 
-	// Now that callframe stack is enough length, we are ready to create a new call frame
+	// Now that call-frame stack is enough length, we are ready to create a new call frame
 	// for the function call we are about to make.
 	getCallFrameStackElement0Address := c.newProg()
 	jmpIfNotCallFrameStackNeedsGrow.To.SetTarget(getCallFrameStackElement0Address)
@@ -4789,19 +4787,19 @@ func (c *amd64Compiler) callFunction(index wasm.Index, compiledFunctionAddressRe
 	// 3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
 	{
 		if isNilRegister(compiledFunctionAddressRegister) {
-			// We must set the target function's address(pointer) of *compiledFunction into the next callframe stack.
+			// We must set the target function's address(pointer) of *compiledFunction into the next call-frame stack.
 			// In the example, this is equivalent to writing the value into "rc.next".
 			//
 			// First, we read the address of the first item of callEngine.compiledFunctions slice (= &callEngine.compiledFunctions[0])
 			// into tmpRegister.
-			readCopmiledFunctionsElement0Address := c.newProg()
-			readCopmiledFunctionsElement0Address.As = x86.AMOVQ
-			readCopmiledFunctionsElement0Address.To.Type = obj.TYPE_REG
-			readCopmiledFunctionsElement0Address.To.Reg = tmpRegister
-			readCopmiledFunctionsElement0Address.From.Type = obj.TYPE_MEM
-			readCopmiledFunctionsElement0Address.From.Reg = reservedRegisterForCallEngine
-			readCopmiledFunctionsElement0Address.From.Offset = callEngineModuleContextCompiledFunctionsElement0AddressOffset
-			c.addInstruction(readCopmiledFunctionsElement0Address)
+			readCompiledFunctionsElement0Address := c.newProg()
+			readCompiledFunctionsElement0Address.As = x86.AMOVQ
+			readCompiledFunctionsElement0Address.To.Type = obj.TYPE_REG
+			readCompiledFunctionsElement0Address.To.Reg = tmpRegister
+			readCompiledFunctionsElement0Address.From.Type = obj.TYPE_MEM
+			readCompiledFunctionsElement0Address.From.Reg = reservedRegisterForCallEngine
+			readCompiledFunctionsElement0Address.From.Offset = callEngineModuleContextCompiledFunctionsElement0AddressOffset
+			c.addInstruction(readCompiledFunctionsElement0Address)
 
 			// Next, read the address of the target function (= &callEngine.compiledFunctions[offset])
 			// into targetAddressRegister.
@@ -4818,7 +4816,7 @@ func (c *amd64Compiler) callFunction(index wasm.Index, compiledFunctionAddressRe
 		} else {
 			targetAddressRegister = compiledFunctionAddressRegister
 		}
-		// Finally, we are ready to place the address of the target function's *compiledFunction into the new callframe.
+		// Finally, we are ready to place the address of the target function's *compiledFunction into the new call-frame.
 		// In the example, this is equivalent to set "rc.next".
 		putCompiledFunctionFunctionIndexOnNewCallFrame := c.newProg()
 		putCompiledFunctionFunctionIndexOnNewCallFrame.As = x86.AMOVQ
@@ -4848,7 +4846,7 @@ func (c *amd64Compiler) callFunction(index wasm.Index, compiledFunctionAddressRe
 	setReturnAddress.From.Reg = tmpRegister
 	c.addInstruction(setReturnAddress)
 
-	// Every preparetion (1 to 5 in the description above) is done to enter into the target function.
+	// Every preparation (1 to 5 in the description above) is done to enter into the target function.
 	// So we increment the call frame stack pointer.
 	incCallFrameStackPointer := c.newProg()
 	incCallFrameStackPointer.As = x86.AINCQ
@@ -4876,7 +4874,7 @@ func (c *amd64Compiler) callFunction(index wasm.Index, compiledFunctionAddressRe
 	// Due to the change to callEngine.valueStackContext.stackBasePointer.
 	c.initializeReservedStackBasePointer()
 	// Due to the change to callEngine.moduleContext.moduleInstanceAddress.
-	if err := c.initializeModuleContext(); err != nil {
+	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
 	// Due to the change to callEngine.moduleContext.moduleInstanceAddress as that might result in
@@ -5140,7 +5138,7 @@ func (c *amd64Compiler) callGoFunction(jitStatus jitCallStatusCode, index wasm.I
 
 // readInstructionAddress add a LEA instruction to read the target instruction's absolute address into the destinationRegister.
 // beforeAcquisitionTargetInstruction is the instruction kind (e.g. RET, JMP, etc.) right before the instruction
-// of which the callsite wants to aquire the absolute address.
+// of which the call-site wants to acquire the absolute address.
 func (c *amd64Compiler) readInstructionAddress(destinationRegister int16, beforeAcquisitionTargetInstruction obj.As) {
 	// Emit the instruction in the form of "LEA destination [RIP + offset]".
 	readInstructionAddress := c.newProg()
@@ -5163,7 +5161,7 @@ func (c *amd64Compiler) readInstructionAddress(destinationRegister int16, before
 		// right after LEA because RIP points to that next instruction in LEA instruction.
 		base := readInstructionAddress.Link
 
-		// Find the address aquisition target instruction.
+		// Find the address acquisition target instruction.
 		target := base
 		for target != nil {
 			// Advance until we have the target.As has the given instruction kind.
@@ -5269,7 +5267,7 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 
 	// Once the stack base pointer is initialized and the size of stack is ok,
 	// initialize the module context next.
-	if err := c.initializeModuleContext(); err != nil {
+	if err := c.compileModuleContextInitialization(); err != nil {
 		return err
 	}
 
@@ -5359,13 +5357,13 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	subStackBasePointer.From.Offset = callEngineValueStackContextStackBasePointerOffset
 	c.addInstruction(subStackBasePointer)
 
-	// If stack base pointer + max stack poitner > valueStackLen, we need to grow the stack.
+	// If stack base pointer + max stack pointer > valueStackLen, we need to grow the stack.
 	cmpWithStackPointerCeil := c.newProg()
 	cmpWithStackPointerCeil.As = x86.ACMPQ
 	cmpWithStackPointerCeil.From.Type = obj.TYPE_REG
 	cmpWithStackPointerCeil.From.Reg = tmpRegister
 	cmpWithStackPointerCeil.To.Type = obj.TYPE_CONST
-	// We don't yet know the max stack poitner at this point.
+	// We don't yet know the max stack pointer at this point.
 	// The max stack pointer is determined after emitting all the instructions.
 	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { cmpWithStackPointerCeil.To.Offset = int64(stackPointerCeil) }
 	c.addInstruction(cmpWithStackPointerCeil)
@@ -5385,10 +5383,10 @@ func (c *amd64Compiler) maybeGrowValueStack() error {
 	return nil
 }
 
-// initializeModuleContext adds instruction to initialize callEngine.ModuleContext's fields based on
+// compileModuleContextInitialization adds instructions to initialize callEngine.ModuleContext's fields based on
 // callEngine.ModuleContext.ModuleInstanceAddress.
 // This is called in two cases: in function preamble, and on the return from (non-Go) function calls.
-func (c *amd64Compiler) initializeModuleContext() error {
+func (c *amd64Compiler) compileModuleContextInitialization() error {
 
 	// Obtain the temporary registers to be used in the followings.
 	regs, found := c.locationStack.takeFreeRegisters(generalPurposeRegisterTypeInt, 3)
@@ -5589,7 +5587,7 @@ func (c *amd64Compiler) initializeModuleContext() error {
 	{
 		// "tmpRegister = [moduleInstanceAddressRegister + moduleInstanceEngineOffset + interfaceDataOffset] (== *moduleEngine)"
 		//
-		// Go's interface is layed out on memory as two quad words as struct {tab, data uintptr}
+		// Go's interface is laid out on memory as two quad words as struct {tab, data uintptr}
 		// where tab points to the interface table, and the latter points to the actual
 		// implementation of interface. This case, we extract "data" pointer as *moduleEngine.
 		// See the following references for detail:
@@ -5615,14 +5613,14 @@ func (c *amd64Compiler) initializeModuleContext() error {
 		c.addInstruction(readCompiledFunctionsElement0Address)
 
 		// "callEngine.moduleContext.compiledFunctionsElement0Address = tmpRegister".
-		writeCompiledFunctionsElement0AddresssIntoCallEngine := c.newProg()
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.As = x86.AMOVQ
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.To.Type = obj.TYPE_MEM
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.To.Reg = reservedRegisterForCallEngine
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.To.Offset = callEngineModuleContextCompiledFunctionsElement0AddressOffset
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.From.Type = obj.TYPE_REG
-		writeCompiledFunctionsElement0AddresssIntoCallEngine.From.Reg = tmpRegister
-		c.addInstruction(writeCompiledFunctionsElement0AddresssIntoCallEngine)
+		writeCompiledFunctionsElement0AddressIntoCallEngine := c.newProg()
+		writeCompiledFunctionsElement0AddressIntoCallEngine.As = x86.AMOVQ
+		writeCompiledFunctionsElement0AddressIntoCallEngine.To.Type = obj.TYPE_MEM
+		writeCompiledFunctionsElement0AddressIntoCallEngine.To.Reg = reservedRegisterForCallEngine
+		writeCompiledFunctionsElement0AddressIntoCallEngine.To.Offset = callEngineModuleContextCompiledFunctionsElement0AddressOffset
+		writeCompiledFunctionsElement0AddressIntoCallEngine.From.Type = obj.TYPE_REG
+		writeCompiledFunctionsElement0AddressIntoCallEngine.From.Reg = tmpRegister
+		c.addInstruction(writeCompiledFunctionsElement0AddressIntoCallEngine)
 	}
 
 	c.locationStack.markRegisterUnused(regs...)

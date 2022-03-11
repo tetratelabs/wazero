@@ -484,7 +484,7 @@ func validateFunction(
 			if table == nil {
 				return fmt.Errorf("table not given while having call_indirect")
 			}
-			if err := valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
+			if err = valueTypeStack.popAndVerifyType(ValueTypeI32); err != nil {
 				return fmt.Errorf("cannot pop the in table index's type for call_indirect")
 			}
 			if int(typeIndex) >= len(types) {
@@ -492,7 +492,7 @@ func validateFunction(
 			}
 			funcType := types[typeIndex]
 			for i := 0; i < len(funcType.Params); i++ {
-				if err := valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
+				if err = valueTypeStack.popAndVerifyType(funcType.Params[len(funcType.Params)-1-i]); err != nil {
 					return fmt.Errorf("type mismatch on call_indirect operation input type")
 				}
 			}
@@ -756,12 +756,11 @@ func validateFunction(
 		} else if op == OpcodeElse {
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.elseAt = pc
-			// Check the type soundness of the instructions *before*　 entering this Eles Op.
+			// Check the type soundness of the instructions *before* entering this else Op.
 			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
 				return fmt.Errorf("invalid instruction results in then instructions")
 			}
-			// Before entring instructions inside else, we pop all the values pushed by
-			// then block.
+			// Before entering instructions inside else, we pop all the values pushed by then block.
 			valueTypeStack.resetAtStackLimit()
 		} else if op == OpcodeEnd {
 			bl := controlBlockStack[len(controlBlockStack)-1]
@@ -847,7 +846,7 @@ type valueTypeStack struct {
 }
 
 const (
-	// Only used in the anlyzeFunction below.
+	// Only used in the analyzeFunction below.
 	valueTypeUnknown = ValueType(0xFF)
 )
 

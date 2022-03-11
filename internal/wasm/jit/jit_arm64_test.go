@@ -1,5 +1,3 @@
-//go:build arm64
-
 package jit
 
 import (
@@ -94,7 +92,7 @@ func TestArm64Compiler_returnFunction(t *testing.T) {
 		stackPointerToExpectedValue := map[uint64]uint32{}
 		for funcIndex := wasm.Index(0); funcIndex < callFrameNums; funcIndex++ {
 			// We have to do compilation in a separate subtest since each compilation takes
-			// the mutext lock and must release on the cleanup of each subtest.
+			// the mutex lock and must release on the cleanup of each subtest.
 			// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 			t.Run(fmt.Sprintf("compiling existing callframe %d", funcIndex), func(t *testing.T) {
 				// Each function pushes its funcaddr and soon returns.
@@ -1210,7 +1208,7 @@ func TestArm64Compiler_compileDrop(t *testing.T) {
 		// Plus, the top value must stay on a register.
 		top := compiler.locationStack.peek()
 		require.True(t, top.onRegister())
-		// Release the top value after drop so that we can verify the cpu itself is not mainpulated.
+		// Release the top value after drop so that we can verify the cpu itself is not manipulated.
 		err = compiler.compileReleaseRegisterToStack(top)
 		require.NoError(t, err)
 
@@ -1421,13 +1419,13 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 
 	for _, tc := range []struct {
 		name      string
-		setupFunc func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool)
+		setupFunc func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool)
 	}{
 		{
 			name: "cond on register",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				val := uint32(1)
-				if shoulGoElse {
+				if shouldGoElse {
 					val = 0
 				}
 				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: val})
@@ -1436,9 +1434,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "LS",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(1), uint32(2)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1449,9 +1447,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "LE",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(1), uint32(2)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1462,9 +1460,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "HS",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(2), uint32(1)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1475,9 +1473,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "GE",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(2), uint32(1)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1488,9 +1486,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "HI",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(2), uint32(1)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1501,9 +1499,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "GT",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(2), uint32(1)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1514,9 +1512,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "LO",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(1), uint32(2)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1527,9 +1525,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "LT",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(1), uint32(2)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1540,9 +1538,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "MI",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := float32(1), float32(2)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2, x1 = x1, x2
 				}
 				requirePushTwoFloat32Consts(t, x1, x2, compiler)
@@ -1553,9 +1551,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "EQ",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(1), uint32(1)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2++
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1565,9 +1563,9 @@ func TestArm64Compiler_compileBrIf(t *testing.T) {
 		},
 		{
 			name: "NE",
-			setupFunc: func(t *testing.T, compiler *arm64Compiler, shoulGoElse bool) {
+			setupFunc: func(t *testing.T, compiler *arm64Compiler, shouldGoElse bool) {
 				x1, x2 := uint32(1), uint32(2)
-				if shoulGoElse {
+				if shouldGoElse {
 					x2 = x1
 				}
 				requirePushTwoInt32Consts(t, x1, x2, compiler)
@@ -1741,7 +1739,7 @@ func TestArm64Compiler_compileCall(t *testing.T) {
 				expectedValue += addTargetValue
 
 				// We have to do compilation in a separate subtest since each compilation takes
-				// the mutext lock and must release on the cleanup of each subtest.
+				// the mutex lock and must release on the cleanup of each subtest.
 				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
 					compiler := env.requireNewCompiler(t)
@@ -1831,14 +1829,14 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 			Module: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
 		}
 
-		// Place the offfset value.
+		// Place the offset value.
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
 		require.NoError(t, err)
 
 		err = compiler.compileCallIndirect(targetOperation)
 		require.NoError(t, err)
 
-		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
 		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
@@ -1874,7 +1872,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		err = compiler.compileCallIndirect(targetOperation)
 		require.NoError(t, err)
 
-		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
 		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
@@ -1903,14 +1901,14 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 		cf := &compiledFunction{source: &wasm.FunctionInstance{TypeID: 50}}
 		table[0] = uintptr(unsafe.Pointer(cf))
 
-		// Place the offfset value.
+		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
 		require.NoError(t, err)
 
 		// Now emit the code.
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
-		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
 		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 		require.NoError(t, err)
 
@@ -1947,7 +1945,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 					expectedReturnValue := uint32(i * 1000)
 
 					// We have to do compilation in a separate subtest since each compilation takes
-					// the mutext lock and must release on the cleanup of each subtest.
+					// the mutex lock and must release on the cleanup of each subtest.
 					// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 					t.Run(fmt.Sprintf("compiling call target for %d", i), func(t *testing.T) {
 						compiler := env.requireNewCompiler(t)
@@ -1986,7 +1984,7 @@ func TestArm64Compiler_compileCallIndirect(t *testing.T) {
 
 						compiler.f = &wasm.FunctionInstance{Module: moduleInstance, Kind: wasm.FunctionKindWasm}
 
-						// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
+						// Place the offset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
 						require.NoError(t, err)
 
@@ -2135,7 +2133,6 @@ func TestArm64Compiler_compileSwap(t *testing.T) {
 }
 
 func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
-	modEngine := &moduleEngine{compiledFunctions: make([]*compiledFunction, 100)}
 	for _, tc := range []struct {
 		name           string
 		moduleInstance *wasm.ModuleInstance
@@ -2143,7 +2140,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "no nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
@@ -2152,7 +2148,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine: modEngine,
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
 				Table:  &wasm.TableInstance{Table: make([]uintptr, 20)},
 			},
@@ -2160,7 +2155,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
 			},
@@ -2168,41 +2162,35 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "table nil",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: nil},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
+				Table:  &wasm.TableInstance{Table: nil},
 			},
 		},
 		{
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 0)},
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
+				Table: &wasm.TableInstance{Table: make([]uintptr, 0)},
 			},
 		},
 		{
 			name: "memory zero length",
 			moduleInstance: &wasm.ModuleInstance{
-				Engine:  modEngine,
-				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 0)},
-				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 0)},
+				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 0)},
 			},
 		},
 		{
-			name: "all nil except mod engine",
-			moduleInstance: &wasm.ModuleInstance{
-				Engine: modEngine,
-			},
+			name:           "all nil except mod engine",
+			moduleInstance: &wasm.ModuleInstance{},
 		},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			env := newJITEnvironment()
+			ce := env.callEngine()
+
 			compiler := env.requireNewCompiler(t)
+			me := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
+			tc.moduleInstance.Engine = me
 			compiler.f.Module = tc.moduleInstance
 
 			// The assembler skips the first instruction so we intentionally add NOP here.
@@ -2226,8 +2214,6 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 			require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
 
 			// Check if the fields of callEngine.moduleContext are updated.
-			ce := env.callEngine()
-
 			bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&tc.moduleInstance.Globals))
 			require.Equal(t, bufSliceHeader.Data, ce.moduleContext.globalElement0Address)
 
@@ -2243,7 +2229,7 @@ func TestArm64Compiler_compileModuleContextInitialization(t *testing.T) {
 				require.Equal(t, tableHeader.Data, ce.moduleContext.tableElement0Address)
 			}
 
-			require.Equal(t, uintptr(unsafe.Pointer(&modEngine.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
+			require.Equal(t, uintptr(unsafe.Pointer(&me.compiledFunctions[0])), ce.moduleContext.compiledFunctionsElement0Address)
 		})
 	}
 }
@@ -2385,7 +2371,7 @@ func TestArm64Compiler_compileMemoryAccessOffsetSetup(t *testing.T) {
 
 					mem := env.memory()
 					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
-						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
+						// If the target memory region's ceil exceeds the length of memory, we must exit the function
 						// with jitCallStatusCodeMemoryOutOfBounds status code.
 						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
 					} else {
@@ -2524,7 +2510,7 @@ func TestArm64Compiler_compileStore(t *testing.T) {
 			require.NoError(t, err)
 
 			// Set the value on the left and right neighboring memoryregion,
-			// so that we can veirfy the operation doesn't affect there.
+			// so that we can verify the operation doesn't affect there.
 			ceil := offset + tc.targetSizeInBytes
 			mem := env.memory()
 			expectedNeighbor8Bytes := uint64(0x12_34_56_78_9a_bc_ef_fe)
