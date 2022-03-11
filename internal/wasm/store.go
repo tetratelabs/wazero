@@ -381,16 +381,12 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 }
 
 // CloseModule deallocates resources if a module with the given name exists.
-func (s *Store) CloseModule(moduleName string) error {
+func (s *Store) CloseModule(moduleName string) {
 	m := s.module(moduleName)
-	if m == nil {
-		return nil // already closed
+	if m != nil {
+		m.Engine.Close()
+		s.deleteModule(moduleName)
 	}
-
-	m.Engine.Close()
-
-	s.deleteModule(moduleName)
-	return nil
 }
 
 // deleteModule makes the moduleName available for instantiation again.
