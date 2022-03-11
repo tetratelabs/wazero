@@ -147,7 +147,7 @@ func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 // Grow extends the memory buffer by "newPages" * memoryPageSize.
 // The logic here is described in https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem.
 //
-// Returns -1 if the operation resulted in excedding the maximum memory pages.
+// Returns -1 if the operation resulted in exceeding the maximum memory pages.
 // Otherwise, returns the prior memory size after growing the memory buffer.
 func (m *MemoryInstance) Grow(newPages uint32) (result uint32) {
 	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))

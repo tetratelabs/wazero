@@ -127,10 +127,9 @@ func (ce *callEngine) popFrame() (frame *callFrame) {
 }
 
 type callFrame struct {
-	// Program counter representing the current postion
-	// in the f.body.
+	// pc is the program counter representing the current position in compiledFunction.body.
 	pc uint64
-	// The compiled function used in this function frame.
+	// f is the compiled function used in this function frame.
 	f *compiledFunction
 }
 
@@ -220,7 +219,7 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 				cb(address)
 			}
 			delete(onLabelAddressResolved, labelKey)
-			// We just ignore the lable operation
+			// We just ignore the label operation
 			// as we translate branch operations to the direct address jmp.
 			continue
 		case *wazeroir.OperationBr:

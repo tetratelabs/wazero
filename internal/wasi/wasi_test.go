@@ -938,7 +938,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 			iovs: 1, iovsCount: 1,
 			memory: []byte{
 				'?',          // `iovs` is after this
-				0, 0, 0x1, 0, // = iovs[0].offset on the secod page
+				0, 0, 0x1, 0, // = iovs[0].offset on the second page
 				1, 0, 0, 0, // = iovs[0].length
 			},
 			expectedErrno: wasi.ErrnoFault,
@@ -950,7 +950,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 			memory: []byte{
 				'?',        // `iovs` is after this
 				9, 0, 0, 0, // = iovs[0].offset
-				0, 0, 0x1, 0, // = iovs[0].length on the secod page
+				0, 0, 0x1, 0, // = iovs[0].length on the second page
 				'?',
 			},
 			expectedErrno: wasi.ErrnoFault,
@@ -1106,7 +1106,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 					require.True(t, ok)
 					require.Equal(t, tc.expectedMemory, actual)
 
-					require.Equal(t, tc.expectedOffset, file.offset) // test that the offset of file is acutally updated.
+					require.Equal(t, tc.expectedOffset, file.offset) // test that the offset of file is actually updated.
 				})
 			}
 		})
@@ -1431,7 +1431,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 
 	var api *wasiAPI
 	mod, fn := instantiateModule(t, FunctionPathOpen, ImportPathOpen, moduleName, func(a *wasiAPI) {
-		// randSouce is used to determine the new fd. Fix it to the expectedFD for testing.
+		// randSource is used to determine the new fd. Fix it to the expectedFD for testing.
 		a.randSource = func(b []byte) error {
 			binary.LittleEndian.PutUint32(b, expectedFD)
 			return nil

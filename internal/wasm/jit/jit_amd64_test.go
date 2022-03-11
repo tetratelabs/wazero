@@ -162,7 +162,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 		stackPointerToExpectedValue := map[uint64]uint32{}
 		for funcindex := wasm.Index(0); funcindex < callFrameNums; funcindex++ {
 			// We have to do compilation in a separate subtest since each compilation takes
-			// the mutext lock and must release on the cleanup of each subtest.
+			// the mutex lock and must release on the cleanup of each subtest.
 			// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 			t.Run(fmt.Sprintf("compiling existing callframe %d", funcindex), func(t *testing.T) {
 
@@ -1497,7 +1497,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						// At this point, all the registesr must be consumed by cmp
+						// At this point, all the registers must be consumed by cmp
 						// so they should be marked as unused.
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
@@ -1577,7 +1577,7 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						// At this point, all the registesr must be consumed by cmp
+						// At this point, all the registers must be consumed by cmp
 						// so they should be marked as unused.
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
@@ -1826,7 +1826,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						// At this point, all the registesr must be consumed by cmp
+						// At this point, all the registers must be consumed by cmp
 						// so they should be marked as unused.
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
@@ -1908,7 +1908,7 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						// At this point, all the registesr must be consumed by cmp
+						// At this point, all the registers must be consumed by cmp
 						// so they should be marked as unused.
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
@@ -2304,7 +2304,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				x2Reg: x86.REG_AX,
 			},
 			{
-				name:  "x1:staack,x2:ax",
+				name:  "x1:stack,x2:ax",
 				x1Reg: -1,
 				x2Reg: x86.REG_AX,
 			},
@@ -2613,7 +2613,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 	})
 }
 
-func TestAmd64Compiler_compilClz(t *testing.T) {
+func TestAmd64Compiler_compileClz(t *testing.T) {
 	t.Run("32bit", func(t *testing.T) {
 		for _, tc := range []struct{ input, expectedLeadingZeros uint32 }{
 			{input: 0xff_ff_ff_ff, expectedLeadingZeros: 0},
@@ -2711,7 +2711,7 @@ func TestAmd64Compiler_compilClz(t *testing.T) {
 	})
 }
 
-func TestAmd64Compiler_compilCtz(t *testing.T) {
+func TestAmd64Compiler_compileCtz(t *testing.T) {
 	t.Run("32bit", func(t *testing.T) {
 		for _, tc := range []struct{ input, expectedTrailingZeros uint32 }{
 			{input: 0xff_ff_ff_ff, expectedTrailingZeros: 0},
@@ -2808,7 +2808,7 @@ func TestAmd64Compiler_compilCtz(t *testing.T) {
 		}
 	})
 }
-func TestAmd64Compiler_compilPopcnt(t *testing.T) {
+func TestAmd64Compiler_compilePopcnt(t *testing.T) {
 	t.Run("32bit", func(t *testing.T) {
 		for _, tc := range []struct{ input, expectedSetBits uint32 }{
 			{input: 0xff_ff_ff_ff, expectedSetBits: 32},
@@ -2951,7 +2951,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 					x2Reg: x86.REG_CX,
 				},
 				{
-					name:  "x1:staack,x2:cx",
+					name:  "x1:stack,x2:cx",
 					x1Reg: nilRegister,
 					x2Reg: x86.REG_CX,
 				},
@@ -3174,7 +3174,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 						x2Reg: x86.REG_AX,
 					},
 					{
-						name:  "x1:staack,x2:ax",
+						name:  "x1:stack,x2:ax",
 						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
@@ -3331,7 +3331,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 						x2Reg: x86.REG_AX,
 					},
 					{
-						name:  "x1:staack,x2:ax",
+						name:  "x1:stack,x2:ax",
 						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
@@ -3416,7 +3416,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// At this point, the previous value on the DX register is saved to the stack.
 								require.True(t, prevOnDX.onStack())
 
-								// We add the value previously on the DX with the quotiont of the division result
+								// We add the value previously on the DX with the quotient of the division result
 								// in order to ensure that not saving existing DX value would cause
 								// the failure in a subsequent instruction.
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
@@ -3634,7 +3634,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 						x2Reg: x86.REG_AX,
 					},
 					{
-						name:  "x1:staack,x2:ax",
+						name:  "x1:stack,x2:ax",
 						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
@@ -3789,7 +3789,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 						x2Reg: x86.REG_AX,
 					},
 					{
-						name:  "x1:staack,x2:ax",
+						name:  "x1:stack,x2:ax",
 						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
@@ -3876,7 +3876,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// At this point, the previous value on the DX register is saved to the stack.
 								require.True(t, prevOnDX.onStack())
 
-								// We add the value previously on the DX with the quotiont of the division result
+								// We add the value previously on the DX with the quotient of the division result
 								// in order to ensure that not saving existing DX value would cause
 								// the failure in a subsequent instruction.
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
@@ -5647,15 +5647,15 @@ func TestAmd64Compiler_generate(t *testing.T) {
 		}
 		verify := func(t *testing.T, compiler *amd64Compiler, expectedStackPointerCeil uint64) {
 			var called bool
-			compiler.onStackPointerCeilDeterminedCallBack = func(acutalStackPointerCeilInCallBack uint64) {
+			compiler.onStackPointerCeilDeterminedCallBack = func(actualStackPointerCeilInCallBack uint64) {
 				called = true
-				require.Equal(t, expectedStackPointerCeil, acutalStackPointerCeilInCallBack)
+				require.Equal(t, expectedStackPointerCeil, actualStackPointerCeilInCallBack)
 			}
 
-			_, _, acutalStackPointerCeil, err := compiler.compile()
+			_, _, actualStackPointerCeil, err := compiler.compile()
 			require.NoError(t, err)
 			require.True(t, called)
-			require.Equal(t, expectedStackPointerCeil, acutalStackPointerCeil)
+			require.Equal(t, expectedStackPointerCeil, actualStackPointerCeil)
 		}
 		t.Run("current one win", func(t *testing.T) {
 			compiler := getCompiler(t)
@@ -6036,7 +6036,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 				expectedValue += addTargetValue
 
 				// We have to do compilation in a separate subtest since each compilation takes
-				// the mutext lock and must release on the cleanup of each subtest.
+				// the mutex lock and must release on the cleanup of each subtest.
 				// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 				t.Run(fmt.Sprintf("compiling call target %d", i), func(t *testing.T) {
 					compiler := env.requireNewCompiler(t)
@@ -6126,14 +6126,14 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 			Module: &wasm.ModuleInstance{Types: []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}},
 		}
 
-		// Place the offfset value.
+		// Place the offset value.
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 10})
 		require.NoError(t, err)
 
 		err = compiler.compileCallIndirect(targetOperation)
 		require.NoError(t, err)
 
-		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
 		compiler.exit(jitCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
@@ -6168,7 +6168,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		err = compiler.compileCallIndirect(targetOperation)
 		require.NoError(t, err)
 
-		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
 		compiler.exit(jitCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
@@ -6196,14 +6196,14 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		cf := &compiledFunction{source: &wasm.FunctionInstance{TypeID: 50}}
 		table[0] = uintptr(unsafe.Pointer(cf))
 
-		// Place the offfset value.
+		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
 		require.NoError(t, err)
 
 		// Now emit the code.
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
-		// We expect to exit from the code in callIndirect so the subsequet code must be unreachable.
+		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
 		compiler.exit(jitCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
@@ -6239,7 +6239,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 					expectedReturnValue := uint32(i * 1000)
 
 					// We have to do compilation in a separate subtest since each compilation takes
-					// the mutext lock and must release on the cleanup of each subtest.
+					// the mutex lock and must release on the cleanup of each subtest.
 					// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 					t.Run(fmt.Sprintf("compiling call target for %d", i), func(t *testing.T) {
 
@@ -6279,7 +6279,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 
 						compiler.f = &wasm.FunctionInstance{Module: moduleInstance, Kind: wasm.FunctionKindWasm}
 
-						// Place the offfset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
+						// Place the offset value. Here we try calling a function of functionaddr == table[i].FunctionIndex.
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(i)})
 						require.NoError(t, err)
 

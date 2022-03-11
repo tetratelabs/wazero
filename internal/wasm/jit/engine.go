@@ -179,7 +179,7 @@ type (
 
 	// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
 	// This is used to store jump tables for br_table instructions.
-	// The primary index is the logical sepration of multiple data, for example data[0] and data[1]
+	// The primary index is the logical separation of multiple data, for example data[0] and data[1]
 	// correspond to different jump tables for different br_table instructions.
 	compiledFunctionStaticData = [][]byte
 )
@@ -471,14 +471,14 @@ func newEngine() *engine {
 }
 
 // Do not make these variables as constants, otherwise there would be
-// dangerous memory accees from native code.
+// dangerous memory access from native code.
 //
 // Background: Go has a mechanism called "goroutine stack-shrink" where Go
 // runtime shrinks Gorotuine's stack when it is GCing. Shrinking means that
 // all the contents on the goroutine stack will be relocated by runtime,
 // Therefore, the memory address of these contents change undeterministically.
 // Not only shrinks, but also Goruntime grows the goroutine stack at any point
-// of function call entries, which also might end up relcating contents.
+// of function call entries, which also might end up relocating contents.
 //
 // On the other hand, we hold pointers to the data region of value stack and
 // callframe stack slices and use these raw pointers from native code.
@@ -725,7 +725,7 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	res := mem.Grow(uint32(newPages))
 	ce.pushValue(uint64(res))
 
-	// Update the moduleContext's ields as they become stale after the update ^^.
+	// Update the moduleContext fields as they become stale after the update ^^.
 	bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
 	ce.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data

@@ -596,7 +596,7 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 }
 
 func (s *Store) getTypes(ts []*FunctionType) ([]*TypeInstance, error) {
-	// We take write-lock here as the follwing might end up mutating typeIDs map.
+	// We take write-lock here as the following might end up mutating typeIDs map.
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	ret := make([]*TypeInstance, len(ts))

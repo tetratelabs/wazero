@@ -23,7 +23,7 @@ func allocateBuffer(size uint32) *byte {
 func getRandomStringRaw(retBufPtr **byte, retBufSize *int)
 
 // Get random string from the hosts.
-func getRandmString() string {
+func getRandomString() string {
 	var bufPtr *byte
 	var bufSize int
 	getRandomStringRaw(&bufPtr, &bufSize)
@@ -40,7 +40,7 @@ func base64OnString(num uint32) {
 	// Get random strings from the host and
 	// do base64 encoding them for given times.
 	for i := uint32(0); i < num; i++ {
-		msg := getRandmString()
+		msg := getRandomString()
 		_ = base64.StdEncoding.EncodeToString([]byte(msg))
 	}
 }
@@ -78,6 +78,7 @@ func reverseArray(size uint32) {
 }
 
 //export random_mat_mul
+//goland:noinspection SpellCheckingInspection
 func randomMatMul(n uint32) {
 	var a, b, result [][]int
 	for i := uint32(0); i < n; i++ {

@@ -25,7 +25,7 @@ var (
 		x86.REG_X12, x86.REG_X13, x86.REG_X14, x86.REG_X15,
 	}
 	// Note that we never invoke "call" instruction,
-	// so we don't need to care about the calling convension.
+	// so we don't need to care about the calling convention.
 	// TODO: Maybe it is safe just save rbp, rsp somewhere
 	// in Go-allocated variables, and reuse these registers
 	// in JITed functions and write them back before returns.

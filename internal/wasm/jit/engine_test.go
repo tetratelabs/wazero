@@ -48,7 +48,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Size and offsets for callFrame.
 	var frame callFrame
 	require.Equal(t, int(unsafe.Sizeof(frame)), callFrameDataSize)
-	// Sizeof callframe must be a power of 2 as we do SHL on the index by "callFrameDataSizeMostSignificantSetBit" to obtain the offset address.
+	// Sizeof call-frame must be a power of 2 as we do SHL on the index by "callFrameDataSizeMostSignificantSetBit" to obtain the offset address.
 	require.True(t, callFrameDataSize&(callFrameDataSize-1) == 0)
 	require.Equal(t, math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit)
 	require.Equal(t, int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset)
@@ -217,7 +217,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 		_, err = e.NewModuleEngine(importedFunctions, moduleFunctions)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
-		// On the compilation failrue, all the compiled functions including suceeded ones must be released.
+		// On the compilation failure, all the compiled functions including succeeded ones must be released.
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
 		for _, f := range moduleFunctions {
 			require.NotContains(t, e.compiledFunctions, f)
@@ -284,7 +284,7 @@ func TestRelease(t *testing.T) {
 	}
 }
 
-// Ensures that value stack and callframe stack are allocated on heap which
+// Ensures that value stack and call-frame stack are allocated on heap which
 // allows us to safely access to their data region from native code.
 // See comments on initialValueStackSize and initialCallFrameStackSize.
 func TestSliceAllocatedOnHeap(t *testing.T) {
@@ -346,7 +346,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 					wasm.OpcodeCall, 3, // Call the wasm function below.
 					// At this point, call stack's memory looks like [call_stack_corruption, index3]
 					// With this function call it should end up [call_stack_corruption, host func]
-					// but if the callframe stack is allocated on goroutine stack, we exit the native code
+					// but if the call-frame stack is allocated on goroutine stack, we exit the native code
 					// with  [call_stack_corruption, index3] (old call frame stack) with HostCall status code,
 					// and end up trying to call index3 as a host function which results in nil pointer exception.
 					wasm.OpcodeCall, 0,

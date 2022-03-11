@@ -36,7 +36,7 @@ type (
 		// Set when type == "module" || "register"
 		Name string `json:"name,omitempty"`
 
-		// Set when type == "module" || "assert_uninstantiable" || "assert_malformed"
+		// Set when type == "module" || "assert_uninstantiatable" || "assert_malformed"
 		Filename string `json:"filename,omitempty"`
 
 		// Set when type == "register"

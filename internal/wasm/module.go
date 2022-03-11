@@ -164,7 +164,7 @@ const (
 
 // TypeOfFunction returns the internalwasm.SectionIDType index for the given function namespace index or nil.
 // Note: The function index namespace is preceded by imported functions.
-// TODO: Returning nil should be impossible when decode results are validated. Validate decode before backfilling tests.
+// TODO: Returning nil should be impossible when decode results are validated. Validate decode before back-filling tests.
 func (m *Module) TypeOfFunction(funcIdx Index) *FunctionType {
 	typeSectionLength := uint32(len(m.TypeSection))
 	if typeSectionLength == 0 {

@@ -756,12 +756,11 @@ func validateFunction(
 		} else if op == OpcodeElse {
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.elseAt = pc
-			// Check the type soundness of the instructions *before*　 entering this Eles Op.
+			// Check the type soundness of the instructions *before* entering this else Op.
 			if err := valueTypeStack.popResults(bl.blockType.Results, true); err != nil {
 				return fmt.Errorf("invalid instruction results in then instructions")
 			}
-			// Before entring instructions inside else, we pop all the values pushed by
-			// then block.
+			// Before entering instructions inside else, we pop all the values pushed by then block.
 			valueTypeStack.resetAtStackLimit()
 		} else if op == OpcodeEnd {
 			bl := controlBlockStack[len(controlBlockStack)-1]
@@ -847,7 +846,7 @@ type valueTypeStack struct {
 }
 
 const (
-	// Only used in the anlyzeFunction below.
+	// Only used in the analyzeFunction below.
 	valueTypeUnknown = ValueType(0xFF)
 )
 
