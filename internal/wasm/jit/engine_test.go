@@ -345,7 +345,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 				Body: []byte{
 					wasm.OpcodeCall, 3, // Call the wasm function below.
 					// At this point, call stack's memory looks like [call_stack_corruption, index3]
-					// With this function call it should up  [call_stack_corruption, index0 (grow_and_shrink_goroutine_stack)]
+					// With this function call it should end up [call_stack_corruption, host func]
 					// but if the callframe stack is allocated on goroutine stack, we exit the native code
 					// with  [call_stack_corruption, index3] (old call frame stack) with HostCall status code,
 					// and end up trying to call index3 as a host function which results in nil pointer exception.
