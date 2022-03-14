@@ -243,7 +243,6 @@ func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.
 		require.NoError(t, err)
 
 		m, err := r.InstantiateModuleFromSource([]byte(`(module $test
-	;; these imports return the input param
 	(import "host" "close_module" (func $close_module ))
 
 	(func $close_while_execution
@@ -266,7 +265,6 @@ func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.
 		require.NoError(t, err)
 
 		m, err := r.InstantiateModuleFromSource([]byte(`(module $test
-		;; these imports return the input param
 		(import "host" "already_closed" (func $already_closed ))
 
 		(func $close_parent_before_execution
