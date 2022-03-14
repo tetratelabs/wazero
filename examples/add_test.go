@@ -22,6 +22,7 @@ func Test_AddInt(t *testing.T) {
     (export "AddInt" (func $addInt))
 )`))
 	require.NoError(t, err)
+	defer module.Close()
 
 	addInt := module.ExportedFunction("AddInt")
 

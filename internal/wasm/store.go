@@ -25,11 +25,6 @@ type (
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#store%E2%91%A0
 	Store struct {
-		// The following fields are wazero-specific fields of Store.
-
-		// ctx is the default context used for function calls
-		ctx context.Context
-
 		// Engine is a global context for a Store which is in responsible for compilation and execution of Wasm modules.
 		engine Engine
 
@@ -251,9 +246,8 @@ func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance,
 	return exp, nil
 }
 
-func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Store {
+func NewStore(engine Engine, enabledFeatures Features) *Store {
 	return &Store{
-		ctx:                  ctx,
 		engine:               engine,
 		EnabledFeatures:      enabledFeatures,
 		moduleNames:          map[string]struct{}{},
@@ -266,8 +260,10 @@ func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Sto
 // Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
 // different names safely and concurrently.
 //
+// * ctx: the default context used for function calls
+//
 // Note: Module.Validate must be called prior to instantiation.
-func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
+func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*ModuleContext, error) {
 	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
@@ -324,13 +320,13 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	m.Ctx = NewModuleContext(s.ctx, s, m)
+	m.Ctx = NewModuleContext(ctx, s, m)
 
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
 		f := m.Functions[funcIdx]
-		if _, err := f.Module.Engine.Call(m.Ctx, f); err != nil {
+		if _, err = f.Module.Engine.Call(m.Ctx, f); err != nil {
 			s.deleteModule(name)
 			return nil, fmt.Errorf("start %s failed: %w", module.funcDesc(funcSection, funcIdx), err)
 		}

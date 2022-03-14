@@ -1,7 +1,9 @@
 package wazero
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -39,4 +41,35 @@ func TestStartWASICommand_UsesStoreContext(t *testing.T) {
 	_, err = StartWASICommand(r, decoded)
 	require.NoError(t, err)
 	require.True(t, calledStart)
+}
+
+// wasiArg was compiled from examples/testdata/wasi_arg.wat
+//go:embed examples/testdata/wasi_arg.wasm
+var wasiArg []byte
+
+func TestStartWASICommandWithConfig(t *testing.T) {
+	r := NewRuntime()
+
+	stdout := bytes.NewBuffer(nil)
+
+	// Configure WASI with baseline config
+	config := NewWASIConfig().WithStdout(stdout)
+	wasi, err := r.InstantiateModule(WASISnapshotPreview1WithConfig(config))
+	require.NoError(t, err)
+	defer wasi.Close()
+
+	m, err := r.CompileModule(wasiArg)
+	require.NoError(t, err)
+
+	// Re-use the same module many times.
+	for _, tc := range []string{"a", "b", "c"} {
+		mod, err := StartWASICommandWithConfig(r, m.WithName(tc), config.WithArgs(tc))
+		require.NoError(t, err)
+
+		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).
+		require.Equal(t, append([]byte(tc), 0), stdout.Bytes())
+
+		stdout.Reset()
+		mod.Close()
+	}
 }

@@ -20,15 +20,18 @@ func Test_Simple(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	// Host functions can be exported as any module name, including the empty string.
-	_, err := r.NewModuleBuilder("").ExportFunction("hello", hello).Instantiate()
+	host, err := r.NewModuleBuilder("").ExportFunction("hello", hello).Instantiate()
 	require.NoError(t, err)
+	defer host.Close()
 
 	// The "hello" function was imported as $hello in Wasm. Since it was marked as the start
 	// function, it is invoked on instantiation. Ensure that worked: "hello" was called!
-	_, err = r.InstantiateModuleFromSource([]byte(`(module $test
+	mod, err := r.InstantiateModuleFromSource([]byte(`(module $test
 	(import "" "hello" (func $hello))
 	(start $hello)
 )`))
 	require.NoError(t, err)
+	defer mod.Close()
+
 	require.Equal(t, "hello!\n", stdout.String())
 }
