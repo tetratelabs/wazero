@@ -46,7 +46,7 @@ func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *
 	return prog
 }
 
-func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
+func TestAmd64Compiler_compileMaybeGrowValueStack(t *testing.T) {
 	t.Run("not grow", func(t *testing.T) {
 		for _, baseOffset := range []uint64{5, 10, 20} {
 			baseOffset := baseOffset
@@ -55,8 +55,8 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 				env := newJITEnvironment()
 				compiler := env.requireNewCompiler(t)
 
-				compiler.initializeReservedStackBasePointer()
-				err := compiler.maybeGrowValueStack()
+				compiler.compileReservedStackBasePointerInitialization()
+				err := compiler.compileMaybeGrowValueStack()
 				require.NoError(t, err)
 				require.NotNil(t, compiler.onStackPointerCeilDeterminedCallBack)
 
@@ -67,7 +67,7 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 				compiler.onStackPointerCeilDeterminedCallBack = nil
 				env.setValueStackBasePointer(stackBasePointer)
 
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -86,12 +86,12 @@ func TestAmd64Compiler_maybeGrowValueStack(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t)
 
-		compiler.initializeReservedStackBasePointer()
-		err := compiler.maybeGrowValueStack()
+		compiler.compileReservedStackBasePointerInitialization()
+		err := compiler.compileMaybeGrowValueStack()
 		require.NoError(t, err)
 
 		// On the return from grow value stack, we just exit with "Returned" status.
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		stackPointerCeil := uint64(6)
 		compiler.stackPointerCeil = stackPointerCeil
@@ -132,7 +132,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 
 		// Before returnFunction, we have the one const on the stack.
 		require.Len(t, compiler.locationStack.usedRegisters, 1)
-		err = compiler.returnFunction()
+		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
 		// After returnFunction, all the registers must be released.
@@ -176,8 +176,7 @@ func TestAmd64Compiler_returnFunction(t *testing.T) {
 				err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
 				require.NoError(t, err)
 
-				// And then return.
-				err = compiler.returnFunction()
+				err = compiler.compileReturnFunction()
 				require.NoError(t, err)
 
 				code, _, _, err := compiler.compile()
@@ -278,7 +277,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			tc.moduleInstance.Engine = me
 			compiler.f.Module = tc.moduleInstance
 
-			compiler.initializeReservedStackBasePointer()
+			compiler.compileReservedStackBasePointerInitialization()
 
 			require.Empty(t, compiler.locationStack.usedRegisters)
 			err := compiler.compileModuleContextInitialization()
@@ -287,7 +286,7 @@ func TestAmd64Compiler_initializeModuleContext(t *testing.T) {
 			require.Empty(t, compiler.locationStack.usedRegisters)
 
 			const expectedStatus = jitCallStatusCodeReturned
-			compiler.exit(expectedStatus)
+			compiler.compileExitFromNativeCode(expectedStatus)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -328,9 +327,7 @@ func TestAmd64Compiler_compileBrTable(t *testing.T) {
 			c.ir.LabelCallers[label.String()] = 1
 			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
 			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
-			err := c.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			c.exit(jitCallStatusCodeReturned)
+			require.NoError(t, c.compileReturnFunction())
 		}
 
 		// Generate the code under test and run.
@@ -497,41 +494,12 @@ func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
 	require.Equal(t, uint64(0), loc.stackPointer)
 }
 
-func Test_setJITStatus(t *testing.T) {
-	for _, s := range []jitCallStatusCode{
-		jitCallStatusCodeReturned,
-		jitCallStatusCodeCallHostFunction,
-		jitCallStatusCodeCallBuiltInFunction,
-		jitCallStatusCodeUnreachable,
-	} {
-		t.Run(s.String(), func(t *testing.T) {
-			env := newJITEnvironment()
-
-			// Build codes.
-			compiler := env.requireNewCompiler(t)
-			err := compiler.compilePreamble()
-			require.NoError(t, err)
-			compiler.exit(s)
-
-			// Generate the code under test.
-			code, _, _, err := compiler.compile()
-			require.NoError(t, err)
-
-			// Run codes
-			env.exec(code)
-
-			// JIT status must be updated.
-			require.Equal(t, s, env.jitStatus())
-		})
-	}
-}
-
 func TestAmd64Compiler_initializeReservedRegisters(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t)
 	err := compiler.compilePreamble()
 	require.NoError(t, err)
-	compiler.exit(jitCallStatusCodeReturned)
+	compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 	// Generate the code under test.
 	code, _, _, err := compiler.compile()
@@ -575,8 +543,8 @@ func TestAmd64Compiler_allocateRegister(t *testing.T) {
 		// Create new value using the stolen register.
 		loc := compiler.locationStack.pushValueLocationOnRegister(reg)
 		compiler.movIntConstToRegister(int64(2000), loc.register)
-		compiler.releaseRegisterToStack(loc)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileReleaseRegisterToStack(loc)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.compile()
@@ -645,10 +613,10 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		compiler.addInstruction(prog)
 		// To verify the behavior, we push the incremented picked value
 		// to the stack.
-		compiler.releaseRegisterToStack(pickedLocation)
+		compiler.compileReleaseRegisterToStack(pickedLocation)
 		// Also write the original location back to the stack.
-		compiler.releaseRegisterToStack(pickTargetLocation)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileReleaseRegisterToStack(pickTargetLocation)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.compile()
@@ -689,9 +657,7 @@ func TestAmd64Compiler_compilePick(t *testing.T) {
 		prog.To.Reg = pickedLocation.register
 		compiler.addInstruction(prog)
 
-		err = compiler.releaseAllRegistersToStack()
-		require.NoError(t, err)
-		compiler.exit(jitCallStatusCodeReturned)
+		require.NoError(t, compiler.compileReturnFunction())
 
 		// Generate the code under test.
 		code, _, _, err := compiler.compile()
@@ -729,8 +695,8 @@ func TestAmd64Compiler_compileConstI32(t *testing.T) {
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = loc.register
 			compiler.addInstruction(prog)
-			compiler.releaseRegisterToStack(loc)
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileReleaseRegisterToStack(loc)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -769,8 +735,8 @@ func TestAmd64Compiler_compileConstI64(t *testing.T) {
 			prog.To.Type = obj.TYPE_REG
 			prog.To.Reg = loc.register
 			compiler.addInstruction(prog)
-			compiler.releaseRegisterToStack(loc)
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileReleaseRegisterToStack(loc)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -811,8 +777,8 @@ func TestAmd64Compiler_compileConstF32(t *testing.T) {
 			prog.From.Type = obj.TYPE_REG
 			prog.From.Reg = loc.register
 			compiler.addInstruction(prog)
-			compiler.releaseRegisterToStack(loc)
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileReleaseRegisterToStack(loc)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -853,8 +819,8 @@ func TestAmd64Compiler_compileConstF64(t *testing.T) {
 			prog.From.Type = obj.TYPE_REG
 			prog.From.Reg = loc.register
 			compiler.addInstruction(prog)
-			compiler.releaseRegisterToStack(loc)
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileReleaseRegisterToStack(loc)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -894,8 +860,8 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		compiler.releaseRegisterToStack(x1)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileReleaseRegisterToStack(x1)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.compile()
@@ -930,8 +896,8 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		compiler.releaseRegisterToStack(x1)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileReleaseRegisterToStack(x1)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.compile()
@@ -975,8 +941,8 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -1023,8 +989,8 @@ func TestAmd64Compiler_compileAdd(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -1087,15 +1053,9 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-						require.NoError(t, err)
-						require.True(t, !top.onConditionalRegister() && top.onRegister())
-						compiler.releaseRegisterToStack(top)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1152,15 +1112,9 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-						require.NoError(t, err)
-						require.True(t, !top.onConditionalRegister() && top.onRegister())
-						compiler.releaseRegisterToStack(top)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1244,11 +1198,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// Plus the result must be pushed.
 						require.Equal(t, len(unreservedGeneralPurposeIntRegisters)+1, int(compiler.locationStack.sp))
 
-						// To verify the behavior, we release the flag value
-						// to the stack.
-						err = compiler.releaseAllRegistersToStack()
-						require.NoError(t, err)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1323,11 +1273,7 @@ func TestAmd64Compiler_emitEqOrNe(t *testing.T) {
 						// Plus the result must be pushed.
 						require.Equal(t, len(unreservedGeneralPurposeIntRegisters)+1, int(compiler.locationStack.sp))
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
-						err = compiler.releaseAllRegistersToStack()
-						require.NoError(t, err)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1376,15 +1322,9 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				// so the corresponding register must be marked unused.
 				require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
 
-				// To verify the behavior, we push the flag value
-				// to the stack.
 				top := compiler.locationStack.peek()
 				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-				require.NoError(t, err)
-				require.True(t, !top.onConditionalRegister() && top.onRegister())
-				compiler.releaseRegisterToStack(top)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -1422,15 +1362,9 @@ func TestAmd64Compiler_compileEqz(t *testing.T) {
 				// so the corresponding register must be marked unused.
 				require.NotContains(t, compiler.locationStack.usedRegisters, loc.register)
 
-				// To verify the behavior, we push the flag value
-				// to the stack.
 				top := compiler.locationStack.peek()
 				require.True(t, top.onConditionalRegister() && !top.onRegister())
-				err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-				require.NoError(t, err)
-				require.True(t, !top.onConditionalRegister() && top.onRegister())
-				compiler.releaseRegisterToStack(top)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -1502,15 +1436,9 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-						require.NoError(t, err)
-						require.True(t, !top.onConditionalRegister() && top.onRegister())
-						compiler.releaseRegisterToStack(top)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						code, _, _, err := compiler.compile()
@@ -1582,15 +1510,9 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-						require.NoError(t, err)
-						require.True(t, !top.onConditionalRegister() && top.onRegister())
-						compiler.releaseRegisterToStack(top)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						code, _, _, err := compiler.compile()
@@ -1665,15 +1587,9 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// Plus the result must be pushed.
 						require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
-						require.NoError(t, err)
-						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-						compiler.releaseRegisterToStack(flag)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						code, _, _, err := compiler.compile()
@@ -1745,15 +1661,9 @@ func TestAmd64Compiler_compileLe_or_Lt(t *testing.T) {
 						// Plus the result must be pushed.
 						require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
-						require.NoError(t, err)
-						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-						compiler.releaseRegisterToStack(flag)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						code, _, _, err := compiler.compile()
@@ -1831,15 +1741,9 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-						require.NoError(t, err)
-						require.True(t, !top.onConditionalRegister() && top.onRegister())
-						compiler.releaseRegisterToStack(top)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1913,15 +1817,9 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						require.NotContains(t, compiler.locationStack.usedRegisters, x1.register)
 						require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						top := compiler.locationStack.peek()
 						require.True(t, top.onConditionalRegister() && !top.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(top)
-						require.NoError(t, err)
-						require.True(t, !top.onConditionalRegister() && top.onRegister())
-						compiler.releaseRegisterToStack(top)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -1997,15 +1895,9 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// Plus the result must be pushed.
 						require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
-						require.NoError(t, err)
-						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-						compiler.releaseRegisterToStack(flag)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -2078,15 +1970,9 @@ func TestAmd64Compiler_compileGe_or_Gt(t *testing.T) {
 						// Plus the result must be pushed.
 						require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-						// To verify the behavior, we push the flag value
-						// to the stack.
 						flag := compiler.locationStack.peek()
 						require.True(t, flag.onConditionalRegister() && !flag.onRegister())
-						err = compiler.moveConditionalToFreeGeneralPurposeRegister(flag)
-						require.NoError(t, err)
-						require.True(t, !flag.onConditionalRegister() && flag.onRegister())
-						compiler.releaseRegisterToStack(flag)
-						compiler.exit(jitCallStatusCodeReturned)
+						require.NoError(t, compiler.compileReturnFunction())
 
 						// Generate the code under test.
 						// and the verification code (moving the result to the stack so we can assert against it)
@@ -2132,8 +2018,8 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		compiler.releaseRegisterToStack(x1)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileReleaseRegisterToStack(x1)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.compile()
@@ -2169,8 +2055,8 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 
 		// To verify the behavior, we push the value
 		// to the stack.
-		compiler.releaseRegisterToStack(x1)
-		compiler.exit(jitCallStatusCodeReturned)
+		compiler.compileReleaseRegisterToStack(x1)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// Generate the code under test.
 		code, _, _, err := compiler.compile()
@@ -2215,8 +2101,8 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -2263,8 +2149,8 @@ func TestAmd64Compiler_compileSub(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -2378,11 +2264,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
 
-				// To verify the behavior, we push the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -2490,11 +2372,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
 				require.NoError(t, err)
 
-				// To verify the behavior, we push the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -2543,8 +2421,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -2595,8 +2473,8 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -2643,11 +2521,7 @@ func TestAmd64Compiler_compileClz(t *testing.T) {
 				// instruction after compileClz.
 				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -2692,11 +2566,7 @@ func TestAmd64Compiler_compileClz(t *testing.T) {
 				// instruction after compileClz.
 				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -2742,11 +2612,7 @@ func TestAmd64Compiler_compileCtz(t *testing.T) {
 				// instruction after compileCtz.
 				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -2790,11 +2656,7 @@ func TestAmd64Compiler_compileCtz(t *testing.T) {
 				// instruction after compileCtz.
 				require.True(t, runtime.GOOS != "darwin" || len(compiler.setJmpOrigins) > 0)
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -2838,11 +2700,7 @@ func TestAmd64Compiler_compilePopcnt(t *testing.T) {
 				// Also the location must be register.
 				require.True(t, compiler.locationStack.peek().onRegister())
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -2888,11 +2746,7 @@ func TestAmd64Compiler_compilePopcnt(t *testing.T) {
 				// Also the location must be register.
 				require.True(t, compiler.locationStack.peek().onRegister())
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -3120,11 +2974,7 @@ func TestAmd64Compiler_compile_and_or_xor_shl_shr_rotl_rotr(t *testing.T) {
 								}
 							}
 
-							// To verify the behavior, we release the value
-							// to the stack.
-							err = compiler.releaseAllRegistersToStack()
-							require.NoError(t, err)
-							compiler.exit(jitCallStatusCodeReturned)
+							require.NoError(t, compiler.compileReturnFunction())
 
 							// Generate and run the code under test.
 							code, _, _, err := compiler.compile()
@@ -3265,11 +3115,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 								require.NoError(t, err)
 
-								// To verify the behavior, we push the value
-								// to the stack.
-								err = compiler.releaseAllRegistersToStack()
-								require.NoError(t, err)
-								compiler.exit(jitCallStatusCodeReturned)
+								require.NoError(t, compiler.compileReturnFunction())
 
 								// Generate the code under test.
 								code, _, _, err := compiler.compile()
@@ -3422,11 +3268,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
 								require.NoError(t, err)
 
-								// To verify the behavior, we push the value
-								// to the stack.
-								err = compiler.releaseAllRegistersToStack()
-								require.NoError(t, err)
-								compiler.exit(jitCallStatusCodeReturned)
+								require.NoError(t, compiler.compileReturnFunction())
 
 								// Generate the code under test.
 								code, _, _, err := compiler.compile()
@@ -3504,8 +3346,8 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -3579,8 +3421,8 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 
 				// To verify the behavior, we push the value
 				// to the stack.
-				compiler.releaseRegisterToStack(x1)
-				compiler.exit(jitCallStatusCodeReturned)
+				compiler.compileReleaseRegisterToStack(x1)
+				compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 				// Generate the code under test.
 				code, _, _, err := compiler.compile()
@@ -3726,11 +3568,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 								require.NoError(t, err)
 
-								// To verify the behavior, we push the value
-								// to the stack.
-								err = compiler.releaseAllRegistersToStack()
-								require.NoError(t, err)
-								compiler.exit(jitCallStatusCodeReturned)
+								require.NoError(t, compiler.compileReturnFunction())
 
 								// Generate the code under test.
 								code, _, _, err := compiler.compile()
@@ -3882,11 +3720,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI64})
 								require.NoError(t, err)
 
-								// To verify the behavior, we push the value
-								// to the stack.
-								err = compiler.releaseAllRegistersToStack()
-								require.NoError(t, err)
-								compiler.exit(jitCallStatusCodeReturned)
+								require.NoError(t, compiler.compileReturnFunction())
 
 								// Generate the code under test.
 								code, _, _, err := compiler.compile()
@@ -3940,11 +3774,7 @@ func TestAmd64Compiler_compileF32DemoteFromF64(t *testing.T) {
 			err = compiler.compileF32DemoteFromF64()
 			require.NoError(t, err)
 
-			// To verify the behavior, we release the value
-			// to the stack.
-			err = compiler.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+			require.NoError(t, compiler.compileReturnFunction())
 
 			// Generate and run the code under test.
 			code, _, _, err := compiler.compile()
@@ -3987,11 +3817,7 @@ func TestAmd64Compiler_compileF64PromoteFromF32(t *testing.T) {
 			err = compiler.compileF64PromoteFromF32()
 			require.NoError(t, err)
 
-			// To verify the behavior, we release the value
-			// to the stack.
-			err = compiler.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+			require.NoError(t, compiler.compileReturnFunction())
 
 			// Generate and run the code under test.
 			code, _, _, err := compiler.compile()
@@ -4078,9 +3904,7 @@ func TestAmd64Compiler_compileReinterpret(t *testing.T) {
 
 							// To verify the behavior, we release the value
 							// to the stack.
-							err = compiler.releaseAllRegistersToStack()
-							require.NoError(t, err)
-							compiler.exit(jitCallStatusCodeReturned)
+							require.NoError(t, compiler.compileReturnFunction())
 
 							// Generate and run the code under test.
 							code, _, _, err := compiler.compile()
@@ -4122,11 +3946,7 @@ func TestAmd64Compiler_compileExtend(t *testing.T) {
 					err = compiler.compileExtend(&wazeroir.OperationExtend{Signed: signed})
 					require.NoError(t, err)
 
-					// To verify the behavior, we release the value
-					// to the stack.
-					err = compiler.releaseAllRegistersToStack()
-					require.NoError(t, err)
-					compiler.exit(jitCallStatusCodeReturned)
+					require.NoError(t, compiler.compileReturnFunction())
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.compile()
@@ -4193,11 +4013,7 @@ func TestAmd64Compiler_compileSignExtend(t *testing.T) {
 				}
 				require.NoError(t, err)
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -4265,11 +4081,7 @@ func TestAmd64Compiler_compileSignExtend(t *testing.T) {
 				}
 				require.NoError(t, err)
 
-				// To verify the behavior, we release the value
-				// to the stack.
-				err = compiler.releaseAllRegistersToStack()
-				require.NoError(t, err)
-				compiler.exit(jitCallStatusCodeReturned)
+				require.NoError(t, compiler.compileReturnFunction())
 
 				// Generate and run the code under test.
 				code, _, _, err := compiler.compile()
@@ -4355,11 +4167,7 @@ func TestAmd64Compiler_compileITruncFromF(t *testing.T) {
 					})
 					require.NoError(t, err)
 
-					// To verify the behavior, we release the value
-					// to the stack.
-					err = compiler.releaseAllRegistersToStack()
-					require.NoError(t, err)
-					compiler.exit(jitCallStatusCodeReturned)
+					require.NoError(t, compiler.compileReturnFunction())
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.compile()
@@ -4486,11 +4294,7 @@ func TestAmd64Compiler_compileFConvertFromI(t *testing.T) {
 					})
 					require.NoError(t, err)
 
-					// To verify the behavior, we release the value
-					// to the stack.
-					err = compiler.releaseAllRegistersToStack()
-					require.NoError(t, err)
-					compiler.exit(jitCallStatusCodeReturned)
+					require.NoError(t, compiler.compileReturnFunction())
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.compile()
@@ -4683,11 +4487,7 @@ func TestAmd64Compiler_compile_abs_neg_ceil_floor(t *testing.T) {
 					// Compile the operation.
 					compileOperationFunc()
 
-					// To verify the behavior, we release the value
-					// to the stack.
-					err = compiler.releaseAllRegistersToStack()
-					require.NoError(t, err)
-					compiler.exit(jitCallStatusCodeReturned)
+					require.NoError(t, compiler.compileReturnFunction())
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.compile()
@@ -4824,11 +4624,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 					// Compile the operation.
 					compileOperationFunc()
 
-					// To verify the behavior, we release the value
-					// to the stack.
-					err = compiler.releaseAllRegistersToStack()
-					require.NoError(t, err)
-					compiler.exit(jitCallStatusCodeReturned)
+					require.NoError(t, compiler.compileReturnFunction())
 
 					// Generate and run the code under test.
 					code, _, _, err := compiler.compile()
@@ -4859,7 +4655,7 @@ func TestAmd64Compiler_compile_min_max_copysign(t *testing.T) {
 	}
 }
 
-func TestAmd64Compiler_setupMemoryAccessCeil(t *testing.T) {
+func TestAmd64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
 	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
 	offsets := []uint32{0,
 		1 << 10, 1 << 31,
@@ -4884,14 +4680,12 @@ func TestAmd64Compiler_setupMemoryAccessCeil(t *testing.T) {
 					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
 					require.NoError(t, err)
 
-					reg, err := compiler.setupMemoryAccessCeil(offset, targetSizeInByte)
+					reg, err := compiler.compileMemoryAccessCeilSetup(offset, targetSizeInByte)
 					require.NoError(t, err)
 
 					compiler.locationStack.pushValueLocationOnRegister(reg)
 
-					err = compiler.releaseAllRegistersToStack()
-					require.NoError(t, err)
-					compiler.exit(jitCallStatusCodeReturned)
+					require.NoError(t, compiler.compileReturnFunction())
 
 					// Generate the code under test and run.
 					code, _, _, err := compiler.compile()
@@ -4972,10 +4766,10 @@ func TestAmd64Compiler_compileLoad(t *testing.T) {
 			compiler.addInstruction(doubleLoadedValue)
 
 			// We need to write the result back to the memory stack.
-			compiler.releaseRegisterToStack(loadedValue)
+			compiler.compileReleaseRegisterToStack(loadedValue)
 
 			// Generate the code under test.
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
@@ -5050,10 +4844,10 @@ func TestAmd64Compiler_compileLoad8(t *testing.T) {
 			compiler.addInstruction(doubleLoadedValue)
 
 			// We need to write the result back to the memory stack.
-			compiler.releaseRegisterToStack(loadedValue)
+			compiler.compileReleaseRegisterToStack(loadedValue)
 
 			// Generate the code under test.
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
@@ -5111,10 +4905,10 @@ func TestAmd64Compiler_compileLoad16(t *testing.T) {
 			compiler.addInstruction(doubleLoadedValue)
 
 			// We need to write the result back to the memory stack.
-			compiler.releaseRegisterToStack(loadedValue)
+			compiler.compileReleaseRegisterToStack(loadedValue)
 
 			// Generate the code under test.
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
@@ -5164,10 +4958,10 @@ func TestAmd64Compiler_compileLoad32(t *testing.T) {
 	compiler.addInstruction(doubleLoadedValue)
 
 	// We need to write the result back to the memory stack.
-	compiler.releaseRegisterToStack(loadedValue)
+	compiler.compileReleaseRegisterToStack(loadedValue)
 
 	// Generate the code under test.
-	compiler.exit(jitCallStatusCodeReturned)
+	compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
@@ -5225,7 +5019,7 @@ func TestAmd64Compiler_compileStore(t *testing.T) {
 			require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 			// Generate the code under test.
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 			code, _, _, err := compiler.compile()
 			require.NoError(t, err)
 
@@ -5279,7 +5073,7 @@ func TestAmd64Compiler_compileStore8(t *testing.T) {
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Generate the code under test.
-	compiler.exit(jitCallStatusCodeReturned)
+	compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
@@ -5323,7 +5117,7 @@ func TestAmd64Compiler_compileStore16(t *testing.T) {
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Generate the code under test.
-	compiler.exit(jitCallStatusCodeReturned)
+	compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
@@ -5367,7 +5161,7 @@ func TestAmd64Compiler_compileStore32(t *testing.T) {
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
 
 	// Generate the code under test.
-	compiler.exit(jitCallStatusCodeReturned)
+	compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 	code, _, _, err := compiler.compile()
 	require.NoError(t, err)
 
@@ -5400,9 +5194,7 @@ func TestAmd64Compiler_compileMemoryGrow(t *testing.T) {
 	require.NoError(t, err)
 	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
 	require.NoError(t, err)
-	err = compiler.releaseAllRegistersToStack()
-	require.NoError(t, err)
-	compiler.exit(jitCallStatusCodeReturned)
+	require.NoError(t, compiler.compileReturnFunction())
 
 	// Generate the code under test.
 	code, _, _, err := compiler.compile()
@@ -5436,9 +5228,7 @@ func TestAmd64Compiler_compileMemorySize(t *testing.T) {
 	require.Equal(t, uint64(1), compiler.locationStack.sp)
 	require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().registerType())
 
-	err = compiler.releaseAllRegistersToStack()
-	require.NoError(t, err)
-	compiler.exit(jitCallStatusCodeReturned)
+	require.NoError(t, compiler.compileReturnFunction())
 
 	// Generate the code under test.
 	code, _, _, err := compiler.compile()
@@ -5573,9 +5363,7 @@ func TestAmd64Compiler_compileDrop(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			err = compiler.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+			require.NoError(t, compiler.compileReturnFunction())
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -5613,10 +5401,9 @@ func TestAmd64Compiler_releaseAllRegistersToStack(t *testing.T) {
 	// Set the values supposed to be released to stack memory space.
 	compiler.movIntConstToRegister(300, x1Reg)
 	compiler.movIntConstToRegister(51, x2Reg)
-	err = compiler.releaseAllRegistersToStack()
-	require.NoError(t, err)
+	compiler.compileReleaseAllRegistersToStack()
 	require.Len(t, compiler.locationStack.usedRegisters, 0)
-	compiler.exit(jitCallStatusCodeReturned)
+	compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 	// Generate the code under test.
 	code, _, _, err := compiler.compile()
@@ -5714,9 +5501,6 @@ func TestAmd64Compiler_compileUnreachable(t *testing.T) {
 
 	// Check the jit status.
 	require.Equal(t, jitCallStatusCodeUnreachable, env.jitStatus())
-	// All the values on registers must be written back to stack.
-	require.Equal(t, uint64(300), env.stack()[0])
-	require.Equal(t, uint64(51), env.stack()[1])
 }
 
 func TestAmd64Compiler_compileSelect(t *testing.T) {
@@ -5827,9 +5611,9 @@ func TestAmd64Compiler_compileSelect(t *testing.T) {
 
 			// Now write back the x1 to the memory if it is on a register.
 			if tc.x1OnRegister {
-				compiler.releaseRegisterToStack(x1)
+				compiler.compileReleaseRegisterToStack(x1)
 			}
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Run code.
 			code, _, _, err := compiler.compile()
@@ -5897,10 +5681,8 @@ func TestAmd64Compiler_compileSwap(t *testing.T) {
 			// Swap x1 and x2.
 			err = compiler.compileSwap(&wazeroir.OperationSwap{Depth: 2})
 			require.NoError(t, err)
-			// To verify the behavior, we release all the registers to stack locations.
-			err = compiler.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+
+			require.NoError(t, compiler.compileReturnFunction())
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -5953,9 +5735,7 @@ func TestAmd64Compiler_compileGlobalGet(t *testing.T) {
 			case wasm.ValueTypeI32, wasm.ValueTypeI64:
 				require.True(t, isIntRegister(global.register))
 			}
-			err = compiler.releaseAllRegistersToStack()
-			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+			require.NoError(t, compiler.compileReturnFunction())
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -5995,7 +5775,7 @@ func TestAmd64Compiler_compileGlobalSet(t *testing.T) {
 			op := &wazeroir.OperationGlobalSet{Index: 1}
 			err = compiler.compileGlobalSet(op)
 			require.NoError(t, err)
-			compiler.exit(jitCallStatusCodeReturned)
+			compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 			// Generate the code under test.
 			code, _, _, err := compiler.compile()
@@ -6050,7 +5830,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 					err = compiler.compileAdd(&wazeroir.OperationAdd{Type: wazeroir.UnsignedTypeI32})
 					require.NoError(t, err)
 
-					err = compiler.returnFunction()
+					err = compiler.compileReturnFunction()
 					require.NoError(t, err)
 
 					code, _, _, err := compiler.compile()
@@ -6083,7 +5863,7 @@ func TestAmd64Compiler_compileCall(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err = compiler.returnFunction()
+			err = compiler.compileReturnFunction()
 			require.NoError(t, err)
 
 			code, _, _, err := compiler.compile()
@@ -6134,7 +5914,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
-		compiler.exit(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
 		code, _, _, err := compiler.compile()
@@ -6169,7 +5949,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, err)
 
 		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
-		compiler.exit(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
 		code, _, _, err := compiler.compile()
@@ -6204,7 +5984,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 		require.NoError(t, compiler.compileCallIndirect(targetOperation))
 
 		// We expect to exit from the code in callIndirect so the subsequent code must be unreachable.
-		compiler.exit(jitCallStatusCodeUnreachable)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 
 		// Generate the code under test and run.
 		code, _, _, err := compiler.compile()
@@ -6248,7 +6028,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 						require.NoError(t, err)
 						err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
 						require.NoError(t, err)
-						err = compiler.returnFunction()
+						err = compiler.compileReturnFunction()
 						require.NoError(t, err)
 
 						code, _, _, err := compiler.compile()
@@ -6292,7 +6072,7 @@ func TestAmd64Compiler_compileCallIndirect(t *testing.T) {
 						// so the stack pointer results in the same.
 						require.Equal(t, uint64(1), compiler.locationStack.sp)
 
-						err = compiler.returnFunction()
+						err = compiler.compileReturnFunction()
 						require.NoError(t, err)
 
 						// Generate the code under test and run.
@@ -6331,7 +6111,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
-		compiler.readInstructionAddress(x86.REG_AX, obj.AJMP)
+		compiler.compileReadInstructionAddress(x86.REG_AX, obj.AJMP)
 
 		// If generate the code without JMP after readInstructionAddress,
 		// the call back added must return error.
@@ -6349,7 +6129,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		const destinationRegister = x86.REG_AX
 		// Set the acquisition target instruction to the one after RET,
 		// and read the absolute address into destinationRegister.
-		compiler.readInstructionAddress(destinationRegister, obj.ARET)
+		compiler.compileReadInstructionAddress(destinationRegister, obj.ARET)
 
 		// Jump to the instruction after RET below via the absolute
 		// address stored in destinationRegister.
@@ -6370,7 +6150,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expectedReturnValue})
 		require.NoError(t, err)
 
-		err = compiler.returnFunction()
+		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
 		// Generate the code under test.
