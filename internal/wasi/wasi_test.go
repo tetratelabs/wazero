@@ -1859,22 +1859,25 @@ const testMemoryPageSize = 1
 
 func instantiateModule(t *testing.T, wasiFunction, wasiImport, moduleName string, opts ...Option) (*wasm.ModuleContext, publicwasm.Function) {
 	enabledFeatures := wasm.Features20191205
-	m, err := text.DecodeModule([]byte(fmt.Sprintf(`(module
+	store := wasm.NewStore(context.Background(), interpreter.NewEngine(), enabledFeatures)
+
+	// The package `wazero` has a simpler interface for adding host modules, but we can't use that as it would create an
+	// import cycle. Instead, we export internalwasm.NewHostModule and use it here.
+	m, err := wasm.NewHostModule(wasi.ModuleSnapshotPreview1, SnapshotPreview1Functions(opts...))
+	require.NoError(t, err)
+
+	// Double-check what we created passes same validity as module-defined modules.
+	require.NoError(t, m.Validate(enabledFeatures))
+
+	_, err = store.Instantiate(m, m.NameSection.ModuleName)
+	require.NoError(t, err)
+
+	m, err = text.DecodeModule([]byte(fmt.Sprintf(`(module
   %[2]s
   (memory 1)  ;; just an arbitrary size big enough for tests
   (export "memory" (memory 0))
   (export "%[1]s" (func $wasi.%[1]s))
 )`, wasiFunction, wasiImport)), enabledFeatures)
-	require.NoError(t, err)
-
-	// The package `wazero` has a simpler interface for adding host modules, but we can't use that as it would create an
-	// import cycle. Instead, we export internalwasm.NewHostModule and use it here.
-	wasi, err := wasm.NewHostModule(wasi.ModuleSnapshotPreview1, SnapshotPreview1Functions(opts...))
-	require.NoError(t, err)
-
-	store := wasm.NewStore(context.Background(), interpreter.NewEngine(), enabledFeatures)
-
-	_, err = store.Instantiate(wasi, wasi.NameSection.ModuleName)
 	require.NoError(t, err)
 
 	mod, err := store.Instantiate(m, moduleName)
