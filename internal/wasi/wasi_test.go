@@ -770,11 +770,11 @@ func TestSnapshotPreview1_FdPread(t *testing.T) {
 	mod, fn := instantiateModule(t, ctx, FunctionFdPread, ImportFdPread, moduleName, config)
 
 	t.Run("SnapshotPreview1.FdPread", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, NewAPI(config).FdPread(mod, 0, 0, 0, 0))
+		require.Equal(t, wasi.ErrnoNosys, NewAPI(config).FdPread(mod, 0, 0, 0, 0, 0))
 	})
 
 	t.Run(FunctionFdPread, func(t *testing.T) {
-		results, err := fn.Call(mod, 0, 0, 0, 0)
+		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
 	})
@@ -894,11 +894,11 @@ func TestSnapshotPreview1_FdPwrite(t *testing.T) {
 	mod, fn := instantiateModule(t, ctx, FunctionFdPwrite, ImportFdPwrite, moduleName, config)
 
 	t.Run("SnapshotPreview1.FdPwrite", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, NewAPI(config).FdPwrite(mod, 0, 0, 0, 0))
+		require.Equal(t, wasi.ErrnoNosys, NewAPI(config).FdPwrite(mod, 0, 0, 0, 0, 0))
 	})
 
 	t.Run(FunctionFdPwrite, func(t *testing.T) {
-		results, err := fn.Call(mod, 0, 0, 0, 0)
+		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
 	})
@@ -1743,11 +1743,11 @@ func TestSnapshotPreview1_PathSymlink(t *testing.T) {
 	mod, fn := instantiateModule(t, ctx, FunctionPathSymlink, ImportPathSymlink, moduleName, config)
 
 	t.Run("SnapshotPreview1.PathSymlink", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, NewAPI(config).PathSymlink(mod, 0, 0, 0, 0, 0, 0))
+		require.Equal(t, wasi.ErrnoNosys, NewAPI(config).PathSymlink(mod, 0, 0, 0, 0, 0))
 	})
 
 	t.Run(FunctionPathSymlink, func(t *testing.T) {
-		results, err := fn.Call(mod, 0, 0, 0, 0, 0, 0)
+		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
 	})

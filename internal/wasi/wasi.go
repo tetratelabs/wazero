@@ -165,7 +165,7 @@ const (
 
 	// ImportFdPread is the WebAssembly 1.0 (20191205) Text format import of FunctionFdPread.
 	ImportFdPread = `(import "wasi_snapshot_preview1" "fd_pread"
-    (func $wasi.fd_pread (param $fd i32) (param $iovs i32) (param $offset i64) (param $result.nread i32) (result (;errno;) i32)))`
+    (func $wasi.fd_pread (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $offset i64) (param $result.nread i32) (result (;errno;) i32)))`
 
 	// FunctionFdPrestatGet returns the prestat data of a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_prestat_get
@@ -189,7 +189,7 @@ const (
 
 	// ImportFdPwrite is the WebAssembly 1.0 (20191205) Text format import of FunctionFdPwrite.
 	ImportFdPwrite = `(import "wasi_snapshot_preview1" "fd_pwrite"
-    (func $wasi.fd_pwrite (param $fd i32) (param $iovs i32) (param $offset i64) (param $result.nwritten i32) (result (;errno;) i32)))`
+    (func $wasi.fd_pwrite (param $fd i32) (param $iovs i32) (param $iovs_len i32) (param $offset i64) (param $result.nwritten i32) (result (;errno;) i32)))`
 
 	// FunctionFdRead read bytes from a file descriptor.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#fd_read
@@ -317,7 +317,7 @@ const (
 
 	// ImportPathSymlink is the WebAssembly 1.0 (20191205) Text format import of FunctionPathSymlink.
 	ImportPathSymlink = `(import "wasi_snapshot_preview1" "path_symlink"
-    (func $wasi.path_symlink (param $old_path i32) (param $old_path_len i32) (param $new_fd i32) (param $fd i32) (param $new_path i32) (param $new_path_len i32) (result (;errno;) i32)))`
+    (func $wasi.path_symlink (param $old_path i32) (param $old_path_len i32) (param $fd i32) (param $new_path i32) (param $new_path_len i32) (result (;errno;) i32)))`
 
 	// FunctionPathUnlinkFile unlinks a file.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-path_unlink_filefd-fd-path-string---errno
@@ -892,7 +892,7 @@ type SnapshotPreview1 interface {
 	PathRename(ctx wasm.Module, fd, oldPath, oldPathLen, newFd, newPath, newPathLen uint32) wasi.Errno
 
 	// PathSymlink is the WASI function named FunctionPathSymlink
-	PathSymlink(ctx wasm.Module, oldPath, oldPathLen, fd, newFd, newPath, newPathLen uint32) wasi.Errno
+	PathSymlink(ctx wasm.Module, oldPath, oldPathLen, fd, newPath, newPathLen uint32) wasi.Errno
 
 	// PathUnlinkFile is the WASI function named FunctionPathUnlinkFile
 	PathUnlinkFile(ctx wasm.Module, fd, path, pathLen uint32) wasi.Errno
@@ -1172,7 +1172,7 @@ func (a *wasiAPI) FdFilestatSetTimes(ctx wasm.Module, fd uint32, atim, mtim uint
 }
 
 // FdPread implements SnapshotPreview1.FdPread
-func (a *wasiAPI) FdPread(ctx wasm.Module, fd, iovs uint32, offset uint64, resultNread uint32) wasi.Errno {
+func (a *wasiAPI) FdPread(ctx wasm.Module, fd, iovs, iovsCount uint32, offset uint64, resultNread uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1198,7 +1198,7 @@ func (a *wasiAPI) FdPrestatDirName(ctx wasm.Module, fd uint32, pathPtr uint32, p
 }
 
 // FdPwrite implements SnapshotPreview1.FdPwrite
-func (a *wasiAPI) FdPwrite(ctx wasm.Module, fd, iovs uint32, offset uint64, resultNwritten uint32) wasi.Errno {
+func (a *wasiAPI) FdPwrite(ctx wasm.Module, fd, iovs, iovsCount uint32, offset uint64, resultNwritten uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
@@ -1416,7 +1416,7 @@ func (a *wasiAPI) PathRename(ctx wasm.Module, fd, oldPath, oldPathLen, newFd, ne
 }
 
 // PathSymlink implements SnapshotPreview1.PathSymlink
-func (a *wasiAPI) PathSymlink(ctx wasm.Module, oldPath, oldPathLen, fd, newFd, newPath, newPathLen uint32) wasi.Errno {
+func (a *wasiAPI) PathSymlink(ctx wasm.Module, oldPath, oldPathLen, fd, newPath, newPathLen uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
