@@ -280,17 +280,15 @@ func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.
 		importedModule.Close()
 
 		// Even we can re-enstantiate the module for the same name.
-		var called bool
 		importedModuleNew, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-			"already_closed": func() { called = true },
+			"already_closed": func() {
+				panic("unreachable") // The new module's function must not be called.
+			},
 		}).Instantiate()
 		require.NoError(t, err)
 		defer importedModuleNew.Close()
 
 		_, err = m.ExportedFunction("close_parent_before_execution").Call(nil)
 		require.NoError(t, err)
-
-		// The new module's function must not be called.
-		require.False(t, called)
 	})
 }
