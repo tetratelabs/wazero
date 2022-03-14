@@ -50,6 +50,9 @@ func runAdhocTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	t.Run("host function with float type", func(t *testing.T) {
 		testHostFunctions(t, newRuntimeConfig)
 	})
+	t.Run("close with outstanding calls", func(t *testing.T) {
+		testAdhocCloseWhileExecution(t, newRuntimeConfig)
+	})
 }
 
 func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
@@ -227,4 +230,63 @@ func testHostFunctions(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConf
 			require.Equal(t, input, publicwasm.DecodeF64(results[0]))
 		})
 	}
+}
+
+// testAdhocCloseWhileExecution ensures that calling Module.Close with outstanding calls is safe.
+func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+	t.Run("singleton", func(t *testing.T) {
+		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+		var moduleCloser func()
+		_, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
+			"close_module": func() { moduleCloser() }, // Closing while executing itself.
+		}).Instantiate()
+		require.NoError(t, err)
+
+		m, err := r.InstantiateModuleFromSource([]byte(`(module $test
+	(import "host" "close_module" (func $close_module ))
+
+	(func $close_while_execution
+		call $close_module
+	)
+	(export "close_while_execution" (func $close_while_execution))
+)`))
+		require.NoError(t, err)
+
+		moduleCloser = m.Close
+
+		_, err = m.ExportedFunction("close_while_execution").Call(nil)
+		require.NoError(t, err)
+	})
+	t.Run("close imported module", func(t *testing.T) {
+		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+		importedModule, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
+			"already_closed": func() {},
+		}).Instantiate()
+		require.NoError(t, err)
+
+		m, err := r.InstantiateModuleFromSource([]byte(`(module $test
+		(import "host" "already_closed" (func $already_closed ))
+
+		(func $close_parent_before_execution
+			call $already_closed
+		)
+		(export "close_parent_before_execution" (func $close_parent_before_execution))
+	)`))
+		require.NoError(t, err)
+
+		// Closing the imported module before making call should also safe.
+		importedModule.Close()
+
+		// Even we can re-enstantiate the module for the same name.
+		importedModuleNew, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
+			"already_closed": func() {
+				panic("unreachable") // The new module's function must not be called.
+			},
+		}).Instantiate()
+		require.NoError(t, err)
+		defer importedModuleNew.Close()
+
+		_, err = m.ExportedFunction("close_parent_before_execution").Call(nil)
+		require.NoError(t, err)
+	})
 }

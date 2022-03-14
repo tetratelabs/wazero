@@ -18,10 +18,9 @@ func TestStore_resolveImports_table(t *testing.T) {
 			Type:  ExternTypeTable,
 			Table: tableInst,
 		}}, Name: moduleName}
-		_, _, table, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &Table{Max: &max}}}})
+		_, _, table, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: &Table{Max: &max}}}})
 		require.NoError(t, err)
 		require.Equal(t, table, tableInst)
-		require.Equal(t, 1, s.modules[moduleName].dependentCount)
 	})
 	t.Run("minimum size mismatch", func(t *testing.T) {
 		s := newStore()
@@ -30,7 +29,7 @@ func TestStore_resolveImports_table(t *testing.T) {
 			Type:  ExternTypeTable,
 			Table: &TableInstance{Min: importTableType.Min - 1},
 		}}, Name: moduleName}
-		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
+		_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
 		require.EqualError(t, err, "import[0] table[test.target]: minimum size mismatch: 2 > 1")
 	})
 	t.Run("maximum size mismatch", func(t *testing.T) {
@@ -41,7 +40,7 @@ func TestStore_resolveImports_table(t *testing.T) {
 			Type:  ExternTypeTable,
 			Table: &TableInstance{Min: importTableType.Min - 1},
 		}}, Name: moduleName}
-		_, _, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
+		_, _, _, _, err := s.resolveImports(&Module{ImportSection: []*Import{{Module: moduleName, Name: name, Type: ExternTypeTable, DescTable: importTableType}}})
 		require.EqualError(t, err, "import[0] table[test.target]: maximum size mismatch: 10, but actual has no max")
 	})
 }

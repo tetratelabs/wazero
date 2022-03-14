@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -33,6 +34,11 @@ type (
 		// parentEngine holds *engine from which this module engine is created from.
 		parentEngine           *engine
 		importedFunctionCounts int
+
+		// Closed indicates whether Close was called for this moduleEngine, and used to prevent
+		// double-free of compiledFunctions.
+		// Note: intentionally use uint32 instead of bool for atomic operation.
+		closed uint32
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -348,7 +354,7 @@ func (e *engine) NewModuleEngine(importedFunctions, moduleFunctions []*wasm.Func
 			compiled, err = compileHostFunction(f)
 		}
 		if err != nil {
-			_ = me.Release()
+			me.Close()
 			return nil, fmt.Errorf("function[%d/%d] %w", i, len(moduleFunctions)-1, err)
 		}
 		me.compiledFunctions = append(me.compiledFunctions, compiled)
@@ -366,16 +372,20 @@ func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
-// Release implements internalwasm.ModuleEngine Release
-func (me *moduleEngine) Release() error {
-	// Release all the function instances declared in this module.
-	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
-		if err := munmapCodeSegment(cf.codeSegment); err != nil {
-			return err
+// Close implements internalwasm.ModuleEngine Close
+func (me *moduleEngine) Close() {
+	// Setting finalizer multiple times result in panic, so we guard with CAS.
+	if atomic.CompareAndSwapUint32(&me.closed, 0, 1) {
+		// Release all the function instances declared in this module.
+		for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+			runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
+				if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
+					panic(err) // mumap failure cannot recover.
+				}
+			})
+			me.parentEngine.deleteCompiledFunction(cf.source)
 		}
-		me.parentEngine.deleteCompiledFunction(cf.source)
 	}
-	return nil
 }
 
 func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {

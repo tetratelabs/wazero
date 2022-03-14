@@ -10,11 +10,12 @@ import (
 // compile time check to ensure ModuleContext implements wasm.Module
 var _ publicwasm.Module = &ModuleContext{}
 
-func NewModuleContext(ctx context.Context, engine Engine, instance *ModuleInstance) *ModuleContext {
+func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance) *ModuleContext {
 	return &ModuleContext{
 		ctx:    ctx,
 		memory: instance.Memory,
 		module: instance,
+		store:  store,
 	}
 }
 
@@ -25,6 +26,7 @@ type ModuleContext struct {
 	module *ModuleInstance
 	// memory is returned by Memory and overridden WithMemory
 	memory publicwasm.Memory
+	store  *Store
 }
 
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
@@ -53,6 +55,10 @@ func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx}
 	}
 	return m
+}
+
+func (m *ModuleContext) Close() {
+	m.store.CloseModule(m.module.Name)
 }
 
 // Memory implements wasm.Module Memory
@@ -90,10 +96,11 @@ func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
 
 // Call implements wasm.Function Call
 func (f *FunctionInstance) Call(ctx publicwasm.Module, params ...uint64) ([]uint64, error) {
+	mod := f.Module
 	if modCtx, ok := ctx.(*ModuleContext); !ok { // allow nil to substitute for the defining module
-		return f.Module.Engine.Call(f.Module.Ctx, f, params...)
+		return mod.Engine.Call(mod.Ctx, f, params...)
 	} else { // TODO: check if the importing context is correct
-		return f.Module.Engine.Call(modCtx, f, params...)
+		return mod.Engine.Call(modCtx, f, params...)
 	}
 }
 

@@ -91,7 +91,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 
 	e := NewEngine()
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewModuleContext(context.Background(), e, module)
+	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(context.Background(), e, wasm.Features20191205), module)
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
 		Kind:   wasm.FunctionKindGoModule,
@@ -281,7 +281,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 	})
 }
 
-func TestRelease(t *testing.T) {
+func TestClose(t *testing.T) {
 	newFunctionInstance := func(id int) *wasm.FunctionInstance {
 		return &wasm.FunctionInstance{
 			Name: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
@@ -327,8 +327,7 @@ func TestRelease(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			err = me.Release()
-			require.NoError(t, err)
+			me.Close()
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
 			for _, f := range tc.importedFunctions {
