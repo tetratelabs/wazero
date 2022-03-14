@@ -89,7 +89,7 @@ func TestWriteUint32Le(t *testing.T) {
 	require.False(t, mem.WriteUint32Le(9, 16))
 }
 
-func TestMemoryInstance_HasLen(t *testing.T) {
+func TestMemoryInstance_HasSize(t *testing.T) {
 	memory := &MemoryInstance{Buffer: make([]byte, 100)}
 
 	tests := []struct {
@@ -120,6 +120,12 @@ func TestMemoryInstance_HasLen(t *testing.T) {
 			name:        "offset exceeds the memory size",
 			offset:      memory.Size(),
 			sizeInBytes: 1, // arbitrary size
+			expected:    false,
+		},
+		{
+			name:        "offset + sizeInBytes overflows in uint32",
+			offset:      math.MaxUint32 - 1, // invalid too large offset
+			sizeInBytes: 4,                  // if there's overflow, offset + sizeInBytes is 3, and it may pass the check
 			expected:    false,
 		},
 	}
