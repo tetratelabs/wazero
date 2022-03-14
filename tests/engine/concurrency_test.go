@@ -19,7 +19,7 @@ func TestJITConcurrency(t *testing.T) {
 
 func TestInterpreterConcurrency(t *testing.T) {
 	runAdhocTestsUnderHighConcurrency(t, wazero.NewRuntimeConfigInterpreter)
-	singleModuleHighConcurrency(t, wazero.NewRuntimeConfigJIT)
+	singleModuleHighConcurrency(t, wazero.NewRuntimeConfigInterpreter)
 }
 
 func runAdhocTestsUnderHighConcurrency(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {

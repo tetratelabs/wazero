@@ -35,7 +35,10 @@ type (
 		parentEngine           *engine
 		importedFunctionCounts int
 
-		closed uint32 // use uint32 instead of bool for atomic operation.
+		// Closed indicates whether Close was called for this moduleEngine, and used to prevent
+		// double-free of compiledFunctions.
+		// Note: intentionally use uint32 instead of bool for atomic operation.
+		closed uint32
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -369,6 +372,22 @@ func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
+// Close implements internalwasm.ModuleEngine Close
+func (me *moduleEngine) Close() {
+	// Setting finalizer multiple times result in panic, so we guard with CAS.
+	if atomic.CompareAndSwapUint32(&me.closed, 0, 1) {
+		// Release all the function instances declared in this module.
+		for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+			runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
+				if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
+					panic(err) // mumap failure cannot recover.
+				}
+			})
+			me.parentEngine.deleteCompiledFunction(cf.source)
+		}
+	}
+}
+
 func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
@@ -386,22 +405,6 @@ func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunc
 	defer e.mux.RUnlock()
 	cf, ok = e.compiledFunctions[f]
 	return
-}
-
-// Close implements internalwasm.ModuleEngine Close
-func (me *moduleEngine) Close() {
-	// Setting finalizer multiple times result in panic, so we guard with CAS.
-	if atomic.CompareAndSwapUint32(&me.closed, 0, 1) {
-		// Release all the function instances declared in this module.
-		for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
-			runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
-				if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
-					panic(err) // mumap failure cannot recover.
-				}
-			})
-			me.parentEngine.deleteCompiledFunction(cf.source)
-		}
-	}
 }
 
 // Call implements internalwasm.ModuleEngine Call
