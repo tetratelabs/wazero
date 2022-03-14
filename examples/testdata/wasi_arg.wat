@@ -24,37 +24,37 @@
     ;; See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#memories%E2%91%A7
     (memory (export "memory") 1)
 
+    ;; $iovs are offset/length pairs in memory fd_write copies to the file descriptor.
+    ;; $main will only write one offset/length pair, corresponding to null-terminated args.
+    (global $iovs i32 i32.const 1024) ;; 1024 is an arbitrary offset larger than the args.
+
+    ;; WASI parameters are usually memory offsets, you can ignore values by writing them to an unread offset.
+    (global $ignored i32 i32.const 32768)
+
     ;; _start is a special function defined by a WASI Command that runs like a main function would.
     ;;
     ;; See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
-    (func $main (export "_start") (local $iovs i32) (local $ignored i32)
-        ;; $iovs are offset/length pairs in memory fd_write copies to the file descriptor.
-        ;; This function will only write one offset/length pair, corresponding to null-terminated args.
-        (local.set $iovs (i32.const 1024)) ;; 1024 is an arbitrary offset larger than the args.
-
-        ;; WASI parameters are usually memory offsets, you can ignore values by writing them to an unread offset.
-        (local.set $ignored (i32.const 32768))
-
+    (func $main (export "_start")
         ;; To copy an argument to a file, we first need to load it into memory.
         (call $wasi.args_get
-            (local.get $ignored) ;; ignore $argv as we only read the argv_buf
+            (global.get $ignored) ;; ignore $argv as we only read the argv_buf
             (i32.const 0) ;; Write $argv_buf (null-terminated args) to memory offset zero.
         )
         drop ;; ignore the errno returned
 
         ;; Next, we need to know how many bytes were loaded, as that's how much we'll copy to the file.
         (call $wasi.args_sizes_get
-            (local.get $ignored) ;; ignore $result.argc as we only read the argv_buf.
-            (i32.add (local.get $iovs) (i32.const 4)) ;; store $result.argv_buf_size as the length to copy
+            (global.get $ignored) ;; ignore $result.argc as we only read the argv_buf.
+            (i32.add (global.get $iovs) (i32.const 4)) ;; store $result.argv_buf_size as the length to copy
         )
         drop ;; ignore the errno returned
 
         ;; Finally, write the memory region to the file.
         (call $wasi.fd_write
             (i32.const 1) ;; $fd is a file descriptor and 1 is stdout (console).
-            (local.get $iovs) ;; $iovs is the start offset of the IO vectors to copy.
+            (global.get $iovs) ;; $iovs is the start offset of the IO vectors to copy.
             (i32.const 1) ;; $iovs_len is the count of offset/length pairs to copy to memory.
-            (local.get $ignored) ;; ignore $result.size as we aren't verifying it.
+            (global.get $ignored) ;; ignore $result.size as we aren't verifying it.
         )
         drop ;; ignore the errno returned
     )
