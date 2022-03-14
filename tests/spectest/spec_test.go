@@ -218,13 +218,13 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 			{Params: []byte{wasm.ValueTypeF64, wasm.ValueTypeF64}}, // print_f64_f64
 		},
 		CodeSection: []*wasm.Code{
-			{Body: []byte{wasm.OpcodeEnd}},                                   // print
-			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_i32
-			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_i64
-			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_f32
-			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeEnd}},                  // print_f64
-			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_i32_f32
-			{Body: []byte{wasm.OpcodeDrop, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_f64_f64
+			{Body: []byte{wasm.OpcodeEnd}},                                                                                   // print
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_i32
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_i64
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_f32
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeEnd}},                                          // print_f64
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeLocalGet, 1, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_i32_f32
+			{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeDrop, wasm.OpcodeLocalGet, 1, wasm.OpcodeDrop, wasm.OpcodeEnd}}, // print_f64_f64
 		},
 		GlobalSection: []*wasm.Global{
 			{ // global_i32
@@ -241,7 +241,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 			},
 			{ // global_f64
 				Type: &wasm.GlobalType{ValType: wasm.ValueTypeF64},
-				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF32Const, Data: []byte{0x40, 0x84, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}},
+				Init: &wasm.ConstantExpression{Opcode: wasm.OpcodeF64Const, Data: []byte{0x40, 0x84, 0xd0, 0x00, 0x00, 0x00, 0x00, 0x00}},
 			},
 		},
 		MemorySection: &wasm.Memory{
@@ -266,7 +266,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 			"memory":        {Name: "memory", Index: 0, Type: wasm.ExternTypeMemory},
 		},
 	}
-
+	require.NoError(t, mod.Validate(wasm.Features20191205))
 	_, err := store.Instantiate(mod, "spectest")
 	require.NoError(t, err)
 }

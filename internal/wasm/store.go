@@ -277,6 +277,8 @@ func NewStore(ctx context.Context, engine Engine, enabledFeatures Features) *Sto
 
 // Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
 // different names safely and concurrently.
+//
+// Note: Module.Validate must be called prior to instantiation.
 func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error) {
 	if err := s.requireModuleName(name); err != nil {
 		return nil, err
