@@ -33,12 +33,15 @@ func Test_WASI(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	// Host functions can be exported as any module name, including the empty string.
-	_, err := r.NewModuleBuilder("").ExportFunction("random", random).Instantiate()
+	host, err := r.NewModuleBuilder("").ExportFunction("random", random).Instantiate()
 	require.NoError(t, err)
+	defer host.Close()
 
 	// Configure WASI and implement the function to use it
 	we, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
+	defer we.Close()
+
 	randomGetFn := we.ExportedFunction("random_get")
 
 	// Implement the function pointer. This mainly shows how you can decouple a host function dependency.
@@ -50,7 +53,7 @@ func Test_WASI(t *testing.T) {
 
 	// The "random" function was imported as $random in Wasm. Since it was marked as the start
 	// function, it is invoked on instantiation. Ensure that worked: "random" was called!
-	_, err = r.InstantiateModuleFromSource([]byte(`(module $wasi
+	mod, err := r.InstantiateModuleFromSource([]byte(`(module $wasi
 	(import "wasi_snapshot_preview1" "random_get"
 		(func $wasi.random_get (param $buf i32) (param $buf_len i32) (result (;errno;) i32)))
 	(import "" "random" (func $random))
@@ -58,5 +61,7 @@ func Test_WASI(t *testing.T) {
 	(start $random)
 )`))
 	require.NoError(t, err)
+	defer mod.Close()
+
 	require.Contains(t, stdout.String(), "random: ")
 }

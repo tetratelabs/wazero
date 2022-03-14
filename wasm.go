@@ -2,6 +2,7 @@ package wazero
 
 import (
 	"bytes"
+	"context"
 	"errors"
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -16,6 +17,7 @@ import (
 //	r := wazero.NewRuntime()
 //	decoded, _ := r.CompileModule(source)
 //	module, _ := r.InstantiateModule(decoded)
+//	defer module.Close()
 //
 // See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/
 type Runtime interface {
@@ -48,6 +50,7 @@ type Runtime interface {
 	//
 	// Ex.
 	//	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
+	//	defer module.Close()
 	//
 	// Note: This is a convenience utility that chains CompileModule with InstantiateModule. To instantiate the same
 	// source multiple times, use CompileModule as InstantiateModule avoids redundant decoding and/or compilation.
@@ -59,6 +62,7 @@ type Runtime interface {
 	//	r := wazero.NewRuntime()
 	//	decoded, _ := r.CompileModule(source)
 	//	module, _ := r.InstantiateModule(decoded)
+	//	defer module.Close()
 	//
 	// While a Module is pre-validated, there are a few situations which can cause an error:
 	//  * The Module name is already in use.
@@ -78,13 +82,15 @@ func NewRuntime() Runtime {
 // NewRuntimeWithConfig returns a runtime with the given configuration.
 func NewRuntimeWithConfig(config *RuntimeConfig) Runtime {
 	return &runtime{
-		store:           internalwasm.NewStore(config.ctx, config.engine, config.enabledFeatures),
+		ctx:             config.ctx,
+		store:           internalwasm.NewStore(config.engine, config.enabledFeatures),
 		enabledFeatures: config.enabledFeatures,
 	}
 }
 
 // runtime allows decoupling of public interfaces from internal representation.
 type runtime struct {
+	ctx             context.Context
 	store           *internalwasm.Store
 	enabledFeatures internalwasm.Features
 }
@@ -140,5 +146,5 @@ func (r *runtime) InstantiateModuleFromSource(source []byte) (wasm.Module, error
 
 // InstantiateModule implements Runtime.InstantiateModule
 func (r *runtime) InstantiateModule(module *Module) (wasm.Module, error) {
-	return r.store.Instantiate(module.module, module.name)
+	return r.store.Instantiate(r.ctx, module.module, module.name)
 }

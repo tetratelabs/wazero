@@ -1,6 +1,7 @@
 package internalwasi
 
 import (
+	"context"
 	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -946,24 +947,15 @@ type SnapshotPreview1 interface {
 }
 
 type wasiAPI struct {
-	args *nullTerminatedStrings
-	// environ stores each environment variable in the form of "key=value",
-	// which is both convenient for the implementation of environ_get and matches os.Environ
-	environ *nullTerminatedStrings
-	stdin   io.Reader
-	stdout,
-	stderr io.Writer
-	opened map[uint32]fileEntry
-	// timeNowUnixNano is mutable for testing
-	timeNowUnixNano func() uint64
-	randSource      func([]byte) error
+	// cfg is the default configuration to use when there is no context.Context override (ConfigContextKey).
+	cfg *Config
 }
 
 // SnapshotPreview1Functions returns all go functions that implement SnapshotPreview1.
 // These should be exported in the module named wasi.ModuleSnapshotPreview1.
 // See internalwasm.NewHostModule
-func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interface{}) {
-	a := NewAPI(opts...)
+func SnapshotPreview1Functions(config *Config) (nameToGoFunc map[string]interface{}) {
+	a := NewAPI(config)
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
@@ -1018,7 +1010,9 @@ func SnapshotPreview1Functions(opts ...Option) (nameToGoFunc map[string]interfac
 
 // ArgsGet implements SnapshotPreview1.ArgsGet
 func (a *wasiAPI) ArgsGet(ctx wasm.Module, argv, argvBuf uint32) wasi.Errno {
-	for _, arg := range a.args.nullTerminatedValues {
+	cfg := a.config(ctx.Context())
+
+	for _, arg := range cfg.args.nullTerminatedValues {
 		if !ctx.Memory().WriteUint32Le(argv, argvBuf) {
 			return wasi.ErrnoFault
 		}
@@ -1034,10 +1028,12 @@ func (a *wasiAPI) ArgsGet(ctx wasm.Module, argv, argvBuf uint32) wasi.Errno {
 
 // ArgsSizesGet implements SnapshotPreview1.ArgsSizesGet
 func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize uint32) wasi.Errno {
-	if !ctx.Memory().WriteUint32Le(resultArgc, uint32(len(a.args.nullTerminatedValues))) {
+	cfg := a.config(ctx.Context())
+
+	if !ctx.Memory().WriteUint32Le(resultArgc, uint32(len(cfg.args.nullTerminatedValues))) {
 		return wasi.ErrnoFault
 	}
-	if !ctx.Memory().WriteUint32Le(resultArgvBufSize, a.args.totalBufSize) {
+	if !ctx.Memory().WriteUint32Le(resultArgvBufSize, cfg.args.totalBufSize) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1045,8 +1041,10 @@ func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize ui
 
 // EnvironGet implements SnapshotPreview1.EnvironGet
 func (a *wasiAPI) EnvironGet(ctx wasm.Module, environ uint32, environBuf uint32) wasi.Errno {
+	cfg := a.config(ctx.Context())
+
 	// w.environ holds the environment variables in the form of "key=val\x00", so just copies it to the linear memory.
-	for _, env := range a.environ.nullTerminatedValues {
+	for _, env := range cfg.environ.nullTerminatedValues {
 		if !ctx.Memory().WriteUint32Le(environ, environBuf) {
 			return wasi.ErrnoFault
 		}
@@ -1062,10 +1060,12 @@ func (a *wasiAPI) EnvironGet(ctx wasm.Module, environ uint32, environBuf uint32)
 
 // EnvironSizesGet implements SnapshotPreview1.EnvironSizesGet
 func (a *wasiAPI) EnvironSizesGet(ctx wasm.Module, resultEnvironc uint32, resultEnvironBufSize uint32) wasi.Errno {
-	if !ctx.Memory().WriteUint32Le(resultEnvironc, uint32(len(a.environ.nullTerminatedValues))) {
+	cfg := a.config(ctx.Context())
+
+	if !ctx.Memory().WriteUint32Le(resultEnvironc, uint32(len(cfg.environ.nullTerminatedValues))) {
 		return wasi.ErrnoFault
 	}
-	if !ctx.Memory().WriteUint32Le(resultEnvironBufSize, a.environ.totalBufSize) {
+	if !ctx.Memory().WriteUint32Le(resultEnvironBufSize, cfg.environ.totalBufSize) {
 		return wasi.ErrnoFault
 	}
 
@@ -1079,8 +1079,10 @@ func (a *wasiAPI) ClockResGet(ctx wasm.Module, id uint32, resultResolution uint3
 
 // ClockTimeGet implements SnapshotPreview1.ClockTimeGet
 func (a *wasiAPI) ClockTimeGet(ctx wasm.Module, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno {
+	cfg := a.config(ctx.Context())
+
 	// TODO: id and precision are currently ignored.
-	if !ctx.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
+	if !ctx.Memory().WriteUint64Le(resultTimestamp, cfg.timeNowUnixNano()) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1098,7 +1100,9 @@ func (a *wasiAPI) FdAllocate(ctx wasm.Module, fd uint32, offset, len uint64) was
 
 // FdClose implements SnapshotPreview1.FdClose
 func (a *wasiAPI) FdClose(ctx wasm.Module, fd uint32) wasi.Errno {
-	f, ok := a.opened[fd]
+	cfg := a.config(ctx.Context())
+
+	f, ok := cfg.opened[fd]
 	if !ok {
 		return wasi.ErrnoBadf
 	}
@@ -1107,7 +1111,7 @@ func (a *wasiAPI) FdClose(ctx wasm.Module, fd uint32) wasi.Errno {
 		f.file.Close()
 	}
 
-	delete(a.opened, fd)
+	delete(cfg.opened, fd)
 
 	return wasi.ErrnoSuccess
 }
@@ -1120,7 +1124,9 @@ func (a *wasiAPI) FdDatasync(ctx wasm.Module, fd uint32) wasi.Errno {
 // FdFdstatGet implements SnapshotPreview1.FdFdstatGet
 // TODO: Currently FdFdstatget implements nothing except returning fake fs_right_inheriting
 func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) wasi.Errno {
-	if _, ok := a.opened[fd]; !ok {
+	cfg := a.config(ctx.Context())
+
+	if _, ok := cfg.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
 	if !ctx.Memory().WriteUint64Le(resultStat+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
@@ -1132,7 +1138,9 @@ func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) was
 // FdPrestatGet implements SnapshotPreview1.FdPrestatGet
 // TODO: Currently FdPrestatGet implements nothing except returning ErrnoBadf
 func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, bufPtr uint32) wasi.Errno {
-	if _, ok := a.opened[fd]; !ok {
+	cfg := a.config(ctx.Context())
+
+	if _, ok := cfg.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
 	return wasi.ErrnoSuccess
@@ -1170,7 +1178,9 @@ func (a *wasiAPI) FdPread(ctx wasm.Module, fd, iovs uint32, offset uint64, resul
 
 // FdPrestatDirName implements SnapshotPreview1.FdPrestatDirName
 func (a *wasiAPI) FdPrestatDirName(ctx wasm.Module, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
-	f, ok := a.opened[fd]
+	cfg := a.config(ctx.Context())
+
+	f, ok := cfg.opened[fd]
 	if !ok {
 		return wasi.ErrnoBadf
 	}
@@ -1194,13 +1204,15 @@ func (a *wasiAPI) FdPwrite(ctx wasm.Module, fd, iovs uint32, offset uint64, resu
 
 // FdRead implements SnapshotPreview1.FdRead
 func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
+	cfg := a.config(ctx.Context())
+
 	var reader io.Reader
 
 	switch fd {
 	case 0:
-		reader = a.stdin
+		reader = cfg.stdin
 	default:
-		f, ok := a.opened[fd]
+		f, ok := cfg.opened[fd]
 		if !ok || f.file == nil {
 			return wasi.ErrnoBadf
 		}
@@ -1248,7 +1260,9 @@ func (a *wasiAPI) FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno {
 
 // FdSeek implements SnapshotPreview1.FdSeek
 func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno {
-	f, ok := a.opened[fd]
+	cfg := a.config(ctx.Context())
+
+	f, ok := cfg.opened[fd]
 	if !ok || f.file == nil {
 		return wasi.ErrnoBadf
 	}
@@ -1280,15 +1294,17 @@ func (a *wasiAPI) FdTell(ctx wasm.Module, fd, resultOffset uint32) wasi.Errno {
 
 // FdWrite implements SnapshotPreview1.FdWrite
 func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
+	cfg := a.config(ctx.Context())
+
 	var writer io.Writer
 
 	switch fd {
 	case 1:
-		writer = a.stdout
+		writer = cfg.stdout
 	case 2:
-		writer = a.stderr
+		writer = cfg.stderr
 	default:
-		f, ok := a.opened[fd]
+		f, ok := cfg.opened[fd]
 		if !ok || f.file == nil {
 			return wasi.ErrnoBadf
 		}
@@ -1345,7 +1361,9 @@ func (a *wasiAPI) PathLink(ctx wasm.Module, oldFd, oldFlags, oldPath, oldPathLen
 // PathOpen implements SnapshotPreview1.PathOpen
 func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
-	dir, ok := a.opened[fd]
+	cfg := a.config(ctx.Context())
+
+	dir, ok := cfg.opened[fd]
 	if !ok || dir.fileSys == nil {
 		return wasi.ErrnoBadf
 	}
@@ -1365,12 +1383,12 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, path, pathLen, oflags 
 		}
 	}
 
-	newFD, err := a.randUnusedFD()
+	newFD, err := a.randUnusedFD(cfg)
 	if err != nil {
 		return wasi.ErrnoIo
 	}
 
-	a.opened[newFD] = fileEntry{
+	cfg.opened[newFD] = fileEntry{
 		path:    pathName,
 		fileSys: dir.fileSys,
 		file:    f,
@@ -1431,8 +1449,10 @@ func (a *wasiAPI) SchedYield(ctx wasm.Module) wasi.Errno {
 
 // RandomGet implements SnapshotPreview1.RandomGet
 func (a *wasiAPI) RandomGet(ctx wasm.Module, buf uint32, bufLen uint32) (errno wasi.Errno) {
+	cfg := a.config(ctx.Context())
+
 	randomBytes := make([]byte, bufLen)
-	err := a.randSource(randomBytes)
+	err := cfg.randSource(randomBytes)
 	if err != nil {
 		// TODO: handle different errors that syscal to entropy source can return
 		return wasi.ErrnoIo
@@ -1466,38 +1486,46 @@ type fileEntry struct {
 	file    wasi.File
 }
 
-type Option func(*wasiAPI)
+// ConfigContextKey indicates a context.Context includes an overriding Config.
+type ConfigContextKey struct{}
 
-func Stdin(reader io.Reader) Option {
-	return func(a *wasiAPI) {
-		a.stdin = reader
-	}
+type Config struct {
+	args *nullTerminatedStrings
+	// environ stores each environment variable in the form of "key=value",
+	// which is both convenient for the implementation of environ_get and matches os.Environ
+	environ *nullTerminatedStrings
+	stdin   io.Reader
+	stdout,
+	stderr io.Writer
+	opened map[uint32]fileEntry
+	// timeNowUnixNano is mutable for testing
+	timeNowUnixNano func() uint64
+	randSource      func([]byte) error
 }
 
-func Stdout(writer io.Writer) Option {
-	return func(a *wasiAPI) {
-		a.stdout = writer
-	}
+func (c *Config) Stdin(reader io.Reader) {
+	c.stdin = reader
 }
 
-func Stderr(writer io.Writer) Option {
-	return func(a *wasiAPI) {
-		a.stderr = writer
-	}
+func (c *Config) Stdout(writer io.Writer) {
+	c.stdout = writer
+}
+
+func (c *Config) Stderr(writer io.Writer) {
+	c.stderr = writer
 }
 
 // Args returns an option to give a command-line arguments in SnapshotPreview1 or errs if the inputs are too large.
 //
 // Note: The only reason to set this is to control what's written by SnapshotPreview1.ArgsSizesGet and SnapshotPreview1.ArgsGet
 // Note: While similar in structure to os.Args, this controls what's visible in Wasm (ex the WASI function "_start").
-func Args(args ...string) (Option, error) {
+func (c *Config) Args(args ...string) error {
 	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "arg", args...) // TODO: this is crazy high even if spec allows it
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return func(a *wasiAPI) {
-		a.args = wasiStrings
-	}, nil
+	c.args = wasiStrings
+	return nil
 }
 
 // Environ returns an option to set environment variables in SnapshotPreview1.
@@ -1508,33 +1536,30 @@ func Args(args ...string) (Option, error) {
 // Note: Implicit environment variable propagation into WASI is intentionally not done.
 // Note: The only reason to set this is to control what's written by SnapshotPreview1.EnvironSizesGet and SnapshotPreview1.EnvironGet
 // Note: While similar in structure to os.Environ, this controls what's visible in Wasm (ex the WASI function "_start").
-func Environ(environ ...string) (Option, error) {
+func (c *Config) Environ(environ ...string) error {
 	for i, env := range environ {
 		if !strings.Contains(env, "=") {
-			return nil, fmt.Errorf("environ[%d] is not joined with '='", i)
+			return fmt.Errorf("environ[%d] is not joined with '='", i)
 		}
 	}
 	wasiStrings, err := newNullTerminatedStrings(math.MaxUint32, "environ", environ...) // TODO: this is crazy high even if spec allows it
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return func(w *wasiAPI) {
-		w.environ = wasiStrings
-	}, nil
+	c.environ = wasiStrings
+	return nil
 }
 
-func Preopen(dir string, fileSys wasi.FS) Option {
-	return func(a *wasiAPI) {
-		a.opened[uint32(len(a.opened))+3] = fileEntry{
-			path:    dir,
-			fileSys: fileSys,
-		}
+func (c *Config) Preopen(dir string, fileSys wasi.FS) {
+	c.opened[uint32(len(c.opened))+3] = fileEntry{
+		path:    dir,
+		fileSys: fileSys,
 	}
 }
 
-// NewAPI is exported for benchmarks
-func NewAPI(opts ...Option) *wasiAPI {
-	ret := &wasiAPI{
+// NewConfig sets configuration defaults
+func NewConfig() *Config {
+	return &Config{
 		args:    &nullTerminatedStrings{},
 		environ: &nullTerminatedStrings{},
 		stdin:   os.Stdin,
@@ -1549,24 +1574,31 @@ func NewAPI(opts ...Option) *wasiAPI {
 			return err
 		},
 	}
-
-	// apply functional options
-	for _, f := range opts {
-		f(ret)
-	}
-	return ret
 }
 
-func (a *wasiAPI) randUnusedFD() (uint32, error) {
+// NewAPI is exported for benchmarks
+func NewAPI(config *Config) *wasiAPI {
+	return &wasiAPI{cfg: config} // Safe copy
+}
+
+// config returns a potentially overridden Config.
+func (a *wasiAPI) config(ctx context.Context) *Config {
+	if cfg := ctx.Value(ConfigContextKey{}); cfg != nil {
+		return cfg.(*Config)
+	}
+	return a.cfg
+}
+
+func (a *wasiAPI) randUnusedFD(config *Config) (uint32, error) {
 	rand := make([]byte, 4)
-	err := a.randSource(rand)
+	err := config.randSource(rand)
 	if err != nil {
 		return 0, err
 	}
 	// fd is actually a signed int32, and must be a positive number.
 	fd := binary.LittleEndian.Uint32(rand) % (1 << 31)
 	for {
-		if _, ok := a.opened[fd]; !ok {
+		if _, ok := config.opened[fd]; !ok {
 			return fd, nil
 		}
 		fd = (fd + 1) % (1 << 31)

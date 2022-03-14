@@ -27,23 +27,25 @@ var ctx = wasm.NewModuleContext(context.Background(), nil, &wasm.ModuleInstance{
 })
 
 func Test_EnvironGet(t *testing.T) {
-	envOpt, err := internalwasi.Environ("a=b", "b=cd")
+	config := internalwasi.NewConfig()
+	err := config.Environ("a=b", "b=cd")
 	require.NoError(t, err)
 
 	testCtx := newCtx(make([]byte, 20))
-	environGet := internalwasi.NewAPI(envOpt).EnvironGet
+	environGet := internalwasi.NewAPI(config).EnvironGet
 
 	require.Equal(t, wasi.ErrnoSuccess, environGet(testCtx, 11, 1))
 	require.Equal(t, testCtx.Memory(), ctx.Memory())
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
-	envOpt, err := internalwasi.Environ("a=b", "b=cd")
+	config := internalwasi.NewConfig()
+	err := config.Environ("a=b", "b=cd")
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	environGet := internalwasi.NewAPI(envOpt).EnvironGet
+	environGet := internalwasi.NewAPI(config).EnvironGet
 	b.Run("EnvironGet", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			if environGet(ctx, 0, 4) != wasi.ErrnoSuccess {

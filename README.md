@@ -19,6 +19,7 @@ func main() {
 
 	// Instantiate the module and return its exported functions
 	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
+	defer module.Close()
 
 	// Discover 7! is 5040
 	fmt.Println(module.ExportedFunction("fac").Call(nil, 7))

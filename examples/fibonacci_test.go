@@ -17,11 +17,13 @@ func Test_fibonacci(t *testing.T) {
 	r := wazero.NewRuntime()
 
 	// Note: fibonacci.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
-	_, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
+	defer wasi.Close()
 
 	module, err := wazero.StartWASICommandFromSource(r, fibWasm)
 	require.NoError(t, err)
+	defer module.Close()
 
 	fibonacci := module.ExportedFunction("fibonacci")
 
