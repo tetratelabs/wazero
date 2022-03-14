@@ -145,19 +145,6 @@ type (
 		Val uint64
 	}
 
-	// TableInstance represents a table instance in a store.
-	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#table-instances%E2%91%A0
-	TableInstance struct {
-		// Table holds the table elements managed by this table instance.
-		Table []uintptr
-
-		// Min is the minimum (function) elements in this table.
-		Min uint32
-
-		// Max if present is the maximum (function) elements in this table, or nil if unbounded.
-		Max *uint32
-	}
-
 	// FunctionTypeID is a uniquely assigned integer for a function type.
 	// This is wazero specific runtime object and specific to a store,
 	// and used at runtime to do type-checks on indirect function calls.
@@ -252,34 +239,6 @@ func (m *ModuleInstance) applyData(data []*DataSegment) {
 	}
 }
 
-func (m *ModuleInstance) validateElements(elements []*ElementSegment) (err error) {
-	for _, elem := range elements {
-		offset := int(executeConstExpression(m.Globals, elem.OffsetExpr).(int32))
-		ceil := offset + len(elem.Init)
-
-		if offset < 0 || ceil > len(m.Table.Table) {
-			return fmt.Errorf("out of bounds table access")
-		}
-		for _, elm := range elem.Init {
-			if elm >= uint32(len(m.Functions)) {
-				return fmt.Errorf("unknown function specified by element")
-			}
-		}
-	}
-	return
-}
-
-func (m *ModuleInstance) applyElements(elements []*ElementSegment) {
-	for _, elem := range elements {
-		offset := int(executeConstExpression(m.Globals, elem.OffsetExpr).(int32))
-		table := m.Table.Table
-		for i, elm := range elem.Init {
-			pos := i + offset
-			table[pos] = m.Engine.FunctionAddress(elm)
-		}
-	}
-}
-
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
 func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance, error) {
 	exp, ok := m.Exports[name]
@@ -342,7 +301,7 @@ func (s *Store) Instantiate(module *Module, name string) (*ModuleContext, error)
 		globals, importedTable, table, importedMemory, memory, types)
 
 	// Plus we are ready to compile functions.
-	m.Engine, err = s.engine.Compile(importedFunctions, functions)
+	m.Engine, err = s.engine.NewModuleEngine(importedFunctions, functions)
 	if err != nil {
 		s.deleteModule(name)
 		return nil, fmt.Errorf("compilation failed: %w", err)
@@ -576,7 +535,7 @@ func executeConstExpression(globals []*GlobalInstance, expr *ConstantExpression)
 }
 
 func (s *Store) getTypes(ts []*FunctionType) ([]*TypeInstance, error) {
-	// We take write-lock here as the follwing might end up mutating typeIDs map.
+	// We take write-lock here as the following might end up mutating typeIDs map.
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	ret := make([]*TypeInstance, len(ts))

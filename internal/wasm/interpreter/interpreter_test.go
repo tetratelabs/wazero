@@ -102,24 +102,24 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		Module: module,
 	}
 
-	modEngine, err := e.Compile(nil, []*wasm.FunctionInstance{f})
+	me, err := e.NewModuleEngine(nil, []*wasm.FunctionInstance{f})
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
 		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		results, err := modEngine.Call(modCtx, f, 3)
+		results, err := me.Call(modCtx, f, 3)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), results[0])
 		require.Same(t, memory, ctxMemory)
 	})
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := modEngine.Call(modCtx, f)
+		_, err := me.Call(modCtx, f)
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := modEngine.Call(modCtx, f, 1, 2)
+		_, err := me.Call(modCtx, f, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
@@ -239,7 +239,10 @@ func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
 func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := NewEngine().(*engine)
-		_, err := e.Compile([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
+		_, err := e.NewModuleEngine(
+			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
+			nil, // moduleFunctions
+		)
 		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
 	})
 
@@ -252,7 +255,9 @@ func TestEngineCompile_Errors(t *testing.T) {
 			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
-		_, err := e.Compile(nil, importedFunctions)
+
+		// initialize the module-engine containing imported functions
+		_, err := e.NewModuleEngine(nil, importedFunctions)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -265,10 +270,10 @@ func TestEngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.Compile(importedFunctions, moduleFunctions)
+		_, err = e.NewModuleEngine(importedFunctions, moduleFunctions)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
-		// On the compilation failrue, all the compiled functions including suceeded ones must be released.
+		// On the compilation failure, all the compiled functions including succeeded ones must be released.
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
 		for _, f := range moduleFunctions {
 			require.NotContains(t, e.compiledFunctions, f)
@@ -287,7 +292,7 @@ func TestClose(t *testing.T) {
 		importedFunctions, moduleFunctions []*wasm.FunctionInstance
 	}{
 		{
-			name:            "no imports",
+			name:            "only module-defined",
 			moduleFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
 		},
 		{
@@ -295,7 +300,7 @@ func TestClose(t *testing.T) {
 			importedFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
 		},
 		{
-			name:              "mix",
+			name:              "imports and module-defined",
 			importedFunctions: []*wasm.FunctionInstance{newFunctionInstance(0), newFunctionInstance(1)},
 			moduleFunctions:   []*wasm.FunctionInstance{newFunctionInstance(100), newFunctionInstance(200), newFunctionInstance(300)},
 		},
@@ -304,14 +309,15 @@ func TestClose(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := NewEngine().(*engine)
 			if len(tc.importedFunctions) > 0 {
-				modEngine, err := e.Compile(nil, tc.importedFunctions)
+				// initialize the module-engine containing imported functions
+				me, err := e.NewModuleEngine(nil, tc.importedFunctions)
 				require.NoError(t, err)
-				require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
+				require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
 			}
 
-			modEngine, err := e.Compile(tc.importedFunctions, tc.moduleFunctions)
+			me, err := e.NewModuleEngine(tc.importedFunctions, tc.moduleFunctions)
 			require.NoError(t, err)
-			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+			require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 			for _, f := range tc.importedFunctions {
@@ -321,7 +327,7 @@ func TestClose(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			modEngine.Close()
+			me.Close()
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
 			for _, f := range tc.importedFunctions {

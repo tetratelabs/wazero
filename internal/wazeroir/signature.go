@@ -136,7 +136,7 @@ var (
 		in:  []UnsignedType{UnsignedTypeF64, UnsignedTypeF64},
 		out: []UnsignedType{UnsignedTypeF64},
 	}
-	signature_UnknownUnkownI32_Unknown = &signature{
+	signature_UnknownUnknownI32_Unknown = &signature{
 		in:  []UnsignedType{UnsignedTypeUnknown, UnsignedTypeUnknown, UnsignedTypeI32},
 		out: []UnsignedType{UnsignedTypeUnknown},
 	}
@@ -168,7 +168,7 @@ func wasmOpcodeSignature(f *wasm.FunctionInstance, op wasm.Opcode, index uint32)
 	case wasm.OpcodeDrop:
 		return signature_Unknown_None, nil
 	case wasm.OpcodeSelect:
-		return signature_UnknownUnkownI32_Unknown, nil
+		return signature_UnknownUnknownI32_Unknown, nil
 	case wasm.OpcodeLocalGet:
 		inputLen := uint32(len(f.Type.Params))
 		if l := uint32(len(f.LocalTypes)) + inputLen; index >= l {

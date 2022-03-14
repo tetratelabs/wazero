@@ -21,7 +21,7 @@ var callStackCeiling = buildoptions.CallStackCeiling
 
 // engine is an interpreter implementation of internalwasm.Engine
 type engine struct {
-	compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // gurded by mutex.
+	compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
 	mux               sync.RWMutex
 }
 
@@ -67,6 +67,7 @@ type callEngine struct {
 	// stack contains the operands.
 	// Note that all the values are represented as uint64.
 	stack []uint64
+
 	// frames are the function call stack.
 	frames []*callFrame
 }
@@ -126,10 +127,9 @@ func (ce *callEngine) popFrame() (frame *callFrame) {
 }
 
 type callFrame struct {
-	// Program counter representing the current postion
-	// in the f.body.
+	// pc is the program counter representing the current position in compiledFunction.body.
 	pc uint64
-	// The compiled function used in this function frame.
+	// f is the compiled function used in this function frame.
 	f *compiledFunction
 }
 
@@ -156,9 +156,9 @@ func (me *moduleEngine) Close() {
 	}
 }
 
-// Compile implements internalwasm.Engine Compile
-func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (me wasm.ModuleEngine, err error) {
-	modEngine := &moduleEngine{
+// NewModuleEngine implements internalwasm.Engine NewModuleEngine
+func (e *engine) NewModuleEngine(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+	me := &moduleEngine{
 		compiledFunctions:      make([]*compiledFunction, 0, len(importedFunctions)+len(moduleFunctions)),
 		parentEngine:           e,
 		importedFunctionCounts: len(importedFunctions),
@@ -169,7 +169,7 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 		if !ok {
 			return nil, fmt.Errorf("import[%d] func[%s.%s]: uncompiled", idx, f.Module.Name, f.Name)
 		}
-		modEngine.compiledFunctions = append(modEngine.compiledFunctions, cf)
+		me.compiledFunctions = append(me.compiledFunctions, cf)
 	}
 
 	for i, f := range moduleFunctions {
@@ -177,30 +177,39 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 		if f.Kind == wasm.FunctionKindWasm {
 			ir, err := wazeroir.Compile(f)
 			if err != nil {
-				modEngine.Close()
+				me.Close()
 				// TODO(Adrian): extract Module.funcDesc so that errors here have more context
 				return nil, fmt.Errorf("function[%d/%d] failed to lower to wazeroir: %w", i, len(moduleFunctions)-1, err)
 			}
 
 			compiled, err = e.lowerIROps(f, ir.Operations)
 			if err != nil {
-				modEngine.Close()
+				me.Close()
 				return nil, fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(moduleFunctions)-1, err)
 			}
 		} else {
 			compiled = &compiledFunction{hostFn: f.GoFunc, funcInstance: f}
 		}
-		compiled.moduleEngine = modEngine
-		modEngine.compiledFunctions = append(modEngine.compiledFunctions, compiled)
+		compiled.moduleEngine = me
+		me.compiledFunctions = append(me.compiledFunctions, compiled)
 
 		// Add the compiled function to the store-wide engine as well so that
 		// the future importing module can refer the function instance.
 		e.addCompiledFunction(f, compiled)
 	}
-	return modEngine, nil
+	return me, nil
 }
 
-// Lowers the wazeroir operations to engine friendly struct.
+// Release implements internalwasm.Engine Release
+func (me *moduleEngine) Release() error {
+	// Release all the function instances declared in this module.
+	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
+	}
+	return nil
+}
+
+// lowerIROps lowers the wazeroir operations to engine friendly struct.
 func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 	ops []wazeroir.Operation) (*compiledFunction, error) {
 	ret := &compiledFunction{funcInstance: f}
@@ -218,7 +227,7 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 				cb(address)
 			}
 			delete(onLabelAddressResolved, labelKey)
-			// We just ignore the lable operation
+			// We just ignore the label operation
 			// as we translate branch operations to the direct address jmp.
 			continue
 		case *wazeroir.OperationBr:

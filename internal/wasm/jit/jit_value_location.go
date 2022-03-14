@@ -97,7 +97,7 @@ func newValueLocationStack() *valueLocationStack {
 // Notably this is only used in the compilation phase, not runtime,
 // and we change the state of this struct at every wazeroir operation we compile.
 // In this way, we can see where the operands of a operation (for example,
-// two variables for wazeroir add operation.) exist and check the neccesity for
+// two variables for wazeroir add operation.) exist and check the necessity for
 // moving the variable to registers to perform actual CPU instruction
 // to achieve wazeroir's add operation.
 type valueLocationStack struct {

@@ -17,7 +17,7 @@ func TestIndexNamespace_SetId(t *testing.T) {
 	t.Run("set when empty", func(t *testing.T) {
 		id, err := in.setID([]byte("$x"))
 		require.NoError(t, err)
-		require.Equal(t, "x", id) // strins "$" to be like the name section
+		require.Equal(t, "x", id) // strips "$" to be like the name section
 		require.Equal(t, map[string]wasm.Index{"x": wasm.Index(0)}, in.idToIdx)
 	})
 	t.Run("set when exists fails", func(t *testing.T) {

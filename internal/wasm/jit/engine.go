@@ -121,7 +121,7 @@ type (
 
 		// stackBasePointer is updated whenever we make function calls.
 		// Background: Functions might be compiled as if they use the stack from the bottom.
-		// However in reality, they have to use it from the middle of the stack depending on
+		// However, in reality, they have to use it from the middle of the stack depending on
 		// when these function calls are made. So instead of accessing stack via stackPointer alone,
 		// functions are compiled so they access the stack via [stackBasePointer](fixed for entire function) + [stackPointer].
 		// More precisely, stackBasePointer is set to [callee's stack pointer] + [callee's stack base pointer] - [caller's params].
@@ -182,7 +182,7 @@ type (
 
 	// staticData holds the read-only data (i.e. out side of codeSegment which is marked as executable) per function.
 	// This is used to store jump tables for br_table instructions.
-	// The primary index is the logical sepration of multiple data, for example data[0] and data[1]
+	// The primary index is the logical separation of multiple data, for example data[0] and data[1]
 	// correspond to different jump tables for different br_table instructions.
 	compiledFunctionStaticData = [][]byte
 )
@@ -193,14 +193,14 @@ const (
 	// Offsets for moduleEngine.compiledFunctions
 	moduleEngineCompiledFunctionsOffset = 0
 
-	// Offsets for callEngine.globalContext.
+	// Offsets for callEngine globalContext.
 	callEngineGlobalContextValueStackElement0AddressOffset     = 0
 	callEngineGlobalContextValueStackLenOffset                 = 8
 	callEngineGlobalContextCallFrameStackElement0AddressOffset = 16
 	callEngineGlobalContextCallFrameStackLenOffset             = 24
 	callEngineGlobalContextCallFrameStackPointerOffset         = 32
 
-	// Offsets for callEngine.moduleContext.
+	// Offsets for callEngine moduleContext.
 	callEngineModuleContextModuleInstanceAddressOffset            = 40
 	callEngineModuleContextGlobalElement0AddressOffset            = 48
 	callEngineModuleContextMemoryElement0AddressOffset            = 56
@@ -209,11 +209,11 @@ const (
 	callEngineModuleContextTableSliceLenOffset                    = 80
 	callEngineModuleContextCompiledFunctionsElement0AddressOffset = 88
 
-	// Offsets for callEngine.valueStackContext.
+	// Offsets for callEngine valueStackContext.
 	callEngineValueStackContextStackPointerOffset     = 96
 	callEngineValueStackContextStackBasePointerOffset = 104
 
-	// Offsets for callEngine.exitContext.
+	// Offsets for callEngine exitContext.
 	callEngineExitContextJITCallStatusCodeOffset          = 112
 	callEngineExitContextBuiltinFunctionCallAddressOffset = 116
 
@@ -229,24 +229,24 @@ const (
 	compiledFunctionStackPointerCeilOffset   = 8
 	compiledFunctionSourceOffset             = 16
 
-	// Offsets for wasm.ModuleInstance
+	// Offsets for internalwasm.ModuleInstance.
 	moduleInstanceGlobalsOffset = 48
 	moduleInstanceMemoryOffset  = 72
 	moduleInstanceTableOffset   = 80
 	moduleInstanceEngineOffset  = 120
 
-	// Offsets for wasm.Table.
+	// Offsets for internalwasm.TableInstance.
 	tableInstanceTableOffset    = 0
 	tableInstanceTableLenOffset = 8
 
-	// Offsets for wasm.FunctionInstance
+	// Offsets for internalwasm.FunctionInstance.
 	functionInstanceTypeIDOffset = 96
 
-	// Offsets for wasm.Memory.
+	// Offsets for internalwasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
 	memoryInstanceBufferLenOffset = 8
 
-	// Offsets for wasm.GlobalInstance.
+	// Offsets for internalwasm.GlobalInstance.
 	globalInstanceValueOffset = 8
 
 	// Offsets for Go's interface.
@@ -325,10 +325,10 @@ func (c *callFrame) String() string {
 	)
 }
 
-// Compile implements internalwasm.Engine Compile
-func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (me wasm.ModuleEngine, err error) {
+// NewModuleEngine implements internalwasm.Engine NewModuleEngine
+func (e *engine) NewModuleEngine(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	imported := len(importedFunctions)
-	modEngine := &moduleEngine{
+	me := &moduleEngine{
 		compiledFunctions:      make([]*compiledFunction, 0, imported+len(moduleFunctions)),
 		parentEngine:           e,
 		importedFunctionCounts: imported,
@@ -339,27 +339,34 @@ func (e *engine) Compile(importedFunctions, moduleFunctions []*wasm.FunctionInst
 		if !ok {
 			return nil, fmt.Errorf("import[%d] func[%s.%s]: uncompiled", idx, f.Module.Name, f.Name)
 		}
-		modEngine.compiledFunctions = append(modEngine.compiledFunctions, cf)
+		me.compiledFunctions = append(me.compiledFunctions, cf)
 	}
 
 	for i, f := range moduleFunctions {
 		var compiled *compiledFunction
+		var err error
 		if f.Kind == wasm.FunctionKindWasm {
 			compiled, err = compileWasmFunction(f)
 		} else {
 			compiled, err = compileHostFunction(f)
 		}
 		if err != nil {
-			modEngine.Close()
+			me.Close()
 			return nil, fmt.Errorf("function[%d/%d] %w", i, len(moduleFunctions)-1, err)
 		}
-		modEngine.compiledFunctions = append(modEngine.compiledFunctions, compiled)
+		me.compiledFunctions = append(me.compiledFunctions, compiled)
 
 		// Add the compiled function to the store-wide engine as well so that
 		// the future importing module can refer the function instance.
 		e.addCompiledFunction(f, compiled)
 	}
-	return modEngine, nil
+
+	return me, nil
+}
+
+// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress
+func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
+	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
 func (e *engine) deleteCompiledFunction(f *wasm.FunctionInstance) {
@@ -379,11 +386,6 @@ func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunc
 	defer e.mux.RUnlock()
 	cf, ok = e.compiledFunctions[f]
 	return
-}
-
-// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress
-func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
-	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
 // Close implements internalwasm.ModuleEngine Close
@@ -476,14 +478,14 @@ func newEngine() *engine {
 }
 
 // Do not make these variables as constants, otherwise there would be
-// dangerous memory accees from native code.
+// dangerous memory access from native code.
 //
 // Background: Go has a mechanism called "goroutine stack-shrink" where Go
 // runtime shrinks Gorotuine's stack when it is GCing. Shrinking means that
 // all the contents on the goroutine stack will be relocated by runtime,
 // Therefore, the memory address of these contents change undeterministically.
 // Not only shrinks, but also Goruntime grows the goroutine stack at any point
-// of function call entries, which also might end up relcating contents.
+// of function call entries, which also might end up relocating contents.
 //
 // On the other hand, we hold pointers to the data region of value stack and
 // callframe stack slices and use these raw pointers from native code.
@@ -688,7 +690,7 @@ func (ce *callEngine) pushCallFrame(f *compiledFunction) {
 	//                 |     |
 	// [...., A, B, C, D, E, _, _ ]
 	//
-	// That maens the next stack base poitner is calculated as follows (note stack pointer is relative to base):
+	// That means the next stack base pointer is calculated as follows (note stack pointer is relative to base):
 	ce.valueStackContext.stackBasePointer =
 		ce.valueStackContext.stackBasePointer + ce.valueStackContext.stackPointer - uint64(len(f.source.Type.Params))
 }
@@ -730,7 +732,7 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	res := mem.Grow(uint32(newPages))
 	ce.pushValue(uint64(res))
 
-	// Update the moduleContext's ields as they become stale after the update ^^.
+	// Update the moduleContext fields as they become stale after the update ^^.
 	bufSliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&mem.Buffer))
 	ce.moduleContext.memorySliceLen = uint64(bufSliceHeader.Len)
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data

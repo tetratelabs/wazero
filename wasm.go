@@ -35,6 +35,10 @@ type Runtime interface {
 	// CompileModule decodes the WebAssembly 1.0 (20191205) text or binary source or errs if invalid.
 	// Any pre-compilation done after decoding the source is dependent on the RuntimeConfig.
 	//
+	// There are two main reasons to use CompileModule instead of InstantiateModuleFromSource:
+	//  * Improve performance when the same module is instantiated multiple times under different names
+	//  * Reduce the amount of errors that can occur during InstantiateModule.
+	//
 	// Note: The resulting module name defaults to what was decoded from the custom name section.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#name-section%E2%91%A0
 	CompileModule(source []byte) (*Module, error)
@@ -56,7 +60,12 @@ type Runtime interface {
 	//	decoded, _ := r.CompileModule(source)
 	//	module, _ := r.InstantiateModule(decoded)
 	//
-	// Note: The last value of RuntimeConfig.WithContext is used for any WebAssembly 1.0 (20191205) Start ExportedFunction.
+	// While a Module is pre-validated, there are a few situations which can cause an error:
+	//  * The Module name is already in use.
+	//  * The Module has a table element initializer that uses an imported global offset that puts it out of range.
+	//  * The Module has a start function, and it failed to execute.
+	//
+	// Note: The last value of RuntimeConfig.WithContext is used for any start function.
 	InstantiateModule(module *Module) (wasm.Module, error)
 
 	// TODO: RemoveModule

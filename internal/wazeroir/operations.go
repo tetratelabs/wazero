@@ -590,7 +590,7 @@ func (o *OperationMemorySize) Kind() OperationKind {
 	return OperationKindMemorySize
 }
 
-type OperationMemoryGrow struct{ Aligment uint64 }
+type OperationMemoryGrow struct{ Alignment uint64 }
 
 func (o *OperationMemoryGrow) Kind() OperationKind {
 	return OperationKindMemoryGrow

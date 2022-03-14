@@ -1,5 +1,3 @@
-//go:build arm64
-
 // This file implements the compiler for arm64 target.
 // Please refer to https://developer.arm.com/documentation/102374/latest/
 // if unfamiliar with arm64 instructions and semantics.
@@ -42,7 +40,7 @@ type archContext struct {
 	// Note: this is only used by JIT code so mark this as nolint.
 	jitCallReturnAddress uint64 //nolint
 
-	// Loading large constants in arm64 is a bit costly so we place the following
+	// Loading large constants in arm64 is a bit costly, so we place the following
 	// consts on callEngine struct so that we can quickly access them during various operations.
 
 	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
@@ -141,7 +139,7 @@ func (c *arm64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	}
 
 	// Now that the ceil of stack pointer is determined, we are invoking the callback.
-	// Note: this must be called before Assemble() befolow.
+	// Note: this must be called before Assemble() below.
 	if c.onStackPointerCeilDeterminedCallBack != nil {
 		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
 	}
@@ -364,7 +362,7 @@ func (c *arm64Compiler) compileRegisterAndConstSourceToNoneInstruction(instructi
 	c.addInstruction(inst)
 }
 
-func (c *arm64Compiler) compilelBranchInstruction(inst obj.As) (br *obj.Prog) {
+func (c *arm64Compiler) compileBranchInstruction(inst obj.As) (br *obj.Prog) {
 	br = c.newProg()
 	br.As = inst
 	br.To.Type = obj.TYPE_BRANCH
@@ -480,14 +478,14 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 		tmpY,
 	)
 	// At this point of compilation, we don't know the value of stack point ceil,
-	// so we layzily resolve the value later.
+	// so we lazily resolve the value later.
 	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { loadStackPointerCeil.From.Offset = int64(stackPointerCeil) }
 
 	// Compare tmpX (len(ce.valueStack) - ce.stackBasePointer) and tmpY (ce.stackPointerCeil)
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmpX, tmpY)
 
 	// If ceil > valueStackLen - stack base pointer, we need to grow the stack by calling builtin Go function.
-	brIfValueStackOK := c.compilelBranchInstruction(arm64.ABLS)
+	brIfValueStackOK := c.compileBranchInstruction(arm64.ABLS)
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowValueStack); err != nil {
 		return err
 	}
@@ -516,7 +514,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	// Alias for readability.
 	callFramePointerReg, callFrameStackTopAddressRegister, tmpReg := tmpRegs[0], tmpRegs[1], tmpRegs[2]
 
-	// First we decrement the callframe stack pointer.
+	// First we decrement the call-frame stack pointer.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset, callFramePointerReg)
 	c.compileConstToRegisterInstruction(arm64.ASUBS, 1, callFramePointerReg)
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD, callFramePointerReg, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
@@ -525,7 +523,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, callFramePointerReg, zeroRegister)
 
 	// If the values are identical, we return back to the Go code with returned status.
-	brIfNotEqual := c.compilelBranchInstruction(arm64.ABNE)
+	brIfNotEqual := c.compileBranchInstruction(arm64.ABNE)
 	if err := c.compileExitFromNativeCode(jitCallStatusCodeReturned); err != nil {
 		return err
 	}
@@ -533,7 +531,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 	// Otherwise, we have to jump to the caller's return address.
 	c.setBranchTargetOnNext(brIfNotEqual)
 
-	// First, we have to calculate the caller callFrame's absolute address to aquire the return address.
+	// First, we have to calculate the caller callFrame's absolute address to acquire the return address.
 	//
 	// "tmpReg = &ce.callFrameStack[0]"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
@@ -825,7 +823,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	conditionalBR := c.newProg()
 	conditionalBR.To.Type = obj.TYPE_BRANCH
 	if cond.onConditionalRegister() {
-		// If the cond is on a conditional register, it corresponds to one of "conditonal codes"
+		// If the cond is on a conditional register, it corresponds to one of "conditional codes"
 		// https://developer.arm.com/documentation/dui0801/a/Condition-Codes/Condition-code-suffixes
 		// Here we represent the conditional codes by using arm64.COND_** registers, and that means the
 		// conditional jump can be performed if we use arm64.AB**.
@@ -861,7 +859,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		}
 	} else {
 		// If the value is not on the conditional register, we compare the value with the zero register,
-		// and then do the conditional BR if the value does't equal zero.
+		// and then do the conditional BR if the value doesn't equal zero.
 		if err := c.compileEnsureOnGeneralPurposeRegister(cond); err != nil {
 			return err
 		}
@@ -888,7 +886,7 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	}
 
 	// Now ready to emit the code for branching into then branch.
-	// Retrieve the original value location stack so that the code below wont'be affected by the Else branch ^^.
+	// Retrieve the original value location stack so that the code below won't be affected by the Else branch ^^.
 	c.setLocationStack(saved)
 	// We branch into here from the original conditional BR (conditionalBR).
 	c.setBranchTargetOnNext(conditionalBR)
@@ -919,7 +917,7 @@ func (c *arm64Compiler) compileBranchInto(target *wazeroir.BranchTarget) error {
 			targetLabel.initialStack = c.locationStack.clone()
 		}
 
-		br := c.compilelBranchInstruction(obj.AJMP)
+		br := c.compileBranchInstruction(obj.AJMP)
 		c.assignBranchTarget(labelKey, br)
 		return nil
 	}
@@ -978,10 +976,10 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// Load the branch table's length.
 	// "tmpReg = len(o.Targets)"
 	c.compileConstToRegisterInstruction(arm64.AMOVW, int64(len(o.Targets)), tmpReg)
-	// Compare the length with offest.
+	// Compare the length with offset.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, tmpReg, index.register)
 	// If the value exceeds the length, we will branch into the default target (corresponding to len(o.Targets) index).
-	brDefaultIndex := c.compilelBranchInstruction(arm64.ABLO)
+	brDefaultIndex := c.compileBranchInstruction(arm64.ABLO)
 	c.compileRegisterToRegisterInstruction(arm64.AMOVW, tmpReg, index.register)
 	c.setBranchTargetOnNext(brDefaultIndex)
 
@@ -1024,7 +1022,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	// "index.register = tmpReg + (index.register << 2) (== &offsetData[offset])"
 	c.compileAddInstructionWithLeftShiftedRegister(index.register, 2, tmpReg, index.register)
 
-	// "index.regsetr = *index.reigier (== offsetData[offset])"
+	// "index.register = *index.register (== offsetData[offset])"
 	c.compileMemoryToRegisterInstruction(arm64.AMOVW, index.register, 0, index.register)
 
 	// Now we read the address of the beginning of the jump table.
@@ -1084,7 +1082,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 				// current implementation.
 				return fmt.Errorf("too large br_table")
 			}
-			// We store the offset from the beiggning of the L0's initial instruction.
+			// We store the offset from the beginning of the L0's initial instruction.
 			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
 		}
 		return nil
@@ -1129,13 +1127,13 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 	)
 	// Compare tmp(len(ce.callFrameStack)) with callFrameStackPointerRegister(ce.callFrameStackPointer).
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, callFrameStackPointerRegister)
-	brIfCallFrameStackOK := c.compilelBranchInstruction(arm64.ABNE)
+	brIfCallFrameStackOK := c.compileBranchInstruction(arm64.ABNE)
 
 	// If these values equal, we need to grow the callFrame stack.
 	// For call_indirect, we need to push the value back to the register.
 	if !isNilRegister(compiledFunctionAddressRegister) {
-		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing callframe stack,
-		// as the register is not saved across function calls.
+		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing the
+		// call-frame stack, as the register is not saved across function calls.
 		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(compiledFunctionAddressRegister)
 		if err := c.compileReleaseRegisterToStack(savedOffsetLocation); err != nil {
 			return err
@@ -1230,7 +1228,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 		compiledFunctionRegister = compiledFunctionAddressRegister
 	}
 
-	// Finally, we are ready to write the address of the target function's *compiledFunction into the new callframe.
+	// Finally, we are ready to write the address of the target function's *compiledFunction into the new call-frame.
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
 		compiledFunctionRegister,
 		callFrameStackTopAddressRegister, callFrameCompiledFunctionOffset)
@@ -1239,15 +1237,14 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 	//
 	// First, Get the return address into the tmp.
 	c.compileReadInstructionAddress(obj.AJMP, tmp)
-	// Then write the address into the callframe.
+	// Then write the address into the call-frame.
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD,
 		tmp,
 		// "ra.current" is BELOW the top address. See the above example for detail.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 	)
 
-	// Everthing is done to make function call now.
-	// We increment the callframe stack pointer.
+	// Everything is done to make function call now: increment the call-frame stack pointer.
 	c.compileMemoryToRegisterInstruction(arm64.AMOVD,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		tmp)
@@ -1406,7 +1403,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, tmp, offset.register)
 
 	// If it exceeds len(table), we exit the execution.
-	brIfOffsetOK := c.compilelBranchInstruction(arm64.ABLO)
+	brIfOffsetOK := c.compileBranchInstruction(arm64.ABLO)
 	if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess); err != nil {
 		return err
 	}
@@ -1422,7 +1419,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 		tmp,
 	)
 	// "offset = tmp + (offset << 3) (== &table[offset])"
-	// Here we left shiting by 3 in order to get the offset in bytes,
+	// Here we left shifting by 3 in order to get the offset in bytes,
 	// and the table element type is uintptr which is 8 bytes.
 	c.compileAddInstructionWithLeftShiftedRegister(
 		offset.register, 3,
@@ -1435,11 +1432,11 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, zeroRegister, offset.register)
-	brIfInitizlied := c.compilelBranchInstruction(arm64.ABNE)
+	brIfInitialized := c.compileBranchInstruction(arm64.ABNE)
 	if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess); err != nil {
 		return err
 	}
-	c.setBranchTargetOnNext(brIfInitizlied)
+	c.setBranchTargetOnNext(brIfInitialized)
 
 	targetFunctionType := c.f.Module.Types[o.TypeIndex]
 	// Next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
@@ -1459,7 +1456,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, tmp, reservedRegisterForTemporary)
-	brIfTypeMatched := c.compilelBranchInstruction(arm64.ABEQ)
+	brIfTypeMatched := c.compileBranchInstruction(arm64.ABEQ)
 	if err := c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall); err != nil {
 		return err
 	}
@@ -1505,7 +1502,7 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 	// Note: drop target range is inclusive.
 	dropNum := r.End - r.Start + 1
 
-	// Then mark all registers used by drop tragets unused.
+	// Then mark all registers used by drop targets unused.
 	for i := 0; i < dropNum; i++ {
 		if loc := c.locationStack.pop(); loc.onRegister() {
 			c.markRegisterUnused(loc.register)
@@ -1514,8 +1511,8 @@ func (c *arm64Compiler) compileDropRange(r *wazeroir.InclusiveRange) error {
 
 	for _, live := range liveValues {
 		// If the value is on a memory, we have to move it to a register,
-		// otherwise the memory location is overriden by other values
-		// after this drop instructin.
+		// otherwise the memory location is overridden by other values
+		// after this drop instruction.
 		if err := c.compileEnsureOnGeneralPurposeRegister(live); err != nil {
 			return err
 		}
@@ -1547,13 +1544,13 @@ func (c *arm64Compiler) compileSelect() error {
 	}
 
 	// In the following, we emit the code so that x1's register contains the chosen value
-	// no matter which of oroginal x1 or x2 is selected.
+	// no matter which of original x1 or x2 is selected.
 	//
 	// If x1 is currently on zero register, we cannot place the result because
 	// "MOV zeroRegister x2.register" results in zeroRegister regardless of the value.
-	// So we explicitly assign a general purpuse register to x1 here.
+	// So we explicitly assign a general purpose register to x1 here.
 	if isZeroRegister(x1.register) {
-		// Mark x2 and cv's regiseters are used so they won't be chosen.
+		// Mark x2 and cv's registers are used so they won't be chosen.
 		c.markRegisterUsed(x2.register)
 		// Pick the non-zero register for x1.
 		x1Reg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
@@ -1565,10 +1562,10 @@ func (c *arm64Compiler) compileSelect() error {
 		c.compileRegisterToRegisterInstruction(arm64.AMOVD, zeroRegister, x1Reg)
 	}
 
-	// At this point, x1 is non-zero register, and x2 is either general purpuse or zero register.
+	// At this point, x1 is non-zero register, and x2 is either general purpose or zero register.
 
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, zeroRegister, cv.register)
-	brIfNotZero := c.compilelBranchInstruction(arm64.ABNE)
+	brIfNotZero := c.compileBranchInstruction(arm64.ABNE)
 	c.addInstruction(brIfNotZero)
 
 	// If cv == 0, we move the value of x2 to the x1.register.
@@ -1629,7 +1626,7 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 		return err
 	}
 
-	// Additon can be nop if one of operands is zero.
+	// Addition can be nop if one of operands is zero.
 	if isZeroRegister(x1.register) {
 		c.locationStack.pushValueLocationOnRegister(x2.register)
 		return nil
@@ -1700,7 +1697,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 		return err
 	}
 
-	// Multiplcation can be done by putting a zero register if one of operands is zero.
+	// Multiplication can be done by putting a zero register if one of operands is zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
 		c.locationStack.pushValueLocationOnRegister(zeroRegister)
 		return nil
@@ -1885,7 +1882,7 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 }
 
 // compileIntegerDivPrecheck adds instructions to check if the divisor and dividend are sound for division operation.
-// First, this adds instrucitons to check if the divisor equals zero, and if so, exits the function.
+// First, this adds instructions to check if the divisor equals zero, and if so, exits the function.
 // Plus, for signed divisions, check if the result might result in overflow or not.
 func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, dividend, divisor int16) error {
 	// We check the divisor value equals zero.
@@ -1903,7 +1900,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisor)
 
 	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
-	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
+	brIfDivisorNonZero := c.compileBranchInstruction(arm64.ABNE)
 	if err := c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero); err != nil {
 		return err
 	}
@@ -1913,7 +1910,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 
 	// If the operation is a signed integer div, we have to do an additional check on overflow.
 	if isSigned {
-		// For sigined division, we have to have branches for "math.MinInt{32,64} / -1"
+		// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
 		// case which results in the overflow.
 
 		// First, we compare the divisor with -1.
@@ -1921,7 +1918,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		c.compileTwoRegistersToNoneInstruction(cmpInst, reservedRegisterForTemporary, divisor)
 
 		// If they not equal, we skip the following check.
-		brIfDivisorNonMinusOne := c.compilelBranchInstruction(arm64.ABNE)
+		brIfDivisorNonMinusOne := c.compileBranchInstruction(arm64.ABNE)
 
 		// Otherwise, we further check if the dividend equals math.MinInt32 or MinInt64.
 		c.compileMemoryToRegisterInstruction(
@@ -1932,7 +1929,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		c.compileTwoRegistersToNoneInstruction(cmpInst, reservedRegisterForTemporary, dividend)
 
 		// If they not equal, we are safe to execute the division.
-		brIfDividendNotMinInt := c.compilelBranchInstruction(arm64.ABNE)
+		brIfDividendNotMinInt := c.compileBranchInstruction(arm64.ABNE)
 
 		// Otherwise, we raise overflow error.
 		if err := c.compileExitFromNativeCode(jitCallStatusIntegerOverflow); err != nil {
@@ -1985,12 +1982,12 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	c.compileTwoRegistersToNoneInstruction(cmpInst, zeroRegister, divisorReg)
 
 	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
-	brIfDivisorNonZero := c.compilelBranchInstruction(arm64.ABNE)
+	brIfDivisorNonZero := c.compileBranchInstruction(arm64.ABNE)
 	if err := c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero); err != nil {
 		return err
 	}
 
-	// Othrewise, we proceed.
+	// Otherwise, we proceed.
 	c.setBranchTargetOnNext(brIfDivisorNonZero)
 
 	// Temporarily mark them used to allocate a result register while keeping these values.
@@ -2421,7 +2418,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
 	c.compileRegisterAndConstSourceToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, 1)
 
-	brOK := c.compilelBranchInstruction(arm64.ABNE)
+	brOK := c.compileBranchInstruction(arm64.ABNE)
 
 	// If so, exit the execution with errors depending on whether or not the source value is NaN.
 	{
@@ -2434,7 +2431,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 		c.compileTwoRegistersToNoneInstruction(floatcmp, source.register, source.register)
 		// VS flag is set if at least one of values for FCMP is NaN.
 		// https://developer.arm.com/documentation/dui0801/g/Condition-Codes/Comparison-of-condition-code-meanings-in-integer-and-floating-point-code
-		brIfSourceNaN := c.compilelBranchInstruction(arm64.ABVS)
+		brIfSourceNaN := c.compileBranchInstruction(arm64.ABVS)
 
 		// If the source value is not NaN, the operation was overflow.
 		if err := c.compileExitFromNativeCode(jitCallStatusIntegerOverflow); err != nil {
@@ -2988,7 +2985,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	// Check if offsetRegister(= base+offsetArg+targetSizeInBytes) > len(memory.Buffer).
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, reservedRegisterForTemporary, offsetRegister)
-	boundsOK := c.compilelBranchInstruction(arm64.ABLS)
+	boundsOK := c.compileBranchInstruction(arm64.ABLS)
 
 	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length,
 	//  we exit the function with jitCallStatusCodeMemoryOutOfBounds.
@@ -3244,7 +3241,7 @@ func (c *arm64Compiler) compileEnsureOnGeneralPurposeRegister(loc *valueLocation
 // if the value is located on a conditional register.
 //
 // This is usually called at the beginning of methods on compiler interface where we possibly
-// compile istructions without saving the conditional register value.
+// compile instructions without saving the conditional register value.
 // The compile* functions without calling this function is saving the conditional
 // value to the stack or register by invoking ensureOnGeneralPurposeRegister for the top.
 func (c *arm64Compiler) maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister() {
@@ -3326,7 +3323,7 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 }
 
 // compileReleaseAllRegistersToStack adds instructions to store all the values located on
-// either general purpuse or conditional registers onto the memory stack.
+// either general purpose or conditional registers onto the memory stack.
 // See releaseRegisterToStack.
 func (c *arm64Compiler) compileReleaseAllRegistersToStack() error {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
@@ -3358,7 +3355,7 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) (err e
 	return
 }
 
-// compileReservedStackBasePointerRegisterInitialization adds intructions to initialize reservedRegisterForStackBasePointerAddress
+// compileReservedStackBasePointerRegisterInitialization adds instructions to initialize reservedRegisterForStackBasePointerAddress
 // so that it points to the absolute address of the stack base for this function.
 func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() {
 	// First, load the address of the first element in the value stack into reservedRegisterForStackBasePointerAddress temporarily.
@@ -3412,7 +3409,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, moduleInstanceAddressRegister, tmpX)
-	brIfModuleUnchanged := c.compilelBranchInstruction(arm64.ABEQ)
+	brIfModuleUnchanged := c.compileBranchInstruction(arm64.ABEQ)
 	c.addInstruction(brIfModuleUnchanged)
 
 	// Otherwise, we have to update the following fields:
@@ -3532,7 +3529,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	{
 		// "tmpX = [moduleInstanceAddressRegister + moduleInstanceEngineOffset + interfaceDataOffset] (== *moduleEngine)"
 		//
-		// Go's interface is layed out on memory as two quad words as struct {tab, data uintptr}
+		// Go's interface is laid out on memory as two quad words as struct {tab, data uintptr}
 		// where tab points to the interface table, and the latter points to the actual
 		// implementation of interface. This case, we extract "data" pointer as *moduleEngine.
 		// See the following references for detail:

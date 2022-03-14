@@ -23,7 +23,7 @@ func munmapCodeSegment(code []byte) error {
 }
 
 // mmapCodeSegmentAMD64 gives all read-write-exec permission to the mmap region
-// to enter the function. Otherwise, segmentation fault exeception is raied.
+// to enter the function. Otherwise, segmentation fault exception is raised.
 func mmapCodeSegmentAMD64(code []byte) ([]byte, error) {
 	mmapFunc, err := syscall.Mmap(
 		-1,

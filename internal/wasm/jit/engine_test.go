@@ -49,7 +49,7 @@ func TestVerifyOffsetValue(t *testing.T) {
 	// Size and offsets for callFrame.
 	var frame callFrame
 	require.Equal(t, int(unsafe.Sizeof(frame)), callFrameDataSize)
-	// Sizeof callframe must be a power of 2 as we do SHL on the index by "callFrameDataSizeMostSignificantSetBit" to obtain the offset address.
+	// Sizeof call-frame must be a power of 2 as we do SHL on the index by "callFrameDataSizeMostSignificantSetBit" to obtain the offset address.
 	require.True(t, callFrameDataSize&(callFrameDataSize-1) == 0)
 	require.Equal(t, math.Ilogb(float64(callFrameDataSize)), callFrameDataSizeMostSignificantSetBit)
 	require.Equal(t, int(unsafe.Offsetof(frame.returnAddress)), callFrameReturnAddressOffset)
@@ -158,7 +158,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		Module: module,
 	}
 
-	modEngine, err := e.Compile(nil, []*wasm.FunctionInstance{f})
+	modEngine, err := e.NewModuleEngine(nil, []*wasm.FunctionInstance{f})
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
@@ -189,7 +189,7 @@ func requireSupportedOSArch(t *testing.T) {
 func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := newEngine()
-		_, err := e.Compile([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
+		_, err := e.NewModuleEngine([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
 		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
 	})
 
@@ -202,7 +202,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
-		_, err := e.Compile(nil, importedFunctions)
+		_, err := e.NewModuleEngine(nil, importedFunctions)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -215,10 +215,10 @@ func TestEngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.Compile(importedFunctions, moduleFunctions)
+		_, err = e.NewModuleEngine(importedFunctions, moduleFunctions)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
-		// On the compilation failrue, all the compiled functions including suceeded ones must be released.
+		// On the compilation failure, all the compiled functions including succeeded ones must be released.
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
 		for _, f := range moduleFunctions {
 			require.NotContains(t, e.compiledFunctions, f)
@@ -255,13 +255,13 @@ func TestRelease(t *testing.T) {
 			e := newEngine()
 			var importedModuleEngine *moduleEngine
 			if len(tc.importedFunctions) > 0 {
-				eng, err := e.Compile(nil, tc.importedFunctions)
+				modEngine, err := e.NewModuleEngine(nil, tc.importedFunctions)
 				require.NoError(t, err)
-				importedModuleEngine = eng.(*moduleEngine)
+				importedModuleEngine = modEngine.(*moduleEngine)
 				require.Len(t, importedModuleEngine.compiledFunctions, len(tc.importedFunctions))
 			}
 
-			modEngine, err := e.Compile(tc.importedFunctions, tc.moduleFunctions)
+			modEngine, err := e.NewModuleEngine(tc.importedFunctions, tc.moduleFunctions)
 			require.NoError(t, err)
 			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
@@ -324,7 +324,7 @@ func TestRelease(t *testing.T) {
 	}
 }
 
-// Ensures that value stack and callframe stack are allocated on heap which
+// Ensures that value stack and call-frame stack are allocated on heap which
 // allows us to safely access to their data region from native code.
 // See comments on initialValueStackSize and initialCallFrameStackSize.
 func TestSliceAllocatedOnHeap(t *testing.T) {
@@ -386,7 +386,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 					wasm.OpcodeCall, 3, // Call the wasm function below.
 					// At this point, call stack's memory looks like [call_stack_corruption, index3]
 					// With this function call it should end up [call_stack_corruption, host func]
-					// but if the callframe stack is allocated on goroutine stack, we exit the native code
+					// but if the call-frame stack is allocated on goroutine stack, we exit the native code
 					// with  [call_stack_corruption, index3] (old call frame stack) with HostCall status code,
 					// and end up trying to call index3 as a host function which results in nil pointer exception.
 					wasm.OpcodeCall, 0,

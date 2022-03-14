@@ -137,7 +137,7 @@ type CompilationResult struct {
 	// Operations holds wazeroir operations compiled from Wasm instructions in a Wasm function.
 	Operations []Operation
 	// LabelCallers maps Label.String() to the number of callers to that label.
-	// Here "callers" means that the callsites which jumps to the label with br, br_if or br_table
+	// Here "callers" means that the call-sites which jumps to the label with br, br_if or br_table
 	// instructions.
 	//
 	// Note: zero possible and allowed in wasm. Ex.
@@ -360,7 +360,7 @@ operatorSwitch:
 		dropOp := &OperationDrop{Range: c.getFrameDropRange(frame)}
 		c.stack = c.stack[:frame.originalStackLen]
 
-		// Prep labels for else and the continueation of this if block.
+		// Prep labels for else and the continuation of this if block.
 		elseLabel := &Label{FrameID: frame.frameID, Kind: LabelKindElse, OriginalStackLen: frame.originalStackLen}
 		continuationLabel := &Label{FrameID: frame.frameID, Kind: LabelKindContinuation}
 		c.result.LabelCallers[continuationLabel.String()]++
@@ -1436,7 +1436,7 @@ func (c *compiler) applyToStack(opcode wasm.Opcode) (*uint32, error) {
 		return nil, err
 	}
 
-	// Manipulate the stack according to the signtature.
+	// Manipulate the stack according to the signature.
 	// Note that the following algorithm assumes that
 	// the unknown type is unique in the signature,
 	// and is determined by the actual type on the stack.
@@ -1483,14 +1483,14 @@ func (c *compiler) stackPush(t UnsignedType) {
 	c.stack = append(c.stack, t)
 }
 
-// Emit the operatiosn into the result.
+// emit adds the operations into the result.
 func (c *compiler) emit(ops ...Operation) {
 	if !c.unreachableState.on {
 		for _, op := range ops {
 			switch o := op.(type) {
 			case *OperationDrop:
 				// If the drop range is nil,
-				// we could remove such operatinos.
+				// we could remove such operations.
 				// That happens when drop operation is unnecessary.
 				// i.e. when there's no need to adjust stack before jmp.
 				if o.Range == nil {
