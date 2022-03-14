@@ -35,7 +35,7 @@ func (m *MemoryInstance) Size() uint32 {
 
 // hasSize returns true if Len is sufficient for sizeInBytes at the given offset.
 func (m *MemoryInstance) hasSize(offset uint32, sizeInBytes uint32) bool {
-	return uint64(offset+sizeInBytes) <= uint64(m.Size()) // uint64 prevents overflow on add
+	return uint64(offset)+uint64(sizeInBytes) <= uint64(m.Size()) // uint64 prevents overflow on add
 }
 
 // ReadByte implements wasm.Memory ReadByte
