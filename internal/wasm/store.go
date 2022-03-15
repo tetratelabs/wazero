@@ -299,7 +299,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*
 		globals, importedTable, table, importedMemory, memory, types)
 
 	// Plus we are ready to compile functions.
-	m.Engine, err = s.engine.NewModuleEngine(importedFunctions, functions)
+	m.Engine, err = s.engine.NewModuleEngine(name, importedFunctions, functions)
 	if err != nil {
 		s.deleteModule(name)
 		return nil, fmt.Errorf("compilation failed: %w", err)

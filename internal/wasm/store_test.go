@@ -307,19 +307,19 @@ func TestStore_Instantiate_Errors(t *testing.T) {
 }
 
 func TestStore_ExportImportedHostFunction(t *testing.T) {
-	m, err := NewHostModule("", map[string]interface{}{"host_fn": func(wasm.Module) {}})
+	m, err := NewHostModule("host", map[string]interface{}{"host_fn": func(wasm.Module) {}})
 	require.NoError(t, err)
 
 	s := newStore()
 
 	// Add the host module
-	_, err = s.Instantiate(context.Background(), m, "")
+	_, err = s.Instantiate(context.Background(), m, m.NameSection.ModuleName)
 	require.NoError(t, err)
 
 	t.Run("Module is the importing module", func(t *testing.T) {
 		_, err = s.Instantiate(context.Background(), &Module{
 			TypeSection:   []*FunctionType{{}},
-			ImportSection: []*Import{{Type: ExternTypeFunc, Name: "host_fn", DescFunc: 0}},
+			ImportSection: []*Import{{Type: ExternTypeFunc, Module: "host", Name: "host_fn", DescFunc: 0}},
 			MemorySection: &Memory{Min: 1},
 			ExportSection: map[string]*Export{"host.fn": {Type: ExternTypeFunc, Name: "host.fn", Index: 0}},
 		}, "test")
@@ -418,17 +418,20 @@ func newStore() *Store {
 	return NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
 }
 
-func (e *mockEngine) NewModuleEngine(_, _ []*FunctionInstance) (ModuleEngine, error) {
+// NewModuleEngine implements Engine.NewModuleEngine
+func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
 	}
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
+// FunctionAddress implements ModuleEngine.FunctionAddress
 func (e *mockModuleEngine) FunctionAddress(index Index) uintptr {
 	return uintptr(index)
 }
 
+// Call implements ModuleEngine.Call
 func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
 		return nil, fmt.Errorf("call failed")
@@ -437,7 +440,10 @@ func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...ui
 	return
 }
 
-func (e *mockModuleEngine) Close() {}
+// Close implements io.Closer
+func (e *mockModuleEngine) Close() (err error) {
+	return
+}
 
 func TestStore_getTypeInstance(t *testing.T) {
 	t.Run("too many functions", func(t *testing.T) {

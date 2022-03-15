@@ -303,11 +303,11 @@ func TestRuntime_NewModule_UsesStoreContext(t *testing.T) {
 		require.Equal(t, runtimeCtx, ctx.Context())
 	}
 
-	_, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
+	_, err := r.NewModuleBuilder("env").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
 
 	decoded, err := r.CompileModule([]byte(`(module $runtime_test.go
-	(import "" "start" (func $start))
+	(import "env" "start" (func $start))
 	(start $start)
 )`))
 	require.NoError(t, err)

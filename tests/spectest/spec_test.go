@@ -457,7 +457,7 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 		return
 	}
 
-	_, err = store.Instantiate(context.Background(), mod, "")
+	_, err = store.Instantiate(context.Background(), mod, t.Name())
 	require.Error(t, err, msg)
 }
 
