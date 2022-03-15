@@ -3977,7 +3977,6 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	return nil
 }
 
-// TODO: this is deletable.
 func (c *amd64Compiler) compileCallHostFunction() error {
 	return c.compileCallGoFunction(jitCallStatusCodeCallHostFunction)
 }

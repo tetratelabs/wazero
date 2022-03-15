@@ -212,10 +212,11 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 
 				// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 				// TODO: delete after #233
-				compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+				require.NoError(t, err)
 				compiler.valueLocationStack().pop()
 
-				err := compiler.compileMaybeGrowValueStack()
+				err = compiler.compileMaybeGrowValueStack()
 				require.NoError(t, err)
 				require.NotNil(t, compiler.getOnStackPointerCeilDeterminedCallBack())
 
@@ -242,10 +243,11 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 
 		// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 		// TODO: delete after #233
-		compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+		err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+		require.NoError(t, err)
 		compiler.valueLocationStack().pop()
 
-		err := compiler.compileMaybeGrowValueStack()
+		err = compiler.compileMaybeGrowValueStack()
 		require.NoError(t, err)
 
 		// On the return from grow value stack, we simply return.
@@ -2000,11 +2002,12 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 
 			// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 			// TODO: delete after #233
-			compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+			err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+			require.NoError(t, err)
 			loc := compiler.valueLocationStack().pop()
 			compiler.valueLocationStack().markRegisterUnused(loc.register)
 
-			err := compiler.compileModuleContextInitialization()
+			err = compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
 			require.Empty(t, compiler.valueLocationStack().usedRegisters)
 
@@ -2606,10 +2609,11 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 
 	// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 	// TODO: delete after #233
-	compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+	err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+	require.NoError(t, err)
 	compiler.valueLocationStack().pop()
 
-	err := compiler.compileHostFunction()
+	err = compiler.compileHostFunction()
 	require.NoError(t, err)
 
 	// Generate and run the code under test.

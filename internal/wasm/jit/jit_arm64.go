@@ -378,6 +378,13 @@ func (c *arm64Compiler) compileUnconditionalBranchToAddressOnRegister(addressReg
 	c.addInstruction(br)
 }
 
+func (c *arm64Compiler) compileStandAloneInstruction(inst obj.As) *obj.Prog {
+	prog := c.newProg()
+	prog.As = inst
+	c.addInstruction(prog)
+	return prog
+}
+
 // compileAddInstructionWithLeftShiftedRegister emits an ADD instruction to perform "destinationReg = srcReg + (shiftedSourceReg << shiftNum)".
 func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSourceReg int16, shiftNum int64, srcReg, destinationReg int16) {
 	inst := c.newProg()
@@ -389,13 +396,6 @@ func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSour
 	inst.From.Offset = (int64(shiftedSourceReg)&31)<<16 | 0<<22 | (shiftNum&63)<<10
 	inst.Reg = srcReg
 	c.addInstruction(inst)
-}
-
-func (c *arm64Compiler) compileNOP() (prog *obj.Prog) {
-	prog = c.newProg()
-	prog.As = obj.ANOP
-	c.addInstruction(prog)
-	return
 }
 
 func (c *arm64Compiler) String() (ret string) { return }
@@ -420,7 +420,7 @@ func (c *arm64Compiler) pushFunctionParams() {
 func (c *arm64Compiler) compilePreamble() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
 	// TODO: delete after #233
-	c.compileNOP()
+	c.compileStandAloneInstruction(obj.ANOP)
 
 	c.pushFunctionParams()
 
@@ -611,7 +611,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) {
 func (c *arm64Compiler) compileHostFunction() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
 	// TODO: delete after #233
-	c.compileNOP()
+	c.compileStandAloneInstruction(obj.ANOP)
 
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
@@ -645,7 +645,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
-	labelBegin := c.compileNOP()
+	labelBegin := c.compileStandAloneInstruction(obj.ANOP)
 
 	// Save the instructions so that backward branching
 	// instructions can branch to this label.
@@ -1033,7 +1033,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
 		// we use NOP as we don't yet know the next instruction in each label.
-		init := c.compileNOP()
+		init := c.compileStandAloneInstruction(obj.ANOP)
 		labelInitialInstructions[i] = init
 
 		var locationStack *valueLocationStack
