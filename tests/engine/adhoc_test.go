@@ -236,9 +236,9 @@ func testHostFunctions(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConf
 func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
 	t.Run("singleton", func(t *testing.T) {
 		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-		var moduleCloser func()
+		var moduleCloser func() error
 		_, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-			"close_module": func() { moduleCloser() }, // Closing while executing itself.
+			"close_module": func() { _ = moduleCloser() }, // Closing while executing itself.
 		}).Instantiate()
 		require.NoError(t, err)
 
@@ -275,7 +275,7 @@ func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.
 		require.NoError(t, err)
 
 		// Closing the imported module before making call should also safe.
-		importedModule.Close()
+		require.NoError(t, importedModule.Close())
 
 		// Even we can re-enstantiate the module for the same name.
 		importedModuleNew, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
@@ -284,7 +284,7 @@ func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.
 			},
 		}).Instantiate()
 		require.NoError(t, err)
-		defer importedModuleNew.Close()
+		defer importedModuleNew.Close() // nolint
 
 		_, err = m.ExportedFunction("close_parent_before_execution").Call(nil)
 		require.NoError(t, err)

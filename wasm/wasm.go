@@ -4,6 +4,7 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 )
 
@@ -62,6 +63,11 @@ func ValueTypeName(t ValueType) string {
 type Module interface {
 	fmt.Stringer
 
+	// Closer (Close) releases resources allocated for this Module. Using this while having outstanding function calls
+	// is safe. After calling this function, re-instantiating a module for the same name is allowed.
+	io.Closer
+	// ^^ io.Closer not due to I/O, but to allow future static analysis to catch leaks (unclosed Closers).
+
 	// Context returns any propagated context from the Runtime or a prior function call.
 	//
 	// The returned context is always non-nil; it defaults to context.Background.
@@ -87,10 +93,6 @@ type Module interface {
 
 	// ExportedGlobal a global exported from this module or nil if it wasn't.
 	ExportedGlobal(name string) Global
-
-	// Close releases resources allocated for this Module. Using this while having outstanding function calls is
-	// safe. After calling this function, re-instantiating a module for the same name is allowed.
-	Close()
 }
 
 // Function is a WebAssembly 1.0 (20191205) function exported from an instantiated module (wazero.Runtime InstantiateModule).

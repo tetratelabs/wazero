@@ -57,8 +57,9 @@ func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 	return m
 }
 
-func (m *ModuleContext) Close() {
-	m.store.CloseModule(m.module.Name)
+// Close implements io.Closer
+func (m *ModuleContext) Close() error {
+	return m.store.CloseModule(m.module.Name)
 }
 
 // Memory implements wasm.Module Memory

@@ -147,15 +147,15 @@ func TestStore_CloseModule(t *testing.T) {
 			_, ok = s.modules[importingModuleName]
 			require.True(t, ok)
 
-			// Release the importing module
-			s.CloseModule(importingModuleName)
+			// Close the importing module
+			require.NoError(t, s.CloseModule(importingModuleName))
 			require.NotContains(t, s.modules, importingModuleName)
 
-			// Can re-release the importing module
-			s.CloseModule(importingModuleName)
+			// Can re-close the importing module
+			require.NoError(t, s.CloseModule(importingModuleName))
 
-			// Now we release the imported module.
-			s.CloseModule(importedModuleName)
+			// Now we close the imported module.
+			require.NoError(t, s.CloseModule(importedModuleName))
 			require.Nil(t, s.modules[importedModuleName])
 			require.NotContains(t, s.modules, importedModuleName)
 		})
@@ -206,13 +206,13 @@ func TestStore_concurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(i int) {
 			defer wg.Done()
-			s.CloseModule(strconv.Itoa(i))
+			require.NoError(t, s.CloseModule(strconv.Itoa(i)))
 			require.NoError(t, err)
 		}(i)
 	}
 	wg.Wait()
 
-	s.CloseModule(hm.Name)
+	require.NoError(t, s.CloseModule(hm.Name))
 
 	// All instances are freed.
 	require.Len(t, s.modules, 0)
