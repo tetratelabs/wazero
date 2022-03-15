@@ -30,3 +30,5 @@ var (
 	generalPurposeFloatRegisters         = []int16{}
 	unreservedGeneralPurposeIntRegisters = []int16{}
 )
+
+const zeroRegister int16 = nilRegister
