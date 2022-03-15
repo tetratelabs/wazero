@@ -20,8 +20,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 		t.Run(kind.String(), func(t *testing.T) {
 			t.Run("int32", func(t *testing.T) {
 				for _, tc := range []struct {
-					name string
-					// Interpret -1 as stack.
+					name         string
 					x1Reg, x2Reg int16
 				}{
 					{
@@ -32,7 +31,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					{
 						name:  "x1:ax,x2:stack",
 						x1Reg: x86.REG_AX,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
@@ -41,7 +40,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:ax",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_AX,
 					},
 					{
@@ -51,18 +50,18 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: -1,
+						x1Reg: nilRegister,
 						x2Reg: x86.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
 						x1Reg: x86.REG_R9,
-						x2Reg: -1,
+						x2Reg: nilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: -1,
-						x2Reg: -1,
+						x1Reg: nilRegister,
+						x2Reg: nilRegister,
 					},
 				} {
 					tc := tc
@@ -109,7 +108,6 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						require.Equal(t, int16(x86.REG_AX), compiler.valueLocationStack().peek().register)
 						require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
 						require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
 						require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
@@ -131,16 +129,14 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						env.exec(code)
 
 						// Verify the stack is in the form of ["any value previously used by DX" + the result of operation]
+						require.Equal(t, uint64(1), env.stackPointer())
 						switch kind {
 						case wazeroir.OperationKindDiv:
-							require.Equal(t, uint64(1), env.stackPointer())
-							require.Equal(t, uint64(x1Value/x2Value)+dxValue, env.stackTopAsUint64())
+							require.Equal(t, x1Value/x2Value+uint32(dxValue), env.stackTopAsUint32())
 						case wazeroir.OperationKindMul:
-							require.Equal(t, uint64(1), env.stackPointer())
-							require.Equal(t, uint64(x1Value*x2Value)+dxValue, env.stackTopAsUint64())
+							require.Equal(t, x1Value*x2Value+uint32(dxValue), env.stackTopAsUint32())
 						case wazeroir.OperationKindRem:
-							require.Equal(t, uint64(1), env.stackPointer())
-							require.Equal(t, uint64(x1Value%x2Value)+dxValue, env.stackTopAsUint64())
+							require.Equal(t, x1Value%x2Value+uint32(dxValue), env.stackTopAsUint32())
 						}
 					})
 				}
@@ -234,7 +230,6 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						}
 						require.NoError(t, err)
 
-						require.Equal(t, int16(x86.REG_AX), compiler.valueLocationStack().peek().register)
 						require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
 						require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
 						require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
@@ -266,7 +261,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 							require.Equal(t, uint64(x1Value*x2Value)+dxValue, env.stackTopAsUint64())
 						case wazeroir.OperationKindRem:
 							require.Equal(t, uint64(1), env.stackPointer())
-							require.Equal(t, uint64(x1Value%x2Value)+dxValue, env.stackTopAsUint64())
+							require.Equal(t, x1Value%x2Value+dxValue, env.stackTopAsUint64())
 						}
 					})
 				}
