@@ -143,7 +143,10 @@ func (j *jitEnv) exec(code []byte) {
 
 func (j *jitEnv) requireNewCompiler(t *testing.T, functype *wasm.FunctionType) compilerImpl {
 	requireSupportedOSArch(t)
-	ret, release, err := newCompiler(&wasm.FunctionInstance{Module: j.moduleInstance, Kind: wasm.FunctionKindWasm, Type: functype}, nil)
+	ret, release, err := newCompiler(
+		&wasm.FunctionInstance{Module: j.moduleInstance, Kind: wasm.FunctionKindWasm, Type: functype},
+		&wazeroir.CompilationResult{LabelCallers: map[string]uint32{}},
+	)
 	t.Cleanup(release)
 	require.NoError(t, err)
 	return ret
@@ -3881,6 +3884,238 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestArm64Compiler_compileBr(t *testing.T) {
+	t.Run("return", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t, nil)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		// Branch into nil label is interpreted as return. See BranchTarget.IsReturnTarget
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: nil}})
+		require.NoError(t, err)
+
+		// Compile and execute the code under test.
+		// Note: we don't invoke "compiler.return()" as the code emitted by compilerBr is enough to exit.
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+	t.Run("back-and-forth br", func(t *testing.T) {
+		env := newJITEnvironment()
+		compiler := env.requireNewCompiler(t, nil)
+		err := compiler.compilePreamble()
+		require.NoError(t, err)
+
+		// Emit the forward br, meaning that handle Br instruction where the target label hasn't been compiled yet.
+		forwardLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 0}
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: forwardLabel}})
+		require.NoError(t, err)
+
+		// We must not reach the code after Br, so emit the code exiting with Unreachable status.
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+		require.NoError(t, err)
+
+		exitLabel := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: exitLabel}})
+		require.NoError(t, err)
+
+		// Emit code for the exitLabel.
+		skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: exitLabel})
+		require.False(t, skip)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+		require.NoError(t, err)
+
+		// Emit code for the forwardLabel.
+		skip = compiler.compileLabel(&wazeroir.OperationLabel{Label: forwardLabel})
+		require.False(t, skip)
+		err = compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: exitLabel}})
+		require.NoError(t, err)
+
+		code, _, _, err := compiler.compile()
+		require.NoError(t, err)
+
+		// The generated code looks like this:
+		//
+		//    ... code from compilePreamble()
+		//    br .forwardLabel
+		//    exit jitCallStatusCodeUnreachable  // must not be reached
+		//    br .exitLabel                      // must not be reached
+		// .exitLabel:
+		//    exit jitCallStatusCodeReturned
+		// .forwardLabel:
+		//    br .exitLabel
+		//
+		// Therefore, if we start executing from the top, we must end up exiting jitCallStatusCodeReturned.
+		env.exec(code)
+		require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	})
+}
+
+func TestCompiler_compileBrTable(t *testing.T) {
+	requireRunAndExpectedValueReturned := func(t *testing.T, env *jitEnv, c compilerImpl, expValue uint32) {
+		// Emit code for each label which returns the frame ID.
+		for returnValue := uint32(0); returnValue < 7; returnValue++ {
+			label := &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: returnValue}
+			err := c.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: label}})
+			require.NoError(t, err)
+			_ = c.compileLabel(&wazeroir.OperationLabel{Label: label})
+			_ = c.compileConstI32(&wazeroir.OperationConstI32{Value: label.FrameID})
+			err = c.compileReturnFunction()
+			require.NoError(t, err)
+		}
+
+		// Generate the code under test and run.
+		code, _, _, err := c.compile()
+		require.NoError(t, err)
+		env.exec(code)
+
+		// Check the returned value.
+		require.Equal(t, uint64(1), env.stackPointer())
+		require.Equal(t, expValue, env.stackTopAsUint32())
+	}
+
+	getBranchTargetDropFromFrameID := func(frameid uint32) *wazeroir.BranchTargetDrop {
+		return &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{
+			Label: &wazeroir.Label{FrameID: frameid, Kind: wazeroir.LabelKindHeader}},
+		}
+	}
+
+	for _, tc := range []struct {
+		name          string
+		index         int64
+		o             *wazeroir.OperationBrTable
+		expectedValue uint32
+	}{
+		{
+			name:          "only default with index 0",
+			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			index:         0,
+			expectedValue: 6,
+		},
+		{
+			name:          "only default with index 100",
+			o:             &wazeroir.OperationBrTable{Default: getBranchTargetDropFromFrameID(6)},
+			index:         100,
+			expectedValue: 6,
+		},
+		{
+			name: "select default with targets and good index",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         3,
+			expectedValue: 6,
+		},
+		{
+			name: "select default with targets and huge index",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         100000,
+			expectedValue: 6,
+		},
+		{
+			name: "select first with two targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         0,
+			expectedValue: 1,
+		},
+		{
+			name: "select last with two targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+				},
+				Default: getBranchTargetDropFromFrameID(6),
+			},
+			index:         1,
+			expectedValue: 2,
+		},
+		{
+			name: "select first with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         0,
+			expectedValue: 1,
+		},
+		{
+			name: "select middle with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         2,
+			expectedValue: 3,
+		},
+		{
+			name: "select last with five targets",
+			o: &wazeroir.OperationBrTable{
+				Targets: []*wazeroir.BranchTargetDrop{
+					getBranchTargetDropFromFrameID(1),
+					getBranchTargetDropFromFrameID(2),
+					getBranchTargetDropFromFrameID(3),
+					getBranchTargetDropFromFrameID(4),
+					getBranchTargetDropFromFrameID(5),
+				},
+				Default: getBranchTargetDropFromFrameID(5),
+			},
+			index:         4,
+			expectedValue: 5,
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t, nil)
+
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(tc.index)})
+			require.NoError(t, err)
+
+			err = compiler.compileBrTable(tc.o)
+			require.NoError(t, err)
+
+			require.Len(t, compiler.valueLocationStack().usedRegisters, 0)
+
+			requireRunAndExpectedValueReturned(t, env, compiler, tc.expectedValue)
 		})
 	}
 }
