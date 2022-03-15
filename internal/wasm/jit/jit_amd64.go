@@ -274,10 +274,6 @@ func (c *amd64Compiler) newProg() (prog *obj.Prog) {
 	return
 }
 
-func (c *amd64Compiler) compileNOP() {
-	c.compileStandAloneInstruction(obj.ANOP)
-}
-
 func (c *amd64Compiler) compileStandAloneInstruction(inst obj.As) *obj.Prog {
 	prog := c.newProg()
 	prog.As = inst

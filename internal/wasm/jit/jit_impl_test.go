@@ -152,7 +152,6 @@ func (j *jitEnv) requireNewCompiler(t *testing.T, functype *wasm.FunctionType) c
 // This is currently implemented by amd64 and arm64.
 type compilerImpl interface {
 	compiler
-	compileNOP()
 	compileExitFromNativeCode(jitCallStatusCode)
 	compileMaybeGrowValueStack() error
 	compileReturnFunction() error
@@ -211,9 +210,10 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 				env := newJITEnvironment()
 				compiler := env.requireNewCompiler(t, nil)
 
-				// The assembler skips the first instruction so we intentionally add NOP here.
+				// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 				// TODO: delete after #233
-				compiler.compileNOP()
+				compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+				compiler.valueLocationStack().pop()
 
 				err := compiler.compileMaybeGrowValueStack()
 				require.NoError(t, err)
@@ -240,9 +240,10 @@ func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t, nil)
 
-		// The assembler skips the first instruction so we intentionally add NOP here.
+		// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 		// TODO: delete after #233
-		compiler.compileNOP()
+		compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+		compiler.valueLocationStack().pop()
 
 		err := compiler.compileMaybeGrowValueStack()
 		require.NoError(t, err)
@@ -1997,9 +1998,11 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			me := &moduleEngine{compiledFunctions: make([]*compiledFunction, 10)}
 			tc.moduleInstance.Engine = me
 
-			// The assembler skips the first instruction so we intentionally add NOP here.
+			// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 			// TODO: delete after #233
-			compiler.compileNOP()
+			compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+			loc := compiler.valueLocationStack().pop()
+			compiler.valueLocationStack().markRegisterUnused(loc.register)
 
 			err := compiler.compileModuleContextInitialization()
 			require.NoError(t, err)
@@ -2601,9 +2604,10 @@ func TestCompiler_compileHostFunction(t *testing.T) {
 	env := newJITEnvironment()
 	compiler := env.requireNewCompiler(t, nil)
 
-	// The assembler skips the first instruction so we intentionally add NOP here.
+	// The assembler skips the first instruction so we intentionally add const op here, which is ignored.
 	// TODO: delete after #233
-	compiler.compileNOP()
+	compiler.compileConstI32(&wazeroir.OperationConstI32{Value: 1})
+	compiler.valueLocationStack().pop()
 
 	err := compiler.compileHostFunction()
 	require.NoError(t, err)

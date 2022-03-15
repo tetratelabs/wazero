@@ -391,13 +391,9 @@ func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSour
 	c.addInstruction(inst)
 }
 
-func (c *arm64Compiler) compileNOP() {
-	c.compileStandAloneInstruction(obj.ANOP)
-}
-
-func (c *arm64Compiler) compileStandAloneInstruction(inst obj.As) (prog *obj.Prog) {
+func (c *arm64Compiler) compileNOP() (prog *obj.Prog) {
 	prog = c.newProg()
-	prog.As = inst
+	prog.As = obj.ANOP
 	c.addInstruction(prog)
 	return
 }
@@ -649,7 +645,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
-	labelBegin := c.compileStandAloneInstruction(obj.ANOP)
+	labelBegin := c.compileNOP()
 
 	// Save the instructions so that backward branching
 	// instructions can branch to this label.
@@ -1037,7 +1033,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
 		// we use NOP as we don't yet know the next instruction in each label.
-		init := c.compileStandAloneInstruction(obj.ANOP)
+		init := c.compileNOP()
 		labelInitialInstructions[i] = init
 
 		var locationStack *valueLocationStack
