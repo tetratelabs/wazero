@@ -147,26 +147,6 @@ type amd64Compiler struct {
 	staticData          compiledFunctionStaticData
 }
 
-// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
-func (c *amd64Compiler) valueLocationStack() *valueLocationStack {
-	return c.locationStack
-}
-
-// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
-func (c *amd64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
-	return c.onStackPointerCeilDeterminedCallBack
-}
-
-// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
-func (c *amd64Compiler) setStackPointerCeil(v uint64) {
-	c.stackPointerCeil = v
-}
-
-// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
-func (c *amd64Compiler) setValueLocationStack(s *valueLocationStack) {
-	c.locationStack = s
-}
-
 // setLocationStack sets the given valueLocationStack to .locationStack field,
 // while allowing us to track valueLocationStack.stackPointerCeil across multiple stacks.
 // This is called when we branch into different block.

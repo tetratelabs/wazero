@@ -10,6 +10,26 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) valueLocationStack() *valueLocationStack {
+	return c.locationStack
+}
+
+// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
+func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
+	return c.onStackPointerCeilDeterminedCallBack
+}
+
+// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
+func (c *arm64Compiler) setStackPointerCeil(v uint64) {
+	c.stackPointerCeil = v
+}
+
+// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
+func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
+	c.locationStack = s
+}
+
 func TestArchContextOffsetInEngine(t *testing.T) {
 	var ctx callEngine
 	require.Equal(t, int(unsafe.Offsetof(ctx.jitCallReturnAddress)), callEngineArchContextJITCallReturnAddressOffset, "fix consts in jit_arm64.s")
