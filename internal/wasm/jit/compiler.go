@@ -338,3 +338,18 @@ type compiler interface {
 	// See internalwasm.OpcodeI64Extend32S
 	compileSignExtend64From32() error
 }
+
+type compilerImpl interface {
+	compiler
+	compileNOP()
+	compileExitFromNativeCode(jitCallStatusCode)
+	compileMaybeGrowValueStack() error
+	compileReturnFunction() error
+	getOnStackPointerCeilDeterminedCallBack() func(uint64)
+	setStackPointerCeil(uint64)
+	compileReleaseRegisterToStack(loc *valueLocation)
+	valueLocationStack() *valueLocationStack
+	setValueLocationStack(*valueLocationStack)
+	compileEnsureOnGeneralPurposeRegister(loc *valueLocation) error
+	compileModuleContextInitialization() error
+}

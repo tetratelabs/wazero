@@ -583,7 +583,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 }
 
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
-func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) error {
+func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) {
 	// Write the current stack pointer to the ce.stackPointer.
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(c.locationStack.sp), reservedRegisterForTemporary)
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForTemporary, reservedRegisterForCallEngine,
@@ -607,7 +607,6 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 	ret.To.Type = obj.TYPE_REG
 	ret.To.Reg = reservedRegisterForTemporary
 	c.addInstruction(ret)
-	return nil
 }
 
 // compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
@@ -3230,6 +3229,25 @@ func (c *arm64Compiler) popValueOnRegister() (v *valueLocation, err error) {
 // compileEnsureOnGeneralPurposeRegister emits instructions to ensure that a value is located on a register.
 func (c *arm64Compiler) compileEnsureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
 	if loc.onStack() {
+		var inst obj.As
+		var reg int16
+		switch loc.regType {
+		case generalPurposeRegisterTypeInt:
+			inst = arm64.AMOVD
+			reg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		case generalPurposeRegisterTypeFloat:
+			inst = arm64.AFMOVD
+			reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+		}
+
+		if err != nil {
+			return
+		}
+
+		// Record that the value holds the register and the register is marked used.
+		loc.setRegister(reg)
+		c.locationStack.markRegisterUsed(reg)
+
 		err = c.compileLoadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
 		c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
@@ -3270,28 +3288,8 @@ func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 }
 
 // compileLoadValueOnStackToRegister emits instructions to load the value located on the stack to a register.
-func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) (err error) {
-	var inst obj.As
-	var reg int16
-	switch loc.regType {
-	case generalPurposeRegisterTypeInt:
-		inst = arm64.AMOVD
-		reg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
-	case generalPurposeRegisterTypeFloat:
-		inst = arm64.AFMOVD
-		reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
-	}
-
-	if err != nil {
-		return
-	}
-
+func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) {
 	c.compileMemoryToRegisterInstruction(inst, reservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8, reg)
-
-	// Record that the value holds the register and the register is marked used.
-	loc.setRegister(reg)
-	c.locationStack.markRegisterUsed(reg)
-	return
 }
 
 // allocateRegister returns an unused register of the given type. The register will be taken
@@ -3342,7 +3340,7 @@ func (c *arm64Compiler) compileReleaseAllRegistersToStack() error {
 }
 
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
-func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) (err error) {
+func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) {
 	var inst obj.As = arm64.AMOVD
 	if loc.regType == generalPurposeRegisterTypeFloat {
 		inst = arm64.AFMOVD
@@ -3352,7 +3350,6 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) (err e
 
 	// Mark the register is free.
 	c.locationStack.releaseRegister(loc)
-	return
 }
 
 // compileReservedStackBasePointerRegisterInitialization adds instructions to initialize reservedRegisterForStackBasePointerAddress

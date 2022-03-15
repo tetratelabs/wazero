@@ -97,7 +97,7 @@ func unlockAssembler() {
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // The function returned must be invoked when finished compiling, so use `defer` to ensure this.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, func(), error) {
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compilerImpl, func(), error) {
 	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
 	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 	assemblerMutex.Lock()
@@ -145,6 +145,26 @@ type amd64Compiler struct {
 	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
 	onGenerateCallbacks []func(code []byte) error
 	staticData          compiledFunctionStaticData
+}
+
+// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
+func (c *amd64Compiler) valueLocationStack() *valueLocationStack {
+	return c.locationStack
+}
+
+// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
+func (c *amd64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
+	return c.onStackPointerCeilDeterminedCallBack
+}
+
+// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
+func (c *amd64Compiler) setStackPointerCeil(v uint64) {
+	c.stackPointerCeil = v
+}
+
+// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
+func (c *amd64Compiler) setValueLocationStack(s *valueLocationStack) {
+	c.locationStack = s
 }
 
 // setLocationStack sets the given valueLocationStack to .locationStack field,
@@ -206,6 +226,7 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	// Note this MUST be called before Assemble() below.
 	if c.onStackPointerCeilDeterminedCallBack != nil {
 		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
+		c.onStackPointerCeilDeterminedCallBack = nil
 	}
 
 	code, err = mmapCodeSegment(c.builder.Assemble())
@@ -273,8 +294,8 @@ func (c *amd64Compiler) newProg() (prog *obj.Prog) {
 	return
 }
 
-func (c *amd64Compiler) compileNOP() *obj.Prog {
-	return c.compileStandAloneInstruction(obj.ANOP)
+func (c *amd64Compiler) compileNOP() {
+	c.compileStandAloneInstruction(obj.ANOP)
 }
 
 func (c *amd64Compiler) compileStandAloneInstruction(inst obj.As) *obj.Prog {
@@ -914,7 +935,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		// Emit the initial instruction of each target.
 		// We use NOP as we don't yet know the next instruction in each label.
 		// Assembler would optimize out this NOP during code generation, so this is harmless.
-		labelInitialInstructions[i] = c.compileNOP()
+		labelInitialInstructions[i] = c.compileStandAloneInstruction(obj.ANOP)
 
 		var locationStack *valueLocationStack
 		var target *wazeroir.BranchTargetDrop
@@ -988,7 +1009,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	}
 
 	// We use NOP as a beginning of instructions in a label.
-	labelBegin := c.compileNOP()
+	labelBegin := c.compileStandAloneInstruction(obj.ANOP)
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
