@@ -7,8 +7,19 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/stretchr/testify/require"
+
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
+
+func TestMain(m *testing.M) {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		// JIT is currently implemented only for amd64 or arm64.
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
 
 type jitEnv struct {
 	me             *moduleEngine
@@ -126,7 +137,37 @@ func (j *jitEnv) exec(code []byte) {
 	)
 }
 
-const defaultMemoryPageNumInTest = 2
+func (j *jitEnv) requireNewCompiler(t *testing.T, functype *wasm.FunctionType) compilerImpl {
+	requireSupportedOSArch(t)
+	c, release, err := newCompiler(
+		&wasm.FunctionInstance{Module: j.moduleInstance, Kind: wasm.FunctionKindWasm, Type: functype},
+		&wazeroir.CompilationResult{LabelCallers: map[string]uint32{}},
+	)
+	t.Cleanup(release)
+	require.NoError(t, err)
+
+	ret, ok := c.(compilerImpl)
+	require.True(t, ok)
+	return ret
+}
+
+// CompilerImpl is the interface used for architecture-independent unit tests in this file.
+// This is currently implemented by amd64 and arm64.
+type compilerImpl interface {
+	compiler
+	compileExitFromNativeCode(jitCallStatusCode)
+	compileMaybeGrowValueStack() error
+	compileReturnFunction() error
+	getOnStackPointerCeilDeterminedCallBack() func(uint64)
+	setStackPointerCeil(uint64)
+	compileReleaseRegisterToStack(loc *valueLocation)
+	valueLocationStack() *valueLocationStack
+	setValueLocationStack(*valueLocationStack)
+	compileEnsureOnGeneralPurposeRegister(loc *valueLocation) error
+	compileModuleContextInitialization() error
+}
+
+const defaultMemoryPageNumInTest = 1
 
 func newJITEnvironment() *jitEnv {
 	me := &moduleEngine{}
@@ -140,12 +181,4 @@ func newJITEnvironment() *jitEnv {
 		},
 		ce: me.newCallEngine(),
 	}
-}
-
-func TestMain(m *testing.M) {
-	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
-		// JIT is currently implemented only for amd64 or arm64.
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
 }

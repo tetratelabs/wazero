@@ -206,6 +206,7 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	// Note this MUST be called before Assemble() below.
 	if c.onStackPointerCeilDeterminedCallBack != nil {
 		c.onStackPointerCeilDeterminedCallBack(stackPointerCeil)
+		c.onStackPointerCeilDeterminedCallBack = nil
 	}
 
 	code, err = mmapCodeSegment(c.builder.Assemble())
@@ -271,10 +272,6 @@ func (c *amd64Compiler) addSetJmpOrigins(progs ...*obj.Prog) {
 func (c *amd64Compiler) newProg() (prog *obj.Prog) {
 	prog = c.builder.NewProg()
 	return
-}
-
-func (c *amd64Compiler) compileNOP() *obj.Prog {
-	return c.compileStandAloneInstruction(obj.ANOP)
 }
 
 func (c *amd64Compiler) compileStandAloneInstruction(inst obj.As) *obj.Prog {
@@ -914,7 +911,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		// Emit the initial instruction of each target.
 		// We use NOP as we don't yet know the next instruction in each label.
 		// Assembler would optimize out this NOP during code generation, so this is harmless.
-		labelInitialInstructions[i] = c.compileNOP()
+		labelInitialInstructions[i] = c.compileStandAloneInstruction(obj.ANOP)
 
 		var locationStack *valueLocationStack
 		var target *wazeroir.BranchTargetDrop
@@ -988,7 +985,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	}
 
 	// We use NOP as a beginning of instructions in a label.
-	labelBegin := c.compileNOP()
+	labelBegin := c.compileStandAloneInstruction(obj.ANOP)
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
@@ -3980,7 +3977,6 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	return nil
 }
 
-// TODO: this is deletable.
 func (c *amd64Compiler) compileCallHostFunction() error {
 	return c.compileCallGoFunction(jitCallStatusCodeCallHostFunction)
 }

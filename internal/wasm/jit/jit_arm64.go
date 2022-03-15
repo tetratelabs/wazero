@@ -378,6 +378,13 @@ func (c *arm64Compiler) compileUnconditionalBranchToAddressOnRegister(addressReg
 	c.addInstruction(br)
 }
 
+func (c *arm64Compiler) compileStandAloneInstruction(inst obj.As) *obj.Prog {
+	prog := c.newProg()
+	prog.As = inst
+	c.addInstruction(prog)
+	return prog
+}
+
 // compileAddInstructionWithLeftShiftedRegister emits an ADD instruction to perform "destinationReg = srcReg + (shiftedSourceReg << shiftNum)".
 func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSourceReg int16, shiftNum int64, srcReg, destinationReg int16) {
 	inst := c.newProg()
@@ -389,13 +396,6 @@ func (c *arm64Compiler) compileAddInstructionWithLeftShiftedRegister(shiftedSour
 	inst.From.Offset = (int64(shiftedSourceReg)&31)<<16 | 0<<22 | (shiftNum&63)<<10
 	inst.Reg = srcReg
 	c.addInstruction(inst)
-}
-
-func (c *arm64Compiler) compileNOP() (nop *obj.Prog) {
-	nop = c.newProg()
-	nop.As = obj.ANOP
-	c.addInstruction(nop)
-	return
 }
 
 func (c *arm64Compiler) String() (ret string) { return }
@@ -420,7 +420,7 @@ func (c *arm64Compiler) pushFunctionParams() {
 func (c *arm64Compiler) compilePreamble() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
 	// TODO: delete after #233
-	c.compileNOP()
+	c.compileStandAloneInstruction(obj.ANOP)
 
 	c.pushFunctionParams()
 
@@ -524,9 +524,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 
 	// If the values are identical, we return back to the Go code with returned status.
 	brIfNotEqual := c.compileBranchInstruction(arm64.ABNE)
-	if err := c.compileExitFromNativeCode(jitCallStatusCodeReturned); err != nil {
-		return err
-	}
+	c.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 	// Otherwise, we have to jump to the caller's return address.
 	c.setBranchTargetOnNext(brIfNotEqual)
@@ -583,7 +581,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 }
 
 // compileExitFromNativeCode adds instructions to give the control back to ce.exec with the given status code.
-func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) error {
+func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) {
 	// Write the current stack pointer to the ce.stackPointer.
 	c.compileConstToRegisterInstruction(arm64.AMOVD, int64(c.locationStack.sp), reservedRegisterForTemporary)
 	c.compileRegisterToMemoryInstruction(arm64.AMOVD, reservedRegisterForTemporary, reservedRegisterForCallEngine,
@@ -607,14 +605,13 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) erro
 	ret.To.Type = obj.TYPE_REG
 	ret.To.Reg = reservedRegisterForTemporary
 	c.addInstruction(ret)
-	return nil
 }
 
 // compileHostFunction implements compiler.compileHostFunction for the arm64 architecture.
 func (c *arm64Compiler) compileHostFunction() error {
 	// The assembler skips the first instruction so we intentionally add NOP here.
 	// TODO: delete after #233
-	c.compileNOP()
+	c.compileStandAloneInstruction(obj.ANOP)
 
 	// First we must update the location stack to reflect the number of host function inputs.
 	c.pushFunctionParams()
@@ -648,7 +645,7 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 
 	// We use NOP as a beginning of instructions in a label.
 	// This should be eventually optimized out by assembler.
-	labelBegin := c.compileNOP()
+	labelBegin := c.compileStandAloneInstruction(obj.ANOP)
 
 	// Save the instructions so that backward branching
 	// instructions can branch to this label.
@@ -667,7 +664,8 @@ func (c *arm64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipThisLabel 
 
 // compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
 func (c *arm64Compiler) compileUnreachable() error {
-	return c.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+	c.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
+	return nil
 }
 
 // compileSwap implements compiler.compileSwap for the arm64 architecture.
@@ -684,15 +682,6 @@ func (c *arm64Compiler) compileSwap(o *wazeroir.OperationSwap) error {
 
 	x.register, y.register = y.register, x.register
 	return nil
-}
-
-// Only used in test, but define this in the main file as sometimes
-// we need to call this from the main code when debugging.
-//nolint:unused
-func (c *arm64Compiler) undefined() {
-	ud := c.newProg()
-	ud.As = obj.AUNDEF
-	c.addInstruction(ud)
 }
 
 // compileGlobalGet implements compiler.compileGlobalGet for the arm64 architecture.
@@ -1044,7 +1033,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target where
 		// we use NOP as we don't yet know the next instruction in each label.
-		init := c.compileNOP()
+		init := c.compileStandAloneInstruction(obj.ANOP)
 		labelInitialInstructions[i] = init
 
 		var locationStack *valueLocationStack
@@ -1135,9 +1124,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing the
 		// call-frame stack, as the register is not saved across function calls.
 		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(compiledFunctionAddressRegister)
-		if err := c.compileReleaseRegisterToStack(savedOffsetLocation); err != nil {
-			return err
-		}
+		c.compileReleaseRegisterToStack(savedOffsetLocation)
 	}
 
 	if err := c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction, builtinFunctionIndexGrowCallFrameStack); err != nil {
@@ -1152,9 +1139,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 
 		savedOffsetLocation := c.locationStack.pop()
 		savedOffsetLocation.setRegister(compiledFunctionAddressRegister)
-		if err := c.compileLoadValueOnStackToRegister(savedOffsetLocation); err != nil {
-			return err
-		}
+		c.compileLoadValueOnStackToRegister(savedOffsetLocation)
 	}
 
 	// On the function return, we again have to set ce.callFrameStackPointer into callFrameStackPointerRegister.
@@ -1404,9 +1389,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 
 	// If it exceeds len(table), we exit the execution.
 	brIfOffsetOK := c.compileBranchInstruction(arm64.ABLO)
-	if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess); err != nil {
-		return err
-	}
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
 
 	// Otherwise, we proceed to do function type check.
 	c.setBranchTargetOnNext(brIfOffsetOK)
@@ -1433,11 +1416,9 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Check if the value of table[offset] equals zero, meaning that the target element is uninitialized.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMP, zeroRegister, offset.register)
 	brIfInitialized := c.compileBranchInstruction(arm64.ABNE)
-	if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess); err != nil {
-		return err
-	}
-	c.setBranchTargetOnNext(brIfInitialized)
+	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
 
+	c.setBranchTargetOnNext(brIfInitialized)
 	targetFunctionType := c.f.Module.Types[o.TypeIndex]
 	// Next we check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
 	// "tmp = table[offset].source ( == *FunctionInstance type)"
@@ -1457,9 +1438,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// Compare these two values, and if they equal, we are ready to make function call.
 	c.compileTwoRegistersToNoneInstruction(arm64.ACMPW, tmp, reservedRegisterForTemporary)
 	brIfTypeMatched := c.compileBranchInstruction(arm64.ABEQ)
-	if err := c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall); err != nil {
-		return err
-	}
+	c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
 
 	c.setBranchTargetOnNext(brIfTypeMatched)
 
@@ -1606,9 +1585,8 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	} else if pickTarget.onStack() {
 		// Temporarily assign a register to the pick target, and then load the value.
 		pickTarget.setRegister(pickedRegister)
-		if err := c.compileLoadValueOnStackToRegister(pickTarget); err != nil {
-			return err
-		}
+		c.compileLoadValueOnStackToRegister(pickTarget)
+
 		// After the load, we revert the register assignment to the pick target.
 		pickTarget.setRegister(nilRegister)
 	}
@@ -1844,7 +1822,8 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
 		c.locationStack.pushValueLocationOnStack()
-		return c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		return nil
 	}
 
 	var inst obj.As
@@ -1901,9 +1880,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 
 	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.compileBranchInstruction(arm64.ABNE)
-	if err := c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero); err != nil {
-		return err
-	}
+	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
 
 	// Otherwise, we proceed.
 	c.setBranchTargetOnNext(brIfDivisorNonZero)
@@ -1932,9 +1909,7 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 		brIfDividendNotMinInt := c.compileBranchInstruction(arm64.ABNE)
 
 		// Otherwise, we raise overflow error.
-		if err := c.compileExitFromNativeCode(jitCallStatusIntegerOverflow); err != nil {
-			return err
-		}
+		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
 
 		c.setBranchTargetOnNext(brIfDivisorNonMinusOne, brIfDividendNotMinInt)
 	}
@@ -1955,7 +1930,8 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	if isZeroRegister(divisor.register) {
 		// Push any value so that the subsequent instruction can have a consistent location stack state.
 		c.locationStack.pushValueLocationOnStack()
-		return c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
+		return nil
 	}
 
 	var divInst, msubInst, cmpInst obj.As
@@ -1983,9 +1959,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 
 	// If it is zero, we exit with jitCallStatusIntegerDivisionByZero.
 	brIfDivisorNonZero := c.compileBranchInstruction(arm64.ABNE)
-	if err := c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero); err != nil {
-		return err
-	}
+	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
 
 	// Otherwise, we proceed.
 	c.setBranchTargetOnNext(brIfDivisorNonZero)
@@ -2434,14 +2408,11 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 		brIfSourceNaN := c.compileBranchInstruction(arm64.ABVS)
 
 		// If the source value is not NaN, the operation was overflow.
-		if err := c.compileExitFromNativeCode(jitCallStatusIntegerOverflow); err != nil {
-			return err
-		}
+		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
+
 		// Otherwise, the operation was invalid as this is trying to convert NaN to integer.
 		c.setBranchTargetOnNext(brIfSourceNaN)
-		if err := c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion); err != nil {
-			return err
-		}
+		c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
 	}
 
 	// Otherwise, we branch into the next instruction.
@@ -2974,7 +2945,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 		c.compileConstToRegisterInstruction(arm64.AADD, offsetConst, offsetRegister)
 	} else {
 		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
-		err = c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
+		c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
 		return
 	}
 
@@ -2989,9 +2960,7 @@ func (c *arm64Compiler) compileMemoryAccessOffsetSetup(offsetArg uint32, targetS
 
 	// If offsetRegister(= base+offsetArg+targetSizeInBytes) exceeds the memory length,
 	//  we exit the function with jitCallStatusCodeMemoryOutOfBounds.
-	if err = c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds); err != nil {
-		return
-	}
+	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
 
 	// Otherwise, we subtract targetSizeInBytes from offsetRegister.
 	c.setBranchTargetOnNext(boundsOK)
@@ -3099,7 +3068,8 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, built
 	)
 
 	c.markRegisterUnused(freeRegs...)
-	return c.compileExitFromNativeCode(jitStatus)
+	c.compileExitFromNativeCode(jitStatus)
+	return nil
 }
 
 // compileConstI32 implements compiler.compileConstI32 for the arm64 architecture.
@@ -3230,7 +3200,23 @@ func (c *arm64Compiler) popValueOnRegister() (v *valueLocation, err error) {
 // compileEnsureOnGeneralPurposeRegister emits instructions to ensure that a value is located on a register.
 func (c *arm64Compiler) compileEnsureOnGeneralPurposeRegister(loc *valueLocation) (err error) {
 	if loc.onStack() {
-		err = c.compileLoadValueOnStackToRegister(loc)
+		var reg int16
+		switch loc.regType {
+		case generalPurposeRegisterTypeInt:
+			reg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
+		case generalPurposeRegisterTypeFloat:
+			reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
+		}
+
+		if err != nil {
+			return
+		}
+
+		// Record that the value holds the register and the register is marked used.
+		loc.setRegister(reg)
+		c.locationStack.markRegisterUsed(reg)
+
+		c.compileLoadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
 		c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
 	}
@@ -3269,29 +3255,16 @@ func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 	loc.setRegister(reg)
 }
 
-// compileLoadValueOnStackToRegister emits instructions to load the value located on the stack to a register.
-func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) (err error) {
+// compileLoadValueOnStackToRegister emits instructions to load the value located on the stack to the assigned register.
+func (c *arm64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) {
 	var inst obj.As
-	var reg int16
 	switch loc.regType {
 	case generalPurposeRegisterTypeInt:
 		inst = arm64.AMOVD
-		reg, err = c.allocateRegister(generalPurposeRegisterTypeInt)
 	case generalPurposeRegisterTypeFloat:
 		inst = arm64.AFMOVD
-		reg, err = c.allocateRegister(generalPurposeRegisterTypeFloat)
 	}
-
-	if err != nil {
-		return
-	}
-
-	c.compileMemoryToRegisterInstruction(inst, reservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8, reg)
-
-	// Record that the value holds the register and the register is marked used.
-	loc.setRegister(reg)
-	c.locationStack.markRegisterUsed(reg)
-	return
+	c.compileMemoryToRegisterInstruction(inst, reservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8, loc.register)
 }
 
 // allocateRegister returns an unused register of the given type. The register will be taken
@@ -3318,7 +3291,7 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 
 	// Release the steal target register value onto stack location.
 	reg = stealTarget.register
-	err = c.compileReleaseRegisterToStack(stealTarget)
+	c.compileReleaseRegisterToStack(stealTarget)
 	return
 }
 
@@ -3328,21 +3301,17 @@ func (c *arm64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 func (c *arm64Compiler) compileReleaseAllRegistersToStack() error {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		if loc := c.locationStack.stack[i]; loc.onRegister() {
-			if err := c.compileReleaseRegisterToStack(loc); err != nil {
-				return err
-			}
+			c.compileReleaseRegisterToStack(loc)
 		} else if loc.onConditionalRegister() {
 			c.compileLoadConditionalRegisterToGeneralPurposeRegister(loc)
-			if err := c.compileReleaseRegisterToStack(loc); err != nil {
-				return err
-			}
+			c.compileReleaseRegisterToStack(loc)
 		}
 	}
 	return nil
 }
 
 // releaseRegisterToStack adds an instruction to write the value on a register back to memory stack region.
-func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) (err error) {
+func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) {
 	var inst obj.As = arm64.AMOVD
 	if loc.regType == generalPurposeRegisterTypeFloat {
 		inst = arm64.AFMOVD
@@ -3352,7 +3321,6 @@ func (c *arm64Compiler) compileReleaseRegisterToStack(loc *valueLocation) (err e
 
 	// Mark the register is free.
 	c.locationStack.releaseRegister(loc)
-	return
 }
 
 // compileReservedStackBasePointerRegisterInitialization adds instructions to initialize reservedRegisterForStackBasePointerAddress
