@@ -2,6 +2,7 @@ package jit
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"reflect"
 	"runtime"
@@ -99,6 +100,19 @@ func TestVerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(eface.data)), interfaceDataOffset)
 }
 
+func TestEngine_NewModuleEngine(t *testing.T) {
+	requireSupportedOSArch(t)
+
+	e := NewEngine()
+
+	t.Run("sets module name", func(t *testing.T) {
+		me, err := e.NewModuleEngine(t.Name(), nil, nil)
+		require.NoError(t, err)
+		defer me.Close()
+		require.Equal(t, t.Name(), me.(*moduleEngine).name)
+	})
+}
+
 func TestEngine_Call(t *testing.T) {
 	requireSupportedOSArch(t)
 
@@ -113,7 +127,7 @@ func TestEngine_Call(t *testing.T) {
 	// Use exported functions to simplify instantiation of a Wasm function
 	e := NewEngine()
 	store := wasm.NewStore(e, wasm.Features20191205)
-	mod, err := store.Instantiate(context.Background(), m, "")
+	mod, err := store.Instantiate(context.Background(), m, t.Name())
 	require.NoError(t, err)
 
 	fn := mod.ExportedFunction("fn")
@@ -158,7 +172,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		Module: module,
 	}
 
-	modEngine, err := e.NewModuleEngine(nil, []*wasm.FunctionInstance{f})
+	modEngine, err := e.NewModuleEngine(t.Name(), nil, []*wasm.FunctionInstance{f})
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
@@ -189,7 +203,11 @@ func requireSupportedOSArch(t *testing.T) {
 func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := newEngine()
-		_, err := e.NewModuleEngine([]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}}, nil)
+		_, err := e.NewModuleEngine(
+			t.Name(),
+			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
+			nil, // moduleFunctions
+		)
 		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
 	})
 
@@ -202,7 +220,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
 		}
-		_, err := e.NewModuleEngine(nil, importedFunctions)
+		_, err := e.NewModuleEngine(t.Name(), nil, importedFunctions)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -215,7 +233,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.NewModuleEngine(importedFunctions, moduleFunctions)
+		_, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
@@ -226,7 +244,44 @@ func TestEngineCompile_Errors(t *testing.T) {
 	})
 }
 
-func TestRelease(t *testing.T) {
+var fakeFinalizer = func(obj interface{}, finalizer interface{}) {
+	cf := obj.(*compiledFunction)
+	fn := finalizer.(func(compiledFn *compiledFunction))
+	fn(cf)
+}
+
+// TestModuleEngine_Close_Panic tests that an unexpected panic has some identifying information in it.
+func TestModuleEngine_Close_Panic(t *testing.T) {
+	e := newEngine()
+	me := &moduleEngine{
+		name: t.Name(),
+		compiledFunctions: []*compiledFunction{
+			{codeSegment: []byte{wasm.OpcodeEnd} /* invalid because not compiled */},
+		},
+		parentEngine: e,
+	}
+
+	// capturePanic because there's no require.PanicsWithErrorPrefix
+	errMessage := capturePanic(func() {
+		me.doClose(fakeFinalizer)
+	})
+	require.Contains(t, errMessage.Error(), "jit: failed to munmap code segment for TestModuleEngine_Close_Panic.function[0]:")
+}
+
+// capturePanic returns an error recovered from a panic
+func capturePanic(panics func()) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if e, ok := recovered.(error); ok {
+				err = e
+			}
+		}
+	}()
+	panics()
+	return
+}
+
+func TestModuleEngine_Close_Concurrent(t *testing.T) {
 	newFunctionInstance := func(id int) *wasm.FunctionInstance {
 		return &wasm.FunctionInstance{
 			Name: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
@@ -255,13 +310,13 @@ func TestRelease(t *testing.T) {
 			e := newEngine()
 			var importedModuleEngine *moduleEngine
 			if len(tc.importedFunctions) > 0 {
-				modEngine, err := e.NewModuleEngine(nil, tc.importedFunctions)
+				modEngine, err := e.NewModuleEngine(fmt.Sprintf("%s - imported functions", t.Name()), nil, tc.importedFunctions)
 				require.NoError(t, err)
 				importedModuleEngine = modEngine.(*moduleEngine)
 				require.Len(t, importedModuleEngine.compiledFunctions, len(tc.importedFunctions))
 			}
 
-			modEngine, err := e.NewModuleEngine(tc.importedFunctions, tc.moduleFunctions)
+			modEngine, err := e.NewModuleEngine(fmt.Sprintf("%s - module-defined functions", t.Name()), tc.importedFunctions, tc.moduleFunctions)
 			require.NoError(t, err)
 			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
@@ -284,7 +339,9 @@ func TestRelease(t *testing.T) {
 			for i := 0; i < goroutines; i++ {
 				go func() {
 					defer wg.Done()
-					modEngine.Close() // concurrent mutliple execution of Close must be guarded by atomic.
+
+					// Ensure concurrent multiple execution of Close is guarded by atomic without overloading finalizer.
+					modEngine.(*moduleEngine).doClose(fakeFinalizer)
 				}()
 			}
 			wg.Wait()
@@ -298,11 +355,6 @@ func TestRelease(t *testing.T) {
 				require.NotContains(t, e.compiledFunctions, f, i)
 			}
 
-			// Release the reference to ModuleEngine -> *compiledFunctions for non-imported compiledFunctions
-			// must be munmapped.
-			modEngine = nil
-			runtime.GC()
-
 			for _, mappedRegion := range mappedRegions {
 				// munmap twice should result in error.
 				err = munmapCodeSegment(mappedRegion)
@@ -310,9 +362,7 @@ func TestRelease(t *testing.T) {
 			}
 
 			if len(tc.importedFunctions) > 0 {
-				importedModuleEngine.Close()
-				importedModuleEngine = nil
-				runtime.GC()
+				importedModuleEngine.doClose(fakeFinalizer)
 
 				for _, mappedRegion := range importedMappedRegions {
 					// munmap twice should result in error.
@@ -403,7 +453,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 		},
 	}
 
-	mi, err := store.Instantiate(context.Background(), m, "")
+	mi, err := store.Instantiate(context.Background(), m, t.Name())
 	require.NoError(t, err)
 
 	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {

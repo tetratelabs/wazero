@@ -47,6 +47,17 @@ func TestCallEngine_PushFrame_StackOverflow(t *testing.T) {
 	require.Panics(t, func() { vm.pushFrame(f4) })
 }
 
+func TestEngine_NewModuleEngine(t *testing.T) {
+	e := NewEngine()
+
+	t.Run("sets module name", func(t *testing.T) {
+		me, err := e.NewModuleEngine(t.Name(), nil, nil)
+		require.NoError(t, err)
+		defer me.Close()
+		require.Equal(t, t.Name(), me.(*moduleEngine).name)
+	})
+}
+
 func TestEngine_Call(t *testing.T) {
 	i64 := wasm.ValueTypeI64
 	m := &wasm.Module{
@@ -59,7 +70,7 @@ func TestEngine_Call(t *testing.T) {
 	// Use exported functions to simplify instantiation of a Wasm function
 	e := NewEngine()
 	store := wasm.NewStore(e, wasm.Features20191205)
-	mod, err := store.Instantiate(context.Background(), m, "")
+	mod, err := store.Instantiate(context.Background(), m, t.Name())
 	require.NoError(t, err)
 
 	fn := mod.ExportedFunction("fn")
@@ -102,7 +113,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		Module: module,
 	}
 
-	me, err := e.NewModuleEngine(nil, []*wasm.FunctionInstance{f})
+	me, err := e.NewModuleEngine(t.Name(), nil, []*wasm.FunctionInstance{f})
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
@@ -239,7 +250,7 @@ func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
 func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		e := NewEngine().(*engine)
-		_, err := e.NewModuleEngine(
+		_, err := e.NewModuleEngine(t.Name(),
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
 			nil, // moduleFunctions
 		)
@@ -257,7 +268,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 		}
 
 		// initialize the module-engine containing imported functions
-		_, err := e.NewModuleEngine(nil, importedFunctions)
+		_, err := e.NewModuleEngine(t.Name(), nil, importedFunctions)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -270,7 +281,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.NewModuleEngine(importedFunctions, moduleFunctions)
+		_, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
@@ -310,12 +321,12 @@ func TestClose(t *testing.T) {
 			e := NewEngine().(*engine)
 			if len(tc.importedFunctions) > 0 {
 				// initialize the module-engine containing imported functions
-				me, err := e.NewModuleEngine(nil, tc.importedFunctions)
+				me, err := e.NewModuleEngine(t.Name(), nil, tc.importedFunctions)
 				require.NoError(t, err)
 				require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
 			}
 
-			me, err := e.NewModuleEngine(tc.importedFunctions, tc.moduleFunctions)
+			me, err := e.NewModuleEngine(t.Name(), tc.importedFunctions, tc.moduleFunctions)
 			require.NoError(t, err)
 			require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 

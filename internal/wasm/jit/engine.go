@@ -25,6 +25,9 @@ type (
 
 	// moduleEngine implements internalwasm.ModuleEngine
 	moduleEngine struct {
+		// name is the name the module was instantiated with used for error handling.
+		name string
+
 		// compiledFunctions are the compiled functions in a module instances.
 		// The index is module instance-scoped. We intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by using
@@ -194,7 +197,7 @@ type (
 // See TestVerifyOffsetValue for how to derive these values.
 const (
 	// Offsets for moduleEngine.compiledFunctions
-	moduleEngineCompiledFunctionsOffset = 0
+	moduleEngineCompiledFunctionsOffset = 16
 
 	// Offsets for callEngine globalContext.
 	callEngineGlobalContextValueStackElement0AddressOffset     = 0
@@ -329,9 +332,10 @@ func (c *callFrame) String() string {
 }
 
 // NewModuleEngine implements internalwasm.Engine NewModuleEngine
-func (e *engine) NewModuleEngine(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	imported := len(importedFunctions)
 	me := &moduleEngine{
+		name:                   name,
 		compiledFunctions:      make([]*compiledFunction, 0, imported+len(moduleFunctions)),
 		parentEngine:           e,
 		importedFunctionCounts: imported,
@@ -372,37 +376,49 @@ func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
 }
 
-// Close implements internalwasm.ModuleEngine Close
-func (me *moduleEngine) Close() {
-	// Current impl: Close is currently guarded with CAS to only be called once. There is a race-condition inside the
-	// critical section: functions are removed from the parent engine, but there's no guard to prevent this
-	// moduleInstance from making new calls. This means at inside the critical section there could be in-flight calls,
-	// and even after it new calls can be made, given a reference to this moduleEngine.
-	//
-	// To ensure neither in-flight, nor new calls segfault due to missing code segment, memory isn't unmapped here.
-	// Rather, it is added to the finalizer queue to be done at some point (perhaps never). This needs to eventually be
-	// as close leaks resources until cleaned up by the finalizer which by docs may never be run.
-	//
-	// Potential future design (possibly faulty, so expect impl to be more complete or better):
-	//  * Change this to implement io.Closer and document this is blocking
-	//    * This implies adding docs can suggest this is run in a goroutine
-	//    * io.Closer allows an error return we can use in case an unrecoverable error happens
-	//  * Continue to guard with CAS so that close is only executed once
-	//  * Once in the critical section, write a status bit to a fixed memory location.
-	//    * End new calls with a Closed Error if this is read.
-	//    * This guard allows Close to eventually complete.
-	//  * Block exiting the critical section until all in-flight calls complete.
-	//    * Knowing which in-flight calls from other modules, that can use this module may be tricky
-	//    * Pure wasm functions can be left to complete.
-	//    * Host functions are the only unknowns (ex can do I/O) so they may need to be tracked.
+// Close implements io.Closer
+func (me *moduleEngine) Close() (err error) {
+	me.doClose(runtime.SetFinalizer) // extracted for testability
+	return
+}
 
+// doClose is currently guarded with CAS to only be called once. There is a race-condition inside the
+// critical section: functions are removed from the parent engine, but there's no guard to prevent this
+// moduleInstance from making new calls. This means at inside the critical section there could be in-flight calls,
+// and even after it new calls can be made, given a reference to this moduleEngine.
+//
+// To ensure neither in-flight, nor new calls segfault due to missing code segment, memory isn't unmapped here.
+// Rather, it is added to the finalizer queue to be done at some point (perhaps never). This needs to eventually be
+// as close leaks resources until cleaned up by the finalizer which by docs may never be run.
+//
+// Potential future design (possibly faulty, so expect impl to be more complete or better):
+//  * Change this to implement io.Closer and document this is blocking
+//    * This implies adding docs can suggest this is run in a goroutine
+//    * io.Closer allows an error return we can use in case an unrecoverable error happens
+//  * Continue to guard with CAS so that close is only executed once
+//  * Once in the critical section, write a status bit to a fixed memory location.
+//    * End new calls with a Closed Error if this is read.
+//    * This guard allows Close to eventually complete.
+//  * Block exiting the critical section until all in-flight calls complete.
+//    * Knowing which in-flight calls from other modules, that can use this module may be tricky
+//    * Pure wasm functions can be left to complete.
+//    * Host functions are the only unknowns (ex can do I/O) so they may need to be tracked.
+func (me *moduleEngine) doClose(setFinalizer func(obj interface{}, finalizer interface{})) {
 	// Setting finalizer multiple times result in panic, so we guard with CAS.
 	if atomic.CompareAndSwapUint32(&me.closed, 0, 1) {
+		moduleName := me.name // pin to avoid leaking moduleEngine on any finalizer error.
+
 		// Release all the function instances declared in this module.
-		for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
-			runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
+		for i, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+			funcIdx := wasm.Index(i) // pin for any finalizer error
+
+			setFinalizer(cf, func(compiledFn *compiledFunction) {
 				if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
-					panic(err) // munmap failure cannot recover.
+
+					// munmap failure cannot recover, and it happens asynchronously. Add context for troubleshooting.
+					// module+funcidx should be enough, but if not, we can later propagate the func name.
+					err = fmt.Errorf("jit: failed to munmap code segment for %s.function[%d]: %w", moduleName, funcIdx, err)
+					panic(err)
 				}
 			})
 			me.parentEngine.deleteCompiledFunction(cf.source)
@@ -506,21 +522,21 @@ func newEngine() *engine {
 // dangerous memory access from native code.
 //
 // Background: Go has a mechanism called "goroutine stack-shrink" where Go
-// runtime shrinks Gorotuine's stack when it is GCing. Shrinking means that
+// runtime shrinks Goroutine's stack when it is GCing. Shrinking means that
 // all the contents on the goroutine stack will be relocated by runtime,
 // Therefore, the memory address of these contents change undeterministically.
-// Not only shrinks, but also Goruntime grows the goroutine stack at any point
+// Not only shrinks, but also Go runtime grows the goroutine stack at any point
 // of function call entries, which also might end up relocating contents.
 //
 // On the other hand, we hold pointers to the data region of value stack and
-// callframe stack slices and use these raw pointers from native code.
+// call-frame stack slices and use these raw pointers from native code.
 // Therefore, it is dangerous if these two stacks are allocated on stack
 // as these stack's address might be changed by Goruntime which we cannot
 // detect.
 //
-// By declaring theses values as `var`, slices created via `make([]..., var)`
+// By declaring these values as `var`, slices created via `make([]..., var)`
 // will never be allocated on stack [1]. This means accessing these slices via
-// raw pointers is safe: As of version 1.18, Go's garbage collectornever relocates
+// raw pointers is safe: As of version 1.18, Go's garbage collector never relocates
 // heap-allocated objects (aka no compilation of memory [2]).
 //
 // On Go upgrades, re-validate heap-allocation via `go build -gcflags='-m' ./internal/wasm/jit/...`.

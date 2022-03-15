@@ -52,6 +52,9 @@ func (e *engine) addCompiledFunction(f *wasm.FunctionInstance, cf *compiledFunct
 
 // moduleEngine implements internalwasm.ModuleEngine
 type moduleEngine struct {
+	// name is the name the module was instantiated with used for error handling.
+	name string
+
 	// compiledFunctions are the compiled functions in a module instances.
 	// The index is module instance-scoped.
 	compiledFunctions []*compiledFunction
@@ -148,17 +151,19 @@ type interpreterOp struct {
 	rs     []*wazeroir.InclusiveRange
 }
 
-// Close implements wasm.Engine Close
-func (me *moduleEngine) Close() {
+// Close implements io.Closer
+func (me *moduleEngine) Close() (err error) {
 	// Release all the function instances declared in this module.
 	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
 		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
 	}
+	return
 }
 
 // NewModuleEngine implements internalwasm.Engine NewModuleEngine
-func (e *engine) NewModuleEngine(importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
+		name:                   name,
 		compiledFunctions:      make([]*compiledFunction, 0, len(importedFunctions)+len(moduleFunctions)),
 		parentEngine:           e,
 		importedFunctionCounts: len(importedFunctions),
