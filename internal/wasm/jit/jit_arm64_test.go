@@ -20,7 +20,7 @@ func TestArchContextOffsetInEngine(t *testing.T) {
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -28,8 +28,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// Set the acquisition target instruction to the one after JMP.
 		compiler.compileReadInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
 
-		err = compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
-		require.NoError(t, err)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
 		// If generate the code without JMP after compileReadInstructionAddress,
 		// the call back added must return error.
@@ -39,7 +38,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	})
 	t.Run("too large offset", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -68,7 +67,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	})
 	t.Run("ok", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -84,8 +83,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		// If we fail to branch, we reach here and exit with unreachable status,
 		// so the assertion would fail.
-		err = compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
-		require.NoError(t, err)
+		compiler.compileExitFromNativeCode(jitCallStatusCodeUnreachable)
 
 		// This could be the read instruction target as this is the
 		// right after RET. Therefore, the branch instruction above

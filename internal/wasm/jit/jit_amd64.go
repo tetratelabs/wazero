@@ -162,7 +162,7 @@ func (c *amd64Compiler) setStackPointerCeil(v uint64) {
 	c.stackPointerCeil = v
 }
 
-// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
+// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
 func (c *amd64Compiler) setValueLocationStack(s *valueLocationStack) {
 	c.locationStack = s
 }

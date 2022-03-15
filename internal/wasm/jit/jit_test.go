@@ -1833,16 +1833,12 @@ func TestCompiler_compileSelect(t *testing.T) {
 					// Now emit code for select.
 					err = compiler.compileSelect()
 					require.NoError(t, err)
-					// The code generation should not affect the x1's placement in any case.
-					require.Equal(t, tc.x1OnRegister, x1.onRegister())
-					// Plus x1 is top of the stack.
+
+					// x1 should be top of the stack.
 					require.Equal(t, x1, compiler.valueLocationStack().peek())
 
-					// Now write back the x1 to the memory if it is on a register.
-					if tc.x1OnRegister {
-						compiler.compileReleaseRegisterToStack(x1)
-					}
-					compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
+					err = compiler.compileReturnFunction()
+					require.NoError(t, err)
 
 					// Run code.
 					code, _, _, err := compiler.compile()
