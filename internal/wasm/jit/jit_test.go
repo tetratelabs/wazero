@@ -2351,3 +2351,346 @@ func TestCompiler_compileLoad(t *testing.T) {
 		})
 	}
 }
+
+func TestCompiler_compileMemorySize(t *testing.T) {
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t, nil)
+
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	// Emit memory.size instructions.
+	err = compiler.compileMemorySize()
+	require.NoError(t, err)
+	// At this point, the size of memory should be pushed onto the stack.
+	require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
+	require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().registerType())
+
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	// Generate and run the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+	env.exec(code)
+
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+	require.Equal(t, uint32(defaultMemoryPageNumInTest), env.stackTopAsUint32())
+}
+
+func TestCompiler_compileMemoryGrow(t *testing.T) {
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t, nil)
+	err := compiler.compilePreamble()
+	require.NoError(t, err)
+
+	err = compiler.compileMemoryGrow()
+	require.NoError(t, err)
+
+	// Emit arbitrary code after MemoryGrow returned so that we can verify
+	// that the code can set the return address properly.
+	const expValue uint32 = 100
+	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: expValue})
+	require.NoError(t, err)
+	err = compiler.compileReturnFunction()
+	require.NoError(t, err)
+
+	// Generate and run the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+	env.exec(code)
+
+	// After the initial exec, the code must exit with builtin function call status and funcaddress for memory grow.
+	require.Equal(t, jitCallStatusCodeCallBuiltInFunction, env.jitStatus())
+	require.Equal(t, builtinFunctionIndexMemoryGrow, env.builtinFunctionCallAddress())
+
+	// Reenter from the return address.
+	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
+
+	// Check if the code successfully executed the code after builtin function call.
+	require.Equal(t, expValue, env.stackTopAsUint32())
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+}
+
+func TestCompiler_compileHostFunction(t *testing.T) {
+	env := newJITEnvironment()
+	compiler := env.requireNewCompiler(t, nil)
+
+	// The assembler skips the first instruction so we intentionally add NOP here.
+	// TODO: delete after #233
+	compiler.compileNOP()
+
+	err := compiler.compileHostFunction()
+	require.NoError(t, err)
+
+	// Generate and run the code under test.
+	code, _, _, err := compiler.compile()
+	require.NoError(t, err)
+	env.exec(code)
+
+	// On the return, the code must exit with the host call status.
+	require.Equal(t, jitCallStatusCodeCallHostFunction, env.jitStatus())
+
+	// Re-enter the return address.
+	jitcall(env.callFrameStackPeek().returnAddress, uintptr(unsafe.Pointer(env.callEngine())))
+
+	// After that, the code must exit with returned status.
+	require.Equal(t, jitCallStatusCodeReturned, env.jitStatus())
+}
+
+func TestCompiler_compile_Clz_Ctz_Popcnt(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindClz,
+		wazeroir.OperationKindCtz,
+		wazeroir.OperationKindPopcnt,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, tp := range []wazeroir.UnsignedInt{wazeroir.UnsignedInt32, wazeroir.UnsignedInt64} {
+				tp := tp
+				is32bit := tp == wazeroir.UnsignedInt32
+				t.Run(tp.String(), func(t *testing.T) {
+					for _, v := range []uint64{
+						0, 1, 1 << 4, 1 << 6, 1 << 31,
+						0b11111111110000, 0b010101010, 0b1111111111111, math.MaxUint64,
+					} {
+						name := fmt.Sprintf("%064b", v)
+						if is32bit {
+							name = fmt.Sprintf("%032b", v)
+						}
+						t.Run(name, func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t, nil)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							if is32bit {
+								err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+							} else {
+								err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+							}
+							require.NoError(t, err)
+
+							switch kind {
+							case wazeroir.OperationKindClz:
+								err = compiler.compileClz(&wazeroir.OperationClz{Type: tp})
+							case wazeroir.OperationKindCtz:
+								err = compiler.compileCtz(&wazeroir.OperationCtz{Type: tp})
+							case wazeroir.OperationKindPopcnt:
+								err = compiler.compilePopcnt(&wazeroir.OperationPopcnt{Type: tp})
+							}
+							require.NoError(t, err)
+
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							// Generate and run the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// One value must be pushed as a result.
+							require.Equal(t, uint64(1), env.stackPointer())
+
+							switch kind {
+							case wazeroir.OperationKindClz:
+								if is32bit {
+									require.Equal(t, bits.LeadingZeros32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.LeadingZeros64(v), int(env.stackTopAsUint32()))
+								}
+							case wazeroir.OperationKindCtz:
+								if is32bit {
+									require.Equal(t, bits.TrailingZeros32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.TrailingZeros64(v), int(env.stackTopAsUint32()))
+								}
+							case wazeroir.OperationKindPopcnt:
+								if is32bit {
+									require.Equal(t, bits.OnesCount32(uint32(v)), int(env.stackTopAsUint32()))
+								} else {
+									require.Equal(t, bits.OnesCount64(v), int(env.stackTopAsUint32()))
+								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestCompiler_compileF32DemoteFromF64(t *testing.T) {
+	for _, v := range []float64{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		math.MaxFloat64,
+		math.SmallestNonzeroFloat64,
+		6.8719476736e+10,  /* = 1 << 36 */
+		1.37438953472e+11, /* = 1 << 37 */
+		math.Inf(1), math.Inf(-1), math.NaN(),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t, nil)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Setup the demote target.
+			err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF32DemoteFromF64()
+			require.NoError(t, err)
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			// Check the result.
+			require.Equal(t, uint64(1), env.stackPointer())
+			if math.IsNaN(v) {
+				require.True(t, math.IsNaN(float64(env.stackTopAsFloat32())))
+			} else {
+				exp := float32(v)
+				actual := env.stackTopAsFloat32()
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestCompiler_compileF64PromoteFromF32(t *testing.T) {
+	for _, v := range []float32{
+		0, 100, -100, 1, -1,
+		100.01234124, -100.01234124, 200.12315,
+		math.MaxFloat32,
+		math.SmallestNonzeroFloat32,
+		float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN()),
+	} {
+		t.Run(fmt.Sprintf("%f", v), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t, nil)
+			err := compiler.compilePreamble()
+			require.NoError(t, err)
+
+			// Setup the promote target.
+			err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: v})
+			require.NoError(t, err)
+
+			err = compiler.compileF64PromoteFromF32()
+			require.NoError(t, err)
+
+			err = compiler.compileReturnFunction()
+			require.NoError(t, err)
+
+			// Generate and run the code under test.
+			code, _, _, err := compiler.compile()
+			require.NoError(t, err)
+			env.exec(code)
+
+			// Check the result.
+			require.Equal(t, uint64(1), env.stackPointer())
+			if math.IsNaN(float64(v)) {
+				require.True(t, math.IsNaN(env.stackTopAsFloat64()))
+			} else {
+				exp := float64(v)
+				actual := env.stackTopAsFloat64()
+				require.Equal(t, exp, actual)
+			}
+		})
+	}
+}
+
+func TestCompiler_compileReinterpret(t *testing.T) {
+	for _, kind := range []wazeroir.OperationKind{
+		wazeroir.OperationKindF32ReinterpretFromI32,
+		wazeroir.OperationKindF64ReinterpretFromI64,
+		wazeroir.OperationKindI32ReinterpretFromF32,
+		wazeroir.OperationKindI64ReinterpretFromF64,
+	} {
+		kind := kind
+		t.Run(kind.String(), func(t *testing.T) {
+			for _, originOnStack := range []bool{false, true} {
+				originOnStack := originOnStack
+				t.Run(fmt.Sprintf("%v", originOnStack), func(t *testing.T) {
+					for _, v := range []uint64{
+						0, 1, 1 << 16, 1 << 31, 1 << 32, 1 << 63,
+						math.MaxInt32, math.MaxUint32, math.MaxUint64,
+					} {
+						v := v
+						t.Run(fmt.Sprintf("%d", v), func(t *testing.T) {
+							env := newJITEnvironment()
+							compiler := env.requireNewCompiler(t, nil)
+							err := compiler.compilePreamble()
+							require.NoError(t, err)
+
+							if originOnStack {
+								loc := compiler.valueLocationStack().pushValueLocationOnStack()
+								env.stack()[loc.stackPointer] = v
+								env.setStackPointer(1)
+							}
+
+							var is32Bit bool
+							switch kind {
+							case wazeroir.OperationKindF32ReinterpretFromI32:
+								is32Bit = true
+								if !originOnStack {
+									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(v)})
+									require.NoError(t, err)
+								}
+								err = compiler.compileF32ReinterpretFromI32()
+								require.NoError(t, err)
+							case wazeroir.OperationKindF64ReinterpretFromI64:
+								if !originOnStack {
+									err = compiler.compileConstI64(&wazeroir.OperationConstI64{Value: v})
+									require.NoError(t, err)
+								}
+								err = compiler.compileF64ReinterpretFromI64()
+								require.NoError(t, err)
+							case wazeroir.OperationKindI32ReinterpretFromF32:
+								is32Bit = true
+								if !originOnStack {
+									err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: math.Float32frombits(uint32(v))})
+									require.NoError(t, err)
+								}
+								err = compiler.compileI32ReinterpretFromF32()
+								require.NoError(t, err)
+							case wazeroir.OperationKindI64ReinterpretFromF64:
+								if !originOnStack {
+									err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: math.Float64frombits(v)})
+									require.NoError(t, err)
+								}
+								err = compiler.compileI64ReinterpretFromF64()
+								require.NoError(t, err)
+							default:
+								t.Fail()
+							}
+
+							err = compiler.compileReturnFunction()
+							require.NoError(t, err)
+
+							// Generate and run the code under test.
+							code, _, _, err := compiler.compile()
+							require.NoError(t, err)
+							env.exec(code)
+
+							// Reinterpret must preserve the bit-pattern.
+							if is32Bit {
+								require.Equal(t, uint32(v), env.stackTopAsUint32())
+							} else {
+								require.Equal(t, v, env.stackTopAsUint64())
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+}
