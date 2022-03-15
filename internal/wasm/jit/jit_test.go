@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
@@ -21,14 +22,6 @@ type jitEnv struct {
 	me             *moduleEngine
 	ce             *callEngine
 	moduleInstance *wasm.ModuleInstance
-}
-
-func (j *jitEnv) stackTopAsByte() byte {
-	return byte(j.stack()[j.stackPointer()-1])
-}
-
-func (j *jitEnv) stackTopAsUint16() uint16 {
-	return uint16(j.stack()[j.stackPointer()-1])
 }
 
 func (j *jitEnv) stackTopAsUint32() uint32 {
@@ -174,6 +167,28 @@ func TestMain(m *testing.M) {
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
+}
+
+func TestArm64Compiler_compileLabel(t *testing.T) {
+	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
+	for _, expectSkip := range []bool{false, true} {
+		expectSkip := expectSkip
+		t.Run(fmt.Sprintf("expect skip=%v", expectSkip), func(t *testing.T) {
+			env := newJITEnvironment()
+			compiler := env.requireNewCompiler(t, nil)
+
+			if expectSkip {
+				// If the initial stack is not set, compileLabel must return skip=true.
+				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				require.True(t, actual)
+			} else {
+				err := compiler.compileBr(&wazeroir.OperationBr{Target: &wazeroir.BranchTarget{Label: label}})
+				require.NoError(t, err)
+				actual := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
+				require.False(t, actual)
+			}
+		})
+	}
 }
 
 func TestCompiler_compileMaybeGrowValueStack(t *testing.T) {
@@ -1869,14 +1884,16 @@ func TestCompiler_compileSwap(t *testing.T) {
 			x2 := compiler.valueLocationStack().pushValueLocationOnStack()
 			env.stack()[x2.stackPointer] = uint64(x2Value)
 			if tc.x2OnRegister {
-				compiler.compileEnsureOnGeneralPurposeRegister(x2)
+				err = compiler.compileEnsureOnGeneralPurposeRegister(x2)
+				require.NoError(t, err)
 			}
 
 			_ = compiler.valueLocationStack().pushValueLocationOnStack() // Dummy value!
 			if tc.x1OnRegister && !tc.x1OnConditionalRegister {
 				x1 := compiler.valueLocationStack().pushValueLocationOnStack()
 				env.stack()[x1.stackPointer] = uint64(x1Value)
-				compiler.compileEnsureOnGeneralPurposeRegister(x1)
+				err = compiler.compileEnsureOnGeneralPurposeRegister(x1)
+				require.NoError(t, err)
 			} else if !tc.x1OnConditionalRegister {
 				x1 := compiler.valueLocationStack().pushValueLocationOnStack()
 				env.stack()[x1.stackPointer] = uint64(x1Value)
@@ -2106,6 +2123,67 @@ func TestCompiler_compileGlobalSet(t *testing.T) {
 			// Plus we consumed the top of the stack, the stack pointer must be decremented.
 			require.Equal(t, uint64(0), env.stackPointer())
 		})
+	}
+}
+
+func TestCompiler_MemoryOutOfBounds(t *testing.T) {
+	bases := []uint32{0, 1 << 5, 1 << 9, 1 << 10, 1 << 15, math.MaxUint32 - 1, math.MaxUint32}
+	offsets := []uint32{0,
+		1 << 10, 1 << 31,
+		defaultMemoryPageNumInTest*wasm.MemoryPageSize - 1, defaultMemoryPageNumInTest * wasm.MemoryPageSize,
+		math.MaxInt32 - 1, math.MaxInt32 - 2, math.MaxInt32 - 3, math.MaxInt32 - 4,
+		math.MaxInt32 - 5, math.MaxInt32 - 8, math.MaxInt32 - 9, math.MaxInt32, math.MaxUint32,
+	}
+	targetSizeInBytes := []int64{1, 2, 4, 8}
+	for _, base := range bases {
+		base := base
+		for _, offset := range offsets {
+			offset := offset
+			for _, targetSizeInByte := range targetSizeInBytes {
+				targetSizeInByte := targetSizeInByte
+				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t, nil)
+
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+
+					err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: base})
+					require.NoError(t, err)
+
+					arg := &wazeroir.MemoryImmediate{Offset: offset}
+
+					switch targetSizeInByte {
+					case 1:
+						err = compiler.compileLoad8(&wazeroir.OperationLoad8{Type: wazeroir.SignedInt32, Arg: arg})
+					case 2:
+						err = compiler.compileLoad16(&wazeroir.OperationLoad16{Type: wazeroir.SignedInt32, Arg: arg})
+					case 4:
+						err = compiler.compileLoad32(&wazeroir.OperationLoad32{Signed: false, Arg: arg})
+					case 8:
+						err = compiler.compileLoad(&wazeroir.OperationLoad{Type: wazeroir.UnsignedTypeF64, Arg: arg})
+					default:
+						t.Fail()
+					}
+
+					require.NoError(t, err)
+
+					require.NoError(t, compiler.compileReturnFunction())
+
+					// Generate the code under test and run.
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+					env.exec(code)
+
+					mem := env.memory()
+					if ceil := int64(base) + int64(offset) + int64(targetSizeInByte); int64(len(mem)) < ceil {
+						// If the targe memory region's ceil exceeds the length of memory, we must exit the function
+						// with jitCallStatusCodeMemoryOutOfBounds status code.
+						require.Equal(t, jitCallStatusCodeMemoryOutOfBounds, env.jitStatus())
+					}
+				})
+			}
+		}
 	}
 }
 
@@ -3750,7 +3828,8 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 								case wazeroir.SignedTypeUint32:
 									// In order to test zero value on non-zero register, we directly assign an register.
 									loc := compiler.valueLocationStack().pushValueLocationOnStack()
-									compiler.compileEnsureOnGeneralPurposeRegister(loc)
+									err = compiler.compileEnsureOnGeneralPurposeRegister(loc)
+									require.NoError(t, err)
 									env.stack()[loc.stackPointer] = uint64(v)
 								case wazeroir.SignedTypeInt32:
 									err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: uint32(int32(v))})
@@ -3888,7 +3967,7 @@ func TestCompiler_compile_Div_Rem(t *testing.T) {
 	}
 }
 
-func TestArm64Compiler_compileBr(t *testing.T) {
+func TestCompiler_compileBr(t *testing.T) {
 	t.Run("return", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t, nil)
@@ -4116,6 +4195,238 @@ func TestCompiler_compileBrTable(t *testing.T) {
 			require.Len(t, compiler.valueLocationStack().usedRegisters, 0)
 
 			requireRunAndExpectedValueReturned(t, env, compiler, tc.expectedValue)
+		})
+	}
+}
+
+func requirePushTwoInt32Consts(t *testing.T, x1, x2 uint32, compiler compilerImpl) {
+	err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x1})
+	require.NoError(t, err)
+	err = compiler.compileConstI32(&wazeroir.OperationConstI32{Value: x2})
+	require.NoError(t, err)
+}
+
+func requirePushTwoFloat32Consts(t *testing.T, x1, x2 float32, compiler compilerImpl) {
+	err := compiler.compileConstF32(&wazeroir.OperationConstF32{Value: x1})
+	require.NoError(t, err)
+	err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: x2})
+	require.NoError(t, err)
+}
+
+func TestCompiler_compileBrIf(t *testing.T) {
+	unreachableStatus, thenLabelExitStatus, elseLabelExitStatus :=
+		jitCallStatusCodeUnreachable, jitCallStatusCodeUnreachable+1, jitCallStatusCodeUnreachable+2
+	thenBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 1}}}
+	elseBranchTarget := &wazeroir.BranchTargetDrop{Target: &wazeroir.BranchTarget{Label: &wazeroir.Label{Kind: wazeroir.LabelKindHeader, FrameID: 2}}}
+
+	for _, tc := range []struct {
+		name      string
+		setupFunc func(t *testing.T, compiler compilerImpl, shouldGoElse bool)
+	}{
+		{
+			name: "cond on register",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				val := uint32(1)
+				if shouldGoElse {
+					val = 0
+				}
+				err := compiler.compileConstI32(&wazeroir.OperationConstI32{Value: val})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LS",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Le on unsigned integer produces the value on COND_LS register.
+				err := compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LE",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Le on signed integer produces the value on COND_LE register.
+				err := compiler.compileLe(&wazeroir.OperationLe{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "HS",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Ge on unsigned integer produces the value on COND_HS register.
+				err := compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "GE",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Ge on signed integer produces the value on COND_GE register.
+				err := compiler.compileGe(&wazeroir.OperationGe{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "HI",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Gt on unsigned integer produces the value on COND_HI register.
+				err := compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "GT",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(2), uint32(1)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Gt on signed integer produces the value on COND_GT register.
+				err := compiler.compileGt(&wazeroir.OperationGt{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LO",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Lt on unsigned integer produces the value on COND_LO register.
+				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeUint32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "LT",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				// Lt on signed integer produces the value on COND_LT register.
+				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeInt32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "MI",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := float32(1), float32(2)
+				if shouldGoElse {
+					x2, x1 = x1, x2
+				}
+				requirePushTwoFloat32Consts(t, x1, x2, compiler)
+				// Lt on floats produces the value on COND_MI register.
+				err := compiler.compileLt(&wazeroir.OperationLt{Type: wazeroir.SignedTypeFloat32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "EQ",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(1), uint32(1)
+				if shouldGoElse {
+					x2++
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				err := compiler.compileEq(&wazeroir.OperationEq{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "NE",
+			setupFunc: func(t *testing.T, compiler compilerImpl, shouldGoElse bool) {
+				x1, x2 := uint32(1), uint32(2)
+				if shouldGoElse {
+					x2 = x1
+				}
+				requirePushTwoInt32Consts(t, x1, x2, compiler)
+				err := compiler.compileNe(&wazeroir.OperationNe{Type: wazeroir.UnsignedTypeI32})
+				require.NoError(t, err)
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			for _, shouldGoToElse := range []bool{false, true} {
+				shouldGoToElse := shouldGoToElse
+				t.Run(fmt.Sprintf("should_goto_else=%v", shouldGoToElse), func(t *testing.T) {
+					env := newJITEnvironment()
+					compiler := env.requireNewCompiler(t, nil)
+					err := compiler.compilePreamble()
+					require.NoError(t, err)
+
+					tc.setupFunc(t, compiler, shouldGoToElse)
+					require.Equal(t, uint64(1), compiler.valueLocationStack().sp)
+
+					err = compiler.compileBrIf(&wazeroir.OperationBrIf{Then: thenBranchTarget, Else: elseBranchTarget})
+					require.NoError(t, err)
+					compiler.compileExitFromNativeCode(unreachableStatus)
+
+					// Emit code for .then label.
+					skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: thenBranchTarget.Target.Label})
+					require.False(t, skip)
+					compiler.compileExitFromNativeCode(thenLabelExitStatus)
+
+					// Emit code for .else label.
+					skip = compiler.compileLabel(&wazeroir.OperationLabel{Label: elseBranchTarget.Target.Label})
+					require.False(t, skip)
+					compiler.compileExitFromNativeCode(elseLabelExitStatus)
+
+					code, _, _, err := compiler.compile()
+					require.NoError(t, err)
+
+					// The generated code looks like this:
+					//
+					//    ... code from compilePreamble()
+					//    ... code from tc.setupFunc()
+					//    br_if .then, .else
+					//    exit $unreachableStatus
+					// .then:
+					//    exit $thenLabelExitStatus
+					// .else:
+					//    exit $elseLabelExitStatus
+					//
+					// Therefore, if we start executing from the top, we must end up exiting with an appropriate status.
+					env.exec(code)
+					require.NotEqual(t, unreachableStatus, env.jitStatus())
+					if shouldGoToElse {
+						require.Equal(t, elseLabelExitStatus, env.jitStatus())
+					} else {
+						require.Equal(t, thenLabelExitStatus, env.jitStatus())
+					}
+				})
+			}
 		})
 	}
 }

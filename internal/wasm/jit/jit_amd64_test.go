@@ -15,56 +15,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-func (c *amd64Compiler) movIntConstToRegister(val int64, targetRegister int16) *obj.Prog {
-	prog := c.newProg()
-	prog.As = x86.AMOVQ
-	prog.From.Type = obj.TYPE_CONST
-	prog.From.Offset = val
-	prog.To.Type = obj.TYPE_REG
-	prog.To.Reg = targetRegister
-	c.addInstruction(prog)
-	return prog
-}
-
-func TestAmd64Compiler_pushFunctionInputs(t *testing.T) {
-	f := &wasm.FunctionInstance{
-		Kind: wasm.FunctionKindWasm,
-		Type: &wasm.FunctionType{Params: []wasm.ValueType{wasm.ValueTypeF64, wasm.ValueTypeI32}}}
-	compiler := &amd64Compiler{locationStack: newValueLocationStack(), f: f}
-	compiler.pushFunctionParams()
-	require.Equal(t, uint64(len(f.Type.Params)), compiler.locationStack.sp)
-	loc := compiler.locationStack.pop()
-	require.Equal(t, uint64(1), loc.stackPointer)
-	loc = compiler.locationStack.pop()
-	require.Equal(t, uint64(0), loc.stackPointer)
-}
-
-func TestAmd64Compiler_compileLabel(t *testing.T) {
-	env := newJITEnvironment()
-	compiler := env.requireNewCompiler(t)
-	err := compiler.compilePreamble()
-	require.NoError(t, err)
-	label := &wazeroir.Label{FrameID: 100, Kind: wazeroir.LabelKindContinuation}
-	labelKey := label.String()
-	var called bool
-	compiler.labels[labelKey] = &labelInfo{
-		labelBeginningCallbacks: []func(*obj.Prog){func(p *obj.Prog) { called = true }},
-		initialStack:            newValueLocationStack(),
-	}
-
-	// If callers > 0, the label must not be skipped.
-	skip := compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
-	require.False(t, skip)
-	require.NotNil(t, compiler.labels[labelKey].initialInstruction)
-	require.True(t, called)
-
-	// Otherwise, skip.
-	compiler.labels[labelKey].initialStack = nil
-	skip = compiler.compileLabel(&wazeroir.OperationLabel{Label: label})
-	require.True(t, skip)
-}
-
-// TODO: comment why this is arch-dependent.
 func TestAmd64Compiler_compileMul(t *testing.T) {
 	t.Run("int32", func(t *testing.T) {
 		for _, tc := range []struct {
@@ -121,7 +71,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				const x2Value uint32 = 51
 				const dxValue uint64 = 111111
 
-				compiler := env.requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
@@ -129,30 +79,30 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-				prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
+				prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
 
 				// Setup values.
 				if tc.x1Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
-					compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
+					compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
 				} else {
-					loc := compiler.locationStack.pushValueLocationOnStack()
+					loc := compiler.valueLocationStack().pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x1Value)
 				}
 				if tc.x2Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
-					compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
+					compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
 				} else {
-					loc := compiler.locationStack.pushValueLocationOnStack()
+					loc := compiler.valueLocationStack().pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x2Value)
 				}
 
 				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI32})
 				require.NoError(t, err)
-				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
-				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
-				require.Equal(t, uint64(2), compiler.locationStack.sp)
-				require.Len(t, compiler.locationStack.usedRegisters, 1)
+				require.Equal(t, int16(x86.REG_AX), compiler.valueLocationStack().peek().register)
+				require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+				require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+				require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
 				// At this point, the previous value on the DX register is saved to the stack.
 				require.True(t, prevOnDX.onStack())
 
@@ -229,7 +179,7 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				const dxValue uint64 = 111111
 
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
@@ -237,30 +187,30 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 				// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 				// but in reality, it can exist in any position of stack.
 				compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-				prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
+				prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
 
 				// Setup values.
 				if tc.x1Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x1Value), tc.x1Reg)
-					compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
+					compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
 				} else {
-					loc := compiler.locationStack.pushValueLocationOnStack()
+					loc := compiler.valueLocationStack().pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x1Value)
 				}
 				if tc.x2Reg != nilRegister {
 					compiler.movIntConstToRegister(int64(x2Value), tc.x2Reg)
-					compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
+					compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
 				} else {
-					loc := compiler.locationStack.pushValueLocationOnStack()
+					loc := compiler.valueLocationStack().pushValueLocationOnStack()
 					env.stack()[loc.stackPointer] = uint64(x2Value)
 				}
 
 				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeI64})
 				require.NoError(t, err)
-				require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
-				require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
-				require.Equal(t, uint64(2), compiler.locationStack.sp)
-				require.Len(t, compiler.locationStack.usedRegisters, 1)
+				require.Equal(t, int16(x86.REG_AX), compiler.valueLocationStack().peek().register)
+				require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+				require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+				require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
 				// At this point, the previous value on the DX register is saved to the stack.
 				require.True(t, prevOnDX.onStack())
 
@@ -301,21 +251,21 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
+				x1 := compiler.valueLocationStack().peek()
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
 				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
+				x2 := compiler.valueLocationStack().peek()
 
 				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeF32})
 				require.NoError(t, err)
-				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.valueLocationStack().usedRegisters, x1.register)
+				require.NotContains(t, compiler.valueLocationStack().usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
@@ -353,21 +303,21 @@ func TestAmd64Compiler_compileMul(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
+				x1 := compiler.valueLocationStack().peek()
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
 				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
+				x2 := compiler.valueLocationStack().peek()
 
 				err = compiler.compileMul(&wazeroir.OperationMul{Type: wazeroir.UnsignedTypeF64})
 				require.NoError(t, err)
-				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.valueLocationStack().usedRegisters, x1.register)
+				require.NotContains(t, compiler.valueLocationStack().usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
@@ -462,7 +412,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							t.Run(fmt.Sprintf("%d/%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
-								compiler := env.requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t, nil)
 								err := compiler.compilePreamble()
 								require.NoError(t, err)
 
@@ -470,21 +420,21 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
+								prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -495,10 +445,10 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								}
 								require.NoError(t, err)
 
-								require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
-								require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
-								require.Equal(t, uint64(2), compiler.locationStack.sp)
-								require.Len(t, compiler.locationStack.usedRegisters, 1)
+								require.Equal(t, int16(x86.REG_AX), compiler.valueLocationStack().peek().register)
+								require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+								require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+								require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
 								// At this point, the previous value on the DX register is saved to the stack.
 								require.True(t, prevOnDX.onStack())
 
@@ -615,7 +565,7 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 							t.Run(fmt.Sprintf("%d/%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
-								compiler := env.requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t, nil)
 								err := compiler.compilePreamble()
 								require.NoError(t, err)
 
@@ -623,21 +573,21 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
+								prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -648,10 +598,10 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 								}
 								require.NoError(t, err)
 
-								require.Equal(t, int16(x86.REG_AX), compiler.locationStack.peek().register)
-								require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
-								require.Equal(t, uint64(2), compiler.locationStack.sp)
-								require.Len(t, compiler.locationStack.usedRegisters, 1)
+								require.Equal(t, int16(x86.REG_AX), compiler.valueLocationStack().peek().register)
+								require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+								require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+								require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
 								// At this point, the previous value on the DX register is saved to the stack.
 								require.True(t, prevOnDX.onStack())
 
@@ -722,20 +672,20 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x1})
 				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
+				x1 := compiler.valueLocationStack().peek()
 				err = compiler.compileConstF32(&wazeroir.OperationConstF32{Value: tc.x2})
 				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
+				x2 := compiler.valueLocationStack().peek()
 
 				err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeFloat32})
 				require.NoError(t, err)
-				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.valueLocationStack().usedRegisters, x1.register)
+				require.NotContains(t, compiler.valueLocationStack().usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
@@ -796,21 +746,21 @@ func TestAmd64Compiler_compileDiv(t *testing.T) {
 			tc := tc
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				env := newJITEnvironment()
-				compiler := env.requireNewCompiler(t)
+				compiler := env.requireNewCompiler(t, nil)
 				err := compiler.compilePreamble()
 				require.NoError(t, err)
 
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x1})
 				require.NoError(t, err)
-				x1 := compiler.locationStack.peek()
+				x1 := compiler.valueLocationStack().peek()
 				err = compiler.compileConstF64(&wazeroir.OperationConstF64{Value: tc.x2})
 				require.NoError(t, err)
-				x2 := compiler.locationStack.peek()
+				x2 := compiler.valueLocationStack().peek()
 
 				err = compiler.compileDiv(&wazeroir.OperationDiv{Type: wazeroir.SignedTypeFloat64})
 				require.NoError(t, err)
-				require.Contains(t, compiler.locationStack.usedRegisters, x1.register)
-				require.NotContains(t, compiler.locationStack.usedRegisters, x2.register)
+				require.Contains(t, compiler.valueLocationStack().usedRegisters, x1.register)
+				require.NotContains(t, compiler.valueLocationStack().usedRegisters, x2.register)
 
 				// To verify the behavior, we push the value
 				// to the stack.
@@ -915,7 +865,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 							t.Run(fmt.Sprintf("x1=%d,x2=%d", vs.x1Value, vs.x2Value), func(t *testing.T) {
 
 								env := newJITEnvironment()
-								compiler := env.requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t, nil)
 								err := compiler.compilePreamble()
 								require.NoError(t, err)
 
@@ -923,21 +873,21 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
+								prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -948,10 +898,10 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								}
 								require.NoError(t, err)
 
-								require.Equal(t, int16(x86.REG_DX), compiler.locationStack.peek().register)
-								require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
-								require.Equal(t, uint64(2), compiler.locationStack.sp)
-								require.Len(t, compiler.locationStack.usedRegisters, 1)
+								require.Equal(t, int16(x86.REG_DX), compiler.valueLocationStack().peek().register)
+								require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+								require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+								require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
 								// At this point, the previous value on the DX register is saved to the stack.
 								require.True(t, prevOnDX.onStack())
 
@@ -1067,7 +1017,7 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 							vs := vs
 							t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 								env := newJITEnvironment()
-								compiler := env.requireNewCompiler(t)
+								compiler := env.requireNewCompiler(t, nil)
 								err := compiler.compilePreamble()
 								require.NoError(t, err)
 
@@ -1075,21 +1025,21 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 								// but in reality, it can exist in any position of stack.
 								compiler.movIntConstToRegister(int64(dxValue), x86.REG_DX)
-								prevOnDX := compiler.locationStack.pushValueLocationOnRegister(x86.REG_DX)
+								prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
 
 								// Setup values.
 								if tc.x1Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x1Value), tc.x1Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x1Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x1Value)
 								}
 								if tc.x2Reg != nilRegister {
 									compiler.movIntConstToRegister(int64(vs.x2Value), tc.x2Reg)
-									compiler.locationStack.pushValueLocationOnRegister(tc.x2Reg)
+									compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
 								} else {
-									loc := compiler.locationStack.pushValueLocationOnStack()
+									loc := compiler.valueLocationStack().pushValueLocationOnStack()
 									env.stack()[loc.stackPointer] = uint64(vs.x2Value)
 								}
 
@@ -1100,10 +1050,10 @@ func TestAmd64Compiler_compileRem(t *testing.T) {
 								}
 								require.NoError(t, err)
 
-								require.Equal(t, int16(x86.REG_DX), compiler.locationStack.peek().register)
-								require.Equal(t, generalPurposeRegisterTypeInt, compiler.locationStack.peek().regType)
-								require.Equal(t, uint64(2), compiler.locationStack.sp)
-								require.Len(t, compiler.locationStack.usedRegisters, 1)
+								require.Equal(t, int16(x86.REG_DX), compiler.valueLocationStack().peek().register)
+								require.Equal(t, generalPurposeRegisterTypeInt, compiler.valueLocationStack().peek().regType)
+								require.Equal(t, uint64(2), compiler.valueLocationStack().sp)
+								require.Len(t, compiler.valueLocationStack().usedRegisters, 1)
 								// At this point, the previous value on the DX register is saved to the stack.
 								require.True(t, prevOnDX.onStack())
 
@@ -1159,7 +1109,7 @@ func TestAmd64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
 				targetSizeInByte := targetSizeInByte
 				t.Run(fmt.Sprintf("base=%d,offset=%d,targetSizeInBytes=%d", base, offset, targetSizeInByte), func(t *testing.T) {
 					env := newJITEnvironment()
-					compiler := env.requireNewCompiler(t)
+					compiler := env.requireNewCompiler(t, nil)
 
 					err := compiler.compilePreamble()
 					require.NoError(t, err)
@@ -1170,7 +1120,7 @@ func TestAmd64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
 					reg, err := compiler.compileMemoryAccessCeilSetup(offset, targetSizeInByte)
 					require.NoError(t, err)
 
-					compiler.locationStack.pushValueLocationOnRegister(reg)
+					compiler.valueLocationStack().pushValueLocationOnRegister(reg)
 
 					require.NoError(t, compiler.compileReturnFunction())
 
@@ -1198,7 +1148,7 @@ func TestAmd64Compiler_compileMemoryAccessCeilSetup(t *testing.T) {
 func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 	t.Run("invalid", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -1214,7 +1164,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		env := newJITEnvironment()
-		compiler := env.requireNewCompiler(t)
+		compiler := env.requireNewCompiler(t, nil)
 
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
