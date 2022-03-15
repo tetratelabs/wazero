@@ -374,13 +374,35 @@ func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
 
 // Close implements internalwasm.ModuleEngine Close
 func (me *moduleEngine) Close() {
+	// Current impl: Close is currently guarded with CAS to only be called once. There is a race-condition inside the
+	// critical section: functions are removed from the parent engine, but there's no guard to prevent this
+	// moduleInstance from making new calls. This means at inside the critical section there could be in-flight calls,
+	// and even after it new calls can be made, given a reference to this moduleEngine.
+	//
+	// To ensure neither in-flight, nor new calls segfault due to missing code segment, memory isn't unmapped here.
+	// Rather, it is added to the finalizer queue to be done at some point (perhaps never). This needs to eventually be
+	// as close leaks resources until cleaned up by the finalizer which by docs may never be run.
+	//
+	// Potential future design (possibly faulty, so expect impl to be more complete or better):
+	//  * Change this to implement io.Closer and document this is blocking
+	//    * This implies adding docs can suggest this is run in a goroutine
+	//    * io.Closer allows an error return we can use in case an unrecoverable error happens
+	//  * Continue to guard with CAS so that close is only executed once
+	//  * Once in the critical section, write a status bit to a fixed memory location.
+	//    * End new calls with a Closed Error if this is read.
+	//    * This guard allows Close to eventually complete.
+	//  * Block exiting the critical section until all in-flight calls complete.
+	//    * Knowing which in-flight calls from other modules, that can use this module may be tricky
+	//    * Pure wasm functions can be left to complete.
+	//    * Host functions are the only unknowns (ex can do I/O) so they may need to be tracked.
+
 	// Setting finalizer multiple times result in panic, so we guard with CAS.
 	if atomic.CompareAndSwapUint32(&me.closed, 0, 1) {
 		// Release all the function instances declared in this module.
 		for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
 			runtime.SetFinalizer(cf, func(compiledFn *compiledFunction) {
 				if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
-					panic(err) // mumap failure cannot recover.
+					panic(err) // munmap failure cannot recover.
 				}
 			})
 			me.parentEngine.deleteCompiledFunction(cf.source)
