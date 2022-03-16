@@ -2,6 +2,7 @@ package jit
 
 import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -22,8 +23,8 @@ var (
 	newCompiler func(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error)
 
 	// unreservedGeneralPurposeIntRegisters contains unreserved general purpose registers of integer type.
-	unreservedGeneralPurposeIntRegisters []int16
+	unreservedGeneralPurposeIntRegisters []asm.Register
 
 	// unreservedGeneralPurposeFloatRegisters contains unreserved general purpose registers of scalar float type.
-	unreservedGeneralPurposeFloatRegisters []int16
+	unreservedGeneralPurposeFloatRegisters []asm.Register
 )

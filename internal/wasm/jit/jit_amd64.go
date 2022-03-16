@@ -13,8 +13,6 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/twitchyliquid64/golang-asm/obj/x86"
-
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
@@ -1070,8 +1068,8 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 // See https://www.felixcloutier.com/x86/mul#description for detail semantics.
 func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instruction) error {
 	const (
-		resultRegister   = x86.REG_AX
-		reservedRegister = x86.REG_DX
+		resultRegister   = amd64.REG_AX
+		reservedRegister = amd64.REG_DX
 	)
 
 	x2 := c.locationStack.pop()
@@ -1326,7 +1324,7 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	}
 	// Now we have the quotient of the division result in the AX register,
 	// so we record it.
-	result := c.pushValueLocationOnRegister(x86.REG_AX)
+	result := c.pushValueLocationOnRegister(amd64.REG_AX)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
@@ -1349,7 +1347,7 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 
 	// Now we have the remainder of the division result in the DX register,
 	// so we record it.
-	result := c.pushValueLocationOnRegister(x86.REG_DX)
+	result := c.pushValueLocationOnRegister(amd64.REG_DX)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return
 }
@@ -1370,8 +1368,8 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 // where AX holds the quotient while DX the remainder of the division result.
 func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error {
 	const (
-		quotientRegister  = x86.REG_AX
-		remainderRegister = x86.REG_DX
+		quotientRegister  = amd64.REG_AX
+		remainderRegister = amd64.REG_DX
 	)
 
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
@@ -1510,7 +1508,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		c.assembler.CompileRegisterToNoneInstruction(amd64.IDIVL, x2.register)
 	} else if is32Bit && !signed {
 		// Zeros DX register to have 64 bit dividend over DX and AX registers.
-		c.assembler.CompileRegisterToRegisterInstruction(amd64.XORQ, x86.REG_DX, x86.REG_DX)
+		c.assembler.CompileRegisterToRegisterInstruction(amd64.XORQ, amd64.REG_DX, amd64.REG_DX)
 		c.assembler.CompileRegisterToNoneInstruction(amd64.DIVL, x2.register)
 	} else if !is32Bit && signed {
 		// Emits sign-extension to have 128 bit dividend over DX and AX registers.
@@ -1518,7 +1516,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		c.assembler.CompileRegisterToNoneInstruction(amd64.IDIVQ, x2.register)
 	} else if !is32Bit && !signed {
 		// Zeros DX register to have 128 bit dividend over DX and AX registers.
-		c.assembler.CompileRegisterToRegisterInstruction(amd64.XORQ, x86.REG_DX, x86.REG_DX)
+		c.assembler.CompileRegisterToRegisterInstruction(amd64.XORQ, amd64.REG_DX, amd64.REG_DX)
 		c.assembler.CompileRegisterToNoneInstruction(amd64.DIVQ, x2.register)
 	}
 
@@ -1663,7 +1661,7 @@ func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool
 	x2 := c.locationStack.pop()
 
 	// Ensures that x2 (holding shift counts) is placed on the CX register.
-	const shiftCountRegister = x86.REG_CX
+	const shiftCountRegister = amd64.REG_CX
 	if (x2.onRegister() && x2.register != shiftCountRegister) || x2.onStack() {
 		// If another value lives on the CX register, we release it to the stack.
 		c.onValueReleaseRegisterToStack(shiftCountRegister)

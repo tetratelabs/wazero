@@ -3,7 +3,6 @@ package amd64
 import "github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 
 const (
-	// Instrctuins in x86 pkg.
 	ADDL = iota
 	ADDQ
 	ADDSD
@@ -132,19 +131,13 @@ const (
 	XORPS
 	XORQ
 
-	// Instructions in obj pkg.
 	RET
 	JMP
 	NOP
 )
 
 const (
-	intRegisterIotaBegin   asm.Register = 2064
-	floatRegisterIotaBegin asm.Register = 2108
-)
-
-const (
-	REG_AX asm.Register = intRegisterIotaBegin + iota
+	REG_AX asm.Register = iota
 	REG_CX
 	REG_DX
 	REG_BX
@@ -160,10 +153,7 @@ const (
 	REG_R13
 	REG_R14
 	REG_R15
-)
-
-const (
-	REG_X0 asm.Register = floatRegisterIotaBegin + iota
+	REG_X0
 	REG_X1
 	REG_X2
 	REG_X3

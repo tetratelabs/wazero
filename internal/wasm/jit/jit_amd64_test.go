@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -40,7 +41,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 			t.Run("int32", func(t *testing.T) {
 				for _, tc := range []struct {
 					name         string
-					x1Reg, x2Reg int16
+					x1Reg, x2Reg asm.Register
 				}{
 					{
 						name:  "x1:ax,x2:random_reg",
@@ -163,7 +164,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 			t.Run("int64", func(t *testing.T) {
 				for _, tc := range []struct {
 					name         string
-					x1Reg, x2Reg int16
+					x1Reg, x2Reg asm.Register
 				}{
 					{
 						name:  "x1:ax,x2:random_reg",

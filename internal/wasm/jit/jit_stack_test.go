@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -35,7 +36,7 @@ func TestCompiler_releaseRegisterToStack(t *testing.T) {
 			s := &valueLocationStack{
 				sp:            tc.stackPointer,
 				stack:         make([]*valueLocation, tc.stackPointer),
-				usedRegisters: map[int16]struct{}{},
+				usedRegisters: map[asm.Register]struct{}{},
 			}
 			// Peek must be non-nil. Otherwise, compileConst* would fail.
 			s.stack[s.sp-1] = &valueLocation{}
