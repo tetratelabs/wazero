@@ -6,7 +6,8 @@ import (
 )
 
 // Following variables must be initialized in init() function in architecture-specific arch_*.go file which
-// is guarded by build tag.
+// is guarded by build tag. This file exists as build-tag free in order to provide documentation interface
+// over these per-architecture definitions of the following symbols.
 var (
 	// newArchContext returns a new archContext which is architecture-specific type to be embedded in callEngine.
 	newArchContext func() archContext
