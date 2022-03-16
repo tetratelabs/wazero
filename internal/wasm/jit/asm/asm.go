@@ -9,8 +9,9 @@ type Register = int16
 type Instruction = int16
 
 type Node interface {
-	Pc() uint64
+	Pc() int64
 	AssignJumpTarget(target Node)
+	AssignDestinationConstant(value int64)
 }
 
 type AssemblerBase interface {

@@ -36,8 +36,8 @@ func (a *assemblerGoAsmImpl) newProg() (prog *obj.Prog) {
 func (a *assemblerGoAsmImpl) addInstruction(next *obj.Prog) {
 	a.b.AddInstruction(next)
 	for _, node := range a.setBranchTargetOnNextNodes {
-		prog := node.(*obj.Prog)
-		prog.To.SetTarget(next)
+		n := node.(*asm.GolangAsmNode)
+		n.Prog.To.SetTarget(next)
 	}
 	a.setBranchTargetOnNextNodes = nil
 }
@@ -55,10 +55,10 @@ func (a *assemblerGoAsmImpl) SetBranchTargetOnNext(nodes ...asm.Node) {
 }
 
 func (a *assemblerGoAsmImpl) CompileStandAloneInstruction(inst asm.Instruction) asm.Node {
-	prog := a.newProg()
-	prog.As = castAsGolangAsmInstruction[inst]
-	a.addInstruction(prog)
-	return prog
+	p := a.newProg()
+	p.As = castAsGolangAsmInstruction[inst]
+	a.addInstruction(p)
+	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register) {
@@ -117,7 +117,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegisterInstruction(inst asm.Register
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = destinationRegister
 	a.addInstruction(p)
-	return p
+	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToConstInstruction(inst asm.Register, srcRegister asm.Register, constValue int64) asm.Node {
@@ -128,7 +128,7 @@ func (a *assemblerGoAsmImpl) CompileRegisterToConstInstruction(inst asm.Register
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = srcRegister
 	a.addInstruction(p)
-	return p
+	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToNoneInstruction(inst asm.Register, register asm.Register) {
@@ -168,7 +168,7 @@ func (a *assemblerGoAsmImpl) CompileConstToMemoryInstruction(inst asm.Register, 
 	p.To.Reg = baseReg
 	p.To.Offset = offset
 	a.addInstruction(p)
-	return p
+	return asm.NewGolangAsmNode(p)
 }
 
 func (c *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
@@ -191,7 +191,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryToConstInstruction(inst asm.Register, 
 	p.From.Reg = baseReg
 	p.From.Offset = offset
 	a.addInstruction(p)
-	return p
+	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileUnconditionalJump() asm.Node {
@@ -203,7 +203,7 @@ func (a *assemblerGoAsmImpl) CompileJump(inst asm.Instruction) asm.Node {
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_BRANCH
 	a.addInstruction(p)
-	return p
+	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(reg asm.Register) {
@@ -220,6 +220,18 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(baseReg asm.Register, offset in
 	p.To.Type = obj.TYPE_MEM
 	p.To.Reg = baseReg
 	p.To.Offset = offset
+	a.addInstruction(p)
+}
+
+func (a *assemblerGoAsmImpl) CompileConstModeRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register, mode int64) {
+	p := a.newProg()
+	p.As = castAsGolangAsmInstruction[inst]
+	p.From.Type = obj.TYPE_CONST
+	p.From.Offset = mode
+	p.To.Type = obj.TYPE_REG
+	p.To.Reg = to
+	p.RestArgs = append(p.RestArgs,
+		obj.Addr{Reg: from, Type: obj.TYPE_REG})
 	a.addInstruction(p)
 }
 

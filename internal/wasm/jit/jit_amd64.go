@@ -13,7 +13,6 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -117,7 +116,9 @@ type amd64Compiler struct {
 	currentLabel string
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	staticData                           compiledFunctionStaticData
+	// onGenerateCallbacks holds the callbacks which are called after generating native code.
+	onGenerateCallbacks []func(code []byte) error
+	staticData          compiledFunctionStaticData
 }
 
 // setLocationStack sets the given valueLocationStack to .locationStack field,
@@ -191,6 +192,12 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	code, err = mmapCodeSegment(c.assembler.Assemble())
 	if err != nil {
 		return
+	}
+
+	for _, cb := range c.onGenerateCallbacks {
+		if err = cb(code); err != nil {
+			return
+		}
 	}
 
 	staticData = c.staticData
@@ -1797,14 +1804,11 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 		return err
 	}
 
-	var inst *obj.Prog
 	if is32Bit {
-		inst = c.assembler.CompileConstToRegisterInstruction(amd64.ROUNDSS, mode, target.register)
+		c.assembler.CompileConstModeRegisterToRegisterInstruction(amd64.ROUNDSS, target.register, target.register, mode)
 	} else {
-		inst = c.assembler.CompileConstToRegisterInstruction(amd64.ROUNDSD, mode, target.register)
+		c.assembler.CompileConstModeRegisterToRegisterInstruction(amd64.ROUNDSD, target.register, target.register, mode)
 	}
-	inst.RestArgs = append(inst.RestArgs,
-		obj.Addr{Reg: target.register, Type: obj.TYPE_REG})
 	return nil
 }
 
@@ -3847,7 +3851,9 @@ func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 
 	// If stack base pointer + max stack pointer > valueStackLen, we need to grow the stack.
 	cmpWithStackPointerCeil := c.assembler.CompileRegisterToConstInstruction(amd64.CMPQ, tmpRegister, 0)
-	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { cmpWithStackPointerCeil.To.Offset = int64(stackPointerCeil) }
+	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) {
+		cmpWithStackPointerCeil.AssignDestinationConstant(int64(stackPointerCeil))
+	}
 
 	// Jump if we have no need to grow.
 	jmpIfNoNeedToGrowStack := c.assembler.CompileJump(amd64.JCC)
