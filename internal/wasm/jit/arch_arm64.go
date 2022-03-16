@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"

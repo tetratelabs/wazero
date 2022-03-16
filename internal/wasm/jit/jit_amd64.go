@@ -13,12 +13,13 @@ import (
 	"runtime"
 	"unsafe"
 
-	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -88,13 +89,13 @@ const (
 	conditionalRegisterStateBE                                            // CF | ZF below or equal (unsigned <=)
 )
 
-const (
+var (
 	// reservedRegisterForCallEngine: pointer to callEngine (i.e. *callEngine as uintptr)
-	reservedRegisterForCallEngine = x86.REG_R13
+	reservedRegisterForCallEngine = amd64.REG_R13
 	// reservedRegisterForStackBasePointerAddress: stack base pointer's address (callEngine.stackBasePointer) in the current function call.
-	reservedRegisterForStackBasePointerAddress = x86.REG_R14
+	reservedRegisterForStackBasePointerAddress = amd64.REG_R14
 	// reservedRegisterForMemory: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
-	reservedRegisterForMemory = x86.REG_R15
+	reservedRegisterForMemory = amd64.REG_R15
 )
 
 func (c *amd64Compiler) String() string {
@@ -102,12 +103,9 @@ func (c *amd64Compiler) String() string {
 }
 
 type amd64Compiler struct {
-	builder *asm.Builder
+	builder amd64.Assembler
 	f       *wasm.FunctionInstance
 	ir      *wazeroir.CompilationResult
-	// setJmpOrigins sets jmp kind instructions where you want to set the next coming
-	// instruction as the destination of the jmp instruction.
-	setJmpOrigins []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
@@ -119,9 +117,7 @@ type amd64Compiler struct {
 	currentLabel string
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
-	onGenerateCallbacks []func(code []byte) error
-	staticData          compiledFunctionStaticData
+	staticData                           compiledFunctionStaticData
 }
 
 // setLocationStack sets the given valueLocationStack to .locationStack field,
@@ -138,7 +134,7 @@ func (c *amd64Compiler) addStaticData(d []byte) {
 	c.staticData = append(c.staticData, d)
 }
 
-func (c *amd64Compiler) pushValueLocationOnRegister(reg int16) (ret *valueLocation) {
+func (c *amd64Compiler) pushValueLocationOnRegister(reg asm.Register) (ret *valueLocation) {
 	ret = c.locationStack.pushValueLocationOnRegister(reg)
 	c.locationStack.markRegisterUsed(reg)
 	return
@@ -197,31 +193,6 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 		return
 	}
 
-	if buildoptions.IsDebugMode {
-		for _, l := range c.labels {
-			if len(l.labelBeginningCallbacks) > 0 {
-				// Meaning that some labels are not compiled even though there's a jump origin.
-				panic("labelBeginningCallbacks must be empty after code generation")
-			}
-		}
-	}
-
-	for _, cb := range c.onGenerateCallbacks {
-		if err = cb(code); err != nil {
-			return
-		}
-	}
-
-	if buildoptions.IsDebugMode {
-		for key, l := range c.labels {
-			if len(l.labelBeginningCallbacks) > 0 {
-				// Meaning that some instruction is trying to jump to this label,
-				// but initialStack is not set. There must be a bug at the call-site of br or br_if.
-				panic(fmt.Sprintf("labelBeginningCallbacks must be called for label %s\n", key))
-			}
-		}
-	}
-
 	staticData = c.staticData
 	return
 }
@@ -238,251 +209,6 @@ func (c *amd64Compiler) pushFunctionParams() {
 			}
 		}
 	}
-}
-
-func (c *amd64Compiler) addInstruction(prog *obj.Prog) {
-	c.builder.AddInstruction(prog)
-	for _, origin := range c.setJmpOrigins {
-		origin.To.SetTarget(prog)
-	}
-	c.setJmpOrigins = nil
-}
-
-func (c *amd64Compiler) addSetJmpOrigins(progs ...*obj.Prog) {
-	c.setJmpOrigins = append(c.setJmpOrigins, progs...)
-}
-
-func (c *amd64Compiler) newProg() (prog *obj.Prog) {
-	prog = c.builder.NewProg()
-	return
-}
-
-func (c *amd64Compiler) compileStandAloneInstruction(inst obj.As) *obj.Prog {
-	prog := c.newProg()
-	prog.As = inst
-	c.addInstruction(prog)
-	return prog
-}
-
-func (c *amd64Compiler) compileRegisterToRegister(instruction obj.As, from, to int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = to
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = from
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileMemoryToRegisterInstruction(instruction obj.As, sourceBaseReg int16, sourceOffsetConst int64, destinationReg int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = sourceBaseReg
-	inst.From.Offset = sourceOffsetConst
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationReg
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileMemoryWithIndexToRegisterInstruction(instruction obj.As,
-	sourceBaseReg int16, sourceOffsetConst int64, sourceIndex int16, sourceScale int16,
-	destinationReg int16,
-) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationReg
-	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = sourceBaseReg
-	inst.From.Offset = sourceOffsetConst
-	inst.From.Index = sourceIndex
-	inst.From.Scale = sourceScale
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileRegisterToMemoryWithIndexInstruction(instruction obj.As,
-	srcReg int16,
-	dstBaseReg int16, dstOffsetConst int64, dstIndex int16, dstScale int16,
-) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = srcReg
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = dstBaseReg
-	inst.To.Offset = dstOffsetConst
-	inst.To.Index = dstIndex
-	inst.To.Scale = dstScale
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileRegisterToMemoryInstruction(instruction obj.As, sourceRegister int16, destinationBaseRegister int16, destinationOffsetConst int64) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = destinationBaseRegister
-	inst.To.Offset = destinationOffsetConst
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = sourceRegister
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileConstToRegisterInstruction(instruction obj.As, constValue int64, destinationRegister int16) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_CONST
-	inst.From.Offset = constValue
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationRegister
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileRegisterToConstInstruction(instruction obj.As, srcRegister int16, constValue int64) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_CONST
-	inst.To.Offset = constValue
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = srcRegister
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileRegisterToNoneInstruction(instruction obj.As, register int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = register
-	inst.To.Type = obj.TYPE_NONE
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileNoneToRegisterInstruction(instruction obj.As, register int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = register
-	inst.From.Type = obj.TYPE_NONE
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileNoneToMemoryInstruction(instruction obj.As, baseReg int16, offset int64) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = baseReg
-	inst.To.Offset = offset
-	inst.From.Type = obj.TYPE_NONE
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileConstToMemoryInstruction(instruction obj.As, constValue int64, baseReg int16, offset int64) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_CONST
-	inst.From.Offset = constValue
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = baseReg
-	inst.To.Offset = offset
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileMemoryToConstInstruction(instruction obj.As, baseReg int16, offset int64, constValue int64) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_CONST
-	inst.To.Offset = constValue
-	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = baseReg
-	inst.From.Offset = offset
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileUnconditionalJump() *obj.Prog {
-	return c.compileJump(obj.AJMP)
-}
-
-func (c *amd64Compiler) compileJump(jmpInst obj.As) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = jmpInst
-	inst.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileJumpToRegister(reg int16) {
-	inst := c.newProg()
-	inst.As = obj.AJMP
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = reg
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileJumpToMemory(baseReg int16, offset int64) {
-	inst := c.newProg()
-	inst.As = obj.AJMP
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = baseReg
-	inst.To.Offset = offset
-	c.addInstruction(inst)
-}
-
-// compileReadInstructionAddress add a LEA instruction to read the target instruction's absolute address into the destinationRegister.
-// beforeAcquisitionTargetInstruction is the instruction kind (e.g. RET, JMP, etc.) right before the instruction
-// of which the call-site wants to acquire the absolute address.
-func (c *amd64Compiler) compileReadInstructionAddress(destinationRegister int16, beforeAcquisitionTargetInstruction obj.As) {
-	// Emit the instruction in the form of "LEA destination [RIP + offset]".
-	readInstructionAddress := c.newProg()
-	readInstructionAddress.As = x86.ALEAQ
-	readInstructionAddress.To.Reg = destinationRegister
-	readInstructionAddress.To.Type = obj.TYPE_REG
-	readInstructionAddress.From.Type = obj.TYPE_MEM
-	// We use place holder here as we don't yet know at this point the offset of the first instruction
-	// after return instruction.
-	readInstructionAddress.From.Offset = 0xffff
-	// Since the assembler cannot directly emit "LEA destination [RIP + offset]", we use the some hack here:
-	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
-	// exactly the same as "LEA destination [RIP + offset]" except the most significant bit of the third byte.
-	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
-	readInstructionAddress.From.Reg = x86.REG_BP
-	c.addInstruction(readInstructionAddress)
-
-	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-		// Advance readInstructionAddress to the next one (.Link) in order to get the instruction
-		// right after LEA because RIP points to that next instruction in LEA instruction.
-		base := readInstructionAddress.Link
-
-		// Find the address acquisition target instruction.
-		target := base
-		for target != nil {
-			// Advance until we have the target.As has the given instruction kind.
-			target = target.Link
-			if target.As == beforeAcquisitionTargetInstruction {
-				// At this point, target is the instruction right before the target instruction.
-				// Thus, advance one more time to make target the target instruction.
-				target = target.Link
-				break
-			}
-		}
-
-		if target == nil {
-			return fmt.Errorf("target instruction not found for read instruction address")
-		}
-
-		// Now we can calculate the "offset" in the LEA instruction.
-		offset := uint32(target.Pc) - uint32(base.Pc)
-
-		// Replace the placeholder bytes by the actual offset.
-		binary.LittleEndian.PutUint32(code[readInstructionAddress.Pc+3:], offset)
-
-		// See the comment at readInstructionAddress.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
-		code[readInstructionAddress.Pc+2] &= 0b01111111
-		return nil
-	})
 }
 
 // compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
@@ -2931,7 +2657,7 @@ func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool)
 	return
 }
 
-func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
+func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstruction obj.As, shouldEqual bool) error {
 	c.compileRegisterToRegister(cmpInstruction, x2Reg, x1Reg)
 
 	// Record that the result is on the conditional register.
@@ -2949,7 +2675,7 @@ func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg int16, cmpInstruction 
 // For float EQ and NE, we have to take NaN values into account.
 // Notably, Wasm specification states that if one of targets is NaN,
 // the result must be zero for EQ or one for NE.
-func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
+func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpInstruction obj.As, shouldEqual bool) error {
 	// Before we allocate the result, we have to reserve two int registers.
 	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
@@ -3364,7 +3090,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 //
 // Note: this also emits the instructions to check the out of bounds memory access.
 // In other words, if the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
-func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (int16, error) {
+func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (asm.Register, error) {
 	base := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(base); err != nil {
 		return 0, err
@@ -3590,7 +3316,7 @@ func (c *amd64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 	c.compileMoveConditionalToGeneralPurposeRegister(loc, reg)
 }
 
-func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valueLocation, reg int16) {
+func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valueLocation, reg asm.Register) {
 	// Set the flag bit to the destination. See
 	// - https://c9x.me/x86/html/file_module_x86_id_288.html
 	// - https://github.com/golang/go/blob/master/src/cmd/internal/obj/x86/asm6.go#L1453-L1468
@@ -3638,7 +3364,7 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valu
 // either from the free register pool or by stealing an used register.
 // Note that resulting registers are NOT marked as used so the call site should
 // mark it used if necessary.
-func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int16, err error) {
+func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.
 	reg, ok = c.locationStack.takeFreeRegister(t)
@@ -3665,7 +3391,7 @@ func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 //
 // Note: this is the counter part for returnFunction, and see the comments there as well
 // to understand how the function calls are achieved.
-func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFunctionAddressRegister int16, functype *wasm.FunctionType) error {
+func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFunctionAddressRegister asm.Register, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	c.compileReleaseAllRegistersToStack()
 
@@ -4027,7 +3753,7 @@ func (c *amd64Compiler) compileReleaseAllRegistersToStack() {
 	}
 }
 
-func (c *amd64Compiler) onValueReleaseRegisterToStack(reg int16) {
+func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		prevValue := c.locationStack.stack[i]
 		if prevValue.register == reg {

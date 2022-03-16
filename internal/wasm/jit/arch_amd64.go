@@ -1,12 +1,8 @@
 package jit
 
 import (
-	"fmt"
-
-	asm "github.com/twitchyliquid64/golang-asm"
-	"github.com/twitchyliquid64/golang-asm/obj/x86"
-
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -16,10 +12,10 @@ func init() {
 	newCompiler = newCompilerImpl
 	newArchContext = newArchContextImpl
 	unreservedGeneralPurposeFloatRegisters = []int16{
-		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
-		x86.REG_X4, x86.REG_X5, x86.REG_X6, x86.REG_X7,
-		x86.REG_X8, x86.REG_X9, x86.REG_X10, x86.REG_X11,
-		x86.REG_X12, x86.REG_X13, x86.REG_X14, x86.REG_X15,
+		amd64.REG_X0, amd64.REG_X1, amd64.REG_X2, amd64.REG_X3,
+		amd64.REG_X4, amd64.REG_X5, amd64.REG_X6, amd64.REG_X7,
+		amd64.REG_X8, amd64.REG_X9, amd64.REG_X10, amd64.REG_X11,
+		amd64.REG_X12, amd64.REG_X13, amd64.REG_X14, amd64.REG_X15,
 	}
 	// Note that we never invoke "call" instruction,
 	// so we don't need to care about the calling convention.
@@ -27,9 +23,9 @@ func init() {
 	// in Go-allocated variables, and reuse these registers
 	// in JITed functions and write them back before returns.
 	unreservedGeneralPurposeIntRegisters = []int16{
-		x86.REG_AX, x86.REG_CX, x86.REG_DX, x86.REG_BX,
-		x86.REG_SI, x86.REG_DI, x86.REG_R8, x86.REG_R9,
-		x86.REG_R10, x86.REG_R11, x86.REG_R12,
+		amd64.REG_AX, amd64.REG_CX, amd64.REG_DX, amd64.REG_BX,
+		amd64.REG_SI, amd64.REG_DI, amd64.REG_R8, amd64.REG_R9,
+		amd64.REG_R10, amd64.REG_R11, amd64.REG_R12,
 	}
 }
 
@@ -39,11 +35,10 @@ func jitcallImpl(codeSegment, ce uintptr)
 
 // newCompilerImpl implements newCompiler for amd64 architecture.
 func newCompilerImpl(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	b, err := asm.NewBuilder("amd64", 1024)
+	b, err := amd64.NewAssembler()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
+		return nil, err
 	}
-
 	compiler := &amd64Compiler{
 		f:             f,
 		builder:       b,
