@@ -7,11 +7,8 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
-// nilRegister is used to indicate a register argument a variable is invalid and not an actual register.
-const nilRegister asm.Register = -1
-
 func isNilRegister(r asm.Register) bool {
-	return r == nilRegister
+	return r == asm.NilRegister
 }
 
 func isIntRegister(r asm.Register) bool {
@@ -34,7 +31,7 @@ const conditionalRegisterStateUnset conditionalRegisterState = 0
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
 	regType generalPurposeRegisterType
-	// Set to nilRegister if the value is stored in the memory stack.
+	// Set to asm.NilRegister if the value is stored in the memory stack.
 	register asm.Register
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
 	conditionalRegister conditionalRegisterState
@@ -56,11 +53,11 @@ func (v *valueLocation) setRegister(reg asm.Register) {
 }
 
 func (v *valueLocation) onRegister() bool {
-	return v.register != nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register != asm.NilRegister && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onStack() bool {
-	return v.register == nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register == asm.NilRegister && v.conditionalRegister == conditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onConditionalRegister() bool {
@@ -151,7 +148,7 @@ func (s *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc 
 
 // pushValueLocationOnRegister creates a new valueLocation and pushes onto the location stack.
 func (s *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
-	loc = &valueLocation{register: nilRegister, conditionalRegister: conditionalRegisterStateUnset}
+	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: conditionalRegisterStateUnset}
 	s.push(loc)
 	return
 }
@@ -159,7 +156,7 @@ func (s *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
 // pushValueLocationOnRegister creates a new valueLocation with a given conditional register state
 // and pushes onto the location stack.
 func (s *valueLocationStack) pushValueLocationOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
-	loc = &valueLocation{register: nilRegister, conditionalRegister: state}
+	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: state}
 	s.push(loc)
 	return
 }
@@ -193,7 +190,7 @@ func (s *valueLocationStack) peek() (loc *valueLocation) {
 
 func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	s.markRegisterUnused(loc.register)
-	loc.register = nilRegister
+	loc.register = asm.NilRegister
 	loc.conditionalRegister = conditionalRegisterStateUnset
 }
 

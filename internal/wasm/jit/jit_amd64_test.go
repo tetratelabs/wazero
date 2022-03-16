@@ -51,7 +51,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					{
 						name:  "x1:ax,x2:stack",
 						x1Reg: amd64.REG_AX,
-						x2Reg: nilRegister,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
@@ -60,7 +60,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:ax",
-						x1Reg: nilRegister,
+						x1Reg: asm.NilRegister,
 						x2Reg: amd64.REG_AX,
 					},
 					{
@@ -70,18 +70,18 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: nilRegister,
+						x1Reg: asm.NilRegister,
 						x2Reg: amd64.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
 						x1Reg: amd64.REG_R9,
-						x2Reg: nilRegister,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: nilRegister,
-						x2Reg: nilRegister,
+						x1Reg: asm.NilRegister,
+						x2Reg: asm.NilRegister,
 					},
 				} {
 					tc := tc
@@ -103,14 +103,14 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
 
 						// Setup values.
-						if tc.x1Reg != nilRegister {
+						if tc.x1Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x1Value), tc.x1Reg)
 							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
-						if tc.x2Reg != nilRegister {
+						if tc.x2Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x2Value), tc.x2Reg)
 							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {
@@ -174,7 +174,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					{
 						name:  "x1:ax,x2:stack",
 						x1Reg: amd64.REG_AX,
-						x2Reg: nilRegister,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
@@ -183,7 +183,7 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:ax",
-						x1Reg: nilRegister,
+						x1Reg: asm.NilRegister,
 						x2Reg: amd64.REG_AX,
 					},
 					{
@@ -193,18 +193,18 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: nilRegister,
+						x1Reg: asm.NilRegister,
 						x2Reg: amd64.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
 						x1Reg: amd64.REG_R9,
-						x2Reg: nilRegister,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: nilRegister,
-						x2Reg: nilRegister,
+						x1Reg: asm.NilRegister,
+						x2Reg: asm.NilRegister,
 					},
 				} {
 					tc := tc
@@ -225,14 +225,14 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
 
 						// Setup values.
-						if tc.x1Reg != nilRegister {
+						if tc.x1Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x1Value), tc.x1Reg)
 							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
-						if tc.x2Reg != nilRegister {
+						if tc.x2Reg != asm.NilRegister {
 							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x2Value), tc.x2Reg)
 							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {

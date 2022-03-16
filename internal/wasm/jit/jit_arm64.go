@@ -1032,7 +1032,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 // compileCall implements compiler.compileCall for the arm64 architecture.
 func (c *arm64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	tp := c.f.Module.Functions[o.FunctionIndex].Type
-	return c.compileCallImpl(o.FunctionIndex, nilRegister, tp)
+	return c.compileCallImpl(o.FunctionIndex, asm.NilRegister, tp)
 }
 
 // compileCallImpl implements compiler.compileCall and compiler.compileCallIndirect for the arm64 architecture.
@@ -1538,7 +1538,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 		c.compileLoadValueOnStackToRegister(pickTarget)
 
 		// After the load, we revert the register assignment to the pick target.
-		pickTarget.setRegister(nilRegister)
+		pickTarget.setRegister(asm.NilRegister)
 	}
 
 	// Now we have the value of the target on the pickedRegister,

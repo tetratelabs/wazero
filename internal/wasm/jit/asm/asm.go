@@ -5,6 +5,8 @@ package asm
 // so change this to byte type after removing golang-asm
 type Register int16
 
+const NilRegister Register = 0
+
 type Instruction int16
 
 type Node interface {

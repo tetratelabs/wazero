@@ -40,7 +40,7 @@ func TestValueLocationStack_basic(t *testing.T) {
 	// releaseRegister.
 	s.releaseRegister(loc)
 	require.NotContains(t, s.usedRegisters, loc.register)
-	require.Equal(t, asm.Register(-1), loc.register)
+	require.Equal(t, asm.NilRegister, loc.register)
 	// Clone.
 	cloned := s.clone()
 	require.Equal(t, s.usedRegisters, cloned.usedRegisters)

@@ -137,8 +137,7 @@ const (
 )
 
 const (
-	_ asm.Register = iota
-	REG_AX
+	REG_AX asm.Register = asm.NilRegister + 1 + iota
 	REG_CX
 	REG_DX
 	REG_BX
