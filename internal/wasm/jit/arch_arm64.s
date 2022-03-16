@@ -1,5 +1,3 @@
-//go:build arm64
-
 #include "funcdata.h"
 #include "textflag.h"
 
