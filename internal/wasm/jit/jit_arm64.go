@@ -13,7 +13,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"sync"
 	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
@@ -23,83 +22,6 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
-
-func newArchContext() archContext {
-	return archContext{
-		minimum32BitSignedInt: math.MinInt32,
-		minimum64BitSignedInt: math.MinInt64,
-	}
-}
-
-// archContext is embedded in callEngine in order to store architecture-specific data.
-type archContext struct {
-	// jitCallReturnAddress holds the absolute return address for jitcall.
-	// The value is set whenever jitcall is executed and done in jit_arm64.s
-	// Native code can return back to the ce.execWasmFunction's main loop back by
-	// executing "ret" instruction with this value. See arm64Compiler.exit.
-	// Note: this is only used by JIT code so mark this as nolint.
-	jitCallReturnAddress uint64 //nolint
-
-	// Loading large constants in arm64 is a bit costly, so we place the following
-	// consts on callEngine struct so that we can quickly access them during various operations.
-
-	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
-	// Note: this can be obtained by moving $1 and doing left-shift with 31, but it is
-	// slower than directly loading fron this location.
-	minimum32BitSignedInt int32
-	// Note: this can be obtained by moving $1 and doing left-shift with 63, but it is
-	// slower than directly loading fron this location.
-	// minimum64BitSignedInt is used for overflow check for 64-bit signed division.
-	minimum64BitSignedInt int64
-}
-
-const (
-	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	callEngineArchContextJITCallReturnAddressOffset = 120
-	// callEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum32BitSignedIntOffset = 128
-	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum64BitSignedIntOffset = 136
-)
-
-// jitcall is implemented in jit_arm64.s as a Go Assembler function.
-// This is used by callEngine.execWasmFunction and the entrypoint to enter the JITed native code.
-// codeSegment is the pointer to the initial instruction of the compiled native code.
-// ce is "*callEngine" as uintptr.
-func jitcall(codeSegment, ce uintptr)
-
-// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-var assemblerMutex = &sync.Mutex{}
-
-func unlockAssembler() {
-	assemblerMutex.Unlock()
-}
-
-// newCompiler returns a new compiler interface which can be used to compile the given function instance.
-// The function returned must be invoked when finished compiling, so use `defer` to ensure this.
-// Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (c compiler, done func(), err error) {
-	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-	assemblerMutex.Lock()
-
-	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
-	// TODO: optimize the number.
-	b, err := asm.NewBuilder("arm64", 1024)
-	if err != nil {
-		return nil, unlockAssembler, fmt.Errorf("failed to create a new assembly builder: %w", err)
-	}
-
-	compiler := &arm64Compiler{
-		f:             f,
-		builder:       b,
-		locationStack: newValueLocationStack(),
-		ir:            ir,
-		labels:        map[string]*labelInfo{},
-	}
-	return compiler, unlockAssembler, nil
-}
 
 type arm64Compiler struct {
 	builder *asm.Builder
@@ -122,6 +44,28 @@ type arm64Compiler struct {
 	// compiledFunctionStaticData holds br_table offset tables.
 	// See compiledFunctionStaticData and arm64Compiler.compileBrTable.
 	staticData compiledFunctionStaticData
+}
+
+const (
+	// reservedRegisterForCallEngine holds the pointer to callEngine instance (i.e. *callEngine as uintptr)
+	reservedRegisterForCallEngine int16 = arm64.REG_R0
+	// reservedRegisterForStackBasePointerAddress holds stack base pointer's address (callEngine.stackBasePointer) in the current function call.
+	reservedRegisterForStackBasePointerAddress int16 = arm64.REG_R1
+	// reservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
+	reservedRegisterForMemory    int16 = arm64.REG_R2
+	reservedRegisterForTemporary int16 = arm64.REG_R3
+	// zeroRegister is the alias of the arm64-specific zero register for readability.
+	zeroRegister int16 = arm64.REGZERO
+)
+
+// simdRegisterForScalarFloatRegister returns SIMD register which corresponds to the given scalar float register.
+// In other words, this returns: REG_F0 -> REG_V0, REG_F1 -> REG_V1, ...., REG_F31 -> REG_V31.
+func simdRegisterForScalarFloatRegister(freg int16) int16 {
+	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
+}
+
+func isZeroRegister(r int16) bool {
+	return r == zeroRegister
 }
 
 func (c *arm64Compiler) addStaticData(d []byte) {
@@ -195,6 +139,12 @@ func (c *arm64Compiler) addInstruction(inst *obj.Prog) {
 
 func (c *arm64Compiler) setBranchTargetOnNext(progs ...*obj.Prog) {
 	c.setBranchTargetOnNextInstructions = append(c.setBranchTargetOnNextInstructions, progs...)
+}
+
+func (c *arm64Compiler) pushValueLocationOnRegister(reg int16) (ret *valueLocation) {
+	ret = c.locationStack.pushValueLocationOnRegister(reg)
+	c.markRegisterUsed(reg)
+	return
 }
 
 func (c *arm64Compiler) markRegisterUsed(regs ...int16) {
@@ -493,7 +443,7 @@ func (c *arm64Compiler) compileMaybeGrowValueStack() error {
 	// Otherwise, skip calling it.
 	c.setBranchTargetOnNext(brIfValueStackOK)
 
-	c.locationStack.markRegisterUnused(tmpRegs...)
+	c.markRegisterUnused(tmpRegs...)
 	return nil
 }
 
@@ -576,7 +526,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		tmpReg)
 	c.compileUnconditionalBranchToAddressOnRegister(tmpReg)
 
-	c.locationStack.markRegisterUnused(tmpRegs...)
+	c.markRegisterUnused(tmpRegs...)
 	return nil
 }
 
@@ -726,7 +676,7 @@ func (c *arm64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 		c.compileRegisterToRegisterInstruction(floatMov, intReg, resultReg)
 	}
 
-	c.locationStack.pushValueLocationOnRegister(resultReg)
+	c.pushValueLocationOnRegister(resultReg)
 	return nil
 }
 
@@ -1096,7 +1046,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 	if !found {
 		return fmt.Errorf("BUG: all registers except indexReg should be free at this point")
 	}
-	c.locationStack.markRegisterUsed(freeRegisters...)
+	c.markRegisterUsed(freeRegisters...)
 
 	// Alias for readability.
 	callFrameStackPointerRegister, callFrameStackTopAddressRegister, compiledFunctionRegister, oldStackBasePointer,
@@ -1123,7 +1073,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 	if !isNilRegister(compiledFunctionAddressRegister) {
 		// If we need to get the target funcaddr from register (call_indirect case), we must save it before growing the
 		// call-frame stack, as the register is not saved across function calls.
-		savedOffsetLocation := c.locationStack.pushValueLocationOnRegister(compiledFunctionAddressRegister)
+		savedOffsetLocation := c.pushValueLocationOnRegister(compiledFunctionAddressRegister)
 		c.compileReleaseRegisterToStack(savedOffsetLocation)
 	}
 
@@ -1517,7 +1467,7 @@ func (c *arm64Compiler) compileSelect() error {
 
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
 		// If both values are zero, the result is always zero.
-		c.locationStack.pushValueLocationOnRegister(zeroRegister)
+		c.pushValueLocationOnRegister(zeroRegister)
 		c.markRegisterUnused(cv.register)
 		return nil
 	}
@@ -1553,7 +1503,7 @@ func (c *arm64Compiler) compileSelect() error {
 	} else {
 		c.compileRegisterToRegisterInstruction(arm64.AFMOVD, x2.register, x1.register)
 	}
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 
 	// Otherwise, nothing to do for select.
 	c.setBranchTargetOnNext(brIfNotZero)
@@ -1593,7 +1543,7 @@ func (c *arm64Compiler) compilePick(o *wazeroir.OperationPick) error {
 
 	// Now we have the value of the target on the pickedRegister,
 	// so push the location.
-	c.locationStack.pushValueLocationOnRegister(pickedRegister)
+	c.pushValueLocationOnRegister(pickedRegister)
 	return nil
 }
 
@@ -1606,10 +1556,10 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 
 	// Addition can be nop if one of operands is zero.
 	if isZeroRegister(x1.register) {
-		c.locationStack.pushValueLocationOnRegister(x2.register)
+		c.pushValueLocationOnRegister(x2.register)
 		return nil
 	} else if isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(x1.register)
+		c.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -1627,7 +1577,7 @@ func (c *arm64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 
 	c.compileRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -1640,7 +1590,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 
 	// If both of registers are zeros, this can be nop and push the zero register.
 	if isZeroRegister(x1.register) && isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(zeroRegister)
+		c.pushValueLocationOnRegister(zeroRegister)
 		return nil
 	}
 
@@ -1664,7 +1614,7 @@ func (c *arm64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	}
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
-	c.locationStack.pushValueLocationOnRegister(destinationReg)
+	c.pushValueLocationOnRegister(destinationReg)
 	return nil
 }
 
@@ -1677,7 +1627,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	// Multiplication can be done by putting a zero register if one of operands is zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(zeroRegister)
+		c.pushValueLocationOnRegister(zeroRegister)
 		return nil
 	}
 
@@ -1695,7 +1645,7 @@ func (c *arm64Compiler) compileMul(o *wazeroir.OperationMul) error {
 
 	c.compileRegisterToRegisterInstruction(inst, x2.register, x1.register)
 	// The result is placed on a register for x1, so record it.
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -1718,7 +1668,7 @@ func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
 		} else {
 			c.compileConstToRegisterInstruction(arm64.AMOVD, 64, reg)
 		}
-		c.locationStack.pushValueLocationOnRegister(reg)
+		c.pushValueLocationOnRegister(reg)
 		return nil
 	}
 
@@ -1728,7 +1678,7 @@ func (c *arm64Compiler) compileClz(o *wazeroir.OperationClz) error {
 	} else {
 		c.compileRegisterToRegisterInstruction(arm64.ACLZ, reg, reg)
 	}
-	c.locationStack.pushValueLocationOnRegister(reg)
+	c.pushValueLocationOnRegister(reg)
 	return nil
 }
 
@@ -1752,7 +1702,7 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		} else {
 			c.compileConstToRegisterInstruction(arm64.AMOVD, 64, reg)
 		}
-		c.locationStack.pushValueLocationOnRegister(reg)
+		c.pushValueLocationOnRegister(reg)
 		return nil
 	}
 
@@ -1766,7 +1716,7 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		c.compileRegisterToRegisterInstruction(arm64.ARBIT, reg, reg)
 		c.compileRegisterToRegisterInstruction(arm64.ACLZ, reg, reg)
 	}
-	c.locationStack.pushValueLocationOnRegister(reg)
+	c.pushValueLocationOnRegister(reg)
 	return nil
 }
 
@@ -1779,7 +1729,7 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 
 	reg := v.register
 	if isZeroRegister(reg) {
-		c.locationStack.pushValueLocationOnRegister(reg)
+		c.pushValueLocationOnRegister(reg)
 		return nil
 	}
 
@@ -1807,7 +1757,7 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	c.compileRegisterToRegisterInstruction(arm64.AVUADDLV, vreg&31+arm64.REG_ARNG+(arm64.ARNG_8B&15)<<5, vreg)
 	c.compileRegisterToRegisterInstruction(arm64.AFMOVD, freg, reg)
 
-	c.locationStack.pushValueLocationOnRegister(reg)
+	c.pushValueLocationOnRegister(reg)
 	return nil
 }
 
@@ -1856,7 +1806,7 @@ func (c *arm64Compiler) compileDiv(o *wazeroir.OperationDiv) error {
 
 	c.compileRegisterToRegisterInstruction(inst, divisor.register, dividend.register)
 
-	c.locationStack.pushValueLocationOnRegister(dividend.register)
+	c.pushValueLocationOnRegister(dividend.register)
 	return nil
 }
 
@@ -1983,7 +1933,7 @@ func (c *arm64Compiler) compileRem(o *wazeroir.OperationRem) error {
 	c.compileTwoRegistersInstruction(msubInst, divisorReg, dividendReg, resultReg, resultReg)
 
 	c.markRegisterUnused(dividend.register, divisor.register)
-	c.locationStack.pushValueLocationOnRegister(resultReg)
+	c.pushValueLocationOnRegister(resultReg)
 	return nil
 }
 
@@ -1997,7 +1947,7 @@ func (c *arm64Compiler) compileAnd(o *wazeroir.OperationAnd) error {
 	// If either of the registers x1 or x2 is zero,
 	// the result will always be zero.
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(zeroRegister)
+		c.pushValueLocationOnRegister(zeroRegister)
 		return nil
 	}
 
@@ -2017,7 +1967,7 @@ func (c *arm64Compiler) compileAnd(o *wazeroir.OperationAnd) error {
 	}
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2029,11 +1979,11 @@ func (c *arm64Compiler) compileOr(o *wazeroir.OperationOr) error {
 	}
 
 	if isZeroRegister(x1.register) {
-		c.locationStack.pushValueLocationOnRegister(x2.register)
+		c.pushValueLocationOnRegister(x2.register)
 		return nil
 	}
 	if isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(x1.register)
+		c.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -2046,7 +1996,7 @@ func (c *arm64Compiler) compileOr(o *wazeroir.OperationOr) error {
 	}
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2073,7 +2023,7 @@ func (c *arm64Compiler) compileXor(o *wazeroir.OperationXor) error {
 	}
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, destinationReg)
-	c.locationStack.pushValueLocationOnRegister(destinationReg)
+	c.pushValueLocationOnRegister(destinationReg)
 	return nil
 }
 
@@ -2085,7 +2035,7 @@ func (c *arm64Compiler) compileShl(o *wazeroir.OperationShl) error {
 	}
 
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(x1.register)
+		c.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -2098,7 +2048,7 @@ func (c *arm64Compiler) compileShl(o *wazeroir.OperationShl) error {
 	}
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2110,7 +2060,7 @@ func (c *arm64Compiler) compileShr(o *wazeroir.OperationShr) error {
 	}
 
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(x1.register)
+		c.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -2127,7 +2077,7 @@ func (c *arm64Compiler) compileShr(o *wazeroir.OperationShr) error {
 	}
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2139,7 +2089,7 @@ func (c *arm64Compiler) compileRotl(o *wazeroir.OperationRotl) error {
 	}
 
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(x1.register)
+		c.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -2162,7 +2112,7 @@ func (c *arm64Compiler) compileRotl(o *wazeroir.OperationRotl) error {
 	c.compileRegisterToRegisterInstruction(neginst, x2.register, x2.register)
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2174,7 +2124,7 @@ func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
 	}
 
 	if isZeroRegister(x1.register) || isZeroRegister(x2.register) {
-		c.locationStack.pushValueLocationOnRegister(x1.register)
+		c.pushValueLocationOnRegister(x1.register)
 		return nil
 	}
 
@@ -2187,7 +2137,7 @@ func (c *arm64Compiler) compileRotr(o *wazeroir.OperationRotr) error {
 	}
 
 	c.compileTwoRegistersToRegisterInstruction(inst, x2.register, x1.register, x1.register)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2278,7 +2228,7 @@ func (c *arm64Compiler) compileSimpleFloatBinop(inst obj.As) error {
 		return err
 	}
 	c.compileRegisterToRegisterInstruction(inst, x2.register, x1.register)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2338,7 +2288,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	)
 
 	c.markRegisterUnused(x2.register)
-	c.locationStack.pushValueLocationOnRegister(x1.register)
+	c.pushValueLocationOnRegister(x1.register)
 	return nil
 }
 
@@ -2383,7 +2333,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 	}
 
 	c.compileRegisterToRegisterInstruction(convinst, source.register, destinationReg)
-	c.locationStack.pushValueLocationOnRegister(destinationReg)
+	c.pushValueLocationOnRegister(destinationReg)
 
 	// Obtain the floating point status register value into the general purpose register,
 	// so that we can check if the conversion resulted in undefined behavior.
@@ -2505,7 +2455,7 @@ func (c *arm64Compiler) compileSimpleConversion(inst obj.As, destinationRegType 
 	}
 
 	c.compileRegisterToRegisterInstruction(inst, source.register, destinationReg)
-	c.locationStack.pushValueLocationOnRegister(destinationReg)
+	c.pushValueLocationOnRegister(destinationReg)
 	return nil
 }
 
@@ -2550,7 +2500,7 @@ func (c *arm64Compiler) compileSimpleUnop(inst obj.As) error {
 	}
 	reg := v.register
 	c.compileRegisterToRegisterInstruction(inst, reg, reg)
-	c.locationStack.pushValueLocationOnRegister(reg)
+	c.pushValueLocationOnRegister(reg)
 	return nil
 }
 
@@ -2854,7 +2804,7 @@ func (c *arm64Compiler) compileLoadImpl(offsetArg uint32, loadInst obj.As, targe
 		resultRegister,
 	)
 
-	c.locationStack.pushValueLocationOnRegister(resultRegister)
+	c.pushValueLocationOnRegister(resultRegister)
 	return nil
 }
 
@@ -3006,7 +2956,7 @@ func (c *arm64Compiler) compileMemorySize() error {
 		reg,
 	)
 
-	c.locationStack.pushValueLocationOnRegister(reg)
+	c.pushValueLocationOnRegister(reg)
 	return nil
 }
 
@@ -3023,7 +2973,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, built
 	if !found {
 		return fmt.Errorf("BUG: all registers except indexReg should be free at this point")
 	}
-	c.locationStack.markRegisterUsed(freeRegs...)
+	c.markRegisterUsed(freeRegs...)
 
 	// Alias these free tmp registers for readability.
 	tmp, currentCallFrameStackPointerRegister, currentCallFrameTopAddressRegister, returnAddressRegister :=
@@ -3105,7 +3055,7 @@ func (c *arm64Compiler) compileIntConstant(is32bit bool, value uint64) error {
 		}
 		c.compileConstToRegisterInstruction(inst, int64(value), reg)
 
-		c.locationStack.pushValueLocationOnRegister(reg)
+		c.pushValueLocationOnRegister(reg)
 	}
 	return nil
 }
@@ -3153,12 +3103,12 @@ func (c *arm64Compiler) compileFloatConstant(is32bit bool, value uint64) error {
 	}
 	c.compileRegisterToRegisterInstruction(inst, tmpReg, reg)
 
-	c.locationStack.pushValueLocationOnRegister(reg)
+	c.pushValueLocationOnRegister(reg)
 	return nil
 }
 
 func (c *arm64Compiler) pushZeroValue() {
-	c.locationStack.pushValueLocationOnRegister(zeroRegister)
+	c.pushValueLocationOnRegister(zeroRegister)
 }
 
 // popTwoValuesOnRegisters pops two values from the location stacks, ensures
@@ -3214,7 +3164,7 @@ func (c *arm64Compiler) compileEnsureOnGeneralPurposeRegister(loc *valueLocation
 
 		// Record that the value holds the register and the register is marked used.
 		loc.setRegister(reg)
-		c.locationStack.markRegisterUsed(reg)
+		c.markRegisterUsed(reg)
 
 		c.compileLoadValueOnStackToRegister(loc)
 	} else if loc.onConditionalRegister() {
@@ -3363,7 +3313,7 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	if !found {
 		return fmt.Errorf("BUG: all the registers should be free at this point")
 	}
-	c.locationStack.markRegisterUsed(regs...)
+	c.markRegisterUsed(regs...)
 
 	// Alias these free registers for readability.
 	moduleInstanceAddressRegister, tmpX, tmpY := regs[0], regs[1], regs[2]
@@ -3525,6 +3475,6 @@ func (c *arm64Compiler) compileModuleContextInitialization() error {
 	}
 
 	c.setBranchTargetOnNext(brIfModuleUnchanged)
-	c.locationStack.markRegisterUnused(regs...)
+	c.markRegisterUnused(regs...)
 	return nil
 }

@@ -100,19 +100,19 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
 						compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(dxValue), x86.REG_DX)
-						prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
+						prevOnDX := compiler.pushValueLocationOnRegister(x86.REG_DX)
 
 						// Setup values.
 						if tc.x1Reg != nilRegister {
 							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x1Value), tc.x1Reg)
-							compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
+							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
 						if tc.x2Reg != nilRegister {
 							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x2Value), tc.x2Reg)
-							compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
+							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x2Value)
@@ -222,19 +222,19 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
 						compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(dxValue), x86.REG_DX)
-						prevOnDX := compiler.valueLocationStack().pushValueLocationOnRegister(x86.REG_DX)
+						prevOnDX := compiler.pushValueLocationOnRegister(x86.REG_DX)
 
 						// Setup values.
 						if tc.x1Reg != nilRegister {
 							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x1Value), tc.x1Reg)
-							compiler.valueLocationStack().pushValueLocationOnRegister(tc.x1Reg)
+							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
 						if tc.x2Reg != nilRegister {
 							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x2Value), tc.x2Reg)
-							compiler.valueLocationStack().pushValueLocationOnRegister(tc.x2Reg)
+							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x2Value)

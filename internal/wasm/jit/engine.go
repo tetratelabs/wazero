@@ -779,10 +779,15 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
-func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	compiler, done, err := newCompiler(f, nil)
-	defer done()
+// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
+// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+var assemblerMutex = &sync.Mutex{}
 
+func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
+	assemblerMutex.Lock()
+	defer assemblerMutex.Unlock()
+
+	compiler, err := newCompiler(f, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -810,13 +815,15 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 }
 
 func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
+	assemblerMutex.Lock()
+	defer assemblerMutex.Unlock()
+
 	ir, err := wazeroir.Compile(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lower to wazeroir: %w", err)
 	}
 
-	compiler, done, err := newCompiler(f, ir)
-	defer done()
+	compiler, err := newCompiler(f, ir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
 	}
