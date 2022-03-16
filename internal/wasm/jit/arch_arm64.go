@@ -11,6 +11,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// init initializes variables for the arm64 architecture
 func init() {
 	jitcall = jitcallImpl
 	newCompiler = newCompilerImpl

@@ -779,11 +779,11 @@ func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
+// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
+// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 var assemblerMutex = &sync.Mutex{}
 
 func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 	assemblerMutex.Lock()
 	defer assemblerMutex.Unlock()
 
@@ -815,8 +815,6 @@ func compileHostFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
 }
 
 func compileWasmFunction(f *wasm.FunctionInstance) (*compiledFunction, error) {
-	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
 	assemblerMutex.Lock()
 	defer assemblerMutex.Unlock()
 

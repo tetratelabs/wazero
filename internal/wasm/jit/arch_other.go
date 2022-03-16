@@ -2,4 +2,5 @@
 
 package jit
 
+// archContext is empty on an unsupported architecture.
 type archContext struct{}
