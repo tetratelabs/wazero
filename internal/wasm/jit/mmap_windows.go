@@ -14,7 +14,6 @@ var (
 	procVirtualAlloc   = kernel32.NewProc("VirtualAlloc")
 	procVirtualProtect = kernel32.NewProc("VirtualProtect")
 	procVirtualFree    = kernel32.NewProc("VirtualFree")
-	procGetLastError   = kernel32.NewProc("GetLastError")
 )
 
 const (
@@ -49,8 +48,8 @@ func allocateMemory(code []byte, protect uintptr) (uintptr, error) {
 	address := uintptr(0) // TODO: document why zero
 	size := uintptr(len(code))
 	alloctype := windows_MEM_COMMIT
-	if r, _, _ := procVirtualAlloc.Call(address, size, alloctype, protect); r == 0 {
-		return 0, fmt.Errorf("jit: VirtualAlloc error: %w", getLastError())
+	if r, _, err := procVirtualAlloc.Call(address, size, alloctype, protect); r == 0 {
+		return 0, fmt.Errorf("jit: VirtualAlloc error: %w", ensureErr(err))
 	} else {
 		return r, nil
 	}
@@ -62,15 +61,15 @@ func freeMemory(code []byte) error {
 	address := uintptr(unsafe.Pointer(&code[0]))
 	size := uintptr(0) // size must be 0 because we're using MEM_RELEASE.
 	freetype := windows_MEM_RELEASE
-	if r, _, _ := procVirtualFree.Call(address, size, freetype); r == 0 {
-		return fmt.Errorf("jit: VirtualFree error: %w", getLastError())
+	if r, _, err := procVirtualFree.Call(address, size, freetype); r == 0 {
+		return fmt.Errorf("jit: VirtualFree error: %w", ensureErr(err))
 	}
 	return nil
 }
 
 func virtualProtect(address, size, newprotect uintptr, oldprotect *uint32) error {
-	if r, _, _ := procVirtualProtect.Call(address, size, newprotect, uintptr(unsafe.Pointer(oldprotect))); r == 0 {
-		return fmt.Errorf("jit: VirtualProtect error: %w", getLastError())
+	if r, _, err := procVirtualProtect.Call(address, size, newprotect, uintptr(unsafe.Pointer(oldprotect))); r == 0 {
+		return fmt.Errorf("jit: VirtualProtect error: %w", ensureErr(err))
 	}
 	return nil
 }
@@ -111,13 +110,15 @@ func mmapCodeSegmentARM64(code []byte) ([]byte, error) {
 	return mem, nil
 }
 
-// getLastError casts the last error on the calling thread to a syscall.Errno or returns syscall.EINVAL.
+// ensureErr returns syscall.EINVAL when the input error is nil.
+//
+// We are supposed to use "GetLastError" which is more precise, but it is not safe to execute in goroutines. While
+// "GetLastError" is thread-local, goroutines are not pinned to threads.
 //
 // See https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
-// See https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes
-func getLastError() syscall.Errno {
-	if errno, _, _ := procGetLastError.Call(); errno != 0 {
-		return syscall.Errno(errno)
+func ensureErr(err error) error {
+	if err != nil {
+		return err
 	}
 	return syscall.EINVAL
 }
