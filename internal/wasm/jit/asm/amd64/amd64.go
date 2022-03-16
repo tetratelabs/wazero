@@ -4,11 +4,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
-const (
-	JMP = iota
-	MOVL
-	MOVQ
-)
+const ()
 
 const (
 	intRegisterIotaBegin   asm.Register = 2064
@@ -79,7 +75,9 @@ type Assembler interface {
 	// TODO
 	CompileStandAloneInstruction(asm.Instruction) asm.Node
 	// TODO
-	CompileRegisterToRegister(inst asm.Instruction, from, to asm.Register)
+	CompileRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register)
+	// TODO
+	CompileMemoryToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register)
 	// TODO
 	CompileMemoryWithIndexToRegisterInstruction(inst asm.Register, sourceBaseReg asm.Register, sourceOffsetConst int64, sourceIndex asm.Register, sourceScale asm.Register, destinationReg asm.Register)
 	// TODO
@@ -108,7 +106,6 @@ type Assembler interface {
 	CompileJumpToRegister(reg asm.Register)
 	// TODO
 	CompileJumpToMemory(baseReg asm.Register, offset int64)
-
 	// TODO
 	CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction)
 }

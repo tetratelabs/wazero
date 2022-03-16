@@ -41,7 +41,7 @@ func newCompilerImpl(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (
 	}
 	compiler := &amd64Compiler{
 		f:             f,
-		builder:       b,
+		assembler:     b,
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,

@@ -28,9 +28,7 @@ func newGolangAsmAssembler() (*assemblerGoAsmImpl, error) {
 	return &assemblerGoAsmImpl{b: b}, nil
 }
 
-var castAsGolangAsmInstruction = map[asm.Instruction]obj.As{
-	JMP: obj.AJMP,
-}
+var castAsGolangAsmInstruction = map[asm.Instruction]obj.As{}
 
 func (a *assemblerGoAsmImpl) newProg() (prog *obj.Prog) {
 	prog = a.b.NewProg()
@@ -65,7 +63,7 @@ func (a *assemblerGoAsmImpl) CompileStandAloneInstruction(inst asm.Instruction) 
 	return prog
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToRegister(inst asm.Instruction, from, to asm.Register) {
+func (a *assemblerGoAsmImpl) CompileRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register) {
 	p := a.newProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG
@@ -173,6 +171,17 @@ func (a *assemblerGoAsmImpl) CompileConstToMemoryInstruction(inst asm.Register, 
 	p.To.Offset = offset
 	a.addInstruction(p)
 	return p
+}
+
+func (c *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
+	p := c.newProg()
+	p.As = castAsGolangAsmInstruction[inst]
+	p.From.Type = obj.TYPE_MEM
+	p.From.Reg = sourceBaseReg
+	p.From.Offset = sourceOffsetConst
+	p.To.Type = obj.TYPE_REG
+	p.To.Reg = destinationReg
+	c.addInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileMemoryToConstInstruction(inst asm.Register, baseReg asm.Register, offset int64, constValue int64) asm.Node {
