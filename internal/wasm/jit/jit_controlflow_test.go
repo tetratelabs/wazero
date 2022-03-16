@@ -528,7 +528,7 @@ func TestCompiler_compileBr(t *testing.T) {
 func TestCompiler_compileCallIndirect(t *testing.T) {
 	t.Run("out of bounds", func(t *testing.T) {
 		env := newJITEnvironment()
-		env.setTable(make([]uintptr, 10))
+		env.setTable(make([]interface{}, 10))
 		compiler := env.requireNewCompiler(t, nil)
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
@@ -567,9 +567,9 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env.module().Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}}}
 
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
-		table := make([]uintptr, 10)
+		table := make([]interface{}, 10)
 		env.setTable(table)
-		table[0] = 0
+		table[0] = nil
 
 		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
@@ -600,11 +600,11 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 		env.module().Types = []*wasm.TypeInstance{{Type: &wasm.FunctionType{}, TypeID: 1000}}
 		// Ensure that the module instance has the type information for targetOperation.TypeIndex,
 		// and the typeID doesn't match the table[targetOffset]'s type ID.
-		table := make([]uintptr, 10)
+		table := make([]interface{}, 10)
 		env.setTable(table)
 
 		cf := &compiledFunction{source: &wasm.FunctionInstance{TypeID: 50}}
-		table[0] = uintptr(unsafe.Pointer(cf))
+		table[0] = cf
 
 		// Place the offset value.
 		err = compiler.compileConstI32(targetOffset)
@@ -635,7 +635,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 				targetTypeID := wasm.FunctionTypeID(10) // Arbitrary number is fine for testing.
 				operation := &wazeroir.OperationCallIndirect{TypeIndex: 0}
 
-				table := make([]uintptr, 10)
+				table := make([]interface{}, 10)
 				env := newJITEnvironment()
 				env.setTable(table)
 
@@ -674,7 +674,7 @@ func TestCompiler_compileCallIndirect(t *testing.T) {
 							},
 						}
 						me.compiledFunctions = append(me.compiledFunctions, cf)
-						table[i] = uintptr(unsafe.Pointer(cf))
+						table[i] = cf
 					})
 				}
 

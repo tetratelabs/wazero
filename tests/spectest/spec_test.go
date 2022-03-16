@@ -322,6 +322,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 
 						mod, err := binary.DecodeModule(buf, wasm.Features20191205)
 						require.NoError(t, err, msg)
+						require.NoError(t, mod.Validate(wasm.Features20191205))
 
 						moduleName := c.Name
 						if moduleName == "" { // When "(module ...) directive doesn't have name.

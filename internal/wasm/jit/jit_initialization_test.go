@@ -22,21 +22,21 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
 				Memory:  &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
 			},
 		},
 		{
 			name: "globals nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Memory: &wasm.MemoryInstance{Buffer: make([]byte, 10)},
-				Table:  &wasm.TableInstance{Table: make([]uintptr, 20)},
+				Table:  &wasm.TableInstance{Table: make([]interface{}, 20)},
 			},
 		},
 		{
 			name: "memory nil",
 			moduleInstance: &wasm.ModuleInstance{
 				Globals: []*wasm.GlobalInstance{{Val: 100}},
-				Table:   &wasm.TableInstance{Table: make([]uintptr, 20)},
+				Table:   &wasm.TableInstance{Table: make([]interface{}, 20)},
 			},
 		},
 		{
@@ -49,7 +49,7 @@ func TestCompiler_compileModuleContextInitialization(t *testing.T) {
 		{
 			name: "table empty",
 			moduleInstance: &wasm.ModuleInstance{
-				Table: &wasm.TableInstance{Table: make([]uintptr, 0)},
+				Table: &wasm.TableInstance{Table: make([]interface{}, 0)},
 			},
 		},
 		{
