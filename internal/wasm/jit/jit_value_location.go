@@ -3,8 +3,6 @@ package jit
 import (
 	"fmt"
 	"strings"
-
-	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 )
 
 // nilRegister is used to indicate a register argument a variable is invalid and not an actual register.
@@ -20,10 +18,6 @@ func isIntRegister(r int16) bool {
 
 func isFloatRegister(r int16) bool {
 	return unreservedGeneralPurposeFloatRegisters[0] <= r && r <= unreservedGeneralPurposeFloatRegisters[len(unreservedGeneralPurposeFloatRegisters)-1]
-}
-
-func isZeroRegister(r int16) bool {
-	return r == zeroRegister
 }
 
 // conditionalRegisterState indicates a state of the conditional flag register.
@@ -145,18 +139,12 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 // the location stack.
 func (s *valueLocationStack) pushValueLocationOnRegister(reg int16) (loc *valueLocation) {
 	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
-	if buildoptions.IsDebugMode {
-		if _, ok := s.usedRegisters[loc.register]; ok {
-			panic("bug in compiler: try pushing a register which is already in use")
-		}
-	}
 
 	if isIntRegister(reg) {
 		loc.setRegisterType(generalPurposeRegisterTypeInt)
 	} else if isFloatRegister(reg) {
 		loc.setRegisterType(generalPurposeRegisterTypeFloat)
 	}
-	s.markRegisterUsed(reg)
 	s.push(loc)
 	return
 }
@@ -217,9 +205,7 @@ func (s *valueLocationStack) markRegisterUnused(regs ...int16) {
 
 func (s *valueLocationStack) markRegisterUsed(regs ...int16) {
 	for _, reg := range regs {
-		if !isZeroRegister(reg) {
-			s.usedRegisters[reg] = struct{}{}
-		}
+		s.usedRegisters[reg] = struct{}{}
 	}
 }
 

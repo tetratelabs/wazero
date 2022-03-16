@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"math"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
-	"github.com/tetratelabs/wazero/internal/wazeroir"
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
+
+	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 func init() {
@@ -53,7 +54,6 @@ func init() {
 		arm64.REG_R25, arm64.REG_R26, arm64.REG_R27, arm64.REG_R29, arm64.REG_R30,
 	}
 	reservedRegisters = []int16{arm64.REG_R0, arm64.REG_R1, arm64.REG_R2, arm64.REG_R3, zeroRegister}
-
 }
 
 const (

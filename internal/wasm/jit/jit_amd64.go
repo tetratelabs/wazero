@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math"
 	"runtime"
-	"sync"
 	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"

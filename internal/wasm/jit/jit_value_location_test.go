@@ -41,7 +41,6 @@ func TestValueLocationStack_basic(t *testing.T) {
 	require.Equal(t, uint64(2), s.sp)
 	require.Equal(t, uint64(1), loc.stackPointer)
 	require.Equal(t, tmpReg, loc.register)
-	require.Contains(t, s.usedRegisters, loc.register)
 	// markRegisterUsed.
 	tmpReg2 := unreservedGeneralPurposeIntRegisters[1]
 	s.markRegisterUsed(tmpReg2)
