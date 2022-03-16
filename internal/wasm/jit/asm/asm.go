@@ -15,6 +15,6 @@ type Node interface {
 }
 
 type AssemblerBase interface {
-	Assemble() []byte
+	Assemble() ([]byte, error)
 	SetBranchTargetOnNext(nodes ...Node)
 }

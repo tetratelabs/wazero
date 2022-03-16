@@ -4,10 +4,11 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 	goasm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
+
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
 type assemblerGoAsmImpl struct {
@@ -20,7 +21,7 @@ type assemblerGoAsmImpl struct {
 var _ Assembler = &assemblerGoAsmImpl{}
 
 func newGolangAsmAssembler() (*assemblerGoAsmImpl, error) {
-	b, err := goasm.NewBuilder("arm64", 1024)
+	b, err := goasm.NewBuilder("amd64", 1024)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
 	}
@@ -42,12 +43,14 @@ func (a *assemblerGoAsmImpl) addInstruction(next *obj.Prog) {
 	a.setBranchTargetOnNextNodes = nil
 }
 
-func (a *assemblerGoAsmImpl) Assemble() []byte {
+func (a *assemblerGoAsmImpl) Assemble() ([]byte, error) {
 	code := a.b.Assemble()
 	for _, cb := range a.onGenerateCallbacks {
-		cb(code)
+		if err := cb(code); err != nil {
+			return nil, err
+		}
 	}
-	return code
+	return code, nil
 }
 
 func (a *assemblerGoAsmImpl) SetBranchTargetOnNext(nodes ...asm.Node) {

@@ -189,7 +189,12 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 		c.onStackPointerCeilDeterminedCallBack = nil
 	}
 
-	code, err = mmapCodeSegment(c.assembler.Assemble())
+	code, err = c.assembler.Assemble()
+	if err != nil {
+		return
+	}
+
+	code, err = mmapCodeSegment(code)
 	if err != nil {
 		return
 	}
