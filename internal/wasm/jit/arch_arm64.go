@@ -7,33 +7,14 @@ import (
 	asm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
-	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
+	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
 func init() {
-	newCompiler = func(f *internalwasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-		b, err := asm.NewBuilder("arm64", 1024)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
-		}
-
-		compiler := &arm64Compiler{
-			f:             f,
-			builder:       b,
-			locationStack: newValueLocationStack(),
-			ir:            ir,
-			labels:        map[string]*labelInfo{},
-		}
-		return compiler, nil
-	}
 	jitcall = jitcallImpl
-	newArchContext = func() archContext {
-		return archContext{
-			minimum32BitSignedInt: math.MinInt32,
-			minimum64BitSignedInt: math.MinInt64,
-		}
-	}
+	newCompiler = newCompilerImpl
+	newArchContext = newArchContextImpl
 	unreservedGeneralPurposeFloatRegisters = []int16{
 		arm64.REG_F0, arm64.REG_F1, arm64.REG_F2, arm64.REG_F3,
 		arm64.REG_F4, arm64.REG_F5, arm64.REG_F6, arm64.REG_F7, arm64.REG_F8,
@@ -55,21 +36,26 @@ func init() {
 	}
 }
 
-const (
-	// reservedRegisterForCallEngine holds the pointer to callEngine instance (i.e. *callEngine as uintptr)
-	reservedRegisterForCallEngine int16 = arm64.REG_R0
-	// reservedRegisterForStackBasePointerAddress holds stack base pointer's address (callEngine.stackBasePointer) in the current function call.
-	reservedRegisterForStackBasePointerAddress int16 = arm64.REG_R1
-	// reservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
-	reservedRegisterForMemory    int16 = arm64.REG_R2
-	reservedRegisterForTemporary int16 = arm64.REG_R3
-	// zeroRegister is the alias of the arm64-specific zero register for readability.
-	zeroRegister int16 = arm64.REGZERO
-)
-
 // jitcallImpl implements jitcallfor arm64 architecture.
 // Note: this function's body is defined in arch_arm64.s
 func jitcallImpl(codeSegment, ce uintptr)
+
+// newCompilerImpl implements newCompiler for amd64 architecture.
+func newCompilerImpl(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
+	b, err := asm.NewBuilder("arm64", 1024)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
+	}
+
+	compiler := &arm64Compiler{
+		f:             f,
+		builder:       b,
+		locationStack: newValueLocationStack(),
+		ir:            ir,
+		labels:        map[string]*labelInfo{},
+	}
+	return compiler, nil
+}
 
 // archContext is embedded in callEngine in order to store architecture-specific data.
 type archContext struct {
@@ -101,3 +87,11 @@ const (
 	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
 	callEngineArchContextMinimum64BitSignedIntOffset = 136
 )
+
+// newArchContextImpl implements newArchContext for amd64 architecture.
+func newArchContextImpl() archContext {
+	return archContext{
+		minimum32BitSignedInt: math.MinInt32,
+		minimum64BitSignedInt: math.MinInt64,
+	}
+}

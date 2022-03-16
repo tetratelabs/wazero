@@ -12,8 +12,8 @@ import (
 
 func init() {
 	jitcall = jitcallImpl
-	newArchContext = newArchContextImpl
 	newCompiler = newCompilerImpl
+	newArchContext = newArchContextImpl
 	unreservedGeneralPurposeFloatRegisters = []int16{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
 		x86.REG_X4, x86.REG_X5, x86.REG_X6, x86.REG_X7,
@@ -38,8 +38,6 @@ func jitcallImpl(codeSegment, ce uintptr)
 
 // newCompilerImpl implements newCompiler for amd64 architecture.
 func newCompilerImpl(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
-	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
-	// TODO: optimize the number.
 	b, err := asm.NewBuilder("amd64", 1024)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)

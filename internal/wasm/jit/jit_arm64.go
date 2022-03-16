@@ -46,6 +46,18 @@ type arm64Compiler struct {
 	staticData compiledFunctionStaticData
 }
 
+const (
+	// reservedRegisterForCallEngine holds the pointer to callEngine instance (i.e. *callEngine as uintptr)
+	reservedRegisterForCallEngine int16 = arm64.REG_R0
+	// reservedRegisterForStackBasePointerAddress holds stack base pointer's address (callEngine.stackBasePointer) in the current function call.
+	reservedRegisterForStackBasePointerAddress int16 = arm64.REG_R1
+	// reservedRegisterForMemory holds the pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
+	reservedRegisterForMemory    int16 = arm64.REG_R2
+	reservedRegisterForTemporary int16 = arm64.REG_R3
+	// zeroRegister is the alias of the arm64-specific zero register for readability.
+	zeroRegister int16 = arm64.REGZERO
+)
+
 // simdRegisterForScalarFloatRegister returns SIMD register which corresponds to the given scalar float register.
 // In other words, this returns: REG_F0 -> REG_V0, REG_F1 -> REG_V1, ...., REG_F31 -> REG_V31.
 func simdRegisterForScalarFloatRegister(freg int16) int16 {
