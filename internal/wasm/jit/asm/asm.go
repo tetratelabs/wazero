@@ -8,7 +8,10 @@ type Register = int16
 // Alias, not type definition for convenience.
 type Instruction = int16
 
-type Node interface{}
+type Node interface {
+	Pc() uint64
+	AssignJumpTarget(target Node)
+}
 
 type AssemblerBase interface {
 	Assemble() []byte
