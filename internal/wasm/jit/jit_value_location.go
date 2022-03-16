@@ -19,7 +19,7 @@ func isIntRegister(r int16) bool {
 }
 
 func isFloatRegister(r int16) bool {
-	return generalPurposeFloatRegisters[0] <= r && r <= generalPurposeFloatRegisters[len(generalPurposeFloatRegisters)-1]
+	return unreservedGeneralPurposeFloatRegisters[0] <= r && r <= unreservedGeneralPurposeFloatRegisters[len(unreservedGeneralPurposeFloatRegisters)-1]
 }
 
 func isZeroRegister(r int16) bool {
@@ -245,7 +245,7 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 	var targetRegs []int16
 	switch tp {
 	case generalPurposeRegisterTypeFloat:
-		targetRegs = generalPurposeFloatRegisters
+		targetRegs = unreservedGeneralPurposeFloatRegisters
 	case generalPurposeRegisterTypeInt:
 		targetRegs = unreservedGeneralPurposeIntRegisters
 	}
@@ -262,7 +262,7 @@ func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, nu
 	var targetRegs []int16
 	switch tp {
 	case generalPurposeRegisterTypeFloat:
-		targetRegs = generalPurposeFloatRegisters
+		targetRegs = unreservedGeneralPurposeFloatRegisters
 	case generalPurposeRegisterTypeInt:
 		targetRegs = unreservedGeneralPurposeIntRegisters
 	}

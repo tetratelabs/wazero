@@ -138,12 +138,16 @@ func (j *jitEnv) exec(code []byte) {
 }
 
 func (j *jitEnv) requireNewCompiler(t *testing.T, functype *wasm.FunctionType) compilerImpl {
+	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
+	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
+	assemblerMutex.Lock()
+
 	requireSupportedOSArch(t)
-	c, release, err := newCompiler(
+	c, err := newCompiler(
 		&wasm.FunctionInstance{Module: j.moduleInstance, Kind: wasm.FunctionKindWasm, Type: functype},
 		&wazeroir.CompilationResult{LabelCallers: map[string]uint32{}},
 	)
-	t.Cleanup(release)
+	t.Cleanup(func() { assemblerMutex.Unlock() })
 	require.NoError(t, err)
 
 	ret, ok := c.(compilerImpl)

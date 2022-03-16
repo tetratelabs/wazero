@@ -13,7 +13,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"sync"
 	"unsafe"
 
 	asm "github.com/twitchyliquid64/golang-asm"
@@ -23,83 +22,6 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
-
-func newArchContext() archContext {
-	return archContext{
-		minimum32BitSignedInt: math.MinInt32,
-		minimum64BitSignedInt: math.MinInt64,
-	}
-}
-
-// archContext is embedded in callEngine in order to store architecture-specific data.
-type archContext struct {
-	// jitCallReturnAddress holds the absolute return address for jitcall.
-	// The value is set whenever jitcall is executed and done in jit_arm64.s
-	// Native code can return back to the ce.execWasmFunction's main loop back by
-	// executing "ret" instruction with this value. See arm64Compiler.exit.
-	// Note: this is only used by JIT code so mark this as nolint.
-	jitCallReturnAddress uint64 //nolint
-
-	// Loading large constants in arm64 is a bit costly, so we place the following
-	// consts on callEngine struct so that we can quickly access them during various operations.
-
-	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
-	// Note: this can be obtained by moving $1 and doing left-shift with 31, but it is
-	// slower than directly loading fron this location.
-	minimum32BitSignedInt int32
-	// Note: this can be obtained by moving $1 and doing left-shift with 63, but it is
-	// slower than directly loading fron this location.
-	// minimum64BitSignedInt is used for overflow check for 64-bit signed division.
-	minimum64BitSignedInt int64
-}
-
-const (
-	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	callEngineArchContextJITCallReturnAddressOffset = 120
-	// callEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum32BitSignedIntOffset = 128
-	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum64BitSignedIntOffset = 136
-)
-
-// jitcall is implemented in jit_arm64.s as a Go Assembler function.
-// This is used by callEngine.execWasmFunction and the entrypoint to enter the JITed native code.
-// codeSegment is the pointer to the initial instruction of the compiled native code.
-// ce is "*callEngine" as uintptr.
-func jitcall(codeSegment, ce uintptr)
-
-// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-var assemblerMutex = &sync.Mutex{}
-
-func unlockAssembler() {
-	assemblerMutex.Unlock()
-}
-
-// newCompiler returns a new compiler interface which can be used to compile the given function instance.
-// The function returned must be invoked when finished compiling, so use `defer` to ensure this.
-// Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (c compiler, done func(), err error) {
-	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-	assemblerMutex.Lock()
-
-	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
-	// TODO: optimize the number.
-	b, err := asm.NewBuilder("arm64", 1024)
-	if err != nil {
-		return nil, unlockAssembler, fmt.Errorf("failed to create a new assembly builder: %w", err)
-	}
-
-	compiler := &arm64Compiler{
-		f:             f,
-		builder:       b,
-		locationStack: newValueLocationStack(),
-		ir:            ir,
-		labels:        map[string]*labelInfo{},
-	}
-	return compiler, unlockAssembler, nil
-}
 
 type arm64Compiler struct {
 	builder *asm.Builder
@@ -122,6 +44,12 @@ type arm64Compiler struct {
 	// compiledFunctionStaticData holds br_table offset tables.
 	// See compiledFunctionStaticData and arm64Compiler.compileBrTable.
 	staticData compiledFunctionStaticData
+}
+
+// simdRegisterForScalarFloatRegister returns SIMD register which corresponds to the given scalar float register.
+// In other words, this returns: REG_F0 -> REG_V0, REG_F1 -> REG_V1, ...., REG_F31 -> REG_V31.
+func simdRegisterForScalarFloatRegister(freg int16) int16 {
+	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
 }
 
 func (c *arm64Compiler) addStaticData(d []byte) {

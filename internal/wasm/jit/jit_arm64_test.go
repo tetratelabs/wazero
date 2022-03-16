@@ -2,10 +2,10 @@ package jit
 
 import (
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/require"
 	"github.com/twitchyliquid64/golang-asm/obj"
+	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -30,11 +30,9 @@ func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
 	c.locationStack = s
 }
 
-func TestArchContextOffsetInEngine(t *testing.T) {
-	var ctx callEngine
-	require.Equal(t, int(unsafe.Offsetof(ctx.jitCallReturnAddress)), callEngineArchContextJITCallReturnAddressOffset, "fix consts in jit_arm64.s")
-	require.Equal(t, int(unsafe.Offsetof(ctx.minimum32BitSignedInt)), callEngineArchContextMinimum32BitSignedIntOffset)
-	require.Equal(t, int(unsafe.Offsetof(ctx.minimum64BitSignedInt)), callEngineArchContextMinimum64BitSignedIntOffset)
+func Test_simdRegisterForScalarFloatRegister(t *testing.T) {
+	require.Equal(t, int16(arm64.REG_V0), simdRegisterForScalarFloatRegister(arm64.REG_F0))
+	require.Equal(t, int16(arm64.REG_V30), simdRegisterForScalarFloatRegister(arm64.REG_F30))
 }
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {

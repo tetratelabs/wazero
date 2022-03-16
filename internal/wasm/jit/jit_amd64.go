@@ -86,22 +86,10 @@ type archContext struct{}
 
 func newArchContext() (ret archContext) { return }
 
-// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-var assemblerMutex = &sync.Mutex{}
-
-func unlockAssembler() {
-	assemblerMutex.Unlock()
-}
-
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // The function returned must be invoked when finished compiling, so use `defer` to ensure this.
 // Note: ir param can be nil for host functions.
-func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, func(), error) {
-	// golang-asm is not goroutine-safe so we take lock until we complete the compilation.
-	// TODO: delete after https://github.com/tetratelabs/wazero/issues/233
-	assemblerMutex.Lock()
-
+func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error) {
 	// We can choose arbitrary number instead of 1024 which indicates the cache size in the compiler.
 	// TODO: optimize the number.
 	b, err := asm.NewBuilder("amd64", 1024)
@@ -117,7 +105,7 @@ func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (comp
 		ir:            ir,
 		labels:        map[string]*labelInfo{},
 	}
-	return compiler, unlockAssembler, nil
+	return compiler, nil
 }
 
 func (c *amd64Compiler) String() string {

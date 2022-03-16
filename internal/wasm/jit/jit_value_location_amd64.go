@@ -18,7 +18,7 @@ const (
 const zeroRegister int16 = nilRegister
 
 var (
-	generalPurposeFloatRegisters = []int16{
+	unreservedGeneralPurposeFloatRegisters = []int16{
 		x86.REG_X0, x86.REG_X1, x86.REG_X2, x86.REG_X3,
 		x86.REG_X4, x86.REG_X5, x86.REG_X6, x86.REG_X7,
 		x86.REG_X8, x86.REG_X9, x86.REG_X10, x86.REG_X11,

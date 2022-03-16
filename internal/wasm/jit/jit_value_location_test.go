@@ -11,12 +11,10 @@ import (
 
 // TestReservedRegisters ensures that reserved registers are not contained in unreservedGeneralPurposeIntRegisters.
 func TestReservedRegisters(t *testing.T) {
-	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForCallEngine)
-	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForStackBasePointerAddress)
-	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForMemory)
-	require.NotContains(t, unreservedGeneralPurposeIntRegisters, reservedRegisterForTemporary)
-	require.NotContains(t, unreservedGeneralPurposeIntRegisters, zeroRegister)
-	require.NotContains(t, unreservedGeneralPurposeIntRegisters, nilRegister)
+	for _, reserved := range reservedRegisters {
+		require.NotContains(t, unreservedGeneralPurposeIntRegisters, reserved)
+		require.NotContains(t, unreservedGeneralPurposeFloatRegisters, reserved)
+	}
 }
 
 func Test_isIntRegister(t *testing.T) {
@@ -26,7 +24,7 @@ func Test_isIntRegister(t *testing.T) {
 }
 
 func Test_isFloatRegister(t *testing.T) {
-	for _, r := range generalPurposeFloatRegisters {
+	for _, r := range unreservedGeneralPurposeFloatRegisters {
 		require.True(t, isFloatRegister(r))
 	}
 }
@@ -89,7 +87,7 @@ func TestValueLocationStack_takeFreeRegister(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, isFloatRegister(r))
 	// Mark all the float registers used.
-	for _, r := range generalPurposeFloatRegisters {
+	for _, r := range unreservedGeneralPurposeFloatRegisters {
 		s.markRegisterUsed(r)
 	}
 	// Now we cannot take free ones for floats.
@@ -101,7 +99,7 @@ func TestValueLocationStack_takeStealTargetFromUsedRegister(t *testing.T) {
 	s := newValueLocationStack()
 	intReg := unreservedGeneralPurposeIntRegisters[0]
 	intLocation := &valueLocation{register: intReg}
-	floatReg := generalPurposeFloatRegisters[0]
+	floatReg := unreservedGeneralPurposeFloatRegisters[0]
 	floatLocation := &valueLocation{register: floatReg}
 	s.push(intLocation)
 	s.push(floatLocation)
