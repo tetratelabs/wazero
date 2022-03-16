@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 
 	internalwasi "github.com/tetratelabs/wazero/internal/wasi"
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -11,17 +12,16 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-// WASIDirFS returns a file system (a wasi.FS) for the tree of files rooted at
-// the directory dir. It's similar to os.DirFS, except that it implements
-// wasi.FS instead of the fs.FS interface.
-func WASIDirFS(dir string) wasi.FS {
+// WASIDirFS returns a file system for the tree of files rooted at the directory dir.
+// It's similar to os.DirFS, except that it also implements wasi.OpenFileFS in addition to fs.FS,
+// which allows new file creation and writing to opened files.
+func WASIDirFS(dir string) wasi.OpenFileFS {
 	return internalwasi.DirFS(dir)
 }
 
-func WASIMemFS() wasi.FS {
-	return &internalwasi.MemFS{
-		Files: map[string][]byte{},
-	}
+// WASIMemFS returns an in-memory file system that implements wasi.OpenFileFS.
+func WASIMemFS() wasi.OpenFileFS {
+	return &internalwasi.MemFS{}
 }
 
 type WASIConfig struct {
@@ -30,7 +30,7 @@ type WASIConfig struct {
 	stderr   io.Writer
 	args     []string
 	environ  map[string]string
-	preopens map[string]wasi.FS
+	preopens map[string]fs.FS
 }
 
 func NewWASIConfig() *WASIConfig {
@@ -62,7 +62,7 @@ func (c *WASIConfig) WithEnviron(environ map[string]string) *WASIConfig {
 	return c
 }
 
-func (c *WASIConfig) WithPreopens(preopens map[string]wasi.FS) *WASIConfig {
+func (c *WASIConfig) WithPreopens(preopens map[string]fs.FS) *WASIConfig {
 	c.preopens = preopens
 	return c
 }

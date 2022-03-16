@@ -44,9 +44,25 @@ System Interface ([WASI](https://github.com/WebAssembly/WASI)). WASI defines
 how WebAssembly programs interact with the host embedding them. For example,
 WASI defines functions for reading the time, or a random number.
 
-This repository includes several [examples](examples) that expose system
-interfaces, via the module `wazero.WASISnapshotPreview1`. These examples are
-tested and a good way to learn what's possible with wazero.
+For example, wazero allows you to control which files a WebAssembly function
+can read via `fs.FS`:
+```golang
+//go:embed your_directory
+var embeddedFS embed.FS
+
+--snip--
+	wasiConfig := wazero.NewWASIConfig().
+		// Mount the embedded filesystem read-only under the directory /static
+		WithPreopens(map[string]fs.FS{"/static": embeddedFS})
+
+	// Instantiate the wasm module with WASI APIs enabled.
+	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1WithConfig(wasiConfig))
+	defer wasi.Close()
+```
+
+This repository includes several [examples](examples) that showcase this and
+other system interfaces. These examples are tested and a good way to learn
+what's possible with wazero.
 
 ## Runtime
 

@@ -3,7 +3,8 @@ package wasi
 
 import (
 	"fmt"
-	"io"
+	"io/fs"
+	"os"
 )
 
 const (
@@ -12,38 +13,22 @@ const (
 	ModuleSnapshotPreview1 = "wasi_snapshot_preview1"
 )
 
-// TODO: rename these according to other naming conventions
-const (
-	// WASI open flags
+// OpenFileFS is the interface implemented by a file system that provides OpenFile implementation.
+//
+// Note: Implementing OpenFile enables WASI APIs to create new files and open a file in a writable mode for that file system.
+type OpenFileFS interface {
+	fs.FS
 
-	O_CREATE = 1 << iota
-	O_DIR
-	O_EXCL
-	O_TRUNC
-
-	// WASI fs rights
-
-	R_FD_READ = 1 << iota
-	R_FD_SEEK
-	R_FD_FDSTAT_SET_FLAGS
-	R_FD_SYNC
-	R_FD_TELL
-	R_FD_WRITE
-)
-
-// File combines file I/O interfaces supported by ModuleSnapshotPreview1.
-type File interface {
-	io.Reader
-	io.Writer
-	io.Seeker
-	io.Closer
-}
-
-// FS is an interface for a preopened directory.
-type FS interface {
-	// OpenWASI is a general method to open a file, similar to
-	// os.OpenFile, but with WASI flags and rights instead of POSIX.
-	OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, fsRightsInheriting uint64, fdFlags uint32) (File, error)
+	// OpenFile opens the named file with specified flag in the same way as os.OpenFile.
+	// For example, if the path does not exist and flag includes os.O_CREATE, it will create a new file with perm.
+	//
+	// Unlike os.OpenFile, OpenFile must reject paths that do not satisfy `fs.ValidPath(path)`,
+	// returning fs.ErrInvalid or fs.ErrNotExist. This is the same behavior as fs.FS.Open rejecting such paths.
+	//
+	// See os.OpenFile
+	// See fs.FS.Open
+	// See fs.ValidPath
+	OpenFile(path string, flag int, perm os.FileMode) (fs.File, error)
 }
 
 // Errno are the error codes returned by WASI functions.

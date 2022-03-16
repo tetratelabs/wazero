@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -1151,7 +1152,7 @@ func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, resultPrestat uint32)
 	cfg := a.config(ctx.Context())
 
 	entry, ok := cfg.opened[fd]
-	if !ok || entry.path == "" {
+	if !ok || entry.preopenPath == "" {
 		return wasi.ErrnoBadf
 	}
 
@@ -1160,7 +1161,7 @@ func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, resultPrestat uint32)
 		return wasi.ErrnoFault
 	}
 	// Write the length of the directory name at offset 4.
-	if !ctx.Memory().WriteUint32Le(resultPrestat+4, uint32(len(entry.path))) {
+	if !ctx.Memory().WriteUint32Le(resultPrestat+4, uint32(len(entry.preopenPath))) {
 		return wasi.ErrnoFault
 	}
 
@@ -1202,17 +1203,16 @@ func (a *wasiAPI) FdPrestatDirName(ctx wasm.Module, fd uint32, pathPtr uint32, p
 	cfg := a.config(ctx.Context())
 
 	f, ok := cfg.opened[fd]
-	if !ok {
+	if !ok || f.preopenPath == "" {
 		return wasi.ErrnoBadf
 	}
 
 	// Some runtimes may have another semantics. See internal/wasi/RATIONALE.md
-	if uint32(len(f.path)) < pathLen {
+	if uint32(len(f.preopenPath)) < pathLen {
 		return wasi.ErrnoNametoolong
 	}
 
-	// TODO: FdPrestatDirName may have to return ErrnoNotdir if the type of the prestat data of `fd` is not a PrestatDir.
-	if !ctx.Memory().Write(pathPtr, []byte(f.path)[:pathLen]) {
+	if !ctx.Memory().Write(pathPtr, []byte(f.preopenPath)[:pathLen]) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1227,17 +1227,9 @@ func (a *wasiAPI) FdPwrite(ctx wasm.Module, fd, iovs, iovsCount uint32, offset u
 func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
 	cfg := a.config(ctx.Context())
 
-	var reader io.Reader
-
-	switch fd {
-	case 0:
-		reader = cfg.stdin
-	default:
-		f, ok := cfg.opened[fd]
-		if !ok || f.file == nil {
-			return wasi.ErrnoBadf
-		}
-		reader = f.file
+	f, ok := cfg.opened[fd]
+	if !ok || f.file == nil {
+		return wasi.ErrnoBadf
 	}
 
 	var nread uint32
@@ -1255,7 +1247,7 @@ func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32
 		if !ok {
 			return wasi.ErrnoFault
 		}
-		n, err := reader.Read(b)
+		n, err := f.file.Read(b)
 		nread += uint32(n)
 		if errors.Is(err, io.EOF) {
 			break
@@ -1321,19 +1313,13 @@ func (a *wasiAPI) FdTell(ctx wasm.Module, fd, resultOffset uint32) wasi.Errno {
 func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
 	cfg := a.config(ctx.Context())
 
-	var writer io.Writer
-
-	switch fd {
-	case 1:
-		writer = cfg.stdout
-	case 2:
-		writer = cfg.stderr
-	default:
-		f, ok := cfg.opened[fd]
-		if !ok || f.file == nil {
-			return wasi.ErrnoBadf
-		}
-		writer = f.file
+	f, ok := cfg.opened[fd]
+	if !ok || f.file == nil {
+		return wasi.ErrnoBadf
+	}
+	writer, ok := f.file.(io.Writer)
+	if !ok {
+		return wasi.ErrnoBadf
 	}
 
 	var nwritten uint32
@@ -1386,7 +1372,7 @@ func (a *wasiAPI) PathLink(ctx wasm.Module, oldFd, oldFlags, oldPath, oldPathLen
 const (
 	// WASI open flags
 	oflagCreate = 1 << iota
-	// TODO: oflagDir
+	oflagDir
 	oflagExclusive
 	oflagTrunc
 
@@ -1431,8 +1417,18 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, ofla
 	if !ok {
 		return wasi.ErrnoFault
 	}
-	pathName := string(b)
-	f, err := dir.fileSys.OpenWASI(dirflags, pathName, oflags, fsRightsBase, fsRightsInheriting, fdflags)
+
+	// Clean the path because fs.FS.Open and OpenFileFS.OpenFile need path satisfying `fs.ValidPath(path)`.
+	// See fs.FS.Open, wasi.OpenFileFS.OpenFile, fs.ValidPath.
+	pathName := path.Clean(dir.path + "/" + string(b))
+	var f fs.File
+	var err error
+	if openFileFS, ok := dir.fileSys.(wasi.OpenFileFS); ok {
+		f, err = openFileFS.OpenFile(pathName, posixOpenFlags(oflags, fsRightsBase), fs.FileMode(0644))
+	} else {
+		// Pure read-only fs.FS. We do not check oFlags here, but non-read operations will fail later in each API.
+		f, err = dir.fileSys.Open(pathName)
+	}
 	if err != nil {
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
@@ -1445,7 +1441,12 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, ofla
 	}
 
 	// when ofagDir is set, the opened file must be a directory.
-	// TODO if oflags&oflagDir != 0 return wasi.ErrnoNotdir if stat != dir
+	if oflags&oflagDir != 0 {
+		stat, err := f.Stat()
+		if err != nil || !stat.IsDir() {
+			return wasi.ErrnoNotdir
+		}
+	}
 
 	newFD, err := a.randUnusedFD(cfg)
 	if err != nil {
@@ -1544,10 +1545,18 @@ func (a *wasiAPI) SockShutdown(ctx wasm.Module, fd, how uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
+// fileEntry is an entry of the opened file descriptors table.
 type fileEntry struct {
-	path    string
-	fileSys wasi.FS
-	file    wasi.File
+	// If this entry is a pre-opend directory, preopenPath is the path to this directory
+	// in the WASI environment, or "." if this directory is opened as a working directory.
+	// preOpenPath is empty when this entry is not a pre-opened directory.
+	preopenPath string
+	// File path relative to the root of `fileSys`.
+	path string
+	// fs.FS instance that this file belongs to.
+	fileSys fs.FS
+	// Opened fs.File instance.
+	file fs.File
 }
 
 // ConfigContextKey indicates a context.Context includes an overriding Config.
@@ -1558,25 +1567,22 @@ type Config struct {
 	// environ stores each environment variable in the form of "key=value",
 	// which is both convenient for the implementation of environ_get and matches os.Environ
 	environ *nullTerminatedStrings
-	stdin   io.Reader
-	stdout,
-	stderr io.Writer
-	opened map[uint32]fileEntry
+	opened  map[uint32]fileEntry
 	// timeNowUnixNano is mutable for testing
 	timeNowUnixNano func() uint64
 	randSource      func([]byte) error
 }
 
 func (c *Config) Stdin(reader io.Reader) {
-	c.stdin = reader
+	c.opened[0] = fileEntry{file: &readerWriterFile{Reader: reader}}
 }
 
 func (c *Config) Stdout(writer io.Writer) {
-	c.stdout = writer
+	c.opened[1] = fileEntry{file: &readerWriterFile{Writer: writer}}
 }
 
 func (c *Config) Stderr(writer io.Writer) {
-	c.stderr = writer
+	c.opened[2] = fileEntry{file: &readerWriterFile{Writer: writer}}
 }
 
 // Args returns an option to give a command-line arguments in SnapshotPreview1 or errs if the inputs are too large.
@@ -1614,10 +1620,11 @@ func (c *Config) Environ(environ ...string) error {
 	return nil
 }
 
-func (c *Config) Preopen(dir string, fileSys wasi.FS) {
-	c.opened[uint32(len(c.opened))+3] = fileEntry{
-		path:    dir,
-		fileSys: fileSys,
+func (c *Config) Preopen(dir string, fileSys fs.FS) {
+	c.opened[uint32(len(c.opened))] = fileEntry{
+		preopenPath: dir,
+		path:        ".",
+		fileSys:     fileSys,
 	}
 }
 
@@ -1626,10 +1633,11 @@ func NewConfig() *Config {
 	return &Config{
 		args:    &nullTerminatedStrings{},
 		environ: &nullTerminatedStrings{},
-		stdin:   os.Stdin,
-		stdout:  os.Stdout,
-		stderr:  os.Stderr,
-		opened:  map[uint32]fileEntry{},
+		opened: map[uint32]fileEntry{
+			0: {file: &readerWriterFile{}}, // stdin
+			1: {file: &readerWriterFile{}}, // stdout
+			2: {file: &readerWriterFile{}}, // stderr
+		},
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},

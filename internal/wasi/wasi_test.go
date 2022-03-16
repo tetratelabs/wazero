@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -611,15 +612,12 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 		ctx := context.Background()
 		config := NewConfig()
 
-		memFs := &MemFS{}
 		config.opened = map[uint32]fileEntry{
 			fdToClose: {
-				path:    "/tmp",
-				fileSys: memFs,
+				preopenPath: "/tmp",
 			},
 			fdToKeep: {
-				path:    "path to keep",
-				fileSys: memFs,
+				preopenPath: "path to keep",
 			},
 		}
 
@@ -786,7 +784,7 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	ctx := context.Background()
 	config := NewConfig()
 	config.opened[fd] = fileEntry{
-		path: "/tmp",
+		preopenPath: "/tmp",
 	}
 
 	mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, config)
@@ -826,13 +824,15 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 }
 
 func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
-	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
-	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_get. We chose 0 here.
+	fd := uint32(3)             // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
+	nonPreopenedFD := uint32(4) // simulated non-pre-opened file will be opened for fd 4
+	validAddress := uint32(0)   // Arbitrary valid address as arguments to fd_prestat_get. We chose 0 here.
 
 	ctx := context.Background()
 	config := NewConfig()
 	config.opened = map[uint32]fileEntry{
-		fd: {path: "/tmp"},
+		fd:             {preopenPath: "/tmp"},
+		nonPreopenedFD: {path: "wazero"},
 	}
 
 	mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, config)
@@ -857,7 +857,12 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 			resultPrestat: memorySize,
 			expectedErrno: wasi.ErrnoFault,
 		},
-		// TODO: non pre-opened file == wasi.ErrnoBadf
+		{
+			name:          "non pre-opened file",
+			fd:            nonPreopenedFD,
+			resultPrestat: validAddress,
+			expectedErrno: wasi.ErrnoBadf,
+		},
 	}
 
 	for _, tt := range tests {
@@ -877,8 +882,7 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	ctx := context.Background()
 	config := NewConfig()
 	config.opened[fd] = fileEntry{
-		path:    "/tmp",
-		fileSys: &MemFS{},
+		preopenPath: "/tmp",
 	}
 
 	mod, fn := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, config)
@@ -916,12 +920,14 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 }
 
 func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
-	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	fd := uint32(3)             // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	nonPreopenedFD := uint32(4) // another arbitrary fd
 
 	ctx := context.Background()
 	config := NewConfig()
 	config.opened = map[uint32]fileEntry{
-		fd: {path: "/tmp"},
+		fd:             {preopenPath: "/tmp"},
+		nonPreopenedFD: {path: "wazero"},
 	}
 	pathLen := uint32(len("/tmp"))
 
@@ -965,7 +971,13 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 			pathLen:       pathLen,
 			expectedErrno: wasi.ErrnoBadf,
 		},
-		// TODO: non pre-opened file == wasi.ErrnoBadf
+		{
+			name:          "non pre-opened file",
+			fd:            nonPreopenedFD,
+			path:          validAddress,
+			pathLen:       pathLen,
+			expectedErrno: wasi.ErrnoBadf,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1448,7 +1460,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
-			require.Equal(t, []byte("wazero"), file.buf) // verify the file was actually written
+			require.Equal(t, []byte("wazero"), file.fsEntry.Contents) // verify the file was actually written
 		})
 	}
 }
@@ -1532,11 +1544,14 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 
 func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
 	memFS := &MemFS{}
-	f, err := memFS.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
+	f, err := memFS.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.FileMode(0644))
 	require.NoError(t, err)
 
 	memFile := f.(*memFile)
-	memFile.buf = append([]byte{}, contents...)
+	_, err = memFile.Write(contents)
+	require.NoError(t, err)
+	_, err = memFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
 
 	return memFile, memFS
 }
@@ -1615,6 +1630,7 @@ func TestSnapshotPreview1_PathLink(t *testing.T) {
 
 func TestSnapshotPreview1_PathOpen(t *testing.T) {
 	workdirFD := uint32(3)                    // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	dirFD := uint32(4)                        // arbitrary another fd for opening a directory
 	dirflags := uint32(0)                     // arbitrary dirflags
 	path := uint32(1)                         // arbitrary offset
 	pathLen := uint32(6)                      // The length of path
@@ -1636,10 +1652,12 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 	)
 
 	// MemFS for testing
-	// Create a memFS for testing that has "./wazero" file.
 	memFS := &MemFS{
-		Files: map[string][]byte{
-			"wazero": {},
+		"wazero": {},
+		"dir": {
+			Entries: map[string]*memFSEntry{
+				"wazero": {},
+			},
 		},
 	}
 
@@ -1685,6 +1703,11 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 			fd:           workdirFD,
 			expectedPath: "wazero",
 		},
+		{
+			name:         "open a file by a directory FD",
+			fd:           dirFD,
+			expectedPath: "dir/wazero",
+		},
 	}
 
 	for _, pathOpenFn := range pathOpenFns {
@@ -1693,11 +1716,18 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 			for _, tt := range tests {
 				tc := tt
 				t.Run(tc.name, func(t *testing.T) {
+					dirFile, _ := memFS.Open("dir")
 					// Set up a fresh opened FD table
 					config.opened = map[uint32]fileEntry{
 						workdirFD: {
-							path:    ".",
+							preopenPath: ".",
+							path:        ".",
+							fileSys:     memFS,
+						},
+						dirFD: {
+							path:    "dir",
 							fileSys: memFS,
+							file:    dirFile,
 						},
 					}
 
@@ -1722,16 +1752,15 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 	validFD := uint64(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	// Create a memFS for testing that has "./wazero" file.
 	memFS := &MemFS{
-		Files: map[string][]byte{
-			"wazero": []byte(""),
-		},
+		"wazero": {},
 	}
 	ctx := context.Background()
 	config := NewConfig()
 	config.opened = map[uint32]fileEntry{
 		uint32(validFD): {
-			path:    ".",
-			fileSys: memFS,
+			preopenPath: ".",
+			path:        ".",
+			fileSys:     memFS,
 		},
 	}
 
@@ -1773,6 +1802,22 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 			path:          validPath,
 			pathLen:       validPathLen - 1, // this make the path "wazer", which doesn't exit
 			expectedErrno: wasi.ErrnoNoent,
+		},
+		{
+			name:          "file must not already exist",
+			fd:            validFD,
+			path:          validPath,
+			pathLen:       validPathLen,
+			oflags:        oflagExclusive | oflagCreate, // indicates the file must not exist, but "wazero" exists
+			expectedErrno: wasi.ErrnoExist,
+		},
+		{
+			name:          "file must be a directory",
+			fd:            validFD,
+			path:          validPath,
+			pathLen:       validPathLen,
+			oflags:        oflagDir, // indicates the file must be a directory, but "wazero" is a regular file
+			expectedErrno: wasi.ErrnoNotdir,
 		},
 		{
 			name:           "out-of-memory writing resultOpenedFd",
