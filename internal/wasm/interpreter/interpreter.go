@@ -9,7 +9,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero/internal/moremath"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -161,7 +160,7 @@ func (me *moduleEngine) Close() (err error) {
 }
 
 // NewModuleEngine implements internalwasm.Engine NewModuleEngine
-func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance) (wasm.ModuleEngine, error) {
+func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
 		name:                   name,
 		compiledFunctions:      make([]*compiledFunction, 0, len(importedFunctions)+len(moduleFunctions)),
@@ -201,6 +200,10 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 		// Add the compiled function to the store-wide engine as well so that
 		// the future importing module can refer the function instance.
 		e.addCompiledFunction(f, compiled)
+	}
+
+	for elemIdx, funcidx := range tableInit { // Initialize any elements with compiled functions
+		table.Table[elemIdx] = me.compiledFunctions[funcidx]
 	}
 	return me, nil
 }
@@ -488,11 +491,6 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 	return ret, nil
 }
 
-// FunctionAddress implements internalwasm.ModuleEngine FunctionAddress.
-func (me *moduleEngine) FunctionAddress(index wasm.Index) uintptr {
-	return uintptr(unsafe.Pointer(me.compiledFunctions[index]))
-}
-
 // Call implements internalwasm.ModuleEngine Call.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	compiled := me.compiledFunctions[f.Index]
@@ -665,8 +663,8 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 				if offset >= uint64(len(table.Table)) {
 					panic(wasm.ErrRuntimeInvalidTableAccess)
 				}
-				targetCompiledFunction := (*compiledFunction)(unsafe.Pointer(table.Table[offset]))
-				if targetCompiledFunction == nil {
+				targetCompiledFunction, ok := table.Table[offset].(*compiledFunction)
+				if !ok {
 					panic(wasm.ErrRuntimeInvalidTableAccess)
 				} else if uint64(targetCompiledFunction.funcInstance.TypeID) != op.us[1] {
 					panic(wasm.ErrRuntimeIndirectCallTypeMismatch)

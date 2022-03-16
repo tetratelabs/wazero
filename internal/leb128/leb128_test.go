@@ -3,6 +3,7 @@ package leb128
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,9 +21,27 @@ func TestEncodeUint32(t *testing.T) {
 		{input: 16256, expected: []byte{0x80, 0x7f}},
 		{input: 624485, expected: []byte{0xe5, 0x8e, 0x26}},
 		{input: 165675008, expected: []byte{0x80, 0x80, 0x80, 0x4f}},
-		{input: 0xffffffff, expected: []byte{0xff, 0xff, 0xff, 0xff, 0xf}},
+		{input: uint32(math.MaxUint32), expected: []byte{0xff, 0xff, 0xff, 0xff, 0xf}},
 	} {
 		require.Equal(t, c.expected, EncodeUint32(c.input))
+	}
+}
+
+func TestEncodeUint64(t *testing.T) {
+	for _, c := range []struct {
+		input    uint64
+		expected []byte
+	}{
+		{input: 0, expected: []byte{0x00}},
+		{input: 1, expected: []byte{0x01}},
+		{input: 4, expected: []byte{0x04}},
+		{input: 16256, expected: []byte{0x80, 0x7f}},
+		{input: 624485, expected: []byte{0xe5, 0x8e, 0x26}},
+		{input: 165675008, expected: []byte{0x80, 0x80, 0x80, 0x4f}},
+		{input: math.MaxUint32, expected: []byte{0xff, 0xff, 0xff, 0xff, 0xf}},
+		{input: math.MaxUint64, expected: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1}},
+	} {
+		require.Equal(t, c.expected, EncodeUint64(c.input))
 	}
 }
 

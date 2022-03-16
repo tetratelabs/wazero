@@ -419,16 +419,11 @@ func newStore() *Store {
 }
 
 // NewModuleEngine implements Engine.NewModuleEngine
-func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance) (ModuleEngine, error) {
+func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *TableInstance, _ map[Index]Index) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
 	}
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
-}
-
-// FunctionAddress implements ModuleEngine.FunctionAddress
-func (e *mockModuleEngine) FunctionAddress(index Index) uintptr {
-	return uintptr(index)
 }
 
 // Call implements ModuleEngine.Call

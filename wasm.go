@@ -66,7 +66,7 @@ type Runtime interface {
 	//
 	// While a Module is pre-validated, there are a few situations which can cause an error:
 	//  * The Module name is already in use.
-	//  * The Module has a table element initializer that uses an imported global offset that puts it out of range.
+	//  * The Module has a table element initializer that resolves to an index outside the Table minimum size.
 	//  * The Module has a start function, and it failed to execute.
 	//
 	// Note: The last value of RuntimeConfig.WithContext is used for any start function.

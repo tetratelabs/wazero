@@ -86,7 +86,7 @@ func (j *jitEnv) getGlobal(index uint32) uint64 {
 	return j.moduleInstance.Globals[index].Val
 }
 
-func (j *jitEnv) setTable(table []uintptr) {
+func (j *jitEnv) setTable(table []interface{}) {
 	j.moduleInstance.Table = &wasm.TableInstance{Table: table}
 }
 

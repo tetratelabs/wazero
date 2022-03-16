@@ -51,10 +51,115 @@ func TestEngine_NewModuleEngine(t *testing.T) {
 	e := NewEngine()
 
 	t.Run("sets module name", func(t *testing.T) {
-		me, err := e.NewModuleEngine(t.Name(), nil, nil)
+		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
 		require.NoError(t, err)
 		defer me.Close()
 		require.Equal(t, t.Name(), me.(*moduleEngine).name)
+	})
+}
+
+func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
+	e := NewEngine()
+
+	t.Run("no table elements", func(t *testing.T) {
+		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		var importedFunctions []*wasm.FunctionInstance
+		var moduleFunctions []*wasm.FunctionInstance
+		var tableInit map[wasm.Index]wasm.Index
+
+		// Instantiate the module, which has nothing but an empty table.
+		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		require.NoError(t, err)
+
+		// Since there are no elements to initialize, we expect the table to be nil.
+		require.Equal(t, table.Table, make([]interface{}, 2))
+
+		// Clean up.
+		require.NoError(t, me.Close())
+	})
+
+	t.Run("module-defined function", func(t *testing.T) {
+		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		var importedFunctions []*wasm.FunctionInstance
+		moduleFunctions := []*wasm.FunctionInstance{
+			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+		}
+		tableInit := map[wasm.Index]wasm.Index{0: 2}
+
+		// Instantiate the module whose table points to its own functions.
+		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		require.NoError(t, err)
+
+		// The functions mapped to the table are defined in the same moduleEngine
+		require.Equal(t, table.Table, []interface{}{me.(*moduleEngine).compiledFunctions[2], nil})
+
+		// Clean up.
+		require.NoError(t, me.Close())
+	})
+
+	t.Run("imported function", func(t *testing.T) {
+		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		importedFunctions := []*wasm.FunctionInstance{
+			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+		}
+		var moduleFunctions []*wasm.FunctionInstance
+		tableInit := map[wasm.Index]wasm.Index{0: 2}
+
+		// Imported functions are compiled before the importing module is instantiated.
+		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
+		require.NoError(t, err)
+
+		// Instantiate the importing module, which is whose table is initialized.
+		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		require.NoError(t, err)
+
+		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
+		require.Equal(t, table.Table, []interface{}{importing.(*moduleEngine).compiledFunctions[2], nil})
+
+		// Clean up.
+		require.NoError(t, importing.Close())
+		require.NoError(t, imported.Close())
+	})
+
+	t.Run("mixed functions", func(t *testing.T) {
+		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
+		importedFunctions := []*wasm.FunctionInstance{
+			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+		}
+		moduleFunctions := []*wasm.FunctionInstance{
+			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+		}
+		tableInit := map[wasm.Index]wasm.Index{0: 0, 1: 4}
+
+		// Imported functions are compiled before the importing module is instantiated.
+		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
+		require.NoError(t, err)
+
+		// Instantiate the importing module, which is whose table is initialized.
+		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
+		require.NoError(t, err)
+
+		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
+		require.Equal(t, table.Table, []interface{}{
+			importing.(*moduleEngine).compiledFunctions[0],
+			importing.(*moduleEngine).compiledFunctions[4],
+		})
+
+		// Clean up.
+		require.NoError(t, importing.Close())
+		require.NoError(t, imported.Close())
 	})
 }
 
@@ -113,7 +218,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 		Module: module,
 	}
 
-	me, err := e.NewModuleEngine(t.Name(), nil, []*wasm.FunctionInstance{f})
+	me, err := e.NewModuleEngine(t.Name(), nil, []*wasm.FunctionInstance{f}, nil, nil)
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
@@ -253,6 +358,8 @@ func TestEngineCompile_Errors(t *testing.T) {
 		_, err := e.NewModuleEngine(t.Name(),
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
 			nil, // moduleFunctions
+			nil, // table
+			nil, // tableInit
 		)
 		require.EqualError(t, err, "import[0] func[uncompiled.fn]: uncompiled")
 	})
@@ -268,7 +375,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 		}
 
 		// initialize the module-engine containing imported functions
-		_, err := e.NewModuleEngine(t.Name(), nil, importedFunctions)
+		_, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
 
 		require.Len(t, e.compiledFunctions, len(importedFunctions))
@@ -281,7 +388,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 			}, Module: &wasm.ModuleInstance{}},
 		}
 
-		_, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions)
+		_, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, nil, nil)
 		require.EqualError(t, err, "function[2/2] failed to lower to wazeroir: handling instruction: apply stack failed for call: reading immediates: EOF")
 
 		// On the compilation failure, all the compiled functions including succeeded ones must be released.
@@ -321,12 +428,12 @@ func TestClose(t *testing.T) {
 			e := NewEngine().(*engine)
 			if len(tc.importedFunctions) > 0 {
 				// initialize the module-engine containing imported functions
-				me, err := e.NewModuleEngine(t.Name(), nil, tc.importedFunctions)
+				me, err := e.NewModuleEngine(t.Name(), nil, tc.importedFunctions, nil, nil)
 				require.NoError(t, err)
 				require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions))
 			}
 
-			me, err := e.NewModuleEngine(t.Name(), tc.importedFunctions, tc.moduleFunctions)
+			me, err := e.NewModuleEngine(t.Name(), tc.importedFunctions, tc.moduleFunctions, nil, nil)
 			require.NoError(t, err)
 			require.Len(t, me.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
