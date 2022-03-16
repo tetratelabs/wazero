@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [go118]
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.17"  # Latest patch
@@ -50,6 +50,7 @@ jobs:
         os: [ubuntu-20.04, macos-11, windows-2022]
         go-version:
         - "1.17" # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.18"
 
     steps:
       - uses: actions/setup-go@v2
@@ -79,6 +80,7 @@ jobs:
       matrix:
         go-version:
         - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
+        - "1.18"
         target:
         - arch: arm64
           image: arm64v8/ubuntu
