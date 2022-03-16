@@ -21,9 +21,6 @@ var (
 	// Note: ir param can be nil for host functions.
 	newCompiler func(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (compiler, error)
 
-	// reservedRegisters contains registers which are saved for special purpose.
-	reservedRegisters []int16
-
 	// unreservedGeneralPurposeIntRegisters contains unreserved general purpose registers of integer type.
 	unreservedGeneralPurposeIntRegisters []int16
 

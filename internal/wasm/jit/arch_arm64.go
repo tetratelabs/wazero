@@ -53,7 +53,6 @@ func init() {
 		arm64.REG_R20, arm64.REG_R21, arm64.REG_R22, arm64.REG_R23, arm64.REG_R24,
 		arm64.REG_R25, arm64.REG_R26, arm64.REG_R27, arm64.REG_R29, arm64.REG_R30,
 	}
-	reservedRegisters = []int16{arm64.REG_R0, arm64.REG_R1, arm64.REG_R2, arm64.REG_R3, zeroRegister}
 }
 
 const (

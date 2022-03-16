@@ -9,14 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestReservedRegisters ensures that reserved registers are not contained in unreservedGeneralPurposeIntRegisters.
-func TestReservedRegisters(t *testing.T) {
-	for _, reserved := range reservedRegisters {
-		require.NotContains(t, unreservedGeneralPurposeIntRegisters, reserved)
-		require.NotContains(t, unreservedGeneralPurposeFloatRegisters, reserved)
-	}
-}
-
 func Test_isIntRegister(t *testing.T) {
 	for _, r := range unreservedGeneralPurposeIntRegisters {
 		require.True(t, isIntRegister(r))
