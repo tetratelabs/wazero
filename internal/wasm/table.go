@@ -45,13 +45,13 @@ type validatedElementSegment struct {
 	// opcode is OpcodeGlobalGet or OpcodeI32Const
 	opcode Opcode
 
-	// arg0 is the arg to opcode, which results in the offset to add to init indices.
+	// arg is the only argument to opcode, which when applied results in the offset to add to init indices.
 	//  * OpcodeGlobalGet: position in the global index namespace of an imported Global ValueTypeI32 holding the offset.
 	//  * OpcodeI32Const: a constant ValueTypeI32 offset.
-	arg0 uint32
+	arg uint32
 
 	// init are a range of table elements whose values are positions in the function index namespace. This range
-	// replaces any values in TableInstance.Table at an offset arg0 which is a constant if opcode == OpcodeI32Const or
+	// replaces any values in TableInstance.Table at an offset arg which is a constant if opcode == OpcodeI32Const or
 	// derived from a globalIdx if opcode == OpcodeGlobalGet
 	init []Index
 }
@@ -170,10 +170,10 @@ func (m *Module) buildTable(importedTable *TableInstance, importedGlobals []*Glo
 	for elemI, elem := range elementSegments {
 		var offset uint32
 		if elem.opcode == OpcodeGlobalGet {
-			global := importedGlobals[elem.arg0]
+			global := importedGlobals[elem.arg]
 			offset = uint32(global.Val)
 		} else {
-			offset = elem.arg0 // constant
+			offset = elem.arg // constant
 		}
 
 		// Check to see if we are out-of-bounds

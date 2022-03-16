@@ -100,7 +100,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeI32Const, arg0: 0, init: []uint32{0}},
+				{opcode: OpcodeI32Const, arg: 0, init: []uint32{0}},
 			},
 		},
 		{
@@ -118,7 +118,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeI32Const, arg0: 0, init: []uint32{0}},
+				{opcode: OpcodeI32Const, arg: 0, init: []uint32{0}},
 			},
 		},
 		{
@@ -136,7 +136,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeI32Const, arg0: 0, init: []uint32{0}},
+				{opcode: OpcodeI32Const, arg: 0, init: []uint32{0}},
 			},
 		},
 		{
@@ -154,7 +154,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeI32Const, arg0: 1, init: []uint32{0, 2}},
+				{opcode: OpcodeI32Const, arg: 1, init: []uint32{0, 2}},
 			},
 		},
 		{ // See: https://github.com/WebAssembly/spec/issues/1427
@@ -191,7 +191,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+				{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 			},
 		},
 		{
@@ -212,7 +212,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+				{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 			},
 		},
 		{
@@ -233,7 +233,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+				{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 			},
 		},
 		{
@@ -255,7 +255,7 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeGlobalGet, arg0: 1, init: []uint32{0, 2}},
+				{opcode: OpcodeGlobalGet, arg: 1, init: []uint32{0, 2}},
 			},
 		},
 		{
@@ -281,8 +281,8 @@ func TestModule_validateTable(t *testing.T) {
 				},
 			},
 			expected: []*validatedElementSegment{
-				{opcode: OpcodeI32Const, arg0: 1, init: []uint32{0, 2}},
-				{opcode: OpcodeGlobalGet, arg0: 1, init: []uint32{1, 2}},
+				{opcode: OpcodeI32Const, arg: 1, init: []uint32{0, 2}},
+				{opcode: OpcodeGlobalGet, arg: 1, init: []uint32{1, 2}},
 			},
 		},
 	}
@@ -573,7 +573,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeI32Const, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeI32Const, arg: 0, init: []uint32{0}},
 				},
 			},
 			expectedTable: &TableInstance{Table: make([]interface{}, 1), Min: 1},
@@ -593,7 +593,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeI32Const, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeI32Const, arg: 0, init: []uint32{0}},
 				},
 			},
 		},
@@ -611,7 +611,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeI32Const, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeI32Const, arg: 0, init: []uint32{0}},
 				},
 			},
 		},
@@ -629,7 +629,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeI32Const, arg0: 1, init: []uint32{0, 2}},
+					{opcode: OpcodeI32Const, arg: 1, init: []uint32{0, 2}},
 				},
 			},
 			expectedTable: &TableInstance{Table: make([]interface{}, 3), Min: 3},
@@ -670,7 +670,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
@@ -694,7 +694,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
@@ -718,7 +718,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 1}},
@@ -743,7 +743,7 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeGlobalGet, arg0: 1, init: []uint32{0, 2}},
+					{opcode: OpcodeGlobalGet, arg: 1, init: []uint32{0, 2}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{
@@ -775,8 +775,8 @@ func TestModule_buildTable(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeI32Const, arg0: 1, init: []uint32{0, 2}},
-					{opcode: OpcodeGlobalGet, arg0: 1, init: []uint32{1, 2}},
+					{opcode: OpcodeI32Const, arg: 1, init: []uint32{0, 2}},
+					{opcode: OpcodeGlobalGet, arg: 1, init: []uint32{1, 2}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{
@@ -827,7 +827,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeI32Const, arg0: 2, init: []uint32{0}},
+					{opcode: OpcodeI32Const, arg: 2, init: []uint32{0}},
 				},
 			},
 			importedTable: &TableInstance{Table: make([]interface{}, 2), Min: 2},
@@ -850,7 +850,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 				},
 			},
 			importedGlobals: []*GlobalInstance{{Type: &GlobalType{ValType: ValueTypeI32}, Val: 2}},
@@ -874,7 +874,7 @@ func TestModule_buildTable_Errors(t *testing.T) {
 					},
 				},
 				validatedElementSegments: []*validatedElementSegment{
-					{opcode: OpcodeGlobalGet, arg0: 0, init: []uint32{0}},
+					{opcode: OpcodeGlobalGet, arg: 0, init: []uint32{0}},
 				},
 			},
 			importedTable:   &TableInstance{Table: make([]interface{}, 2), Min: 2},
