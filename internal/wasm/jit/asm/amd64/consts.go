@@ -130,14 +130,15 @@ const (
 	XORPD
 	XORPS
 	XORQ
-
 	RET
 	JMP
 	NOP
+	UD2
 )
 
 const (
-	REG_AX asm.Register = iota
+	_ asm.Register = iota
+	REG_AX
 	REG_CX
 	REG_DX
 	REG_BX

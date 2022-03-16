@@ -35,7 +35,6 @@ func (a *assemblerGoAsmImpl) newProg() (prog *obj.Prog) {
 }
 
 func (a *assemblerGoAsmImpl) addInstruction(next *obj.Prog) {
-	fmt.Println(next)
 	a.b.AddInstruction(next)
 	for _, node := range a.setBranchTargetOnNextNodes {
 		n := node.(*asm.GolangAsmNode)
@@ -346,6 +345,7 @@ var castAsGolangAsmInstruction = [...]obj.As{
 	NOP:       obj.ANOP,
 	RET:       obj.ARET,
 	JMP:       obj.AJMP,
+	UD2:       x86.AUD2,
 	ADDL:      x86.AADDL,
 	ADDQ:      x86.AADDQ,
 	ADDSD:     x86.AADDSD,

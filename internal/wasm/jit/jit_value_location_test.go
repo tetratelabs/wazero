@@ -5,6 +5,8 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
 func Test_isIntRegister(t *testing.T) {
@@ -34,11 +36,11 @@ func TestValueLocationStack_basic(t *testing.T) {
 	// markRegisterUsed.
 	tmpReg2 := unreservedGeneralPurposeIntRegisters[1]
 	s.markRegisterUsed(tmpReg2)
-	require.Contains(t, s.usedRegisters, int16(tmpReg2))
+	require.Contains(t, s.usedRegisters, tmpReg2)
 	// releaseRegister.
 	s.releaseRegister(loc)
 	require.NotContains(t, s.usedRegisters, loc.register)
-	require.Equal(t, int16(-1), loc.register)
+	require.Equal(t, asm.Register(-1), loc.register)
 	// Clone.
 	cloned := s.clone()
 	require.Equal(t, s.usedRegisters, cloned.usedRegisters)
