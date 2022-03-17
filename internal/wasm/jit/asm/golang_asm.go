@@ -18,7 +18,7 @@ func NewGolangAsmNode(p *obj.Prog) Node {
 	return &golangAsmNode{prog: p}
 }
 
-func (n *golangAsmNode) Pc() int64 {
+func (n *golangAsmNode) offsetInBinary() int64 {
 	return n.prog.Pc
 }
 
@@ -36,7 +36,9 @@ func (n *golangAsmNode) AssignSourceConstant(value int64) {
 }
 
 type GolangAsmBaseAssembler struct {
-	b                          *goasm.Builder
+	b *goasm.Builder
+	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
+	// where we want to set the next coming instruction as the destination of these BR instructions.
 	setBranchTargetOnNextNodes []Node
 	// onGenerateCallbacks holds the callbacks which are called after generating native code.
 	onGenerateCallbacks []func(code []byte) error
@@ -63,8 +65,8 @@ func (a *GolangAsmBaseAssembler) Assemble() ([]byte, error) {
 	return code, nil
 }
 
-// SetBranchTargetOnNext implements AssemblerBase.SetBranchTargetOnNext
-func (a *GolangAsmBaseAssembler) SetBranchTargetOnNext(nodes ...Node) {
+// SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
+func (a *GolangAsmBaseAssembler) SetJumpTargetOnNext(nodes ...Node) {
 	a.setBranchTargetOnNextNodes = append(a.setBranchTargetOnNextNodes, nodes...)
 }
 
@@ -82,9 +84,9 @@ func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
 func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstructions []Node) {
 	a.AddOnGenerateCallBack(func(code []byte) error {
 		// Build the offset table for each target including default one.
-		base := labelInitialInstructions[0].Pc() // This corresponds to the L0's address in the example.
+		base := labelInitialInstructions[0].offsetInBinary() // This corresponds to the L0's address in the example.
 		for i, nop := range labelInitialInstructions {
-			if uint64(nop.Pc())-uint64(base) >= math.MaxUint32 {
+			if uint64(nop.offsetInBinary())-uint64(base) >= math.MaxUint32 {
 				// TODO: this happens when users try loading an extremely large webassembly binary
 				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
 				// We would like to support that binary, but realistically speaking, that kind of binary
@@ -94,7 +96,7 @@ func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstru
 				return fmt.Errorf("too large br_table")
 			}
 			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(table[i*4:(i+1)*4], uint32(nop.Pc())-uint32(base))
+			binary.LittleEndian.PutUint32(table[i*4:(i+1)*4], uint32(nop.offsetInBinary())-uint32(base))
 		}
 		return nil
 	})
