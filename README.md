@@ -1,19 +1,21 @@
 # wazero
 
-wazero lets you run WebAssembly modules with zero platform dependencies. Since wazero doesn’t rely on CGO, you keep
-portability features like cross compilation. Import wazero and extend your Go application with code written in any
-language!
+WebAssembly is a way to safely run code compiled in other languages. Runtimes
+execute WebAssembly Modules (Wasm), which are most often binaries with a `.wasm`
+extension.
+
+wazero is a [WebAssembly 1.0 (20191205)](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/) spec compliant runtime written in Go.
+It has zero platform dependencies, and doesn't rely on CGO. This means you can
+run applications in other languages and still keep cross compilation.
+
+Import wazero and extend your Go application with code written in any language!
 
 ## Example
 
-Here's an example of using wazero to invoke a factorial included in a Wasm binary.
-
-While our [source for this](tests/engine/testdata/fac.wat) is the WebAssembly 1.0 (20191205) Text Format,
-it could have been written in another language that targets Wasm, such as AssemblyScript/C/C++/Rust/TinyGo/Zig.
-
+Here's an example of using wazero to invoke a factorial function:
 ```golang
 func main() {
-	// Read WebAssembly binary containing an exported "fac" function.
+	// Read a WebAssembly binary containing an exported "fac" function.
 	// * Ex. (func (export "fac") (param i64) (result i64) ...
 	source, _ := os.ReadFile("./tests/engine/testdata/fac.wasm")
 
@@ -25,6 +27,26 @@ func main() {
 	fmt.Println(module.ExportedFunction("fac").Call(nil, 7))
 }
 ```
+
+Note: While the [source for this](tests/engine/testdata/fac.wat) is in the
+WebAssembly 1.0 (20191205) Text Format, it could have been written in another
+language that compiles to (targets) WebAssembly, such as AssemblyScript/C/C++/Rust/TinyGo/Zig.
+
+## Deeper dive
+
+The former example is a pure function. While a good start, you probably are
+wondering how to do something more realistic, like read a file. WebAssembly
+Modules (Wasm) are sand-boxed similar to containers. They can't read anything
+on your machine unless you explicitly allow it.
+
+System access is defined by an emerging specification called WebAssembly
+System Interface ([WASI](https://github.com/WebAssembly/WASI)). WASI defines
+how WebAssembly programs interact with the host embedding them. For example,
+WASI defines functions for reading the time, or a random number.
+
+This repository includes several [examples](examples) that expose system
+interfaces, via the module `wazero.WASISnapshotPreview1`. These examples are
+tested and a good way to learn what's possible with wazero.
 
 ## Runtime
 
