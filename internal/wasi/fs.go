@@ -20,8 +20,9 @@ type DirFS string // string holds the root path of this directory on the host fi
 
 // OpenFile implements wasi.OpenFileFS.OpenFile.
 func (dir DirFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	// fs.FS requires a FS to reject a path that doesn't satisfy fs.ValidPath.
 	if !fs.ValidPath(name) ||
-		// '\' works as alternate path separater and ':' allows to express a root drive directory.
+		// '\' works as alternative path separater and ':' allows to express a root drive directory.
 		// fs.FS implementation must reject those path on Windows. See Note in the doc of fs.ValidPath.
 		runtime.GOOS == "windows" && strings.ContainsAny(name, `\:`) {
 		return nil, &os.PathError{Op: "open", Path: name, Err: os.ErrInvalid}
@@ -41,6 +42,7 @@ type MemFS map[string]*memFSEntry
 
 // OpenFile implements wasi.OpenFileFS.OpenFile.
 func (m MemFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	// fs.FS requires a FS to reject a path that doesn't satisfy fs.ValidPath.
 	if !fs.ValidPath(name) {
 		return nil, &os.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
