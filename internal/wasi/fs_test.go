@@ -2,6 +2,7 @@ package internalwasi
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -30,6 +31,47 @@ func TestMemFile_Read_Seek(t *testing.T) {
 	// It also tests io.Seeker when it's implemented, which memFile does.
 	err := iotest.TestReader(memFile, expectedFileContent)
 	require.NoError(t, err)
+}
+
+// TestMemFile_Seek_Errors tests the error result of Seek, which iotest.TestReader does not test.
+func TestMemFile_Seek_Errors(t *testing.T) {
+	memFile := &memFile{
+		fsEntry: &memFSEntry{Contents: []byte("wazero")},
+	}
+
+	tests := []struct {
+		name   string
+		offset int64
+		whence int
+		err    string
+	}{
+		{
+			name:   "seek to negative",
+			offset: -1,
+			whence: io.SeekStart,
+			err:    "invalid new offset: -1",
+		},
+		{
+			name:   "seek to more than file length",
+			offset: 1,
+			whence: io.SeekEnd,
+			err:    fmt.Sprintf("invalid new offset: %d", len(memFile.fsEntry.Contents)+1),
+		},
+		{
+			name:   "invalid whence",
+			offset: 1,
+			whence: 42, // arbitrary invalid whence
+			err:    fmt.Sprintf("invalid whence: %d", 42),
+		},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := memFile.Seek(tc.offset, tc.whence)
+			require.EqualError(t, err, tc.err)
+		})
+	}
 }
 
 // TestMemFS_FSInterface tests the behavior of fs.FS interface of MemFS by fstest.TestFS.

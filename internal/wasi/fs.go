@@ -149,16 +149,21 @@ func (f *memFile) Write(p []byte) (int, error) {
 
 // Seek implements io.Seeker
 func (f *memFile) Seek(offset int64, whence int) (int64, error) {
+	var newOffset int64
 	switch whence {
 	case io.SeekStart:
-		f.offset = offset
+		newOffset = offset
 	case io.SeekCurrent:
-		f.offset += offset
+		newOffset = f.offset + offset
 	case io.SeekEnd:
-		f.offset = int64(len(f.fsEntry.Contents)) + offset
+		newOffset = int64(len(f.fsEntry.Contents)) + offset
 	default:
 		return 0, fmt.Errorf("invalid whence: %d", whence)
 	}
+	if newOffset < 0 || newOffset > int64(len(f.fsEntry.Contents)) {
+		return 0, fmt.Errorf("invalid new offset: %d", newOffset)
+	}
+	f.offset = newOffset
 	return f.offset, nil
 }
 
@@ -191,16 +196,21 @@ func (d *memDir) Close() error {
 
 // Seek implements io.Seeker
 func (d *memDir) Seek(offset int64, whence int) (int64, error) {
+	var newOffset int64
 	switch whence {
 	case io.SeekStart:
-		d.offset = offset
+		newOffset = offset
 	case io.SeekCurrent:
-		d.offset += offset
+		newOffset = d.offset + offset
 	case io.SeekEnd:
-		d.offset = int64(len(d.fsEntry.Entries)) + offset
+		newOffset = int64(len(d.fsEntry.Entries)) + offset
 	default:
 		return 0, fmt.Errorf("invalid whence: %d", whence)
 	}
+	if newOffset < 0 || newOffset > int64(len(d.fsEntry.Entries)) {
+		return 0, fmt.Errorf("invalid new offset: %d", newOffset)
+	}
+	d.offset = newOffset
 	return d.offset, nil
 }
 
