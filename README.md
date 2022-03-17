@@ -69,7 +69,7 @@ The last W3C REC was at the end of 2019. There were other features that didn't
 make the cut or were developed in the years since. The community unofficially
 refers to these as [Finished Proposals](https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md).
 
-To ensure compatability, wazero does not opt-into any non-standard feature by
+To ensure compatability, wazero does not opt-in to any non-standard feature by
 default. However, the following status covers what's currently possible with
 `wazero.RuntimeConfig`.
 
