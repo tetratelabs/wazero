@@ -34,6 +34,10 @@ type Node interface {
 }
 
 // AssemblerBase is the common interface for assemblers among multiple architectures.
+//
+// Note: some of them can be implemented in a arch-independent way, but not all can be
+// implemented as such. However, we intentionally put such arch-dependant methods here
+// in order to provide the common documentation interface.
 type AssemblerBase interface {
 	// Assemble produces the final binary for the assembled operations.
 	Assemble() ([]byte, error)
@@ -46,21 +50,24 @@ type AssemblerBase interface {
 	//
 	// TODO: This can be hidden into assembler implementation after golang-asm removal.
 	BuildJumpTable(table []byte, initialInstructions []Node)
-	// TODO
+	// CompileStandAlone adds an instruction to take no arguments.
 	CompileStandAlone(instruction Instruction) Node
-	// TODO
-	CompileConstToRegister(instruction Instruction, constValue int64, destinationReg Register) (inst Node)
-	// TODO
+	// CompileConstToRegister adds an instruction where source operand is `value` as constant and destination is `destinationReg` register.
+	CompileConstToRegister(instruction Instruction, value int64, destinationReg Register) (inst Node)
+	// CompileConstToRegister adds an instruction where source and destination operands are registers.
 	CompileRegisterToRegister(instruction Instruction, from, to Register)
-	// TODO
+	// CompileMemoryToRegister adds an instruction where source operands is the memory address specified by `sourceBaseReg+sourceOffsetConst`
+	// and the destination is `destinationReg` register.
 	CompileMemoryToRegister(instruction Instruction, sourceBaseReg Register, sourceOffsetConst int64, destinationReg Register)
-	// TODO
+	// CompileRegisterToMemory adds an instruction where source operand is `sourceRegister` register and the destination is the
+	// memory address specified by `destinationBaseRegister+destinationOffsetConst`.
 	CompileRegisterToMemory(inst Instruction, sourceRegister Register, destinationBaseRegister Register, destinationOffsetConst int64)
-	// TODO
+	// CompileJump adds jump-type instruction and returns the corresponding Node in the assembled linked list.
 	CompileJump(jmpInstruction Instruction) Node
-	// TODO
+	// CompileJumpToMemory adds jump-type instruction whose destination is stored in the memory address specified by `baseReg+offset`,
+	// and returns the corresponding Node in the assembled linked list.
 	CompileJumpToMemory(jmpInstruction Instruction, baseReg Register, offset int64)
-	// TODO
+	// CompileJumpToMemory adds jump-type instruction whose destination is the memory address specified by `reg` register.
 	CompileJumpToRegister(jmpInstruction Instruction, reg Register)
 	// CompileReadInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
 	// into destinationRegister. "target instruction" is specified by beforeTargetInst argument and
