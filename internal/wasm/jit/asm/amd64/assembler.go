@@ -10,7 +10,6 @@ func NewAssembler() (Assembler, error) {
 
 type Assembler interface {
 	asm.AssemblerBase
-
 	// TODO
 	CompileStandAloneInstruction(asm.Instruction) asm.Node
 	// TODO
@@ -49,6 +48,6 @@ type Assembler interface {
 	CompileJumpToMemory(baseReg asm.Register, offset int64)
 	// TODO
 	CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction)
-
+	// TODO
 	BuildJumpTable(table []byte, initialInstructions []asm.Node)
 }

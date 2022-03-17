@@ -40,11 +40,12 @@ type Assembler interface {
 	CompileAddInstructionWithLeftShiftedRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, desReg asm.Register)
 	// TODO
 	CompileReturn(returnAddressReg asm.Register)
-
+	// TODO
 	CompileSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg, dstReg asm.Register)
+	// TODO
 	CompileTwoSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register)
+	// TODO
 	CompileSIMDWithByteArrangementToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register)
-
 	// CompileReadInstructionAddress adds an ADR instruction to set the absolute address of "target instruction"
 	// into destinationRegister. "target instruction" is specified by beforeTargetInst argument and
 	// the target is determined by "the instruction right after beforeTargetInst type".
@@ -53,7 +54,8 @@ type Assembler interface {
 	// ADR -> X -> Y -> ... -> RET -> MOV, then the ADR instruction emitted by this function set the absolute
 	// address of MOV instruction into the destination register.
 	CompileReadInstructionAddress(beforeTargetInst asm.Instruction, destinationRegister asm.Register)
-
 	// CSET
 	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, destinationReg asm.Register)
+	// TODO
+	BuildJumpTable(table []byte, initialInstructions []asm.Node)
 }
