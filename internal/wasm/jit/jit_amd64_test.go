@@ -99,19 +99,19 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
-						compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
+						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
 						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
 
 						// Setup values.
 						if tc.x1Reg != asm.NilRegister {
-							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x1Value), tc.x1Reg)
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x1Value), tc.x1Reg)
 							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
 						if tc.x2Reg != asm.NilRegister {
-							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x2Value), tc.x2Reg)
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x2Value), tc.x2Reg)
 							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
@@ -221,19 +221,19 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
-						compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
+						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
 						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
 
 						// Setup values.
 						if tc.x1Reg != asm.NilRegister {
-							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x1Value), tc.x1Reg)
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x1Value), tc.x1Reg)
 							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
 						if tc.x2Reg != asm.NilRegister {
-							compiler.assembler.CompileConstToRegisterInstruction(amd64.MOVQ, int64(x2Value), tc.x2Reg)
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x2Value), tc.x2Reg)
 							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
@@ -321,9 +321,9 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 
 		// Jump to the instruction after RET below via the absolute
 		// address stored in destinationRegister.
-		compiler.assembler.CompileJumpToRegister(destinationRegister)
+		compiler.assembler.CompileJumpToRegister(amd64.JMP, destinationRegister)
 
-		compiler.assembler.CompileStandAloneInstruction(amd64.RET)
+		compiler.assembler.CompileStandAlone(amd64.RET)
 
 		// This could be the read instruction target as this is the
 		// right after RET. Therefore, the jmp instruction above
