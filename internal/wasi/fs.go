@@ -12,14 +12,18 @@ import (
 	"time"
 )
 
-// DirFS is a file system that implements fs.FS and wasi.OpenFileFS.
-// It is similar to os.DirFS, but supports file creation by OpenFile.
+// DirFS is a file system that implements fs.FS and wasi.OpenFileFS, similar to the read-only os.DirFS.
+// This is the only implementation that allows the Wasm to create or change files on the host file system, since
+// there is no official alternative interface to wasi.OpenFileFS.
 // See os.DirFS.
-type DirFS string
+type DirFS string // string holds the root path of this directory on the host file system.
 
 // OpenFile implements wasi.OpenFileFS.OpenFile.
 func (dir DirFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
-	if !fs.ValidPath(name) || runtime.GOOS == "windows" && strings.ContainsAny(name, `\:`) {
+	if !fs.ValidPath(name) ||
+		// '\' works as alternate path separater and ':' allows to express a root drive directory.
+		// fs.FS implementation must reject those path on Windows. See Note in the doc of fs.ValidPath.
+		runtime.GOOS == "windows" && strings.ContainsAny(name, `\:`) {
 		return nil, &os.PathError{Op: "open", Path: name, Err: os.ErrInvalid}
 	}
 	return os.OpenFile(string(dir)+"/"+name, flag, perm)
@@ -31,6 +35,8 @@ func (dir DirFS) Open(path string) (fs.File, error) {
 }
 
 // MemFS is an in-memory file system that implements fs.FS and wasi.OpenFileFS.
+// This is the only in-memory FS implementation that allows the Wasm to create or change files, since
+// there is no official alternative interface to wasi.OpenFileFS.
 type MemFS map[string]*memFSEntry
 
 // OpenFile implements wasi.OpenFileFS.OpenFile.
@@ -39,14 +45,13 @@ func (m MemFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error
 		return nil, &os.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
 
-	dir := &memFSEntry{Entries: m}
-
 	// Path "." indicates m itself as a directory.
 	if name == "." {
-		return newMemDir(dir, "."), nil
+		return &memDir{name: ".", fsEntry: &memFSEntry{Entries: m}}, nil
 	}
 
-	// Traverse directories.
+	// Walk directories until we find the directory that the target file belongs to, updating `dir`.
+	dir := &memFSEntry{Entries: m}
 	files := strings.Split(name, "/")
 	for _, file := range files[:len(files)-1] {
 		var ok bool
@@ -55,6 +60,7 @@ func (m MemFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error
 			return nil, &os.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 		}
 	}
+	// now `dir` is the directory that the target file belongs to.
 
 	// Open or create the entry.
 	// Note: MemFS does not check permission for now.
@@ -78,7 +84,7 @@ func (m MemFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error
 	}
 
 	if entry.IsDir() {
-		return newMemDir(entry, baseName), nil
+		return &memDir{name: baseName, fsEntry: entry}, nil
 	} else {
 		return &memFile{name: baseName, fsEntry: entry}, nil
 	}
@@ -129,6 +135,7 @@ func (f *memFile) Read(p []byte) (int, error) {
 
 // Close implements fs.File.Close
 func (f *memFile) Close() error {
+	f.fsEntry = nil
 	return nil
 }
 
@@ -162,27 +169,8 @@ type memDir struct {
 	name string
 	// Seek offset of this opened directory.
 	offset int64
-	// Sorted file list of the dirEntries for ReadDir and Seek.
-	entries []fs.DirEntry
 	// The memFSEntry this memFileInfo is about.
 	fsEntry *memFSEntry
-}
-
-func newMemDir(dir *memFSEntry, baseName string) *memDir {
-	// Cache the file list of the directory for ReadDir to return the result in the consistent order.
-	// Note that it's ok to return stale file list if the directory is modified after Open.
-	// The result of ReadDir is undefined in POSIX in that situation, so WASI will be the same.
-	entries := make([]fs.DirEntry, 0, len(dir.Entries))
-	for name, entry := range dir.Entries {
-		entries = append(entries, &memFileInfo{name: path.Base(name), fsEntry: entry})
-	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
-
-	return &memDir{
-		name:    baseName,
-		entries: entries,
-		fsEntry: dir,
-	}
 }
 
 // Stat implements fs.File.Stat
@@ -197,6 +185,7 @@ func (d *memDir) Read(p []byte) (int, error) {
 
 // Close implements fs.File.Close
 func (d *memDir) Close() error {
+	d.fsEntry = nil
 	return nil
 }
 
@@ -208,7 +197,7 @@ func (d *memDir) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekCurrent:
 		d.offset += offset
 	case io.SeekEnd:
-		d.offset = int64(len(d.entries)) + offset
+		d.offset = int64(len(d.fsEntry.Entries)) + offset
 	default:
 		return 0, fmt.Errorf("invalid whence: %d", whence)
 	}
@@ -217,7 +206,16 @@ func (d *memDir) Seek(offset int64, whence int) (int64, error) {
 
 // ReadDir implements fs.ReadDirFile.
 func (d *memDir) ReadDir(n int) ([]fs.DirEntry, error) {
-	remaining := int64(len(d.entries)) - d.offset
+	// Note that it's ok to return inconsistent list if the directory is modified after previous ReadDir.
+	// The result of modifying directory during ReadDir calls is undefined in POSIX, so WASI will be the same.
+	entries := make([]fs.DirEntry, 0, len(d.fsEntry.Entries))
+	for name, entry := range d.fsEntry.Entries {
+		entries = append(entries, &memFileInfo{name: path.Base(name), fsEntry: entry})
+	}
+	// fs.FeadDirFile.ReadDir requires the result to be sorted by their names.
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+
+	remaining := int64(len(entries)) - d.offset
 	if remaining == 0 &&
 		n > 0 {
 		// return io.EOF only when n > 0, since ReadDir should return empty slice
@@ -228,10 +226,9 @@ func (d *memDir) ReadDir(n int) ([]fs.DirEntry, error) {
 	if n <= 0 || n > int(remaining) {
 		n = int(remaining)
 	}
-	entries := d.entries[d.offset : d.offset+int64(n)]
 	d.offset += int64(n)
 
-	return entries, nil
+	return entries[d.offset-int64(n) : d.offset], nil
 }
 
 // memFileInfo represents a FileInfo of an opened memFile or memDir.
@@ -304,5 +301,7 @@ func (f *readerWriterFile) Write(p []byte) (int, error) {
 
 // Close implements fs.File.Close
 func (f *readerWriterFile) Close() error {
+	f.Reader = nil
+	f.Writer = nil
 	return nil
 }
