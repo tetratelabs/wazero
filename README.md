@@ -63,9 +63,6 @@ Format, yet, e.g. compiling `%.wat` files. The intent is to finish this, and
 meanwhile users can work around this using tools such as `wat2wasm` to compile
 the text format into the binary format.
 
-Currently, this is limited to running existing WebAssembly Modules (Wasm) in
-the Binary Format, though the Text Format is partially implemented.
-
 #### Post 1.0 Features
 
 The last W3C REC was at the end of 2019. There were other features that didn't
