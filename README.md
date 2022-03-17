@@ -30,7 +30,7 @@ func main() {
 
 Note: While the [source for this](tests/engine/testdata/fac.wat) is in the
 WebAssembly 1.0 (20191205) Text Format, it could have been written in another
-language that compiles to (targets) WebAssembly, such as AssemblyScript/C/C++/Rust/TinyGo/Zig.
+language that compiles to (targets) WebAssembly, such as AssemblyScript, C, C++, Rust, TinyGo or Zig.
 
 ## Deeper dive
 
