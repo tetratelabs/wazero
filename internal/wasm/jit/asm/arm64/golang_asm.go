@@ -200,7 +200,7 @@ func (a *assemblerGoAsmImpl) CompileAddInstructionWithLeftShiftedRegister(shifte
 	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
 	// See https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L120-L131
 	inst.From.Type = obj.TYPE_SHIFT
-	inst.From.Offset = (int64(shiftedSourceReg)&31)<<16 | 0<<22 | (shiftNum&63)<<10
+	inst.From.Offset = (int64(castAsGolangAsmRegister[shiftedSourceReg])&31)<<16 | 0<<22 | (shiftNum&63)<<10
 	inst.Reg = castAsGolangAsmRegister[srcReg]
 	a.AddInstruction(inst)
 }

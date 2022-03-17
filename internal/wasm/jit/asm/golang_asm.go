@@ -71,6 +71,11 @@ func (a *GolangAsmBaseAssembler) NewProg() (prog *obj.Prog) {
 	return
 }
 
+// AddOnGenerateCallBack implements AssemblerBase.AddOnGenerateCallBack
+func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
+	a.onGenerateCallbacks = append(a.onGenerateCallbacks, cb)
+}
+
 func (a *GolangAsmBaseAssembler) AddInstruction(next *obj.Prog) {
 	a.b.AddInstruction(next)
 	for _, node := range a.setBranchTargetOnNextNodes {
@@ -78,9 +83,4 @@ func (a *GolangAsmBaseAssembler) AddInstruction(next *obj.Prog) {
 		n.prog.To.SetTarget(next)
 	}
 	a.setBranchTargetOnNextNodes = nil
-}
-
-// AddOnGenerateCallBack implements AssemblerBase.AddOnGenerateCallBack
-func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
-	a.onGenerateCallbacks = append(a.onGenerateCallbacks, cb)
 }
