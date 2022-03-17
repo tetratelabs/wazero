@@ -14,8 +14,6 @@ import (
 	"math"
 	"unsafe"
 
-	garm64 "github.com/twitchyliquid64/golang-asm/obj/arm64"
-
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/arm64"
@@ -1404,7 +1402,7 @@ func (c *arm64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 
 	// Since arm64 doesn't have an instruction directly counting trailing zeros,
 	// we reverse the bits first, and then do CLZ, which is exactly the same as
-	// gcc implements __builtin_ctz for garm64.
+	// gcc implements __builtin_ctz for arm64.
 	if o.Type == wazeroir.UnsignedInt32 {
 		c.assembler.CompileRegisterToRegisterInstruction(arm64.RBITW, reg, reg)
 		c.assembler.CompileRegisterToRegisterInstruction(arm64.CLZW, reg, reg)
@@ -1981,7 +1979,7 @@ func (c *arm64Compiler) compileI32WrapFromI64() error {
 // compileITruncFromF implements compiler.compileITruncFromF for the arm64 architecture.
 func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) error {
 	// Clear the floating point status register (FPSR).
-	c.assembler.CompileRegisterToRegisterInstruction(arm64.MSR, arm64.REGZERO, garm64.REG_FPSR)
+	c.assembler.CompileRegisterToRegisterInstruction(arm64.MSR, arm64.REGZERO, arm64.REG_FPSR)
 
 	var convinst asm.Instruction
 	var is32bitFloat = o.InputType == wazeroir.Float32
@@ -2018,7 +2016,7 @@ func (c *arm64Compiler) compileITruncFromF(o *wazeroir.OperationITruncFromF) err
 
 	// Obtain the floating point status register value into the general purpose register,
 	// so that we can check if the conversion resulted in undefined behavior.
-	c.assembler.CompileRegisterToRegisterInstruction(arm64.MRS, garm64.REG_FPSR, reservedRegisterForTemporary)
+	c.assembler.CompileRegisterToRegisterInstruction(arm64.MRS, arm64.REG_FPSR, reservedRegisterForTemporary)
 	// Check if the conversion was undefined by comparing the status with 1.
 	// See https://developer.arm.com/documentation/ddi0595/2020-12/AArch64-Registers/FPSR--Floating-point-Status-Register
 	c.assembler.CompileRegisterAndConstSourceToNoneInstruction(arm64.CMP, reservedRegisterForTemporary, 1)

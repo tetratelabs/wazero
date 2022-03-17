@@ -24,7 +24,7 @@ const (
 )
 
 const (
-	// integer
+	// Integer registers.
 	REG_R0 asm.Register = asm.NilRegister + 1 + iota
 	REG_R1
 	REG_R2
@@ -58,7 +58,7 @@ const (
 	REG_R30
 	REGZERO
 
-	// scalar floating point
+	// Scalar floating point registers.
 	REG_F0
 	REG_F1
 	REG_F2
@@ -91,6 +91,9 @@ const (
 	REG_F29
 	REG_F30
 	REG_F31
+
+	// Floating point status register.
+	REG_FPSR
 )
 
 const (
