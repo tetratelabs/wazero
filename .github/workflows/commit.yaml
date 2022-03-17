@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 env:  # Update this prior to requiring a higher minor version in go.mod
-  GO_VERSION: "1.17"  # Latest patch
+  GO_VERSION: "1.17"  # 1.xx == latest patch of 1.xx
 
 defaults:
   run:  # use bash for all operating systems unless overridden
@@ -19,11 +19,13 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
+          # TODO: Change to a matrix to ensure developers can use the latest version, noting often there is a lag of
+          # weeks before the latest version is usable. Ex. golangci/golangci-lint#2649
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install wast2json
+      - name: Install latest wast2json
         run: |  # Needed for build.spectest. wabt includes wast2json
-          wabt_version=1.0.24
+          wabt_version=1.0.27
           wabt_url=https://github.com/WebAssembly/wabt/releases/download/${wabt_version}/wabt-${wabt_version}-ubuntu.tar.gz
           curl -sSL ${wabt_url} | tar --strip-components 2 -C /usr/local/bin -xzf - wabt-${wabt_version}/bin/wast2json
 

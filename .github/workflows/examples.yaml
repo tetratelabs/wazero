@@ -18,7 +18,7 @@ jobs:
     name: Build examples
     runs-on: ubuntu-20.04
     steps:
-      - name: Install TinyGo
+      - name: Install latest TinyGo
         run: |  # installing via curl so commands are similar on OS/x
           tinygo_version=0.22.0
           curl -sSL https://github.com/tinygo-org/tinygo/releases/download/v${tinygo_version}/tinygo${tinygo_version}.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
