@@ -180,27 +180,27 @@ func (a *assemblerGoAsmImpl) CompileUnconditionalJump() asm.Node {
 }
 
 // CompileJump implements Assembler.CompileJump.
-func (a *assemblerGoAsmImpl) CompileJump(inst asm.Instruction) asm.Node {
+func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	p := a.NewProg()
-	p.As = castAsGolangAsmInstruction[inst]
+	p.As = castAsGolangAsmInstruction[jmpInstruction]
 	p.To.Type = obj.TYPE_BRANCH
 	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
 // CompileJumpToRegister implements Assembler.CompileJumpToRegister.
-func (a *assemblerGoAsmImpl) CompileJumpToRegister(reg asm.Register) {
+func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	p := a.NewProg()
-	p.As = obj.AJMP
+	p.As = castAsGolangAsmInstruction[jmpInstruction]
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[reg]
 	a.AddInstruction(p)
 }
 
 // CompileJumpToMemory implements Assembler.CompileJumpToMemory.
-func (a *assemblerGoAsmImpl) CompileJumpToMemory(baseReg asm.Register, offset int64) {
+func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset int64) {
 	p := a.NewProg()
-	p.As = obj.AJMP
+	p.As = castAsGolangAsmInstruction[jmpInstruction]
 	p.To.Type = obj.TYPE_MEM
 	p.To.Reg = castAsGolangAsmRegister[baseReg]
 	p.To.Offset = offset

@@ -11,8 +11,7 @@ func NewAssembler(temporaryRegister asm.Register) (Assembler, error) {
 // Assembler is the interface for arm64 specific assembler.
 type Assembler interface {
 	asm.AssemblerBase
-	// TODO
-	CompileConstToRegister(instruction asm.Instruction, constValue int64, destinationReg asm.Register) (inst asm.Node)
+
 	// TODO
 	CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register)
 	// TODO
@@ -22,8 +21,6 @@ type Assembler interface {
 	// TODO
 	CompileRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, sourceRegister, destinationBaseRegister, destinationOffsetReg asm.Register)
 	// TODO
-	CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register)
-	// TODO
 	CompileTwoRegistersToRegister(instruction asm.Instruction, src1, src2, destination asm.Register)
 	// TODO
 	CompileTwoRegisters(instruction asm.Instruction, src1, src2, dst1, dst2 asm.Register)
@@ -32,15 +29,7 @@ type Assembler interface {
 	// TODO
 	CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst int64)
 	// TODO
-	CompileBranch(instruction asm.Instruction) (br asm.Node)
-	// TODO
-	CompileUnconditionalBranchToAddressOnMemory(addressReg asm.Register)
-	// TODO
-	CompileStandAlone(instruction asm.Instruction) asm.Node
-	// TODO
 	CompileAddInstructionWithLeftShiftedRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, desReg asm.Register)
-	// TODO
-	CompileReturn(returnAddressReg asm.Register)
 	// TODO
 	CompileSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg, dstReg asm.Register)
 	// TODO

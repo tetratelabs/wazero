@@ -170,30 +170,30 @@ func (a *assemblerGoAsmImpl) CompileRegisterAndConstSourceToNone(instruction asm
 	a.AddInstruction(inst)
 }
 
-// CompileBranch implements Assembler.CompileBranch.
-func (a *assemblerGoAsmImpl) CompileBranch(instruction asm.Instruction) asm.Node {
+// CompileJump implements AssemblerBase.CompileJump.
+func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	br := a.NewProg()
-	br.As = castAsGolangAsmInstruction[instruction]
+	br.As = castAsGolangAsmInstruction[jmpInstruction]
 	br.To.Type = obj.TYPE_BRANCH
 	a.AddInstruction(br)
 	return asm.NewGolangAsmNode(br)
 }
 
-// CompileUnconditionalBranchToAddressOnMemory implements Assembler.CompileUnconditionalBranchToAddressOnMemory.
-func (a *assemblerGoAsmImpl) CompileUnconditionalBranchToAddressOnMemory(memoryLocationReg asm.Register) {
+// CompileJumpToMemory implements AssemblerBase.CompileJumpToMemory.
+func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset int64) {
 	br := a.NewProg()
-	br.As = obj.AJMP
+	br.As = castAsGolangAsmInstruction[jmpInstruction]
 	br.To.Type = obj.TYPE_MEM
-	br.To.Reg = castAsGolangAsmRegister[memoryLocationReg]
+	br.To.Reg = castAsGolangAsmRegister[baseReg]
+	br.To.Offset = offset
 	a.AddInstruction(br)
 }
 
-// CompileReturn implements Assembler.CompileReturn.
-func (a *assemblerGoAsmImpl) CompileReturn(returnAddressReg asm.Register) {
+func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	ret := a.NewProg()
-	ret.As = obj.ARET
+	ret.As = castAsGolangAsmInstruction[jmpInstruction]
 	ret.To.Type = obj.TYPE_REG
-	ret.To.Reg = castAsGolangAsmRegister[returnAddressReg]
+	ret.To.Reg = castAsGolangAsmRegister[reg]
 	a.AddInstruction(ret)
 }
 
