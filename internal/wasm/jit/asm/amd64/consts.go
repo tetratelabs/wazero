@@ -3,6 +3,21 @@ package amd64
 import "github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 
 const (
+	ConditionalRegisterStateE  = asm.ConditionalRegisterStateUnset + 1 + iota // ZF equal to zero
+	ConditionalRegisterStateNE                                                //˜ZF not equal to zero
+	ConditionalRegisterStateS                                                 // SF negative
+	ConditionalRegisterStateNS                                                // ˜SF non-negative
+	ConditionalRegisterStateG                                                 // ˜(SF xor OF) & ˜ ZF greater (signed >)
+	ConditionalRegisterStateGE                                                // ˜(SF xor OF) greater or equal (signed >=)
+	ConditionalRegisterStateL                                                 // SF xor OF less (signed <)
+	ConditionalRegisterStateLE                                                // (SF xor OF) | ZF less or equal (signed <=)
+	ConditionalRegisterStateA                                                 // ˜CF & ˜ZF above (unsigned >)
+	ConditionalRegisterStateAE                                                // ˜CF above or equal (unsigned >=)
+	ConditionalRegisterStateB                                                 // CF below (unsigned <)
+	ConditionalRegisterStateBE                                                // CF | ZF below or equal (unsigned <=)
+)
+
+const (
 	ADDL = iota
 	ADDQ
 	ADDSD

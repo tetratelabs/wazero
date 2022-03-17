@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/arm64"
+
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
 type assemblerGoAsmImpl struct {

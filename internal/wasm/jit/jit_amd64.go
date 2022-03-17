@@ -71,21 +71,6 @@ func init() {
 	float64ForMaximumSigned64bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float64ForMaximumSigned64bitIntPlusOne))
 }
 
-const (
-	conditionalRegisterStateE  = conditionalRegisterStateUnset + 1 + iota // ZF equal to zero
-	conditionalRegisterStateNE                                            //˜ZF not equal to zero
-	conditionalRegisterStateS                                             // SF negative
-	conditionalRegisterStateNS                                            // ˜SF non-negative
-	conditionalRegisterStateG                                             // ˜(SF xor OF) & ˜ ZF greater (signed >)
-	conditionalRegisterStateGE                                            // ˜(SF xor OF) greater or equal (signed >=)
-	conditionalRegisterStateL                                             // SF xor OF less (signed <)
-	conditionalRegisterStateLE                                            // (SF xor OF) | ZF less or equal (signed <=)
-	conditionalRegisterStateA                                             // ˜CF & ˜ZF above (unsigned >)
-	conditionalRegisterStateAE                                            // ˜CF above or equal (unsigned >=)
-	conditionalRegisterStateB                                             // CF below (unsigned <)
-	conditionalRegisterStateBE                                            // CF | ZF below or equal (unsigned <=)
-)
-
 var (
 	// reservedRegisterForCallEngine: pointer to callEngine (i.e. *callEngine as uintptr)
 	reservedRegisterForCallEngine = amd64.REG_R13
@@ -425,29 +410,29 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	if cond.onConditionalRegister() {
 		var inst asm.Instruction
 		switch cond.conditionalRegister {
-		case conditionalRegisterStateE:
+		case amd64.ConditionalRegisterStateE:
 			inst = amd64.JEQ
-		case conditionalRegisterStateNE:
+		case amd64.ConditionalRegisterStateNE:
 			inst = amd64.JNE
-		case conditionalRegisterStateS:
+		case amd64.ConditionalRegisterStateS:
 			inst = amd64.JMI
-		case conditionalRegisterStateNS:
+		case amd64.ConditionalRegisterStateNS:
 			inst = amd64.JPL
-		case conditionalRegisterStateG:
+		case amd64.ConditionalRegisterStateG:
 			inst = amd64.JGT
-		case conditionalRegisterStateGE:
+		case amd64.ConditionalRegisterStateGE:
 			inst = amd64.JGE
-		case conditionalRegisterStateL:
+		case amd64.ConditionalRegisterStateL:
 			inst = amd64.JLT
-		case conditionalRegisterStateLE:
+		case amd64.ConditionalRegisterStateLE:
 			inst = amd64.JLE
-		case conditionalRegisterStateA:
+		case amd64.ConditionalRegisterStateA:
 			inst = amd64.JHI
-		case conditionalRegisterStateAE:
+		case amd64.ConditionalRegisterStateAE:
 			inst = amd64.JCC
-		case conditionalRegisterStateB:
+		case amd64.ConditionalRegisterStateB:
 			inst = amd64.JCS
-		case conditionalRegisterStateBE:
+		case amd64.ConditionalRegisterStateBE:
 			inst = amd64.JLS
 		}
 		jmpWithCond = c.assembler.CompileJump(inst)
@@ -2667,11 +2652,11 @@ func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstr
 	c.assembler.CompileRegisterToRegisterInstruction(cmpInstruction, x2Reg, x1Reg)
 
 	// Record that the result is on the conditional register.
-	var condReg conditionalRegisterState
+	var condReg asm.ConditionalRegisterState
 	if shouldEqual {
-		condReg = conditionalRegisterStateE
+		condReg = amd64.ConditionalRegisterStateE
 	} else {
-		condReg = conditionalRegisterStateNE
+		condReg = amd64.ConditionalRegisterStateNE
 	}
 	loc := c.locationStack.pushValueLocationOnConditionalRegister(condReg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
@@ -2751,7 +2736,7 @@ func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	c.locationStack.releaseRegister(v)
 
 	// Finally, record that the result is on the conditional register.
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegisterStateE)
+	loc := c.locationStack.pushValueLocationOnConditionalRegister(amd64.ConditionalRegisterStateE)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
@@ -2769,26 +2754,26 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	}
 
 	// Emit the compare instruction.
-	var resultConditionState conditionalRegisterState
+	var resultConditionState asm.ConditionalRegisterState
 	var inst asm.Instruction
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
-		resultConditionState = conditionalRegisterStateL
+		resultConditionState = amd64.ConditionalRegisterStateL
 		inst = amd64.CMPL
 	case wazeroir.SignedTypeUint32:
-		resultConditionState = conditionalRegisterStateB
+		resultConditionState = amd64.ConditionalRegisterStateB
 		inst = amd64.CMPL
 	case wazeroir.SignedTypeInt64:
 		inst = amd64.CMPQ
-		resultConditionState = conditionalRegisterStateL
+		resultConditionState = amd64.ConditionalRegisterStateL
 	case wazeroir.SignedTypeUint64:
-		resultConditionState = conditionalRegisterStateB
+		resultConditionState = amd64.ConditionalRegisterStateB
 		inst = amd64.CMPQ
 	case wazeroir.SignedTypeFloat32:
-		resultConditionState = conditionalRegisterStateA
+		resultConditionState = amd64.ConditionalRegisterStateA
 		inst = amd64.COMISS
 	case wazeroir.SignedTypeFloat64:
-		resultConditionState = conditionalRegisterStateA
+		resultConditionState = amd64.ConditionalRegisterStateA
 		inst = amd64.COMISD
 	}
 	c.assembler.CompileRegisterToRegisterInstruction(inst, x1.register, x2.register)
@@ -2816,26 +2801,26 @@ func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	}
 
 	// Emit the compare instruction.
-	var resultConditionState conditionalRegisterState
+	var resultConditionState asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
-		resultConditionState = conditionalRegisterStateG
+		resultConditionState = amd64.ConditionalRegisterStateG
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPL, x1.register, x2.register)
 	case wazeroir.SignedTypeUint32:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPL, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateA
+		resultConditionState = amd64.ConditionalRegisterStateA
 	case wazeroir.SignedTypeInt64:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateG
+		resultConditionState = amd64.ConditionalRegisterStateG
 	case wazeroir.SignedTypeUint64:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateA
+		resultConditionState = amd64.ConditionalRegisterStateA
 	case wazeroir.SignedTypeFloat32:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.UCOMISS, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateA
+		resultConditionState = amd64.ConditionalRegisterStateA
 	case wazeroir.SignedTypeFloat64:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.UCOMISD, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateA
+		resultConditionState = amd64.ConditionalRegisterStateA
 	}
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
@@ -2862,25 +2847,25 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 
 	// Emit the compare instruction.
 	var inst asm.Instruction
-	var resultConditionState conditionalRegisterState
+	var resultConditionState asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
-		resultConditionState = conditionalRegisterStateLE
+		resultConditionState = amd64.ConditionalRegisterStateLE
 		inst = amd64.CMPL
 	case wazeroir.SignedTypeUint32:
-		resultConditionState = conditionalRegisterStateBE
+		resultConditionState = amd64.ConditionalRegisterStateBE
 		inst = amd64.CMPL
 	case wazeroir.SignedTypeInt64:
-		resultConditionState = conditionalRegisterStateLE
+		resultConditionState = amd64.ConditionalRegisterStateLE
 		inst = amd64.CMPQ
 	case wazeroir.SignedTypeUint64:
-		resultConditionState = conditionalRegisterStateBE
+		resultConditionState = amd64.ConditionalRegisterStateBE
 		inst = amd64.CMPQ
 	case wazeroir.SignedTypeFloat32:
-		resultConditionState = conditionalRegisterStateAE
+		resultConditionState = amd64.ConditionalRegisterStateAE
 		inst = amd64.UCOMISS
 	case wazeroir.SignedTypeFloat64:
-		resultConditionState = conditionalRegisterStateAE
+		resultConditionState = amd64.ConditionalRegisterStateAE
 		inst = amd64.UCOMISD
 	}
 	c.assembler.CompileRegisterToRegisterInstruction(inst, x1.register, x2.register)
@@ -2908,26 +2893,26 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	}
 
 	// Emit the compare instruction.
-	var resultConditionState conditionalRegisterState
+	var resultConditionState asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPL, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateGE
+		resultConditionState = amd64.ConditionalRegisterStateGE
 	case wazeroir.SignedTypeUint32:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPL, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateAE
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	case wazeroir.SignedTypeInt64:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateGE
+		resultConditionState = amd64.ConditionalRegisterStateGE
 	case wazeroir.SignedTypeUint64:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.CMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateAE
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	case wazeroir.SignedTypeFloat32:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.COMISS, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateAE
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	case wazeroir.SignedTypeFloat64:
 		c.assembler.CompileRegisterToRegisterInstruction(amd64.COMISD, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateAE
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	}
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
@@ -3329,29 +3314,29 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valu
 	// to translate conditionalRegisterState* to amd64.SET*
 	var inst asm.Instruction
 	switch loc.conditionalRegister {
-	case conditionalRegisterStateE:
+	case amd64.ConditionalRegisterStateE:
 		inst = amd64.SETEQ
-	case conditionalRegisterStateNE:
+	case amd64.ConditionalRegisterStateNE:
 		inst = amd64.SETNE
-	case conditionalRegisterStateS:
+	case amd64.ConditionalRegisterStateS:
 		inst = amd64.SETMI
-	case conditionalRegisterStateNS:
+	case amd64.ConditionalRegisterStateNS:
 		inst = amd64.SETPL
-	case conditionalRegisterStateG:
+	case amd64.ConditionalRegisterStateG:
 		inst = amd64.SETGT
-	case conditionalRegisterStateGE:
+	case amd64.ConditionalRegisterStateGE:
 		inst = amd64.SETGE
-	case conditionalRegisterStateL:
+	case amd64.ConditionalRegisterStateL:
 		inst = amd64.SETLT
-	case conditionalRegisterStateLE:
+	case amd64.ConditionalRegisterStateLE:
 		inst = amd64.SETLE
-	case conditionalRegisterStateA:
+	case amd64.ConditionalRegisterStateA:
 		inst = amd64.SETHI
-	case conditionalRegisterStateAE:
+	case amd64.ConditionalRegisterStateAE:
 		inst = amd64.SETCC
-	case conditionalRegisterStateB:
+	case amd64.ConditionalRegisterStateB:
 		inst = amd64.SETCS
-	case conditionalRegisterStateBE:
+	case amd64.ConditionalRegisterStateBE:
 		inst = amd64.SETLS
 	}
 
