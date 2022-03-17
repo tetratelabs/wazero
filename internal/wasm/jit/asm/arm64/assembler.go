@@ -56,6 +56,4 @@ type Assembler interface {
 	CompileReadInstructionAddress(beforeTargetInst asm.Instruction, destinationRegister asm.Register)
 	// CSET
 	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, destinationReg asm.Register)
-	// TODO
-	BuildJumpTable(table []byte, initialInstructions []asm.Node)
 }

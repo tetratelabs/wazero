@@ -1,7 +1,6 @@
 package arm64
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 
@@ -259,27 +258,6 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(beforeTargetInst asm.
 		adrInstructionBytes[0] |= (v & 0b00011100) << 3
 		// The 5 to 7 bits live on 8 to 10 bits of the instruction.
 		adrInstructionBytes[1] |= (v & 0b11100000) >> 5
-		return nil
-	})
-}
-
-func (a *assemblerGoAsmImpl) BuildJumpTable(table []byte, labelInitialInstructions []asm.Node) {
-	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Build the offset table for each target including default one.
-		base := labelInitialInstructions[0].Pc() // This corresponds to the L0's address in the example.
-		for i, nop := range labelInitialInstructions {
-			if uint64(nop.Pc())-uint64(base) >= math.MaxUint32 {
-				// TODO: this happens when users try loading an extremely large webassembly binary
-				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
-				// We would like to support that binary, but realistically speaking, that kind of binary
-				// could result in more than ten giga bytes of native JITed code where we have to care about
-				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
-				// current implementation.
-				return fmt.Errorf("too large br_table")
-			}
-			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(table[i*4:(i+1)*4], uint32(nop.Pc())-uint32(base))
-		}
 		return nil
 	})
 }

@@ -22,4 +22,6 @@ type Node interface {
 type AssemblerBase interface {
 	Assemble() ([]byte, error)
 	SetBranchTargetOnNext(nodes ...Node)
+	// TODO
+	BuildJumpTable(table []byte, initialInstructions []Node)
 }
