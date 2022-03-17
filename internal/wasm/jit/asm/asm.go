@@ -18,7 +18,7 @@ type ConditionalRegisterState byte
 // can be used to indicate that no conditional state is specificed.
 const ConditionalRegisterStateUnset ConditionalRegisterState = 0
 
-// Node represents a node in singly linked list of assembled operations.
+// Node represents a node in the linked list of assembled operations.
 type Node interface {
 	// AssignJumpTarget assigns the given target node as the destination of
 	// jump instruction for this Node.

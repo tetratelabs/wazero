@@ -10,6 +10,8 @@ import (
 	"github.com/twitchyliquid64/golang-asm/obj"
 )
 
+// golangAsmNode implements Node for golang-asm library.
+
 type golangAsmNode struct {
 	prog *obj.Prog
 }
@@ -18,23 +20,28 @@ func NewGolangAsmNode(p *obj.Prog) Node {
 	return &golangAsmNode{prog: p}
 }
 
+// offsetInBinary implements Node.offsetInBinary.
 func (n *golangAsmNode) offsetInBinary() int64 {
 	return n.prog.Pc
 }
 
+// AssignJumpTarget implements Node.AssignJumpTarget.
 func (n *golangAsmNode) AssignJumpTarget(target Node) {
 	b := target.(*golangAsmNode)
 	n.prog.To.SetTarget(b.prog)
 }
 
+// AssignDestinationConstant implements Node.AssignDestinationConstant.
 func (n *golangAsmNode) AssignDestinationConstant(value int64) {
 	n.prog.To.Offset = value
 }
 
+// AssignSourceConstant implements Node.AssignSourceConstant.
 func (n *golangAsmNode) AssignSourceConstant(value int64) {
 	n.prog.From.Offset = value
 }
 
+// GolangAsmBaseAssembler implements AssemblerBase for golang-asm library.
 type GolangAsmBaseAssembler struct {
 	b *goasm.Builder
 	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
@@ -43,8 +50,6 @@ type GolangAsmBaseAssembler struct {
 	// onGenerateCallbacks holds the callbacks which are called after generating native code.
 	onGenerateCallbacks []func(code []byte) error
 }
-
-var _ AssemblerBase = &GolangAsmBaseAssembler{}
 
 func NewGolangAsmBaseAssembler() (*GolangAsmBaseAssembler, error) {
 	b, err := goasm.NewBuilder(runtime.GOARCH, 1024)
@@ -68,11 +73,6 @@ func (a *GolangAsmBaseAssembler) Assemble() ([]byte, error) {
 // SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
 func (a *GolangAsmBaseAssembler) SetJumpTargetOnNext(nodes ...Node) {
 	a.setBranchTargetOnNextNodes = append(a.setBranchTargetOnNextNodes, nodes...)
-}
-
-func (a *GolangAsmBaseAssembler) NewProg() (prog *obj.Prog) {
-	prog = a.b.NewProg()
-	return
 }
 
 // AddOnGenerateCallBack implements AssemblerBase.AddOnGenerateCallBack
@@ -102,6 +102,7 @@ func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstru
 	})
 }
 
+// AddInstruction is used in architecture specific assembler implementation for golang-asm.
 func (a *GolangAsmBaseAssembler) AddInstruction(next *obj.Prog) {
 	a.b.AddInstruction(next)
 	for _, node := range a.setBranchTargetOnNextNodes {
@@ -109,4 +110,10 @@ func (a *GolangAsmBaseAssembler) AddInstruction(next *obj.Prog) {
 		n.prog.To.SetTarget(next)
 	}
 	a.setBranchTargetOnNextNodes = nil
+}
+
+// NewProg is used in architecture specific assembler implementation for golang-asm.
+func (a *GolangAsmBaseAssembler) NewProg() (prog *obj.Prog) {
+	prog = a.b.NewProg()
+	return
 }
