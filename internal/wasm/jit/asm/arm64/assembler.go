@@ -54,8 +54,6 @@ type Assembler interface {
 	// address of MOV instruction into the destination register.
 	CompileReadInstructionAddress(beforeTargetInst asm.Instruction, destinationRegister asm.Register)
 
-	BuildJumpTable(table []byte, initialInstructions []asm.Node)
-
 	// CSET
 	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, destinationReg asm.Register)
 }

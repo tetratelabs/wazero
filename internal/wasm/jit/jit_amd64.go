@@ -7,7 +7,6 @@ package jit
 // e.g. MOVQ will be given as amd64.MOVQ.
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 	"runtime"
@@ -99,9 +98,7 @@ type amd64Compiler struct {
 	currentLabel string
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	// onGenerateCallbacks holds the callbacks which are called after generating native code.
-	onGenerateCallbacks []func(code []byte) error
-	staticData          compiledFunctionStaticData
+	staticData                           compiledFunctionStaticData
 }
 
 // setLocationStack sets the given valueLocationStack to .locationStack field,
@@ -180,12 +177,6 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 	code, err = mmapCodeSegment(code)
 	if err != nil {
 		return
-	}
-
-	for _, cb := range c.onGenerateCallbacks {
-		if err = cb(code); err != nil {
-			return
-		}
 	}
 
 	staticData = c.staticData
@@ -639,25 +630,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		}
 	}
 
-	// TODO: this should be done in assembler pkg.
-	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-		// Build the offset table for each target including default one.
-		base := labelInitialInstructions[0].Pc() // This corresponds to the L0's address in the example.
-		for i, nop := range labelInitialInstructions {
-			if uint64(nop.Pc())-uint64(base) >= math.MaxUint32 {
-				// TODO: this happens when users try loading an extremely large webassembly binary
-				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
-				// We would like to support that binary, but realistically speaking, that kind of binary
-				// could result in more than ten giga bytes of native JITed code where we have to care about
-				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
-				// current implementation.
-				return fmt.Errorf("too large br_table")
-			}
-			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc())-uint32(base))
-		}
-		return nil
-	})
+	c.assembler.BuildJumpTable(offsetData, labelInitialInstructions)
 	return nil
 }
 

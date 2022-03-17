@@ -49,4 +49,6 @@ type Assembler interface {
 	CompileJumpToMemory(baseReg asm.Register, offset int64)
 	// TODO
 	CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction)
+
+	BuildJumpTable(table []byte, initialInstructions []asm.Node)
 }
