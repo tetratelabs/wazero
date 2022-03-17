@@ -3432,7 +3432,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 
 	// At this point, callFrameStackPointerRegister holds the offset in call frame slice in bytes,
 	// and tmpRegister holds the absolute address of the first item of call frame slice.
-	// To illustrate the situation:m
+	// To illustrate the situation:
 	//
 	//  tmpRegister (holding the absolute address of &callFrame[0])
 	//      |

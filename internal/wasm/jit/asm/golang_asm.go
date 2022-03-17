@@ -11,7 +11,6 @@ import (
 )
 
 // golangAsmNode implements Node for golang-asm library.
-
 type golangAsmNode struct {
 	prog *obj.Prog
 }

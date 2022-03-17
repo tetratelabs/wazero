@@ -11,7 +11,6 @@ import (
 )
 
 // assemblerGoAsmImpl implements Assembler for golang-asm library.
-
 type assemblerGoAsmImpl struct {
 	*asm.GolangAsmBaseAssembler
 }
