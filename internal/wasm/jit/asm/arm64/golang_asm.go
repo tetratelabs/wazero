@@ -206,8 +206,8 @@ func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.
 	return asm.NewGolangAsmNode(prog)
 }
 
-// CompileAddInstructionWithLeftShiftedRegister implements Assembler.CompileAddInstructionWithLeftShiftedRegister.
-func (a *assemblerGoAsmImpl) CompileAddInstructionWithLeftShiftedRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, destinationReg asm.Register) {
+// CompileLeftShiftedRegisterToRegister implements Assembler.CompileLeftShiftedRegisterToRegister.
+func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = arm64.AADD
 	inst.To.Type = obj.TYPE_REG
@@ -298,8 +298,8 @@ func simdRegisterForScalarFloatRegister(freg int16) int16 {
 	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
 }
 
-// CompileTwoSIMDToSIMDWithByteArrangement implements Assembler.CompileTwoSIMDToSIMDWithByteArrangement.
-func (a *assemblerGoAsmImpl) CompileTwoSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
+// CompileTwoSIMDByteToRegister implements Assembler.CompileTwoSIMDByteToRegister.
+func (a *assemblerGoAsmImpl) CompileTwoSIMDByteToRegister(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
 	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg1], castAsGolangAsmRegister[srcReg2], castAsGolangAsmRegister[dstReg]
 	src1VReg, src2VReg, dstVReg := simdRegisterForScalarFloatRegister(src1FloatReg), simdRegisterForScalarFloatRegister(src2FloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
 
@@ -316,8 +316,8 @@ func (a *assemblerGoAsmImpl) CompileTwoSIMDToSIMDWithByteArrangement(instruction
 
 }
 
-// CompileSIMDToSIMDWithByteArrangement implements Assembler.CompileSIMDToSIMDWithByteArrangement.
-func (a *assemblerGoAsmImpl) CompileSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg, dstReg asm.Register) {
+// CompileSIMDByteToSIMDByte implements Assembler.CompileSIMDByteToSIMDByte.
+func (a *assemblerGoAsmImpl) CompileSIMDByteToSIMDByte(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
 
@@ -332,8 +332,8 @@ func (a *assemblerGoAsmImpl) CompileSIMDToSIMDWithByteArrangement(instruction as
 	a.AddInstruction(inst)
 }
 
-// CompileSIMDWithByteArrangementToRegister implements Assembler.CompileSIMDWithByteArrangementToRegister.
-func (a *assemblerGoAsmImpl) CompileSIMDWithByteArrangementToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
+// CompileSIMDByteToRegister implements Assembler.CompileSIMDByteToRegister.
+func (a *assemblerGoAsmImpl) CompileSIMDByteToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFlaotReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFlaotReg)
 

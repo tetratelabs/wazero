@@ -267,7 +267,7 @@ func (c *arm64Compiler) compileReturnFunction() error {
 		tmpReg,
 	)
 	// "callFrameStackTopAddressRegister = tmpReg + callFramePointerReg << ${callFrameDataSizeMostSignificantSetBit}"
-	c.assembler.CompileAddInstructionWithLeftShiftedRegister(
+	c.assembler.CompileLeftShiftedRegisterToRegister(
 		callFramePointerReg, callFrameDataSizeMostSignificantSetBit,
 		tmpReg,
 		callFrameStackTopAddressRegister,
@@ -735,7 +735,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	)
 
 	// "index.register = tmpReg + (index.register << 2) (== &offsetData[offset])"
-	c.assembler.CompileAddInstructionWithLeftShiftedRegister(index.register, 2, tmpReg, index.register)
+	c.assembler.CompileLeftShiftedRegisterToRegister(index.register, 2, tmpReg, index.register)
 
 	// "index.register = *index.register (== offsetData[offset])"
 	c.assembler.CompileMemoryToRegister(arm64.MOVW, index.register, 0, index.register)
@@ -992,7 +992,7 @@ func (c *arm64Compiler) compileCalcCallFrameStackTopAddress(callFrameStackPointe
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackElement0AddressOffset,
 		destinationRegister)
 	// "destinationRegister += callFrameStackPointerRegister << $callFrameDataSizeMostSignificantSetBit"
-	c.assembler.CompileAddInstructionWithLeftShiftedRegister(
+	c.assembler.CompileLeftShiftedRegisterToRegister(
 		callFrameStackPointerRegister, callFrameDataSizeMostSignificantSetBit,
 		destinationRegister,
 		destinationRegister,
@@ -1049,7 +1049,7 @@ func (c *arm64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	// "offset = tmp + (offset << 4) (== &table[offset])"
 	// Here we left shifting by 4 in order to get the offset in bytes,
 	// and the table element type is interface which is 16 bytes (two pointers).
-	c.assembler.CompileAddInstructionWithLeftShiftedRegister(
+	c.assembler.CompileLeftShiftedRegisterToRegister(
 		offset.register, 4,
 		tmp,
 		offset.register,
@@ -1443,8 +1443,8 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	//    VUADDLV V0.B8, V0
 	//
 	c.assembler.CompileRegisterToRegister(arm64.FMOVD, reg, freg)
-	c.assembler.CompileSIMDToSIMDWithByteArrangement(arm64.VCNT, freg, freg)
-	c.assembler.CompileSIMDWithByteArrangementToRegister(arm64.VUADDLV, freg, freg)
+	c.assembler.CompileSIMDByteToSIMDByte(arm64.VCNT, freg, freg)
+	c.assembler.CompileSIMDByteToRegister(arm64.VUADDLV, freg, freg)
 
 	c.assembler.CompileRegisterToRegister(arm64.FMOVD, freg, reg)
 
@@ -1964,7 +1964,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
 	//
 	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b" == "inserting 64th bit of x2 into x1".
-	c.assembler.CompileTwoSIMDToSIMDWithByteArrangement(arm64.VBIT, freg, x2.register, x1.register)
+	c.assembler.CompileTwoSIMDByteToRegister(arm64.VBIT, freg, x2.register, x1.register)
 
 	c.markRegisterUnused(x2.register)
 	c.pushValueLocationOnRegister(x1.register)
@@ -2964,7 +2964,7 @@ func (c *arm64Compiler) compileReservedStackBasePointerRegisterInitialization() 
 	// Finally, we calculate "reservedRegisterForStackBasePointerAddress + reservedRegisterForTemporary << 3"
 	// where we shift tmpReg by 3 because stack pointer is an index in the []uint64
 	// so we must multiply the value by the size of uint64 = 8 bytes.
-	c.assembler.CompileAddInstructionWithLeftShiftedRegister(
+	c.assembler.CompileLeftShiftedRegisterToRegister(
 		reservedRegisterForTemporary, 3, reservedRegisterForStackBasePointerAddress,
 		reservedRegisterForStackBasePointerAddress)
 }
