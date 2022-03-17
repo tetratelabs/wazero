@@ -219,7 +219,9 @@ func (d *memDir) Seek(offset int64, whence int) (int64, error) {
 func (d *memDir) ReadDir(n int) ([]fs.DirEntry, error) {
 	remaining := int64(len(d.entries)) - d.offset
 	if remaining == 0 &&
-		n > 0 /* only when n > 0, since ReadDir should return empty slice instead of io.EOF when n <= 0 */ {
+		n > 0 {
+		// return io.EOF only when n > 0, since ReadDir should return empty slice
+		// instead of io.EOF when n <= 0. See fs.ReadDir.
 		return []fs.DirEntry{}, io.EOF
 	}
 

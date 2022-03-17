@@ -1228,7 +1228,7 @@ func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32
 	cfg := a.config(ctx.Context())
 
 	f, ok := cfg.opened[fd]
-	if !ok || f.file == nil {
+	if !ok {
 		return wasi.ErrnoBadf
 	}
 
@@ -1314,7 +1314,7 @@ func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint3
 	cfg := a.config(ctx.Context())
 
 	f, ok := cfg.opened[fd]
-	if !ok || f.file == nil {
+	if !ok {
 		return wasi.ErrnoBadf
 	}
 	writer, ok := f.file.(io.Writer)
@@ -1549,11 +1549,13 @@ func (a *wasiAPI) SockShutdown(ctx wasm.Module, fd, how uint32) wasi.Errno {
 type fileEntry struct {
 	// If this entry is a pre-opend directory, preopenPath is the path to this directory
 	// in the WASI environment, or "." if this directory is opened as a working directory.
-	// preOpenPath is empty when this entry is not a pre-opened directory.
+	// Empty when this entry is not a pre-opened directory.
 	preopenPath string
 	// File path relative to the root of `fileSys`.
+	// Empty if this opened entry has no path, such as Stdio.
 	path string
 	// fs.FS instance that this file belongs to.
+	// nil if this opened entry has no FS, such as Stdio.
 	fileSys fs.FS
 	// Opened fs.File instance.
 	file fs.File
@@ -1573,16 +1575,23 @@ type Config struct {
 	randSource      func([]byte) error
 }
 
+// FD number constants of standard input / output / error.
+const (
+	stdinFD = iota
+	stdoutFD
+	stderrFD
+)
+
 func (c *Config) Stdin(reader io.Reader) {
-	c.opened[0] = fileEntry{file: &readerWriterFile{Reader: reader}}
+	c.opened[stdinFD] = fileEntry{file: &readerWriterFile{Reader: reader}}
 }
 
 func (c *Config) Stdout(writer io.Writer) {
-	c.opened[1] = fileEntry{file: &readerWriterFile{Writer: writer}}
+	c.opened[stdoutFD] = fileEntry{file: &readerWriterFile{Writer: writer}}
 }
 
 func (c *Config) Stderr(writer io.Writer) {
-	c.opened[2] = fileEntry{file: &readerWriterFile{Writer: writer}}
+	c.opened[stderrFD] = fileEntry{file: &readerWriterFile{Writer: writer}}
 }
 
 // Args returns an option to give a command-line arguments in SnapshotPreview1 or errs if the inputs are too large.
@@ -1621,10 +1630,16 @@ func (c *Config) Environ(environ ...string) error {
 }
 
 func (c *Config) Preopen(dir string, fileSys fs.FS) {
+	rootFile, err := fileSys.Open(".")
+	if err != nil {
+		// Opening "." should always succeed on a fs.FS correctly implemented. Panic instead of returning error.
+		panic(fmt.Errorf("failed to open '.' for pre-opened FS: %w", err))
+	}
 	c.opened[uint32(len(c.opened))] = fileEntry{
 		preopenPath: dir,
 		path:        ".",
 		fileSys:     fileSys,
+		file:        rootFile,
 	}
 }
 
@@ -1634,9 +1649,9 @@ func NewConfig() *Config {
 		args:    &nullTerminatedStrings{},
 		environ: &nullTerminatedStrings{},
 		opened: map[uint32]fileEntry{
-			0: {file: &readerWriterFile{}}, // stdin
-			1: {file: &readerWriterFile{}}, // stdout
-			2: {file: &readerWriterFile{}}, // stderr
+			stdinFD:  {file: &readerWriterFile{}},
+			stdoutFD: {file: &readerWriterFile{}},
+			stderrFD: {file: &readerWriterFile{}},
 		},
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
