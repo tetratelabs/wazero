@@ -28,8 +28,6 @@ func main() {
 
 ## Status
 
-wazero is an early project, so APIs are subject to change until version 1.0.
-
 There are two runtime configurations supported in wazero, where _JIT_ is default:
 
 1. _Interpreter_: a naive interpreter-based implementation of Wasm virtual machine. Its implementation doesn't have any platform (GOARCH, GOOS) specific code, therefore _interpreter_ can be used for any compilation target available for Go (such as `riscv64`).
@@ -46,6 +44,47 @@ If you don't choose, ex `wazero.NewRuntime()`, JIT is used if supported. You can
 ```go
 r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 ```
+
+## Support Policy
+
+The below support policy focuses on compatability concerns of those embedding wazero into their Go applications.
+
+### wazero
+
+wazero is an early project, so APIs are subject to change until version 1.0.
+
+We expect 1.0 to be at or before Q3 2022, so please practice the current APIs to ensure they work for you!
+
+### Go
+
+wazero has no dependencies except Go, so the only source of conflict in your project's use of Wazero is the Go version.
+
+To simplify our support policy, we adopt Go's [Release Policy](https://go.dev/doc/devel/release) (two versions).
+
+This means wazero will remain compilable and tested on the the version prior to the latest release of Go.
+
+For example, once Go 1.29 is released, wazero may choose to use a Go 1.28 feature.
+
+### Platform
+
+wazero has two runtime modes: Interpreter and JIT. The only supported operating
+systems are ones we test, but that doesn't necessarily mean other operating
+system versions won't work.
+
+We currently test ubuntu-20.04, macos-11 and windows-2022 as packaged by
+[GitHub Actions](https://github.com/actions/virtual-environments).
+
+* Interpreter
+  * Ubuntu is tested on amd64 (native) as well arm64 and riscv64 via emulation.
+  * MacOS and Windows are only tested on amd64.
+* JIT
+  * Ubuntu is tested on amd64 (native) as well arm64 via emulation.
+  * MacOS and Windows are only tested on amd64.
+
+wazero has no dependencies and doesn't require CGO. This means it can also be
+embedded in an application that doesn't use an operating system. For example,
+via Docker `FROM scratch`. While we don't currently have tests for this, it is
+an intended use case and a major differentiator between wazero and alternatives.
 
 ## Background
 
