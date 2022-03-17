@@ -4,21 +4,18 @@ package jit
 // Please refer to https://www.felixcloutier.com/x86/index.html
 // if unfamiliar with amd64 instructions used here.
 // Note that x86 pkg used here prefixes all the instructions with "A"
-// e.g. MOVQ will be given as x86.AMOVQ.
+// e.g. MOVQ will be given as amd64.MOVQ.
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 	"runtime"
 	"unsafe"
 
-	asm "github.com/twitchyliquid64/golang-asm"
-	"github.com/twitchyliquid64/golang-asm/obj"
-	"github.com/twitchyliquid64/golang-asm/obj/x86"
-
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -73,28 +70,13 @@ func init() {
 	float64ForMaximumSigned64bitIntPlusOneAddress = uintptr(unsafe.Pointer(&float64ForMaximumSigned64bitIntPlusOne))
 }
 
-const (
-	conditionalRegisterStateE  = conditionalRegisterStateUnset + 1 + iota // ZF equal to zero
-	conditionalRegisterStateNE                                            //˜ZF not equal to zero
-	conditionalRegisterStateS                                             // SF negative
-	conditionalRegisterStateNS                                            // ˜SF non-negative
-	conditionalRegisterStateG                                             // ˜(SF xor OF) & ˜ ZF greater (signed >)
-	conditionalRegisterStateGE                                            // ˜(SF xor OF) greater or equal (signed >=)
-	conditionalRegisterStateL                                             // SF xor OF less (signed <)
-	conditionalRegisterStateLE                                            // (SF xor OF) | ZF less or equal (signed <=)
-	conditionalRegisterStateA                                             // ˜CF & ˜ZF above (unsigned >)
-	conditionalRegisterStateAE                                            // ˜CF above or equal (unsigned >=)
-	conditionalRegisterStateB                                             // CF below (unsigned <)
-	conditionalRegisterStateBE                                            // CF | ZF below or equal (unsigned <=)
-)
-
-const (
+var (
 	// reservedRegisterForCallEngine: pointer to callEngine (i.e. *callEngine as uintptr)
-	reservedRegisterForCallEngine = x86.REG_R13
+	reservedRegisterForCallEngine = amd64.REG_R13
 	// reservedRegisterForStackBasePointerAddress: stack base pointer's address (callEngine.stackBasePointer) in the current function call.
-	reservedRegisterForStackBasePointerAddress = x86.REG_R14
+	reservedRegisterForStackBasePointerAddress = amd64.REG_R14
 	// reservedRegisterForMemory: pointer to the memory slice's data (i.e. &memory.Buffer[0] as uintptr).
-	reservedRegisterForMemory = x86.REG_R15
+	reservedRegisterForMemory = amd64.REG_R15
 )
 
 func (c *amd64Compiler) String() string {
@@ -102,12 +84,9 @@ func (c *amd64Compiler) String() string {
 }
 
 type amd64Compiler struct {
-	builder *asm.Builder
-	f       *wasm.FunctionInstance
-	ir      *wazeroir.CompilationResult
-	// setJmpOrigins sets jmp kind instructions where you want to set the next coming
-	// instruction as the destination of the jmp instruction.
-	setJmpOrigins []*obj.Prog
+	assembler amd64.Assembler
+	f         *wasm.FunctionInstance
+	ir        *wazeroir.CompilationResult
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
@@ -119,9 +98,7 @@ type amd64Compiler struct {
 	currentLabel string
 	// onStackPointerCeilDeterminedCallBack hold a callback which are called when the max stack pointer is determined BEFORE generating native code.
 	onStackPointerCeilDeterminedCallBack func(stackPointerCeil uint64)
-	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
-	onGenerateCallbacks []func(code []byte) error
-	staticData          compiledFunctionStaticData
+	staticData                           compiledFunctionStaticData
 }
 
 // setLocationStack sets the given valueLocationStack to .locationStack field,
@@ -138,7 +115,7 @@ func (c *amd64Compiler) addStaticData(d []byte) {
 	c.staticData = append(c.staticData, d)
 }
 
-func (c *amd64Compiler) pushValueLocationOnRegister(reg int16) (ret *valueLocation) {
+func (c *amd64Compiler) pushValueLocationOnRegister(reg asm.Register) (ret *valueLocation) {
 	ret = c.locationStack.pushValueLocationOnRegister(reg)
 	c.locationStack.markRegisterUsed(reg)
 	return
@@ -146,11 +123,11 @@ func (c *amd64Compiler) pushValueLocationOnRegister(reg int16) (ret *valueLocati
 
 type labelInfo struct {
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
-	initialInstruction *obj.Prog
+	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
 	initialStack *valueLocationStack
 	// labelBeginningCallbacks holds callbacks should to be called with initialInstruction
-	labelBeginningCallbacks []func(*obj.Prog)
+	labelBeginningCallbacks []func(asm.Node)
 }
 
 func (c *amd64Compiler) label(labelKey string) *labelInfo {
@@ -192,34 +169,14 @@ func (c *amd64Compiler) compile() (code []byte, staticData compiledFunctionStati
 		c.onStackPointerCeilDeterminedCallBack = nil
 	}
 
-	code, err = mmapCodeSegment(c.builder.Assemble())
+	code, err = c.assembler.Assemble()
 	if err != nil {
 		return
 	}
 
-	if buildoptions.IsDebugMode {
-		for _, l := range c.labels {
-			if len(l.labelBeginningCallbacks) > 0 {
-				// Meaning that some labels are not compiled even though there's a jump origin.
-				panic("labelBeginningCallbacks must be empty after code generation")
-			}
-		}
-	}
-
-	for _, cb := range c.onGenerateCallbacks {
-		if err = cb(code); err != nil {
-			return
-		}
-	}
-
-	if buildoptions.IsDebugMode {
-		for key, l := range c.labels {
-			if len(l.labelBeginningCallbacks) > 0 {
-				// Meaning that some instruction is trying to jump to this label,
-				// but initialStack is not set. There must be a bug at the call-site of br or br_if.
-				panic(fmt.Sprintf("labelBeginningCallbacks must be called for label %s\n", key))
-			}
-		}
+	code, err = mmapCodeSegment(code)
+	if err != nil {
+		return
 	}
 
 	staticData = c.staticData
@@ -238,251 +195,6 @@ func (c *amd64Compiler) pushFunctionParams() {
 			}
 		}
 	}
-}
-
-func (c *amd64Compiler) addInstruction(prog *obj.Prog) {
-	c.builder.AddInstruction(prog)
-	for _, origin := range c.setJmpOrigins {
-		origin.To.SetTarget(prog)
-	}
-	c.setJmpOrigins = nil
-}
-
-func (c *amd64Compiler) addSetJmpOrigins(progs ...*obj.Prog) {
-	c.setJmpOrigins = append(c.setJmpOrigins, progs...)
-}
-
-func (c *amd64Compiler) newProg() (prog *obj.Prog) {
-	prog = c.builder.NewProg()
-	return
-}
-
-func (c *amd64Compiler) compileStandAloneInstruction(inst obj.As) *obj.Prog {
-	prog := c.newProg()
-	prog.As = inst
-	c.addInstruction(prog)
-	return prog
-}
-
-func (c *amd64Compiler) compileRegisterToRegister(instruction obj.As, from, to int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = to
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = from
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileMemoryToRegisterInstruction(instruction obj.As, sourceBaseReg int16, sourceOffsetConst int64, destinationReg int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = sourceBaseReg
-	inst.From.Offset = sourceOffsetConst
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationReg
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileMemoryWithIndexToRegisterInstruction(instruction obj.As,
-	sourceBaseReg int16, sourceOffsetConst int64, sourceIndex int16, sourceScale int16,
-	destinationReg int16,
-) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationReg
-	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = sourceBaseReg
-	inst.From.Offset = sourceOffsetConst
-	inst.From.Index = sourceIndex
-	inst.From.Scale = sourceScale
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileRegisterToMemoryWithIndexInstruction(instruction obj.As,
-	srcReg int16,
-	dstBaseReg int16, dstOffsetConst int64, dstIndex int16, dstScale int16,
-) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = srcReg
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = dstBaseReg
-	inst.To.Offset = dstOffsetConst
-	inst.To.Index = dstIndex
-	inst.To.Scale = dstScale
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileRegisterToMemoryInstruction(instruction obj.As, sourceRegister int16, destinationBaseRegister int16, destinationOffsetConst int64) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = destinationBaseRegister
-	inst.To.Offset = destinationOffsetConst
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = sourceRegister
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileConstToRegisterInstruction(instruction obj.As, constValue int64, destinationRegister int16) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_CONST
-	inst.From.Offset = constValue
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = destinationRegister
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileRegisterToConstInstruction(instruction obj.As, srcRegister int16, constValue int64) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_CONST
-	inst.To.Offset = constValue
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = srcRegister
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileRegisterToNoneInstruction(instruction obj.As, register int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_REG
-	inst.From.Reg = register
-	inst.To.Type = obj.TYPE_NONE
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileNoneToRegisterInstruction(instruction obj.As, register int16) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = register
-	inst.From.Type = obj.TYPE_NONE
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileNoneToMemoryInstruction(instruction obj.As, baseReg int16, offset int64) {
-	inst := c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = baseReg
-	inst.To.Offset = offset
-	inst.From.Type = obj.TYPE_NONE
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileConstToMemoryInstruction(instruction obj.As, constValue int64, baseReg int16, offset int64) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.From.Type = obj.TYPE_CONST
-	inst.From.Offset = constValue
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = baseReg
-	inst.To.Offset = offset
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileMemoryToConstInstruction(instruction obj.As, baseReg int16, offset int64, constValue int64) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = instruction
-	inst.To.Type = obj.TYPE_CONST
-	inst.To.Offset = constValue
-	inst.From.Type = obj.TYPE_MEM
-	inst.From.Reg = baseReg
-	inst.From.Offset = offset
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileUnconditionalJump() *obj.Prog {
-	return c.compileJump(obj.AJMP)
-}
-
-func (c *amd64Compiler) compileJump(jmpInst obj.As) (inst *obj.Prog) {
-	inst = c.newProg()
-	inst.As = jmpInst
-	inst.To.Type = obj.TYPE_BRANCH
-	c.addInstruction(inst)
-	return
-}
-
-func (c *amd64Compiler) compileJumpToRegister(reg int16) {
-	inst := c.newProg()
-	inst.As = obj.AJMP
-	inst.To.Type = obj.TYPE_REG
-	inst.To.Reg = reg
-	c.addInstruction(inst)
-}
-
-func (c *amd64Compiler) compileJumpToMemory(baseReg int16, offset int64) {
-	inst := c.newProg()
-	inst.As = obj.AJMP
-	inst.To.Type = obj.TYPE_MEM
-	inst.To.Reg = baseReg
-	inst.To.Offset = offset
-	c.addInstruction(inst)
-}
-
-// compileReadInstructionAddress add a LEA instruction to read the target instruction's absolute address into the destinationRegister.
-// beforeAcquisitionTargetInstruction is the instruction kind (e.g. RET, JMP, etc.) right before the instruction
-// of which the call-site wants to acquire the absolute address.
-func (c *amd64Compiler) compileReadInstructionAddress(destinationRegister int16, beforeAcquisitionTargetInstruction obj.As) {
-	// Emit the instruction in the form of "LEA destination [RIP + offset]".
-	readInstructionAddress := c.newProg()
-	readInstructionAddress.As = x86.ALEAQ
-	readInstructionAddress.To.Reg = destinationRegister
-	readInstructionAddress.To.Type = obj.TYPE_REG
-	readInstructionAddress.From.Type = obj.TYPE_MEM
-	// We use place holder here as we don't yet know at this point the offset of the first instruction
-	// after return instruction.
-	readInstructionAddress.From.Offset = 0xffff
-	// Since the assembler cannot directly emit "LEA destination [RIP + offset]", we use the some hack here:
-	// We intentionally use x86.REG_BP here so that the resulting instruction sequence becomes
-	// exactly the same as "LEA destination [RIP + offset]" except the most significant bit of the third byte.
-	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
-	readInstructionAddress.From.Reg = x86.REG_BP
-	c.addInstruction(readInstructionAddress)
-
-	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-		// Advance readInstructionAddress to the next one (.Link) in order to get the instruction
-		// right after LEA because RIP points to that next instruction in LEA instruction.
-		base := readInstructionAddress.Link
-
-		// Find the address acquisition target instruction.
-		target := base
-		for target != nil {
-			// Advance until we have the target.As has the given instruction kind.
-			target = target.Link
-			if target.As == beforeAcquisitionTargetInstruction {
-				// At this point, target is the instruction right before the target instruction.
-				// Thus, advance one more time to make target the target instruction.
-				target = target.Link
-				break
-			}
-		}
-
-		if target == nil {
-			return fmt.Errorf("target instruction not found for read instruction address")
-		}
-
-		// Now we can calculate the "offset" in the LEA instruction.
-		offset := uint32(target.Pc) - uint32(base.Pc)
-
-		// Replace the placeholder bytes by the actual offset.
-		binary.LittleEndian.PutUint32(code[readInstructionAddress.Pc+3:], offset)
-
-		// See the comment at readInstructionAddress.From.Reg above. Here we drop the most significant bit of the third byte of the LEA instruction.
-		code[readInstructionAddress.Pc+2] &= 0b01111111
-		return nil
-	})
 }
 
 // compileUnreachable implements compiler.compileUnreachable for the arm64 architecture.
@@ -585,13 +297,13 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	}
 
 	// First, move the pointer to the global slice into the allocated register.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
 
 	// Then, get the memory location of the target global instance's pointer.
-	c.compileConstToRegisterInstruction(x86.AADDQ, 8*int64(o.Index), intReg)
+	c.assembler.CompileConstToRegister(amd64.ADDQ, 8*int64(o.Index), intReg)
 
 	// Now, move the location of the global instance into the register.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, intReg, 0, intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 0, intReg)
 
 	// When an integer, reuse the pointer register for the value. Otherwise, allocate a float register for it.
 	valueReg := intReg
@@ -605,7 +317,7 @@ func (c *amd64Compiler) compileGlobalGet(o *wazeroir.OperationGlobalGet) error {
 	}
 
 	// Using the register holding the pointer to the target instance, move its value into a register.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, intReg, globalInstanceValueOffset, valueReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, globalInstanceValueOffset, valueReg)
 
 	// Record that the retrieved global value on the top of the stack is now in a register.
 	loc := c.pushValueLocationOnRegister(valueReg)
@@ -633,16 +345,16 @@ func (c *amd64Compiler) compileGlobalSet(o *wazeroir.OperationGlobalSet) error {
 	}
 
 	// First, move the pointer to the global slice into the allocated register.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset, intReg)
 
 	// Then, get the memory location of the target global instance's pointer.
-	c.compileConstToRegisterInstruction(x86.AADDQ, 8*int64(o.Index), intReg)
+	c.assembler.CompileConstToRegister(amd64.ADDQ, 8*int64(o.Index), intReg)
 
 	// Now, move the location of the global instance into the register.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, intReg, 0, intReg)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, intReg, 0, intReg)
 
 	// Now ready to write the value to the global instance location.
-	c.compileRegisterToMemoryInstruction(x86.AMOVQ, val.register, intReg, globalInstanceValueOffset)
+	c.assembler.CompileRegisterToMemory(amd64.MOVQ, val.register, intReg, globalInstanceValueOffset)
 
 	// Since the value is now written to memory, release the value register.
 	c.locationStack.releaseRegister(val)
@@ -676,7 +388,7 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 			// TODO: verify ^^.
 			targetLabel.initialStack = c.locationStack.clone()
 		}
-		jmp := c.compileUnconditionalJump()
+		jmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(labelKey, jmp)
 	}
 	return nil
@@ -685,36 +397,36 @@ func (c *amd64Compiler) branchInto(target *wazeroir.BranchTarget) error {
 // compileBrIf implements compiler.compileBrIf for the amd64 architecture.
 func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	cond := c.locationStack.pop()
-	var jmpWithCond *obj.Prog
+	var jmpWithCond asm.Node
 	if cond.onConditionalRegister() {
-		var inst obj.As
+		var inst asm.Instruction
 		switch cond.conditionalRegister {
-		case conditionalRegisterStateE:
-			inst = x86.AJEQ
-		case conditionalRegisterStateNE:
-			inst = x86.AJNE
-		case conditionalRegisterStateS:
-			inst = x86.AJMI
-		case conditionalRegisterStateNS:
-			inst = x86.AJPL
-		case conditionalRegisterStateG:
-			inst = x86.AJGT
-		case conditionalRegisterStateGE:
-			inst = x86.AJGE
-		case conditionalRegisterStateL:
-			inst = x86.AJLT
-		case conditionalRegisterStateLE:
-			inst = x86.AJLE
-		case conditionalRegisterStateA:
-			inst = x86.AJHI
-		case conditionalRegisterStateAE:
-			inst = x86.AJCC
-		case conditionalRegisterStateB:
-			inst = x86.AJCS
-		case conditionalRegisterStateBE:
-			inst = x86.AJLS
+		case amd64.ConditionalRegisterStateE:
+			inst = amd64.JEQ
+		case amd64.ConditionalRegisterStateNE:
+			inst = amd64.JNE
+		case amd64.ConditionalRegisterStateS:
+			inst = amd64.JMI
+		case amd64.ConditionalRegisterStateNS:
+			inst = amd64.JPL
+		case amd64.ConditionalRegisterStateG:
+			inst = amd64.JGT
+		case amd64.ConditionalRegisterStateGE:
+			inst = amd64.JGE
+		case amd64.ConditionalRegisterStateL:
+			inst = amd64.JLT
+		case amd64.ConditionalRegisterStateLE:
+			inst = amd64.JLE
+		case amd64.ConditionalRegisterStateA:
+			inst = amd64.JHI
+		case amd64.ConditionalRegisterStateAE:
+			inst = amd64.JCC
+		case amd64.ConditionalRegisterStateB:
+			inst = amd64.JCS
+		case amd64.ConditionalRegisterStateBE:
+			inst = amd64.JLS
 		}
-		jmpWithCond = c.compileJump(inst)
+		jmpWithCond = c.assembler.CompileJump(inst)
 	} else {
 		// Usually the comparison operand for br_if is on the conditional register,
 		// but in some cases, they are on the stack or register.
@@ -729,10 +441,10 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 			return err
 		}
 		// Check if the value not equals zero.
-		c.compileRegisterToConstInstruction(x86.ACMPQ, cond.register, 0)
+		c.assembler.CompileRegisterToConst(amd64.CMPQ, cond.register, 0)
 
 		// Emit jump instruction which jumps when the value does not equals zero.
-		jmpWithCond = c.compileJump(x86.AJNE)
+		jmpWithCond = c.assembler.CompileJump(amd64.JNE)
 		c.locationStack.markRegisterUnused(cond.register)
 	}
 
@@ -770,12 +482,12 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 			labelInfo.initialStack = c.locationStack
 		}
 
-		elseJmp := c.compileUnconditionalJump()
+		elseJmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(elseLabelKey, elseJmp)
 	}
 
 	// Handle then branch.
-	c.addSetJmpOrigins(jmpWithCond)
+	c.assembler.SetJumpTargetOnNext(jmpWithCond)
 	c.setLocationStack(saved)
 	if err := c.emitDropRange(thenTarget.ToDrop); err != nil {
 		return err
@@ -797,7 +509,7 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		if labelInfo.initialStack == nil {
 			labelInfo.initialStack = c.locationStack
 		}
-		thenJmp := c.compileUnconditionalJump()
+		thenJmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(thenLabelKey, thenJmp)
 		return nil
 	}
@@ -827,16 +539,16 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	}
 
 	// First, we move the length of target list into the tmp register.
-	c.compileConstToRegisterInstruction(x86.AMOVQ, int64(len(o.Targets)), tmp)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(len(o.Targets)), tmp)
 
 	// Then, we compare the value with the length of targets.
-	c.compileRegisterToRegister(x86.ACMPL, tmp, index.register)
+	c.assembler.CompileRegisterToRegister(amd64.CMPL, tmp, index.register)
 
 	// If the value is larger than the length,
 	// we round the index to the length as the spec states that
 	// if the index is larger than or equal the length of list,
 	// branch into the default branch.
-	c.compileRegisterToRegister(x86.ACMOVQCS, tmp, index.register)
+	c.assembler.CompileRegisterToRegister(amd64.CMOVQCS, tmp, index.register)
 
 	// We prepare the static data which holds the offset of
 	// each target's first instruction (incl. default)
@@ -866,35 +578,35 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 	offsetData := make([]byte, 4*(len(o.Targets)+1))
 	c.addStaticData(offsetData)
 
-	c.compileConstToRegisterInstruction(x86.AMOVQ, int64(uintptr(unsafe.Pointer(&offsetData[0]))), tmp)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(uintptr(unsafe.Pointer(&offsetData[0]))), tmp)
 
 	// Now we have the address of first byte of offsetData in tmp register.
 	// So the target offset's first byte is at tmp+index*4 as we store
 	// the offset as 4 bytes for a 32-byte integer.
 	// Here, we store the offset into the index.register.
-	c.compileMemoryWithIndexToRegisterInstruction(x86.AMOVL, tmp, 0, index.register, 4, index.register)
+	c.assembler.CompileMemoryWithIndexToRegister(amd64.MOVL, tmp, 0, index.register, 4, index.register)
 
 	// Now we read the address of the beginning of the jump table.
 	// In the above example, this corresponds to reading the address of 0x123001.
-	c.compileReadInstructionAddress(tmp, obj.AJMP)
+	c.assembler.CompileReadInstructionAddress(tmp, amd64.JMP)
 
 	// Now we have the address of L0 in tmp register, and the offset to the target label in the index.register.
 	// So we could achieve the br_table jump by adding them and jump into the resulting address.
-	c.compileRegisterToRegister(x86.AADDQ, index.register, tmp)
+	c.assembler.CompileRegisterToRegister(amd64.ADDQ, index.register, tmp)
 
-	c.compileJumpToRegister(tmp)
+	c.assembler.CompileJumpToRegister(amd64.JMP, tmp)
 
 	// We no longer need the index's register, so mark it unused.
 	c.locationStack.markRegisterUnused(index.register)
 
 	// [Emit the code for each targets and default branch]
-	labelInitialInstructions := make([]*obj.Prog, len(o.Targets)+1)
+	labelInitialInstructions := make([]asm.Node, len(o.Targets)+1)
 	saved := c.locationStack
 	for i := range labelInitialInstructions {
 		// Emit the initial instruction of each target.
 		// We use NOP as we don't yet know the next instruction in each label.
 		// Assembler would optimize out this NOP during code generation, so this is harmless.
-		labelInitialInstructions[i] = c.compileStandAloneInstruction(obj.ANOP)
+		labelInitialInstructions[i] = c.assembler.CompileStandAlone(amd64.NOP)
 
 		var locationStack *valueLocationStack
 		var target *wazeroir.BranchTargetDrop
@@ -918,35 +630,17 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		}
 	}
 
-	// Set up the callbacks to do tasks which cannot be done at the compilation phase.
-	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
-		// Build the offset table for each target including default one.
-		base := labelInitialInstructions[0].Pc // This corresponds to the L0's address in the example.
-		for i, nop := range labelInitialInstructions {
-			if uint64(nop.Pc)-uint64(base) >= math.MaxUint32 {
-				// TODO: this happens when users try loading an extremely large webassembly binary
-				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
-				// We would like to support that binary, but realistically speaking, that kind of binary
-				// could result in more than ten giga bytes of native JITed code where we have to care about
-				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
-				// current implementation.
-				return fmt.Errorf("too large br_table")
-			}
-			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(offsetData[i*4:(i+1)*4], uint32(nop.Pc)-uint32(base))
-		}
-		return nil
-	})
+	c.assembler.BuildJumpTable(offsetData, labelInitialInstructions)
 	return nil
 }
 
-func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction *obj.Prog) {
+func (c *amd64Compiler) assignJumpTarget(labelKey string, jmpInstruction asm.Node) {
 	jmpTargetLabel := c.label(labelKey)
 	if jmpTargetLabel.initialInstruction != nil {
-		jmpInstruction.To.SetTarget(jmpTargetLabel.initialInstruction)
+		jmpInstruction.AssignJumpTarget(jmpTargetLabel.initialInstruction)
 	} else {
-		jmpTargetLabel.labelBeginningCallbacks = append(jmpTargetLabel.labelBeginningCallbacks, func(labelInitialInstruction *obj.Prog) {
-			jmpInstruction.To.SetTarget(labelInitialInstruction)
+		jmpTargetLabel.labelBeginningCallbacks = append(jmpTargetLabel.labelBeginningCallbacks, func(labelInitialInstruction asm.Node) {
+			jmpInstruction.AssignJumpTarget(labelInitialInstruction)
 		})
 	}
 }
@@ -968,7 +662,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	}
 
 	// We use NOP as a beginning of instructions in a label.
-	labelBegin := c.compileStandAloneInstruction(obj.ANOP)
+	labelBegin := c.assembler.CompileStandAlone(amd64.NOP)
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
@@ -996,7 +690,7 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 // compileCall implements compiler.compileCall for the amd64 architecture.
 func (c *amd64Compiler) compileCall(o *wazeroir.OperationCall) error {
 	target := c.f.Module.Functions[o.FunctionIndex]
-	if err := c.compileCallFunctionImpl(o.FunctionIndex, nilRegister, target.Type); err != nil {
+	if err := c.compileCallFunctionImpl(o.FunctionIndex, asm.NilRegister, target.Type); err != nil {
 		return err
 	}
 
@@ -1031,55 +725,55 @@ func (c *amd64Compiler) compileCallIndirect(o *wazeroir.OperationCallIndirect) e
 	}
 
 	// First, we need to check if the offset doesn't exceed the length of table.
-	c.compileMemoryToRegisterInstruction(x86.ACMPQ, reservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset, offset.register)
-	notLengthExceedJump := c.compileJump(x86.AJHI)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, reservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset, offset.register)
+	notLengthExceedJump := c.assembler.CompileJump(amd64.JHI)
 
 	// If it exceeds, we return the function with jitCallStatusCodeInvalidTableAccess.
 	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
-	c.addSetJmpOrigins(notLengthExceedJump)
+	c.assembler.SetJumpTargetOnNext(notLengthExceedJump)
 
 	// Next we check if the target's type matches the operation's one.
 	// In order to get the type instance's address, we have to multiply the offset
 	// by 16 as the offset is the "length" of table in Go's "[]interface{}",
 	// and size of interface{} equals 16 bytes == (2^4).
-	c.compileConstToRegisterInstruction(x86.ASHLQ, 4, offset.register)
+	c.assembler.CompileConstToRegister(amd64.SHLQ, 4, offset.register)
 
 	// Adds the address of wasm.Table[0] stored as callEngine.tableElement0Address to the offset.
-	c.compileMemoryToRegisterInstruction(x86.AADDQ,
+	c.assembler.CompileMemoryToRegister(amd64.ADDQ,
 		reservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset, offset.register)
 
 	// "offset = (*offset) + interfaceDataOffset (== table[offset] + interfaceDataOffset == *compiledFunction type)"
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, offset.register, interfaceDataOffset, offset.register)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, interfaceDataOffset, offset.register)
 
 	// At this point offset.register holds the address of *compiledFunction (as uintptr) at wasm.Table[offset].
 	//
 	// Check if the value of table[offset] equals zero, meaning that the target is uninitialized.
-	c.compileRegisterToConstInstruction(x86.ACMPQ, offset.register, 0)
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, offset.register, 0)
 
 	// Jump if the target is initialized element.
-	jumpIfInitialized := c.compileJump(x86.AJNE)
+	jumpIfInitialized := c.assembler.CompileJump(amd64.JNE)
 
 	// If not initialized, we return the function with jitCallStatusCodeInvalidTableAccess.
 	c.compileExitFromNativeCode(jitCallStatusCodeInvalidTableAccess)
 
-	c.addSetJmpOrigins(jumpIfInitialized)
+	c.assembler.SetJumpTargetOnNext(jumpIfInitialized)
 
 	// Next we need to check the type matches, i.e. table[offset].source.TypeID == targetFunctionType.
 	//
 	// "tmp = table[offset].source ( == *FunctionInstance type)"
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, offset.register, compiledFunctionSourceOffset, tmp)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, offset.register, compiledFunctionSourceOffset, tmp)
 
 	ti := c.f.Module.Types[o.TypeIndex]
 	targetFunctionType := ti.Type
-	c.compileMemoryToConstInstruction(x86.ACMPL, tmp, functionInstanceTypeIDOffset, int64(ti.TypeID))
+	c.assembler.CompileMemoryToConst(amd64.CMPL, tmp, functionInstanceTypeIDOffset, int64(ti.TypeID))
 
 	// Jump if the type matches.
-	jumpIfTypeMatch := c.compileJump(x86.AJEQ)
+	jumpIfTypeMatch := c.assembler.CompileJump(amd64.JEQ)
 
 	// Otherwise, exit with type mismatch status.
 	c.compileExitFromNativeCode(jitCallStatusCodeTypeMismatchOnIndirectCall)
 
-	c.addSetJmpOrigins(jumpIfTypeMatch)
+	c.assembler.SetJumpTargetOnNext(jumpIfTypeMatch)
 	if err = c.compileCallFunctionImpl(0, offset.register, targetFunctionType); err != nil {
 		return nil
 	}
@@ -1165,14 +859,14 @@ func (c *amd64Compiler) compileSelect() error {
 	peekedX1 := c.locationStack.peek()
 
 	// Compare the conditional value with zero.
-	c.compileRegisterToConstInstruction(x86.ACMPQ, cv.register, 0)
+	c.assembler.CompileRegisterToConst(amd64.CMPQ, cv.register, 0)
 
 	// Now we can use c.register as temporary location.
 	// We alias it here for readability.
 	tmpRegister := cv.register
 
 	// Set the jump if the top value is not zero.
-	jmpIfNotZero := c.compileJump(x86.AJNE)
+	jmpIfNotZero := c.assembler.CompileJump(amd64.JNE)
 
 	// If the value is zero, we must place the value of x2 onto the stack position of x1.
 
@@ -1188,14 +882,14 @@ func (c *amd64Compiler) compileSelect() error {
 
 	// Then release the value in the x2's register to the x1's stack position.
 	if peekedX1.onRegister() {
-		c.compileRegisterToRegister(x86.AMOVQ, x2.register, peekedX1.register)
+		c.assembler.CompileRegisterToRegister(amd64.MOVQ, x2.register, peekedX1.register)
 	} else {
 		peekedX1.register = x2.register
 		c.compileReleaseRegisterToStack(peekedX1) // Note inside we mark the register unused!
 	}
 
 	// Else, we don't need to adjust value, just need to jump to the next instruction.
-	c.addSetJmpOrigins(jmpIfNotZero)
+	c.assembler.SetJumpTargetOnNext(jmpIfNotZero)
 
 	// In any case, we don't need x2 and c anymore!
 	c.locationStack.releaseRegister(x2)
@@ -1217,11 +911,11 @@ func (c *amd64Compiler) compilePick(o *wazeroir.OperationPick) error {
 	}
 
 	if pickTarget.onRegister() {
-		c.compileRegisterToRegister(x86.AMOVQ, pickTarget.register, reg)
+		c.assembler.CompileRegisterToRegister(amd64.MOVQ, pickTarget.register, reg)
 	} else if pickTarget.onStack() {
 		// Copy the value from the stack.
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, reservedRegisterForStackBasePointerAddress, int64(pickTarget.stackPointer)*8, reg)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, reservedRegisterForStackBasePointerAddress, int64(pickTarget.stackPointer)*8, reg)
 	}
 	// Now we already placed the picked value on the register,
 	// so push the location onto the stack.
@@ -1235,16 +929,16 @@ func (c *amd64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
 
-	var instruction obj.As
+	var instruction asm.Instruction
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
-		instruction = x86.AADDL
+		instruction = amd64.ADDL
 	case wazeroir.UnsignedTypeI64:
-		instruction = x86.AADDQ
+		instruction = amd64.ADDQ
 	case wazeroir.UnsignedTypeF32:
-		instruction = x86.AADDSS
+		instruction = amd64.ADDSS
 	case wazeroir.UnsignedTypeF64:
-		instruction = x86.AADDSD
+		instruction = amd64.ADDSD
 	}
 
 	x2 := c.locationStack.pop()
@@ -1258,7 +952,7 @@ func (c *amd64Compiler) compileAdd(o *wazeroir.OperationAdd) error {
 	}
 
 	// x1 += x2.
-	c.compileRegisterToRegister(instruction, x2.register, x1.register)
+	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
 
 	// We no longer need x2 register after ADD operation here,
 	// so we release it.
@@ -1271,16 +965,16 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	// TODO: if the previous instruction is const, then
 	// this can be optimized. Same goes for other arithmetic instructions.
 
-	var instruction obj.As
+	var instruction asm.Instruction
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
-		instruction = x86.ASUBL
+		instruction = amd64.SUBL
 	case wazeroir.UnsignedTypeI64:
-		instruction = x86.ASUBQ
+		instruction = amd64.SUBQ
 	case wazeroir.UnsignedTypeF32:
-		instruction = x86.ASUBSS
+		instruction = amd64.SUBSS
 	case wazeroir.UnsignedTypeF64:
-		instruction = x86.ASUBSD
+		instruction = amd64.SUBSD
 	}
 
 	x2 := c.locationStack.pop()
@@ -1294,7 +988,7 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 	}
 
 	// x1 -= x2.
-	c.compileRegisterToRegister(instruction, x2.register, x1.register)
+	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
 
 	// We no longer need x2 register after ADD operation here,
 	// so we release it.
@@ -1306,13 +1000,13 @@ func (c *amd64Compiler) compileSub(o *wazeroir.OperationSub) error {
 func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
-		err = c.compileMulForInts(true, x86.AMULL)
+		err = c.compileMulForInts(true, amd64.MULL)
 	case wazeroir.UnsignedTypeI64:
-		err = c.compileMulForInts(false, x86.AMULQ)
+		err = c.compileMulForInts(false, amd64.MULQ)
 	case wazeroir.UnsignedTypeF32:
-		err = c.compileMulForFloats(x86.AMULSS)
+		err = c.compileMulForFloats(amd64.MULSS)
 	case wazeroir.UnsignedTypeF64:
-		err = c.compileMulForFloats(x86.AMULSD)
+		err = c.compileMulForFloats(amd64.MULSD)
 	}
 	return
 }
@@ -1330,10 +1024,10 @@ func (c *amd64Compiler) compileMul(o *wazeroir.OperationMul) (err error) {
 //    the existing value will be overridden after the mul execution.
 // 2) One of the operands (x1 or x2) must be on AX register.
 // See https://www.felixcloutier.com/x86/mul#description for detail semantics.
-func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) error {
+func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction asm.Instruction) error {
 	const (
-		resultRegister   = x86.REG_AX
-		reservedRegister = x86.REG_DX
+		resultRegister   = amd64.REG_AX
+		reservedRegister = amd64.REG_DX
 	)
 
 	x2 := c.locationStack.pop()
@@ -1355,13 +1049,13 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 			c.compileLoadValueOnStackToRegister(x2)
 			c.locationStack.markRegisterUsed(resultRegister)
 		} else {
-			var inst obj.As
+			var inst asm.Instruction
 			if is32Bit {
-				inst = x86.AMOVL
+				inst = amd64.MOVL
 			} else {
-				inst = x86.AMOVQ
+				inst = amd64.MOVQ
 			}
-			c.compileRegisterToRegister(inst, x2.register, resultRegister)
+			c.assembler.CompileRegisterToRegister(inst, x2.register, resultRegister)
 
 			// We no longer uses the prev register of x2.
 			c.locationStack.releaseRegister(x2)
@@ -1387,9 +1081,9 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 
 	// Now ready to emit the mul instruction.
 	if x1 == valueOnAX {
-		c.compileRegisterToNoneInstruction(mulInstruction, x2.register)
+		c.assembler.CompileRegisterToNone(mulInstruction, x2.register)
 	} else {
-		c.compileRegisterToNoneInstruction(mulInstruction, x1.register)
+		c.assembler.CompileRegisterToNone(mulInstruction, x1.register)
 	}
 
 	c.locationStack.markRegisterUnused(x2.register)
@@ -1402,7 +1096,7 @@ func (c *amd64Compiler) compileMulForInts(is32Bit bool, mulInstruction obj.As) e
 	return nil
 }
 
-func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
+func (c *amd64Compiler) compileMulForFloats(instruction asm.Instruction) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
 		return err
@@ -1414,7 +1108,7 @@ func (c *amd64Compiler) compileMulForFloats(instruction obj.As) error {
 	}
 
 	// x1 *= x2.
-	c.compileRegisterToRegister(instruction, x2.register, x1.register)
+	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
 
 	// We no longer need x2 register after MUL operation here,
 	// so we release it.
@@ -1431,9 +1125,9 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 
 	if runtime.GOOS != "darwin" {
 		if o.Type == wazeroir.UnsignedInt32 {
-			c.compileRegisterToRegister(x86.ALZCNTL, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.LZCNTL, target.register, target.register)
 		} else {
-			c.compileRegisterToRegister(x86.ALZCNTQ, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.LZCNTQ, target.register, target.register)
 		}
 	} else {
 		// On x86 mac, we cannot use LZCNT as it always results in zero.
@@ -1444,39 +1138,39 @@ func (c *amd64Compiler) compileClz(o *wazeroir.OperationClz) error {
 
 		// First, we have to check if the target is non-zero as BSR is undefined
 		// on zero. See https://www.felixcloutier.com/x86/bsr.
-		c.compileRegisterToConstInstruction(x86.ACMPQ, target.register, 0)
-		jmpIfNonZero := c.compileJump(x86.AJNE)
+		c.assembler.CompileRegisterToConst(amd64.CMPQ, target.register, 0)
+		jmpIfNonZero := c.assembler.CompileJump(amd64.JNE)
 
 		// If the value is zero, we just push the const value.
 		if o.Type == wazeroir.UnsignedInt32 {
-			c.compileConstToRegisterInstruction(x86.AMOVL, int64(32), target.register)
+			c.assembler.CompileConstToRegister(amd64.MOVL, int64(32), target.register)
 		} else {
-			c.compileConstToRegisterInstruction(x86.AMOVL, int64(64), target.register)
+			c.assembler.CompileConstToRegister(amd64.MOVL, int64(64), target.register)
 		}
 
 		// Emit the jmp instruction to jump to the position right after
 		// the non-zero case.
-		jmpAtEndOfZero := c.compileUnconditionalJump()
+		jmpAtEndOfZero := c.assembler.CompileJump(amd64.JMP)
 
 		// Start emitting non-zero case.
-		c.addSetJmpOrigins(jmpIfNonZero)
+		c.assembler.SetJumpTargetOnNext(jmpIfNonZero)
 		// First, we calculate the most significant set bit.
 		if o.Type == wazeroir.UnsignedInt32 {
-			c.compileRegisterToRegister(x86.ABSRL, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.BSRL, target.register, target.register)
 		} else {
-			c.compileRegisterToRegister(x86.ABSRQ, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.BSRQ, target.register, target.register)
 		}
 
 		// Now we XOR the value with the bit length minus one.
 		if o.Type == wazeroir.UnsignedInt32 {
-			c.compileConstToRegisterInstruction(x86.AXORL, 31, target.register)
+			c.assembler.CompileConstToRegister(amd64.XORL, 31, target.register)
 		} else {
-			c.compileConstToRegisterInstruction(x86.AXORQ, 63, target.register)
+			c.assembler.CompileConstToRegister(amd64.XORQ, 63, target.register)
 		}
 
 		// Finally the end jump instruction of zero case must target towards
 		// the next instruction.
-		c.addSetJmpOrigins(jmpAtEndOfZero)
+		c.assembler.SetJumpTargetOnNext(jmpAtEndOfZero)
 	}
 
 	// We reused the same register of target for the result.
@@ -1495,9 +1189,9 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 
 	if runtime.GOOS != "darwin" {
 		if o.Type == wazeroir.UnsignedInt32 {
-			c.compileRegisterToRegister(x86.ATZCNTL, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.TZCNTL, target.register, target.register)
 		} else {
-			c.compileRegisterToRegister(x86.ATZCNTQ, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.TZCNTQ, target.register, target.register)
 		}
 	} else {
 		// Somehow, if the target value is zero, TZCNT always returns zero: this is wrong.
@@ -1505,31 +1199,31 @@ func (c *amd64Compiler) compileCtz(o *wazeroir.OperationCtz) error {
 		// TODO: find the reference to this behavior and put the link here.
 
 		// First we compare the target with zero.
-		c.compileRegisterToConstInstruction(x86.ACMPQ, target.register, 0)
-		jmpIfNonZero := c.compileJump(x86.AJNE)
+		c.assembler.CompileRegisterToConst(amd64.CMPQ, target.register, 0)
+		jmpIfNonZero := c.assembler.CompileJump(amd64.JNE)
 
 		// If the value is zero, we just push the const value.
 		if o.Type == wazeroir.UnsignedInt32 {
-			c.compileConstToRegisterInstruction(x86.AMOVL, int64(32), target.register)
+			c.assembler.CompileConstToRegister(amd64.MOVL, int64(32), target.register)
 		} else {
-			c.compileConstToRegisterInstruction(x86.AMOVL, int64(64), target.register)
+			c.assembler.CompileConstToRegister(amd64.MOVL, int64(64), target.register)
 		}
 
 		// Emit the jmp instruction to jump to the position right after
 		// the non-zero case.
-		jmpAtEndOfZero := c.compileUnconditionalJump()
+		jmpAtEndOfZero := c.assembler.CompileJump(amd64.JMP)
 
 		// Otherwise, emit the TZCNT.
-		c.addSetJmpOrigins(jmpIfNonZero)
+		c.assembler.SetJumpTargetOnNext(jmpIfNonZero)
 		if o.Type == wazeroir.UnsignedInt32 {
-			c.compileRegisterToRegister(x86.ATZCNTL, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.TZCNTL, target.register, target.register)
 		} else {
-			c.compileRegisterToRegister(x86.ATZCNTQ, target.register, target.register)
+			c.assembler.CompileRegisterToRegister(amd64.TZCNTQ, target.register, target.register)
 		}
 
 		// Finally the end jump instruction of zero case must target towards
 		// the next instruction.
-		c.addSetJmpOrigins(jmpAtEndOfZero)
+		c.assembler.SetJumpTargetOnNext(jmpAtEndOfZero)
 	}
 
 	// We reused the same register of target for the result.
@@ -1547,9 +1241,9 @@ func (c *amd64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	}
 
 	if o.Type == wazeroir.UnsignedInt32 {
-		c.compileRegisterToRegister(x86.APOPCNTL, target.register, target.register)
+		c.assembler.CompileRegisterToRegister(amd64.POPCNTL, target.register, target.register)
 	} else {
-		c.compileRegisterToRegister(x86.APOPCNTQ, target.register, target.register)
+		c.assembler.CompileRegisterToRegister(amd64.POPCNTQ, target.register, target.register)
 	}
 
 	// We reused the same register of target for the result.
@@ -1588,7 +1282,7 @@ func (c *amd64Compiler) compileDivForInts(is32Bit bool, signed bool) error {
 	}
 	// Now we have the quotient of the division result in the AX register,
 	// so we record it.
-	result := c.pushValueLocationOnRegister(x86.REG_AX)
+	result := c.pushValueLocationOnRegister(amd64.REG_AX)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
@@ -1611,7 +1305,7 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 
 	// Now we have the remainder of the division result in the DX register,
 	// so we record it.
-	result := c.pushValueLocationOnRegister(x86.REG_DX)
+	result := c.pushValueLocationOnRegister(amd64.REG_DX)
 	result.setRegisterType(generalPurposeRegisterTypeInt)
 	return
 }
@@ -1632,8 +1326,8 @@ func (c *amd64Compiler) compileRem(o *wazeroir.OperationRem) (err error) {
 // where AX holds the quotient while DX the remainder of the division result.
 func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error {
 	const (
-		quotientRegister  = x86.REG_AX
-		remainderRegister = x86.REG_DX
+		quotientRegister  = amd64.REG_AX
+		remainderRegister = amd64.REG_DX
 	)
 
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
@@ -1660,27 +1354,27 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 	// Check if the x2 equals zero.
 	if is32Bit {
-		c.compileRegisterToConstInstruction(x86.ACMPL, x2.register, 0)
+		c.assembler.CompileRegisterToConst(amd64.CMPL, x2.register, 0)
 	} else {
-		c.compileRegisterToConstInstruction(x86.ACMPQ, x2.register, 0)
+		c.assembler.CompileRegisterToConst(amd64.CMPQ, x2.register, 0)
 	}
 
 	// Jump if the divisor is not zero.
-	jmpIfNotZero := c.compileJump(x86.AJNE)
+	jmpIfNotZero := c.assembler.CompileJump(amd64.JNE)
 
 	// Otherwise, we return with jitCallStatusIntegerDivisionByZero status.
 	c.compileExitFromNativeCode(jitCallStatusIntegerDivisionByZero)
 
-	c.addSetJmpOrigins(jmpIfNotZero)
+	c.assembler.SetJumpTargetOnNext(jmpIfNotZero)
 
 	// Next, we ensure that x1 is placed on AX.
 	x1 := c.locationStack.pop()
 	if x1.onRegister() && x1.register != quotientRegister {
 		// Move x1 to quotientRegister.
 		if is32Bit {
-			c.compileRegisterToRegister(x86.AMOVL, x1.register, quotientRegister)
+			c.assembler.CompileRegisterToRegister(amd64.MOVL, x1.register, quotientRegister)
 		} else {
-			c.compileRegisterToRegister(x86.AMOVQ, x1.register, quotientRegister)
+			c.assembler.CompileRegisterToRegister(amd64.MOVQ, x1.register, quotientRegister)
 		}
 		c.locationStack.markRegisterUnused(x1.register)
 		x1.setRegister(quotientRegister)
@@ -1693,7 +1387,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 	isSignedRem := isRem && signed
 	isSignedDiv := !isRem && signed
-	var signedRemMinusOneDivisorJmp *obj.Prog
+	var signedRemMinusOneDivisorJmp asm.Node
 	if isSignedRem {
 		// If this is for getting remainder of signed division,
 		// we have to treat the special case where the divisor equals -1.
@@ -1706,27 +1400,27 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 		// First we compare the division with -1.
 		if is32Bit {
-			c.compileRegisterToConstInstruction(x86.ACMPL, x2.register, -1)
+			c.assembler.CompileRegisterToConst(amd64.CMPL, x2.register, -1)
 		} else {
-			c.compileRegisterToConstInstruction(x86.ACMPQ, x2.register, -1)
+			c.assembler.CompileRegisterToConst(amd64.CMPQ, x2.register, -1)
 		}
 
 		// If it doesn't equal minus one, we jump to the normal case.
-		okJmp := c.compileJump(x86.AJNE)
+		okJmp := c.assembler.CompileJump(amd64.JNE)
 
 		// Otherwise, we store zero into the remainder result register (DX).
 		if is32Bit {
-			c.compileRegisterToRegister(x86.AXORL, remainderRegister, remainderRegister)
+			c.assembler.CompileRegisterToRegister(amd64.XORL, remainderRegister, remainderRegister)
 		} else {
-			c.compileRegisterToRegister(x86.AXORQ, remainderRegister, remainderRegister)
+			c.assembler.CompileRegisterToRegister(amd64.XORQ, remainderRegister, remainderRegister)
 		}
 
 		// Emit the exit jump instruction for the divisor -1 case so
 		// we skips the normal case.
-		signedRemMinusOneDivisorJmp = c.compileUnconditionalJump()
+		signedRemMinusOneDivisorJmp = c.assembler.CompileJump(amd64.JMP)
 
 		// Set the normal case's jump target.
-		c.addSetJmpOrigins(okJmp)
+		c.assembler.SetJumpTargetOnNext(okJmp)
 	} else if isSignedDiv {
 		// For signed division, we have to have branches for "math.MinInt{32,64} / -1"
 		// case which results in the floating point exception via division error as
@@ -1734,24 +1428,24 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 
 		// First we compare the division with -1.
 		if is32Bit {
-			c.compileRegisterToConstInstruction(x86.ACMPL, x2.register, -1)
+			c.assembler.CompileRegisterToConst(amd64.CMPL, x2.register, -1)
 		} else {
-			c.compileRegisterToConstInstruction(x86.ACMPQ, x2.register, -1)
+			c.assembler.CompileRegisterToConst(amd64.CMPQ, x2.register, -1)
 		}
 
 		// If it doesn't equal minus one, we jump to the normal case.
-		nonMinusOneDivisorJmp := c.compileJump(x86.AJNE)
+		nonMinusOneDivisorJmp := c.assembler.CompileJump(amd64.JNE)
 
 		// Next we check if the quotient is the most negative value for the signed integer.
 		// That means whether or not we try to do (math.MaxInt32 / -1) or (math.Math.Int64 / -1) respectively.
 		if is32Bit {
-			c.compileRegisterToMemoryInstruction(x86.ACMPL, x1.register, 0, int64(minimum32BitSignedIntAddress))
+			c.assembler.CompileRegisterToMemory(amd64.CMPL, x1.register, asm.NilRegister, int64(minimum32BitSignedIntAddress))
 		} else {
-			c.compileRegisterToMemoryInstruction(x86.ACMPQ, x1.register, 0, int64(minimum64BitSignedIntAddress))
+			c.assembler.CompileRegisterToMemory(amd64.CMPQ, x1.register, asm.NilRegister, int64(minimum64BitSignedIntAddress))
 		}
 
 		// If it doesn't equal, we jump to the normal case.
-		jmpOK := c.compileJump(x86.AJNE)
+		jmpOK := c.assembler.CompileJump(amd64.JNE)
 
 		// Otherwise, we are trying to do (math.MaxInt32 / -1) or (math.Math.Int64 / -1),
 		// and that is the overflow in division as the result becomes 2^31 which is larger than
@@ -1759,7 +1453,7 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 		c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
 
 		// Set the normal case's jump target.
-		c.addSetJmpOrigins(nonMinusOneDivisorJmp, jmpOK)
+		c.assembler.SetJumpTargetOnNext(nonMinusOneDivisorJmp, jmpOK)
 	}
 
 	// Now ready to emit the div instruction.
@@ -1768,26 +1462,26 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 	// * unsigned case - we need to zero DX register via "XOR DX DX"
 	if is32Bit && signed {
 		// Emit sign-extension to have 64 bit dividend over DX and AX registers.
-		c.compileStandAloneInstruction(x86.ACDQ)
-		c.compileRegisterToNoneInstruction(x86.AIDIVL, x2.register)
+		c.assembler.CompileStandAlone(amd64.CDQ)
+		c.assembler.CompileRegisterToNone(amd64.IDIVL, x2.register)
 	} else if is32Bit && !signed {
 		// Zeros DX register to have 64 bit dividend over DX and AX registers.
-		c.compileRegisterToRegister(x86.AXORQ, x86.REG_DX, x86.REG_DX)
-		c.compileRegisterToNoneInstruction(x86.ADIVL, x2.register)
+		c.assembler.CompileRegisterToRegister(amd64.XORQ, amd64.REG_DX, amd64.REG_DX)
+		c.assembler.CompileRegisterToNone(amd64.DIVL, x2.register)
 	} else if !is32Bit && signed {
 		// Emits sign-extension to have 128 bit dividend over DX and AX registers.
-		c.compileStandAloneInstruction(x86.ACQO)
-		c.compileRegisterToNoneInstruction(x86.AIDIVQ, x2.register)
+		c.assembler.CompileStandAlone(amd64.CQO)
+		c.assembler.CompileRegisterToNone(amd64.IDIVQ, x2.register)
 	} else if !is32Bit && !signed {
 		// Zeros DX register to have 128 bit dividend over DX and AX registers.
-		c.compileRegisterToRegister(x86.AXORQ, x86.REG_DX, x86.REG_DX)
-		c.compileRegisterToNoneInstruction(x86.ADIVQ, x2.register)
+		c.assembler.CompileRegisterToRegister(amd64.XORQ, amd64.REG_DX, amd64.REG_DX)
+		c.assembler.CompileRegisterToNone(amd64.DIVQ, x2.register)
 	}
 
 	// If this is signed rem instruction, we must set the jump target of
 	// the exit jump from division -1 case towards the next instruction.
 	if signedRemMinusOneDivisorJmp != nil {
-		c.addSetJmpOrigins(signedRemMinusOneDivisorJmp)
+		c.assembler.SetJumpTargetOnNext(signedRemMinusOneDivisorJmp)
 	}
 
 	// We mark them as unused so that we can push one of them onto the location stack at call sites.
@@ -1802,9 +1496,9 @@ func (c *amd64Compiler) performDivisionOnInts(isRem, is32Bit, signed bool) error
 // For example, stack [..., 1.0, 4.0] results in [..., 0.25].
 func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 	if is32Bit {
-		return c.compileSimpleBinaryOp(x86.ADIVSS)
+		return c.compileSimpleBinaryOp(amd64.DIVSS)
 	} else {
-		return c.compileSimpleBinaryOp(x86.ADIVSD)
+		return c.compileSimpleBinaryOp(amd64.DIVSD)
 	}
 }
 
@@ -1812,9 +1506,9 @@ func (c *amd64Compiler) compileDivForFloats(is32Bit bool) error {
 func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.compileSimpleBinaryOp(x86.AANDL)
+		err = c.compileSimpleBinaryOp(amd64.ANDL)
 	case wazeroir.UnsignedInt64:
-		err = c.compileSimpleBinaryOp(x86.AANDQ)
+		err = c.compileSimpleBinaryOp(amd64.ANDQ)
 	}
 	return
 }
@@ -1823,9 +1517,9 @@ func (c *amd64Compiler) compileAnd(o *wazeroir.OperationAnd) (err error) {
 func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.compileSimpleBinaryOp(x86.AORL)
+		err = c.compileSimpleBinaryOp(amd64.ORL)
 	case wazeroir.UnsignedInt64:
-		err = c.compileSimpleBinaryOp(x86.AORQ)
+		err = c.compileSimpleBinaryOp(amd64.ORQ)
 	}
 	return
 }
@@ -1834,9 +1528,9 @@ func (c *amd64Compiler) compileOr(o *wazeroir.OperationOr) (err error) {
 func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.compileSimpleBinaryOp(x86.AXORL)
+		err = c.compileSimpleBinaryOp(amd64.XORL)
 	case wazeroir.UnsignedInt64:
-		err = c.compileSimpleBinaryOp(x86.AXORQ)
+		err = c.compileSimpleBinaryOp(amd64.XORQ)
 	}
 	return
 }
@@ -1844,7 +1538,7 @@ func (c *amd64Compiler) compileXor(o *wazeroir.OperationXor) (err error) {
 // compileSimpleBinaryOp emits instructions to pop two values from the stack
 // and perform the given instruction on these two values and push the result
 // onto the stack.
-func (c *amd64Compiler) compileSimpleBinaryOp(instruction obj.As) error {
+func (c *amd64Compiler) compileSimpleBinaryOp(instruction asm.Instruction) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
 		return err
@@ -1855,7 +1549,7 @@ func (c *amd64Compiler) compileSimpleBinaryOp(instruction obj.As) error {
 		return err
 	}
 
-	c.compileRegisterToRegister(instruction, x2.register, x1.register)
+	c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
 
 	// We consumed x2 register after the operation here,
 	// so we release it.
@@ -1873,9 +1567,9 @@ func (c *amd64Compiler) compileSimpleBinaryOp(instruction obj.As) error {
 func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.compileShiftOp(x86.ASHLL, false)
+		err = c.compileShiftOp(amd64.SHLL, false)
 	case wazeroir.UnsignedInt64:
-		err = c.compileShiftOp(x86.ASHLQ, true)
+		err = c.compileShiftOp(amd64.SHLQ, true)
 	}
 	return
 }
@@ -1884,13 +1578,13 @@ func (c *amd64Compiler) compileShl(o *wazeroir.OperationShl) (err error) {
 func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		err = c.compileShiftOp(x86.ASARL, true)
+		err = c.compileShiftOp(amd64.SARL, true)
 	case wazeroir.SignedInt64:
-		err = c.compileShiftOp(x86.ASARQ, false)
+		err = c.compileShiftOp(amd64.SARQ, false)
 	case wazeroir.SignedUint32:
-		err = c.compileShiftOp(x86.ASHRL, true)
+		err = c.compileShiftOp(amd64.SHRL, true)
 	case wazeroir.SignedUint64:
-		err = c.compileShiftOp(x86.ASHRQ, false)
+		err = c.compileShiftOp(amd64.SHRQ, false)
 	}
 	return
 }
@@ -1899,9 +1593,9 @@ func (c *amd64Compiler) compileShr(o *wazeroir.OperationShr) (err error) {
 func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.compileShiftOp(x86.AROLL, true)
+		err = c.compileShiftOp(amd64.ROLL, true)
 	case wazeroir.UnsignedInt64:
-		err = c.compileShiftOp(x86.AROLQ, false)
+		err = c.compileShiftOp(amd64.ROLQ, false)
 	}
 	return
 }
@@ -1910,22 +1604,22 @@ func (c *amd64Compiler) compileRotl(o *wazeroir.OperationRotl) (err error) {
 func (c *amd64Compiler) compileRotr(o *wazeroir.OperationRotr) (err error) {
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		err = c.compileShiftOp(x86.ARORL, true)
+		err = c.compileShiftOp(amd64.RORL, true)
 	case wazeroir.UnsignedInt64:
-		err = c.compileShiftOp(x86.ARORQ, false)
+		err = c.compileShiftOp(amd64.RORQ, false)
 	}
 	return
 }
 
 // compileShiftOp adds instructions for shift operations (SHR, SHL, ROTR, ROTL)
 // where we have to place the second value (shift counts) on the CX register.
-func (c *amd64Compiler) compileShiftOp(instruction obj.As, is32Bit bool) error {
+func (c *amd64Compiler) compileShiftOp(instruction asm.Instruction, is32Bit bool) error {
 	c.maybeCompileMoveTopConditionalToFreeGeneralPurposeRegister()
 
 	x2 := c.locationStack.pop()
 
 	// Ensures that x2 (holding shift counts) is placed on the CX register.
-	const shiftCountRegister = x86.REG_CX
+	const shiftCountRegister = amd64.REG_CX
 	if (x2.onRegister() && x2.register != shiftCountRegister) || x2.onStack() {
 		// If another value lives on the CX register, we release it to the stack.
 		c.onValueReleaseRegisterToStack(shiftCountRegister)
@@ -1933,9 +1627,9 @@ func (c *amd64Compiler) compileShiftOp(instruction obj.As, is32Bit bool) error {
 		if x2.onRegister() {
 			// If x2 lives on a register, we move the value to CX.
 			if is32Bit {
-				c.compileRegisterToRegister(x86.AMOVL, x2.register, shiftCountRegister)
+				c.assembler.CompileRegisterToRegister(amd64.MOVL, x2.register, shiftCountRegister)
 			} else {
-				c.compileRegisterToRegister(x86.AMOVQ, x2.register, shiftCountRegister)
+				c.assembler.CompileRegisterToRegister(amd64.MOVQ, x2.register, shiftCountRegister)
 			}
 			// We no longer place any value on the original register, so we record it.
 			c.locationStack.markRegisterUnused(x2.register)
@@ -1952,11 +1646,11 @@ func (c *amd64Compiler) compileShiftOp(instruction obj.As, is32Bit bool) error {
 	x1 := c.locationStack.peek() // Note this is peek!
 
 	if x1.onRegister() {
-		c.compileRegisterToRegister(instruction, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(instruction, x2.register, x1.register)
 	} else {
 		// Shift target can be placed on a memory location.
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
-		c.compileRegisterToMemoryInstruction(instruction, x2.register, reservedRegisterForStackBasePointerAddress, int64(x1.stackPointer)*8)
+		c.assembler.CompileRegisterToMemory(instruction, x2.register, reservedRegisterForStackBasePointerAddress, int64(x1.stackPointer)*8)
 	}
 
 	// We consumed x2 register after the operation here,
@@ -1978,11 +1672,11 @@ func (c *amd64Compiler) compileAbs(o *wazeroir.OperationAbs) (err error) {
 
 	// First shift left by one to clear the sign bit, and then shift right by one.
 	if o.Type == wazeroir.Float32 {
-		c.compileConstToRegisterInstruction(x86.APSLLL, 1, target.register)
-		c.compileConstToRegisterInstruction(x86.APSRLL, 1, target.register)
+		c.assembler.CompileConstToRegister(amd64.PSLLL, 1, target.register)
+		c.assembler.CompileConstToRegister(amd64.PSRLL, 1, target.register)
 	} else {
-		c.compileConstToRegisterInstruction(x86.APSLLQ, 1, target.register)
-		c.compileConstToRegisterInstruction(x86.APSRLQ, 1, target.register)
+		c.assembler.CompileConstToRegister(amd64.PSLLQ, 1, target.register)
+		c.assembler.CompileConstToRegister(amd64.PSRLQ, 1, target.register)
 	}
 	return nil
 }
@@ -2003,11 +1697,11 @@ func (c *amd64Compiler) compileNeg(o *wazeroir.OperationNeg) (err error) {
 	// since we cannot take XOR directly with float reg and const.
 	// And then negate the value by XOR it with the sign-bit mask.
 	if o.Type == wazeroir.Float32 {
-		c.compileMemoryToRegisterInstruction(x86.AMOVL, 0, int64(float32SignBitMaskAddress), tmpReg)
-		c.compileRegisterToRegister(x86.AXORPS, tmpReg, target.register)
+		c.assembler.CompileMemoryToRegister(amd64.MOVL, asm.NilRegister, int64(float32SignBitMaskAddress), tmpReg)
+		c.assembler.CompileRegisterToRegister(amd64.XORPS, tmpReg, target.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, 0, int64(float64SignBitMaskAddress), tmpReg)
-		c.compileRegisterToRegister(x86.AXORPD, tmpReg, target.register)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, asm.NilRegister, int64(float64SignBitMaskAddress), tmpReg)
+		c.assembler.CompileRegisterToRegister(amd64.XORPD, tmpReg, target.register)
 	}
 	return nil
 }
@@ -2071,14 +1765,11 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 		return err
 	}
 
-	var inst *obj.Prog
 	if is32Bit {
-		inst = c.compileConstToRegisterInstruction(x86.AROUNDSS, mode, target.register)
+		c.assembler.CompileConstModeRegisterToRegister(amd64.ROUNDSS, target.register, target.register, mode)
 	} else {
-		inst = c.compileConstToRegisterInstruction(x86.AROUNDSD, mode, target.register)
+		c.assembler.CompileConstModeRegisterToRegister(amd64.ROUNDSD, target.register, target.register, mode)
 	}
-	inst.RestArgs = append(inst.RestArgs,
-		obj.Addr{Reg: target.register, Type: obj.TYPE_REG})
 	return nil
 }
 
@@ -2086,9 +1777,9 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
-		return c.compileMinOrMax(is32Bit, x86.AMINSS)
+		return c.compileMinOrMax(is32Bit, amd64.MINSS)
 	} else {
-		return c.compileMinOrMax(is32Bit, x86.AMINSD)
+		return c.compileMinOrMax(is32Bit, amd64.MINSD)
 	}
 }
 
@@ -2096,9 +1787,9 @@ func (c *amd64Compiler) compileMin(o *wazeroir.OperationMin) error {
 func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 	is32Bit := o.Type == wazeroir.Float32
 	if is32Bit {
-		return c.compileMinOrMax(is32Bit, x86.AMAXSS)
+		return c.compileMinOrMax(is32Bit, amd64.MAXSS)
 	} else {
-		return c.compileMinOrMax(is32Bit, x86.AMAXSD)
+		return c.compileMinOrMax(is32Bit, amd64.MAXSD)
 	}
 }
 
@@ -2114,7 +1805,7 @@ func (c *amd64Compiler) compileMax(o *wazeroir.OperationMax) error {
 // the native min/max, which is why we cannot simply emit a native min/max instruction here.
 //
 // For the semantics, see wazeroir.Min and wazeroir.Max for detail.
-func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction obj.As) error {
+func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction asm.Instruction) error {
 	x2 := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(x2); err != nil {
 		return err
@@ -2126,9 +1817,9 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction obj.As
 
 	// Check if this is (either x1 or x2 is NaN) or (x1 equals x2) case
 	if is32Bit {
-		c.compileRegisterToRegister(x86.AUCOMISS, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, x2.register, x1.register)
 	} else {
-		c.compileRegisterToRegister(x86.AUCOMISD, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISD, x2.register, x1.register)
 	}
 
 	// At this point, we have the three cases of conditional flags below
@@ -2140,35 +1831,35 @@ func (c *amd64Compiler) compileMinOrMax(is32Bit bool, minOrMaxInstruction obj.As
 
 	// Jump instruction to handle 1) case by checking the ZF flag
 	// as ZF is only set for 2) and 3) cases.
-	nanFreeOrDiffJump := c.compileJump(x86.AJNE)
+	nanFreeOrDiffJump := c.assembler.CompileJump(amd64.JNE)
 
 	// Start handling 2) and 3).
 
 	// Jump if two values are equal and NaN-free by checking the parity flag (PF).
 	// Here we use JPC to do the conditional jump when the parity flag is NOT set,
 	// and that is of 2).
-	equalExitJmp := c.compileJump(x86.AJPC)
+	equalExitJmp := c.assembler.CompileJump(amd64.JPC)
 
 	// Start handling 3).
 
 	// We emit the ADD instruction to produce the NaN in x1.
 	if is32Bit {
-		c.compileRegisterToRegister(x86.AADDSS, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.ADDSS, x2.register, x1.register)
 	} else {
-		c.compileRegisterToRegister(x86.AADDSD, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.ADDSD, x2.register, x1.register)
 	}
 
 	// Exit from the NaN case branch.
-	nanExitJmp := c.compileJump(obj.AJMP)
+	nanExitJmp := c.assembler.CompileJump(amd64.JMP)
 
 	// Start handling 1).
-	c.addSetJmpOrigins(nanFreeOrDiffJump)
+	c.assembler.SetJumpTargetOnNext(nanFreeOrDiffJump)
 
 	// Now handle the NaN-free and different values case.
-	c.compileRegisterToRegister(minOrMaxInstruction, x2.register, x1.register)
+	c.assembler.CompileRegisterToRegister(minOrMaxInstruction, x2.register, x1.register)
 
 	// Set the jump target of 1) and 2) cases to the next instruction after 3) case.
-	c.addSetJmpOrigins(nanExitJmp, equalExitJmp)
+	c.assembler.SetJumpTargetOnNext(nanExitJmp, equalExitJmp)
 
 	// Record that we consumed the x2 and placed the minOrMax result in the x1's register.
 	c.locationStack.markRegisterUnused(x2.register)
@@ -2196,37 +1887,37 @@ func (c *amd64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 
 	// Move the rest bit mask to the temp register.
 	if is32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AMOVL, 0, int64(float32RestBitMaskAddress), tmpReg)
+		c.assembler.CompileMemoryToRegister(amd64.MOVL, asm.NilRegister, int64(float32RestBitMaskAddress), tmpReg)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, 0, int64(float64RestBitMaskAddress), tmpReg)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, asm.NilRegister, int64(float64RestBitMaskAddress), tmpReg)
 	}
 
 	// Clear the sign bit of x1 via AND with the mask.
 	if is32Bit {
-		c.compileRegisterToRegister(x86.AANDPS, tmpReg, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.ANDPS, tmpReg, x1.register)
 	} else {
-		c.compileRegisterToRegister(x86.AANDPD, tmpReg, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.ANDPD, tmpReg, x1.register)
 	}
 
 	// Move the sign bit mask to the temp register.
 	if is32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AMOVL, 0, int64(float32SignBitMaskAddress), tmpReg)
+		c.assembler.CompileMemoryToRegister(amd64.MOVL, asm.NilRegister, int64(float32SignBitMaskAddress), tmpReg)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, 0, int64(float64SignBitMaskAddress), tmpReg)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, asm.NilRegister, int64(float64SignBitMaskAddress), tmpReg)
 	}
 
 	// Clear the non-sign bits of x2 via AND with the mask.
 	if is32Bit {
-		c.compileRegisterToRegister(x86.AANDPS, tmpReg, x2.register)
+		c.assembler.CompileRegisterToRegister(amd64.ANDPS, tmpReg, x2.register)
 	} else {
-		c.compileRegisterToRegister(x86.AANDPD, tmpReg, x2.register)
+		c.assembler.CompileRegisterToRegister(amd64.ANDPD, tmpReg, x2.register)
 	}
 
 	// Finally, copy the sign bit of x2 to x1.
 	if is32Bit {
-		c.compileRegisterToRegister(x86.AORPS, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.ORPS, x2.register, x1.register)
 	} else {
-		c.compileRegisterToRegister(x86.AORPD, x2.register, x1.register)
+		c.assembler.CompileRegisterToRegister(amd64.ORPD, x2.register, x1.register)
 	}
 
 	// Record that we consumed the x2 and placed the copysign result in the x1's register.
@@ -2243,9 +1934,9 @@ func (c *amd64Compiler) compileSqrt(o *wazeroir.OperationSqrt) error {
 		return err
 	}
 	if o.Type == wazeroir.Float32 {
-		c.compileRegisterToRegister(x86.ASQRTSS, target.register, target.register)
+		c.assembler.CompileRegisterToRegister(amd64.SQRTSS, target.register, target.register)
 	} else {
-		c.compileRegisterToRegister(x86.ASQRTSD, target.register, target.register)
+		c.assembler.CompileRegisterToRegister(amd64.SQRTSD, target.register, target.register)
 	}
 	return nil
 }
@@ -2256,7 +1947,7 @@ func (c *amd64Compiler) compileI32WrapFromI64() error {
 	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
 		return err
 	}
-	c.compileRegisterToRegister(x86.AMOVL, target.register, target.register)
+	c.assembler.CompileRegisterToRegister(amd64.MOVL, target.register, target.register)
 	return nil
 }
 
@@ -2303,71 +1994,71 @@ func (c *amd64Compiler) emitUnsignedI32TruncFromFloat(isFloat32Bit bool) error {
 
 	// First, we check the source float value is above or equal math.MaxInt32+1.
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISS, 0, int64(float32ForMaximumSigned32bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(float32ForMaximumSigned32bitIntPlusOneAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISD, 0, int64(float64ForMaximumSigned32bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(float64ForMaximumSigned32bitIntPlusOneAddress), source.register)
 	}
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNaN := c.compileJump(x86.AJPS) // jump if parity is set.
+	jmpIfNaN := c.assembler.CompileJump(amd64.JPS) // jump if parity is set.
 
 	// Jump if the source float value is above or equal math.MaxInt32+1.
-	jmpAboveOrEqualMaxIn32PlusOne := c.compileJump(x86.AJCC)
+	jmpAboveOrEqualMaxIn32PlusOne := c.assembler.CompileJump(amd64.JCC)
 
 	// Next we convert the value as a signed integer.
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.ACVTTSS2SL, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SL, source.register, result)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTTSD2SL, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SL, source.register, result)
 	}
 
 	// Then if the result is minus, it is invalid conversion from minus float (incl. -Inf).
-	c.compileRegisterToRegister(x86.ATESTL, result, result)
+	c.assembler.CompileRegisterToRegister(amd64.TESTL, result, result)
 
-	jmpIfMinusOrMinusInf := c.compileJump(x86.AJMI)
+	jmpIfMinusOrMinusInf := c.assembler.CompileJump(amd64.JMI)
 
 	// Otherwise, the values is valid.
-	okJmpForLessThanMaxInt32PlusOne := c.compileUnconditionalJump()
+	okJmpForLessThanMaxInt32PlusOne := c.assembler.CompileJump(amd64.JMP)
 
 	// Now, start handling the case where the original float value is above or equal math.MaxInt32+1.
 	//
 	// First, we subtract the math.MaxInt32+1 from the original value so it can fit in signed 32-bit integer.
-	c.addSetJmpOrigins(jmpAboveOrEqualMaxIn32PlusOne)
+	c.assembler.SetJumpTargetOnNext(jmpAboveOrEqualMaxIn32PlusOne)
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.ASUBSS, 0, int64(float32ForMaximumSigned32bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.SUBSS, asm.NilRegister, int64(float32ForMaximumSigned32bitIntPlusOneAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.ASUBSD, 0, int64(float64ForMaximumSigned32bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.SUBSD, asm.NilRegister, int64(float64ForMaximumSigned32bitIntPlusOneAddress), source.register)
 	}
 
 	// Then, convert the subtracted value as a signed 32-bit integer.
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.ACVTTSS2SL, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SL, source.register, result)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTTSD2SL, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SL, source.register, result)
 	}
 
 	// Next, we have to check if the value is from NaN, +Inf.
 	// NaN or +Inf cases result in 0x8000_0000 according to the semantics of conversion,
 	// This means we check if the result int value is minus or not.
-	c.compileRegisterToRegister(x86.ATESTL, result, result)
+	c.assembler.CompileRegisterToRegister(amd64.TESTL, result, result)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfPlusInf := c.compileJump(x86.AJMI)
+	jmpIfPlusInf := c.assembler.CompileJump(amd64.JMI)
 
 	// Otherwise, we successfully converted the the source float minus (math.MaxInt32+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
-	c.compileMemoryToRegisterInstruction(x86.AADDL, 0, int64(float32SignBitMaskAddress), result)
+	c.assembler.CompileMemoryToRegister(amd64.ADDL, asm.NilRegister, int64(float32SignBitMaskAddress), result)
 
-	okJmpForAboveOrEqualMaxInt32PlusOne := c.compileUnconditionalJump()
+	okJmpForAboveOrEqualMaxInt32PlusOne := c.assembler.CompileJump(amd64.JMP)
 
-	c.addSetJmpOrigins(jmpIfNaN)
+	c.assembler.SetJumpTargetOnNext(jmpIfNaN)
 	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
 
-	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfPlusInf)
+	c.assembler.SetJumpTargetOnNext(jmpIfMinusOrMinusInf, jmpIfPlusInf)
 	c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
 
 	// We jump to the next instructions for valid cases.
-	c.addSetJmpOrigins(okJmpForLessThanMaxInt32PlusOne, okJmpForAboveOrEqualMaxInt32PlusOne)
+	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt32PlusOne, okJmpForAboveOrEqualMaxInt32PlusOne)
 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
@@ -2391,70 +2082,70 @@ func (c *amd64Compiler) emitUnsignedI64TruncFromFloat(isFloat32Bit bool) error {
 
 	// First, we check the source float value is above or equal math.MaxInt64+1.
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISS, 0, int64(float32ForMaximumSigned64bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(float32ForMaximumSigned64bitIntPlusOneAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISD, 0, int64(float64ForMaximumSigned64bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(float64ForMaximumSigned64bitIntPlusOneAddress), source.register)
 	}
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNaN := c.compileJump(x86.AJPS) // jump if parity is set.
+	jmpIfNaN := c.assembler.CompileJump(amd64.JPS) // jump if parity is set.
 
 	// Jump if the source float values is above or equal math.MaxInt64+1.
-	jmpAboveOrEqualMaxIn32PlusOne := c.compileJump(x86.AJCC)
+	jmpAboveOrEqualMaxIn32PlusOne := c.assembler.CompileJump(amd64.JCC)
 
 	// Next we convert the value as a signed integer.
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.ACVTTSS2SQ, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SQ, source.register, result)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTTSD2SQ, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SQ, source.register, result)
 	}
 
 	// Then if the result is minus, it is invalid conversion from minus float (incl. -Inf).
-	c.compileRegisterToRegister(x86.ATESTQ, result, result)
-	jmpIfMinusOrMinusInf := c.compileJump(x86.AJMI)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, result, result)
+	jmpIfMinusOrMinusInf := c.assembler.CompileJump(amd64.JMI)
 
 	// Otherwise, the values is valid.
-	okJmpForLessThanMaxInt64PlusOne := c.compileUnconditionalJump()
+	okJmpForLessThanMaxInt64PlusOne := c.assembler.CompileJump(amd64.JMP)
 
 	// Now, start handling the case where the original float value is above or equal math.MaxInt64+1.
 	//
 	// First, we subtract the math.MaxInt64+1 from the original value so it can fit in signed 64-bit integer.
-	c.addSetJmpOrigins(jmpAboveOrEqualMaxIn32PlusOne)
+	c.assembler.SetJumpTargetOnNext(jmpAboveOrEqualMaxIn32PlusOne)
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.ASUBSS, 0, int64(float32ForMaximumSigned64bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.SUBSS, asm.NilRegister, int64(float32ForMaximumSigned64bitIntPlusOneAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.ASUBSD, 0, int64(float64ForMaximumSigned64bitIntPlusOneAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.SUBSD, asm.NilRegister, int64(float64ForMaximumSigned64bitIntPlusOneAddress), source.register)
 	}
 
 	// Then, convert the subtracted value as a signed 64-bit integer.
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.ACVTTSS2SQ, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SQ, source.register, result)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTTSD2SQ, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SQ, source.register, result)
 	}
 
 	// Next, we have to check if the value is from NaN, +Inf.
 	// NaN or +Inf cases result in 0x8000_0000 according to the semantics of conversion,
 	// This means we check if the result int value is minus or not.
-	c.compileRegisterToRegister(x86.ATESTQ, result, result)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, result, result)
 
 	// If the result is minus, the conversion is invalid (from NaN or +Inf)
-	jmpIfPlusInf := c.compileJump(x86.AJMI)
+	jmpIfPlusInf := c.assembler.CompileJump(amd64.JMI)
 
 	// Otherwise, we successfully converted the the source float minus (math.MaxInt64+1) to int.
 	// So, we retrieve the original source float value by adding the sign mask.
-	c.compileMemoryToRegisterInstruction(x86.AADDQ, 0, int64(float64SignBitMaskAddress), result)
+	c.assembler.CompileMemoryToRegister(amd64.ADDQ, asm.NilRegister, int64(float64SignBitMaskAddress), result)
 
-	okJmpForAboveOrEqualMaxInt64PlusOne := c.compileUnconditionalJump()
+	okJmpForAboveOrEqualMaxInt64PlusOne := c.assembler.CompileJump(amd64.JMP)
 
-	c.addSetJmpOrigins(jmpIfNaN)
+	c.assembler.SetJumpTargetOnNext(jmpIfNaN)
 	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
 
-	c.addSetJmpOrigins(jmpIfMinusOrMinusInf, jmpIfPlusInf)
+	c.assembler.SetJumpTargetOnNext(jmpIfMinusOrMinusInf, jmpIfPlusInf)
 	c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
 
 	// We jump to the next instructions for valid cases.
-	c.addSetJmpOrigins(okJmpForLessThanMaxInt64PlusOne, okJmpForAboveOrEqualMaxInt64PlusOne)
+	c.assembler.SetJumpTargetOnNext(okJmpForLessThanMaxInt64PlusOne, okJmpForAboveOrEqualMaxInt64PlusOne)
 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
@@ -2478,67 +2169,66 @@ func (c *amd64Compiler) emitSignedI32TruncFromFloat(isFloat32Bit bool) error {
 
 	// First we unconditionally convert source to integer via CVTTSS2SI (CVTTSD2SI for 64bit float).
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.ACVTTSS2SL, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SL, source.register, result)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTTSD2SL, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SL, source.register, result)
 	}
 
 	// We compare the conversion result with the sign bit mask to check if it is either
 	// 1) the source float value is either +-Inf or NaN, or it exceeds representative ranges of 32bit signed integer, or
 	// 2) the source equals the minimum signed 32-bit (=-2147483648.000000) whose bit pattern is float32ForMinimumSigned32bitIntegerAddress for 32 bit float
 	// 	  or float64ForMinimumSigned32bitIntegerAddress for 64bit float.
-	c.compileMemoryToRegisterInstruction(x86.ACMPL, 0, int64(float32SignBitMaskAddress), result)
+	c.assembler.CompileMemoryToRegister(amd64.CMPL, asm.NilRegister, int64(float32SignBitMaskAddress), result)
 
 	// Otherwise, jump to exit as the result is valid.
-	okJmp := c.compileJump(x86.AJNE)
+	okJmp := c.assembler.CompileJump(amd64.JNE)
 
 	// Start handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.AUCOMISS, source.register, source.register)
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, source.register, source.register)
 	} else {
-		c.compileRegisterToRegister(x86.AUCOMISD, source.register, source.register)
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISD, source.register, source.register)
 	}
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNotNaN := c.compileJump(x86.AJPC) // jump if parity is not set.
+	jmpIfNotNaN := c.assembler.CompileJump(amd64.JPC) // jump if parity is not set.
 
 	// If the value is NaN, we return the function with jitCallStatusCodeInvalidFloatToIntConversion.
 	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
 
 	// Check if the value is larger than or equal the minimum 32-bit integer value,
 	// meaning that the value exceeds the lower bound of 32-bit signed integer range.
-	c.addSetJmpOrigins(jmpIfNotNaN)
+	c.assembler.SetJumpTargetOnNext(jmpIfNotNaN)
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISS, 0, int64(float32ForMinimumSigned32bitIntegerAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(float32ForMinimumSigned32bitIntegerAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISD, 0, int64(float64ForMinimumSigned32bitIntegerAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(float64ForMinimumSigned32bitIntegerAddress), source.register)
 	}
 
 	// Jump if the value exceeds the lower bound.
-	var jmpIfExceedsLowerBound *obj.Prog
+	var jmpIfExceedsLowerBound asm.Node
 	if isFloat32Bit {
-		jmpIfExceedsLowerBound = c.compileJump(x86.AJCS)
+		jmpIfExceedsLowerBound = c.assembler.CompileJump(amd64.JCS)
 	} else {
-		jmpIfExceedsLowerBound = c.compileJump(x86.AJLS)
+		jmpIfExceedsLowerBound = c.assembler.CompileJump(amd64.JLS)
 	}
-	c.addInstruction(jmpIfExceedsLowerBound)
 
 	// At this point, the value is the minimum signed 32-bit int (=-2147483648.000000) or larger than 32-bit maximum.
 	// So, check if the value equals the minimum signed 32-bit int.
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISS, 0, int64(zero64BitAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(zero64BitAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISD, 0, int64(zero64BitAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(zero64BitAddress), source.register)
 	}
 
-	jmpIfMinimumSignedInt := c.compileJump(x86.AJCS) // jump if the value is minus (= the minimum signed 32-bit int).
+	jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 32-bit int).
 
-	c.addSetJmpOrigins(jmpIfExceedsLowerBound)
+	c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
 	c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
 
 	// We jump to the next instructions for valid cases.
-	c.addSetJmpOrigins(okJmp, jmpIfMinimumSignedInt)
+	c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
@@ -2562,60 +2252,60 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 
 	// First we unconditionally convert source to integer via CVTTSS2SI (CVTTSD2SI for 64bit float).
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.ACVTTSS2SQ, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSS2SQ, source.register, result)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTTSD2SQ, source.register, result)
+		c.assembler.CompileRegisterToRegister(amd64.CVTTSD2SQ, source.register, result)
 	}
 
 	// We compare the conversion result with the sign bit mask to check if it is either
 	// 1) the source float value is either +-Inf or NaN, or it exceeds representative ranges of 32bit signed integer, or
 	// 2) the source equals the minimum signed 32-bit (=-9223372036854775808.0) whose bit pattern is float32ForMinimumSigned64bitIntegerAddress for 32 bit float
 	// 	  or float64ForMinimumSigned64bitIntegerAddress for 64bit float.
-	c.compileMemoryToRegisterInstruction(x86.ACMPQ, 0, int64(float64SignBitMaskAddress), result)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, asm.NilRegister, int64(float64SignBitMaskAddress), result)
 
 	// Otherwise, we simply jump to exit as the result is valid.
-	okJmp := c.compileJump(x86.AJNE)
+	okJmp := c.assembler.CompileJump(amd64.JNE)
 
 	// Start handling the case of 1) and 2).
 	// First, check if the value is NaN.
 	if isFloat32Bit {
-		c.compileRegisterToRegister(x86.AUCOMISS, source.register, source.register)
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, source.register, source.register)
 	} else {
-		c.compileRegisterToRegister(x86.AUCOMISD, source.register, source.register)
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISD, source.register, source.register)
 	}
 
 	// Check the parity flag (set when the value is NaN), and if it is set, we should raise an exception.
-	jmpIfNotNaN := c.compileJump(x86.AJPC) // jump if parity is not set.
+	jmpIfNotNaN := c.assembler.CompileJump(amd64.JPC) // jump if parity is not set.
 
 	c.compileExitFromNativeCode(jitCallStatusCodeInvalidFloatToIntConversion)
 
 	// Check if the value is larger than or equal the minimum 64-bit integer value,
 	// meaning that the value exceeds the lower bound of 64-bit signed integer range.
-	c.addSetJmpOrigins(jmpIfNotNaN)
+	c.assembler.SetJumpTargetOnNext(jmpIfNotNaN)
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISS, 0, int64(float32ForMinimumSigned64bitIntegerAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(float32ForMinimumSigned64bitIntegerAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISD, 0, int64(float64ForMinimumSigned64bitIntegerAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(float64ForMinimumSigned64bitIntegerAddress), source.register)
 	}
 
 	// Jump if the value is -Inf.
-	jmpIfExceedsLowerBound := c.compileJump(x86.AJCS)
+	jmpIfExceedsLowerBound := c.assembler.CompileJump(amd64.JCS)
 
 	// At this point, the value is the minimum signed 64-bit int (=-9223372036854775808.0) or larger than 64-bit maximum.
 	// So, check if the value equals the minimum signed 64-bit int.
 	if isFloat32Bit {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISS, 0, int64(zero64BitAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISS, asm.NilRegister, int64(zero64BitAddress), source.register)
 	} else {
-		c.compileMemoryToRegisterInstruction(x86.AUCOMISD, 0, int64(zero64BitAddress), source.register)
+		c.assembler.CompileMemoryToRegister(amd64.UCOMISD, asm.NilRegister, int64(zero64BitAddress), source.register)
 	}
 
-	jmpIfMinimumSignedInt := c.compileJump(x86.AJCS) // jump if the value is minus (= the minimum signed 64-bit int).
+	jmpIfMinimumSignedInt := c.assembler.CompileJump(amd64.JCS) // jump if the value is minus (= the minimum signed 64-bit int).
 
-	c.addSetJmpOrigins(jmpIfExceedsLowerBound)
+	c.assembler.SetJumpTargetOnNext(jmpIfExceedsLowerBound)
 	c.compileExitFromNativeCode(jitCallStatusIntegerOverflow)
 
 	// We jump to the next instructions for valid cases.
-	c.addSetJmpOrigins(okJmp, jmpIfMinimumSignedInt)
+	c.assembler.SetJumpTargetOnNext(okJmp, jmpIfMinimumSignedInt)
 
 	// We consumed the source's register and placed the conversion result
 	// in the result register.
@@ -2628,13 +2318,13 @@ func (c *amd64Compiler) emitSignedI64TruncFromFloat(isFloat32Bit bool) error {
 // compileFConvertFromI implements compiler.compileFConvertFromI for the amd64 architecture.
 func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI) (err error) {
 	if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt32 {
-		err = c.compileSimpleConversion(x86.ACVTSL2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 32bit int
+		err = c.compileSimpleConversion(amd64.CVTSL2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 32bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedInt64 {
-		err = c.compileSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int
+		err = c.compileSimpleConversion(amd64.CVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt32 {
-		err = c.compileSimpleConversion(x86.ACVTSL2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 32bit int
+		err = c.compileSimpleConversion(amd64.CVTSL2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 32bit int
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedInt64 {
-		err = c.compileSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int
+		err = c.compileSimpleConversion(amd64.CVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint32 {
 		// See the following link for why we use 64bit conversion for unsigned 32bit integer sources:
 		// https://stackoverflow.com/questions/41495498/fpu-operations-generated-by-gcc-during-casting-integer-to-float.
@@ -2644,10 +2334,10 @@ func (c *amd64Compiler) compileFConvertFromI(o *wazeroir.OperationFConvertFromI)
 		// >> not an unsigned integer like you have here. So what gives? Well, a 64-bit processor has 64-bit wide
 		// >> registers available, so the unsigned 32-bit input values can be stored as signed 64-bit intermediate values,
 		// >> which allows CVTSI2SS to be used after all.
-		err = c.compileSimpleConversion(x86.ACVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int.
+		err = c.compileSimpleConversion(amd64.CVTSQ2SS, generalPurposeRegisterTypeFloat) // = CVTSI2SS for 64bit int.
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint32 {
 		// For the same reason above, we use 64bit conversion for unsigned 32bit.
-		err = c.compileSimpleConversion(x86.ACVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int.
+		err = c.compileSimpleConversion(amd64.CVTSQ2SD, generalPurposeRegisterTypeFloat) // = CVTSI2SD for 64bit int.
 	} else if o.OutputType == wazeroir.Float32 && o.InputType == wazeroir.SignedUint64 {
 		err = c.emitUnsignedInt64ToFloatConversion(true)
 	} else if o.OutputType == wazeroir.Float64 && o.InputType == wazeroir.SignedUint64 {
@@ -2709,19 +2399,19 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	}
 
 	// Check if the most significant bit (sign bit) is set.
-	c.compileRegisterToRegister(x86.ATESTQ, origin.register, origin.register)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, origin.register, origin.register)
 
 	// Jump if the sign bit is set.
-	jmpIfSignbitSet := c.compileJump(x86.AJMI)
+	jmpIfSignbitSet := c.assembler.CompileJump(amd64.JMI)
 
 	// Otherwise, we could fit the unsigned int into float32.
 	// So, we convert it to float32 and emit jump instruction to exit from this branch.
 	if isFloat32bit {
-		c.compileRegisterToRegister(x86.ACVTSQ2SS, origin.register, dest)
+		c.assembler.CompileRegisterToRegister(amd64.CVTSQ2SS, origin.register, dest)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTSQ2SD, origin.register, dest)
+		c.assembler.CompileRegisterToRegister(amd64.CVTSQ2SD, origin.register, dest)
 	}
-	exitFromSignbitUnSet := c.compileUnconditionalJump()
+	exitFromSignbitUnSet := c.assembler.CompileJump(amd64.JMP)
 
 	// Now handling the case where sign-bit is set.
 	// We emit the following sequences:
@@ -2732,26 +2422,26 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 	// 	   cvtsi2ss        xmm0, tmpReg
 	// 	   addsd   xmm0, xmm0
 
-	c.addSetJmpOrigins(jmpIfSignbitSet)
-	c.compileRegisterToRegister(x86.AMOVQ, origin.register, tmpReg)
-	c.compileConstToRegisterInstruction(x86.ASHRQ, 1, tmpReg)
-	c.compileConstToRegisterInstruction(x86.AANDQ, 1, origin.register)
-	c.compileRegisterToRegister(x86.AORQ, origin.register, tmpReg)
+	c.assembler.SetJumpTargetOnNext(jmpIfSignbitSet)
+	c.assembler.CompileRegisterToRegister(amd64.MOVQ, origin.register, tmpReg)
+	c.assembler.CompileConstToRegister(amd64.SHRQ, 1, tmpReg)
+	c.assembler.CompileConstToRegister(amd64.ANDQ, 1, origin.register)
+	c.assembler.CompileRegisterToRegister(amd64.ORQ, origin.register, tmpReg)
 	if isFloat32bit {
-		c.compileRegisterToRegister(x86.ACVTSQ2SS, tmpReg, dest)
+		c.assembler.CompileRegisterToRegister(amd64.CVTSQ2SS, tmpReg, dest)
 	} else {
-		c.compileRegisterToRegister(x86.ACVTSQ2SD, tmpReg, dest)
+		c.assembler.CompileRegisterToRegister(amd64.CVTSQ2SD, tmpReg, dest)
 	}
 	if isFloat32bit {
-		c.compileRegisterToRegister(x86.AADDSS, dest, dest)
+		c.assembler.CompileRegisterToRegister(amd64.ADDSS, dest, dest)
 	} else {
-		c.compileRegisterToRegister(x86.AADDSD, dest, dest)
+		c.assembler.CompileRegisterToRegister(amd64.ADDSD, dest, dest)
 	}
 
 	// Now, we finished the sign-bit set branch.
 	// We have to make the exit jump target of sign-bit unset branch
 	// towards the next instruction.
-	c.addSetJmpOrigins(exitFromSignbitUnSet)
+	c.assembler.SetJumpTargetOnNext(exitFromSignbitUnSet)
 
 	// We consumed the origin's register and placed the conversion result
 	// in the dest register.
@@ -2763,7 +2453,7 @@ func (c *amd64Compiler) emitUnsignedInt64ToFloatConversion(isFloat32bit bool) er
 
 // compileSimpleConversion pops a value type from the stack, and applies the
 // given instruction on it, and push the result onto a register of the given type.
-func (c *amd64Compiler) compileSimpleConversion(convInstruction obj.As, destinationRegisterType generalPurposeRegisterType) error {
+func (c *amd64Compiler) compileSimpleConversion(convInstruction asm.Instruction, destinationRegisterType generalPurposeRegisterType) error {
 	origin := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(origin); err != nil {
 		return err
@@ -2774,7 +2464,7 @@ func (c *amd64Compiler) compileSimpleConversion(convInstruction obj.As, destinat
 		return err
 	}
 
-	c.compileRegisterToRegister(convInstruction, origin.register, dest)
+	c.assembler.CompileRegisterToRegister(convInstruction, origin.register, dest)
 
 	c.locationStack.markRegisterUnused(origin.register)
 	loc := c.pushValueLocationOnRegister(dest)
@@ -2789,7 +2479,7 @@ func (c *amd64Compiler) compileF32DemoteFromF64() error {
 		return err
 	}
 
-	c.compileRegisterToRegister(x86.ACVTSD2SS, target.register, target.register)
+	c.assembler.CompileRegisterToRegister(amd64.CVTSD2SS, target.register, target.register)
 	return nil
 }
 
@@ -2800,7 +2490,7 @@ func (c *amd64Compiler) compileF64PromoteFromF32() error {
 		return err
 	}
 
-	c.compileRegisterToRegister(x86.ACVTSS2SD, target.register, target.register)
+	c.assembler.CompileRegisterToRegister(amd64.CVTSS2SD, target.register, target.register)
 	return nil
 }
 
@@ -2811,7 +2501,7 @@ func (c *amd64Compiler) compileI32ReinterpretFromF32() error {
 		peek.setRegisterType(generalPurposeRegisterTypeInt)
 		return nil
 	}
-	return c.compileSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeInt)
+	return c.compileSimpleConversion(amd64.MOVL, generalPurposeRegisterTypeInt)
 }
 
 // compileI64ReinterpretFromF64 implements compiler.compileI64ReinterpretFromF64 for the amd64 architecture.
@@ -2821,7 +2511,7 @@ func (c *amd64Compiler) compileI64ReinterpretFromF64() error {
 		peek.setRegisterType(generalPurposeRegisterTypeInt)
 		return nil
 	}
-	return c.compileSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeInt)
+	return c.compileSimpleConversion(amd64.MOVQ, generalPurposeRegisterTypeInt)
 }
 
 // compileF32ReinterpretFromI32 implements compiler.compileF32ReinterpretFromI32 for the amd64 architecture.
@@ -2831,7 +2521,7 @@ func (c *amd64Compiler) compileF32ReinterpretFromI32() error {
 		peek.setRegisterType(generalPurposeRegisterTypeFloat)
 		return nil
 	}
-	return c.compileSimpleConversion(x86.AMOVL, generalPurposeRegisterTypeFloat)
+	return c.compileSimpleConversion(amd64.MOVL, generalPurposeRegisterTypeFloat)
 }
 
 // compileF64ReinterpretFromI64 implements compiler.compileF64ReinterpretFromI64 for the amd64 architecture.
@@ -2841,52 +2531,52 @@ func (c *amd64Compiler) compileF64ReinterpretFromI64() error {
 		peek.setRegisterType(generalPurposeRegisterTypeFloat)
 		return nil
 	}
-	return c.compileSimpleConversion(x86.AMOVQ, generalPurposeRegisterTypeFloat)
+	return c.compileSimpleConversion(amd64.MOVQ, generalPurposeRegisterTypeFloat)
 }
 
 // compileExtend implements compiler.compileExtend for the amd64 architecture.
 func (c *amd64Compiler) compileExtend(o *wazeroir.OperationExtend) error {
-	var inst obj.As
+	var inst asm.Instruction
 	if o.Signed {
-		inst = x86.AMOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
+		inst = amd64.MOVLQSX // = MOVSXD https://www.felixcloutier.com/x86/movsx:movsxd
 	} else {
-		inst = x86.AMOVQ
+		inst = amd64.MOVQ
 	}
 	return c.compileExtendImpl(inst)
 }
 
 // compileSignExtend32From8 implements compiler.compileSignExtend32From8 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend32From8() error {
-	return c.compileExtendImpl(x86.AMOVBLSX)
+	return c.compileExtendImpl(amd64.MOVBLSX)
 }
 
 // compileSignExtend32From16 implements compiler.compileSignExtend32From16 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend32From16() error {
-	return c.compileExtendImpl(x86.AMOVWLSX)
+	return c.compileExtendImpl(amd64.MOVWLSX)
 }
 
 // compileSignExtend64From8 implements compiler.compileSignExtend64From8 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From8() error {
-	return c.compileExtendImpl(x86.AMOVBQSX)
+	return c.compileExtendImpl(amd64.MOVBQSX)
 }
 
 // compileSignExtend64From16 implements compiler.compileSignExtend64From16 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From16() error {
-	return c.compileExtendImpl(x86.AMOVWQSX)
+	return c.compileExtendImpl(amd64.MOVWQSX)
 }
 
 // compileSignExtend64From32 implements compiler.compileSignExtend64From32 for the amd64 architecture.
 func (c *amd64Compiler) compileSignExtend64From32() error {
-	return c.compileExtendImpl(x86.AMOVLQSX)
+	return c.compileExtendImpl(amd64.MOVLQSX)
 }
 
-func (c *amd64Compiler) compileExtendImpl(inst obj.As) error {
+func (c *amd64Compiler) compileExtendImpl(inst asm.Instruction) error {
 	target := c.locationStack.peek() // Note this is peek!
 	if err := c.compileEnsureOnGeneralPurposeRegister(target); err != nil {
 		return err
 	}
 
-	c.compileRegisterToRegister(inst, target.register, target.register)
+	c.assembler.CompileRegisterToRegister(inst, target.register, target.register)
 	return nil
 }
 
@@ -2913,13 +2603,13 @@ func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool)
 
 	switch t {
 	case wazeroir.UnsignedTypeI32:
-		err = c.compileEqOrNeForInts(x1.register, x2.register, x86.ACMPL, shouldEqual)
+		err = c.compileEqOrNeForInts(x1.register, x2.register, amd64.CMPL, shouldEqual)
 	case wazeroir.UnsignedTypeI64:
-		err = c.compileEqOrNeForInts(x1.register, x2.register, x86.ACMPQ, shouldEqual)
+		err = c.compileEqOrNeForInts(x1.register, x2.register, amd64.CMPQ, shouldEqual)
 	case wazeroir.UnsignedTypeF32:
-		err = c.compileEqOrNeForFloats(x1.register, x2.register, x86.AUCOMISS, shouldEqual)
+		err = c.compileEqOrNeForFloats(x1.register, x2.register, amd64.UCOMISS, shouldEqual)
 	case wazeroir.UnsignedTypeF64:
-		err = c.compileEqOrNeForFloats(x1.register, x2.register, x86.AUCOMISD, shouldEqual)
+		err = c.compileEqOrNeForFloats(x1.register, x2.register, amd64.UCOMISD, shouldEqual)
 	}
 	if err != nil {
 		return
@@ -2931,15 +2621,15 @@ func (c *amd64Compiler) compileEqOrNe(t wazeroir.UnsignedType, shouldEqual bool)
 	return
 }
 
-func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
-	c.compileRegisterToRegister(cmpInstruction, x2Reg, x1Reg)
+func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg asm.Register, cmpInstruction asm.Instruction, shouldEqual bool) error {
+	c.assembler.CompileRegisterToRegister(cmpInstruction, x2Reg, x1Reg)
 
 	// Record that the result is on the conditional register.
-	var condReg conditionalRegisterState
+	var condReg asm.ConditionalRegisterState
 	if shouldEqual {
-		condReg = conditionalRegisterStateE
+		condReg = amd64.ConditionalRegisterStateE
 	} else {
-		condReg = conditionalRegisterStateNE
+		condReg = amd64.ConditionalRegisterStateNE
 	}
 	loc := c.locationStack.pushValueLocationOnConditionalRegister(condReg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
@@ -2949,7 +2639,7 @@ func (c *amd64Compiler) compileEqOrNeForInts(x1Reg, x2Reg int16, cmpInstruction 
 // For float EQ and NE, we have to take NaN values into account.
 // Notably, Wasm specification states that if one of targets is NaN,
 // the result must be zero for EQ or one for NE.
-func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstruction obj.As, shouldEqual bool) error {
+func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg asm.Register, cmpInstruction asm.Instruction, shouldEqual bool) error {
 	// Before we allocate the result, we have to reserve two int registers.
 	nanFragReg, err := c.allocateRegister(generalPurposeRegisterTypeInt)
 	if err != nil {
@@ -2962,36 +2652,36 @@ func (c *amd64Compiler) compileEqOrNeForFloats(x1Reg, x2Reg int16, cmpInstructio
 	}
 
 	// Then, execute the comparison.
-	c.compileRegisterToRegister(cmpInstruction, x2Reg, x1Reg)
+	c.assembler.CompileRegisterToRegister(cmpInstruction, x2Reg, x1Reg)
 
 	// First, we get the parity flag which indicates whether one of values was NaN.
 	if shouldEqual {
 		// Set 1 if two values are NOT NaN.
-		c.compileNoneToRegisterInstruction(x86.ASETPC, nanFragReg)
+		c.assembler.CompileNoneToRegister(amd64.SETPC, nanFragReg)
 	} else {
 		// Set 1 if one of values is NaN.
-		c.compileNoneToRegisterInstruction(x86.ASETPS, nanFragReg)
+		c.assembler.CompileNoneToRegister(amd64.SETPS, nanFragReg)
 	}
 
 	// Next, we get the usual comparison flag.
 	if shouldEqual {
 		// Set 1 if equal.
-		c.compileNoneToRegisterInstruction(x86.ASETEQ, cmpResultReg)
+		c.assembler.CompileNoneToRegister(amd64.SETEQ, cmpResultReg)
 	} else {
 		// Set 1 if not equal.
-		c.compileNoneToRegisterInstruction(x86.ASETNE, cmpResultReg)
+		c.assembler.CompileNoneToRegister(amd64.SETNE, cmpResultReg)
 	}
 
 	// Do "and" or "or" operations on these two flags to get the actual result.
 	if shouldEqual {
-		c.compileRegisterToRegister(x86.AANDL, nanFragReg, cmpResultReg)
+		c.assembler.CompileRegisterToRegister(amd64.ANDL, nanFragReg, cmpResultReg)
 	} else {
-		c.compileRegisterToRegister(x86.AORL, nanFragReg, cmpResultReg)
+		c.assembler.CompileRegisterToRegister(amd64.ORL, nanFragReg, cmpResultReg)
 	}
 
 	// Clear the unnecessary bits by zero extending the first byte.
 	// This is necessary the upper bits (5 to 32 bits) of SET* instruction result is undefined.
-	c.compileRegisterToRegister(x86.AMOVBLZX, cmpResultReg, cmpResultReg)
+	c.assembler.CompileRegisterToRegister(amd64.MOVBLZX, cmpResultReg, cmpResultReg)
 
 	// Now we have the result in cmpResultReg register, so we record it.
 	loc := c.pushValueLocationOnRegister(cmpResultReg)
@@ -3010,16 +2700,16 @@ func (c *amd64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 
 	switch o.Type {
 	case wazeroir.UnsignedInt32:
-		c.compileMemoryToRegisterInstruction(x86.ACMPL, 0, int64(zero64BitAddress), v.register)
+		c.assembler.CompileMemoryToRegister(amd64.CMPL, asm.NilRegister, int64(zero64BitAddress), v.register)
 	case wazeroir.UnsignedInt64:
-		c.compileMemoryToRegisterInstruction(x86.ACMPQ, 0, int64(zero64BitAddress), v.register)
+		c.assembler.CompileMemoryToRegister(amd64.CMPQ, asm.NilRegister, int64(zero64BitAddress), v.register)
 	}
 
 	// v is consumed by the cmp operation so release it.
 	c.locationStack.releaseRegister(v)
 
 	// Finally, record that the result is on the conditional register.
-	loc := c.locationStack.pushValueLocationOnConditionalRegister(conditionalRegisterStateE)
+	loc := c.locationStack.pushValueLocationOnConditionalRegister(amd64.ConditionalRegisterStateE)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 	return nil
 }
@@ -3037,29 +2727,29 @@ func (c *amd64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	}
 
 	// Emit the compare instruction.
-	var resultConditionState conditionalRegisterState
-	var inst obj.As
+	var resultConditionState asm.ConditionalRegisterState
+	var inst asm.Instruction
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
-		resultConditionState = conditionalRegisterStateL
-		inst = x86.ACMPL
+		resultConditionState = amd64.ConditionalRegisterStateL
+		inst = amd64.CMPL
 	case wazeroir.SignedTypeUint32:
-		resultConditionState = conditionalRegisterStateB
-		inst = x86.ACMPL
+		resultConditionState = amd64.ConditionalRegisterStateB
+		inst = amd64.CMPL
 	case wazeroir.SignedTypeInt64:
-		inst = x86.ACMPQ
-		resultConditionState = conditionalRegisterStateL
+		inst = amd64.CMPQ
+		resultConditionState = amd64.ConditionalRegisterStateL
 	case wazeroir.SignedTypeUint64:
-		resultConditionState = conditionalRegisterStateB
-		inst = x86.ACMPQ
+		resultConditionState = amd64.ConditionalRegisterStateB
+		inst = amd64.CMPQ
 	case wazeroir.SignedTypeFloat32:
-		resultConditionState = conditionalRegisterStateA
-		inst = x86.ACOMISS
+		resultConditionState = amd64.ConditionalRegisterStateA
+		inst = amd64.COMISS
 	case wazeroir.SignedTypeFloat64:
-		resultConditionState = conditionalRegisterStateA
-		inst = x86.ACOMISD
+		resultConditionState = amd64.ConditionalRegisterStateA
+		inst = amd64.COMISD
 	}
-	c.compileRegisterToRegister(inst, x1.register, x2.register)
+	c.assembler.CompileRegisterToRegister(inst, x1.register, x2.register)
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
@@ -3084,26 +2774,26 @@ func (c *amd64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	}
 
 	// Emit the compare instruction.
-	var resultConditionState conditionalRegisterState
+	var resultConditionState asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
-		resultConditionState = conditionalRegisterStateG
-		c.compileRegisterToRegister(x86.ACMPL, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateG
+		c.assembler.CompileRegisterToRegister(amd64.CMPL, x1.register, x2.register)
 	case wazeroir.SignedTypeUint32:
-		c.compileRegisterToRegister(x86.ACMPL, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateA
+		c.assembler.CompileRegisterToRegister(amd64.CMPL, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateA
 	case wazeroir.SignedTypeInt64:
-		c.compileRegisterToRegister(x86.ACMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateG
+		c.assembler.CompileRegisterToRegister(amd64.CMPQ, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateG
 	case wazeroir.SignedTypeUint64:
-		c.compileRegisterToRegister(x86.ACMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateA
+		c.assembler.CompileRegisterToRegister(amd64.CMPQ, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateA
 	case wazeroir.SignedTypeFloat32:
-		c.compileRegisterToRegister(x86.AUCOMISS, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateA
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISS, x2.register, x1.register)
+		resultConditionState = amd64.ConditionalRegisterStateA
 	case wazeroir.SignedTypeFloat64:
-		c.compileRegisterToRegister(x86.AUCOMISD, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateA
+		c.assembler.CompileRegisterToRegister(amd64.UCOMISD, x2.register, x1.register)
+		resultConditionState = amd64.ConditionalRegisterStateA
 	}
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
@@ -3129,29 +2819,29 @@ func (c *amd64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	}
 
 	// Emit the compare instruction.
-	var inst obj.As
-	var resultConditionState conditionalRegisterState
+	var inst asm.Instruction
+	var resultConditionState asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
-		resultConditionState = conditionalRegisterStateLE
-		inst = x86.ACMPL
+		resultConditionState = amd64.ConditionalRegisterStateLE
+		inst = amd64.CMPL
 	case wazeroir.SignedTypeUint32:
-		resultConditionState = conditionalRegisterStateBE
-		inst = x86.ACMPL
+		resultConditionState = amd64.ConditionalRegisterStateBE
+		inst = amd64.CMPL
 	case wazeroir.SignedTypeInt64:
-		resultConditionState = conditionalRegisterStateLE
-		inst = x86.ACMPQ
+		resultConditionState = amd64.ConditionalRegisterStateLE
+		inst = amd64.CMPQ
 	case wazeroir.SignedTypeUint64:
-		resultConditionState = conditionalRegisterStateBE
-		inst = x86.ACMPQ
+		resultConditionState = amd64.ConditionalRegisterStateBE
+		inst = amd64.CMPQ
 	case wazeroir.SignedTypeFloat32:
-		resultConditionState = conditionalRegisterStateAE
-		inst = x86.AUCOMISS
+		resultConditionState = amd64.ConditionalRegisterStateAE
+		inst = amd64.UCOMISS
 	case wazeroir.SignedTypeFloat64:
-		resultConditionState = conditionalRegisterStateAE
-		inst = x86.AUCOMISD
+		resultConditionState = amd64.ConditionalRegisterStateAE
+		inst = amd64.UCOMISD
 	}
-	c.compileRegisterToRegister(inst, x1.register, x2.register)
+	c.assembler.CompileRegisterToRegister(inst, x1.register, x2.register)
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
 	c.locationStack.releaseRegister(x1)
@@ -3176,26 +2866,26 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	}
 
 	// Emit the compare instruction.
-	var resultConditionState conditionalRegisterState
+	var resultConditionState asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeInt32:
-		c.compileRegisterToRegister(x86.ACMPL, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateGE
+		c.assembler.CompileRegisterToRegister(amd64.CMPL, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateGE
 	case wazeroir.SignedTypeUint32:
-		c.compileRegisterToRegister(x86.ACMPL, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateAE
+		c.assembler.CompileRegisterToRegister(amd64.CMPL, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	case wazeroir.SignedTypeInt64:
-		c.compileRegisterToRegister(x86.ACMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateGE
+		c.assembler.CompileRegisterToRegister(amd64.CMPQ, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateGE
 	case wazeroir.SignedTypeUint64:
-		c.compileRegisterToRegister(x86.ACMPQ, x1.register, x2.register)
-		resultConditionState = conditionalRegisterStateAE
+		c.assembler.CompileRegisterToRegister(amd64.CMPQ, x1.register, x2.register)
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	case wazeroir.SignedTypeFloat32:
-		c.compileRegisterToRegister(x86.ACOMISS, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateAE
+		c.assembler.CompileRegisterToRegister(amd64.COMISS, x2.register, x1.register)
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	case wazeroir.SignedTypeFloat64:
-		c.compileRegisterToRegister(x86.ACOMISD, x2.register, x1.register)
-		resultConditionState = conditionalRegisterStateAE
+		c.assembler.CompileRegisterToRegister(amd64.COMISD, x2.register, x1.register)
+		resultConditionState = amd64.ConditionalRegisterStateAE
 	}
 
 	// x1 and x2 are temporary registers only used for the cmp operation. Release them.
@@ -3212,25 +2902,25 @@ func (c *amd64Compiler) compileGe(o *wazeroir.OperationGe) error {
 func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	var (
 		isIntType         bool
-		movInst           obj.As
+		movInst           asm.Instruction
 		targetSizeInBytes int64
 	)
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32:
 		isIntType = true
-		movInst = x86.AMOVL
+		movInst = amd64.MOVL
 		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeI64:
 		isIntType = true
-		movInst = x86.AMOVQ
+		movInst = amd64.MOVQ
 		targetSizeInBytes = 64 / 8
 	case wazeroir.UnsignedTypeF32:
 		isIntType = false
-		movInst = x86.AMOVL
+		movInst = amd64.MOVL
 		targetSizeInBytes = 32 / 8
 	case wazeroir.UnsignedTypeF64:
 		isIntType = false
-		movInst = x86.AMOVQ
+		movInst = amd64.MOVQ
 		targetSizeInBytes = 64 / 8
 	}
 
@@ -3242,7 +2932,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 	if isIntType {
 		// For integer types, read the corresponding bytes from the offset to the memory
 		// and store the value to the int register.
-		c.compileMemoryWithIndexToRegisterInstruction(movInst,
+		c.assembler.CompileMemoryWithIndexToRegister(movInst,
 			// we access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 			reservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 			reg)
@@ -3254,7 +2944,7 @@ func (c *amd64Compiler) compileLoad(o *wazeroir.OperationLoad) error {
 		if err != nil {
 			return err
 		}
-		c.compileMemoryWithIndexToRegisterInstruction(movInst,
+		c.assembler.CompileMemoryWithIndexToRegister(movInst,
 			// we access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 			reservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 			floatReg)
@@ -3276,19 +2966,19 @@ func (c *amd64Compiler) compileLoad8(o *wazeroir.OperationLoad8) error {
 
 	// Then move a byte at the offset to the register.
 	// Note that Load8 is only for integer types.
-	var inst obj.As
+	var inst asm.Instruction
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		inst = x86.AMOVBLSX
+		inst = amd64.MOVBLSX
 	case wazeroir.SignedUint32:
-		inst = x86.AMOVBLZX
+		inst = amd64.MOVBLZX
 	case wazeroir.SignedInt64:
-		inst = x86.AMOVBQSX
+		inst = amd64.MOVBQSX
 	case wazeroir.SignedUint64:
-		inst = x86.AMOVBQZX
+		inst = amd64.MOVBQZX
 	}
 
-	c.compileMemoryWithIndexToRegisterInstruction(inst,
+	c.assembler.CompileMemoryWithIndexToRegister(inst,
 		// we access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 		reservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 		reg)
@@ -3310,18 +3000,18 @@ func (c *amd64Compiler) compileLoad16(o *wazeroir.OperationLoad16) error {
 
 	// Then move 2 bytes at the offset to the register.
 	// Note that Load16 is only for integer types.
-	var inst obj.As
+	var inst asm.Instruction
 	switch o.Type {
 	case wazeroir.SignedInt32:
-		inst = x86.AMOVWLSX
+		inst = amd64.MOVWLSX
 	case wazeroir.SignedInt64:
-		inst = x86.AMOVWQSX
+		inst = amd64.MOVWQSX
 	case wazeroir.SignedUint32:
-		inst = x86.AMOVWLZX
+		inst = amd64.MOVWLZX
 	case wazeroir.SignedUint64:
-		inst = x86.AMOVWQZX
+		inst = amd64.MOVWQZX
 	}
-	c.compileMemoryWithIndexToRegisterInstruction(inst,
+	c.assembler.CompileMemoryWithIndexToRegister(inst,
 		// we access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 		reservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 		reg)
@@ -3341,13 +3031,13 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 	}
 
 	// Then move 4 bytes at the offset to the register.
-	var inst obj.As
+	var inst asm.Instruction
 	if o.Signed {
-		inst = x86.AMOVLQSX
+		inst = amd64.MOVLQSX
 	} else {
-		inst = x86.AMOVLQZX
+		inst = amd64.MOVLQZX
 	}
-	c.compileMemoryWithIndexToRegisterInstruction(inst,
+	c.assembler.CompileMemoryWithIndexToRegister(inst,
 		// We access memory as memory.Buffer[ceil-targetSizeInBytes: ceil].
 		reservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 		reg)
@@ -3364,7 +3054,7 @@ func (c *amd64Compiler) compileLoad32(o *wazeroir.OperationLoad32) error {
 //
 // Note: this also emits the instructions to check the out of bounds memory access.
 // In other words, if the ceil exceeds the memory size, the code exits with jitCallStatusCodeMemoryOutOfBounds status.
-func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (int16, error) {
+func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSizeInBytes int64) (asm.Register, error) {
 	base := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(base); err != nil {
 		return 0, err
@@ -3372,7 +3062,7 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 
 	result := base.register
 	if offsetConst := int64(offsetArg) + targetSizeInBytes; offsetConst <= math.MaxUint32 {
-		c.compileConstToRegisterInstruction(x86.AADDQ, offsetConst, result)
+		c.assembler.CompileConstToRegister(amd64.ADDQ, offsetConst, result)
 	} else {
 		// If the offset const is too large, we exit with jitCallStatusCodeMemoryOutOfBounds.
 		c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
@@ -3380,15 +3070,15 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 	}
 
 	// Now we compare the value with the memory length which is held by callEngine.
-	c.compileMemoryToRegisterInstruction(x86.ACMPQ, reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, result)
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ, reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, result)
 
 	// Jump if the value is within the memory length.
-	okJmp := c.compileJump(x86.AJCC)
+	okJmp := c.assembler.CompileJump(amd64.JCC)
 
 	// Otherwise, we exit the function with out of bounds status code.
 	c.compileExitFromNativeCode(jitCallStatusCodeMemoryOutOfBounds)
 
-	c.addSetJmpOrigins(okJmp)
+	c.assembler.SetJumpTargetOnNext(okJmp)
 
 	c.locationStack.markRegisterUnused(result)
 	return result, nil
@@ -3396,14 +3086,14 @@ func (c *amd64Compiler) compileMemoryAccessCeilSetup(offsetArg uint32, targetSiz
 
 // compileStore implements compiler.compileStore for the amd64 architecture.
 func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
-	var movInst obj.As
+	var movInst asm.Instruction
 	var targetSizeInByte int64
 	switch o.Type {
 	case wazeroir.UnsignedTypeI32, wazeroir.UnsignedTypeF32:
-		movInst = x86.AMOVL
+		movInst = amd64.MOVL
 		targetSizeInByte = 32 / 8
 	case wazeroir.UnsignedTypeI64, wazeroir.UnsignedTypeF64:
-		movInst = x86.AMOVQ
+		movInst = amd64.MOVQ
 		targetSizeInByte = 64 / 8
 	}
 	return c.compileStoreImpl(o.Arg.Offset, movInst, targetSizeInByte)
@@ -3411,20 +3101,20 @@ func (c *amd64Compiler) compileStore(o *wazeroir.OperationStore) error {
 
 // compileStore8 implements compiler.compileStore8 for the amd64 architecture.
 func (c *amd64Compiler) compileStore8(o *wazeroir.OperationStore8) error {
-	return c.compileStoreImpl(o.Arg.Offset, x86.AMOVB, 1)
+	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVB, 1)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
 func (c *amd64Compiler) compileStore16(o *wazeroir.OperationStore16) error {
-	return c.compileStoreImpl(o.Arg.Offset, x86.AMOVW, 16/8)
+	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVW, 16/8)
 }
 
 // compileStore32 implements compiler.compileStore32 for the amd64 architecture.
 func (c *amd64Compiler) compileStore32(o *wazeroir.OperationStore32) error {
-	return c.compileStoreImpl(o.Arg.Offset, x86.AMOVL, 32/8)
+	return c.compileStoreImpl(o.Arg.Offset, amd64.MOVL, 32/8)
 }
 
-func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst obj.As, targetSizeInBytes int64) error {
+func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst asm.Instruction, targetSizeInBytes int64) error {
 	val := c.locationStack.pop()
 	if err := c.compileEnsureOnGeneralPurposeRegister(val); err != nil {
 		return err
@@ -3435,7 +3125,7 @@ func (c *amd64Compiler) compileStoreImpl(offsetConst uint32, inst obj.As, target
 		return nil
 	}
 
-	c.compileRegisterToMemoryWithIndexInstruction(
+	c.assembler.CompileRegisterToMemoryWithIndex(
 		inst, val.register,
 		reservedRegisterForMemory, -targetSizeInBytes, reg, 1,
 	)
@@ -3471,12 +3161,12 @@ func (c *amd64Compiler) compileMemorySize() error {
 	}
 	loc := c.pushValueLocationOnRegister(reg)
 
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, loc.register)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset, loc.register)
 
 	// WebAssembly's memory.size returns the page size (65536) of memory region.
 	// That is equivalent to divide the len of memory slice by 65536 and
 	// that can be calculated as SHR by 16 bits as 65536 = 2^16.
-	c.compileConstToRegisterInstruction(x86.ASHRQ, wasm.MemoryPageSizeInBits, loc.register)
+	c.assembler.CompileConstToRegister(amd64.SHRQ, wasm.MemoryPageSizeInBits, loc.register)
 	return nil
 }
 
@@ -3491,7 +3181,7 @@ func (c *amd64Compiler) compileConstI32(o *wazeroir.OperationConstI32) error {
 	loc := c.pushValueLocationOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
-	c.compileConstToRegisterInstruction(x86.AMOVL, int64(o.Value), reg)
+	c.assembler.CompileConstToRegister(amd64.MOVL, int64(o.Value), reg)
 	return nil
 }
 
@@ -3506,7 +3196,7 @@ func (c *amd64Compiler) compileConstI64(o *wazeroir.OperationConstI64) error {
 	loc := c.pushValueLocationOnRegister(reg)
 	loc.setRegisterType(generalPurposeRegisterTypeInt)
 
-	c.compileConstToRegisterInstruction(x86.AMOVQ, int64(o.Value), reg)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(o.Value), reg)
 	return nil
 }
 
@@ -3528,8 +3218,8 @@ func (c *amd64Compiler) compileConstF32(o *wazeroir.OperationConstF32) error {
 		return err
 	}
 
-	c.compileConstToRegisterInstruction(x86.AMOVL, int64(math.Float32bits(o.Value)), tmpReg)
-	c.compileRegisterToRegister(x86.AMOVL, tmpReg, reg)
+	c.assembler.CompileConstToRegister(amd64.MOVL, int64(uint64(math.Float32bits(o.Value))), tmpReg)
+	c.assembler.CompileRegisterToRegister(amd64.MOVL, tmpReg, reg)
 	return nil
 }
 
@@ -3551,14 +3241,14 @@ func (c *amd64Compiler) compileConstF64(o *wazeroir.OperationConstF64) error {
 		return err
 	}
 
-	c.compileConstToRegisterInstruction(x86.AMOVQ, int64(math.Float64bits(o.Value)), tmpReg)
-	c.compileRegisterToRegister(x86.AMOVQ, tmpReg, reg)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(math.Float64bits(o.Value)), tmpReg)
+	c.assembler.CompileRegisterToRegister(amd64.MOVQ, tmpReg, reg)
 	return nil
 }
 
 func (c *amd64Compiler) compileLoadValueOnStackToRegister(loc *valueLocation) {
 	// Copy the value from the stack.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 		reservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8,
 		loc.register)
@@ -3590,43 +3280,43 @@ func (c *amd64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 	c.compileMoveConditionalToGeneralPurposeRegister(loc, reg)
 }
 
-func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valueLocation, reg int16) {
+func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valueLocation, reg asm.Register) {
 	// Set the flag bit to the destination. See
 	// - https://c9x.me/x86/html/file_module_x86_id_288.html
 	// - https://github.com/golang/go/blob/master/src/cmd/internal/obj/x86/asm6.go#L1453-L1468
-	// to translate conditionalRegisterState* to x86.ASET*
-	var inst obj.As
+	// to translate conditionalRegisterState* to amd64.SET*
+	var inst asm.Instruction
 	switch loc.conditionalRegister {
-	case conditionalRegisterStateE:
-		inst = x86.ASETEQ
-	case conditionalRegisterStateNE:
-		inst = x86.ASETNE
-	case conditionalRegisterStateS:
-		inst = x86.ASETMI
-	case conditionalRegisterStateNS:
-		inst = x86.ASETPL
-	case conditionalRegisterStateG:
-		inst = x86.ASETGT
-	case conditionalRegisterStateGE:
-		inst = x86.ASETGE
-	case conditionalRegisterStateL:
-		inst = x86.ASETLT
-	case conditionalRegisterStateLE:
-		inst = x86.ASETLE
-	case conditionalRegisterStateA:
-		inst = x86.ASETHI
-	case conditionalRegisterStateAE:
-		inst = x86.ASETCC
-	case conditionalRegisterStateB:
-		inst = x86.ASETCS
-	case conditionalRegisterStateBE:
-		inst = x86.ASETLS
+	case amd64.ConditionalRegisterStateE:
+		inst = amd64.SETEQ
+	case amd64.ConditionalRegisterStateNE:
+		inst = amd64.SETNE
+	case amd64.ConditionalRegisterStateS:
+		inst = amd64.SETMI
+	case amd64.ConditionalRegisterStateNS:
+		inst = amd64.SETPL
+	case amd64.ConditionalRegisterStateG:
+		inst = amd64.SETGT
+	case amd64.ConditionalRegisterStateGE:
+		inst = amd64.SETGE
+	case amd64.ConditionalRegisterStateL:
+		inst = amd64.SETLT
+	case amd64.ConditionalRegisterStateLE:
+		inst = amd64.SETLE
+	case amd64.ConditionalRegisterStateA:
+		inst = amd64.SETHI
+	case amd64.ConditionalRegisterStateAE:
+		inst = amd64.SETCC
+	case amd64.ConditionalRegisterStateB:
+		inst = amd64.SETCS
+	case amd64.ConditionalRegisterStateBE:
+		inst = amd64.SETLS
 	}
 
-	c.compileNoneToRegisterInstruction(inst, reg)
+	c.assembler.CompileNoneToRegister(inst, reg)
 
 	// Then we reset the unnecessary bit.
-	c.compileConstToRegisterInstruction(x86.AANDQ, 0x1, reg)
+	c.assembler.CompileConstToRegister(amd64.ANDQ, 0x1, reg)
 
 	// Mark it uses the register.
 	loc.setRegister(reg)
@@ -3638,7 +3328,7 @@ func (c *amd64Compiler) compileMoveConditionalToGeneralPurposeRegister(loc *valu
 // either from the free register pool or by stealing an used register.
 // Note that resulting registers are NOT marked as used so the call site should
 // mark it used if necessary.
-func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int16, err error) {
+func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg asm.Register, err error) {
 	var ok bool
 	// Try to get the unused register.
 	reg, ok = c.locationStack.takeFreeRegister(t)
@@ -3660,12 +3350,12 @@ func (c *amd64Compiler) allocateRegister(t generalPurposeRegisterType) (reg int1
 }
 
 // callFunction adds instructions to call a function whose address equals either addr parameter or the value on indexReg.
-// Pass indexReg == nilRegister to indicate that use addr argument as the source of target function's address.
+// Pass indexReg == asm.NilRegister to indicate that use addr argument as the source of target function's address.
 // Otherwise, the added code tries to read the function address from the register for indexReg argument.
 //
 // Note: this is the counter part for returnFunction, and see the comments there as well
 // to understand how the function calls are achieved.
-func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFunctionAddressRegister int16, functype *wasm.FunctionType) error {
+func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFunctionAddressRegister asm.Register, functype *wasm.FunctionType) error {
 	// Release all the registers as our calling convention requires the caller-save.
 	c.compileReleaseAllRegistersToStack()
 
@@ -3687,16 +3377,16 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 		callFrameStackTopAddressRegister := freeRegs[0], freeRegs[1], freeRegs[2], freeRegs[3]
 
 	// First, we read the current call frame stack pointer.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		callFrameStackPointerRegister)
 
 	// And compare it with the underlying slice length.
-	c.compileMemoryToRegisterInstruction(x86.ACMPQ,
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackLenOffset, callFrameStackPointerRegister)
 
 	// If they do not equal, then we don't have to grow the call frame stack.
-	jmpIfNotCallFrameStackNeedsGrow := c.compileJump(x86.AJNE)
+	jmpIfNotCallFrameStackNeedsGrow := c.assembler.CompileJump(amd64.JNE)
 
 	// Otherwise, we have to make the builtin function call to grow the call frame stack.
 	if !isNilRegister(compiledFunctionAddressRegister) {
@@ -3723,14 +3413,14 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 	}
 
 	// Also we have to re-read the call frame stack pointer into callFrameStackPointerRegister.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		callFrameStackPointerRegister)
 
 	// Now that call-frame stack is enough length, we are ready to create a new call frame
 	// for the function call we are about to make.
-	c.addSetJmpOrigins(jmpIfNotCallFrameStackNeedsGrow)
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.SetJumpTargetOnNext(jmpIfNotCallFrameStackNeedsGrow)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackElement0AddressOffset,
 		tmpRegister)
 
@@ -3738,7 +3428,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 	// here we get the actual offset in bytes via shifting callFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
 	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
 	// multiplying withe the size of struct equals shifting by its most significant bit.
-	c.compileConstToRegisterInstruction(x86.ASHLQ, int64(callFrameDataSizeMostSignificantSetBit), callFrameStackPointerRegister)
+	c.assembler.CompileConstToRegister(amd64.SHLQ, int64(callFrameDataSizeMostSignificantSetBit), callFrameStackPointerRegister)
 
 	// At this point, callFrameStackPointerRegister holds the offset in call frame slice in bytes,
 	// and tmpRegister holds the absolute address of the first item of call frame slice.
@@ -3767,7 +3457,7 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 
 	// First, read the address corresponding to tmpRegister+callFrameStackPointerRegister
 	// by LEA instruction which equals the address of call frame stack top.
-	c.compileMemoryWithIndexToRegisterInstruction(x86.ALEAQ,
+	c.assembler.CompileMemoryWithIndexToRegister(amd64.LEAQ,
 		tmpRegister, 0, callFrameStackPointerRegister, 1,
 		callFrameStackTopAddressRegister)
 
@@ -3775,9 +3465,9 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 	{
 		// We must save the current stack base pointer (which lives on callEngine.valueStackContext.stackPointer)
 		// to the call frame stack. In the example, this is equivalent to writing the value into "rb.1".
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset, tmpRegister)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset, tmpRegister)
 
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister,
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister,
 			// "rb.1" is BELOW the top address. See the above example for detail.
 			callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
 		)
@@ -3788,10 +3478,10 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 		// At this point, tmpRegister holds the old stack base pointer. We could get the new frame's
 		// stack base pointer by "old stack base pointer + old stack pointer - # of function params"
 		// See the comments in callEngine.pushCallFrame which does exactly the same calculation in Go.
-		c.compileConstToRegisterInstruction(x86.AADDQ, offset, tmpRegister)
+		c.assembler.CompileConstToRegister(amd64.ADDQ, offset, tmpRegister)
 
 		// Write the calculated value to callEngine.valueStackContext.stackBasePointer.
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister, reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
 	}
 
 	// 3) Set rc.next to specify which function is executed on the current call frame (needs to make builtin function calls).
@@ -3802,11 +3492,11 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 			//
 			// First, we read the address of the first item of callEngine.compiledFunctions slice (= &callEngine.compiledFunctions[0])
 			// into tmpRegister.
-			c.compileMemoryToRegisterInstruction(x86.AMOVQ, reservedRegisterForCallEngine, callEngineModuleContextCompiledFunctionsElement0AddressOffset, tmpRegister)
+			c.assembler.CompileMemoryToRegister(amd64.MOVQ, reservedRegisterForCallEngine, callEngineModuleContextCompiledFunctionsElement0AddressOffset, tmpRegister)
 
 			// Next, read the address of the target function (= &callEngine.compiledFunctions[offset])
 			// into targetAddressRegister.
-			c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+			c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 				// Note: FunctionIndex is limited up to 2^27 so this offset never exceeds 32-bit integer.
 				// *8 because the size of *compiledFunction equals 8 bytes.
 				tmpRegister, int64(index)*8,
@@ -3817,18 +3507,18 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 		}
 		// Finally, we are ready to place the address of the target function's *compiledFunction into the new call-frame.
 		// In the example, this is equivalent to set "rc.next".
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, targetAddressRegister, callFrameStackTopAddressRegister, callFrameCompiledFunctionOffset)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, targetAddressRegister, callFrameStackTopAddressRegister, callFrameCompiledFunctionOffset)
 	}
 
 	// 4) Set ra.1 so that we can return back to this function properly.
 	//
 	// We have to set the return address for the current call frame (which is "ra.1" in the example).
 	// First, Get the return address into the tmpRegister.
-	c.compileReadInstructionAddress(tmpRegister, obj.AJMP)
+	c.assembler.CompileReadInstructionAddress(tmpRegister, amd64.JMP)
 
 	// Now we are ready to set the return address to the current call frame.
 	// This is equivalent to set "ra.1" in the example.
-	c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister,
+	c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister,
 		callFrameStackTopAddressRegister,
 		// "ra.1" is BELOW the top address. See the above example for detail.
 		-(callFrameDataSize - callFrameReturnAddressOffset),
@@ -3836,10 +3526,10 @@ func (c *amd64Compiler) compileCallFunctionImpl(index wasm.Index, compiledFuncti
 
 	// Every preparation (1 to 5 in the description above) is done to enter into the target function.
 	// So we increment the call frame stack pointer.
-	c.compileNoneToMemoryInstruction(x86.AINCQ, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
+	c.assembler.CompileNoneToMemory(amd64.INCQ, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	// And jump into the initial address of the target function.
-	c.compileJumpToMemory(targetAddressRegister, compiledFunctionCodeInitialAddressOffset)
+	c.assembler.CompileJumpToMemory(amd64.JMP, targetAddressRegister, compiledFunctionCodeInitialAddressOffset)
 
 	// All the registers used are temporary so we mark them unused.
 	c.locationStack.markRegisterUnused(freeRegs...)
@@ -3883,17 +3573,17 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	decrementedCallFrameStackPointerRegister, callFrameStackTopAddressRegister, tmpRegister := regs[0], regs[1], regs[2]
 
 	// Since we return from the function, we need to decement the callframe stack pointer.
-	c.compileNoneToMemoryInstruction(x86.ADECQ, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
+	c.assembler.CompileNoneToMemory(amd64.DECQ, reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset)
 
 	// Next, get the decremented callframe stack pointer into decrementedCallFrameStackPointerRegister.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset,
 		decrementedCallFrameStackPointerRegister)
 
 	// We have to exit if the decremented stack pointer equals zero.
-	c.compileRegisterToRegister(x86.ATESTQ, decrementedCallFrameStackPointerRegister, decrementedCallFrameStackPointerRegister)
+	c.assembler.CompileRegisterToRegister(amd64.TESTQ, decrementedCallFrameStackPointerRegister, decrementedCallFrameStackPointerRegister)
 
-	jmpIfNotCallStackPointerZero := c.compileJump(x86.AJNE)
+	jmpIfNotCallStackPointerZero := c.assembler.CompileJump(amd64.JNE)
 
 	// If the callframe stack pointer equals the previous one,
 	// we exit the JIT call with returned status.
@@ -3905,13 +3595,13 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	// here we get the actual offset in bytes via shifting decrementedCallFrameStackPointerRegister by callFrameDataSizeMostSignificantSetBit.
 	// That is valid because the size of callFrame struct is a power of 2 (see TestVerifyOffsetValue), which means
 	// multiplying withe the size of struct equals shifting by its most significant bit.
-	c.addSetJmpOrigins(jmpIfNotCallStackPointerZero)
-	c.compileConstToRegisterInstruction(x86.ASHLQ, int64(callFrameDataSizeMostSignificantSetBit), decrementedCallFrameStackPointerRegister)
+	c.assembler.SetJumpTargetOnNext(jmpIfNotCallStackPointerZero)
+	c.assembler.CompileConstToRegister(amd64.SHLQ, int64(callFrameDataSizeMostSignificantSetBit), decrementedCallFrameStackPointerRegister)
 
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackElement0AddressOffset, tmpRegister)
 
-	c.compileMemoryWithIndexToRegisterInstruction(x86.ALEAQ,
+	c.assembler.CompileMemoryWithIndexToRegister(amd64.LEAQ,
 		tmpRegister, 0, decrementedCallFrameStackPointerRegister, 1,
 		callFrameStackTopAddressRegister)
 
@@ -3938,22 +3628,22 @@ func (c *amd64Compiler) compileReturnFunction() error {
 	//   2) Jump into the address of "ra.caller".
 
 	// 1) Set callEngine.valueStackContext.stackBasePointer to the value on "rb.caller"
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		// "rb.caller" is BELOW the top address. See the above example for detail.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnStackBasePointerOffset),
 		tmpRegister,
 	)
-	c.compileRegisterToMemoryInstruction(x86.AMOVQ,
+	c.assembler.CompileRegisterToMemory(amd64.MOVQ,
 		tmpRegister, reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset)
 
 	// 2) Jump into the address of "ra.caller".
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		// "ra.caller" is BELOW the top address. See the above example for detail.
 		callFrameStackTopAddressRegister, -(callFrameDataSize - callFrameReturnAddressOffset),
 		tmpRegister,
 	)
 
-	c.compileJumpToRegister(tmpRegister)
+	c.assembler.CompileJumpToRegister(amd64.JMP, tmpRegister)
 
 	// They were temporarily used, so we mark them unused.
 	c.locationStack.markRegisterUnused(regs...)
@@ -3966,7 +3656,7 @@ func (c *amd64Compiler) compileCallHostFunction() error {
 
 func (c *amd64Compiler) compileCallBuiltinFunction(index wasm.Index) error {
 	// Set the functionAddress to the callEngine.exitContext functionCallAddress.
-	c.compileConstToMemoryInstruction(x86.AMOVL, int64(index), reservedRegisterForCallEngine, callEngineExitContextBuiltinFunctionCallAddressOffset)
+	c.assembler.CompileConstToMemory(amd64.MOVL, int64(index), reservedRegisterForCallEngine, callEngineExitContextBuiltinFunctionCallAddressOffset)
 	return c.compileCallGoFunction(jitCallStatusCodeCallBuiltInFunction)
 }
 
@@ -3986,26 +3676,26 @@ func (c *amd64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode) error
 	instructionAddressRegister, currentCallFrameAddressRegister, tmpRegister := regs[0], regs[1], regs[2]
 
 	// We need to store the address of the current callFrame's return address.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackPointerOffset, currentCallFrameAddressRegister)
 
 	// Next we shift the stack pointer so we get the actual offset from the address of stack's initial item.
-	c.compileConstToRegisterInstruction(x86.ASHLQ, int64(callFrameDataSizeMostSignificantSetBit), currentCallFrameAddressRegister)
+	c.assembler.CompileConstToRegister(amd64.SHLQ, int64(callFrameDataSizeMostSignificantSetBit), currentCallFrameAddressRegister)
 
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextCallFrameStackElement0AddressOffset, tmpRegister)
 
 	// Now we can get the current call frame's address, which is equivalent to get &callEngine.callFrameStack[callEngine.callStackFramePointer-1].returnAddress.
-	c.compileMemoryWithIndexToRegisterInstruction(
-		x86.ALEAQ,
+	c.assembler.CompileMemoryWithIndexToRegister(
+		amd64.LEAQ,
 		tmpRegister, -(callFrameDataSize - callFrameReturnAddressOffset), currentCallFrameAddressRegister, 1,
 		currentCallFrameAddressRegister,
 	)
 
-	c.compileReadInstructionAddress(instructionAddressRegister, obj.ARET)
+	c.assembler.CompileReadInstructionAddress(instructionAddressRegister, amd64.RET)
 
 	// We are ready to store the return address (in instructionAddressRegister) to callEngine.callFrameStack[callEngine.callStackFramePointer-1].
-	c.compileRegisterToMemoryInstruction(x86.AMOVQ, instructionAddressRegister, currentCallFrameAddressRegister, callFrameReturnAddressOffset)
+	c.assembler.CompileRegisterToMemory(amd64.MOVQ, instructionAddressRegister, currentCallFrameAddressRegister, callFrameReturnAddressOffset)
 
 	c.compileExitFromNativeCode(jitStatus)
 
@@ -4027,7 +3717,7 @@ func (c *amd64Compiler) compileReleaseAllRegistersToStack() {
 	}
 }
 
-func (c *amd64Compiler) onValueReleaseRegisterToStack(reg int16) {
+func (c *amd64Compiler) onValueReleaseRegisterToStack(reg asm.Register) {
 	for i := uint64(0); i < c.locationStack.sp; i++ {
 		prevValue := c.locationStack.stack[i]
 		if prevValue.register == reg {
@@ -4039,7 +3729,7 @@ func (c *amd64Compiler) onValueReleaseRegisterToStack(reg int16) {
 
 func (c *amd64Compiler) compileReleaseRegisterToStack(loc *valueLocation) {
 	// Push value.
-	c.compileRegisterToMemoryInstruction(x86.AMOVQ, loc.register,
+	c.assembler.CompileRegisterToMemory(amd64.MOVQ, loc.register,
 		// Note: stack pointers are ensured not to exceed 2^27 so this offset never exceeds 32-bit range.
 		reservedRegisterForStackBasePointerAddress, int64(loc.stackPointer)*8)
 
@@ -4048,12 +3738,12 @@ func (c *amd64Compiler) compileReleaseRegisterToStack(loc *valueLocation) {
 }
 
 func (c *amd64Compiler) compileExitFromNativeCode(status jitCallStatusCode) {
-	c.compileConstToMemoryInstruction(x86.AMOVB, int64(status), reservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
+	c.assembler.CompileConstToMemory(amd64.MOVB, int64(status), reservedRegisterForCallEngine, callEngineExitContextJITCallStatusCodeOffset)
 
 	// Write back the cached SP to the actual eng.stackPointer.
-	c.compileConstToMemoryInstruction(x86.AMOVQ, int64(c.locationStack.sp), reservedRegisterForCallEngine, callEngineValueStackContextStackPointerOffset)
+	c.assembler.CompileConstToMemory(amd64.MOVQ, int64(c.locationStack.sp), reservedRegisterForCallEngine, callEngineValueStackContextStackPointerOffset)
 
-	c.compileStandAloneInstruction(obj.ARET)
+	c.assembler.CompileStandAlone(amd64.RET)
 }
 
 func (c *amd64Compiler) compilePreamble() (err error) {
@@ -4081,7 +3771,7 @@ func (c *amd64Compiler) compilePreamble() (err error) {
 
 func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 	// First, make reservedRegisterForStackBasePointer point to the beginning of the slice backing array.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineGlobalContextValueStackElement0AddressOffset,
 		reservedRegisterForStackBasePointerAddress)
 
@@ -4090,13 +3780,13 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 	tmpReg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 
 	// Next we move the base pointer (callEngine.stackBasePointer) to the tmp register.
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 		reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset,
 		tmpReg,
 	)
 
-	c.compileMemoryWithIndexToRegisterInstruction(
-		x86.ALEAQ,
+	c.assembler.CompileMemoryWithIndexToRegister(
+		amd64.LEAQ,
 		reservedRegisterForStackBasePointerAddress, 0, tmpReg, 8,
 		reservedRegisterForStackBasePointerAddress,
 	)
@@ -4104,7 +3794,7 @@ func (c *amd64Compiler) compileReservedStackBasePointerInitialization() {
 
 func (c *amd64Compiler) compileReservedMemoryPointerInitialization() {
 	if c.f.Module.Memory != nil {
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ,
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ,
 			reservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset,
 			reservedRegisterForMemory,
 		)
@@ -4117,22 +3807,24 @@ func (c *amd64Compiler) compileReservedMemoryPointerInitialization() {
 func (c *amd64Compiler) compileMaybeGrowValueStack() error {
 	tmpRegister, _ := c.allocateRegister(generalPurposeRegisterTypeInt)
 
-	c.compileMemoryToRegisterInstruction(x86.AMOVQ, reservedRegisterForCallEngine, callEngineGlobalContextValueStackLenOffset, tmpRegister)
-	c.compileMemoryToRegisterInstruction(x86.ASUBQ, reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset, tmpRegister)
+	c.assembler.CompileMemoryToRegister(amd64.MOVQ, reservedRegisterForCallEngine, callEngineGlobalContextValueStackLenOffset, tmpRegister)
+	c.assembler.CompileMemoryToRegister(amd64.SUBQ, reservedRegisterForCallEngine, callEngineValueStackContextStackBasePointerOffset, tmpRegister)
 
 	// If stack base pointer + max stack pointer > valueStackLen, we need to grow the stack.
-	cmpWithStackPointerCeil := c.compileRegisterToConstInstruction(x86.ACMPQ, tmpRegister, 0)
-	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) { cmpWithStackPointerCeil.To.Offset = int64(stackPointerCeil) }
+	cmpWithStackPointerCeil := c.assembler.CompileRegisterToConst(amd64.CMPQ, tmpRegister, 0)
+	c.onStackPointerCeilDeterminedCallBack = func(stackPointerCeil uint64) {
+		cmpWithStackPointerCeil.AssignDestinationConstant(int64(stackPointerCeil))
+	}
 
 	// Jump if we have no need to grow.
-	jmpIfNoNeedToGrowStack := c.compileJump(x86.AJCC)
+	jmpIfNoNeedToGrowStack := c.assembler.CompileJump(amd64.JCC)
 
 	// Otherwise, we have to make the builtin function call to grow the call stack.
 	if err := c.compileCallBuiltinFunction(builtinFunctionIndexGrowValueStack); err != nil {
 		return err
 	}
 
-	c.addSetJmpOrigins(jmpIfNoNeedToGrowStack)
+	c.assembler.SetJumpTargetOnNext(jmpIfNoNeedToGrowStack)
 	return nil
 }
 
@@ -4152,20 +3844,20 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// Alias these free tmp registers for readability.
 	moduleInstanceAddressRegister, tmpRegister, tmpRegister2 := regs[0], regs[1], regs[2]
 
-	c.compileConstToRegisterInstruction(x86.AMOVQ, int64(uintptr(unsafe.Pointer(c.f.Module))), moduleInstanceAddressRegister)
+	c.assembler.CompileConstToRegister(amd64.MOVQ, int64(uintptr(unsafe.Pointer(c.f.Module))), moduleInstanceAddressRegister)
 
 	// If the module instance address stays the same, we could skip the entire code below.
 	// The rationale/idea for this is that, in almost all use cases, users instantiate a single
 	// Wasm binary and run the functions from it, rather than doing import/export on multiple
 	// binaries. As a result, this cmp and jmp instruction sequence below must be easy for
 	// x64 CPU to do branch prediction since almost 100% jump happens across function calls.
-	c.compileMemoryToRegisterInstruction(x86.ACMPQ,
+	c.assembler.CompileMemoryToRegister(amd64.CMPQ,
 		reservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset, moduleInstanceAddressRegister)
-	jmpIfModuleNotChange := c.compileJump(x86.AJEQ)
+	jmpIfModuleNotChange := c.assembler.CompileJump(amd64.JEQ)
 
 	// Otherwise, we need to update fields.
 	// First, save the read module instance address to callEngine.moduleInstanceAddress
-	c.compileRegisterToMemoryInstruction(x86.AMOVQ, moduleInstanceAddressRegister,
+	c.assembler.CompileRegisterToMemory(amd64.MOVQ, moduleInstanceAddressRegister,
 		reservedRegisterForCallEngine, callEngineModuleContextModuleInstanceAddressOffset)
 
 	// Otherwise, we have to update the following fields:
@@ -4185,9 +3877,9 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		// Since ModuleInstance.Globals is []*globalInstance, internally
 		// the address of the first item in the underlying array lies exactly on the globals offset.
 		// See https://go.dev/blog/slices-intro if unfamiliar.
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, moduleInstanceAddressRegister, moduleInstanceGlobalsOffset, tmpRegister)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, moduleInstanceAddressRegister, moduleInstanceGlobalsOffset, tmpRegister)
 
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister, reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, reservedRegisterForCallEngine, callEngineModuleContextGlobalElement0AddressOffset)
 	}
 
 	// Update tableElement0Address and tableSliceLen.
@@ -4197,22 +3889,22 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// why it is ok to skip the initialization if the module's table doesn't exist.
 	if c.f.Module.Table != nil {
 		// First, we need to read the *wasm.Table.
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, moduleInstanceAddressRegister, moduleInstanceTableOffset, tmpRegister)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, moduleInstanceAddressRegister, moduleInstanceTableOffset, tmpRegister)
 
 		// At this point, tmpRegister holds the address of ModuleInstance.Table.
 		// So we are ready to read and put the first item's address stored in Table.Table.
 		// Here we read the value into tmpRegister2.
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, tmpRegister, tableInstanceTableOffset, tmpRegister2)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, tableInstanceTableOffset, tmpRegister2)
 
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister2,
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			reservedRegisterForCallEngine, callEngineModuleContextTableElement0AddressOffset)
 
 		// Finally, read the length of table and update tableSliceLen accordingly.
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, tmpRegister, tableInstanceTableLenOffset, tmpRegister2)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, tableInstanceTableLenOffset, tmpRegister2)
 
 		// And put the length into tableSliceLen.
 
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister2,
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			reservedRegisterForCallEngine, callEngineModuleContextTableSliceLenOffset)
 	}
 
@@ -4222,16 +3914,16 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 	// That is ensured by function validation at module instantiation phase, and that's
 	// why it is ok to skip the initialization if the module's memory instance is nil.
 	if c.f.Module.Memory != nil {
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, moduleInstanceAddressRegister, moduleInstanceMemoryOffset, tmpRegister)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, moduleInstanceAddressRegister, moduleInstanceMemoryOffset, tmpRegister)
 
 		// Set length.
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, tmpRegister, memoryInstanceBufferLenOffset, tmpRegister2)
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister2,
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, memoryInstanceBufferLenOffset, tmpRegister2)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			reservedRegisterForCallEngine, callEngineModuleContextMemorySliceLenOffset)
 
 		// Set elemnt zero address.
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, tmpRegister, memoryInstanceBufferOffset, tmpRegister2)
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister2,
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, memoryInstanceBufferOffset, tmpRegister2)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister2,
 			reservedRegisterForCallEngine, callEngineModuleContextMemoryElement0AddressOffset)
 	}
 
@@ -4245,19 +3937,19 @@ func (c *amd64Compiler) compileModuleContextInitialization() error {
 		// See the following references for detail:
 		// * https://research.swtch.com/interfaces
 		// * https://github.com/golang/go/blob/release-branch.go1.17/src/runtime/runtime2.go#L207-L210
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, moduleInstanceAddressRegister, moduleInstanceEngineOffset+interfaceDataOffset, tmpRegister)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, moduleInstanceAddressRegister, moduleInstanceEngineOffset+interfaceDataOffset, tmpRegister)
 
 		// "tmpRegister = [tmpRegister + moduleEngineCompiledFunctionsOffset] (== &moduleEngine.compiledFunctions[0])"
-		c.compileMemoryToRegisterInstruction(x86.AMOVQ, tmpRegister, moduleEngineCompiledFunctionsOffset, tmpRegister)
+		c.assembler.CompileMemoryToRegister(amd64.MOVQ, tmpRegister, moduleEngineCompiledFunctionsOffset, tmpRegister)
 
 		// "callEngine.moduleContext.compiledFunctionsElement0Address = tmpRegister".
-		c.compileRegisterToMemoryInstruction(x86.AMOVQ, tmpRegister, reservedRegisterForCallEngine, callEngineModuleContextCompiledFunctionsElement0AddressOffset)
+		c.assembler.CompileRegisterToMemory(amd64.MOVQ, tmpRegister, reservedRegisterForCallEngine, callEngineModuleContextCompiledFunctionsElement0AddressOffset)
 	}
 
 	c.locationStack.markRegisterUnused(regs...)
 
 	// Set the jump target towards the next instruction for the case where module instance address hasn't changed.
-	c.addSetJmpOrigins(jmpIfModuleNotChange)
+	c.assembler.SetJumpTargetOnNext(jmpIfModuleNotChange)
 	return nil
 }
 

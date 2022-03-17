@@ -3,39 +3,31 @@ package jit
 import (
 	"fmt"
 	"strings"
+
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
-// nilRegister is used to indicate a register argument a variable is invalid and not an actual register.
-const nilRegister int16 = -1
-
-func isNilRegister(r int16) bool {
-	return r == nilRegister
+func isNilRegister(r asm.Register) bool {
+	return r == asm.NilRegister
 }
 
-func isIntRegister(r int16) bool {
+func isIntRegister(r asm.Register) bool {
 	return unreservedGeneralPurposeIntRegisters[0] <= r && r <= unreservedGeneralPurposeIntRegisters[len(unreservedGeneralPurposeIntRegisters)-1]
 }
 
-func isFloatRegister(r int16) bool {
+func isFloatRegister(r asm.Register) bool {
 	return unreservedGeneralPurposeFloatRegisters[0] <= r && r <= unreservedGeneralPurposeFloatRegisters[len(unreservedGeneralPurposeFloatRegisters)-1]
 }
-
-// conditionalRegisterState indicates a state of the conditional flag register.
-// In arm64, conditional registers are defined as arm64.COND_*.
-// In amd64, we define each flag value in value_locations_amd64.go
-type conditionalRegisterState int16
-
-const conditionalRegisterStateUnset conditionalRegisterState = 0
 
 // valueLocation corresponds to each variable pushed onto the wazeroir (virtual) stack,
 // and it has the information about where it exists in the physical machine.
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
 type valueLocation struct {
 	regType generalPurposeRegisterType
-	// Set to nilRegister if the value is stored in the memory stack.
-	register int16
+	// Set to asm.NilRegister if the value is stored in the memory stack.
+	register asm.Register
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
-	conditionalRegister conditionalRegisterState
+	conditionalRegister asm.ConditionalRegisterState
 	// This is the location of this value in the memory stack at runtime,
 	stackPointer uint64
 }
@@ -48,21 +40,21 @@ func (v *valueLocation) setRegisterType(t generalPurposeRegisterType) {
 	v.regType = t
 }
 
-func (v *valueLocation) setRegister(reg int16) {
+func (v *valueLocation) setRegister(reg asm.Register) {
 	v.register = reg
-	v.conditionalRegister = conditionalRegisterStateUnset
+	v.conditionalRegister = asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onRegister() bool {
-	return v.register != nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register != asm.NilRegister && v.conditionalRegister == asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onStack() bool {
-	return v.register == nilRegister && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register == asm.NilRegister && v.conditionalRegister == asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onConditionalRegister() bool {
-	return v.conditionalRegister != conditionalRegisterStateUnset
+	return v.conditionalRegister != asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) String() string {
@@ -78,9 +70,7 @@ func (v *valueLocation) String() string {
 }
 
 func newValueLocationStack() *valueLocationStack {
-	return &valueLocationStack{
-		usedRegisters: map[int16]struct{}{},
-	}
+	return &valueLocationStack{usedRegisters: map[asm.Register]struct{}{}}
 }
 
 // valueLocationStack represents the wazeroir virtual stack
@@ -98,7 +88,7 @@ type valueLocationStack struct {
 	// sp is the current stack pointer.
 	sp uint64
 	// usedRegisters stores the used registers.
-	usedRegisters map[int16]struct{}
+	usedRegisters map[asm.Register]struct{}
 	// stackPointerCeil tracks max(.sp) across the lifespan of this struct.
 	stackPointerCeil uint64
 }
@@ -118,7 +108,7 @@ func (v *valueLocationStack) String() string {
 func (s *valueLocationStack) clone() *valueLocationStack {
 	ret := &valueLocationStack{}
 	ret.sp = s.sp
-	ret.usedRegisters = make(map[int16]struct{}, len(ret.usedRegisters))
+	ret.usedRegisters = make(map[asm.Register]struct{}, len(ret.usedRegisters))
 	for r := range s.usedRegisters {
 		ret.markRegisterUsed(r)
 	}
@@ -137,8 +127,8 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 
 // pushValueLocationOnRegister creates a new valueLocation with a given register and pushes onto
 // the location stack.
-func (s *valueLocationStack) pushValueLocationOnRegister(reg int16) (loc *valueLocation) {
-	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
+func (s *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc *valueLocation) {
+	loc = &valueLocation{register: reg, conditionalRegister: asm.ConditionalRegisterStateUnset}
 
 	if isIntRegister(reg) {
 		loc.setRegisterType(generalPurposeRegisterTypeInt)
@@ -151,15 +141,15 @@ func (s *valueLocationStack) pushValueLocationOnRegister(reg int16) (loc *valueL
 
 // pushValueLocationOnRegister creates a new valueLocation and pushes onto the location stack.
 func (s *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
-	loc = &valueLocation{register: nilRegister, conditionalRegister: conditionalRegisterStateUnset}
+	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: asm.ConditionalRegisterStateUnset}
 	s.push(loc)
 	return
 }
 
 // pushValueLocationOnRegister creates a new valueLocation with a given conditional register state
 // and pushes onto the location stack.
-func (s *valueLocationStack) pushValueLocationOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
-	loc = &valueLocation{register: nilRegister, conditionalRegister: state}
+func (s *valueLocationStack) pushValueLocationOnConditionalRegister(state asm.ConditionalRegisterState) (loc *valueLocation) {
+	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: state}
 	s.push(loc)
 	return
 }
@@ -193,17 +183,17 @@ func (s *valueLocationStack) peek() (loc *valueLocation) {
 
 func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	s.markRegisterUnused(loc.register)
-	loc.register = nilRegister
-	loc.conditionalRegister = conditionalRegisterStateUnset
+	loc.register = asm.NilRegister
+	loc.conditionalRegister = asm.ConditionalRegisterStateUnset
 }
 
-func (s *valueLocationStack) markRegisterUnused(regs ...int16) {
+func (s *valueLocationStack) markRegisterUnused(regs ...asm.Register) {
 	for _, reg := range regs {
 		delete(s.usedRegisters, reg)
 	}
 }
 
-func (s *valueLocationStack) markRegisterUsed(regs ...int16) {
+func (s *valueLocationStack) markRegisterUsed(regs ...asm.Register) {
 	for _, reg := range regs {
 		s.usedRegisters[reg] = struct{}{}
 	}
@@ -227,8 +217,8 @@ func (tp generalPurposeRegisterType) String() (ret string) {
 }
 
 // takeFreeRegister searches for unused registers. Any found are marked used and returned.
-func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg int16, found bool) {
-	var targetRegs []int16
+func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (reg asm.Register, found bool) {
+	var targetRegs []asm.Register
 	switch tp {
 	case generalPurposeRegisterTypeFloat:
 		targetRegs = unreservedGeneralPurposeFloatRegisters
@@ -244,8 +234,8 @@ func (s *valueLocationStack) takeFreeRegister(tp generalPurposeRegisterType) (re
 	return 0, false
 }
 
-func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []int16, found bool) {
-	var targetRegs []int16
+func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, num int) (regs []asm.Register, found bool) {
+	var targetRegs []asm.Register
 	switch tp {
 	case generalPurposeRegisterTypeFloat:
 		targetRegs = unreservedGeneralPurposeFloatRegisters
@@ -253,7 +243,7 @@ func (s *valueLocationStack) takeFreeRegisters(tp generalPurposeRegisterType, nu
 		targetRegs = unreservedGeneralPurposeIntRegisters
 	}
 
-	regs = make([]int16, 0, num)
+	regs = make([]asm.Register, 0, num)
 	for _, candidate := range targetRegs {
 		if _, ok := s.usedRegisters[candidate]; ok {
 			continue

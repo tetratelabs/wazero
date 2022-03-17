@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/twitchyliquid64/golang-asm/obj"
-	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/amd64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -41,47 +41,47 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 			t.Run("int32", func(t *testing.T) {
 				for _, tc := range []struct {
 					name         string
-					x1Reg, x2Reg int16
+					x1Reg, x2Reg asm.Register
 				}{
 					{
 						name:  "x1:ax,x2:random_reg",
-						x1Reg: x86.REG_AX,
-						x2Reg: x86.REG_R10,
+						x1Reg: amd64.REG_AX,
+						x2Reg: amd64.REG_R10,
 					},
 					{
 						name:  "x1:ax,x2:stack",
-						x1Reg: x86.REG_AX,
-						x2Reg: nilRegister,
+						x1Reg: amd64.REG_AX,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
-						x1Reg: x86.REG_R10,
-						x2Reg: x86.REG_AX,
+						x1Reg: amd64.REG_R10,
+						x2Reg: amd64.REG_AX,
 					},
 					{
 						name:  "x1:stack,x2:ax",
-						x1Reg: nilRegister,
-						x2Reg: x86.REG_AX,
+						x1Reg: asm.NilRegister,
+						x2Reg: amd64.REG_AX,
 					},
 					{
 						name:  "x1:random_reg,x2:random_reg",
-						x1Reg: x86.REG_R10,
-						x2Reg: x86.REG_R9,
+						x1Reg: amd64.REG_R10,
+						x2Reg: amd64.REG_R9,
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: nilRegister,
-						x2Reg: x86.REG_R9,
+						x1Reg: asm.NilRegister,
+						x2Reg: amd64.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
-						x1Reg: x86.REG_R9,
-						x2Reg: nilRegister,
+						x1Reg: amd64.REG_R9,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: nilRegister,
-						x2Reg: nilRegister,
+						x1Reg: asm.NilRegister,
+						x2Reg: asm.NilRegister,
 					},
 				} {
 					tc := tc
@@ -99,19 +99,19 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
-						compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(dxValue), x86.REG_DX)
-						prevOnDX := compiler.pushValueLocationOnRegister(x86.REG_DX)
+						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
+						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
 
 						// Setup values.
-						if tc.x1Reg != nilRegister {
-							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x1Value), tc.x1Reg)
+						if tc.x1Reg != asm.NilRegister {
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x1Value), tc.x1Reg)
 							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
-						if tc.x2Reg != nilRegister {
-							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x2Value), tc.x2Reg)
+						if tc.x2Reg != asm.NilRegister {
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x2Value), tc.x2Reg)
 							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
@@ -164,47 +164,47 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 			t.Run("int64", func(t *testing.T) {
 				for _, tc := range []struct {
 					name         string
-					x1Reg, x2Reg int16
+					x1Reg, x2Reg asm.Register
 				}{
 					{
 						name:  "x1:ax,x2:random_reg",
-						x1Reg: x86.REG_AX,
-						x2Reg: x86.REG_R10,
+						x1Reg: amd64.REG_AX,
+						x2Reg: amd64.REG_R10,
 					},
 					{
 						name:  "x1:ax,x2:stack",
-						x1Reg: x86.REG_AX,
-						x2Reg: nilRegister,
+						x1Reg: amd64.REG_AX,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:random_reg,x2:ax",
-						x1Reg: x86.REG_R10,
-						x2Reg: x86.REG_AX,
+						x1Reg: amd64.REG_R10,
+						x2Reg: amd64.REG_AX,
 					},
 					{
 						name:  "x1:stack,x2:ax",
-						x1Reg: nilRegister,
-						x2Reg: x86.REG_AX,
+						x1Reg: asm.NilRegister,
+						x2Reg: amd64.REG_AX,
 					},
 					{
 						name:  "x1:random_reg,x2:random_reg",
-						x1Reg: x86.REG_R10,
-						x2Reg: x86.REG_R9,
+						x1Reg: amd64.REG_R10,
+						x2Reg: amd64.REG_R9,
 					},
 					{
 						name:  "x1:stack,x2:random_reg",
-						x1Reg: nilRegister,
-						x2Reg: x86.REG_R9,
+						x1Reg: asm.NilRegister,
+						x2Reg: amd64.REG_R9,
 					},
 					{
 						name:  "x1:random_reg,x2:stack",
-						x1Reg: x86.REG_R9,
-						x2Reg: nilRegister,
+						x1Reg: amd64.REG_R9,
+						x2Reg: asm.NilRegister,
 					},
 					{
 						name:  "x1:stack,x2:stack",
-						x1Reg: nilRegister,
-						x2Reg: nilRegister,
+						x1Reg: asm.NilRegister,
+						x2Reg: asm.NilRegister,
 					},
 				} {
 					tc := tc
@@ -221,19 +221,19 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 						// Pretend there was an existing value on the DX register. We expect compileMul to save this to the stack.
 						// Here, we put it just before two operands as ["any value used by DX", x1, x2]
 						// but in reality, it can exist in any position of stack.
-						compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(dxValue), x86.REG_DX)
-						prevOnDX := compiler.pushValueLocationOnRegister(x86.REG_DX)
+						compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(dxValue), amd64.REG_DX)
+						prevOnDX := compiler.pushValueLocationOnRegister(amd64.REG_DX)
 
 						// Setup values.
-						if tc.x1Reg != nilRegister {
-							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x1Value), tc.x1Reg)
+						if tc.x1Reg != asm.NilRegister {
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x1Value), tc.x1Reg)
 							compiler.pushValueLocationOnRegister(tc.x1Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
 							env.stack()[loc.stackPointer] = uint64(x1Value)
 						}
-						if tc.x2Reg != nilRegister {
-							compiler.compileConstToRegisterInstruction(x86.AMOVQ, int64(x2Value), tc.x2Reg)
+						if tc.x2Reg != asm.NilRegister {
+							compiler.assembler.CompileConstToRegister(amd64.MOVQ, int64(x2Value), tc.x2Reg)
 							compiler.pushValueLocationOnRegister(tc.x2Reg)
 						} else {
 							loc := compiler.valueLocationStack().pushValueLocationOnStack()
@@ -299,7 +299,7 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
-		compiler.compileReadInstructionAddress(x86.REG_AX, obj.AJMP)
+		compiler.assembler.CompileReadInstructionAddress(amd64.REG_AX, amd64.JMP)
 
 		// If generate the code without JMP after readInstructionAddress,
 		// the call back added must return error.
@@ -314,22 +314,16 @@ func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
 		err := compiler.compilePreamble()
 		require.NoError(t, err)
 
-		const destinationRegister = x86.REG_AX
+		const destinationRegister = amd64.REG_AX
 		// Set the acquisition target instruction to the one after RET,
 		// and read the absolute address into destinationRegister.
-		compiler.compileReadInstructionAddress(destinationRegister, obj.ARET)
+		compiler.assembler.CompileReadInstructionAddress(destinationRegister, amd64.RET)
 
 		// Jump to the instruction after RET below via the absolute
 		// address stored in destinationRegister.
-		jmpToAfterRet := compiler.newProg()
-		jmpToAfterRet.As = obj.AJMP
-		jmpToAfterRet.To.Type = obj.TYPE_REG
-		jmpToAfterRet.To.Reg = destinationRegister
-		compiler.addInstruction(jmpToAfterRet)
+		compiler.assembler.CompileJumpToRegister(amd64.JMP, destinationRegister)
 
-		ret := compiler.newProg()
-		ret.As = obj.ARET
-		compiler.addInstruction(ret)
+		compiler.assembler.CompileStandAlone(amd64.RET)
 
 		// This could be the read instruction target as this is the
 		// right after RET. Therefore, the jmp instruction above
