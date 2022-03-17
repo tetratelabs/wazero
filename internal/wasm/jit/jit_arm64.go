@@ -1443,18 +1443,15 @@ func (c *arm64Compiler) compilePopcnt(o *wazeroir.OperationPopcnt) error {
 	// This exactly what the official Go implements bits.OneCount.
 	// For example, "func () int { return bits.OneCount(10) }" is compiled as
 	//
-	//    MOVD    $10, R0
+	//    MOVD    $10, R0 ;; Load 10.
 	//    FMOVD   R0, F0
 	//    VCNT    V0.B8, V0.B8
 	//    VUADDLV V0.B8, V0
 	//
 	c.assembler.CompileRegisterToRegisterInstruction(arm64.FMOVD, reg, freg)
-	vreg := simdRegisterForScalarFloatRegister(freg)
-	// For how to specify "V0.B8" (SIMD register arrangement), see
-	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
-	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
-	c.assembler.CompileRegisterToRegisterInstruction(arm64.VCNT, vreg&31+garm64.REG_ARNG+(arm64.RNG_8B&15)<<5, vreg&31+garm64.REG_ARNG+(arm64.RNG_8B&15)<<5)
-	c.assembler.CompileRegisterToRegisterInstruction(arm64.VUADDLV, vreg&31+garm64.REG_ARNG+(arm64.RNG_8B&15)<<5, vreg)
+	c.assembler.CompileSIMDToSIMDWithByteArrangement(arm64.VCNT, freg, freg)
+	c.assembler.CompileSIMDWithByteArrangementToRegister(arm64.VUADDLV, freg, freg)
+
 	c.assembler.CompileRegisterToRegisterInstruction(arm64.FMOVD, freg, reg)
 
 	c.pushValueLocationOnRegister(reg)
@@ -1951,10 +1948,6 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 		return err
 	}
 
-	x1vreg := arm64.SimdRegisterForScalarFloatRegister(x1.register)
-	x2vreg := arm64.SimdRegisterForScalarFloatRegister(x2.register)
-	vreg := arm64.SimdRegisterForScalarFloatRegister(freg)
-
 	// This is exactly the same code emitted by GCC for "__builtin_copysign":
 	//
 	//    mov     x0, -9223372036854775808
@@ -1977,11 +1970,7 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
 	//
 	// "vbit vreg.8b, x2vreg.8b, x1vreg.8b" == "inserting 64th bit of x2 into x1".
-	c.assembler.CompileTwoRegistersToRegisterInstruction(arm64.VBIT,
-		vreg&31+garm64.REG_ARNG+(arm64.RNG_8B&15)<<5,
-		x2vreg&31+garm64.REG_ARNG+(arm64.RNG_8B&15)<<5,
-		x1vreg&31+garm64.REG_ARNG+(arm64.RNG_8B&15)<<5,
-	)
+	c.assembler.CompileTwoSIMDToSIMDWithByteArrangement(arm64.VBIT, freg, x2.register, x1.register)
 
 	c.markRegisterUnused(x2.register)
 	c.pushValueLocationOnRegister(x1.register)

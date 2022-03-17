@@ -40,7 +40,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegisterInstruction(instruction asm.I
 	inst.To.Type = obj.TYPE_REG
 	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
 	a.AddInstruction(inst)
-	return nil
+	return asm.NewGolangAsmNode(inst)
 }
 
 func (a *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
@@ -190,7 +190,7 @@ func (a *assemblerGoAsmImpl) CompileStandAloneInstruction(instruction asm.Instru
 	prog := a.NewProg()
 	prog.As = castAsGolangAsmInstruction[instruction]
 	a.AddInstruction(prog)
-	return nil
+	return asm.NewGolangAsmNode(prog)
 }
 
 func (a *assemblerGoAsmImpl) CompileAddInstructionWithLeftShiftedRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, destinationReg asm.Register) {
@@ -294,6 +294,59 @@ func (a *assemblerGoAsmImpl) CompileConditionalRegisterSet(cond asm.ConditionalR
 	a.AddInstruction(inst)
 }
 
+// simdRegisterForScalarFloatRegister returns SIMD register which corresponds to the given scalar float register.
+// In other words, this returns: REG_F0 -> REG_V0, REG_F1 -> REG_V1, ...., REG_F31 -> REG_V31.
+func simdRegisterForScalarFloatRegister(freg int16) int16 {
+	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
+}
+
+func (a *assemblerGoAsmImpl) CompileTwoSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
+	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmConditionalRegister[srcReg1], castAsGolangAsmConditionalRegister[srcReg2], castAsGolangAsmConditionalRegister[dstReg]
+	src1VReg, src2VReg, dstVReg := simdRegisterForScalarFloatRegister(src1FloatReg), simdRegisterForScalarFloatRegister(src2FloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
+
+	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
+	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
+	inst := a.NewProg()
+	inst.As = castAsGolangAsmInstruction[instruction]
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = dstVReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = src1VReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
+	inst.Reg = src2VReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
+	a.AddInstruction(inst)
+
+}
+
+func (a *assemblerGoAsmImpl) CompileSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg, dstReg asm.Register) {
+	srcFloatReg, dstFloatReg := castAsGolangAsmConditionalRegister[srcReg], castAsGolangAsmConditionalRegister[dstReg]
+	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
+
+	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
+	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
+	inst := a.NewProg()
+	inst.As = castAsGolangAsmInstruction[instruction]
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = dstVReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = srcVReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
+	a.AddInstruction(inst)
+}
+
+func (a *assemblerGoAsmImpl) CompileSIMDWithByteArrangementToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
+	srcFloatReg := castAsGolangAsmConditionalRegister[srcReg]
+	srcVReg := simdRegisterForScalarFloatRegister(srcFloatReg)
+
+	// * https://github.com/twitchyliquid64/golang-asm/blob/v0.15.1/obj/link.go#L172-L177
+	// * https://github.com/golang/go/blob/739328c694d5e608faa66d17192f0a59f6e01d04/src/cmd/compile/internal/arm64/ssa.go#L972
+	inst := a.NewProg()
+	inst.As = castAsGolangAsmInstruction[instruction]
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = castAsGolangAsmRegister[dstReg]
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = srcVReg&31 + arm64.REG_ARNG + (arm64.ARNG_8B&15)<<5
+	a.AddInstruction(inst)
+}
+
 var castAsGolangAsmConditionalRegister = [...]int16{
 	COND_EQ: arm64.COND_EQ,
 	COND_NE: arm64.COND_NE,
@@ -378,43 +431,11 @@ var castAsGolangAsmRegister = [...]int16{
 	REG_F29: arm64.REG_F29,
 	REG_F30: arm64.REG_F30,
 	REG_F31: arm64.REG_F31,
-	REG_V0:  arm64.REG_V0,
-	REG_V1:  arm64.REG_V1,
-	REG_V2:  arm64.REG_V2,
-	REG_V3:  arm64.REG_V3,
-	REG_V4:  arm64.REG_V4,
-	REG_V5:  arm64.REG_V5,
-	REG_V6:  arm64.REG_V6,
-	REG_V7:  arm64.REG_V7,
-	REG_V8:  arm64.REG_V8,
-	REG_V9:  arm64.REG_V9,
-	REG_V10: arm64.REG_V10,
-	REG_V11: arm64.REG_V11,
-	REG_V12: arm64.REG_V12,
-	REG_V13: arm64.REG_V13,
-	REG_V14: arm64.REG_V14,
-	REG_V15: arm64.REG_V15,
-	REG_V16: arm64.REG_V16,
-	REG_V17: arm64.REG_V17,
-	REG_V18: arm64.REG_V18,
-	REG_V19: arm64.REG_V19,
-	REG_V20: arm64.REG_V20,
-	REG_V21: arm64.REG_V21,
-	REG_V22: arm64.REG_V22,
-	REG_V23: arm64.REG_V23,
-	REG_V24: arm64.REG_V24,
-	REG_V25: arm64.REG_V25,
-	REG_V26: arm64.REG_V26,
-	REG_V27: arm64.REG_V27,
-	REG_V28: arm64.REG_V28,
-	REG_V29: arm64.REG_V29,
-	REG_V30: arm64.REG_V30,
-	REG_V31: arm64.REG_V31,
 }
 
 var castAsGolangAsmInstruction = [...]obj.As{
 	NOP:      obj.ANOP,
-	RET:      obj.ANOP,
+	RET:      obj.ARET,
 	ADD:      arm64.AADD,
 	ADDW:     arm64.AADDW,
 	ADR:      arm64.AADR,

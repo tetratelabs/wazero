@@ -4,12 +4,6 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
-// SimdRegisterForScalarFloatRegister returns SIMD register which corresponds to the given scalar float register.
-// In other words, this returns: REG_F0 -> REG_V0, REG_F1 -> REG_V1, ...., REG_F31 -> REG_V31.
-func SimdRegisterForScalarFloatRegister(freg asm.Register) asm.Register {
-	return freg + (REG_F31 - REG_F0) + 1
-}
-
 const (
 	COND_EQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
 	COND_NE
@@ -97,40 +91,6 @@ const (
 	REG_F29
 	REG_F30
 	REG_F31
-
-	// SIMD
-	REG_V0
-	REG_V1
-	REG_V2
-	REG_V3
-	REG_V4
-	REG_V5
-	REG_V6
-	REG_V7
-	REG_V8
-	REG_V9
-	REG_V10
-	REG_V11
-	REG_V12
-	REG_V13
-	REG_V14
-	REG_V15
-	REG_V16
-	REG_V17
-	REG_V18
-	REG_V19
-	REG_V20
-	REG_V21
-	REG_V22
-	REG_V23
-	REG_V24
-	REG_V25
-	REG_V26
-	REG_V27
-	REG_V28
-	REG_V29
-	REG_V30
-	REG_V31
 )
 
 const (

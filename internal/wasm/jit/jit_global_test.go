@@ -1,7 +1,6 @@
 package jit
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,11 +11,11 @@ import (
 
 func TestCompiler_compileGlobalGet(t *testing.T) {
 	const globalValue uint64 = 12345
-	for i, tp := range []wasm.ValueType{
+	for _, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64, wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
 		tp := tp
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t, nil)
 
@@ -61,12 +60,12 @@ func TestCompiler_compileGlobalGet(t *testing.T) {
 
 func TestCompiler_compileGlobalSet(t *testing.T) {
 	const valueToSet uint64 = 12345
-	for i, tp := range []wasm.ValueType{
+	for _, tp := range []wasm.ValueType{
 		wasm.ValueTypeF32, wasm.ValueTypeF64,
 		wasm.ValueTypeI32, wasm.ValueTypeI64,
 	} {
 		tp := tp
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+		t.Run(wasm.ValueTypeName(tp), func(t *testing.T) {
 			env := newJITEnvironment()
 			compiler := env.requireNewCompiler(t, nil)
 

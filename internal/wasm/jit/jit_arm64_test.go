@@ -4,9 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/twitchyliquid64/golang-asm/obj"
-	"github.com/twitchyliquid64/golang-asm/obj/arm64"
 
+	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
@@ -30,11 +29,6 @@ func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
 	c.locationStack = s
 }
 
-func Test_simdRegisterForScalarFloatRegister(t *testing.T) {
-	require.Equal(t, int16(arm64.REG_V0), simdRegisterForScalarFloatRegister(arm64.REG_F0))
-	require.Equal(t, int16(arm64.REG_V30), simdRegisterForScalarFloatRegister(arm64.REG_F30))
-}
-
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
@@ -44,7 +38,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
-		compiler.compileReadInstructionAddress(obj.AJMP, reservedRegisterForTemporary)
+		compiler.assembler.CompileReadInstructionAddress(arm64.B, reservedRegisterForTemporary)
 
 		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
@@ -62,7 +56,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after RET.
-		compiler.compileReadInstructionAddress(obj.ARET, reservedRegisterForTemporary)
+		compiler.assembler.CompileReadInstructionAddress(arm64.RET, reservedRegisterForTemporary)
 
 		// Add many instruction between the target and compileReadInstructionAddress.
 		for i := 0; i < 100; i++ {
@@ -70,10 +64,8 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		ret := compiler.newProg()
-		ret.As = obj.ARET
-		ret.To.Type = obj.TYPE_REG
-		ret.To.Reg = reservedRegisterForTemporary
+		compiler.assembler.CompileReturn(reservedRegisterForTemporary)
+
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
 
@@ -93,11 +85,11 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		// Set the acquisition target instruction to the one after RET,
 		// and read the absolute address into destinationRegister.
 		const addressReg = reservedRegisterForTemporary
-		compiler.compileReadInstructionAddress(obj.ARET, addressReg)
+		compiler.assembler.CompileReadInstructionAddress(arm64.RET, addressReg)
 
 		// Branch to the instruction after RET below via the absolute
 		// address stored in destinationRegister.
-		compiler.compileUnconditionalBranchToAddressOnRegister(addressReg)
+		compiler.assembler.CompileUnconditionalBranchToAddressOnMemory(addressReg)
 
 		// If we fail to branch, we reach here and exit with unreachable status,
 		// so the assertion would fail.
