@@ -283,6 +283,35 @@ func (a *assemblerGoAsmImpl) BuildJumpTable(table []byte, labelInitialInstructio
 	})
 }
 
+func (a *assemblerGoAsmImpl) CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, destinationReg asm.Register) {
+	inst := a.NewProg()
+	inst.As = arm64.ACSET
+	inst.To.Type = obj.TYPE_REG
+	inst.To.Reg = castAsGolangAsmRegister[destinationReg]
+	inst.From.Type = obj.TYPE_REG
+	inst.From.Reg = castAsGolangAsmConditionalRegister[cond]
+	a.AddInstruction(inst)
+}
+
+var castAsGolangAsmConditionalRegister = [...]int16{
+	COND_EQ: arm64.COND_EQ,
+	COND_NE: arm64.COND_NE,
+	COND_HS: arm64.COND_HS,
+	COND_LO: arm64.COND_LO,
+	COND_MI: arm64.COND_MI,
+	COND_PL: arm64.COND_PL,
+	COND_VS: arm64.COND_VS,
+	COND_VC: arm64.COND_VC,
+	COND_HI: arm64.COND_HI,
+	COND_LS: arm64.COND_LS,
+	COND_GE: arm64.COND_GE,
+	COND_LT: arm64.COND_LT,
+	COND_GT: arm64.COND_GT,
+	COND_LE: arm64.COND_LE,
+	COND_AL: arm64.COND_AL,
+	COND_NV: arm64.COND_NV,
+}
+
 var castAsGolangAsmRegister = [...]int16{
 	REG_R0:  arm64.REG_R0,
 	REG_R1:  arm64.REG_R1,

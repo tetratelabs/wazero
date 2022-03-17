@@ -545,33 +545,33 @@ func (c *arm64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 	if cond.onConditionalRegister() {
 		// If the cond is on a conditional register, it corresponds to one of "conditional codes"
 		// https://developer.arm.com/documentation/dui0801/a/Condition-Codes/Condition-code-suffixes
-		// Here we represent the conditional codes by using garm64.COND_** registers, and that means the
+		// Here we represent the conditional codes by using arm64.COND_** registers, and that means the
 		// conditional jump can be performed if we use arm64.B**.
-		// For example, if we have garm64.COND_EQ on cond, that means we performed compileEq right before
+		// For example, if we have arm64.COND_EQ on cond, that means we performed compileEq right before
 		// this compileBrIf and BrIf can be achieved by arm64.BEQ.
 		var brInst asm.Instruction
 		switch cond.conditionalRegister {
-		case garm64.COND_EQ:
+		case arm64.COND_EQ:
 			brInst = arm64.BEQ
-		case garm64.COND_NE:
+		case arm64.COND_NE:
 			brInst = arm64.BNE
-		case garm64.COND_HS:
+		case arm64.COND_HS:
 			brInst = arm64.BHS
-		case garm64.COND_LO:
+		case arm64.COND_LO:
 			brInst = arm64.BLO
-		case garm64.COND_MI:
+		case arm64.COND_MI:
 			brInst = arm64.BMI
-		case garm64.COND_HI:
+		case arm64.COND_HI:
 			brInst = arm64.BHI
-		case garm64.COND_LS:
+		case arm64.COND_LS:
 			brInst = arm64.BLS
-		case garm64.COND_GE:
+		case arm64.COND_GE:
 			brInst = arm64.BGE
-		case garm64.COND_LT:
+		case arm64.COND_LT:
 			brInst = arm64.BLT
-		case garm64.COND_GT:
+		case arm64.COND_GT:
 			brInst = arm64.BGT
-		case garm64.COND_LE:
+		case arm64.COND_LE:
 			brInst = arm64.BLE
 		default:
 			// BUG: This means that we use the cond.conditionalRegister somewhere in this file,
@@ -2232,9 +2232,9 @@ func (c *arm64Compiler) emitEqOrNe(isEq bool, unsignedType wazeroir.UnsignedType
 	c.assembler.CompileTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	cond := conditionalRegisterState(garm64.COND_NE)
+	cond := arm64.COND_NE
 	if isEq {
-		cond = garm64.COND_EQ
+		cond = arm64.COND_EQ
 	}
 	c.locationStack.pushValueLocationOnConditionalRegister(cond)
 	return nil
@@ -2258,8 +2258,7 @@ func (c *arm64Compiler) compileEqz(o *wazeroir.OperationEqz) error {
 	c.assembler.CompileTwoRegistersToNoneInstruction(inst, arm64.REGZERO, x1.register)
 
 	// Push the comparison result as a conditional register value.
-	cond := conditionalRegisterState(garm64.COND_EQ)
-	c.locationStack.pushValueLocationOnConditionalRegister(cond)
+	c.locationStack.pushValueLocationOnConditionalRegister(arm64.COND_EQ)
 	return nil
 }
 
@@ -2271,26 +2270,26 @@ func (c *arm64Compiler) compileLt(o *wazeroir.OperationLt) error {
 	}
 
 	var inst asm.Instruction
-	var conditionalRegister conditionalRegisterState
+	var conditionalRegister asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_LO
+		conditionalRegister = arm64.COND_LO
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_LO
+		conditionalRegister = arm64.COND_LO
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_LT
+		conditionalRegister = arm64.COND_LT
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_LT
+		conditionalRegister = arm64.COND_LT
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = garm64.COND_MI
+		conditionalRegister = arm64.COND_MI
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = garm64.COND_MI
+		conditionalRegister = arm64.COND_MI
 	}
 
 	c.assembler.CompileTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
@@ -2308,26 +2307,26 @@ func (c *arm64Compiler) compileGt(o *wazeroir.OperationGt) error {
 	}
 
 	var inst asm.Instruction
-	var conditionalRegister conditionalRegisterState
+	var conditionalRegister asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_HI
+		conditionalRegister = arm64.COND_HI
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_HI
+		conditionalRegister = arm64.COND_HI
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_GT
+		conditionalRegister = arm64.COND_GT
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_GT
+		conditionalRegister = arm64.COND_GT
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = garm64.COND_GT
+		conditionalRegister = arm64.COND_GT
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = garm64.COND_GT
+		conditionalRegister = arm64.COND_GT
 	}
 
 	c.assembler.CompileTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
@@ -2345,26 +2344,26 @@ func (c *arm64Compiler) compileLe(o *wazeroir.OperationLe) error {
 	}
 
 	var inst asm.Instruction
-	var conditionalRegister conditionalRegisterState
+	var conditionalRegister asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_LS
+		conditionalRegister = arm64.COND_LS
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_LS
+		conditionalRegister = arm64.COND_LS
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_LE
+		conditionalRegister = arm64.COND_LE
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_LE
+		conditionalRegister = arm64.COND_LE
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = garm64.COND_LS
+		conditionalRegister = arm64.COND_LS
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = garm64.COND_LS
+		conditionalRegister = arm64.COND_LS
 	}
 
 	c.assembler.CompileTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
@@ -2382,26 +2381,26 @@ func (c *arm64Compiler) compileGe(o *wazeroir.OperationGe) error {
 	}
 
 	var inst asm.Instruction
-	var conditionalRegister conditionalRegisterState
+	var conditionalRegister asm.ConditionalRegisterState
 	switch o.Type {
 	case wazeroir.SignedTypeUint32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_HS
+		conditionalRegister = arm64.COND_HS
 	case wazeroir.SignedTypeUint64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_HS
+		conditionalRegister = arm64.COND_HS
 	case wazeroir.SignedTypeInt32:
 		inst = arm64.CMPW
-		conditionalRegister = garm64.COND_GE
+		conditionalRegister = arm64.COND_GE
 	case wazeroir.SignedTypeInt64:
 		inst = arm64.CMP
-		conditionalRegister = garm64.COND_GE
+		conditionalRegister = arm64.COND_GE
 	case wazeroir.SignedTypeFloat32:
 		inst = arm64.FCMPS
-		conditionalRegister = garm64.COND_GE
+		conditionalRegister = arm64.COND_GE
 	case wazeroir.SignedTypeFloat64:
 		inst = arm64.FCMPD
-		conditionalRegister = garm64.COND_GE
+		conditionalRegister = arm64.COND_GE
 	}
 
 	c.assembler.CompileTwoRegistersToNoneInstruction(inst, x2.register, x1.register)
@@ -2895,7 +2894,7 @@ func (c *arm64Compiler) compileLoadConditionalRegisterToGeneralPurposeRegister(l
 	reg, _ := c.locationStack.takeFreeRegister(generalPurposeRegisterTypeInt)
 	c.markRegisterUsed(reg)
 
-	c.assembler.CompileRegisterToRegisterInstruction(arm64.CSET, int16(loc.conditionalRegister), reg)
+	c.assembler.CompileConditionalRegisterSet(loc.conditionalRegister, reg)
 
 	// Record that now the value is located on a general purpose register.
 	loc.setRegister(reg)

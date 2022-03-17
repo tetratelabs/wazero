@@ -38,5 +38,5 @@ type Assembler interface {
 	BuildJumpTable(table []byte, initialInstructions []asm.Node)
 
 	// CSET
-	// CompileMoveConditionalRegisterStateToRegister(conditioal)
+	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, destinationReg asm.Register)
 }

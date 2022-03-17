@@ -19,13 +19,6 @@ func isFloatRegister(r asm.Register) bool {
 	return unreservedGeneralPurposeFloatRegisters[0] <= r && r <= unreservedGeneralPurposeFloatRegisters[len(unreservedGeneralPurposeFloatRegisters)-1]
 }
 
-// conditionalRegisterState indicates a state of the conditional flag register.
-// In arm64, conditional registers are defined as arm64.COND_*.
-// In amd64, we define each flag value in value_locations_amd64.go
-type conditionalRegisterState int16
-
-const conditionalRegisterStateUnset conditionalRegisterState = 0
-
 // valueLocation corresponds to each variable pushed onto the wazeroir (virtual) stack,
 // and it has the information about where it exists in the physical machine.
 // It might exist in registers, or maybe on in the non-virtual physical stack allocated in memory.
@@ -34,7 +27,7 @@ type valueLocation struct {
 	// Set to asm.NilRegister if the value is stored in the memory stack.
 	register asm.Register
 	// Set to conditionalRegisterStateUnset if the value is not on the conditional register.
-	conditionalRegister conditionalRegisterState
+	conditionalRegister asm.ConditionalRegisterState
 	// This is the location of this value in the memory stack at runtime,
 	stackPointer uint64
 }
@@ -49,19 +42,19 @@ func (v *valueLocation) setRegisterType(t generalPurposeRegisterType) {
 
 func (v *valueLocation) setRegister(reg asm.Register) {
 	v.register = reg
-	v.conditionalRegister = conditionalRegisterStateUnset
+	v.conditionalRegister = asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onRegister() bool {
-	return v.register != asm.NilRegister && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register != asm.NilRegister && v.conditionalRegister == asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onStack() bool {
-	return v.register == asm.NilRegister && v.conditionalRegister == conditionalRegisterStateUnset
+	return v.register == asm.NilRegister && v.conditionalRegister == asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) onConditionalRegister() bool {
-	return v.conditionalRegister != conditionalRegisterStateUnset
+	return v.conditionalRegister != asm.ConditionalRegisterStateUnset
 }
 
 func (v *valueLocation) String() string {
@@ -135,7 +128,7 @@ func (s *valueLocationStack) clone() *valueLocationStack {
 // pushValueLocationOnRegister creates a new valueLocation with a given register and pushes onto
 // the location stack.
 func (s *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc *valueLocation) {
-	loc = &valueLocation{register: reg, conditionalRegister: conditionalRegisterStateUnset}
+	loc = &valueLocation{register: reg, conditionalRegister: asm.ConditionalRegisterStateUnset}
 
 	if isIntRegister(reg) {
 		loc.setRegisterType(generalPurposeRegisterTypeInt)
@@ -148,14 +141,14 @@ func (s *valueLocationStack) pushValueLocationOnRegister(reg asm.Register) (loc 
 
 // pushValueLocationOnRegister creates a new valueLocation and pushes onto the location stack.
 func (s *valueLocationStack) pushValueLocationOnStack() (loc *valueLocation) {
-	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: conditionalRegisterStateUnset}
+	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: asm.ConditionalRegisterStateUnset}
 	s.push(loc)
 	return
 }
 
 // pushValueLocationOnRegister creates a new valueLocation with a given conditional register state
 // and pushes onto the location stack.
-func (s *valueLocationStack) pushValueLocationOnConditionalRegister(state conditionalRegisterState) (loc *valueLocation) {
+func (s *valueLocationStack) pushValueLocationOnConditionalRegister(state asm.ConditionalRegisterState) (loc *valueLocation) {
 	loc = &valueLocation{register: asm.NilRegister, conditionalRegister: state}
 	s.push(loc)
 	return
@@ -191,7 +184,7 @@ func (s *valueLocationStack) peek() (loc *valueLocation) {
 func (s *valueLocationStack) releaseRegister(loc *valueLocation) {
 	s.markRegisterUnused(loc.register)
 	loc.register = asm.NilRegister
-	loc.conditionalRegister = conditionalRegisterStateUnset
+	loc.conditionalRegister = asm.ConditionalRegisterStateUnset
 }
 
 func (s *valueLocationStack) markRegisterUnused(regs ...asm.Register) {

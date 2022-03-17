@@ -9,6 +9,10 @@ const NilRegister Register = 0
 
 type Instruction int16
 
+type ConditionalRegisterState byte
+
+const ConditionalRegisterStateUnset ConditionalRegisterState = 0
+
 type Node interface {
 	Pc() int64
 	AssignJumpTarget(target Node)

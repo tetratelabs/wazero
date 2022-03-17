@@ -11,6 +11,25 @@ func SimdRegisterForScalarFloatRegister(freg asm.Register) asm.Register {
 }
 
 const (
+	COND_EQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
+	COND_NE
+	COND_HS
+	COND_LO
+	COND_MI
+	COND_PL
+	COND_VS
+	COND_VC
+	COND_HI
+	COND_LS
+	COND_GE
+	COND_LT
+	COND_GT
+	COND_LE
+	COND_AL
+	COND_NV
+)
+
+const (
 	// integer
 	REG_R0 asm.Register = asm.NilRegister + 1 + iota
 	REG_R1
