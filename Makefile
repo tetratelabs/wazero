@@ -1,5 +1,5 @@
-goimports := golang.org/x/tools/cmd/goimports@v0.1.5
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
+goimports := golang.org/x/tools/cmd/goimports@v0.1.10
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.2
 
 .PHONY: bench
 bench:
