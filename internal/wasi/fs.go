@@ -13,22 +13,6 @@ import (
 
 type DirFS string
 
-func posixOpenFlags(oFlags uint32, fsRights uint64) (pFlags int) {
-	if fsRights&wasi.R_FD_WRITE != 0 {
-		pFlags |= os.O_RDWR
-	}
-	if oFlags&wasi.O_CREATE != 0 {
-		pFlags |= os.O_CREATE
-	}
-	if oFlags&wasi.O_EXCL != 0 {
-		pFlags |= os.O_EXCL
-	}
-	if oFlags&wasi.O_TRUNC != 0 {
-		pFlags |= os.O_TRUNC
-	}
-	return
-}
-
 func (dir DirFS) OpenWASI(dirFlags uint32, path string, oFlags uint32, fsRights, fsRightsInheriting uint64, fdFlags uint32) (wasi.File, error) {
 	// I'm not sure how to use all these passed flags and rights yet
 	if !fs.ValidPath(path) || runtime.GOOS == "windows" && strings.ContainsAny(path, `\:`) {
