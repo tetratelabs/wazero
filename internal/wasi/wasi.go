@@ -636,10 +636,13 @@ type SnapshotPreview1 interface {
 	FdPread(ctx wasm.Module, fd, iovs uint32, offset uint64, resultNread uint32) wasi.Errno
 
 	// FdPrestatGet is the WASI function to return the prestat data of a file descriptor.
-	// This returns wasi.ErrnoBadf if the fd is invalid.
 	//
 	// * fd - the file descriptor to get the prestat
 	// * resultPrestat - the offset to write the result prestat data
+	//
+	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+	// * wasi.ErrnoBadf - if `fd` is invalid or the `fd` is not a pre-opened directory.
+	// * wasi.ErrnoFault - if `resultPrestat` is an invalid offset due to the memory constraint
 	//
 	// prestat byte layout is 8 bytes, beginning with an 8-bit tag and 3 pad bytes. The only valid tag is `prestat_dir`,
 	// which is tag zero. This simplifies the byte layout to 4 empty bytes followed by the uint32le encoded path length.
@@ -857,6 +860,14 @@ type SnapshotPreview1 interface {
 	// * resultOpenedFd - the offset in `ctx.Memory` to write the newly created file descriptor to.
 	//     * The result FD value is guaranteed to be less than 2**31
 	//
+	// The wasi.Errno returned is wasi.ErrnoSuccess except the following error conditions:
+	// * wasi.ErrnoBadf - if `fd` is invalid
+	// * wasi.ErrnoFault - if `resultOpenedFd` contains an invalid offset due to the memory constraint
+	// * wasi.ErrnoNoent - if `path` does not exist.
+	// * wasi.ErrnoExist - if `path` exists, while `oFlags` requires that it must not.
+	// * wasi.ErrnoNotdir - if `path` is not a directory, while `oFlags` requires that it must be.
+	// * wasi.ErrnoIo - if other error happens during the operation of the underying file system.
+	//
 	// For example, this function needs to first read `path` to determine the file to open.
 	//    If parameters `path` = 1, `pathLen` = 6, and the path is "wazero", PathOpen reads the path from `ctx.Memory`:
 	//
@@ -866,13 +877,13 @@ type SnapshotPreview1 interface {
 	//   []byte{ ?, 'w', 'a', 'z', 'e', 'r', 'o', ?... }
 	//        path --^
 	//
-	// Then, if parameters resultOpenedFd = 8, and this function opened a new file descriptor 3 with the given flags,
+	// Then, if parameters resultOpenedFd = 8, and this function opened a new file descriptor 5 with the given flags,
 	// this function writes the blow to `ctx.Memory`:
 	//
 	//                          uint32le
 	//                         +--------+
 	//                         |        |
-	//        []byte{ 0..6, ?, 4, 0, 0, 0, ?}
+	//        []byte{ 0..6, ?, 5, 0, 0, 0, ?}
 	//        resultOpenedFd --^
 	//
 	// Note: ImportPathOpen shows this signature in the WebAssembly 1.0 (20191205) Text Format.
@@ -1129,20 +1140,30 @@ func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) was
 	if _, ok := cfg.opened[fd]; !ok {
 		return wasi.ErrnoBadf
 	}
-	if !ctx.Memory().WriteUint64Le(resultStat+16, wasi.R_FD_READ|wasi.R_FD_WRITE) {
+	if !ctx.Memory().WriteUint64Le(resultStat+16, rightFDRead|rightFDWrite) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
 }
 
 // FdPrestatGet implements SnapshotPreview1.FdPrestatGet
-// TODO: Currently FdPrestatGet implements nothing except returning ErrnoBadf
-func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, bufPtr uint32) wasi.Errno {
+func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, resultPrestat uint32) wasi.Errno {
 	cfg := a.config(ctx.Context())
 
-	if _, ok := cfg.opened[fd]; !ok {
+	entry, ok := cfg.opened[fd]
+	if !ok || entry.path == "" {
 		return wasi.ErrnoBadf
 	}
+
+	// Zero-value 8-bit tag, and 3-byte zero-value paddings, which is uint32le(0) in short.
+	if !ctx.Memory().WriteUint32Le(resultPrestat, uint32(0)) {
+		return wasi.ErrnoFault
+	}
+	// Write the length of the directory name at offset 4.
+	if !ctx.Memory().WriteUint32Le(resultPrestat+4, uint32(len(entry.path))) {
+		return wasi.ErrnoFault
+	}
+
 	return wasi.ErrnoSuccess
 }
 
@@ -1266,11 +1287,15 @@ func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint3
 	if !ok || f.file == nil {
 		return wasi.ErrnoBadf
 	}
+	seeker, ok := f.file.(io.Seeker)
+	if !ok {
+		return wasi.ErrnoBadf
+	}
 
 	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
 		return wasi.ErrnoInval
 	}
-	newOffst, err := f.file.Seek(int64(offset), int(whence))
+	newOffst, err := seeker.Seek(int64(offset), int(whence))
 	if err != nil {
 		return wasi.ErrnoIo
 	}
@@ -1358,8 +1383,42 @@ func (a *wasiAPI) PathLink(ctx wasm.Module, oldFd, oldFlags, oldPath, oldPathLen
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
+const (
+	// WASI open flags
+	oflagCreate = 1 << iota
+	// TODO: oflagDir
+	oflagExclusive
+	oflagTrunc
+
+	// WASI FS rights
+	rightFDRead  = 1 << iota
+	rightFDWrite = 0x200
+)
+
+func posixOpenFlags(oFlags uint32, fsRights uint64) (pFlags int) {
+	// TODO: handle dirflags, which decides whether to follow symbolic links or not,
+	//       by O_NOFOLLOW. Note O_NOFOLLOW doesn't exist on Windows.
+	if fsRights&rightFDWrite != 0 {
+		if fsRights&rightFDRead != 0 {
+			pFlags |= os.O_RDWR
+		} else {
+			pFlags |= os.O_WRONLY
+		}
+	}
+	if oFlags&oflagCreate != 0 {
+		pFlags |= os.O_CREATE
+	}
+	if oFlags&oflagExclusive != 0 {
+		pFlags |= os.O_EXCL
+	}
+	if oFlags&oflagTrunc != 0 {
+		pFlags |= os.O_TRUNC
+	}
+	return
+}
+
 // PathOpen implements SnapshotPreview1.PathOpen
-func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, path, pathLen, oflags uint32, fsRightsBase,
+func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
 	cfg := a.config(ctx.Context())
 
@@ -1368,7 +1427,7 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, path, pathLen, oflags 
 		return wasi.ErrnoBadf
 	}
 
-	b, ok := ctx.Memory().Read(path, pathLen)
+	b, ok := ctx.Memory().Read(pathPtr, pathLen)
 	if !ok {
 		return wasi.ErrnoFault
 	}
@@ -1378,10 +1437,15 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, path, pathLen, oflags 
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 			return wasi.ErrnoNoent
+		case errors.Is(err, fs.ErrExist):
+			return wasi.ErrnoExist
 		default:
-			return wasi.ErrnoInval
+			return wasi.ErrnoIo
 		}
 	}
+
+	// when ofagDir is set, the opened file must be a directory.
+	// TODO if oflags&oflagDir != 0 return wasi.ErrnoNotdir if stat != dir
 
 	newFD, err := a.randUnusedFD(cfg)
 	if err != nil {

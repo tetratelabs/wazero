@@ -780,7 +780,96 @@ func TestSnapshotPreview1_FdPread(t *testing.T) {
 	})
 }
 
-// TODO: TestSnapshotPreview1_FdPrestatGet TestSnapshotPreview1_FdPrestatGet_Errors
+func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
+	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+
+	ctx := context.Background()
+	config := NewConfig()
+	config.opened[fd] = fileEntry{
+		path: "/tmp",
+	}
+
+	mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, config)
+
+	resultPrestat := uint32(1) // arbitrary offset
+	expectedMemory := []byte{
+		'?',     // resultPrstat after this
+		0,       // 8-bit tag indicating `prestat_dir`, the only available tag
+		0, 0, 0, // 3-byte padding
+		// the result path length field after this
+		4, 0, 0, 0, // = 4, which is len("/tmp")
+		'?',
+	}
+
+	t.Run("SnapshotPreview1.FdPrestatGet", func(t *testing.T) {
+		maskMemory(t, mod, len(expectedMemory))
+
+		errno := NewAPI(config).FdPrestatGet(mod, fd, resultPrestat)
+		require.Equal(t, wasi.ErrnoSuccess, errno)
+
+		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
+	})
+
+	t.Run(FunctionFdPrestatDirName, func(t *testing.T) {
+		maskMemory(t, mod, len(expectedMemory))
+
+		ret, err := fn.Call(mod, uint64(fd), uint64(resultPrestat))
+		require.NoError(t, err)
+		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+
+		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
+	})
+}
+
+func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
+	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
+	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_get. We chose 0 here.
+
+	ctx := context.Background()
+	config := NewConfig()
+	config.opened = map[uint32]fileEntry{
+		fd: {path: "/tmp"},
+	}
+
+	mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, config)
+
+	memorySize := mod.Memory().Size()
+
+	tests := []struct {
+		name          string
+		fd            uint32
+		resultPrestat uint32
+		expectedErrno wasi.Errno
+	}{
+		{
+			name:          "invalid FD",
+			fd:            42, // arbitrary invalid FD
+			resultPrestat: validAddress,
+			expectedErrno: wasi.ErrnoBadf,
+		},
+		{
+			name:          "out-of-memory resultPrestat",
+			fd:            fd,
+			resultPrestat: memorySize,
+			expectedErrno: wasi.ErrnoFault,
+		},
+		// TODO: non pre-opened file == wasi.ErrnoBadf
+	}
+
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			results, err := fn.Call(mod, uint64(tc.fd), uint64(tc.resultPrestat))
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
+		})
+	}
+}
 
 func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
@@ -827,16 +916,19 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 }
 
 func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
-	dirName := "/tmp"
+	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+
 	ctx := context.Background()
 	config := NewConfig()
-	config.Preopen(dirName, &MemFS{})
+	config.opened = map[uint32]fileEntry{
+		fd: {path: "/tmp"},
+	}
+	pathLen := uint32(len("/tmp"))
 
 	mod, fn := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, config)
 
 	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
-	fd := uint32(3)           // fd 3 will be opened for the "/tmp" directory after 0, 1, and 2, that are stdin/out/err
 
 	tests := []struct {
 		name          string
@@ -849,30 +941,31 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 			name:          "out-of-memory path",
 			fd:            fd,
 			path:          memorySize,
-			pathLen:       uint32(len(dirName)),
+			pathLen:       pathLen,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "path exceeds the maximum valid address by 1",
 			fd:            fd,
-			path:          memorySize - uint32(len(dirName)) + 1,
-			pathLen:       uint32(len(dirName)),
+			path:          memorySize - pathLen + 1,
+			pathLen:       pathLen,
 			expectedErrno: wasi.ErrnoFault,
 		},
 		{
 			name:          "pathLen exceeds the length of the dir name",
 			fd:            fd,
 			path:          validAddress,
-			pathLen:       uint32(len(dirName)) + 1,
+			pathLen:       pathLen + 1,
 			expectedErrno: wasi.ErrnoNametoolong,
 		},
 		{
 			name:          "invalid fd",
 			fd:            42, // arbitrary invalid fd
 			path:          validAddress,
-			pathLen:       uint32(len(dirName)) + 1,
+			pathLen:       pathLen,
 			expectedErrno: wasi.ErrnoBadf,
 		},
+		// TODO: non pre-opened file == wasi.ErrnoBadf
 	}
 
 	for _, tt := range tests {
@@ -1521,26 +1614,34 @@ func TestSnapshotPreview1_PathLink(t *testing.T) {
 }
 
 func TestSnapshotPreview1_PathOpen(t *testing.T) {
-	fd := uint32(3)                              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	dirflags := uint32(0)                        // arbitrary dirflags
-	path := uint32(1)                            // arbitrary offset
-	pathLen := uint32(6)                         // The length of path
-	oflags := uint32(0)                          // arbitrary oflags
-	fsRightsBase := uint64(wasi.R_FD_READ)       // arbitrary right
-	fsRightsInheriting := uint64(wasi.R_FD_READ) // arbitrary right
+	workdirFD := uint32(3)                    // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	dirflags := uint32(0)                     // arbitrary dirflags
+	path := uint32(1)                         // arbitrary offset
+	pathLen := uint32(6)                      // The length of path
+	oflags := uint32(0)                       // arbitrary oflags
+	fsRightsBase := uint64(rightFDRead)       // arbitrary right
+	fsRightsInheriting := uint64(rightFDRead) // arbitrary right
 	fdFlags := uint32(0)
 	resultOpenedFd := uint32(8)
 	initialMemory := []byte{
 		'?',                          // `path` is after this
 		'w', 'a', 'z', 'e', 'r', 'o', // path
-		'?', // `resultOpenedFd` is after this
 	}
+	expectedFD := uint32(5) // arbitrary expected FD
 	expectedMemory := append(
 		initialMemory,
-		4, 0, 0, 0, // resultOpenedFd
+		'?',        // `resultOpenedFd` is after this
+		5, 0, 0, 0, // = epxectedFD (5)
 		'?',
 	)
-	expectedFD := uint32(4) // arbitrary expected FD
+
+	// MemFS for testing
+	// Create a memFS for testing that has "./wazero" file.
+	memFS := &MemFS{
+		Files: map[string][]byte{
+			"wazero": {},
+		},
+	}
 
 	ctx := context.Background()
 	config := NewConfig()
@@ -1556,7 +1657,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 	type pathOpenFn func(ctx publicwasm.Module, fd, dirflags, path, pathLen, oflags uint32,
 		fsRightsBase, fsRightsInheriting uint64,
 		fdFlags, resultOpenedFd uint32) wasi.Errno
-	tests := []struct {
+	pathOpenFns := []struct {
 		name     string
 		pathOpen func() pathOpenFn
 	}{
@@ -1574,38 +1675,50 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		}},
 	}
 
-	for _, tt := range tests {
-		tc := tt
-		t.Run(tc.name, func(t *testing.T) {
-			// Create a memFS for testing that has "./wazero" file.
-			memFS := &MemFS{
-				Files: map[string][]byte{
-					"wazero": []byte(""),
-				},
+	tests := []struct {
+		name         string
+		fd           uint32
+		expectedPath string
+	}{
+		{
+			name:         "simple file open",
+			fd:           workdirFD,
+			expectedPath: "wazero",
+		},
+	}
+
+	for _, pathOpenFn := range pathOpenFns {
+		pf := pathOpenFn
+		t.Run(pf.name, func(t *testing.T) {
+			for _, tt := range tests {
+				tc := tt
+				t.Run(tc.name, func(t *testing.T) {
+					// Set up a fresh opened FD table
+					config.opened = map[uint32]fileEntry{
+						workdirFD: {
+							path:    ".",
+							fileSys: memFS,
+						},
+					}
+
+					maskMemory(t, mod, len(expectedMemory))
+					ok := mod.Memory().Write(0, initialMemory)
+					require.True(t, ok)
+
+					errno := pf.pathOpen()(mod, tc.fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
+					require.Equal(t, wasi.ErrnoSuccess, errno)
+
+					actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+					require.True(t, ok)
+					require.Equal(t, expectedMemory, actual)
+					require.Equal(t, tc.expectedPath, config.opened[expectedFD].path) // verify the file was actually opened
+				})
 			}
-			config.opened = map[uint32]fileEntry{
-				fd: {
-					path:    ".",
-					fileSys: memFS,
-				},
-			}
-
-			maskMemory(t, mod, len(expectedMemory))
-			ok := mod.Memory().Write(0, initialMemory)
-			require.True(t, ok)
-
-			errno := tc.pathOpen()(mod, fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
-			require.Equal(t, wasi.ErrnoSuccess, errno)
-
-			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
-			require.True(t, ok)
-			require.Equal(t, expectedMemory, actual)
-			require.Equal(t, "wazero", config.opened[expectedFD].path) // verify the file was actually opened
 		})
 	}
 }
 
-func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
+func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 	validFD := uint64(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	// Create a memFS for testing that has "./wazero" file.
 	memFS := &MemFS{
@@ -1631,9 +1744,9 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 	}) // wazero is the path to the file in the memFS
 
 	tests := []struct {
-		name                              string
-		fd, path, pathLen, resultOpenedFd uint64
-		expectedErrno                     wasi.Errno
+		name                                      string
+		fd, path, pathLen, oflags, resultOpenedFd uint64
+		expectedErrno                             wasi.Errno
 	}{
 		{
 			name:          "invalid fd",
@@ -1674,7 +1787,7 @@ func TestSnapshotPreview1_PathOpen_Erros(t *testing.T) {
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := fn.Call(mod, tc.fd, 0, tc.path, tc.pathLen, 0, 0, 0, 0, tc.resultOpenedFd)
+			results, err := fn.Call(mod, tc.fd, 0, tc.path, tc.pathLen, tc.oflags, 0, 0, 0, tc.resultOpenedFd)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedErrno, wasi.Errno(results[0])) // results[0] is the errno
 		})
