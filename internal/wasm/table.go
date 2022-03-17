@@ -98,7 +98,6 @@ func (m *Module) validateTable() ([]*validatedElementSegment, error) {
 		}
 
 		// global.get needs to be discovered during initialization
-		var arg uint32
 		oc := elem.OffsetExpr.Opcode
 		if oc == OpcodeGlobalGet {
 			globalIdx, _, err := leb128.DecodeUint32(bytes.NewReader(elem.OffsetExpr.Data))
@@ -111,7 +110,8 @@ func (m *Module) validateTable() ([]*validatedElementSegment, error) {
 			if initCount == 0 {
 				continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
 			}
-			arg = globalIdx
+
+			ret = append(ret, &validatedElementSegment{oc, globalIdx, elem.Init})
 		} else if oc == OpcodeI32Const {
 			o, _, err := leb128.DecodeInt32(bytes.NewReader(elem.OffsetExpr.Data))
 			if err != nil {
@@ -132,11 +132,10 @@ func (m *Module) validateTable() ([]*validatedElementSegment, error) {
 				continue // Per https://github.com/WebAssembly/spec/issues/1427 init can be no-op, but validate anyway!
 			}
 
-			arg = offset
+			ret = append(ret, &validatedElementSegment{oc, offset, elem.Init})
 		} else {
 			return nil, fmt.Errorf("%s[%d] has an invalid const expression: %s", SectionIDName(SectionIDElement), idx, InstructionName(oc))
 		}
-		ret = append(ret, &validatedElementSegment{oc, arg, elem.Init})
 	}
 
 	m.validatedElementSegments = ret
