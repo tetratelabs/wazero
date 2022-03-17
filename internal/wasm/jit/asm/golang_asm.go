@@ -41,7 +41,7 @@ func (n *golangAsmNode) AssignSourceConstant(value int64) {
 	n.prog.From.Offset = value
 }
 
-// GolangAsmBaseAssembler implements AssemblerBase for golang-asm library.
+// GolangAsmBaseAssembler implements *part of* AssemblerBase for golang-asm library.
 type GolangAsmBaseAssembler struct {
 	b *goasm.Builder
 	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)

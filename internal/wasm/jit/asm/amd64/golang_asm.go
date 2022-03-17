@@ -149,7 +149,7 @@ func (a *assemblerGoAsmImpl) CompileConstToMemory(inst asm.Instruction, constVal
 	return asm.NewGolangAsmNode(p)
 }
 
-// CompileMemoryToRegister implements Assembler.CompileMemoryToRegister.
+// CompileMemoryToRegister implements AssemblerBase.CompileMemoryToRegister.
 func (a *assemblerGoAsmImpl) CompileMemoryToRegister(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]

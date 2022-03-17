@@ -42,7 +42,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction,
 	return asm.NewGolangAsmNode(inst)
 }
 
-// CompileMemoryToRegister implements Assembler.CompileMemoryToRegister.
+// CompileMemoryToRegister implements AssemblerBase.CompileMemoryToRegister.
 func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
 	if sourceOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
@@ -189,6 +189,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction,
 	a.AddInstruction(br)
 }
 
+// CompileJumpToMemory implements AssemblerBase.CompileJumpToMemory.
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
 	ret := a.NewProg()
 	ret.As = castAsGolangAsmInstruction[jmpInstruction]
@@ -197,7 +198,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToRegister(jmpInstruction asm.Instructio
 	a.AddInstruction(ret)
 }
 
-// CompileStandAlone implements Assembler.CompileStandAlone.
+// CompileStandAlone implements AssemblerBase.CompileStandAlone.
 func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.Node {
 	prog := a.NewProg()
 	prog.As = castAsGolangAsmInstruction[instruction]
@@ -218,8 +219,8 @@ func (a *assemblerGoAsmImpl) CompileAddInstructionWithLeftShiftedRegister(shifte
 	a.AddInstruction(inst)
 }
 
-// CompileReadInstructionAddress implements Assembler.CompileReadInstructionAddress.
-func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(beforeTargetInst asm.Instruction, destinationReg asm.Register) {
+// CompileReadInstructionAddress implements AssemblerBase.CompileReadInstructionAddress.
+func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationReg asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
 	// Emit ADR instruction to read the specified instruction's absolute address.
 	// Note: we cannot emit the "ADR REG, $(target's offset from here)" due to the
 	// incapability of the assembler. Instead, we emit "ADR REG, ." meaning that
@@ -238,7 +239,7 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(beforeTargetInst asm.
 	a.AddOnGenerateCallBack(func(code []byte) error {
 		// Find the target instruction.
 		target := readAddress
-		beforeTarget := castAsGolangAsmInstruction[beforeTargetInst]
+		beforeTarget := castAsGolangAsmInstruction[beforeAcquisitionTargetInstruction]
 		for target != nil {
 			if target.As == beforeTarget {
 				// At this point, target is the instruction right before the target instruction.

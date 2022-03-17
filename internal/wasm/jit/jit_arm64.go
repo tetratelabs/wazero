@@ -742,7 +742,7 @@ func (c *arm64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 
 	// Now we read the address of the beginning of the jump table.
 	// In the above example, this corresponds to reading the address of 0x123001.
-	c.assembler.CompileReadInstructionAddress(arm64.B, tmpReg)
+	c.assembler.CompileReadInstructionAddress(tmpReg, arm64.B)
 
 	// Now we have the address of L0 in tmp register, and the offset to the target label in the index.register.
 	// So we could achieve the br_table jump by adding them and jump into the resulting address.
@@ -930,7 +930,7 @@ func (c *arm64Compiler) compileCallImpl(index wasm.Index, compiledFunctionAddres
 	// 4) Set ra.current so that we can return back to this function properly.
 	//
 	// First, Get the return address into the tmp.
-	c.assembler.CompileReadInstructionAddress(arm64.B, tmp)
+	c.assembler.CompileReadInstructionAddress(tmp, arm64.B)
 	// Then write the address into the call-frame.
 	c.assembler.CompileRegisterToMemory(arm64.MOVD,
 		tmp,
@@ -2685,7 +2685,7 @@ func (c *arm64Compiler) compileCallGoFunction(jitStatus jitCallStatusCode, built
 	c.compileCalcCallFrameStackTopAddress(currentCallFrameStackPointerRegister, currentCallFrameTopAddressRegister)
 
 	// Set the return address (after RET in c.exit below) into returnAddressRegister.
-	c.assembler.CompileReadInstructionAddress(arm64.RET, returnAddressRegister)
+	c.assembler.CompileReadInstructionAddress(returnAddressRegister, arm64.RET)
 
 	// Write returnAddressRegister into callFrameStack[ce.callFrameStackPointer-1].returnAddress.
 	c.assembler.CompileRegisterToMemory(
