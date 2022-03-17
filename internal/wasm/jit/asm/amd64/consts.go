@@ -2,6 +2,7 @@ package amd64
 
 import "github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 
+// Arm64-specific register states.
 const (
 	ConditionalRegisterStateE  = asm.ConditionalRegisterStateUnset + 1 + iota // ZF equal to zero
 	ConditionalRegisterStateNE                                                //˜ZF not equal to zero
@@ -17,6 +18,7 @@ const (
 	ConditionalRegisterStateBE                                                // CF | ZF below or equal (unsigned <=)
 )
 
+// Arm64-specific instructions.
 const (
 	ADDL = iota
 	ADDQ
@@ -151,6 +153,7 @@ const (
 	UD2
 )
 
+// Arm64-specific registers.
 const (
 	REG_AX asm.Register = asm.NilRegister + 1 + iota
 	REG_CX

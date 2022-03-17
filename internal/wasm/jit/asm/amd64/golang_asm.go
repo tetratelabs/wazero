@@ -10,25 +10,27 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
+// assemblerGoAsmImpl implements Assembler for golang-asm library.
+
 type assemblerGoAsmImpl struct {
 	*asm.GolangAsmBaseAssembler
 }
-
-var _ Assembler = &assemblerGoAsmImpl{}
 
 func newGolangAsmAssembler() (*assemblerGoAsmImpl, error) {
 	g, err := asm.NewGolangAsmBaseAssembler()
 	return &assemblerGoAsmImpl{g}, err
 }
 
-func (a *assemblerGoAsmImpl) CompileStandAloneInstruction(inst asm.Instruction) asm.Node {
+// CompileStandAlone implements Assembler.CompileStandAlone.
+func (a *assemblerGoAsmImpl) CompileStandAlone(inst asm.Instruction) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register) {
+// CompileRegisterToRegister implements Assembler.CompileRegisterToRegister.
+func (a *assemblerGoAsmImpl) CompileRegisterToRegister(inst asm.Instruction, from, to asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG
@@ -38,7 +40,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegisterInstruction(inst asm.Instr
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegisterInstruction(inst asm.Instruction,
+// CompileMemoryWithIndexToRegister implements Assembler.CompileMemoryWithIndexToRegister.
+func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegister(inst asm.Instruction,
 	sourceBaseReg asm.Register, sourceOffsetConst int64, sourceIndexReg asm.Register, sourceScale int16, destinationReg asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
@@ -52,7 +55,8 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegisterInstruction(inst as
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndexInstruction(inst asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst int64, dstIndexReg asm.Register, dstScale int16) {
+// CompileRegisterToMemoryWithIndex implements Assembler.CompileRegisterToMemoryWithIndex.
+func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndex(inst asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst int64, dstIndexReg asm.Register, dstScale int16) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_REG
@@ -65,7 +69,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndexInstruction(inst as
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToMemoryInstruction(inst asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst int64) {
+// CompileRegisterToMemory implements Assembler.CompileRegisterToMemory.
+func (a *assemblerGoAsmImpl) CompileRegisterToMemory(inst asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst int64) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_MEM
@@ -76,7 +81,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryInstruction(inst asm.Instruc
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileConstToRegisterInstruction(inst asm.Instruction, constValue int64, destinationRegister asm.Register) asm.Node {
+// CompileConstToRegister implements Assembler.CompileConstToRegister.
+func (a *assemblerGoAsmImpl) CompileConstToRegister(inst asm.Instruction, constValue int64, destinationRegister asm.Register) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
@@ -87,7 +93,8 @@ func (a *assemblerGoAsmImpl) CompileConstToRegisterInstruction(inst asm.Instruct
 	return asm.NewGolangAsmNode(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToConstInstruction(inst asm.Instruction, srcRegister asm.Register, constValue int64) asm.Node {
+// CompileRegisterToConst implements Assembler.CompileRegisterToConst.
+func (a *assemblerGoAsmImpl) CompileRegisterToConst(inst asm.Instruction, srcRegister asm.Register, constValue int64) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_CONST
@@ -98,7 +105,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToConstInstruction(inst asm.Instruct
 	return asm.NewGolangAsmNode(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToNoneInstruction(inst asm.Instruction, register asm.Register) {
+// CompileRegisterToNone implements Assembler.CompileRegisterToNone.
+func (a *assemblerGoAsmImpl) CompileRegisterToNone(inst asm.Instruction, register asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_REG
@@ -107,7 +115,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToNoneInstruction(inst asm.Instructi
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileNoneToRegisterInstruction(inst asm.Instruction, register asm.Register) {
+// CompileNoneToRegister implements Assembler.CompileNoneToRegister.
+func (a *assemblerGoAsmImpl) CompileNoneToRegister(inst asm.Instruction, register asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG
@@ -116,7 +125,8 @@ func (a *assemblerGoAsmImpl) CompileNoneToRegisterInstruction(inst asm.Instructi
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileNoneToMemoryInstruction(inst asm.Instruction, baseReg asm.Register, offset int64) {
+// CompileNoneToMemory implements Assembler.CompileNoneToMemory.
+func (a *assemblerGoAsmImpl) CompileNoneToMemory(inst asm.Instruction, baseReg asm.Register, offset int64) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_MEM
@@ -126,7 +136,8 @@ func (a *assemblerGoAsmImpl) CompileNoneToMemoryInstruction(inst asm.Instruction
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileConstToMemoryInstruction(inst asm.Instruction, constValue int64, baseReg asm.Register, offset int64) asm.Node {
+// CompileConstToMemory implements Assembler.CompileConstToMemory.
+func (a *assemblerGoAsmImpl) CompileConstToMemory(inst asm.Instruction, constValue int64, baseReg asm.Register, offset int64) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
@@ -138,7 +149,8 @@ func (a *assemblerGoAsmImpl) CompileConstToMemoryInstruction(inst asm.Instructio
 	return asm.NewGolangAsmNode(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
+// CompileMemoryToRegister implements Assembler.CompileMemoryToRegister.
+func (a *assemblerGoAsmImpl) CompileMemoryToRegister(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_MEM
@@ -149,7 +161,8 @@ func (a *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(inst asm.Instruc
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileMemoryToConstInstruction(inst asm.Instruction, baseReg asm.Register, offset int64, constValue int64) asm.Node {
+// CompileMemoryToConst implements Assembler.CompileMemoryToConst.
+func (a *assemblerGoAsmImpl) CompileMemoryToConst(inst asm.Instruction, baseReg asm.Register, offset int64, constValue int64) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_CONST
@@ -161,10 +174,12 @@ func (a *assemblerGoAsmImpl) CompileMemoryToConstInstruction(inst asm.Instructio
 	return asm.NewGolangAsmNode(p)
 }
 
+// CompileUnconditionalJump implements Assembler.CompileUnconditionalJump.
 func (a *assemblerGoAsmImpl) CompileUnconditionalJump() asm.Node {
 	return a.CompileJump(JMP)
 }
 
+// CompileJump implements Assembler.CompileJump.
 func (a *assemblerGoAsmImpl) CompileJump(inst asm.Instruction) asm.Node {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
@@ -173,6 +188,7 @@ func (a *assemblerGoAsmImpl) CompileJump(inst asm.Instruction) asm.Node {
 	return asm.NewGolangAsmNode(p)
 }
 
+// CompileJumpToRegister implements Assembler.CompileJumpToRegister.
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(reg asm.Register) {
 	p := a.NewProg()
 	p.As = obj.AJMP
@@ -181,6 +197,7 @@ func (a *assemblerGoAsmImpl) CompileJumpToRegister(reg asm.Register) {
 	a.AddInstruction(p)
 }
 
+// CompileJumpToMemory implements Assembler.CompileJumpToMemory.
 func (a *assemblerGoAsmImpl) CompileJumpToMemory(baseReg asm.Register, offset int64) {
 	p := a.NewProg()
 	p.As = obj.AJMP
@@ -190,7 +207,8 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(baseReg asm.Register, offset in
 	a.AddInstruction(p)
 }
 
-func (a *assemblerGoAsmImpl) CompileConstModeRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register, mode int64) {
+// CompileConstModeRegisterToRegister implements Assembler.CompileConstModeRegisterToRegister.
+func (a *assemblerGoAsmImpl) CompileConstModeRegisterToRegister(inst asm.Instruction, from, to asm.Register, mode int64) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
@@ -202,6 +220,7 @@ func (a *assemblerGoAsmImpl) CompileConstModeRegisterToRegisterInstruction(inst 
 	a.AddInstruction(p)
 }
 
+// CompileReadInstructionAddress implements Assembler.CompileReadInstructionAddress.
 func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
 	// Emit the instruction in the form of "LEA destination [RIP + offset]".
 	readInstructionAddress := a.NewProg()
@@ -254,6 +273,7 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationRegister a
 	})
 }
 
+// castAsGolangAsmRegister maps the registers to golang-asm specific register values.
 var castAsGolangAsmRegister = [...]int16{
 	REG_AX:  x86.REG_AX,
 	REG_CX:  x86.REG_CX,
@@ -305,6 +325,7 @@ var castAsGolangAsmRegister = [...]int16{
 	REG_X31: x86.REG_X31,
 }
 
+// castAsGolangAsmRegister maps the instructions to golang-asm specific instruction values.
 var castAsGolangAsmInstruction = [...]obj.As{
 	NOP:       obj.ANOP,
 	RET:       obj.ARET,

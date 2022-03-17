@@ -4,6 +4,7 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
+// Arm64-specific register states.
 const (
 	COND_EQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
 	COND_NE
@@ -23,6 +24,7 @@ const (
 	COND_NV
 )
 
+// Arm64-specific registers.
 const (
 	// Integer registers.
 	REG_R0 asm.Register = asm.NilRegister + 1 + iota
@@ -96,6 +98,7 @@ const (
 	REG_FPSR
 )
 
+// Arm64-specific instructions.
 const (
 	NOP asm.Instruction = iota
 	RET

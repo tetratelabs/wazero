@@ -5,37 +5,38 @@ import (
 )
 
 func NewAssembler(temporaryRegister asm.Register) (Assembler, error) {
-	return newGolangAsmAssembler(temporaryRegister) // TODO: replace our homemade assembler #233
+	return newGolangAsmAssembler(temporaryRegister) // TODO: replace with our homemade assembler #233
 }
 
+// Assembler is the interface for arm64 specific assembler.
 type Assembler interface {
 	asm.AssemblerBase
 	// TODO
-	CompileConstToRegisterInstruction(instruction asm.Instruction, constValue int64, destinationReg asm.Register) (inst asm.Node)
+	CompileConstToRegister(instruction asm.Instruction, constValue int64, destinationReg asm.Register) (inst asm.Node)
 	// TODO
-	CompileMemoryToRegisterInstruction(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register)
+	CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register)
 	// TODO
-	CompileMemoryWithRegisterOffsetToRegisterInstruction(instruction asm.Instruction, sourceBaseReg, sourceOffsetReg, destinationReg asm.Register)
+	CompileMemoryWithRegisterOffsetToRegister(instruction asm.Instruction, sourceBaseReg, sourceOffsetReg, destinationReg asm.Register)
 	// TODO
-	CompileRegisterToMemoryInstruction(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst int64)
+	CompileRegisterToMemory(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst int64)
 	// TODO
-	CompileRegisterToMemoryWithRegisterOffsetInstruction(instruction asm.Instruction, sourceRegister, destinationBaseRegister, destinationOffsetReg asm.Register)
+	CompileRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, sourceRegister, destinationBaseRegister, destinationOffsetReg asm.Register)
 	// TODO
-	CompileRegisterToRegisterInstruction(instruction asm.Instruction, from, to asm.Register)
+	CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register)
 	// TODO
-	CompileTwoRegistersToRegisterInstruction(instruction asm.Instruction, src1, src2, destination asm.Register)
+	CompileTwoRegistersToRegister(instruction asm.Instruction, src1, src2, destination asm.Register)
 	// TODO
-	CompileTwoRegistersInstruction(instruction asm.Instruction, src1, src2, dst1, dst2 asm.Register)
+	CompileTwoRegisters(instruction asm.Instruction, src1, src2, dst1, dst2 asm.Register)
 	// TODO
-	CompileTwoRegistersToNoneInstruction(instruction asm.Instruction, src1, src2 asm.Register)
+	CompileTwoRegistersToNone(instruction asm.Instruction, src1, src2 asm.Register)
 	// TODO
-	CompileRegisterAndConstSourceToNoneInstruction(instruction asm.Instruction, src asm.Register, srcConst int64)
+	CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst int64)
 	// TODO
-	CompileBranchInstruction(instruction asm.Instruction) (br asm.Node)
+	CompileBranch(instruction asm.Instruction) (br asm.Node)
 	// TODO
 	CompileUnconditionalBranchToAddressOnMemory(addressReg asm.Register)
 	// TODO
-	CompileStandAloneInstruction(instruction asm.Instruction) asm.Node
+	CompileStandAlone(instruction asm.Instruction) asm.Node
 	// TODO
 	CompileAddInstructionWithLeftShiftedRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, desReg asm.Register)
 	// TODO
@@ -54,6 +55,7 @@ type Assembler interface {
 	// ADR -> X -> Y -> ... -> RET -> MOV, then the ADR instruction emitted by this function set the absolute
 	// address of MOV instruction into the destination register.
 	CompileReadInstructionAddress(beforeTargetInst asm.Instruction, destinationRegister asm.Register)
-	// CSET
+	// CompileConditionalRegisterSet adds an instruction to set 1 on destinationReg if the condition satisfies,
+	// otherwise set 0.
 	CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, destinationReg asm.Register)
 }

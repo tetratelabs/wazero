@@ -11,33 +11,33 @@ func NewAssembler() (Assembler, error) {
 type Assembler interface {
 	asm.AssemblerBase
 	// TODO
-	CompileStandAloneInstruction(asm.Instruction) asm.Node
+	CompileStandAlone(asm.Instruction) asm.Node
 	// TODO
-	CompileRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register)
+	CompileRegisterToRegister(inst asm.Instruction, from, to asm.Register)
 	// TODO
-	CompileConstModeRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register, mode int64)
+	CompileConstModeRegisterToRegister(inst asm.Instruction, from, to asm.Register, mode int64)
 	// TODO
-	CompileMemoryToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register)
+	CompileMemoryToRegister(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register)
 	// TODO
-	CompileMemoryWithIndexToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, sourceIndex asm.Register, sourceScale int16, destinationReg asm.Register)
+	CompileMemoryWithIndexToRegister(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, sourceIndex asm.Register, sourceScale int16, destinationReg asm.Register)
 	// TODO
-	CompileRegisterToMemoryWithIndexInstruction(inst asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst int64, dstIndex asm.Register, dstScale int16)
+	CompileRegisterToMemoryWithIndex(inst asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst int64, dstIndex asm.Register, dstScale int16)
 	// TODO
-	CompileRegisterToMemoryInstruction(inst asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst int64)
+	CompileRegisterToMemory(inst asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst int64)
 	// TODO
-	CompileConstToRegisterInstruction(inst asm.Instruction, constValue int64, destinationRegister asm.Register) asm.Node
+	CompileConstToRegister(inst asm.Instruction, constValue int64, destinationRegister asm.Register) asm.Node
 	// TODO
-	CompileRegisterToConstInstruction(inst asm.Instruction, srcRegister asm.Register, constValue int64) asm.Node
+	CompileRegisterToConst(inst asm.Instruction, srcRegister asm.Register, constValue int64) asm.Node
 	// TODO
-	CompileRegisterToNoneInstruction(inst asm.Instruction, register asm.Register)
+	CompileRegisterToNone(inst asm.Instruction, register asm.Register)
 	// TODO
-	CompileNoneToRegisterInstruction(inst asm.Instruction, register asm.Register)
+	CompileNoneToRegister(inst asm.Instruction, register asm.Register)
 	// TODO
-	CompileNoneToMemoryInstruction(inst asm.Instruction, baseReg asm.Register, offset int64)
+	CompileNoneToMemory(inst asm.Instruction, baseReg asm.Register, offset int64)
 	// TODO
-	CompileConstToMemoryInstruction(inst asm.Instruction, constValue int64, baseReg asm.Register, offset int64) asm.Node
+	CompileConstToMemory(inst asm.Instruction, constValue int64, baseReg asm.Register, offset int64) asm.Node
 	// TODO
-	CompileMemoryToConstInstruction(inst asm.Instruction, baseReg asm.Register, offset int64, constValue int64) asm.Node
+	CompileMemoryToConst(inst asm.Instruction, baseReg asm.Register, offset int64, constValue int64) asm.Node
 	// TODO
 	CompileUnconditionalJump() asm.Node
 	// TODO

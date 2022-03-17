@@ -10,19 +10,19 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
+// assemblerGoAsmImpl implements Assembler for golang-asm library.
 type assemblerGoAsmImpl struct {
 	*asm.GolangAsmBaseAssembler
 	temporaryRegister asm.Register
 }
-
-var _ Assembler = &assemblerGoAsmImpl{}
 
 func newGolangAsmAssembler(temporaryRegister asm.Register) (*assemblerGoAsmImpl, error) {
 	g, err := asm.NewGolangAsmBaseAssembler()
 	return &assemblerGoAsmImpl{GolangAsmBaseAssembler: g, temporaryRegister: temporaryRegister}, err
 }
 
-func (a *assemblerGoAsmImpl) CompileConstToRegisterInstruction(instruction asm.Instruction, constValue int64, destinationReg asm.Register) asm.Node {
+// CompileConstToRegisterInstruction implements Assembler.CompileConstToRegisterInstruction.
+func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction, constValue int64, destinationReg asm.Register) asm.Node {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	if constValue == 0 {
@@ -42,13 +42,14 @@ func (a *assemblerGoAsmImpl) CompileConstToRegisterInstruction(instruction asm.I
 	return asm.NewGolangAsmNode(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
+// CompileMemoryToRegister implements Assembler.CompileMemoryToRegister.
+func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
 	if sourceOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
 		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
 		// but instead load the constant manually to "our" temporary register, then emit the load with it.
-		a.CompileConstToRegisterInstruction(MOVD, sourceOffsetConst, a.temporaryRegister)
-		a.CompileMemoryWithRegisterOffsetToRegisterInstruction(instruction, sourceBaseReg, a.temporaryRegister, destinationReg)
+		a.CompileConstToRegister(MOVD, sourceOffsetConst, a.temporaryRegister)
+		a.CompileMemoryWithRegisterOffsetToRegister(instruction, sourceBaseReg, a.temporaryRegister, destinationReg)
 	} else {
 		inst := a.NewProg()
 		inst.As = castAsGolangAsmInstruction[instruction]
@@ -61,7 +62,8 @@ func (a *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(instruction asm.
 	}
 }
 
-func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegisterInstruction(instruction asm.Instruction, sourceBaseReg, sourceOffsetReg, destinationReg asm.Register) {
+// CompileMemoryWithRegisterOffsetToRegister implements Assembler.CompileMemoryWithRegisterOffsetToRegister.
+func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegister(instruction asm.Instruction, sourceBaseReg, sourceOffsetReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.From.Type = obj.TYPE_MEM
@@ -73,13 +75,14 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegisterInstructio
 	a.AddInstruction(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToMemoryInstruction(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst int64) {
+// CompileRegisterToMemory implements Assembler.CompileRegisterToMemory.
+func (a *assemblerGoAsmImpl) CompileRegisterToMemory(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst int64) {
 	if destinationOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
 		// but we cannot track its temporary register. Therefore, we avoid directly emitting memory load with large offsets:
 		// load the constant manually to "our" temporary register, then emit the load with it.
-		a.CompileConstToRegisterInstruction(MOVD, destinationOffsetConst, a.temporaryRegister)
-		a.CompileRegisterToMemoryWithRegisterOffsetInstruction(instruction, sourceReg, destinationBaseReg, a.temporaryRegister)
+		a.CompileConstToRegister(MOVD, destinationOffsetConst, a.temporaryRegister)
+		a.CompileRegisterToMemoryWithRegisterOffset(instruction, sourceReg, destinationBaseReg, a.temporaryRegister)
 	} else {
 		inst := a.NewProg()
 		inst.As = castAsGolangAsmInstruction[instruction]
@@ -92,7 +95,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryInstruction(instruction asm.
 	}
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithRegisterOffsetInstruction(instruction asm.Instruction, sourceReg, destinationBaseReg, destinationOffsetReg asm.Register) {
+// CompileRegisterToMemoryWithRegisterOffset implements Assembler.CompileRegisterToMemoryWithRegisterOffset.
+func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithRegisterOffset(instruction asm.Instruction, sourceReg, destinationBaseReg, destinationOffsetReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_MEM
@@ -104,7 +108,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithRegisterOffsetInstructio
 	a.AddInstruction(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterToRegisterInstruction(instruction asm.Instruction, from, to asm.Register) {
+// CompileRegisterToRegister implements Assembler.CompileRegisterToRegister.
+func (a *assemblerGoAsmImpl) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_REG
@@ -114,7 +119,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterToRegisterInstruction(instruction as
 	a.AddInstruction(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegisterInstruction(instruction asm.Instruction, src1, src2, destination asm.Register) {
+// CompileTwoRegistersToRegister implements Assembler.CompileTwoRegistersToRegister.
+func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegister(instruction asm.Instruction, src1, src2, destination asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_REG
@@ -125,7 +131,8 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToRegisterInstruction(instructio
 	a.AddInstruction(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileTwoRegistersInstruction(instruction asm.Instruction, src1, src2, dst1, dst2 asm.Register) {
+// CompileTwoRegisters implements Assembler.CompileTwoRegisters.
+func (a *assemblerGoAsmImpl) CompileTwoRegisters(instruction asm.Instruction, src1, src2, dst1, dst2 asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	inst.To.Type = obj.TYPE_REG
@@ -137,7 +144,8 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersInstruction(instruction asm.Inst
 	a.AddInstruction(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileTwoRegistersToNoneInstruction(instruction asm.Instruction, src1, src2 asm.Register) {
+// CompileTwoRegistersToNone implements Assembler.CompileTwoRegistersToNone.
+func (a *assemblerGoAsmImpl) CompileTwoRegistersToNone(instruction asm.Instruction, src1, src2 asm.Register) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	// TYPE_NONE indicates that this instruction doesn't have a destination.
@@ -149,7 +157,8 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToNoneInstruction(instruction as
 	a.AddInstruction(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileRegisterAndConstSourceToNoneInstruction(instruction asm.Instruction, src asm.Register, srcConst int64) {
+// CompileRegisterAndConstSourceToNone implements Assembler.CompileRegisterAndConstSourceToNone.
+func (a *assemblerGoAsmImpl) CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst int64) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	// TYPE_NONE indicates that this instruction doesn't have a destination.
@@ -161,7 +170,8 @@ func (a *assemblerGoAsmImpl) CompileRegisterAndConstSourceToNoneInstruction(inst
 	a.AddInstruction(inst)
 }
 
-func (a *assemblerGoAsmImpl) CompileBranchInstruction(instruction asm.Instruction) asm.Node {
+// CompileBranch implements Assembler.CompileBranch.
+func (a *assemblerGoAsmImpl) CompileBranch(instruction asm.Instruction) asm.Node {
 	br := a.NewProg()
 	br.As = castAsGolangAsmInstruction[instruction]
 	br.To.Type = obj.TYPE_BRANCH
@@ -169,6 +179,7 @@ func (a *assemblerGoAsmImpl) CompileBranchInstruction(instruction asm.Instructio
 	return asm.NewGolangAsmNode(br)
 }
 
+// CompileUnconditionalBranchToAddressOnMemory implements Assembler.CompileUnconditionalBranchToAddressOnMemory.
 func (a *assemblerGoAsmImpl) CompileUnconditionalBranchToAddressOnMemory(memoryLocationReg asm.Register) {
 	br := a.NewProg()
 	br.As = obj.AJMP
@@ -177,6 +188,7 @@ func (a *assemblerGoAsmImpl) CompileUnconditionalBranchToAddressOnMemory(memoryL
 	a.AddInstruction(br)
 }
 
+// CompileReturn implements Assembler.CompileReturn.
 func (a *assemblerGoAsmImpl) CompileReturn(returnAddressReg asm.Register) {
 	ret := a.NewProg()
 	ret.As = obj.ARET
@@ -185,13 +197,15 @@ func (a *assemblerGoAsmImpl) CompileReturn(returnAddressReg asm.Register) {
 	a.AddInstruction(ret)
 }
 
-func (a *assemblerGoAsmImpl) CompileStandAloneInstruction(instruction asm.Instruction) asm.Node {
+// CompileStandAlone implements Assembler.CompileStandAlone.
+func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.Node {
 	prog := a.NewProg()
 	prog.As = castAsGolangAsmInstruction[instruction]
 	a.AddInstruction(prog)
 	return asm.NewGolangAsmNode(prog)
 }
 
+// CompileAddInstructionWithLeftShiftedRegister implements Assembler.CompileAddInstructionWithLeftShiftedRegister.
 func (a *assemblerGoAsmImpl) CompileAddInstructionWithLeftShiftedRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = arm64.AADD
@@ -204,6 +218,7 @@ func (a *assemblerGoAsmImpl) CompileAddInstructionWithLeftShiftedRegister(shifte
 	a.AddInstruction(inst)
 }
 
+// CompileReadInstructionAddress implements Assembler.CompileReadInstructionAddress.
 func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(beforeTargetInst asm.Instruction, destinationReg asm.Register) {
 	// Emit ADR instruction to read the specified instruction's absolute address.
 	// Note: we cannot emit the "ADR REG, $(target's offset from here)" due to the
@@ -262,6 +277,10 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(beforeTargetInst asm.
 	})
 }
 
+// CompileConditionalRegisterSet implements Assembler.CompileConditionalRegisterSet.
+//
+// We use CSET instruction to set 1 on the register if the condition satisfies:
+// https://developer.arm.com/documentation/100076/0100/a64-instruction-set-reference/a64-general-instructions/cset
 func (a *assemblerGoAsmImpl) CompileConditionalRegisterSet(cond asm.ConditionalRegisterState, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = arm64.ACSET
@@ -278,6 +297,7 @@ func simdRegisterForScalarFloatRegister(freg int16) int16 {
 	return freg + (arm64.REG_F31 - arm64.REG_F0) + 1
 }
 
+// CompileTwoSIMDToSIMDWithByteArrangement implements Assembler.CompileTwoSIMDToSIMDWithByteArrangement.
 func (a *assemblerGoAsmImpl) CompileTwoSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg1, srcReg2, dstReg asm.Register) {
 	src1FloatReg, src2FloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg1], castAsGolangAsmRegister[srcReg2], castAsGolangAsmRegister[dstReg]
 	src1VReg, src2VReg, dstVReg := simdRegisterForScalarFloatRegister(src1FloatReg), simdRegisterForScalarFloatRegister(src2FloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
@@ -295,6 +315,7 @@ func (a *assemblerGoAsmImpl) CompileTwoSIMDToSIMDWithByteArrangement(instruction
 
 }
 
+// CompileSIMDToSIMDWithByteArrangement implements Assembler.CompileSIMDToSIMDWithByteArrangement.
 func (a *assemblerGoAsmImpl) CompileSIMDToSIMDWithByteArrangement(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFloatReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFloatReg)
@@ -310,6 +331,7 @@ func (a *assemblerGoAsmImpl) CompileSIMDToSIMDWithByteArrangement(instruction as
 	a.AddInstruction(inst)
 }
 
+// CompileSIMDWithByteArrangementToRegister implements Assembler.CompileSIMDWithByteArrangementToRegister.
 func (a *assemblerGoAsmImpl) CompileSIMDWithByteArrangementToRegister(instruction asm.Instruction, srcReg, dstReg asm.Register) {
 	srcFloatReg, dstFlaotReg := castAsGolangAsmRegister[srcReg], castAsGolangAsmRegister[dstReg]
 	srcVReg, dstVReg := simdRegisterForScalarFloatRegister(srcFloatReg), simdRegisterForScalarFloatRegister(dstFlaotReg)
@@ -325,6 +347,7 @@ func (a *assemblerGoAsmImpl) CompileSIMDWithByteArrangementToRegister(instructio
 	a.AddInstruction(inst)
 }
 
+// castAsGolangAsmConditionalRegister maps the conditional states to golang-asm specific conditional state register values.
 var castAsGolangAsmConditionalRegister = [...]int16{
 	COND_EQ: arm64.COND_EQ,
 	COND_NE: arm64.COND_NE,
@@ -344,6 +367,7 @@ var castAsGolangAsmConditionalRegister = [...]int16{
 	COND_NV: arm64.COND_NV,
 }
 
+// castAsGolangAsmRegister maps the registers to golang-asm specific registers values.
 var castAsGolangAsmRegister = [...]int16{
 	REG_R0:   arm64.REG_R0,
 	REG_R1:   arm64.REG_R1,
@@ -412,6 +436,7 @@ var castAsGolangAsmRegister = [...]int16{
 	REG_FPSR: arm64.REG_FPSR,
 }
 
+// castAsGolangAsmInstruction maps the instructions to golang-asm specific instructions values.
 var castAsGolangAsmInstruction = [...]obj.As{
 	NOP:      obj.ANOP,
 	RET:      obj.ARET,
