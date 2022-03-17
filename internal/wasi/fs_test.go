@@ -12,6 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//
+// fs_test.go tests structs and methods defined fs.go.
+// Types in fs.go often implements fs.FS or fs.File. fs.FS provides a test function to test the behavior
+// of read-only fs.FS, and iotest provides a test function to test io.Reader and io.Seeker interfaces.
+// So, tests in this file utilizes those generic test functions for read-only operations if possible.
+//
+
 // TestMemFile_Read_Seek tests the behavior of Read and Seek by iotest.TestReader.
 // See iotest.TestReader
 func TestMemFile_Read_Seek(t *testing.T) {
@@ -32,32 +39,32 @@ func TestMemFile_Read_Seek(t *testing.T) {
 // See fstest.TestFS
 func TestMemFS_FSInterface(t *testing.T) {
 	memFS := &MemFS{
-		"simple file": {Contents: []byte("simple cont")},
-		"directory": {
+		"file1": {Contents: []byte("wazero")},
+		"directory1": {
 			Entries: map[string]*memFSEntry{
-				"file1 inside directory": {Contents: []byte("simple cont file1 inside directory")},
-				"file2 inside directory": {Contents: []byte("simple cont file2 inside directory")},
-				"nested directory": {
+				"file1": {Contents: []byte("wazero")},
+				"file2": {Contents: []byte("wazero")},
+				"nested_directory1": {
 					Entries: map[string]*memFSEntry{
-						"file1 inside directory": {Contents: []byte("simple cont file1 inside directory")},
+						"file": {Contents: []byte("wazero")},
 					},
 				},
-				"nested directory with no children": {Entries: map[string]*memFSEntry{}},
+				"nested_directory2": {Entries: map[string]*memFSEntry{}}, // nested directory with no children
 			},
 		},
-		"directory with no children": {Entries: map[string]*memFSEntry{}},
+		"directory2": {Entries: map[string]*memFSEntry{}}, // directory with no children
 	}
 
 	// TestFS tests that fs.FS correctly does the expected operations.
 	err := fstest.TestFS(memFS,
-		"simple file",
-		"directory",
-		"directory/file1 inside directory",
-		"directory/file2 inside directory",
-		"directory/nested directory",
-		"directory/nested directory/file1 inside directory",
-		"directory/nested directory with no children",
-		"directory with no children")
+		"file1",
+		"directory1",
+		"directory1/file1",
+		"directory1/file2",
+		"directory1/nested_directory1",
+		"directory1/nested_directory1/file",
+		"directory1/nested_directory2",
+		"directory2")
 	require.NoError(t, err)
 }
 
@@ -222,7 +229,7 @@ func TestReaderWriterFile_Read(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			file := &readerWriterFile{
-				Reader: tc.reader,
+				reader: tc.reader,
 			}
 			// TestReader tests that io.Reader correctly reads the expected contents.
 			err := iotest.TestReader(file, tc.expectedContent)
@@ -235,10 +242,9 @@ func TestReaderWriterFile_Write(t *testing.T) {
 	t.Run("simple write", func(t *testing.T) {
 		writer := bytes.NewBuffer([]byte{})
 		file := &readerWriterFile{
-			Writer: writer,
+			writer: writer,
 		}
 		content := []byte("wazero")
-		// TestReader tests that io.Reader correctly reads the expected contents.
 		nwritten, err := file.Write(content)
 		require.NoError(t, err)
 		require.Equal(t, len(content), nwritten)
@@ -247,10 +253,9 @@ func TestReaderWriterFile_Write(t *testing.T) {
 
 	t.Run("nil writer returns no error", func(t *testing.T) {
 		file := &readerWriterFile{
-			Writer: nil,
+			writer: nil,
 		}
 		content := []byte("wazero")
-		// TestReader tests that io.Reader correctly reads the expected contents.
 		nwritten, err := file.Write(content)
 		require.NoError(t, err)
 		require.Equal(t, len(content), nwritten)

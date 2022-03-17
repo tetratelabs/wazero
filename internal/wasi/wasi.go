@@ -1583,15 +1583,15 @@ const (
 )
 
 func (c *Config) Stdin(reader io.Reader) {
-	c.opened[stdinFD] = fileEntry{file: &readerWriterFile{Reader: reader}}
+	c.opened[stdinFD] = fileEntry{file: &readerWriterFile{reader: reader}}
 }
 
 func (c *Config) Stdout(writer io.Writer) {
-	c.opened[stdoutFD] = fileEntry{file: &readerWriterFile{Writer: writer}}
+	c.opened[stdoutFD] = fileEntry{file: &readerWriterFile{writer: writer}}
 }
 
 func (c *Config) Stderr(writer io.Writer) {
-	c.opened[stderrFD] = fileEntry{file: &readerWriterFile{Writer: writer}}
+	c.opened[stderrFD] = fileEntry{file: &readerWriterFile{writer: writer}}
 }
 
 // Args returns an option to give a command-line arguments in SnapshotPreview1 or errs if the inputs are too large.

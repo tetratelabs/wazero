@@ -270,13 +270,15 @@ func (f *memFileInfo) Sys() interface{} { return nil }
 // Info implements fs.DirEntry.Info
 func (f *memFileInfo) Info() (fs.FileInfo, error) { return f, nil }
 
-// readerWriterFile wraps io.Reader and io.Writer as fs.File.
 // readerWriterFile implements fs.File and io.Writer.
 // If Reader or Writer is nil, Read and Write are no-op just like /dev/null file on unix.
 type readerWriterFile struct {
-	Reader io.Reader
-	Writer io.Writer
+	reader io.Reader
+	writer io.Writer
 }
+
+// compile-time check that readerWriterFile wraps io.Reader and io.Writer as fs.File.
+var _ fs.File = &readerWriterFile{}
 
 // Stat implements fs.File.Stat
 func (f *readerWriterFile) Stat() (fs.FileInfo, error) {
@@ -285,23 +287,23 @@ func (f *readerWriterFile) Stat() (fs.FileInfo, error) {
 
 // Read implements fs.File.Read
 func (f *readerWriterFile) Read(p []byte) (int, error) {
-	if f.Reader == nil {
+	if f.reader == nil {
 		return 0, io.EOF
 	}
-	return f.Reader.Read(p)
+	return f.reader.Read(p)
 }
 
 // Write implements fs.File.Write
 func (f *readerWriterFile) Write(p []byte) (int, error) {
-	if f.Writer == nil {
+	if f.writer == nil {
 		return len(p), nil
 	}
-	return f.Writer.Write(p)
+	return f.writer.Write(p)
 }
 
 // Close implements fs.File.Close
 func (f *readerWriterFile) Close() error {
-	f.Reader = nil
-	f.Writer = nil
+	f.reader = nil
+	f.writer = nil
 	return nil
 }
