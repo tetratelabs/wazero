@@ -654,7 +654,7 @@ func (c *amd64Compiler) compileBrTable(o *wazeroir.OperationBrTable) error {
 		}
 	}
 
-	// Set up the callbacks to do tasks which cannot be done at the compilation phase.
+	// TODO: this should be done in assembler pkg.
 	c.onGenerateCallbacks = append(c.onGenerateCallbacks, func(code []byte) error {
 		// Build the offset table for each target including default one.
 		base := labelInitialInstructions[0].Pc() // This corresponds to the L0's address in the example.

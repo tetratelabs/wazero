@@ -13,6 +13,7 @@ type Node interface {
 	Pc() int64
 	AssignJumpTarget(target Node)
 	AssignDestinationConstant(value int64)
+	AssignSourceConstant(value int64)
 }
 
 type AssemblerBase interface {

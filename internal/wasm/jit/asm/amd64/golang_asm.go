@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	goasm "github.com/twitchyliquid64/golang-asm"
 	"github.com/twitchyliquid64/golang-asm/obj"
 	"github.com/twitchyliquid64/golang-asm/obj/x86"
 
@@ -12,71 +11,36 @@ import (
 )
 
 type assemblerGoAsmImpl struct {
-	b                          *goasm.Builder
-	setBranchTargetOnNextNodes []asm.Node
-	// onGenerateCallbacks holds the callbacks which are called AFTER generating native code.
-	onGenerateCallbacks []func(code []byte) error
+	*asm.GolangAsmBaseAssembler
 }
 
 var _ Assembler = &assemblerGoAsmImpl{}
 
 func newGolangAsmAssembler() (*assemblerGoAsmImpl, error) {
-	b, err := goasm.NewBuilder("amd64", 1024)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create a new assembly builder: %w", err)
-	}
-
-	return &assemblerGoAsmImpl{b: b}, nil
-}
-
-func (a *assemblerGoAsmImpl) newProg() (prog *obj.Prog) {
-	prog = a.b.NewProg()
-	return
-}
-
-func (a *assemblerGoAsmImpl) addInstruction(next *obj.Prog) {
-	a.b.AddInstruction(next)
-	for _, node := range a.setBranchTargetOnNextNodes {
-		n := node.(*asm.GolangAsmNode)
-		n.Prog.To.SetTarget(next)
-	}
-	a.setBranchTargetOnNextNodes = nil
-}
-
-func (a *assemblerGoAsmImpl) Assemble() ([]byte, error) {
-	code := a.b.Assemble()
-	for _, cb := range a.onGenerateCallbacks {
-		if err := cb(code); err != nil {
-			return nil, err
-		}
-	}
-	return code, nil
-}
-
-func (a *assemblerGoAsmImpl) SetBranchTargetOnNext(nodes ...asm.Node) {
-	a.setBranchTargetOnNextNodes = append(a.setBranchTargetOnNextNodes, nodes...)
+	g, err := asm.NewGolangAsmBaseAssembler()
+	return &assemblerGoAsmImpl{g}, err
 }
 
 func (a *assemblerGoAsmImpl) CompileStandAloneInstruction(inst asm.Instruction) asm.Node {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
-	a.addInstruction(p)
+	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[to]
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = castAsGolangAsmRegister[from]
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegisterInstruction(inst asm.Instruction,
 	sourceBaseReg asm.Register, sourceOffsetConst int64, sourceIndexReg asm.Register, sourceScale int16, destinationReg asm.Register) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[destinationReg]
@@ -85,11 +49,11 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithIndexToRegisterInstruction(inst as
 	p.From.Offset = sourceOffsetConst
 	p.From.Index = castAsGolangAsmRegister[sourceIndexReg]
 	p.From.Scale = sourceScale
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndexInstruction(inst asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst int64, dstIndexReg asm.Register, dstScale int16) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = castAsGolangAsmRegister[srcReg]
@@ -98,102 +62,102 @@ func (a *assemblerGoAsmImpl) CompileRegisterToMemoryWithIndexInstruction(inst as
 	p.To.Offset = dstOffsetConst
 	p.To.Index = castAsGolangAsmRegister[dstIndexReg]
 	p.To.Scale = dstScale
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToMemoryInstruction(inst asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst int64) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_MEM
 	p.To.Reg = castAsGolangAsmRegister[destinationBaseRegister]
 	p.To.Offset = destinationOffsetConst
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = castAsGolangAsmRegister[sourceRegister]
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileConstToRegisterInstruction(inst asm.Instruction, constValue int64, destinationRegister asm.Register) asm.Node {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
 	p.From.Offset = constValue
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[destinationRegister]
-	a.addInstruction(p)
+	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToConstInstruction(inst asm.Instruction, srcRegister asm.Register, constValue int64) asm.Node {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_CONST
 	p.To.Offset = constValue
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = castAsGolangAsmRegister[srcRegister]
-	a.addInstruction(p)
+	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileRegisterToNoneInstruction(inst asm.Instruction, register asm.Register) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_REG
 	p.From.Reg = castAsGolangAsmRegister[register]
 	p.To.Type = obj.TYPE_NONE
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileNoneToRegisterInstruction(inst asm.Instruction, register asm.Register) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[register]
 	p.From.Type = obj.TYPE_NONE
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileNoneToMemoryInstruction(inst asm.Instruction, baseReg asm.Register, offset int64) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_MEM
 	p.To.Reg = castAsGolangAsmRegister[baseReg]
 	p.To.Offset = offset
 	p.From.Type = obj.TYPE_NONE
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileConstToMemoryInstruction(inst asm.Instruction, constValue int64, baseReg asm.Register, offset int64) asm.Node {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
 	p.From.Offset = constValue
 	p.To.Type = obj.TYPE_MEM
 	p.To.Reg = castAsGolangAsmRegister[baseReg]
 	p.To.Offset = offset
-	a.addInstruction(p)
+	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
-func (c *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
-	p := c.newProg()
+func (a *assemblerGoAsmImpl) CompileMemoryToRegisterInstruction(inst asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_MEM
 	p.From.Reg = castAsGolangAsmRegister[sourceBaseReg]
 	p.From.Offset = sourceOffsetConst
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[destinationReg]
-	c.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileMemoryToConstInstruction(inst asm.Instruction, baseReg asm.Register, offset int64, constValue int64) asm.Node {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_CONST
 	p.To.Offset = constValue
 	p.From.Type = obj.TYPE_MEM
 	p.From.Reg = castAsGolangAsmRegister[baseReg]
 	p.From.Offset = offset
-	a.addInstruction(p)
+	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
@@ -202,32 +166,32 @@ func (a *assemblerGoAsmImpl) CompileUnconditionalJump() asm.Node {
 }
 
 func (a *assemblerGoAsmImpl) CompileJump(inst asm.Instruction) asm.Node {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.To.Type = obj.TYPE_BRANCH
-	a.addInstruction(p)
+	a.AddInstruction(p)
 	return asm.NewGolangAsmNode(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileJumpToRegister(reg asm.Register) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = obj.AJMP
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = castAsGolangAsmRegister[reg]
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileJumpToMemory(baseReg asm.Register, offset int64) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = obj.AJMP
 	p.To.Type = obj.TYPE_MEM
 	p.To.Reg = castAsGolangAsmRegister[baseReg]
 	p.To.Offset = offset
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileConstModeRegisterToRegisterInstruction(inst asm.Instruction, from, to asm.Register, mode int64) {
-	p := a.newProg()
+	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
 	p.From.Offset = mode
@@ -235,12 +199,12 @@ func (a *assemblerGoAsmImpl) CompileConstModeRegisterToRegisterInstruction(inst 
 	p.To.Reg = castAsGolangAsmRegister[to]
 	p.RestArgs = append(p.RestArgs,
 		obj.Addr{Reg: castAsGolangAsmRegister[from], Type: obj.TYPE_REG})
-	a.addInstruction(p)
+	a.AddInstruction(p)
 }
 
 func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationRegister asm.Register, beforeAcquisitionTargetInstruction asm.Instruction) {
 	// Emit the instruction in the form of "LEA destination [RIP + offset]".
-	readInstructionAddress := a.newProg()
+	readInstructionAddress := a.NewProg()
 	readInstructionAddress.As = x86.ALEAQ
 	readInstructionAddress.To.Reg = castAsGolangAsmRegister[destinationRegister]
 	readInstructionAddress.To.Type = obj.TYPE_REG
@@ -253,9 +217,9 @@ func (a *assemblerGoAsmImpl) CompileReadInstructionAddress(destinationRegister a
 	// exactly the same as "LEA destination [RIP + offset]" except the most significant bit of the third byte.
 	// We do the rewrite in onGenerateCallbacks which is invoked after the assembler emitted the code.
 	readInstructionAddress.From.Reg = x86.REG_BP
-	a.addInstruction(readInstructionAddress)
+	a.AddInstruction(readInstructionAddress)
 
-	a.onGenerateCallbacks = append(a.onGenerateCallbacks, func(code []byte) error {
+	a.AddOnGenerateCallBack(func(code []byte) error {
 		// Advance readInstructionAddress to the next one (.Link) in order to get the instruction
 		// right after LEA because RIP points to that next instruction in LEA instruction.
 		base := readInstructionAddress.Link
