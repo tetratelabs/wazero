@@ -14,7 +14,6 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/twitchyliquid64/golang-asm/obj"
 	garm64 "github.com/twitchyliquid64/golang-asm/obj/arm64"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -27,9 +26,6 @@ type arm64Compiler struct {
 	assembler arm64.Assembler
 	f         *wasm.FunctionInstance
 	ir        *wazeroir.CompilationResult
-	// setBranchTargetOnNextInstructions holds branch kind instructions (BR, conditional BR, etc)
-	// where we want to set the next coming instruction as the destination of these BR instructions.
-	setBranchTargetOnNextInstructions []*obj.Prog
 	// locationStack holds the state of wazeroir virtual stack.
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
