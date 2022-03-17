@@ -26,7 +26,7 @@ func main() {
 }
 ```
 
-## Status
+## Runtime
 
 There are two runtime configurations supported in wazero, where _JIT_ is default:
 
@@ -48,6 +48,48 @@ r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfigInterpreter())
 ## Support Policy
 
 The below support policy focuses on compatability concerns of those embedding wazero into their Go applications.
+
+### WebAssembly
+
+#### Core API
+wazero supports the only WebAssembly specification which has reached W3C
+Recommendation (REC) phase: [WebAssembly Core Specification 1.0 (20191205)](https://www.w3.org/TR/2019/REC-wasm-core-1-20191205).
+
+Independent verification is possible via the [WebAssembly spec test suite](https://github.com/WebAssembly/spec/tree/wg-1.0/test/core),
+which we run on every change and against all supported platforms.
+
+One current limitation of wazero is that it doesn't fully implement the Text
+Format, yet, e.g. compiling `%.wat` files. The intent is to finish this, and
+meanwhile users can work around this using tools such as `wat2wasm` to compile
+the text format into the binary format.
+
+#### Post 1.0 Features
+
+The last W3C REC was at the end of 2019. There were other features that didn't
+make the cut or were developed in the years since. The community unofficially
+refers to these as [Finished Proposals](https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md).
+
+To ensure compatability, wazero does not opt-in to any non-standard feature by
+default. However, the following status covers what's currently possible with
+`wazero.RuntimeConfig`.
+
+| Feature                               | Status |
+|:-------------------------------------:|:------:|
+| mutable-global                        |   ✅   |
+| nontrapping-float-to-int-conversions  |   ❌   |
+| sign-extension-ops                    |   ✅   |
+| multi-value                           |   ❌   |
+| JS-BigInt-integration                 |  N/A   |
+| reference-types                       |   ❌   |
+| bulk-memory-operations                |   ❌   |
+| simd                                  |   ❌   |
+
+Note: While the above are specified in a WebAssembly GitHub repository, they
+are not W3C recommendations (standards). This means they can change further
+between now and any future update to the W3C WebAssembly core specification.
+Due to this, we cannot guarantee future compatability. Please encourage the
+[WebAssembly community](https://www.w3.org/community/webassembly/) to formalize
+features you rely on, specifically to read the W3C recommendation (REC) phase.
 
 ### wazero
 
