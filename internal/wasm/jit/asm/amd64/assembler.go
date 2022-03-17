@@ -5,7 +5,7 @@ import (
 )
 
 func NewAssembler() (Assembler, error) {
-	return newGolangAsmAssembler() // TODO: replace our homemade assembler #233
+	return newGolangAsmAssembler() // TODO: replace with our homemade assembler #233
 }
 
 type Assembler interface {
