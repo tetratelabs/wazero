@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"fmt"
 	"runtime"
 
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -34,11 +35,13 @@ func init() {
 // newCompiler returns a new compiler interface which can be used to compile the given function instance.
 // Note: ir param can be nil for host functions.
 func newCompiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) (c compiler, err error) {
-	switch runtime.GOARCH {
+	switch arch := runtime.GOARCH; arch {
 	case "arm64":
 		c, err = newArm64Compiler(f, ir)
 	case "amd64":
 		c, err = newAmd64Compiler(f, ir)
+	default:
+		err = fmt.Errorf("unsupported GOARCH %s", arch)
 	}
 	return
 }
