@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,7 +11,15 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+func requireAMD64(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip()
+	}
+}
+
 func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
+	requireAMD64(t)
+
 	for _, kind := range []wazeroir.OperationKind{
 		wazeroir.OperationKindMul,
 		wazeroir.OperationKindDiv,
@@ -271,6 +280,8 @@ func TestAmd64Compiler_compile_Mul_Div_Rem(t *testing.T) {
 }
 
 func TestAmd64Compiler_readInstructionAddress(t *testing.T) {
+	requireAMD64(t)
+
 	t.Run("invalid", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t, nil).(*amd64Compiler)

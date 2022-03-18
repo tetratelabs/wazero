@@ -1,22 +1,18 @@
 package jit
 
 import (
+	"runtime"
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-func TestArchContextOffsetInArm64Engine(t *testing.T) {
-	var ctx callEngine
-	require.Equal(t, int(unsafe.Offsetof(ctx.jitCallReturnAddress)), arm64CallEngineArchContextJITCallReturnAddressOffset, "fix consts in jit_arm64.s")
-	require.Equal(t, int(unsafe.Offsetof(ctx.minimum32BitSignedInt)), arm64CallEngineArchContextMinimum32BitSignedIntOffset)
-	require.Equal(t, int(unsafe.Offsetof(ctx.minimum64BitSignedInt)), arm64CallEngineArchContextMinimum64BitSignedIntOffset)
-}
-
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
 	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
