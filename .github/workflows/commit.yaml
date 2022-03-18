@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [scratch]
+    branches: [main]
 
 env:  # Update this prior to requiring a higher minor version in go.mod
   GO_VERSION: "1.17"  # 1.xx == latest patch of 1.xx
@@ -102,6 +102,7 @@ jobs:
         run: go list ./... | xargs -Ipkg go test pkg -c
         env:
           GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
 
       - name: Set up QEMU
         if: ${{ matrix.arch != 'amd64' }}
