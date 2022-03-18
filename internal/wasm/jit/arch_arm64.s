@@ -1,7 +1,7 @@
 #include "funcdata.h"
 #include "textflag.h"
 
-// jitcallImpl(codeSegment, ce)
+// jitcall(codeSegment, ce)
 TEXT ·jitcall(SB),NOSPLIT|NOFRAME,$0-16
         // Load the address of native code.
         MOVD codeSegment+0(FP),R1

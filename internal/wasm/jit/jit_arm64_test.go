@@ -2,6 +2,7 @@ package jit
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
