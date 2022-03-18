@@ -113,7 +113,7 @@ jobs:
           platforms: ${{ matrix.arch }}
 
       - name: Build scratch container
-        run:
+        run: |
           echo 'FROM scratch' >> Dockerfile
           echo 'CMD ["/test"]' >> Dockerfile
           docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
