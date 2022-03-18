@@ -70,12 +70,8 @@ jobs:
 
       - run: make test
 
-  test_non_amd64:
-    # Only amd64 is viable with "make test" because other architectures require emulation:
-    # the process of installing depedencies and building the project through an emulator is unacceptably slow.
-    # Instead, we build cross-platform test binaries on our amd64 runner, which limits what is emulated to
-    # only executing the tests. This is why below uses "bash -c 'testbin test.v'" (running test binary) instead of make.
-    name: ${{ matrix.target.arch }}, ubuntu, Go-${{ matrix.go-version }}
+  test_scratch:
+    name: ${{ matrix.arch }}, Linux (scratch), Go-${{ matrix.go-version }}
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false  # don't fail fast as sometimes failures are arch/OS specific
@@ -83,11 +79,10 @@ jobs:
         go-version:
         - "1.17"  # == ${{ env.GO_VERSION }} because matrix cannot expand env variables
         - "1.18"
-        target:
-        - arch: arm64
-          image: arm64v8/ubuntu
-        - arch: riscv64
-          image: riscv64/ubuntu
+        arch:
+        - "amd64"
+        - "arm64"
+        - "riscv64"
 
     steps:
       - uses: actions/setup-go@v2
@@ -101,20 +96,28 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.target.arch }}
+          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}
 
       - name: Build test binaries
         run: go list ./... | xargs -Ipkg go test pkg -c
         env:
-          GOARCH: ${{ matrix.target.arch }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
 
       - name: Set up QEMU
+        if: ${{ matrix.arch != 'amd64' }}
         uses: docker/setup-qemu-action@v1
         with:
-          platforms: ${{ matrix.target.arch }}
+          platforms: ${{ matrix.arch }}
+
+      - name: Build scratch container
+        run: |
+          echo 'FROM scratch' >> Dockerfile
+          echo 'CMD ["/test"]' >> Dockerfile
+          docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
 
       - name: Run built test binaries
-        run: docker run -w /tmp/wazero -v $(pwd):/tmp/wazero --rm -t ${{ matrix.target.image }} /bin/bash -c 'find . -name "*.test" | xargs -Itestbin bash -c "testbin test.v"'
+        run: find . -name "*.test" | xargs -Itestbin docker run -v $(pwd)/testbin:/test --rm -t wazero:test
 
   bench:
     name: Benchmark
