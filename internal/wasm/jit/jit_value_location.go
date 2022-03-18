@@ -7,6 +7,14 @@ import (
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
 )
 
+var (
+	// unreservedGeneralPurposeIntRegisters contains unreserved general purpose registers of integer type.
+	unreservedGeneralPurposeIntRegisters []asm.Register
+
+	// unreservedGeneralPurposeFloatRegisters contains unreserved general purpose registers of scalar float type.
+	unreservedGeneralPurposeFloatRegisters []asm.Register
+)
+
 func isNilRegister(r asm.Register) bool {
 	return r == asm.NilRegister
 }

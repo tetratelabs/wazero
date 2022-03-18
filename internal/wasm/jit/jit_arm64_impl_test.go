@@ -1,6 +1,7 @@
 package jit
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,27 +10,10 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
-// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) valueLocationStack() *valueLocationStack {
-	return c.locationStack
-}
-
-// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
-func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
-	return c.onStackPointerCeilDeterminedCallBack
-}
-
-// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
-func (c *arm64Compiler) setStackPointerCeil(v uint64) {
-	c.stackPointerCeil = v
-}
-
-// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
-	c.locationStack = s
-}
-
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip()
+	}
 	t.Run("target instruction not found", func(t *testing.T) {
 		env := newJITEnvironment()
 		compiler := env.requireNewCompiler(t, nil).(*arm64Compiler)
@@ -38,7 +22,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
-		compiler.assembler.CompileReadInstructionAddress(reservedRegisterForTemporary, arm64.B)
+		compiler.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.B)
 
 		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
@@ -56,7 +40,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after RET.
-		compiler.assembler.CompileReadInstructionAddress(reservedRegisterForTemporary, arm64.RET)
+		compiler.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.RET)
 
 		// Add many instruction between the target and compileReadInstructionAddress.
 		for i := 0; i < 100; i++ {
@@ -64,7 +48,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		compiler.assembler.CompileJumpToRegister(arm64.RET, reservedRegisterForTemporary)
+		compiler.assembler.CompileJumpToRegister(arm64.RET, arm64ReservedRegisterForTemporary)
 
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
@@ -84,7 +68,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		// Set the acquisition target instruction to the one after RET,
 		// and read the absolute address into destinationRegister.
-		const addressReg = reservedRegisterForTemporary
+		const addressReg = arm64ReservedRegisterForTemporary
 		compiler.assembler.CompileReadInstructionAddress(addressReg, arm64.RET)
 
 		// Branch to the instruction after RET below via the absolute
