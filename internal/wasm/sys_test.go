@@ -160,7 +160,7 @@ func TestSysContext_Close(t *testing.T) {
 	t.Run("open files", func(t *testing.T) {
 		tempDir := t.TempDir()
 		pathName := "test"
-		file, _ := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
+		file, testFS := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
 
 		sys, err := NewSysContext(
 			0,   // max
@@ -170,8 +170,8 @@ func TestSysContext_Close(t *testing.T) {
 			nil, // stdout
 			nil, // stderr
 			map[uint32]*FileEntry{ // openedFiles
-				3: {Path: "."},
-				4: {Path: path.Join(".", pathName), File: file},
+				3: {Path: ".", FS: testFS},
+				4: {Path: path.Join(".", pathName), File: file, FS: testFS},
 			},
 		)
 		require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestSysContext_Close(t *testing.T) {
 		require.Empty(t, sys.openedFiles)
 
 		// Verify it was actually closed, by trying to close it again.
-		err = file.Close()
+		err = file.(*os.File).Close()
 		require.Contains(t, err.Error(), "file already closed")
 
 		// No problem closing config again because the descriptors were removed, so they won't be called again.
@@ -193,8 +193,7 @@ func TestSysContext_Close(t *testing.T) {
 }
 
 // createWriteableFile uses real files when io.Writer tests are needed.
-// TODO: temporarily *os.File until #394
-func createWriteableFile(t *testing.T, tmpDir string, pathName string, data []byte) (*os.File, fs.FS) {
+func createWriteableFile(t *testing.T, tmpDir string, pathName string, data []byte) (fs.File, fs.FS) {
 	require.NotNil(t, data)
 	absolutePath := path.Join(tmpDir, pathName)
 	require.NoError(t, os.WriteFile(absolutePath, data, 0o600))

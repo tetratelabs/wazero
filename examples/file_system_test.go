@@ -2,15 +2,19 @@ package examples
 
 import (
 	"bytes"
+	"embed"
 	_ "embed"
-	"io"
+	"io/fs"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
 )
+
+// catFS is an embedded filesystem limited to cat.go
+//go:embed testdata/cat.go
+var catFS embed.FS
 
 // catGo is the TinyGo source
 //go:embed testdata/cat.go
@@ -31,16 +35,13 @@ func Test_Cat(t *testing.T) {
 	stdoutBuf := bytes.NewBuffer(nil)
 	sysConfig := wazero.NewSysConfig().WithStdout(stdoutBuf)
 
-	// Next, configure a sandboxed filesystem to include one file.
-	file := "cat.go" // arbitrary file
-	memFS := wazero.WASIMemFS()
-	err := writeFile(memFS, file, catGo)
+	// Since wazero uses fs.FS we can use standard libraries to do things like trim the leading path.
+	rooted, err := fs.Sub(catFS, "testdata")
 	require.NoError(t, err)
-	sysConfig.WithWorkDirFS(memFS)
 
 	// Since this runs a main function (_start in WASI), configure the arguments.
 	// Remember, arg[0] is the program name!
-	sysConfig.WithArgs("cat", file)
+	sysConfig = sysConfig.WithFS(rooted).WithArgs("cat", "/cat.go")
 
 	// Compile the `cat` module.
 	compiled, err := r.CompileModule(catWasm)
@@ -53,23 +54,9 @@ func Test_Cat(t *testing.T) {
 
 	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to.
 	cat, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig)
-
 	require.NoError(t, err)
 	defer cat.Close()
 
 	// To ensure it worked, verify stdout from WebAssembly had what we expected.
-	require.Equal(t, string(catGo), stdoutBuf.String())
-}
-
-func writeFile(fs wasi.FS, path string, data []byte) error {
-	f, err := fs.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
-	if err != nil {
-		return err
-	}
-
-	if _, err := io.Copy(f, bytes.NewBuffer(data)); err != nil {
-		return err
-	}
-
-	return f.Close()
+	require.Equal(t, catGo, stdoutBuf.Bytes())
 }

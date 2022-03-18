@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
+	"path"
 	"time"
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
@@ -1100,15 +1100,11 @@ func (a *wasiAPI) FdDatasync(ctx wasm.Module, fd uint32) wasi.Errno {
 }
 
 // FdFdstatGet implements SnapshotPreview1.FdFdstatGet
-// TODO: Currently FdFdstatget implements nothing except returning fake fs_right_inheriting
 func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) wasi.Errno {
 	sys := sysContext(ctx)
 
 	if _, ok := sys.OpenedFile(fd); !ok {
 		return wasi.ErrnoBadf
-	}
-	if !ctx.Memory().WriteUint64Le(resultStat+16, rightFDRead|rightFDWrite) {
-		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
 }
@@ -1118,7 +1114,7 @@ func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, resultPrestat uint32)
 	sys := sysContext(ctx)
 
 	entry, ok := sys.OpenedFile(fd)
-	if !ok || entry.Path == "" {
+	if !ok {
 		return wasi.ErrnoBadf
 	}
 
@@ -1140,6 +1136,7 @@ func (a *wasiAPI) FdFdstatSetFlags(ctx wasm.Module, fd uint32, flags uint32) was
 }
 
 // FdFdstatSetRights implements SnapshotPreview1.FdFdstatSetRights
+// Note: This will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
 func (a *wasiAPI) FdFdstatSetRights(ctx wasm.Module, fd uint32, fsRightsBase, fsRightsInheriting uint64) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
@@ -1196,13 +1193,11 @@ func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32
 
 	var reader io.Reader
 
-	if fd == 0 {
+	if fd == fdStdin {
 		reader = sys.Stdin()
+	} else if f, ok := sys.OpenedFile(fd); !ok || f.File == nil {
+		return wasi.ErrnoBadf
 	} else {
-		f, ok := sys.OpenedFile(fd)
-		if !ok || f.File == nil {
-			return wasi.ErrnoBadf
-		}
 		reader = f.File
 	}
 
@@ -1249,24 +1244,24 @@ func (a *wasiAPI) FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno {
 func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno {
 	sys := sysContext(ctx)
 
-	f, ok := sys.OpenedFile(fd)
-	if !ok || f.File == nil {
+	var seeker io.Seeker
+	// Check to see if the file descriptor is available
+	if f, ok := sys.OpenedFile(fd); !ok || f.File == nil {
 		return wasi.ErrnoBadf
-	}
-	seeker, ok := f.File.(io.Seeker)
-	if !ok {
+		// fs.FS doesn't declare io.Seeker, but implementations such as os.File implement it.
+	} else if seeker, ok = f.File.(io.Seeker); !ok {
 		return wasi.ErrnoBadf
 	}
 
 	if whence > io.SeekEnd /* exceeds the largest valid whence */ {
 		return wasi.ErrnoInval
 	}
-	newOffst, err := seeker.Seek(int64(offset), int(whence))
+	newOffset, err := seeker.Seek(int64(offset), int(whence))
 	if err != nil {
 		return wasi.ErrnoIo
 	}
 
-	if !ctx.Memory().WriteUint32Le(resultNewoffset, uint32(newOffst)) {
+	if !ctx.Memory().WriteUint32Le(resultNewoffset, uint32(newOffset)) {
 		return wasi.ErrnoFault
 	}
 
@@ -1290,16 +1285,18 @@ func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint3
 	var writer io.Writer
 
 	switch fd {
-	case 1:
+	case fdStdout:
 		writer = sys.Stdout()
-	case 2:
+	case fdStderr:
 		writer = sys.Stderr()
 	default:
-		f, ok := sys.OpenedFile(fd)
-		if !ok || f.File == nil {
+		// Check to see if the file descriptor is available
+		if f, ok := sys.OpenedFile(fd); !ok || f.File == nil {
+			return wasi.ErrnoBadf
+			// fs.FS doesn't declare io.Writer, but implementations such as os.File implement it.
+		} else if writer, ok = f.File.(io.Writer); !ok {
 			return wasi.ErrnoBadf
 		}
-		writer = f.File
 	}
 
 	var nwritten uint32
@@ -1349,41 +1346,8 @@ func (a *wasiAPI) PathLink(ctx wasm.Module, oldFd, oldFlags, oldPath, oldPathLen
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
-const (
-	// WASI open flags
-	oflagCreate = 1 << iota
-	// TODO: oflagDir
-	oflagExclusive
-	oflagTrunc
-
-	// WASI FS rights
-	rightFDRead  = 1 << iota
-	rightFDWrite = 0x200
-)
-
-func posixOpenFlags(oFlags uint32, fsRights uint64) (pFlags int) {
-	// TODO: handle dirflags, which decides whether to follow symbolic links or not,
-	//       by O_NOFOLLOW. Note O_NOFOLLOW doesn't exist on Windows.
-	if fsRights&rightFDWrite != 0 {
-		if fsRights&rightFDRead != 0 {
-			pFlags |= os.O_RDWR
-		} else {
-			pFlags |= os.O_WRONLY
-		}
-	}
-	if oFlags&oflagCreate != 0 {
-		pFlags |= os.O_CREATE
-	}
-	if oFlags&oflagExclusive != 0 {
-		pFlags |= os.O_EXCL
-	}
-	if oFlags&oflagTrunc != 0 {
-		pFlags |= os.O_TRUNC
-	}
-	return
-}
-
 // PathOpen implements SnapshotPreview1.PathOpen
+// Note: Rights will never be implemented per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
 func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
 	sys := sysContext(ctx)
@@ -1397,25 +1361,20 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, ofla
 	if !ok {
 		return wasi.ErrnoFault
 	}
-	pathName := string(b)
-	f, err := dir.FS.OpenWASI(dirflags, pathName, oflags, fsRightsBase, fsRightsInheriting, fdflags)
-	if err != nil {
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			return wasi.ErrnoNoent
-		case errors.Is(err, fs.ErrExist):
-			return wasi.ErrnoExist
-		default:
-			return wasi.ErrnoIo
-		}
+
+	// TODO: Consider dirflags and oflags. Also, allow non-read-only open based on config about the mount.
+	// Ex. allow os.O_RDONLY, os.O_WRONLY, or os.O_RDWR either by config flag or pattern on filename
+	// See #390
+	entry, errno := openFileEntry(dir.FS, path.Join(dir.Path, string(b)))
+	if errno != wasi.ErrnoSuccess {
+		return errno
 	}
 
-	// when ofagDir is set, the opened file must be a directory.
-	// TODO if oflags&oflagDir != 0 return wasi.ErrnoNotdir if stat != dir
-
-	if newFD, ok := sys.OpenFile(&internalwasm.FileEntry{Path: pathName, File: f, FS: dir.FS}); !ok {
+	if newFD, ok := sys.OpenFile(entry); !ok {
+		_ = entry.File.Close()
 		return wasi.ErrnoIo
 	} else if !ctx.Memory().WriteUint32Le(resultOpenedFd, newFD) {
+		_ = entry.File.Close()
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1499,6 +1458,12 @@ func (a *wasiAPI) SockShutdown(ctx wasm.Module, fd, how uint32) wasi.Errno {
 	return wasi.ErrnoNosys // stubbed for GrainLang per #271
 }
 
+const (
+	fdStdin  = 0
+	fdStdout = 1
+	fdStderr = 2
+)
+
 // NewAPI is exported for benchmarks
 func NewAPI() *wasiAPI {
 	return &wasiAPI{
@@ -1518,6 +1483,25 @@ func sysContext(ctx wasm.Module) *internalwasm.SysContext {
 	} else {
 		return internal.Sys()
 	}
+}
+
+func openFileEntry(rootFS fs.FS, pathName string) (*internalwasm.FileEntry, wasi.Errno) {
+	f, err := rootFS.Open(pathName)
+	if err != nil {
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return nil, wasi.ErrnoNoent
+		case errors.Is(err, fs.ErrExist):
+			return nil, wasi.ErrnoExist
+		default:
+			return nil, wasi.ErrnoIo
+		}
+	}
+
+	// TODO: verify if oflags is a directory and fail with wasi.ErrnoNotdir if not
+	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-oflags-flagsu16
+
+	return &internalwasm.FileEntry{Path: pathName, FS: rootFS, File: f}, wasi.ErrnoSuccess
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {

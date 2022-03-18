@@ -9,19 +9,6 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-// WASIDirFS returns a file system (a wasi.FS) for the tree of files rooted at
-// the directory dir. It's similar to os.DirFS, except that it implements
-// wasi.FS instead of the fs.FS interface.
-func WASIDirFS(dir string) wasi.FS {
-	return internalwasi.DirFS(dir)
-}
-
-func WASIMemFS() wasi.FS {
-	return &internalwasi.MemFS{
-		Files: map[string][]byte{},
-	}
-}
-
 // WASISnapshotPreview1 are functions importable as the module name wasi.ModuleSnapshotPreview1
 func WASISnapshotPreview1() *Module {
 	_, fns := internalwasi.SnapshotPreview1Functions()

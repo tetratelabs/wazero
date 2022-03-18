@@ -4,19 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"sync/atomic"
-
-	"github.com/tetratelabs/wazero/wasi"
 )
 
-// FileEntry temporarily uses wasi types until #394.
+// FileEntry maps a path to an open file in a file system.
 //
 // Note: This does not introduce cycles because the types here are in the package "wasi" not "internalwasi".
 type FileEntry struct {
 	Path string
-	FS   wasi.FS
-	File wasi.File
+	FS   fs.FS
+	// File when nil this is a mount like "." or "/".
+	File fs.File
 }
 
 // SysContext holds module-scoped system resources currently only used by internalwasi.

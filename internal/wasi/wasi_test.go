@@ -7,9 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"math/rand"
+	"os"
+	"path"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
 
@@ -46,7 +50,7 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 
 		// Invoke ArgsGet directly and check the memory side effects.
 		errno := a.ArgsGet(mod, argv, argvBuf)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -58,7 +62,8 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 
 		results, err := fn.Call(mod, uint64(argv), uint64(argvBuf))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -112,7 +117,7 @@ func TestSnapshotPreview1_ArgsGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.ArgsGet(mod, tc.argv, tc.argvBuf)
 			require.NoError(t, err)
-			require.Equal(t, wasi.ErrnoFault, errno)
+			require.Equal(t, wasi.ErrnoFault, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -140,7 +145,7 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 
 		// Invoke ArgsSizesGet directly and check the memory side effects.
 		errno := a.ArgsSizesGet(mod, resultArgc, resultArgvBufSize)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -152,7 +157,8 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 
 		results, err := fn.Call(mod, uint64(resultArgc), uint64(resultArgvBufSize))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -203,8 +209,7 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.ArgsSizesGet(mod, tc.argc, tc.argvBufSize)
-			require.NoError(t, err)
-			require.Equal(t, wasi.ErrnoFault, errno)
+			require.Equal(t, wasi.ErrnoFault, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -234,7 +239,7 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 
 		// Invoke EnvironGet directly and check the memory side effects.
 		errno := a.EnvironGet(mod, resultEnviron, resultEnvironBuf)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -246,7 +251,8 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 
 		results, err := fn.Call(mod, uint64(resultEnviron), uint64(resultEnvironBuf))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -299,8 +305,7 @@ func TestSnapshotPreview1_EnvironGet_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.EnvironGet(mod, tc.environ, tc.environBuf)
-			require.NoError(t, err)
-			require.Equal(t, wasi.ErrnoFault, errno)
+			require.Equal(t, wasi.ErrnoFault, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -328,7 +333,7 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 
 		// Invoke EnvironSizesGet directly and check the memory side effects.
 		errno := a.EnvironSizesGet(mod, resultEnvironc, resultEnvironBufSize)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -340,7 +345,8 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 
 		results, err := fn.Call(mod, uint64(resultEnvironc), uint64(resultEnvironBufSize))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -391,8 +397,7 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.EnvironSizesGet(mod, tc.environc, tc.environBufSize)
-			require.NoError(t, err)
-			require.Equal(t, wasi.ErrnoFault, errno)
+			require.Equal(t, wasi.ErrnoFault, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -413,7 +418,8 @@ func TestSnapshotPreview1_ClockResGet(t *testing.T) {
 	t.Run(FunctionClockResGet, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -440,7 +446,7 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 
 		// invoke ClockTimeGet directly and check the memory side effects!
 		errno := a.ClockTimeGet(mod, 0 /* TODO: id */, 0 /* TODO: precision */, resultTimestamp)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -452,7 +458,8 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 
 		results, err := fn.Call(mod, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(resultTimestamp))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -496,7 +503,8 @@ func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			results, err := fn.Call(mod, 0 /* TODO: id */, 0 /* TODO: precision */, uint64(tc.resultTimestamp))
 			require.NoError(t, err)
-			require.Equal(t, uint64(wasi.ErrnoFault), results[0]) // results[0] is the errno
+			errno := wasi.Errno(results[0]) // results[0] is the errno
+			require.Equal(t, wasi.ErrnoFault, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -511,13 +519,15 @@ func TestSnapshotPreview1_FdAdvise(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdAdvise", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdAdvise(mod, 0, 0, 0, 0))
+		errno := a.FdAdvise(mod, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdAdvise, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -531,13 +541,15 @@ func TestSnapshotPreview1_FdAllocate(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdAllocate", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdAllocate(mod, 0, 0, 0))
+		errno := a.FdAllocate(mod, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdAllocate, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -547,16 +559,18 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 
 	setupFD := func() (publicwasm.Module, publicwasm.Function, *wasiAPI) {
 		ctx := context.Background()
-		memFs := &MemFS{}
+
+		// fd_close needs to close an open file descriptor. Open two files so that we can tell which is closed.
+		path1, path2 := "a", "b"
+		testFs := fstest.MapFS{path1: {Data: make([]byte, 0)}, path2: {Data: make([]byte, 0)}}
+		entry1, errno := openFileEntry(testFs, path1)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
+		entry2, errno := openFileEntry(testFs, path2)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
+
 		sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-			fdToClose: {
-				Path: "/tmp",
-				FS:   memFs,
-			},
-			fdToKeep: {
-				Path: "path to keep",
-				FS:   memFs,
-			},
+			fdToClose: entry1,
+			fdToKeep:  entry2,
 		})
 		require.NoError(t, err)
 
@@ -579,7 +593,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 		defer mod.Close()
 
 		errno := api.FdClose(mod, fdToClose)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		verify(mod)
 	})
@@ -587,9 +601,10 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 		mod, fn, _ := setupFD()
 		defer mod.Close()
 
-		ret, err := fn.Call(mod, uint64(fdToClose))
+		results, err := fn.Call(mod, uint64(fdToClose))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		verify(mod)
 	})
@@ -612,13 +627,15 @@ func TestSnapshotPreview1_FdDatasync(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdDatasync", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdDatasync(mod, 0))
+		errno := a.FdDatasync(mod, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdDatasync, func(t *testing.T) {
 		results, err := fn.Call(mod, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -634,13 +651,15 @@ func TestSnapshotPreview1_FdFdstatSetFlags(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFdstatSetFlags", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdFdstatSetFlags(mod, 0, 0))
+		errno := a.FdFdstatSetFlags(mod, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdFdstatSetFlags, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -654,13 +673,15 @@ func TestSnapshotPreview1_FdFdstatSetRights(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFdstatSetRights", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdFdstatSetRights(mod, 0, 0, 0))
+		errno := a.FdFdstatSetRights(mod, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdFdstatSetRights, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -674,13 +695,15 @@ func TestSnapshotPreview1_FdFilestatGet(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatGet", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdFilestatGet(mod, 0, 0))
+		errno := a.FdFilestatGet(mod, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdFilestatGet, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -694,13 +717,15 @@ func TestSnapshotPreview1_FdFilestatSetSize(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatSetSize", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdFilestatSetSize(mod, 0, 0))
+		errno := a.FdFilestatSetSize(mod, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdFilestatSetSize, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -714,13 +739,15 @@ func TestSnapshotPreview1_FdFilestatSetTimes(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatSetTimes", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdFilestatSetTimes(mod, 0, 0, 0, 0))
+		errno := a.FdFilestatSetTimes(mod, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdFilestatSetTimes, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -734,13 +761,15 @@ func TestSnapshotPreview1_FdPread(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdPread", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdPread(mod, 0, 0, 0, 0, 0))
+		errno := a.FdPread(mod, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdPread, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -748,7 +777,8 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
 	ctx := context.Background()
-	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
+	pathName := "/tmp"
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: pathName}})
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, sys)
@@ -756,11 +786,11 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 
 	resultPrestat := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
-		'?',     // resultPrstat after this
+		'?',     // resultPrestat after this
 		0,       // 8-bit tag indicating `prestat_dir`, the only available tag
 		0, 0, 0, // 3-byte padding
 		// the result path length field after this
-		4, 0, 0, 0, // = 4, which is len("/tmp")
+		byte(len(pathName)), 0, 0, 0, // = in little endian encoding
 		'?',
 	}
 
@@ -768,7 +798,7 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
 
 		errno := a.FdPrestatGet(mod, fd, resultPrestat)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -778,9 +808,10 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	t.Run(FunctionFdPrestatDirName, func(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
 
-		ret, err := fn.Call(mod, uint64(fd), uint64(resultPrestat))
+		results, err := fn.Call(mod, uint64(fd), uint64(resultPrestat))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -827,7 +858,7 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.FdPrestatGet(mod, tc.fd, tc.resultPrestat)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedErrno, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -854,7 +885,7 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
 
 		errno := a.FdPrestatDirName(mod, fd, path, pathLen)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -864,9 +895,10 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	t.Run(FunctionFdPrestatDirName, func(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
 
-		ret, err := fn.Call(mod, uint64(fd), uint64(path), uint64(pathLen))
+		results, err := fn.Call(mod, uint64(fd), uint64(path), uint64(pathLen))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 		require.True(t, ok)
@@ -931,7 +963,7 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.FdPrestatDirName(mod, tc.fd, tc.path, tc.pathLen)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedErrno, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -946,13 +978,15 @@ func TestSnapshotPreview1_FdPwrite(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdPwrite", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdPwrite(mod, 0, 0, 0, 0, 0))
+		errno := a.FdPwrite(mod, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdPwrite, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -992,9 +1026,9 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 		}},
 		{FunctionFdRead, func(_ *wasiAPI, mod *wasm.ModuleContext, fn publicwasm.Function) fdReadFn {
 			return func(ctx publicwasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
-				ret, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
+				results, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
-				return wasi.Errno(ret[0])
+				return wasi.Errno(results[0])
 			}
 		}},
 	}
@@ -1003,9 +1037,9 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to read the contents from
-			file, memFS := createFile(t, "test_path", []byte("wazero"))
+			file, testFS := createFile(t, "test_path", []byte("wazero"))
 			sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-				fd: {Path: "test_path", FS: memFS, File: file},
+				fd: {Path: "test_path", FS: testFS, File: file},
 			})
 			require.NoError(t, err)
 
@@ -1018,7 +1052,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 			require.True(t, ok)
 
 			errno := tc.fdRead(a, mod, fn)(mod, fd, iovs, iovsCount, resultSize)
-			require.Equal(t, wasi.ErrnoSuccess, errno)
+			require.Zero(t, errno, wasi.ErrnoName(errno))
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
@@ -1028,12 +1062,12 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 }
 
 func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
-	validFD := uint32(3)                                // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	file, memFS := createFile(t, "test_path", []byte{}) // file with empty contents
+	validFD := uint32(3)                                 // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
+	file, testFS := createFile(t, "test_path", []byte{}) // file with empty contents
 
 	ctx := context.Background()
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-		validFD: {Path: "test_path", FS: memFS, File: file},
+		validFD: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
 
@@ -1115,7 +1149,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 			require.True(t, memoryWriteOK)
 
 			errno := a.FdRead(mod, tc.fd, tc.iovs+offset, tc.iovsCount+offset, tc.resultSize+offset)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedErrno, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -1130,13 +1164,15 @@ func TestSnapshotPreview1_FdReaddir(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdReaddir", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdReaddir(mod, 0, 0, 0, 0, 0))
+		errno := a.FdReaddir(mod, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdReaddir, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1150,24 +1186,26 @@ func TestSnapshotPreview1_FdRenumber(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdRenumber", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdRenumber(mod, 0, 0))
+		errno := a.FdRenumber(mod, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdRenumber, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
 func TestSnapshotPreview1_FdSeek(t *testing.T) {
-	fd := uint32(3)                                             // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	resultNewoffset := uint32(1)                                // arbitrary offset in `ctx.Memory` for the new offset value
-	file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
+	fd := uint32(3)                                              // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	resultNewoffset := uint32(1)                                 // arbitrary offset in `ctx.Memory` for the new offset value
+	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
 
 	ctx := context.Background()
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-		fd: {Path: "test_path", FS: memFS, File: file},
+		fd: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
 
@@ -1185,9 +1223,9 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 		}},
 		{FunctionFdSeek, func() fdSeekFn {
 			return func(ctx publicwasm.Module, fd uint32, offset uint64, whence, resultNewoffset uint32) wasi.Errno {
-				ret, err := fn.Call(mod, uint64(fd), offset, uint64(whence), uint64(resultNewoffset))
+				results, err := fn.Call(mod, uint64(fd), offset, uint64(whence), uint64(resultNewoffset))
 				require.NoError(t, err)
-				return wasi.Errno(ret[0])
+				return wasi.Errno(results[0])
 			}
 		}},
 	}
@@ -1241,16 +1279,27 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 				tc := tt
 				t.Run(tc.name, func(t *testing.T) {
 					maskMemory(t, mod, len(tc.expectedMemory))
-					file.offset = 1 // set the initial offset of the file to 1
+
+					// Since we initialized this file, we know it is a seeker (because it is a MapFile)
+					f, ok := sys.OpenedFile(fd)
+					require.True(t, ok)
+					seeker := f.File.(io.Seeker)
+
+					// set the initial offset of the file to 1
+					offset, err := seeker.Seek(1, io.SeekStart)
+					require.NoError(t, err)
+					require.Equal(t, int64(1), offset)
 
 					errno := sf.fdSeek()(mod, fd, uint64(tc.offset), uint32(tc.whence), resultNewoffset)
-					require.Equal(t, wasi.ErrnoSuccess, errno)
+					require.Zero(t, errno, wasi.ErrnoName(errno))
 
 					actual, ok := mod.Memory().Read(0, uint32(len(tc.expectedMemory)))
 					require.True(t, ok)
 					require.Equal(t, tc.expectedMemory, actual)
 
-					require.Equal(t, tc.expectedOffset, file.offset) // test that the offset of file is actually updated.
+					offset, err = seeker.Seek(0, io.SeekCurrent)
+					require.NoError(t, err)
+					require.Equal(t, tc.expectedOffset, offset) // test that the offset of file is actually updated.
 				})
 			}
 		})
@@ -1258,11 +1307,11 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 }
 
 func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
-	validFD := uint32(3)                                        // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary valid file with non-empty contents
+	validFD := uint32(3)                                         // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
+	file, testFS := createFile(t, "test_path", []byte("wazero")) // arbitrary valid file with non-empty contents
 	ctx := context.Background()
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-		validFD: {Path: "test_path", FS: memFS, File: file},
+		validFD: {Path: "test_path", FS: testFS, File: file},
 	})
 	require.NoError(t, err)
 
@@ -1301,7 +1350,7 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.FdSeek(mod, tc.fd, tc.offset, tc.whence, tc.resultNewoffset)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedErrno, errno, wasi.ErrnoName(errno))
 		})
 	}
 
@@ -1317,13 +1366,15 @@ func TestSnapshotPreview1_FdSync(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdSync", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdSync(mod, 0))
+		errno := a.FdSync(mod, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdSync, func(t *testing.T) {
 		results, err := fn.Call(mod, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1337,13 +1388,15 @@ func TestSnapshotPreview1_FdTell(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdTell", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.FdTell(mod, 0, 0))
+		errno := a.FdTell(mod, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionFdTell, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1383,20 +1436,23 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 		}},
 		{FunctionFdWrite, func(_ *wasiAPI, mod *wasm.ModuleContext, fn publicwasm.Function) fdWriteFn {
 			return func(ctx publicwasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
-				ret, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
+				results, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
-				return wasi.Errno(ret[0])
+				return wasi.Errno(results[0])
 			}
 		}},
 	}
+
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
 
 	for _, tt := range tests {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to write the contents to
-			file, memFS := createFile(t, "test_path", []byte{})
+			pathName := "test_path"
+			file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
 			sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-				fd: {Path: "test_path", FS: memFS, File: file},
+				fd: {Path: pathName, FS: testFS, File: file},
 			})
 			require.NoError(t, err)
 
@@ -1408,22 +1464,31 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			require.True(t, ok)
 
 			errno := tc.fdWrite(a, mod, fn)(mod, fd, iovs, iovsCount, resultSize)
-			require.Equal(t, wasi.ErrnoSuccess, errno)
+			require.Zero(t, errno, wasi.ErrnoName(errno))
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 			require.True(t, ok)
 			require.Equal(t, expectedMemory, actual)
-			require.Equal(t, []byte("wazero"), file.buf) // verify the file was actually written
+
+			// Since we initialized this file, we know we can read it by path
+			buf, err := os.ReadFile(path.Join(tmpDir, pathName))
+			require.NoError(t, err)
+
+			require.Equal(t, []byte("wazero"), buf) // verify the file was actually written
 		})
 	}
 }
 
 func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
-	validFD := uint32(3)                                // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	file, memFS := createFile(t, "test_path", []byte{}) // file with empty contents
+	validFD := uint32(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
+
+	tmpDir := t.TempDir() // open before loop to ensure no locking problems.
+	pathName := "test_path"
+	file, testFS := createWriteableFile(t, tmpDir, pathName, []byte{})
+
 	ctx := context.Background()
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-		validFD: {Path: "test_path", FS: memFS, File: file},
+		validFD: {Path: pathName, FS: testFS, File: file},
 	})
 	require.NoError(t, err)
 
@@ -1488,20 +1553,9 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 			mod.Memory().(*wasm.MemoryInstance).Buffer = tc.memory
 
 			errno := a.FdWrite(mod, tc.fd, iovs, iovsCount, tc.resultSize)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedErrno, errno, wasi.ErrnoName(errno))
 		})
 	}
-}
-
-func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
-	memFS := &MemFS{Files: map[string][]byte{}}
-	f, err := memFS.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
-	require.NoError(t, err)
-
-	mf := f.(*memFile)
-	mf.buf = append([]byte{}, contents...)
-
-	return mf, memFS
 }
 
 // TestSnapshotPreview1_PathCreateDirectory only tests it is stubbed for GrainLang per #271
@@ -1514,13 +1568,15 @@ func TestSnapshotPreview1_PathCreateDirectory(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathCreateDirectory", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathCreateDirectory(mod, 0, 0, 0))
+		errno := a.PathCreateDirectory(mod, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathCreateDirectory, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1534,13 +1590,15 @@ func TestSnapshotPreview1_PathFilestatGet(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathFilestatGet", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathFilestatGet(mod, 0, 0, 0, 0, 0))
+		errno := a.PathFilestatGet(mod, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathFilestatGet, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1554,13 +1612,15 @@ func TestSnapshotPreview1_PathFilestatSetTimes(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathFilestatSetTimes", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathFilestatSetTimes(mod, 0, 0, 0, 0, 0, 0, 0))
+		errno := a.PathFilestatSetTimes(mod, 0, 0, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathFilestatSetTimes, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1574,31 +1634,32 @@ func TestSnapshotPreview1_PathLink(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathLink", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathLink(mod, 0, 0, 0, 0, 0, 0, 0))
+		errno := a.PathLink(mod, 0, 0, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathLink, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
 func TestSnapshotPreview1_PathOpen(t *testing.T) {
-	workdirFD := uint32(3)                    // arbitrary fd after 0, 1, and 2, that are stdin/out/err
-	dirflags := uint32(0)                     // arbitrary dirflags
-	path := uint32(1)                         // arbitrary offset
-	pathLen := uint32(6)                      // The length of path
-	oflags := uint32(0)                       // arbitrary oflags
-	fsRightsBase := uint64(rightFDRead)       // arbitrary right
-	fsRightsInheriting := uint64(rightFDRead) // arbitrary right
+	workdirFD := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
+	dirflags := uint32(0)  // arbitrary dirflags
+	oflags := uint32(0)    // arbitrary oflags
 	fdFlags := uint32(0)
-	resultOpenedFd := uint32(8)
-	initialMemory := []byte{
-		'?',                          // `path` is after this
-		'w', 'a', 'z', 'e', 'r', 'o', // path
-	}
+
+	// Setup the initial memory to include the path name starting at an offset.
+	pathName := "wazero"
+	path := uint32(1)
+	pathLen := uint32(len(pathName))
+	initialMemory := append([]byte{'?'}, pathName...)
+
 	expectedFD := byte(workdirFD + 1)
+	resultOpenedFd := uint32(len(initialMemory) + 1)
 	expectedMemory := append(
 		initialMemory,
 		'?', // `resultOpenedFd` is after this
@@ -1608,88 +1669,58 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 
 	ctx := context.Background()
 
-	// TestSnapshotPreview1_PathOpen uses a matrix because setting up test files is complicated and has to be clean each time.
-	type pathOpenFn func(ctx publicwasm.Module, fd, dirflags, path, pathLen, oflags uint32,
-		fsRightsBase, fsRightsInheriting uint64,
-		fdFlags, resultOpenedFd uint32) wasi.Errno
-	pathOpenFns := []struct {
-		name     string
-		pathOpen func(*wasiAPI, *wasm.ModuleContext, publicwasm.Function) pathOpenFn
-	}{
-		{"SnapshotPreview1.PathOpen", func(a *wasiAPI, _ *wasm.ModuleContext, _ publicwasm.Function) pathOpenFn {
-			return a.PathOpen
-		}},
-		{FunctionPathOpen, func(_ *wasiAPI, mod *wasm.ModuleContext, fn publicwasm.Function) pathOpenFn {
-			return func(ctx publicwasm.Module, fd, dirflags, path, pathLen, oflags uint32,
-				fsRightsBase, fsRightsInheriting uint64,
-				fdFlags, resultOpenedFd uint32) wasi.Errno {
-				ret, err := fn.Call(mod, uint64(fd), uint64(dirflags), uint64(path), uint64(pathLen), uint64(oflags), uint64(fsRightsBase), uint64(fsRightsInheriting), uint64(fdFlags), uint64(resultOpenedFd))
-				require.NoError(t, err)
-				return wasi.Errno(ret[0])
-			}
-		}},
-	}
+	// rights are ignored per https://github.com/WebAssembly/WASI/issues/469#issuecomment-1045251844
+	fsRightsBase, fsRightsInheriting := uint64(1), uint64(2)
 
-	tests := []struct {
-		name         string
-		fd           uint32
-		expectedPath string
-	}{
-		{
-			name:         "simple file open",
-			fd:           workdirFD,
-			expectedPath: "wazero",
-		},
-	}
-
-	for _, pathOpenFn := range pathOpenFns {
-		pf := pathOpenFn
-		t.Run(pf.name, func(t *testing.T) {
-			for _, tt := range tests {
-				tc := tt
-				t.Run(tc.name, func(t *testing.T) {
-					// Create a memFS for testing that has "./wazero" file.
-					memFS := &MemFS{Files: map[string][]byte{"wazero": {}}}
-					sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-						workdirFD: {Path: ".", FS: memFS},
-					})
-					require.NoError(t, err)
-
-					a, mod, fn := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
-					defer mod.Close()
-
-					maskMemory(t, mod, len(expectedMemory))
-					ok := mod.Memory().Write(0, initialMemory)
-					require.True(t, ok)
-
-					errno := pf.pathOpen(a, mod, fn)(mod, tc.fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
-					require.Equal(t, wasi.ErrnoSuccess, errno)
-
-					actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
-					require.True(t, ok)
-					require.Equal(t, expectedMemory, actual)
-
-					// verify the file was actually opened
-					f, ok := sys.OpenedFile(uint32(expectedFD))
-					require.True(t, ok)
-					require.Equal(t, tc.expectedPath, f.Path)
-				})
-			}
+	setup := func() (*wasiAPI, *wasm.ModuleContext, publicwasm.Function) {
+		testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
+		sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+			workdirFD: {Path: ".", FS: testFS},
 		})
+		require.NoError(t, err)
+		a, mod, fn := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
+		maskMemory(t, mod, len(expectedMemory))
+		ok := mod.Memory().Write(0, initialMemory)
+		require.True(t, ok)
+		return a, mod, fn
 	}
+
+	verify := func(errno wasi.Errno, mod *wasm.ModuleContext) {
+		require.Zero(t, errno, wasi.ErrnoName(errno))
+
+		actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
+		require.True(t, ok)
+		require.Equal(t, expectedMemory, actual)
+
+		// verify the file was actually opened
+		f, ok := sysContext(mod).OpenedFile(uint32(expectedFD))
+		require.True(t, ok)
+		require.Equal(t, pathName, f.Path)
+	}
+
+	t.Run("SnapshotPreview1.PathOpen", func(t *testing.T) {
+		a, mod, _ := setup()
+		errno := a.PathOpen(mod, workdirFD, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
+		verify(errno, mod)
+	})
+
+	t.Run(FunctionPathOpen, func(t *testing.T) {
+		_, mod, fn := setup()
+		results, err := fn.Call(mod, uint64(workdirFD), uint64(dirflags), uint64(path), uint64(pathLen), uint64(oflags), fsRightsBase, fsRightsInheriting, uint64(fdFlags), uint64(resultOpenedFd))
+		require.NoError(t, err)
+		errno := wasi.Errno(results[0])
+		verify(errno, mod)
+	})
 }
 
 func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 	validFD := uint32(3) // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
-	// Create a memFS for testing that has "./wazero" file.
-	memFS := &MemFS{
-		Files: map[string][]byte{
-			"wazero": []byte(""),
-		},
-	}
+	pathName := "wazero"
+	testFS := fstest.MapFS{pathName: &fstest.MapFile{Mode: os.ModeDir}}
+
 	ctx := context.Background()
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
-		validFD: {Path: ".", FS: memFS},
+		validFD: {Path: ".", FS: testFS},
 	})
 	require.NoError(t, err)
 
@@ -1698,9 +1729,7 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 
 	validPath := uint32(0)    // arbitrary offset
 	validPathLen := uint32(6) // the length of "wazero"
-	mod.Memory().Write(validPath, []byte{
-		'w', 'a', 'z', 'e', 'r', 'o', // write to offset 0 (= validPath)
-	}) // wazero is the path to the file in the memFS
+	mod.Memory().Write(validPath, []byte(pathName))
 
 	tests := []struct {
 		name                                      string
@@ -1747,7 +1776,7 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 		tc := tt
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.PathOpen(mod, tc.fd, 0, tc.path, tc.pathLen, tc.oflags, 0, 0, 0, tc.resultOpenedFd)
-			require.Equal(t, tc.expectedErrno, errno)
+			require.Equal(t, tc.expectedErrno, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -1762,13 +1791,15 @@ func TestSnapshotPreview1_PathReadlink(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathLink", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathReadlink(mod, 0, 0, 0, 0, 0, 0))
+		errno := a.PathReadlink(mod, 0, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathReadlink, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1782,13 +1813,15 @@ func TestSnapshotPreview1_PathRemoveDirectory(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathRemoveDirectory", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathRemoveDirectory(mod, 0, 0, 0))
+		errno := a.PathRemoveDirectory(mod, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathRemoveDirectory, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1802,13 +1835,15 @@ func TestSnapshotPreview1_PathRename(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathRename", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathRename(mod, 0, 0, 0, 0, 0, 0))
+		errno := a.PathRename(mod, 0, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathRename, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1822,13 +1857,15 @@ func TestSnapshotPreview1_PathSymlink(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathSymlink", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathSymlink(mod, 0, 0, 0, 0, 0))
+		errno := a.PathSymlink(mod, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathSymlink, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1842,13 +1879,15 @@ func TestSnapshotPreview1_PathUnlinkFile(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathUnlinkFile", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PathUnlinkFile(mod, 0, 0, 0))
+		errno := a.PathUnlinkFile(mod, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPathUnlinkFile, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1862,13 +1901,15 @@ func TestSnapshotPreview1_PollOneoff(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PollOneoff", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.PollOneoff(mod, 0, 0, 0, 0))
+		errno := a.PollOneoff(mod, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionPollOneoff, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1920,13 +1961,15 @@ func TestSnapshotPreview1_ProcRaise(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ProcRaise", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.ProcRaise(mod, 0))
+		errno := a.ProcRaise(mod, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionProcRaise, func(t *testing.T) {
 		results, err := fn.Call(mod, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1940,13 +1983,15 @@ func TestSnapshotPreview1_SchedYield(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SchedYield", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.SchedYield(mod))
+		errno := a.SchedYield(mod)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionSchedYield, func(t *testing.T) {
 		results, err := fn.Call(mod)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -1980,7 +2025,7 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 
 		// Invoke RandomGet directly and check the memory side effects!
 		errno := a.RandomGet(mod, offset, length)
-		require.Equal(t, wasi.ErrnoSuccess, errno)
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, offset+length+1)
 		require.True(t, ok)
@@ -1992,7 +2037,8 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 
 		results, err := fn.Call(mod, uint64(offset), uint64(length))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Zero(t, errno, wasi.ErrnoName(errno))
 
 		actual, ok := mod.Memory().Read(0, offset+length+1)
 		require.True(t, ok)
@@ -2035,7 +2081,7 @@ func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			errno := a.RandomGet(mod, tc.offset, tc.length)
-			require.Equal(t, wasi.ErrnoFault, errno)
+			require.Equal(t, wasi.ErrnoFault, errno, wasi.ErrnoName(errno))
 		})
 	}
 }
@@ -2053,7 +2099,7 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 	}
 
 	errno := a.RandomGet(mod, uint32(1), uint32(5)) // arbitrary offset and length
-	require.Equal(t, wasi.ErrnoIo, errno)
+	require.Equal(t, wasi.ErrnoIo, errno, wasi.ErrnoName(errno))
 }
 
 // TestSnapshotPreview1_SockRecv only tests it is stubbed for GrainLang per #271
@@ -2066,13 +2112,15 @@ func TestSnapshotPreview1_SockRecv(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockRecv", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.SockRecv(mod, 0, 0, 0, 0, 0, 0))
+		errno := a.SockRecv(mod, 0, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionSockRecv, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -2086,13 +2134,15 @@ func TestSnapshotPreview1_SockSend(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockSend", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.SockSend(mod, 0, 0, 0, 0, 0))
+		errno := a.SockSend(mod, 0, 0, 0, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionSockSend, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0, 0, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
@@ -2106,17 +2156,26 @@ func TestSnapshotPreview1_SockShutdown(t *testing.T) {
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockShutdown", func(t *testing.T) {
-		require.Equal(t, wasi.ErrnoNosys, a.SockShutdown(mod, 0, 0))
+		errno := a.SockShutdown(mod, 0, 0)
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 
 	t.Run(FunctionSockShutdown, func(t *testing.T) {
 		results, err := fn.Call(mod, 0, 0)
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoNosys, wasi.Errno(results[0])) // cast because results are always uint64
+		errno := wasi.Errno(results[0]) // results[0] is the errno
+		require.Equal(t, wasi.ErrnoNosys, errno, wasi.ErrnoName(errno))
 	})
 }
 
 const testMemoryPageSize = 1
+
+// maskMemory sets the first memory in the store to '?' * size, so tests can see what's written.
+func maskMemory(t *testing.T, mod publicwasm.Module, size int) {
+	for i := uint32(0); i < uint32(size); i++ {
+		require.True(t, mod.Memory().WriteByte(i, '?'))
+	}
+}
 
 func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImport, moduleName string, sys *wasm.SysContext) (*wasiAPI, *wasm.ModuleContext, publicwasm.Function) {
 	enabledFeatures := wasm.Features20191205
@@ -2150,13 +2209,29 @@ func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImpo
 	return a, mod, fn
 }
 
-// maskMemory sets the first memory in the store to '?' * size, so tests can see what's written.
-func maskMemory(t *testing.T, mod publicwasm.Module, size int) {
-	for i := uint32(0); i < uint32(size); i++ {
-		require.True(t, mod.Memory().WriteByte(i, '?'))
-	}
-}
-
 func newSysContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sys *wasm.SysContext, err error) {
 	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, openedFiles)
+}
+
+func createFile(t *testing.T, pathName string, data []byte) (fs.File, fs.FS) {
+	mapFile := &fstest.MapFile{Data: data}
+	if data == nil {
+		mapFile.Mode = os.ModeDir
+	}
+	mapFS := fstest.MapFS{pathName: mapFile}
+	f, err := mapFS.Open(pathName)
+	require.NoError(t, err)
+	return f, mapFS
+}
+
+// createWriteableFile uses real files when io.Writer tests are needed.
+func createWriteableFile(t *testing.T, tmpDir string, pathName string, data []byte) (fs.File, fs.FS) {
+	require.NotNil(t, data)
+	absolutePath := path.Join(tmpDir, pathName)
+	require.NoError(t, os.WriteFile(absolutePath, data, 0o600))
+
+	// open the file for writing in a custom way until #390
+	f, err := os.OpenFile(absolutePath, os.O_RDWR, 0o600)
+	require.NoError(t, err)
+	return f, os.DirFS(tmpDir)
 }

@@ -70,6 +70,8 @@ func TestStartWASICommandWithConfig(t *testing.T) {
 		require.Equal(t, append([]byte(tc), 0), stdout.Bytes())
 
 		stdout.Reset()
-		mod.Close()
+		require.NoError(t, mod.Close())
+
+		// TODO: figure out how to test config closed.
 	}
 }
