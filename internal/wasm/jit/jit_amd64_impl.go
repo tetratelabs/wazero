@@ -110,7 +110,7 @@ type amd64Compiler struct {
 	// and each item is either placed in register or the actual memory stack.
 	locationStack *valueLocationStack
 	// labels hold per wazeroir label specific information in this function.
-	labels map[string]*labelInfo
+	labels map[string]*amd64LabelInfo
 	// stackPointerCeil is the greatest stack pointer value (from valueLocationStack) seen during compilation.
 	stackPointerCeil uint64
 	// currentLabel holds a currently compiled wazeroir label key. For debugging only.
@@ -131,7 +131,7 @@ func newAmd64Compiler(f *wasm.FunctionInstance, ir *wazeroir.CompilationResult) 
 		locationStack: newValueLocationStack(),
 		currentLabel:  wazeroir.EntrypointLabel,
 		ir:            ir,
-		labels:        map[string]*labelInfo{},
+		labels:        map[string]*amd64LabelInfo{},
 	}
 	return c, nil
 }
@@ -156,7 +156,7 @@ func (c *amd64Compiler) pushValueLocationOnRegister(reg asm.Register) (ret *valu
 	return
 }
 
-type labelInfo struct {
+type amd64LabelInfo struct {
 	// initialInstruction is the initial instruction for this label so other block can jump into it.
 	initialInstruction asm.Node
 	// initialStack is the initial value location stack from which we start compiling this label.
@@ -165,12 +165,12 @@ type labelInfo struct {
 	labelBeginningCallbacks []func(asm.Node)
 }
 
-func (c *amd64Compiler) label(labelKey string) *labelInfo {
+func (c *amd64Compiler) label(labelKey string) *amd64LabelInfo {
 	ret, ok := c.labels[labelKey]
 	if ok {
 		return ret
 	}
-	c.labels[labelKey] = &labelInfo{}
+	c.labels[labelKey] = &amd64LabelInfo{}
 	return c.labels[labelKey]
 }
 
@@ -512,9 +512,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		labelInfo := c.label(elseLabelKey)
-		if labelInfo.initialStack == nil {
-			labelInfo.initialStack = c.locationStack
+		amd64LabelInfo := c.label(elseLabelKey)
+		if amd64LabelInfo.initialStack == nil {
+			amd64LabelInfo.initialStack = c.locationStack
 		}
 
 		elseJmp := c.assembler.CompileJump(amd64.JMP)
@@ -540,9 +540,9 @@ func (c *amd64Compiler) compileBrIf(o *wazeroir.OperationBrIf) error {
 		// Set the initial stack of the target label, so we can start compiling the label
 		// with the appropriate value locations. Note we clone the stack here as we maybe
 		// manipulate the stack before compiler reaches the label.
-		labelInfo := c.label(thenLabelKey)
-		if labelInfo.initialStack == nil {
-			labelInfo.initialStack = c.locationStack
+		amd64LabelInfo := c.label(thenLabelKey)
+		if amd64LabelInfo.initialStack == nil {
+			amd64LabelInfo.initialStack = c.locationStack
 		}
 		thenJmp := c.assembler.CompileJump(amd64.JMP)
 		c.assignJumpTarget(thenLabelKey, thenJmp)
@@ -687,10 +687,10 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 	}
 
 	labelKey := o.Label.String()
-	labelInfo := c.label(labelKey)
+	amd64LabelInfo := c.label(labelKey)
 
 	// If initialStack is not set, that means this label has never been reached.
-	if labelInfo.initialStack == nil {
+	if amd64LabelInfo.initialStack == nil {
 		skipLabel = true
 		c.currentLabel = ""
 		return
@@ -701,19 +701,19 @@ func (c *amd64Compiler) compileLabel(o *wazeroir.OperationLabel) (skipLabel bool
 
 	// Save the instructions so that backward branching
 	// instructions can jump to this label.
-	labelInfo.initialInstruction = labelBegin
+	amd64LabelInfo.initialInstruction = labelBegin
 
 	// Set the initial stack.
-	c.setLocationStack(labelInfo.initialStack)
+	c.setLocationStack(amd64LabelInfo.initialStack)
 
 	// Invoke callbacks to notify the forward branching
 	// instructions can properly jump to this label.
-	for _, cb := range labelInfo.labelBeginningCallbacks {
+	for _, cb := range amd64LabelInfo.labelBeginningCallbacks {
 		cb(labelBegin)
 	}
 
-	// Clear for debugging purpose. See the comment in "len(labelInfo.labelBeginningCallbacks) > 0" block above.
-	labelInfo.labelBeginningCallbacks = nil
+	// Clear for debugging purpose. See the comment in "len(amd64LabelInfo.labelBeginningCallbacks) > 0" block above.
+	amd64LabelInfo.labelBeginningCallbacks = nil
 
 	if buildoptions.IsDebugMode {
 		fmt.Printf("[label %s (num callers=%d)]\n%s\n", labelKey, c.ir.LabelCallers[labelKey], c.locationStack)
