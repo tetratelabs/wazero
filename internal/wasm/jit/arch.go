@@ -17,7 +17,7 @@ var (
 // codeSegment is the pointer to the initial instruction of the compiled native code.
 // ce is "*callEngine" as uintptr.
 //
-// Note: this is implemented in per-arch Go assembler file. For example, arch_amd64.S implements this for amd64.
+// Note: this is implemented in per-arch Go assembler file. For example, arch_amd64.s implements this for amd64.
 func jitcall(codeSegment, ce uintptr)
 
 func init() {

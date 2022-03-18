@@ -5,7 +5,6 @@ import (
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
-
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm/arm64"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
@@ -15,26 +14,6 @@ func TestArchContextOffsetInArm64Engine(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(ctx.jitCallReturnAddress)), arm64CallEngineArchContextJITCallReturnAddressOffset, "fix consts in jit_arm64.s")
 	require.Equal(t, int(unsafe.Offsetof(ctx.minimum32BitSignedInt)), arm64CallEngineArchContextMinimum32BitSignedIntOffset)
 	require.Equal(t, int(unsafe.Offsetof(ctx.minimum64BitSignedInt)), arm64CallEngineArchContextMinimum64BitSignedIntOffset)
-}
-
-// compile implements compilerImpl.valueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) valueLocationStack() *valueLocationStack {
-	return c.locationStack
-}
-
-// compile implements compilerImpl.getOnStackPointerCeilDeterminedCallBack for the amd64 architecture.
-func (c *arm64Compiler) getOnStackPointerCeilDeterminedCallBack() func(uint64) {
-	return c.onStackPointerCeilDeterminedCallBack
-}
-
-// compile implements compilerImpl.setStackPointerCeil for the amd64 architecture.
-func (c *arm64Compiler) setStackPointerCeil(v uint64) {
-	c.stackPointerCeil = v
-}
-
-// compile implements compilerImpl.setValueLocationStack for the amd64 architecture.
-func (c *arm64Compiler) setValueLocationStack(s *valueLocationStack) {
-	c.locationStack = s
 }
 
 func TestArm64Compiler_readInstructionAddress(t *testing.T) {
