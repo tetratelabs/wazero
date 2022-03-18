@@ -113,11 +113,11 @@ jobs:
       - name: Build scratch container
         run: |
           echo 'FROM scratch' >> Dockerfile
-          echo 'CMD ["/wazero/test"]' >> Dockerfile
+          echo 'CMD ["/test"]' >> Dockerfile
           docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
 
       - name: Run built test binaries
-        run: find . -name "*.test" | xargs -Itestbin docker run -w /wazero -v $(pwd)/testbin:/wazero/test --rm -t wazero:test
+        run: find . -name "*.test" | xargs -Itestbin docker run -v $(pwd)/testbin:/test --rm -t wazero:test
 
   bench:
     name: Benchmark
