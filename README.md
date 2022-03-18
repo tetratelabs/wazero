@@ -97,10 +97,10 @@ We currently test ubuntu-20.04, macos-11 and windows-2022 as packaged by
 [GitHub Actions](https://github.com/actions/virtual-environments).
 
 * Interpreter
-  * Ubuntu is tested on amd64 (native) as well arm64 and riscv64 via emulation.
+  * Linux is tested on amd64 (native) as well arm64 and riscv64 via emulation.
   * MacOS and Windows are only tested on amd64.
 * JIT
-  * Ubuntu is tested on amd64 (native) as well arm64 via emulation.
+  * Linux is tested on amd64 (native) as well arm64 via emulation.
   * MacOS and Windows are only tested on amd64.
 
 wazero has no dependencies and doesn't require CGO. This means it can also be
