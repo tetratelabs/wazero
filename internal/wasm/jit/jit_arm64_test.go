@@ -38,7 +38,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after JMP.
-		compiler.assembler.CompileReadInstructionAddress(reservedRegisterForTemporary, arm64.B)
+		compiler.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.B)
 
 		compiler.compileExitFromNativeCode(jitCallStatusCodeReturned)
 
@@ -56,7 +56,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set the acquisition target instruction to the one after RET.
-		compiler.assembler.CompileReadInstructionAddress(reservedRegisterForTemporary, arm64.RET)
+		compiler.assembler.CompileReadInstructionAddress(arm64ReservedRegisterForTemporary, arm64.RET)
 
 		// Add many instruction between the target and compileReadInstructionAddress.
 		for i := 0; i < 100; i++ {
@@ -64,7 +64,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		compiler.assembler.CompileJumpToRegister(arm64.RET, reservedRegisterForTemporary)
+		compiler.assembler.CompileJumpToRegister(arm64.RET, arm64ReservedRegisterForTemporary)
 
 		err = compiler.compileReturnFunction()
 		require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestArm64Compiler_readInstructionAddress(t *testing.T) {
 
 		// Set the acquisition target instruction to the one after RET,
 		// and read the absolute address into destinationRegister.
-		const addressReg = reservedRegisterForTemporary
+		const addressReg = arm64ReservedRegisterForTemporary
 		compiler.assembler.CompileReadInstructionAddress(addressReg, arm64.RET)
 
 		// Branch to the instruction after RET below via the absolute
