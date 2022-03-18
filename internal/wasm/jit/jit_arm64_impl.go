@@ -86,6 +86,15 @@ const (
 	arm64ReservedRegisterForTemporary asm.Register = arm64.REG_R3
 )
 
+const (
+	// arm64CallEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
+	arm64CallEngineArchContextJITCallReturnAddressOffset = 120
+	// arm64CallEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
+	arm64CallEngineArchContextMinimum32BitSignedIntOffset = 128
+	// arm64CallEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
+	arm64CallEngineArchContextMinimum64BitSignedIntOffset = 136
+)
+
 func isZeroRegister(r asm.Register) bool {
 	return r == arm64.REGZERO
 }
@@ -366,7 +375,7 @@ func (c *arm64Compiler) compileExitFromNativeCode(status jitCallStatusCode) {
 	// The return address to the Go code is stored in archContext.jitReturnAddress which
 	// is embedded in ce. We load the value to the tmpRegister, and then
 	// invoke RET with that register.
-	c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, callEngineArchContextJITCallReturnAddressOffset, arm64ReservedRegisterForTemporary)
+	c.assembler.CompileMemoryToRegister(arm64.MOVD, arm64ReservedRegisterForCallEngine, arm64CallEngineArchContextJITCallReturnAddressOffset, arm64ReservedRegisterForTemporary)
 
 	c.assembler.CompileJumpToRegister(arm64.RET, arm64ReservedRegisterForTemporary)
 }
@@ -1549,11 +1558,11 @@ func (c *arm64Compiler) compileIntegerDivPrecheck(is32Bit, isSigned bool, divide
 	if is32Bit {
 		cmpInst = arm64.CMPW
 		movInst = arm64.MOVW
-		minValueOffsetInVM = callEngineArchContextMinimum32BitSignedIntOffset
+		minValueOffsetInVM = arm64CallEngineArchContextMinimum32BitSignedIntOffset
 	} else {
 		cmpInst = arm64.CMP
 		movInst = arm64.MOVD
-		minValueOffsetInVM = callEngineArchContextMinimum64BitSignedIntOffset
+		minValueOffsetInVM = arm64CallEngineArchContextMinimum64BitSignedIntOffset
 	}
 	c.assembler.CompileTwoRegistersToNone(cmpInst, arm64.REGZERO, divisor)
 
@@ -1968,10 +1977,10 @@ func (c *arm64Compiler) compileCopysign(o *wazeroir.OperationCopysign) error {
 	var minValueOffsetInVM int64
 	if o.Type == wazeroir.Float32 {
 		fmov = arm64.FMOVS
-		minValueOffsetInVM = callEngineArchContextMinimum32BitSignedIntOffset
+		minValueOffsetInVM = arm64CallEngineArchContextMinimum32BitSignedIntOffset
 	} else {
 		fmov = arm64.FMOVD
-		minValueOffsetInVM = callEngineArchContextMinimum64BitSignedIntOffset
+		minValueOffsetInVM = arm64CallEngineArchContextMinimum64BitSignedIntOffset
 	}
 
 	c.markRegisterUsed(x1.register, x2.register)

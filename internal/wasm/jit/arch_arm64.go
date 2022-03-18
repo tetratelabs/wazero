@@ -31,15 +31,6 @@ type archContext struct {
 	minimum64BitSignedInt int64
 }
 
-const (
-	// callEngineArchContextJITCallReturnAddressOffset is the offset of archContext.jitCallReturnAddress in callEngine.
-	callEngineArchContextJITCallReturnAddressOffset = 120
-	// callEngineArchContextMinimum32BitSignedIntOffset is the offset of archContext.minimum32BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum32BitSignedIntOffset = 128
-	// callEngineArchContextMinimum64BitSignedIntOffset is the offset of archContext.minimum64BitSignedIntAddress in callEngine.
-	callEngineArchContextMinimum64BitSignedIntOffset = 136
-)
-
 // newArchContextImpl implements newArchContext for amd64 architecture.
 func newArchContextImpl() archContext {
 	return archContext{
