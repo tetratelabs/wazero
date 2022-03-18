@@ -106,7 +106,7 @@ We currently test ubuntu-20.04, macos-11 and windows-2022 as packaged by
 wazero has no dependencies and doesn't require CGO. This means it can also be
 embedded in an application that doesn't use an operating system. For example,
 we've tested every change via Docker `FROM scratch` to ensure that wazero doesn't
-require any platform dependency. It is an intended use case and a major
+require any OS dependency. It is an intended use case and a major
 differentiator between wazero and alternatives.
 
 ## Standards Compliance
