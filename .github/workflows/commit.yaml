@@ -100,17 +100,17 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.target.arch }}
+          key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}
 
       - name: Build test binaries
         run: go list ./... | xargs -Ipkg go test pkg -c
         env:
-          GOARCH: ${{ matrix.target.arch }}
+          GOARCH: ${{ matrix.arch }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
         with:
-          platforms: ${{ matrix.target.arch }}
+          platforms: ${{ matrix.arch }}
 
       - name: Build scratch container
         run:
