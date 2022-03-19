@@ -228,6 +228,7 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 | sock_shutdown           |   ❌   |                |
 
 </p>
+</details>
 
 ## History of wazero
 
