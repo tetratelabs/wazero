@@ -117,7 +117,7 @@ jobs:
           docker buildx build -t wazero:test --platform linux/${{ matrix.arch }} .
 
       - name: Run built test binaries
-        run: find . -name "*.test" | xargs -Itestbin docker run -v $(pwd)/testbin:/test --rm -t wazero:test
+        run: find . -name "*.test" | xargs -Itestbin docker run --platform linux/${{ matrix.arch }} -v $(pwd)/testbin:/test --rm -t wazero:test
 
   bench:
     name: Benchmark
