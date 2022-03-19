@@ -176,6 +176,9 @@ complete the below chart. If you desire something not yet implemented, please
 [raise an issue](https://github.com/tetratelabs/wazero/issues/new) and include
 your use case (ex which language you are using to compile, a.k.a. target Wasm).
 
+<details><summary>Click to see the full list of supported WASI systemcalls</summary>
+<p>
+
 | Function                | Status | Known Usage    |
 |:-----------------------:|:------:|---------------:|
 | args_get                |   ✅   | TinyGo         |
@@ -224,6 +227,8 @@ your use case (ex which language you are using to compile, a.k.a. target Wasm).
 | sock_send               |   ❌   |                |
 | sock_shutdown           |   ❌   |                |
 
+</p>
+</details>
 
 ## History of wazero
 
