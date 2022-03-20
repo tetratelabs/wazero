@@ -960,13 +960,16 @@ type SnapshotPreview1 interface {
 type wasiAPI struct {
 	// cfg is the default configuration to use when there is no context.Context override (ConfigContextKey).
 	cfg *Config
+	// timeNowUnixNano is mutable for testing
+	timeNowUnixNano func() uint64
+	randSource      func([]byte) error
 }
 
 // SnapshotPreview1Functions returns all go functions that implement SnapshotPreview1.
 // These should be exported in the module named wasi.ModuleSnapshotPreview1.
 // See internalwasm.NewHostModule
-func SnapshotPreview1Functions(config *Config) (nameToGoFunc map[string]interface{}) {
-	a := NewAPI(config)
+func SnapshotPreview1Functions(config *Config) (a *wasiAPI, nameToGoFunc map[string]interface{}) {
+	a = NewAPI(config)
 	// Note: these are ordered per spec for consistency even if the resulting map can't guarantee that.
 	// See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#functions
 	nameToGoFunc = map[string]interface{}{
@@ -1090,10 +1093,8 @@ func (a *wasiAPI) ClockResGet(ctx wasm.Module, id uint32, resultResolution uint3
 
 // ClockTimeGet implements SnapshotPreview1.ClockTimeGet
 func (a *wasiAPI) ClockTimeGet(ctx wasm.Module, id uint32, precision uint64, resultTimestamp uint32) wasi.Errno {
-	cfg := a.config(ctx.Context())
-
 	// TODO: id and precision are currently ignored.
-	if !ctx.Memory().WriteUint64Le(resultTimestamp, cfg.timeNowUnixNano()) {
+	if !ctx.Memory().WriteUint64Le(resultTimestamp, a.timeNowUnixNano()) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1513,10 +1514,8 @@ func (a *wasiAPI) SchedYield(ctx wasm.Module) wasi.Errno {
 
 // RandomGet implements SnapshotPreview1.RandomGet
 func (a *wasiAPI) RandomGet(ctx wasm.Module, buf uint32, bufLen uint32) (errno wasi.Errno) {
-	cfg := a.config(ctx.Context())
-
 	randomBytes := make([]byte, bufLen)
-	err := cfg.randSource(randomBytes)
+	err := a.randSource(randomBytes)
 	if err != nil {
 		// TODO: handle different errors that syscal to entropy source can return
 		return wasi.ErrnoIo
@@ -1562,9 +1561,6 @@ type Config struct {
 	stdout,
 	stderr io.Writer
 	opened map[uint32]fileEntry
-	// timeNowUnixNano is mutable for testing
-	timeNowUnixNano func() uint64
-	randSource      func([]byte) error
 }
 
 func (c *Config) Stdin(reader io.Reader) {
@@ -1630,6 +1626,13 @@ func NewConfig() *Config {
 		stdout:  os.Stdout,
 		stderr:  os.Stderr,
 		opened:  map[uint32]fileEntry{},
+	}
+}
+
+// NewAPI is exported for benchmarks
+func NewAPI(config *Config) *wasiAPI {
+	return &wasiAPI{
+		cfg: config,
 		timeNowUnixNano: func() uint64 {
 			return uint64(time.Now().UnixNano())
 		},
@@ -1638,11 +1641,6 @@ func NewConfig() *Config {
 			return err
 		},
 	}
-}
-
-// NewAPI is exported for benchmarks
-func NewAPI(config *Config) *wasiAPI {
-	return &wasiAPI{cfg: config} // Safe copy
 }
 
 // config returns a potentially overridden Config.
@@ -1655,7 +1653,7 @@ func (a *wasiAPI) config(ctx context.Context) *Config {
 
 func (a *wasiAPI) randUnusedFD(config *Config) (uint32, error) {
 	rand := make([]byte, 4)
-	err := config.randSource(rand)
+	err := a.randSource(rand)
 	if err != nil {
 		return 0, err
 	}
