@@ -160,7 +160,7 @@ are not W3C recommendations (standards). This means they can change further
 between now and any future update to the W3C WebAssembly core specification.
 Due to this, we cannot guarantee future compatability. Please encourage the
 [WebAssembly community](https://www.w3.org/community/webassembly/) to formalize
-features you rely on, specifically to read the W3C recommendation (REC) phase.
+features you rely on, specifically to reach the W3C recommendation (REC) phase.
 
 ### WebAssembly System Interface (WASI)
 
