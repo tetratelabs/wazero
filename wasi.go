@@ -75,7 +75,8 @@ func WASISnapshotPreview1() *Module {
 // WASISnapshotPreview1WithConfig are functions importable as the module name wasi.ModuleSnapshotPreview1
 func WASISnapshotPreview1WithConfig(c *WASIConfig) *Module {
 	cfg := newConfig(c) // safe copy of config
-	m, err := internalwasm.NewHostModule(wasi.ModuleSnapshotPreview1, internalwasi.SnapshotPreview1Functions(cfg))
+	_, fns := internalwasi.SnapshotPreview1Functions(cfg)
+	m, err := internalwasm.NewHostModule(wasi.ModuleSnapshotPreview1, fns)
 	if err != nil {
 		panic(fmt.Errorf("BUG: %w", err))
 	}
