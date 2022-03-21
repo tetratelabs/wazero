@@ -54,7 +54,7 @@ func TestStartWASICommandWithConfig(t *testing.T) {
 
 	// Configure WASI with baseline config
 	config := NewWASIConfig().WithStdout(stdout)
-	wasi, err := r.InstantiateModule(WASISnapshotPreview1WithConfig(config))
+	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
 	require.NoError(t, err)
 	defer wasi.Close()
 

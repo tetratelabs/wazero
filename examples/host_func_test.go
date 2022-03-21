@@ -59,15 +59,23 @@ func Test_hostFunc(t *testing.T) {
 	_, err := r.NewModuleBuilder("env").ExportFunction("get_random_bytes", getRandomBytes).Instantiate()
 	require.NoError(t, err)
 
-	// Note: host_func.go doesn't directly use WASI, but TinyGo needs to be initialized as a WASI Command.
+	// Compile the `hostFunc` module.
+	compiled, err := r.CompileModule(hostFuncWasm)
+	require.NoError(t, err)
+
+	// Configure stdout (console) to write to a buffer.
 	stdout := bytes.NewBuffer(nil)
-	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1WithConfig(wazero.NewWASIConfig().WithStdout(stdout)))
+	config := wazero.NewWASIConfig().WithStdout(stdout)
+
+	// Instantiate WASI, which implements system I/O such as console output.
+	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 	defer wasi.Close()
 
-	module, err := wazero.StartWASICommandFromSource(r, hostFuncWasm)
+	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to.
+	module, err := wazero.StartWASICommandWithConfig(r, compiled, config)
 	require.NoError(t, err)
-	defer module.Close()
+	defer wasi.Close()
 
 	allocateInWasmBufferFn := module.ExportedFunction("allocate_buffer")
 	require.NotNil(t, allocateInWasmBuffer)

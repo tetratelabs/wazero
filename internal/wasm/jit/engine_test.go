@@ -267,6 +267,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 	e := NewEngine()
 	module := &wasm.ModuleInstance{Memory: memory}
 	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module)
+
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
 		Kind:   wasm.FunctionKindGoModule,

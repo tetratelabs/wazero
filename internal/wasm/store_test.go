@@ -5,12 +5,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/cstring"
 	"github.com/tetratelabs/wazero/wasm"
 )
 
@@ -87,7 +89,7 @@ func TestModuleInstance_Memory(t *testing.T) {
 	}
 }
 
-func TestPublicModule_String(t *testing.T) {
+func TestModuleContext_String(t *testing.T) {
 	s := newStore()
 
 	// Ensure paths that can create the host module can see the name.
@@ -95,6 +97,31 @@ func TestPublicModule_String(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Module[module]", m.String())
 	require.Equal(t, "Module[module]", s.Module(m.module.Name).String())
+}
+
+func TestStore_Instantiate(t *testing.T) {
+	s := newStore()
+	m, err := NewHostModule("", map[string]interface{}{"fn": func(wasm.Module) {}})
+	require.NoError(t, err)
+
+	type key string
+	ctx := context.WithValue(context.Background(), key("a"), "b") // arbitrary non-default context
+	mod, err := s.Instantiate(ctx, m, "")
+	require.NoError(t, err)
+	defer mod.Close()
+
+	t.Run("ModuleContext defaults", func(t *testing.T) {
+		require.Equal(t, ctx, mod.ctx)
+		require.Equal(t, s.modules[""], mod.module)
+		require.Equal(t, s.modules[""].Memory, mod.memory)
+		require.Equal(t, s, mod.store)
+		require.Equal(t, cstring.EmptyNullTerminatedStrings, mod.System.Args)
+		require.Equal(t, cstring.EmptyNullTerminatedStrings, mod.System.Environ)
+		require.Equal(t, os.Stdin, mod.System.Stdin)
+		require.Equal(t, os.Stdout, mod.System.Stdout)
+		require.Equal(t, os.Stderr, mod.System.Stderr)
+		require.Empty(t, mod.System.OpenedFiles)
+	})
 }
 
 func TestStore_CloseModule(t *testing.T) {

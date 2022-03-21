@@ -1,7 +1,6 @@
 package wazero
 
 import (
-	"context"
 	"fmt"
 	"io"
 
@@ -69,13 +68,7 @@ func (c *WASIConfig) WithPreopens(preopens map[string]wasi.FS) *WASIConfig {
 
 // WASISnapshotPreview1 are functions importable as the module name wasi.ModuleSnapshotPreview1
 func WASISnapshotPreview1() *Module {
-	return WASISnapshotPreview1WithConfig(&WASIConfig{})
-}
-
-// WASISnapshotPreview1WithConfig are functions importable as the module name wasi.ModuleSnapshotPreview1
-func WASISnapshotPreview1WithConfig(c *WASIConfig) *Module {
-	cfg := newConfig(c) // safe copy of config
-	_, fns := internalwasi.SnapshotPreview1Functions(cfg)
+	_, fns := internalwasi.SnapshotPreview1Functions()
 	m, err := internalwasm.NewHostModule(wasi.ModuleSnapshotPreview1, fns)
 	if err != nil {
 		panic(fmt.Errorf("BUG: %w", err))
@@ -83,19 +76,23 @@ func WASISnapshotPreview1WithConfig(c *WASIConfig) *Module {
 	return &Module{name: wasi.ModuleSnapshotPreview1, module: m}
 }
 
-func newConfig(c *WASIConfig) *internalwasi.Config {
-	cfg := internalwasi.NewConfig()
+func newSystemContext(c *WASIConfig) (*internalwasm.SystemContext, error) {
+	sys, err := internalwasm.NewSystemContext()
+	if err != nil {
+		return nil, err
+	}
+
 	if c.stdin != nil {
-		cfg.Stdin(c.stdin)
+		sys.WithStdin(c.stdin)
 	}
 	if c.stdout != nil {
-		cfg.Stdout(c.stdout)
+		sys.WithStdout(c.stdout)
 	}
 	if c.stderr != nil {
-		cfg.Stderr(c.stderr)
+		sys.WithStderr(c.stderr)
 	}
 	if len(c.args) > 0 {
-		err := cfg.Args(c.args...)
+		err = sys.WithArgs(c.args...)
 		if err != nil {
 			panic(err) // better to panic vs have bother users about unlikely size > uint32
 		}
@@ -105,17 +102,17 @@ func newConfig(c *WASIConfig) *internalwasi.Config {
 		for k, v := range c.environ {
 			environ = append(environ, fmt.Sprintf("%s=%s", k, v))
 		}
-		err := cfg.Environ(environ...)
+		err = sys.WithEnviron(environ...)
 		if err != nil { // this can't be due to lack of '=' as we did that above.
 			panic(err) // better to panic vs have bother users about unlikely size > uint32
 		}
 	}
 	if len(c.preopens) > 0 {
 		for k, v := range c.preopens {
-			cfg.Preopen(k, v)
+			sys.WithPreopen(k, v)
 		}
 	}
-	return cfg
+	return sys, nil
 }
 
 // StartWASICommandFromSource instantiates a module from the WebAssembly 1.0 (20191205) text or binary source or errs if
@@ -172,16 +169,24 @@ func StartWASICommand(r Runtime, module *Module) (wasm.Module, error) {
 //	// Initialize base configuration:
 //	r := wazero.NewRuntime()
 //	config := wazero.NewWASIConfig().WithStdout(buf)
-//	wasi, _ := r.NewHostModule(wazero.WASISnapshotPreview1WithConfig(config))
+//	wasi, _ := r.NewHostModule(wazero.WASISnapshotPreview1())
 //	decoded, _ := r.CompileModule(source)
 //
 //	// Assign configuration only when ready to instantiate.
 //	module, _ := StartWASICommandWithConfig(r, decoded, config.WithArgs("rotate", "angle=90", "dir=cw"))
 //
 // See StartWASICommand
-func StartWASICommandWithConfig(r Runtime, module *Module, config *WASIConfig) (wasm.Module, error) {
-	if err := internalwasi.ValidateWASICommand(module.module, module.name); err != nil {
-		return nil, err
+func StartWASICommandWithConfig(r Runtime, module *Module, config *WASIConfig) (mod wasm.Module, err error) {
+	// Until #394 we have to re-assign the system context manually.
+	var sys *internalwasm.SystemContext
+	if config != nil {
+		if sys, err = newSystemContext(config); err != nil {
+			return
+		}
+	}
+
+	if err = internalwasi.ValidateWASICommand(module.module, module.name); err != nil {
+		return
 	}
 
 	internal, ok := r.(*runtime)
@@ -189,19 +194,17 @@ func StartWASICommandWithConfig(r Runtime, module *Module, config *WASIConfig) (
 		return nil, fmt.Errorf("unsupported Runtime implementation: %s", r)
 	}
 
-	// Override the configuration if needed.
-	ctx := internal.ctx
-	if config != nil {
-		ctx = context.WithValue(ctx, internalwasi.ConfigContextKey{}, newConfig(config)) // safe copy of config
+	if mod, err = internal.store.Instantiate(internal.ctx, module.module, module.name); err != nil {
+		return
 	}
 
-	mod, err := internal.store.Instantiate(ctx, module.module, module.name)
-	if err != nil {
-		return nil, err
+	// Override as necessary
+	if sys != nil {
+		mod.(*internalwasm.ModuleContext).System = sys
 	}
 
 	start := mod.ExportedFunction(internalwasi.FunctionStart)
-	if _, err = start.Call(mod.WithContext(ctx)); err != nil {
+	if _, err = start.Call(mod.WithContext(internal.ctx)); err != nil {
 		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
 	}
 	return mod, nil
