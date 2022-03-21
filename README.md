@@ -36,7 +36,7 @@ language that compiles to (targets) WebAssembly, such as AssemblyScript, C, C++,
 
 The former example is a pure function. While a good start, you probably are
 wondering how to do something more realistic, like read a file. WebAssembly
-Modules (Wasm) are sand-boxed similar to containers. They can't read anything
+Modules (Wasm) are sandboxed similar to containers. They can't read anything
 on your machine unless you explicitly allow it.
 
 System access is defined by an emerging specification called WebAssembly

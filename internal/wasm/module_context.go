@@ -11,12 +11,7 @@ import (
 var _ publicwasm.Module = &ModuleContext{}
 
 func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance) *ModuleContext {
-	return &ModuleContext{
-		ctx:    ctx,
-		memory: instance.Memory,
-		module: instance,
-		store:  store,
-	}
+	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store}
 }
 
 // ModuleContext implements wasm.Module
@@ -27,13 +22,18 @@ type ModuleContext struct {
 	// memory is returned by Memory and overridden WithMemory
 	memory publicwasm.Memory
 	store  *Store
+
+	// System is not exposed publicly. This is currently only used by internalwasi.
+	// Note: This is a part of ModuleContext so that scope is correct and Close is coherent.
+	// TODO: In #394 unexport this for System()
+	System *SystemContext
 }
 
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
 func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	// only re-allocate if it will change the effective memory
 	if m.memory == nil || (memory != nil && memory.Max != nil && *memory.Max > 0 && memory != m.memory) {
-		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx}
+		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx, System: m.System}
 	}
 	return m
 }
@@ -52,14 +52,19 @@ func (m *ModuleContext) Context() context.Context {
 func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 	// only re-allocate if it will change the effective context
 	if ctx != nil && ctx != m.ctx {
-		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx}
+		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, System: m.System}
 	}
 	return m
 }
 
 // Close implements io.Closer
-func (m *ModuleContext) Close() error {
-	return m.store.CloseModule(m.module.Name)
+// Note: When there are multiple errors, the error returned is the last one.
+func (m *ModuleContext) Close() (err error) {
+	err = m.store.CloseModule(m.module.Name)
+	if err2 := m.System.Close(); err2 != nil {
+		err = err2
+	}
+	return
 }
 
 // Memory implements wasm.Module Memory

@@ -31,7 +31,7 @@ func Test_Cat(t *testing.T) {
 	stdoutBuf := bytes.NewBuffer(nil)
 	wasiConfig := wazero.NewWASIConfig().WithStdout(stdoutBuf)
 
-	// Next, configure a sand-boxed filesystem to include one file.
+	// Next, configure a sandboxed filesystem to include one file.
 	file := "cat.go" // arbitrary file
 	memFS := wazero.WASIMemFS()
 	err := writeFile(memFS, file, catGo)
@@ -42,13 +42,18 @@ func Test_Cat(t *testing.T) {
 	// Remember, arg[0] is the program name!
 	wasiConfig.WithArgs("cat", file)
 
-	// Now, instantiate WASI with the above configuration.
-	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1WithConfig(wasiConfig))
+	// Compile the `cat` module.
+	compiled, err := r.CompileModule(catWasm)
+	require.NoError(t, err)
+
+	// Instantiate WASI, which implements system I/O such as console output.
+	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
 	require.NoError(t, err)
 	defer wasi.Close()
 
-	// Finally, start the `cat` program's main function (in WASI, this is named `_start`).
-	cat, err := wazero.StartWASICommandFromSource(r, catWasm)
+	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to.
+	cat, err := wazero.StartWASICommandWithConfig(r, compiled, wasiConfig)
+
 	require.NoError(t, err)
 	defer cat.Close()
 

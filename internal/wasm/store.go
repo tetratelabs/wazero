@@ -260,7 +260,12 @@ func NewStore(engine Engine, enabledFeatures Features) *Store {
 //
 // Note: Module.Validate must be called prior to instantiation.
 func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*ModuleContext, error) {
-	if err := s.requireModuleName(name); err != nil {
+	sys, err := NewSystemContext() // TODO: from config in #394
+	if err != nil {                // fail early
+		return nil, err
+	}
+
+	if err = s.requireModuleName(name); err != nil {
 		return nil, err
 	}
 
@@ -314,6 +319,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*
 
 	// Build the default context for calls to this module.
 	m.Ctx = NewModuleContext(ctx, s, m)
+	m.Ctx.System = sys
 
 	// Execute the start function.
 	if module.StartSection != nil {
