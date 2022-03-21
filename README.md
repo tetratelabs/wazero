@@ -17,7 +17,7 @@ Here's an example of using wazero to invoke a factorial function:
 func main() {
 	// Read a WebAssembly binary containing an exported "fac" function.
 	// * Ex. (func (export "fac") (param i64) (result i64) ...
-	source, _ := os.ReadFile("./tests/engine/testdata/fac.wasm")
+	source, _ := os.ReadFile("./tests/bench/testdata/fac.wasm")
 
 	// Instantiate the module and return its exported functions
 	module, _ := wazero.NewRuntime().InstantiateModuleFromSource(source)
@@ -28,7 +28,7 @@ func main() {
 }
 ```
 
-Note: While the [source for this](tests/engine/testdata/fac.wat) is in the
+Note: While the [source for this](tests/bench/testdata/fac.wat) is in the
 WebAssembly 1.0 (20191205) Text Format, it could have been written in another
 language that compiles to (targets) WebAssembly, such as AssemblyScript, C, C++, Rust, TinyGo or Zig.
 
@@ -93,7 +93,7 @@ wazero has two runtime modes: Interpreter and JIT. The only supported operating
 systems are ones we test, but that doesn't necessarily mean other operating
 system versions won't work.
 
-We currently test ubuntu-20.04, macos-11 and windows-2022 as packaged by
+We currently test Linux (Ubuntu and scratch), MacOS and Windows as packaged by
 [GitHub Actions](https://github.com/actions/virtual-environments).
 
 * Interpreter
@@ -104,10 +104,11 @@ We currently test ubuntu-20.04, macos-11 and windows-2022 as packaged by
   * MacOS and Windows are only tested on amd64.
 
 wazero has no dependencies and doesn't require CGO. This means it can also be
-embedded in an application that doesn't use an operating system. For example,
-we've tested every change via Docker `FROM scratch` to ensure that wazero doesn't
-require any OS dependency. It is an intended use case and a major
+embedded in an application that doesn't use an operating system. This is a main
 differentiator between wazero and alternatives.
+
+We verify wazero's independence by running tests in Docker's [scratch image](https://docs.docker.com/develop/develop-images/baseimages/#create-a-simple-parent-image-using-scratch).
+This approach ensures compatibility with any parent image.
 
 ## Standards Compliance
 
