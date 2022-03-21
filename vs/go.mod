@@ -3,7 +3,8 @@ module github.com/tetratelabs/wazero/vs
 go 1.17
 
 require (
-	github.com/bytecodealliance/wasmtime-go v0.34.0
+	github.com/birros/go-wasm3 v0.0.0-20220320175540-c625eebef38c
+	github.com/bytecodealliance/wasmtime-go v0.35.0
 	github.com/stretchr/testify v1.7.0
 	github.com/tetratelabs/wazero v0.0.0
 	github.com/wasmerio/wasmer-go v1.0.4
