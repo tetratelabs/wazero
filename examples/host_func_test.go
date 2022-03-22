@@ -65,7 +65,7 @@ func Test_hostFunc(t *testing.T) {
 
 	// Configure stdout (console) to write to a buffer.
 	stdout := bytes.NewBuffer(nil)
-	config := wazero.NewWASIConfig().WithStdout(stdout)
+	config := wazero.NewSysConfig().WithStdout(stdout)
 
 	// Instantiate WASI, which implements system I/O such as console output.
 	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())

@@ -54,3 +54,5 @@ func TestRuntimeConfig_Features(t *testing.T) {
 		})
 	}
 }
+
+// TODO: test buildSysContext

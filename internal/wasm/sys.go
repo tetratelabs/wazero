@@ -1,13 +1,13 @@
 package internalwasm
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
-	"strings"
+	"sync/atomic"
 
-	"github.com/tetratelabs/wazero/internal/cstring"
 	"github.com/tetratelabs/wazero/wasi"
 )
 
@@ -20,102 +20,206 @@ type FileEntry struct {
 	File wasi.File
 }
 
-// SystemContext holds module-scoped system resources currently only used by internalwasi.
-//
-// TODO: Most fields are mutable so that WASI config can overwrite fields when starting a command module. This can be
-// fixed in #394 by replacing wazero.WASIConfig with wazero.SystemConfig, defaulted by wazero.RuntimeConfig and
-// overridable with InstantiateModule.
-type SystemContext struct {
-	// WithArgs hold a possibly empty (cstring.EmptyNullTerminatedStrings) list of arguments similar to os.Args.
-	//
-	// TODO: document this better in #396
-	Args *cstring.NullTerminatedStrings
+// SysContext holds module-scoped system resources currently only used by internalwasi.
+type SysContext struct {
+	args, environ         []string
+	argsSize, environSize uint32
+	stdin                 io.Reader
+	stdout, stderr        io.Writer
 
-	// WithArgs hold a possibly empty (cstring.EmptyNullTerminatedStrings) list of arguments key/value pairs, similar to
-	// os.Environ.
-	//
-	// TODO: document this better in #396
-	Environ *cstring.NullTerminatedStrings
-
-	// WithStdin defaults to os.Stdin.
-	//
-	// TODO: change default to read os.DevNull in #396
-	Stdin io.Reader
-
-	// WithStdout defaults to os.Stdout.
-	//
-	// TODO: change default to io.Discard in #396
-	Stdout io.Writer
-
-	// WithStderr defaults to os.Stderr.
-	//
-	// TODO: change default to io.Discard in #396
-	Stderr io.Writer
-
-	// OpenedFiles are a map of file descriptor numbers (starting at 3) to open files (or directories).
+	// openedFiles is a map of file descriptor numbers (>=3) to open files (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
-	OpenedFiles map[uint32]*FileEntry
+	openedFiles map[uint32]*FileEntry
+
+	// lastFD is not meant to be read directly. Rather by nextFD.
+	lastFD uint32
 }
 
-func NewSystemContext() (*SystemContext, error) {
-	return &SystemContext{
-		Args:        cstring.EmptyNullTerminatedStrings,
-		Environ:     cstring.EmptyNullTerminatedStrings,
-		Stdin:       os.Stdin, // TODO: stop this default #396
-		Stdout:      os.Stdout,
-		Stderr:      os.Stderr,
-		OpenedFiles: map[uint32]*FileEntry{},
-	}, nil // TODO: once we open stdin from os.DevNull, this may raise an error (albeit unlikely).
-}
-
-// WithStdin the same as wazero.WASIConfig WithStdin
-func (c *SystemContext) WithStdin(reader io.Reader) {
-	c.Stdin = reader
-}
-
-// WithStdout the same as wazero.WASIConfig WithStdout
-func (c *SystemContext) WithStdout(writer io.Writer) {
-	c.Stdout = writer
-}
-
-// WithStderr the same as wazero.WASIConfig WithStderr
-func (c *SystemContext) WithStderr(writer io.Writer) {
-	c.Stderr = writer
-}
-
-// WithArgs is the same as wazero.WASIConfig WithArgs
-func (c *SystemContext) WithArgs(args ...string) error {
-	wasiStrings, err := cstring.NewNullTerminatedStrings(math.MaxUint32, "arg", args...) // TODO: this is crazy high even if spec allows it
-	if err != nil {
-		return err
+// nextFD gets the next file descriptor number in a goroutine safe way (monotonically) or zero if we ran out.
+// TODO: opendFiles is still not goroutine safe!
+// TODO: This can return zero if we ran out of file descriptors. A future change can optimize by re-using an FD pool.
+func (c *SysContext) nextFD() uint32 {
+	if c.lastFD == math.MaxUint32 {
+		return 0
 	}
-	c.Args = wasiStrings
-	return nil
+	return atomic.AddUint32(&c.lastFD, 1)
 }
 
-// WithEnviron is the same as wazero.WASIConfig WithEnviron
-func (c *SystemContext) WithEnviron(environ ...string) error {
-	for i, env := range environ {
-		if !strings.Contains(env, "=") {
-			return fmt.Errorf("environ[%d] is not joined with '='", i)
+// Args is like os.Args and defaults to nil.
+//
+// Note: The count will never be more than math.MaxUint32.
+// See wazero.SysConfig WithArgs
+func (c *SysContext) Args() []string {
+	return c.args
+}
+
+// ArgsSize is the size to encode Args as Null-terminated strings.
+//
+// Note: To get the size without null-terminators, subtract the length of Args from this value.
+// See wazero.SysConfig WithArgs
+// See https://en.wikipedia.org/wiki/Null-terminated_string
+func (c *SysContext) ArgsSize() uint32 {
+	return c.argsSize
+}
+
+// Environ are "key=value" entries like os.Environ and default to nil.
+//
+// Note: The count will never be more than math.MaxUint32.
+// See wazero.SysConfig WithEnviron
+func (c *SysContext) Environ() []string {
+	return c.environ
+}
+
+// EnvironSize is the size to encode Environ as Null-terminated strings.
+//
+// Note: To get the size without null-terminators, subtract the length of Environ from this value.
+// See wazero.SysConfig WithEnviron
+// See https://en.wikipedia.org/wiki/Null-terminated_string
+func (c *SysContext) EnvironSize() uint32 {
+	return c.environSize
+}
+
+// Stdin is like exec.Cmd Stdin and defaults to a reader of os.DevNull.
+// See wazero.SysConfig WithStdin
+func (c *SysContext) Stdin() io.Reader {
+	return c.stdin
+}
+
+// Stdout is like exec.Cmd Stdout and defaults to io.Discard.
+// See wazero.SysConfig WithStdout
+func (c *SysContext) Stdout() io.Writer {
+	return c.stdout
+}
+
+// Stderr is like exec.Cmd Stderr and defaults to io.Discard.
+// See wazero.SysConfig WithStderr
+func (c *SysContext) Stderr() io.Writer {
+	return c.stderr
+}
+
+// eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
+type eofReader struct{}
+
+// Read implements io.Reader
+// Note: This doesn't use a pointer reference as it has no state and an empty struct doesn't allocate.
+func (eofReader) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+// NewSystemContext is a factory function which helps avoid needing to know defaults or exporting all fields.
+// Note: max is exposed for testing. max is only used for env/args validation.
+func NewSystemContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
+	sys = &SysContext{args: args, environ: environ}
+
+	if sys.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
+		return nil, fmt.Errorf("args invalid: %w", err)
+	}
+
+	if sys.environSize, err = nullTerminatedByteCount(max, environ); err != nil {
+		return nil, fmt.Errorf("environ invalid: %w", err)
+	}
+
+	if stdin == nil {
+		sys.stdin = eofReader{}
+	} else {
+		sys.stdin = stdin
+	}
+
+	if stdout == nil {
+		sys.stdout = io.Discard
+	} else {
+		sys.stdout = stdout
+	}
+
+	if stderr == nil {
+		sys.stderr = io.Discard
+	} else {
+		sys.stderr = stderr
+	}
+
+	if openedFiles == nil {
+		sys.openedFiles = map[uint32]*FileEntry{}
+		sys.lastFD = 2 // STDERR
+	} else {
+		sys.openedFiles = openedFiles
+		sys.lastFD = 2 // STDERR
+		for fd := range openedFiles {
+			if fd > sys.lastFD {
+				sys.lastFD = fd
+			}
 		}
 	}
-	wasiStrings, err := cstring.NewNullTerminatedStrings(math.MaxUint32, "environ", environ...) // TODO: this is crazy high even if spec allows it
-	if err != nil {
-		return err
-	}
-	c.Environ = wasiStrings
-	return nil
+	return
 }
 
-// WithPreopen adds one element in  wazero.WASIConfig WithPreopens
-func (c *SystemContext) WithPreopen(dir string, fileSys wasi.FS) {
-	c.OpenedFiles[uint32(len(c.OpenedFiles))+3] = &FileEntry{Path: dir, FS: fileSys}
+// nullTerminatedByteCount ensures the count or Nul-terminated length of the elements doesn't exceed max, and that no
+// element includes the nul character.
+func nullTerminatedByteCount(max uint32, elements []string) (uint32, error) {
+	count := uint32(len(elements))
+	if count > max {
+		return 0, errors.New("exceeds maximum count")
+	}
+
+	// The buffer size is the total size including null terminators. The null terminator count == value count, sum
+	// count with each value length. This works because in Go, the length of a string is the same as its byte count.
+	bufSize, maxSize := uint64(count), uint64(max) // uint64 to allow summing without overflow
+	for _, e := range elements {
+		// As this is null-terminated, We have to validate there are no null characters in the string.
+		for _, c := range e {
+			if c == 0 {
+				return 0, errors.New("contains NUL character")
+			}
+		}
+
+		nextSize := bufSize + uint64(len(e))
+		if nextSize > maxSize {
+			return 0, errors.New("exceeds maximum size")
+		}
+		bufSize = nextSize
+
+	}
+	return uint32(bufSize), nil
 }
 
 // Close implements io.Closer
-func (c *SystemContext) Close() (err error) {
-	// Note: WithStdin, WithStdout and WithStderr are not closed as we didn't open them.
-	// TODO: In #394, close open files
+func (c *SysContext) Close() (err error) {
+	// stdin, stdout and stderr are only closed if we opened them. The only case we open is when stdin -> /dev/null
+	if f, ok := c.stdin.(*os.File); ok && f.Name() == os.DevNull {
+		_ = f.Close() // ignore error closing reader of /dev/null
+	}
+	// TODO: close openedFiles
 	return
+}
+
+// CloseFile returns true if a file was opened and closed without error, or false if not.
+func (c *SysContext) CloseFile(fd uint32) (bool, error) {
+	f, ok := c.openedFiles[fd]
+	if !ok {
+		return false, nil
+	}
+	delete(c.openedFiles, fd)
+
+	if f.File == nil { // TODO: currently, this means it is a pre-opened filesystem, but this may change later.
+		return true, nil
+	}
+	if err := f.File.Close(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// OpenedFile returns a file and true if it was opened or nil and false, if not.
+func (c *SysContext) OpenedFile(fd uint32) (*FileEntry, bool) {
+	f, ok := c.openedFiles[fd]
+	return f, ok
+}
+
+// OpenFile returns the file descriptor of the new file or false if we ran out of file descriptors
+func (c *SysContext) OpenFile(f *FileEntry) (uint32, bool) {
+	newFD := c.nextFD()
+	if newFD == 0 {
+		return 0, false
+	}
+	c.openedFiles[newFD] = f
+	return newFD, true
 }

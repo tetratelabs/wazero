@@ -2,7 +2,6 @@ package internalwasi
 
 import (
 	crand "crypto/rand"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -1020,29 +1019,18 @@ func SnapshotPreview1Functions() (a *wasiAPI, nameToGoFunc map[string]interface{
 // ArgsGet implements SnapshotPreview1.ArgsGet
 func (a *wasiAPI) ArgsGet(ctx wasm.Module, argv, argvBuf uint32) wasi.Errno {
 	sys := systemContext(ctx)
-
-	for _, arg := range sys.Args.NullTerminatedValues {
-		if !ctx.Memory().WriteUint32Le(argv, argvBuf) {
-			return wasi.ErrnoFault
-		}
-		argv += 4 // size of uint32
-		if !ctx.Memory().Write(argvBuf, arg) {
-			return wasi.ErrnoFault
-		}
-		argvBuf += uint32(len(arg))
-	}
-
-	return wasi.ErrnoSuccess
+	return writeOffsetsAndNullTerminatedValues(ctx.Memory(), sys.Args(), argv, argvBuf)
 }
 
 // ArgsSizesGet implements SnapshotPreview1.ArgsSizesGet
 func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize uint32) wasi.Errno {
 	sys := systemContext(ctx)
+	mem := ctx.Memory()
 
-	if !ctx.Memory().WriteUint32Le(resultArgc, uint32(len(sys.Args.NullTerminatedValues))) {
+	if !mem.WriteUint32Le(resultArgc, uint32(len(sys.Args()))) {
 		return wasi.ErrnoFault
 	}
-	if !ctx.Memory().WriteUint32Le(resultArgvBufSize, sys.Args.TotalBufSize) {
+	if !mem.WriteUint32Le(resultArgvBufSize, sys.ArgsSize()) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1051,30 +1039,18 @@ func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize ui
 // EnvironGet implements SnapshotPreview1.EnvironGet
 func (a *wasiAPI) EnvironGet(ctx wasm.Module, environ uint32, environBuf uint32) wasi.Errno {
 	sys := systemContext(ctx)
-
-	// w.environ holds the environment variables in the form of "key=val\x00", so just copies it to the linear memory.
-	for _, env := range sys.Environ.NullTerminatedValues {
-		if !ctx.Memory().WriteUint32Le(environ, environBuf) {
-			return wasi.ErrnoFault
-		}
-		environ += 4 // size of uint32
-		if !ctx.Memory().Write(environBuf, env) {
-			return wasi.ErrnoFault
-		}
-		environBuf += uint32(len(env))
-	}
-
-	return wasi.ErrnoSuccess
+	return writeOffsetsAndNullTerminatedValues(ctx.Memory(), sys.Environ(), environ, environBuf)
 }
 
 // EnvironSizesGet implements SnapshotPreview1.EnvironSizesGet
 func (a *wasiAPI) EnvironSizesGet(ctx wasm.Module, resultEnvironc uint32, resultEnvironBufSize uint32) wasi.Errno {
 	sys := systemContext(ctx)
+	mem := ctx.Memory()
 
-	if !ctx.Memory().WriteUint32Le(resultEnvironc, uint32(len(sys.Environ.NullTerminatedValues))) {
+	if !mem.WriteUint32Le(resultEnvironc, uint32(len(sys.Environ()))) {
 		return wasi.ErrnoFault
 	}
-	if !ctx.Memory().WriteUint32Le(resultEnvironBufSize, sys.Environ.TotalBufSize) {
+	if !mem.WriteUint32Le(resultEnvironBufSize, sys.EnvironSize()) {
 		return wasi.ErrnoFault
 	}
 
@@ -1109,16 +1085,11 @@ func (a *wasiAPI) FdAllocate(ctx wasm.Module, fd uint32, offset, len uint64) was
 func (a *wasiAPI) FdClose(ctx wasm.Module, fd uint32) wasi.Errno {
 	sys := systemContext(ctx)
 
-	f, ok := sys.OpenedFiles[fd]
-	if !ok {
+	if ok, err := sys.CloseFile(fd); err != nil {
+		return wasi.ErrnoIo
+	} else if !ok {
 		return wasi.ErrnoBadf
 	}
-
-	if f.File != nil {
-		f.File.Close()
-	}
-
-	delete(sys.OpenedFiles, fd)
 
 	return wasi.ErrnoSuccess
 }
@@ -1133,7 +1104,7 @@ func (a *wasiAPI) FdDatasync(ctx wasm.Module, fd uint32) wasi.Errno {
 func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) wasi.Errno {
 	sys := systemContext(ctx)
 
-	if _, ok := sys.OpenedFiles[fd]; !ok {
+	if _, ok := sys.OpenedFile(fd); !ok {
 		return wasi.ErrnoBadf
 	}
 	if !ctx.Memory().WriteUint64Le(resultStat+16, rightFDRead|rightFDWrite) {
@@ -1146,7 +1117,7 @@ func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) was
 func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, resultPrestat uint32) wasi.Errno {
 	sys := systemContext(ctx)
 
-	entry, ok := sys.OpenedFiles[fd]
+	entry, ok := sys.OpenedFile(fd)
 	if !ok || entry.Path == "" {
 		return wasi.ErrnoBadf
 	}
@@ -1197,7 +1168,7 @@ func (a *wasiAPI) FdPread(ctx wasm.Module, fd, iovs, iovsCount uint32, offset ui
 func (a *wasiAPI) FdPrestatDirName(ctx wasm.Module, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
 	sys := systemContext(ctx)
 
-	f, ok := sys.OpenedFiles[fd]
+	f, ok := sys.OpenedFile(fd)
 	if !ok {
 		return wasi.ErrnoBadf
 	}
@@ -1225,15 +1196,10 @@ func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32
 
 	var reader io.Reader
 
-	switch fd {
-	case 0:
-		if sys.Stdin != nil {
-			reader = sys.Stdin
-		} else {
-			return wasi.ErrnoBadf
-		}
-	default:
-		f, ok := sys.OpenedFiles[fd]
+	if fd == 0 {
+		reader = sys.Stdin()
+	} else {
+		f, ok := sys.OpenedFile(fd)
 		if !ok || f.File == nil {
 			return wasi.ErrnoBadf
 		}
@@ -1283,7 +1249,7 @@ func (a *wasiAPI) FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno {
 func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno {
 	sys := systemContext(ctx)
 
-	f, ok := sys.OpenedFiles[fd]
+	f, ok := sys.OpenedFile(fd)
 	if !ok || f.File == nil {
 		return wasi.ErrnoBadf
 	}
@@ -1325,11 +1291,11 @@ func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint3
 
 	switch fd {
 	case 1:
-		writer = sys.Stdout
+		writer = sys.Stdout()
 	case 2:
-		writer = sys.Stderr
+		writer = sys.Stderr()
 	default:
-		f, ok := sys.OpenedFiles[fd]
+		f, ok := sys.OpenedFile(fd)
 		if !ok || f.File == nil {
 			return wasi.ErrnoBadf
 		}
@@ -1422,7 +1388,7 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, ofla
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
 	sys := systemContext(ctx)
 
-	dir, ok := sys.OpenedFiles[fd]
+	dir, ok := sys.OpenedFile(fd)
 	if !ok || dir.FS == nil {
 		return wasi.ErrnoBadf
 	}
@@ -1447,14 +1413,9 @@ func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, ofla
 	// when ofagDir is set, the opened file must be a directory.
 	// TODO if oflags&oflagDir != 0 return wasi.ErrnoNotdir if stat != dir
 
-	newFD, err := a.randUnusedFD(sys)
-	if err != nil {
+	if newFD, ok := sys.OpenFile(&internalwasm.FileEntry{Path: pathName, File: f, FS: dir.FS}); !ok {
 		return wasi.ErrnoIo
-	}
-
-	sys.OpenedFiles[newFD] = &internalwasm.FileEntry{Path: pathName, File: f, FS: dir.FS}
-
-	if !ctx.Memory().WriteUint32Le(resultOpenedFd, newFD) {
+	} else if !ctx.Memory().WriteUint32Le(resultOpenedFd, newFD) {
 		return wasi.ErrnoFault
 	}
 	return wasi.ErrnoSuccess
@@ -1551,29 +1512,11 @@ func NewAPI() *wasiAPI {
 	}
 }
 
-func systemContext(ctx wasm.Module) *internalwasm.SystemContext {
+func systemContext(ctx wasm.Module) *internalwasm.SysContext {
 	if internal, ok := ctx.(*internalwasm.ModuleContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", ctx))
 	} else {
-		return internal.System
-	}
-}
-
-func (a *wasiAPI) randUnusedFD(sys *internalwasm.SystemContext) (uint32, error) {
-	// TODO: consider not using random source here, as there's collision avoidance below anyway, and using the random
-	// source is both expensive (including allocation and decoding) and can deplete it.
-	rand := make([]byte, 4)
-	err := a.randSource(rand)
-	if err != nil {
-		return 0, err
-	}
-	// fd is actually a signed int32, and must be a positive number.
-	fd := binary.LittleEndian.Uint32(rand) % (1 << 31)
-	for { // avoid collisions on an already used file-descriptor. Note: this is not goroutine safe.
-		if _, ok := sys.OpenedFiles[fd]; !ok {
-			return fd, nil
-		}
-		fd = (fd + 1) % (1 << 31)
+		return internal.Sys()
 	}
 }
 
@@ -1607,4 +1550,26 @@ func requireExport(module *internalwasm.Module, moduleName string, exportName st
 		return nil, fmt.Errorf("module[%s] does not export %s[%s]", moduleName, internalwasm.ExternTypeName(kind), exportName)
 	}
 	return exp, nil
+}
+
+func writeOffsetsAndNullTerminatedValues(mem wasm.Memory, values []string, offsets, bytes uint32) wasi.Errno {
+	for _, value := range values {
+		// Write current offset and advance it.
+		if !mem.WriteUint32Le(offsets, bytes) {
+			return wasi.ErrnoFault
+		}
+		offsets += 4 // size of uint32
+
+		// Write the next value to memory with a NUL terminator
+		if !mem.Write(bytes, []byte(value)) {
+			return wasi.ErrnoFault
+		}
+		bytes += uint32(len(value))
+		if !mem.WriteByte(bytes, 0) {
+			return wasi.ErrnoFault
+		}
+		bytes++
+	}
+
+	return wasi.ErrnoSuccess
 }

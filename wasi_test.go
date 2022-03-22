@@ -52,8 +52,8 @@ func TestStartWASICommandWithConfig(t *testing.T) {
 
 	stdout := bytes.NewBuffer(nil)
 
-	// Configure WASI with baseline config
-	config := NewWASIConfig().WithStdout(stdout)
+	// Configure WASI to write stdout to a buffer, so that we can verify it later.
+	sys := NewSysConfig().WithStdout(stdout)
 	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
 	require.NoError(t, err)
 	defer wasi.Close()
@@ -63,7 +63,7 @@ func TestStartWASICommandWithConfig(t *testing.T) {
 
 	// Re-use the same module many times.
 	for _, tc := range []string{"a", "b", "c"} {
-		mod, err := StartWASICommandWithConfig(r, m.WithName(tc), config.WithArgs(tc))
+		mod, err := StartWASICommandWithConfig(r, m.WithName(tc), sys.WithArgs(tc))
 		require.NoError(t, err)
 
 		// Ensure the scoped configuration applied. As the args are null-terminated, we append zero (NUL).

@@ -59,6 +59,7 @@ func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 	module, err := r.InstantiateModuleFromSource(hugestackWasm)
 	require.NoError(t, err)
+	defer module.Close()
 
 	fn := module.ExportedFunction("main")
 	require.NotNil(t, fn)
@@ -79,6 +80,7 @@ func testUnreachable(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig
 
 	module, err := r.InstantiateModuleFromSource(unreachableWasm)
 	require.NoError(t, err)
+	defer module.Close()
 
 	_, err = module.ExportedFunction("main").Call(nil)
 	exp := `wasm runtime error: panic in host function
@@ -103,6 +105,7 @@ func testRecursiveEntry(t *testing.T, newRuntimeConfig func() *wazero.RuntimeCon
 
 	module, err := r.InstantiateModuleFromSource(recursiveWasm)
 	require.NoError(t, err)
+	defer module.Close()
 
 	_, err = module.ExportedFunction("main").Call(nil, 1)
 	require.NoError(t, err)
@@ -135,6 +138,7 @@ func testImportedAndExportedFunc(t *testing.T, newRuntimeConfig func() *wazero.R
 		(export "store_int" (func $store_int))
 		)`))
 	require.NoError(t, err)
+	defer module.Close()
 
 	// Call store_int and ensure it didn't return an error code.
 	results, err := module.ExportedFunction("store_int").Call(nil, 1, math.MaxUint64)
@@ -211,6 +215,7 @@ func testHostFunctions(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConf
 	(export "call->test.identity_f64" (func $call->test.identity_f64))
 )`))
 		require.NoError(t, err)
+		defer m.Close()
 
 		t.Run(fmt.Sprintf("host function with f32 param%s", k), func(t *testing.T) {
 			name := "call->test.identity_f32"

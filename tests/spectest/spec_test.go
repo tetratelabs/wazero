@@ -267,7 +267,7 @@ func addSpectestModule(t *testing.T, store *wasm.Store) {
 		},
 	}
 	require.NoError(t, mod.Validate(wasm.Features20191205))
-	_, err := store.Instantiate(context.Background(), mod, "spectest")
+	_, err := store.Instantiate(context.Background(), mod, "spectest", nil)
 	require.NoError(t, err)
 }
 
@@ -335,7 +335,7 @@ func runTest(t *testing.T, newEngine func() wasm.Engine) {
 							}
 						}
 						moduleName = strings.TrimPrefix(moduleName, "$")
-						_, err = store.Instantiate(context.Background(), mod, moduleName)
+						_, err = store.Instantiate(context.Background(), mod, moduleName, nil)
 						lastInstantiatedModuleName = moduleName
 						require.NoError(t, err)
 					case "register":
@@ -458,7 +458,7 @@ func requireInstantiationError(t *testing.T, store *wasm.Store, buf []byte, msg 
 		return
 	}
 
-	_, err = store.Instantiate(context.Background(), mod, t.Name())
+	_, err = store.Instantiate(context.Background(), mod, t.Name(), nil)
 	require.Error(t, err, msg)
 }
 

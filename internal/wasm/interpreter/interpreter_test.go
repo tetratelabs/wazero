@@ -175,7 +175,7 @@ func TestEngine_Call(t *testing.T) {
 	// Use exported functions to simplify instantiation of a Wasm function
 	e := NewEngine()
 	store := wasm.NewStore(e, wasm.Features20191205)
-	mod, err := store.Instantiate(context.Background(), m, t.Name())
+	mod, err := store.Instantiate(context.Background(), m, t.Name(), nil)
 	require.NoError(t, err)
 
 	fn := mod.ExportedFunction("fn")
@@ -207,7 +207,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 
 	e := NewEngine()
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module)
+	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module, nil)
 
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,

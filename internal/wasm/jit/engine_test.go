@@ -127,7 +127,7 @@ func TestEngine_Call(t *testing.T) {
 	// Use exported functions to simplify instantiation of a Wasm function
 	e := NewEngine()
 	store := wasm.NewStore(e, wasm.Features20191205)
-	mod, err := store.Instantiate(context.Background(), m, t.Name())
+	mod, err := store.Instantiate(context.Background(), m, t.Name(), nil)
 	require.NoError(t, err)
 
 	fn := mod.ExportedFunction("fn")
@@ -266,7 +266,7 @@ func TestEngine_Call_HostFn(t *testing.T) {
 
 	e := NewEngine()
 	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module)
+	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module, nil)
 
 	f := &wasm.FunctionInstance{
 		GoFunc: &hostFn,
@@ -523,7 +523,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
-	_, err = store.Instantiate(context.Background(), hm, hostModuleName)
+	_, err = store.Instantiate(context.Background(), hm, hostModuleName, nil)
 	require.NoError(t, err)
 
 	const valueStackCorruption = "value_stack_corruption"
@@ -574,7 +574,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 		},
 	}
 
-	mi, err := store.Instantiate(context.Background(), m, t.Name())
+	mi, err := store.Instantiate(context.Background(), m, t.Name(), nil)
 	require.NoError(t, err)
 
 	for _, fnName := range []string{valueStackCorruption, callStackCorruption} {

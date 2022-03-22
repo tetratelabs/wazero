@@ -10,8 +10,8 @@ import (
 // compile time check to ensure ModuleContext implements wasm.Module
 var _ publicwasm.Module = &ModuleContext{}
 
-func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance) *ModuleContext {
-	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store}
+func NewModuleContext(ctx context.Context, store *Store, instance *ModuleInstance, sys *SysContext) *ModuleContext {
+	return &ModuleContext{ctx: ctx, memory: instance.Memory, module: instance, store: store, sys: sys}
 }
 
 // ModuleContext implements wasm.Module
@@ -23,17 +23,16 @@ type ModuleContext struct {
 	memory publicwasm.Memory
 	store  *Store
 
-	// System is not exposed publicly. This is currently only used by internalwasi.
+	// Sys is not exposed publicly. This is currently only used by internalwasi.
 	// Note: This is a part of ModuleContext so that scope is correct and Close is coherent.
-	// TODO: In #394 unexport this for System()
-	System *SystemContext
+	sys *SysContext
 }
 
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
 func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
 	// only re-allocate if it will change the effective memory
 	if m.memory == nil || (memory != nil && memory.Max != nil && *memory.Max > 0 && memory != m.memory) {
-		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx, System: m.System}
+		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx, sys: m.sys}
 	}
 	return m
 }
@@ -48,11 +47,16 @@ func (m *ModuleContext) Context() context.Context {
 	return m.ctx
 }
 
+// Sys is exposed only for WASI.
+func (m *ModuleContext) Sys() *SysContext {
+	return m.sys
+}
+
 // WithContext implements wasm.Module WithContext
 func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 	// only re-allocate if it will change the effective context
 	if ctx != nil && ctx != m.ctx {
-		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, System: m.System}
+		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, sys: m.sys}
 	}
 	return m
 }
@@ -61,7 +65,9 @@ func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 // Note: When there are multiple errors, the error returned is the last one.
 func (m *ModuleContext) Close() (err error) {
 	err = m.store.CloseModule(m.module.Name)
-	if err2 := m.System.Close(); err2 != nil {
+	if sys := m.sys; sys == nil { // ex from ModuleBuilder
+		return
+	} else if err2 := m.sys.Close(); err2 != nil {
 		err = err2
 	}
 	return

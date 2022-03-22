@@ -71,8 +71,6 @@ type Runtime interface {
 	//
 	// Note: The last value of RuntimeConfig.WithContext is used for any start function.
 	InstantiateModule(module *Module) (wasm.Module, error)
-
-	// TODO: RemoveModule
 }
 
 func NewRuntime() Runtime {
@@ -146,5 +144,9 @@ func (r *runtime) InstantiateModuleFromSource(source []byte) (wasm.Module, error
 
 // InstantiateModule implements Runtime.InstantiateModule
 func (r *runtime) InstantiateModule(module *Module) (wasm.Module, error) {
-	return r.store.Instantiate(r.ctx, module.module, module.name)
+	if sys, err := buildSysContext(&SysConfig{}); err != nil {
+		return nil, err
+	} else {
+		return r.store.Instantiate(r.ctx, module.module, module.name, sys)
+	}
 }
