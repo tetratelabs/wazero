@@ -99,7 +99,7 @@ jobs:
           key: test-${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}-${{ matrix.arch }}
 
       - name: Build test binaries
-        run: go list ./... | xargs -Ipkg go test pkg -c
+        run: go list ./... | sed 's/github\.com\/tetratelabs\/wazero\//.\//' | xargs -Ipkg go test pkg -c -o pkg.test
         env:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
