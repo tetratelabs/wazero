@@ -1,5 +1,7 @@
 package asm
 
+import "fmt"
+
 // Register represents architecture-specific registers.
 type Register byte
 
@@ -20,6 +22,7 @@ const ConditionalRegisterStateUnset ConditionalRegisterState = 0
 
 // Node represents a node in the linked list of assembled operations.
 type Node interface {
+	fmt.Stringer
 	// AssignJumpTarget assigns the given target node as the destination of
 	// jump instruction for this Node.
 	AssignJumpTarget(target Node)
@@ -29,8 +32,8 @@ type Node interface {
 	// AssignSourceConstant assigns the given constnat as the source
 	// of the instruction for this node.
 	AssignSourceConstant(value int64)
-	// offsetInBinary returns the offset of this node in the assembled binary.
-	offsetInBinary() int64
+	// OffsetInBinary returns the offset of this node in the assembled binary.
+	OffsetInBinary() int64
 }
 
 // AssemblerBase is the common interface for assemblers among multiple architectures.
@@ -53,7 +56,7 @@ type AssemblerBase interface {
 	// CompileStandAlone adds an instruction to take no arguments.
 	CompileStandAlone(instruction Instruction) Node
 	// CompileConstToRegister adds an instruction where source operand is `value` as constant and destination is `destinationReg` register.
-	CompileConstToRegister(instruction Instruction, value int64, destinationReg Register) (inst Node)
+	CompileConstToRegister(instruction Instruction, value int64, destinationReg Register) Node
 	// CompileConstToRegister adds an instruction where source and destination operands are registers.
 	CompileRegisterToRegister(instruction Instruction, from, to Register)
 	// CompileMemoryToRegister adds an instruction where source operands is the memory address specified by `sourceBaseReg+sourceOffsetConst`
@@ -61,7 +64,7 @@ type AssemblerBase interface {
 	CompileMemoryToRegister(instruction Instruction, sourceBaseReg Register, sourceOffsetConst int64, destinationReg Register)
 	// CompileRegisterToMemory adds an instruction where source operand is `sourceRegister` register and the destination is the
 	// memory address specified by `destinationBaseRegister+destinationOffsetConst`.
-	CompileRegisterToMemory(inst Instruction, sourceRegister Register, destinationBaseRegister Register, destinationOffsetConst int64)
+	CompileRegisterToMemory(instruction Instruction, sourceRegister Register, destinationBaseRegister Register, destinationOffsetConst int64)
 	// CompileJump adds jump-type instruction and returns the corresponding Node in the assembled linked list.
 	CompileJump(jmpInstruction Instruction) Node
 	// CompileJumpToMemory adds jump-type instruction whose destination is stored in the memory address specified by `baseReg+offset`,

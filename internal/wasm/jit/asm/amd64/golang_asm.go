@@ -173,11 +173,6 @@ func (a *assemblerGoAsmImpl) CompileMemoryToConst(inst asm.Instruction, baseReg 
 	return asm.NewGolangAsmNode(p)
 }
 
-// CompileUnconditionalJump implements Assembler.CompileUnconditionalJump.
-func (a *assemblerGoAsmImpl) CompileUnconditionalJump() asm.Node {
-	return a.CompileJump(JMP)
-}
-
 // CompileJump implements Assembler.CompileJump.
 func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
 	p := a.NewProg()
@@ -206,8 +201,8 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction,
 	a.AddInstruction(p)
 }
 
-// CompileConstModeRegisterToRegister implements Assembler.CompileConstModeRegisterToRegister.
-func (a *assemblerGoAsmImpl) CompileConstModeRegisterToRegister(inst asm.Instruction, from, to asm.Register, mode int64) {
+// CompileModeRegisterToRegister implements Assembler.CompileModeRegisterToRegister.
+func (a *assemblerGoAsmImpl) CompileModeRegisterToRegister(inst asm.Instruction, from, to asm.Register, mode int64) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST
