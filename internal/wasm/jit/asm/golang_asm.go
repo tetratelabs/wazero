@@ -20,7 +20,7 @@ func NewGolangAsmNode(p *obj.Prog) Node {
 }
 
 func (n *golangAsmNode) String() string {
-	return n.String()
+	return n.prog.String()
 }
 
 // OffsetInBinary implements Node.OffsetInBinary.
