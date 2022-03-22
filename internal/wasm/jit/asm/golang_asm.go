@@ -19,6 +19,7 @@ func NewGolangAsmNode(p *obj.Prog) Node {
 	return &golangAsmNode{prog: p}
 }
 
+// String implements fmt.Stringer.
 func (n *golangAsmNode) String() string {
 	return n.prog.String()
 }

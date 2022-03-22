@@ -27,6 +27,70 @@ func TestNodeImpl_AssignSourceConstant(t *testing.T) {
 	require.Equal(t, int64(12345), n.srcConst)
 }
 
+func TestNodeImpl_String(t *testing.T) {
+	for _, tc := range []struct {
+		in  *nodeImpl
+		exp string
+	}{
+		{
+			in:  &nodeImpl{instruction: NOP},
+			exp: "NOP",
+		},
+		{
+			in:  &nodeImpl{instruction: SETCC, types: operandTypesNoneToRegister, dstReg: REG_AX},
+			exp: "SETCC , AX",
+		},
+		{
+			in:  &nodeImpl{instruction: JMP, types: operandTypesNoneToMemory, dstReg: REG_AX, dstConst: 100},
+			exp: "JMP , [AX + 0x64]",
+		},
+		{
+			in:  &nodeImpl{instruction: JMP, types: operandTypesNoneToMemory, dstReg: REG_AX, dstConst: 100, dstMemScale: 8, dstMemIndex: REG_R11},
+			exp: "JMP , [AX + 0x64 + R11*0x8]",
+		},
+		{
+			in:  &nodeImpl{instruction: JMP, types: operandTypesNoneToBranch, jumpTarget: &nodeImpl{instruction: JMP, types: operandTypesNoneToMemory, dstReg: REG_AX, dstConst: 100}},
+			exp: "JMP , {JMP , [AX + 0x64]}",
+		},
+		{
+			in:  &nodeImpl{instruction: IDIVQ, types: operandTypesRegisterToNone, srcReg: REG_DX},
+			exp: "IDIVQ DX, ",
+		},
+		{
+			in:  &nodeImpl{instruction: ADDL, types: operandTypesRegisterToRegister, srcReg: REG_DX, dstReg: REG_R14},
+			exp: "ADDL DX, R14",
+		},
+		{
+			in: &nodeImpl{instruction: MOVQ, types: operandTypesRegisterToMemory,
+				srcReg: REG_DX, dstReg: REG_R14, dstConst: 100},
+			exp: "MOVQ DX, [R14 + 0x64]",
+		},
+		{
+			in: &nodeImpl{instruction: MOVQ, types: operandTypesRegisterToMemory,
+				srcReg: REG_DX, dstReg: REG_R14, dstConst: 100, dstMemIndex: REG_CX, dstMemScale: 4},
+			exp: "MOVQ DX, [R14 + 0x64 + CX*0x4]",
+		},
+		{
+			in: &nodeImpl{instruction: CMPL, types: operandTypesRegisterToConst,
+				srcReg: REG_DX, dstConst: 100},
+			exp: "CMPL DX, 0x64",
+		},
+		{
+			in: &nodeImpl{instruction: MOVL, types: operandTypesMemoryToRegister,
+				srcReg: REG_DX, srcConst: 1, dstReg: REG_AX},
+			exp: "MOVL [DX + 0x1], AX",
+		},
+		{
+			in: &nodeImpl{instruction: MOVL, types: operandTypesMemoryToRegister,
+				srcReg: REG_DX, srcConst: 1, srcMemIndex: REG_R12, srcMemScale: 2,
+				dstReg: REG_AX},
+			exp: "MOVL [DX + 1 + R12*0x2], AX",
+		},
+	} {
+		require.Equal(t, tc.exp, tc.in.String())
+	}
+}
+
 func TestAssemblerImpl_addNode(t *testing.T) {
 	a := &assemblerImpl{}
 

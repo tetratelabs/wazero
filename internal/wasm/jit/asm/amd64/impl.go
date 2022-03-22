@@ -52,8 +52,44 @@ func (n *nodeImpl) OffsetInBinary() int64 {
 }
 
 // String implements fmt.Stringer.
-func (n *nodeImpl) String() string {
-	return "TODO"
+func (n *nodeImpl) String() (ret string) {
+	instName := instructionName(n.instruction)
+	switch n.types {
+	case operandTypesNoneToNone:
+		ret = instName
+	case operandTypesNoneToRegister:
+		ret = fmt.Sprintf("%s , %s", instName, registerName(n.dstReg))
+	case operandTypesNoneToMemory:
+		if n.dstMemIndex != asm.NilRegister {
+			ret = fmt.Sprintf("%s , [%s + 0x%x + %s*0x%x]", instName,
+				registerName(n.dstReg), n.dstConst, registerName(n.dstMemIndex), n.dstMemScale)
+		} else {
+			ret = fmt.Sprintf("%s , [%s + 0x%x]", instName, registerName(n.dstReg), n.dstConst)
+		}
+	case operandTypesNoneToBranch:
+		ret = fmt.Sprintf("%s , {%v}", instName, n.jumpTarget)
+	case operandTypesRegisterToNone:
+		ret = fmt.Sprintf("%s %s, ", instName, registerName(n.srcReg))
+	case operandTypesRegisterToRegister:
+		ret = fmt.Sprintf("%s %s, %s", instName, registerName(n.srcReg), registerName(n.dstReg))
+	case operandTypesRegisterToMemory:
+		if n.dstMemIndex != asm.NilRegister {
+			ret = fmt.Sprintf("%s %s, [%s + 0x%x + %s*0x%x]", instName, registerName(n.srcReg),
+				registerName(n.dstReg), n.dstConst, registerName(n.dstMemIndex), n.dstMemScale)
+		} else {
+			ret = fmt.Sprintf("%s %s, [%s + 0x%x]", instName, registerName(n.srcReg), registerName(n.dstReg), n.dstConst)
+		}
+	case operandTypesRegisterToConst:
+		ret = fmt.Sprintf("%s %s, 0x%x", instName, registerName(n.srcReg), n.dstConst)
+	case operandTypesMemoryToRegister:
+		if n.srcMemIndex != asm.NilRegister {
+			ret = fmt.Sprintf("%s [%s + %d + %s*0x%x], %s", instName,
+				registerName(n.srcReg), n.srcConst, registerName(n.srcMemIndex), n.srcMemScale, registerName(n.dstReg))
+		} else {
+			ret = fmt.Sprintf("%s [%s + 0x%x], %s", instName, registerName(n.srcReg), n.srcConst, registerName(n.dstReg))
+		}
+	}
+	return
 }
 
 type operandType byte
@@ -91,7 +127,7 @@ var (
 	operandTypesNoneToBranch       = operandTypes{operandTypeNone, operandTypeBranch}
 	operandTypesRegisterToNone     = operandTypes{operandTypeRegister, operandTypeNone}
 	operandTypesRegisterToRegister = operandTypes{operandTypeRegister, operandTypeRegister}
-	operandTypesRegisterToMemory   = operandTypes{operandTypeRegister, operandTypeRegister}
+	operandTypesRegisterToMemory   = operandTypes{operandTypeRegister, operandTypeMemory}
 	operandTypesRegisterToConst    = operandTypes{operandTypeRegister, operandTypeConst}
 	operandTypesMemoryToRegister   = operandTypes{operandTypeMemory, operandTypeRegister}
 )
