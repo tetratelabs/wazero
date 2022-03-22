@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"bytes"
+	"errors"
 	"io"
 
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
@@ -20,7 +21,7 @@ type nodeImpl struct {
 	// next holds the next node from this node in the assembled linked list.
 	next *nodeImpl
 
-	srcType, dstType         operandType
+	types                    operandTypes
 	srcReg, dstReg           asm.Register
 	srcConst, dstConst       int64
 	srcMemIndex, dstMemIndex asm.Register
@@ -54,10 +55,6 @@ func (n *nodeImpl) String() string {
 	return "TODO"
 }
 
-func (*nodeImpl) encode(w io.Writer) error {
-	panic("TODO")
-}
-
 type operandType byte
 
 const (
@@ -66,6 +63,20 @@ const (
 	operandTypeMemory
 	operandTypeConst
 	operandTypeBranch
+)
+
+type operandTypes struct{ src, dst operandType }
+
+var (
+	operandTypesNoneToNone         = operandTypes{operandTypeNone, operandTypeNone}
+	operandTypesNoneToRegister     = operandTypes{operandTypeNone, operandTypeRegister}
+	operandTypesNoneToMemory       = operandTypes{operandTypeNone, operandTypeMemory}
+	operandTypesNoneToBranch       = operandTypes{operandTypeNone, operandTypeBranch}
+	operandTypesRegisterToNone     = operandTypes{operandTypeRegister, operandTypeNone}
+	operandTypesRegisterToRegister = operandTypes{operandTypeRegister, operandTypeRegister}
+	operandTypesRegisterToMemory   = operandTypes{operandTypeRegister, operandTypeRegister}
+	operandTypesRegisterToConst    = operandTypes{operandTypeRegister, operandTypeConst}
+	operandTypesMemoryToRegister   = operandTypes{operandTypeMemory, operandTypeRegister}
 )
 
 // assemblerImpl implements Assembler.
@@ -83,8 +94,7 @@ func (a *assemblerImpl) newNode(instruction asm.Instruction, srcType, dstType op
 		instruction: instruction,
 		prev:        nil,
 		next:        nil,
-		srcType:     srcType,
-		dstType:     dstType,
+		types:       operandTypes{src: srcType, dst: dstType},
 	}
 	a.addNode(n)
 	return n
@@ -102,12 +112,39 @@ func (a *assemblerImpl) addNode(node *nodeImpl) {
 	}
 }
 
+func (a *assemblerImpl) encodeNode(w io.Writer, n *nodeImpl) (err error) {
+	switch n.types {
+	case operandTypesNoneToNone:
+		err = a.encodeNoneToNone(w, n)
+	case operandTypesNoneToRegister:
+		err = a.encodeNoneToRegister(w, n)
+	case operandTypesNoneToMemory:
+		err = a.encodeNoneToMemory(w, n)
+	case operandTypesNoneToBranch:
+		err = a.encodeNoneToBranch(w, n)
+	case operandTypesRegisterToNone:
+		err = a.encodeRegisterToNone(w, n)
+	case operandTypesRegisterToRegister:
+		err = a.encodeRegisterToRegister(w, n)
+	case operandTypesRegisterToMemory:
+		err = a.encodeRegisterToMemory(w, n)
+	case operandTypesRegisterToConst:
+		err = a.encodeRegisterToConst(w, n)
+	case operandTypesMemoryToRegister:
+		err = a.encodeMemoryToRegister(w, n)
+	}
+	return
+}
+
 // Assemble implements asm.AssemblerBase
 func (a *assemblerImpl) Assemble() ([]byte, error) {
 	w := bytes.NewBuffer(nil)
+	// TODO: NOP padding for jumps before encodes: https://github.com/golang/go/issues/35881
+
 	for n := a.root; n != nil; n = n.next {
-		// TODO: NOP padding for jump-kinds: https://github.com/golang/go/issues/35881
-		n.encode(w)
+		if err := a.encodeNode(w, n); err != nil {
+			return nil, err
+		}
 	}
 	return w.Bytes(), nil
 }
@@ -238,4 +275,40 @@ func (a *assemblerImpl) CompileMemoryToConst(instruction asm.Instruction, srcBas
 	n.srcConst = srcOffset
 	n.dstConst = value
 	return n
+}
+
+func (a *assemblerImpl) encodeNoneToNone(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeNoneToRegister(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeNoneToMemory(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeNoneToBranch(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeRegisterToNone(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeRegisterToRegister(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeRegisterToMemory(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeRegisterToConst(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
+}
+
+func (a *assemblerImpl) encodeMemoryToRegister(w io.Writer, n *nodeImpl) error {
+	return errors.New("TODO")
 }
