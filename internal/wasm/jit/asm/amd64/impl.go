@@ -88,6 +88,22 @@ func (n *nodeImpl) String() (ret string) {
 		} else {
 			ret = fmt.Sprintf("%s [%s + 0x%x], %s", instName, registerName(n.srcReg), n.srcConst, registerName(n.dstReg))
 		}
+	case operandTypesMemoryToConst:
+		if n.srcMemIndex != asm.NilRegister {
+			ret = fmt.Sprintf("%s [%s + %d + %s*0x%x], 0x%x", instName,
+				registerName(n.srcReg), n.srcConst, registerName(n.srcMemIndex), n.srcMemScale, n.dstConst)
+		} else {
+			ret = fmt.Sprintf("%s [%s + 0x%x], 0x%x", instName, registerName(n.srcReg), n.srcConst, n.dstConst)
+		}
+	case operandTypesConstToMemory:
+		if n.dstMemIndex != asm.NilRegister {
+			ret = fmt.Sprintf("%s 0x%x, [%s + 0x%x + %s*0x%x]", instName, n.srcConst,
+				registerName(n.dstReg), n.dstConst, registerName(n.dstMemIndex), n.dstMemScale)
+		} else {
+			ret = fmt.Sprintf("%s 0x%x, [%s + 0x%x]", instName, n.srcConst, registerName(n.dstReg), n.dstConst)
+		}
+	case operandTypesConstToRegister:
+		ret = fmt.Sprintf("%s 0x%x, %s", instName, n.srcConst, registerName(n.dstReg))
 	}
 	return
 }
@@ -130,6 +146,9 @@ var (
 	operandTypesRegisterToMemory   = operandTypes{operandTypeRegister, operandTypeMemory}
 	operandTypesRegisterToConst    = operandTypes{operandTypeRegister, operandTypeConst}
 	operandTypesMemoryToRegister   = operandTypes{operandTypeMemory, operandTypeRegister}
+	operandTypesMemoryToConst      = operandTypes{operandTypeMemory, operandTypeConst}
+	operandTypesConstToRegister    = operandTypes{operandTypeConst, operandTypeRegister}
+	operandTypesConstToMemory      = operandTypes{operandTypeConst, operandTypeMemory}
 )
 
 func (o operandTypes) String() string {
@@ -146,12 +165,12 @@ type assemblerImpl struct {
 var _ Assembler = &assemblerImpl{}
 
 // newNode creates a new Node and appends it into the linked list.
-func (a *assemblerImpl) newNode(instruction asm.Instruction, srcType, dstType operandType) *nodeImpl {
+func (a *assemblerImpl) newNode(instruction asm.Instruction, types operandTypes) *nodeImpl {
 	n := &nodeImpl{
 		instruction: instruction,
 		prev:        nil,
 		next:        nil,
-		types:       operandTypes{src: srcType, dst: dstType},
+		types:       types,
 	}
 	a.addNode(n)
 	return n
@@ -217,12 +236,12 @@ func (a *assemblerImpl) Assemble() ([]byte, error) {
 
 // CompileReadInstructionAddress implements asm.AssemblerBase.CompileReadInstructionAddress
 func (a *assemblerImpl) CompileStandAlone(instruction asm.Instruction) asm.Node {
-	return a.newNode(instruction, operandTypeNone, operandTypeNone)
+	return a.newNode(instruction, operandTypesNoneToNone)
 }
 
 // CompileConstToRegister implements asm.AssemblerBase.CompileConstToRegister
 func (a *assemblerImpl) CompileConstToRegister(instruction asm.Instruction, value int64, destinationReg asm.Register) (inst asm.Node) {
-	n := a.newNode(instruction, operandTypeConst, operandTypeRegister)
+	n := a.newNode(instruction, operandTypesConstToRegister)
 	n.srcConst = value
 	n.dstReg = destinationReg
 	return n
@@ -230,14 +249,14 @@ func (a *assemblerImpl) CompileConstToRegister(instruction asm.Instruction, valu
 
 // CompileRegisterToRegister implements asm.AssemblerBase.CompileRegisterToRegister
 func (a *assemblerImpl) CompileRegisterToRegister(instruction asm.Instruction, from, to asm.Register) {
-	n := a.newNode(instruction, operandTypeRegister, operandTypeRegister)
+	n := a.newNode(instruction, operandTypesRegisterToRegister)
 	n.srcReg = from
 	n.dstReg = to
 }
 
 // CompileMemoryToRegister implements asm.AssemblerBase.CompileMemoryToRegister
 func (a *assemblerImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
-	n := a.newNode(instruction, operandTypeMemory, operandTypeRegister)
+	n := a.newNode(instruction, operandTypesMemoryToRegister)
 	n.srcReg = sourceBaseReg
 	n.srcConst = sourceOffsetConst
 	n.dstReg = destinationReg
@@ -245,7 +264,7 @@ func (a *assemblerImpl) CompileMemoryToRegister(instruction asm.Instruction, sou
 
 // CompileRegisterToMemory implements asm.AssemblerBase.CompileRegisterToMemory
 func (a *assemblerImpl) CompileRegisterToMemory(instruction asm.Instruction, sourceRegister asm.Register, destinationBaseRegister asm.Register, destinationOffsetConst int64) {
-	n := a.newNode(instruction, operandTypeRegister, operandTypeMemory)
+	n := a.newNode(instruction, operandTypesRegisterToMemory)
 	n.srcReg = sourceRegister
 	n.dstReg = destinationBaseRegister
 	n.dstConst = destinationOffsetConst
@@ -253,19 +272,19 @@ func (a *assemblerImpl) CompileRegisterToMemory(instruction asm.Instruction, sou
 
 // CompileJump implements asm.AssemblerBase.CompileJump
 func (a *assemblerImpl) CompileJump(jmpInstruction asm.Instruction) asm.Node {
-	return a.newNode(jmpInstruction, operandTypeNone, operandTypeBranch)
+	return a.newNode(jmpInstruction, operandTypesNoneToBranch)
 }
 
 // CompileJumpToMemory implements asm.AssemblerBase.CompileJumpToMemory
 func (a *assemblerImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset int64) {
-	n := a.newNode(jmpInstruction, operandTypeNone, operandTypeMemory)
+	n := a.newNode(jmpInstruction, operandTypesNoneToMemory)
 	n.dstReg = baseReg
 	n.dstConst = offset
 }
 
 // CompileJumpToRegister implements asm.AssemblerBase.CompileJumpToRegister
 func (a *assemblerImpl) CompileJumpToRegister(jmpInstruction asm.Instruction, reg asm.Register) {
-	n := a.newNode(jmpInstruction, operandTypeNone, operandTypeRegister)
+	n := a.newNode(jmpInstruction, operandTypesNoneToRegister)
 	n.dstReg = reg
 }
 
@@ -276,7 +295,7 @@ func (a *assemblerImpl) CompileReadInstructionAddress(destinationRegister asm.Re
 
 // CompileRegisterToRegisterWithMode implements assembler.CompileRegisterToRegisterWithMode
 func (a *assemblerImpl) CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode int64) {
-	n := a.newNode(instruction, operandTypeRegister, operandTypeRegister)
+	n := a.newNode(instruction, operandTypesRegisterToRegister)
 	n.srcReg = from
 	n.dstReg = to
 	n.mode = byte(mode)
@@ -284,7 +303,7 @@ func (a *assemblerImpl) CompileRegisterToRegisterWithMode(instruction asm.Instru
 
 // CompileMemoryWithIndexToRegister implements assembler.CompileMemoryWithIndexToRegister
 func (a *assemblerImpl) CompileMemoryWithIndexToRegister(instruction asm.Instruction, srcBaseReg asm.Register, srcOffsetConst int64, srcIndex asm.Register, srcScale int16, dstReg asm.Register) {
-	n := a.newNode(instruction, operandTypeMemory, operandTypeRegister)
+	n := a.newNode(instruction, operandTypesMemoryToRegister)
 	n.srcReg = srcBaseReg
 	n.srcConst = srcOffsetConst
 	n.srcMemIndex = srcIndex
@@ -294,7 +313,7 @@ func (a *assemblerImpl) CompileMemoryWithIndexToRegister(instruction asm.Instruc
 
 // CompileRegisterToMemoryWithIndex implements assembler.CompileRegisterToMemoryWithIndex
 func (a *assemblerImpl) CompileRegisterToMemoryWithIndex(instruction asm.Instruction, srcReg asm.Register, dstBaseReg asm.Register, dstOffsetConst int64, dstIndex asm.Register, dstScale int16) {
-	n := a.newNode(instruction, operandTypeRegister, operandTypeMemory)
+	n := a.newNode(instruction, operandTypesRegisterToMemory)
 	n.srcReg = srcReg
 	n.dstReg = dstBaseReg
 	n.dstConst = dstOffsetConst
@@ -304,7 +323,7 @@ func (a *assemblerImpl) CompileRegisterToMemoryWithIndex(instruction asm.Instruc
 
 // CompileRegisterToConst implements assembler.CompileRegisterToConst
 func (a *assemblerImpl) CompileRegisterToConst(instruction asm.Instruction, srcRegister asm.Register, value int64) asm.Node {
-	n := a.newNode(instruction, operandTypeRegister, operandTypeConst)
+	n := a.newNode(instruction, operandTypesRegisterToConst)
 	n.srcReg = srcRegister
 	n.dstConst = value
 	return n
@@ -312,25 +331,25 @@ func (a *assemblerImpl) CompileRegisterToConst(instruction asm.Instruction, srcR
 
 // CompileRegisterToNone implements assembler.CompileRegisterToNone
 func (a *assemblerImpl) CompileRegisterToNone(instruction asm.Instruction, register asm.Register) {
-	n := a.newNode(instruction, operandTypeRegister, operandTypeNone)
+	n := a.newNode(instruction, operandTypesRegisterToNone)
 	n.srcReg = register
 }
 
 // CompileNoneToRegister implements assembler.CompileNoneToRegister
 func (a *assemblerImpl) CompileNoneToRegister(instruction asm.Instruction, register asm.Register) {
-	n := a.newNode(instruction, operandTypeNone, operandTypeRegister)
+	n := a.newNode(instruction, operandTypesNoneToRegister)
 	n.dstReg = register
 }
 
 // CompileNoneToMemory implements assembler.CompileNoneToMemory
 func (a *assemblerImpl) CompileNoneToMemory(instruction asm.Instruction, baseReg asm.Register, offset int64) {
-	n := a.newNode(instruction, operandTypeNone, operandTypeMemory)
+	n := a.newNode(instruction, operandTypesNoneToMemory)
 	n.dstReg = baseReg
 	n.dstConst = offset
 }
 
 func (a *assemblerImpl) CompileConstToMemory(instruction asm.Instruction, value int64, dstbaseReg asm.Register, dstOffset int64) asm.Node {
-	n := a.newNode(instruction, operandTypeConst, operandTypeMemory)
+	n := a.newNode(instruction, operandTypesConstToMemory)
 	n.srcConst = value
 	n.dstReg = dstbaseReg
 	n.dstConst = dstOffset
@@ -338,7 +357,7 @@ func (a *assemblerImpl) CompileConstToMemory(instruction asm.Instruction, value 
 }
 
 func (a *assemblerImpl) CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset int64, value int64) asm.Node {
-	n := a.newNode(instruction, operandTypeMemory, operandTypeConst)
+	n := a.newNode(instruction, operandTypesMemoryToConst)
 	n.srcReg = srcBaseReg
 	n.srcConst = srcOffset
 	n.dstConst = value

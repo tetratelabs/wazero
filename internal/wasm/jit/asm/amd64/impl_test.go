@@ -86,6 +86,20 @@ func TestNodeImpl_String(t *testing.T) {
 				dstReg: REG_AX},
 			exp: "MOVL [DX + 1 + R12*0x2], AX",
 		},
+		{
+			in: &nodeImpl{instruction: CMPQ, types: operandTypesMemoryToConst,
+				srcReg: REG_DX, srcConst: 1, srcMemIndex: REG_R12, srcMemScale: 2,
+				dstConst: 123},
+			exp: "CMPQ [DX + 1 + R12*0x2], 0x7b",
+		},
+		{
+			in:  &nodeImpl{instruction: MOVQ, types: operandTypesConstToMemory, srcConst: 123, dstReg: REG_AX, dstConst: 100, dstMemScale: 8, dstMemIndex: REG_R11},
+			exp: "MOVQ 0x7b, [AX + 0x64 + R11*0x8]",
+		},
+		{
+			in:  &nodeImpl{instruction: MOVQ, types: operandTypesConstToRegister, srcConst: 123, dstReg: REG_AX},
+			exp: "MOVQ 0x7b, AX",
+		},
 	} {
 		require.Equal(t, tc.exp, tc.in.String())
 	}
@@ -110,7 +124,7 @@ func TestAssemblerImpl_addNode(t *testing.T) {
 
 func TestAssemblerImpl_newNode(t *testing.T) {
 	a := &assemblerImpl{}
-	actual := a.newNode(ADDL, operandTypeConst, operandTypeMemory)
+	actual := a.newNode(ADDL, operandTypesConstToMemory)
 	require.Equal(t, ADDL, actual.instruction)
 	require.Equal(t, operandTypeConst, actual.types.src)
 	require.Equal(t, operandTypeMemory, actual.types.dst)
