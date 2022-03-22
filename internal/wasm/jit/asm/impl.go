@@ -11,7 +11,7 @@ type BaseAssemblerImpl struct {
 	// where we want to set the next coming instruction as the destination of these BR instructions.
 	setBranchTargetOnNextNodes []Node
 	// onGenerateCallbacks holds the callbacks which are called after generating native code.
-	onGenerateCallbacks []func(code []byte) error
+	OnGenerateCallbacks []func(code []byte) error
 }
 
 // SetJumpTargetOnNext implements AssemblerBase.SetJumpTargetOnNext
@@ -21,7 +21,7 @@ func (a *BaseAssemblerImpl) SetJumpTargetOnNext(nodes ...Node) {
 
 // AddOnGenerateCallBack implements AssemblerBase.AddOnGenerateCallBack
 func (a *BaseAssemblerImpl) AddOnGenerateCallBack(cb func([]byte) error) {
-	a.onGenerateCallbacks = append(a.onGenerateCallbacks, cb)
+	a.OnGenerateCallbacks = append(a.OnGenerateCallbacks, cb)
 }
 
 // BuildJumpTable implements AssemblerBase.BuildJumpTable

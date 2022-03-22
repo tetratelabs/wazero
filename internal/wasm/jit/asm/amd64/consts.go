@@ -20,7 +20,7 @@ const (
 
 // Arm64-specific instructions.
 const (
-	ADDL = iota
+	ADDL asm.Instruction = iota
 	ADDQ
 	ADDSD
 	ADDSS

@@ -3,6 +3,7 @@ package amd64
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/tetratelabs/wazero/internal/wasm/jit/asm"
@@ -65,6 +66,22 @@ const (
 	operandTypeBranch
 )
 
+func (o operandType) String() (ret string) {
+	switch o {
+	case operandTypeNone:
+		ret = "none"
+	case operandTypeRegister:
+		ret = "register"
+	case operandTypeMemory:
+		ret = "memory"
+	case operandTypeConst:
+		ret = "const"
+	case operandTypeBranch:
+		ret = "branch"
+	}
+	return
+}
+
 type operandTypes struct{ src, dst operandType }
 
 var (
@@ -78,6 +95,10 @@ var (
 	operandTypesRegisterToConst    = operandTypes{operandTypeRegister, operandTypeConst}
 	operandTypesMemoryToRegister   = operandTypes{operandTypeMemory, operandTypeRegister}
 )
+
+func (o operandTypes) String() string {
+	return fmt.Sprintf("%s[from]_%s[to]", o.src, o.dst)
+}
 
 // assemblerImpl implements Assembler.
 type assemblerImpl struct {
@@ -132,6 +153,8 @@ func (a *assemblerImpl) encodeNode(w io.Writer, n *nodeImpl) (err error) {
 		err = a.encodeRegisterToConst(w, n)
 	case operandTypesMemoryToRegister:
 		err = a.encodeMemoryToRegister(w, n)
+	default:
+		return fmt.Errorf("encoder undefined for %s", n.types)
 	}
 	return
 }
@@ -146,7 +169,14 @@ func (a *assemblerImpl) Assemble() ([]byte, error) {
 			return nil, err
 		}
 	}
-	return w.Bytes(), nil
+
+	code := w.Bytes()
+	for _, cb := range a.OnGenerateCallbacks {
+		if err := cb(code); err != nil {
+			return nil, err
+		}
+	}
+	return code, nil
 }
 
 // CompileReadInstructionAddress implements asm.AssemblerBase.CompileReadInstructionAddress
