@@ -27,8 +27,8 @@ func (a *BaseAssemblerImpl) AddOnGenerateCallBack(cb func([]byte) error) {
 // BuildJumpTable implements AssemblerBase.BuildJumpTable
 func (a *BaseAssemblerImpl) BuildJumpTable(table []byte, labelInitialInstructions []Node) {
 	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Build the offset table for each target including default one.
-		base := labelInitialInstructions[0].OffsetInBinary() // This corresponds to the L0's address in the example.
+		// Build the offset table for each target.
+		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {
 			if uint64(nop.OffsetInBinary())-uint64(base) >= math.MaxUint32 {
 				// TODO: this happens when users try loading an extremely large webassembly binary

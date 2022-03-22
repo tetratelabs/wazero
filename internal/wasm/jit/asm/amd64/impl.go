@@ -97,7 +97,7 @@ var (
 )
 
 func (o operandTypes) String() string {
-	return fmt.Sprintf("%s[from]_%s[to]", o.src, o.dst)
+	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
 }
 
 // assemblerImpl implements Assembler.
