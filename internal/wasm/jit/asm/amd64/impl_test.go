@@ -2,6 +2,7 @@ package amd64
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,26 @@ func TestAssemblerImpl_encodeNode(t *testing.T) {
 	// TODO: adds ok cases.
 }
 
+func TestAssemblerImpl_Assemble(t *testing.T) {
+	t.Run("callback", func(t *testing.T) {
+		t.Run("ok", func(t *testing.T) {
+			a := &assemblerImpl{}
+			callbacked := false
+			a.AddOnGenerateCallBack(func(b []byte) error { callbacked = true; return nil })
+			_, err := a.Assemble()
+			require.NoError(t, err)
+			require.True(t, callbacked)
+		})
+		t.Run("error", func(t *testing.T) {
+			a := &assemblerImpl{}
+			a.AddOnGenerateCallBack(func(b []byte) error { return fmt.Errorf("some error") })
+			_, err := a.Assemble()
+			require.EqualError(t, err, "some error")
+		})
+	})
+	// TODO: adds actual e2e assembling case.
+}
+
 func TestAssemblerImpl_CompileStandAlone(t *testing.T) {
 	a := &assemblerImpl{}
 	a.CompileStandAlone(RET)
@@ -81,7 +102,45 @@ func TestAssemblerImpl_CompileMemoryToRegister(t *testing.T) {
 	a.CompileMemoryToRegister(MOVQ, REG_BX, 100, REG_AX)
 	actualNode := a.current
 	require.Equal(t, MOVQ, actualNode.instruction)
-
+	require.Equal(t, REG_BX, actualNode.srcReg)
+	require.Equal(t, int64(100), actualNode.srcConst)
+	require.Equal(t, REG_AX, actualNode.dstReg)
 	require.Equal(t, operandTypeMemory, actualNode.types.src)
 	require.Equal(t, operandTypeRegister, actualNode.types.dst)
+}
+
+func TestAssemblerImpl_CompileRegisterToMemory(t *testing.T) {
+	a := &assemblerImpl{}
+	a.CompileRegisterToMemory(MOVQ, REG_BX, REG_AX, 100)
+	actualNode := a.current
+	require.Equal(t, MOVQ, actualNode.instruction)
+	require.Equal(t, REG_BX, actualNode.srcReg)
+	require.Equal(t, REG_AX, actualNode.dstReg)
+	require.Equal(t, int64(100), actualNode.dstConst)
+	require.Equal(t, operandTypeRegister, actualNode.types.src)
+	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+}
+
+func TestAssemblerImpl_CompileJump(t *testing.T) {
+	a := &assemblerImpl{}
+	a.CompileJump(JMP)
+	actualNode := a.current
+	require.Equal(t, JMP, actualNode.instruction)
+	require.Equal(t, operandTypeNone, actualNode.types.src)
+	require.Equal(t, operandTypeBranch, actualNode.types.dst)
+}
+
+func TestAssemblerImpl_CompileJumpToMemory(t *testing.T) {
+	a := &assemblerImpl{}
+	a.CompileJumpToMemory(JNE, REG_AX, 100)
+	actualNode := a.current
+	require.Equal(t, JNE, actualNode.instruction)
+	require.Equal(t, REG_AX, actualNode.dstReg)
+	require.Equal(t, int64(100), actualNode.dstConst)
+	require.Equal(t, operandTypeNone, actualNode.types.src)
+	require.Equal(t, operandTypeMemory, actualNode.types.dst)
+}
+
+func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
+	t.Skip("TODO: unimplemented")
 }
