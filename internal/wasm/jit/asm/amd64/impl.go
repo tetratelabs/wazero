@@ -154,7 +154,7 @@ func (a *assemblerImpl) encodeNode(w io.Writer, n *nodeImpl) (err error) {
 	case operandTypesMemoryToRegister:
 		err = a.encodeMemoryToRegister(w, n)
 	default:
-		return fmt.Errorf("encoder undefined for [%s] operand type", n.types)
+		err = fmt.Errorf("encoder undefined for [%s] operand type", n.types)
 	}
 	return
 }
