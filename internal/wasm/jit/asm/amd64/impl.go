@@ -238,8 +238,8 @@ func (a *assemblerImpl) CompileReadInstructionAddress(destinationRegister asm.Re
 	// TODO
 }
 
-// CompileModeRegisterToRegister implements assembler.CompileModeRegisterToRegister
-func (a *assemblerImpl) CompileModeRegisterToRegister(instruction asm.Instruction, from, to asm.Register, mode int64) {
+// CompileRegisterToRegisterWithMode implements assembler.CompileRegisterToRegisterWithMode
+func (a *assemblerImpl) CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode int64) {
 	n := a.newNode(instruction, operandTypeRegister, operandTypeRegister)
 	n.srcReg = from
 	n.dstReg = to

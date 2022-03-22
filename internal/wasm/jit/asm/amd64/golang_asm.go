@@ -201,8 +201,8 @@ func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction,
 	a.AddInstruction(p)
 }
 
-// CompileModeRegisterToRegister implements Assembler.CompileModeRegisterToRegister.
-func (a *assemblerGoAsmImpl) CompileModeRegisterToRegister(inst asm.Instruction, from, to asm.Register, mode int64) {
+// CompileRegisterToRegisterWithMode implements Assembler.CompileRegisterToRegisterWithMode.
+func (a *assemblerGoAsmImpl) CompileRegisterToRegisterWithMode(inst asm.Instruction, from, to asm.Register, mode int64) {
 	p := a.NewProg()
 	p.As = castAsGolangAsmInstruction[inst]
 	p.From.Type = obj.TYPE_CONST

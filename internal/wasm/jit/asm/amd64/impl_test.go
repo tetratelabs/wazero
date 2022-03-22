@@ -174,9 +174,9 @@ func TestAssemblerImpl_CompileReadInstructionAddress(t *testing.T) {
 	t.Skip("TODO: unimplemented")
 }
 
-func TestAssemblerImpl_CompileModeRegisterToRegister(t *testing.T) {
+func TestAssemblerImpl_CompileRegisterToRegisterWithMode(t *testing.T) {
 	a := &assemblerImpl{}
-	a.CompileModeRegisterToRegister(MOVQ, REG_BX, REG_AX, 123)
+	a.CompileRegisterToRegisterWithMode(MOVQ, REG_BX, REG_AX, 123)
 	actualNode := a.current
 	require.Equal(t, MOVQ, actualNode.instruction)
 	require.Equal(t, REG_BX, actualNode.srcReg)

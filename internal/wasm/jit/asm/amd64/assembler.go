@@ -10,11 +10,11 @@ func NewAssembler() (Assembler, error) {
 
 type Assembler interface {
 	asm.AssemblerBase
-	// CompileModeRegisterToRegister adds an instruction where source and destination
+	// CompileRegisterToRegisterWithMode adds an instruction where source and destination
 	// are `from` and `to` registers and the instruction's "mode" is specified by `mode`.
 	// For example, ROUND** instructions can be modified "mode" constant.
 	// See https://www.felixcloutier.com/x86/roundss for ROUNDSS as an example.
-	CompileModeRegisterToRegister(instruction asm.Instruction, from, to asm.Register, mode int64)
+	CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode int64)
 	// CompileMemoryWithIndexToRegister adds an instruction where source operand is the memory address
 	// specified as `srcBaseReg + srcOffsetConst + srcIndex*srcScale` and destination is the register `dstReg`.
 	// Note: sourceScale must be one of 1, 2, 4, 8.

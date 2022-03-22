@@ -1801,9 +1801,9 @@ func (c *amd64Compiler) compileRoundInstruction(is32Bit bool, mode int64) error 
 	}
 
 	if is32Bit {
-		c.assembler.CompileModeRegisterToRegister(amd64.ROUNDSS, target.register, target.register, mode)
+		c.assembler.CompileRegisterToRegisterWithMode(amd64.ROUNDSS, target.register, target.register, mode)
 	} else {
-		c.assembler.CompileModeRegisterToRegister(amd64.ROUNDSD, target.register, target.register, mode)
+		c.assembler.CompileRegisterToRegisterWithMode(amd64.ROUNDSD, target.register, target.register, mode)
 	}
 	return nil
 }
