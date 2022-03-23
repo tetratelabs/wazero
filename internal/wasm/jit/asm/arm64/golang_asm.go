@@ -22,7 +22,7 @@ func newGolangAsmAssembler(temporaryRegister asm.Register) (*assemblerGoAsmImpl,
 }
 
 // CompileConstToRegisterInstruction implements Assembler.CompileConstToRegisterInstruction.
-func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction, constValue int64, destinationReg asm.Register) asm.Node {
+func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction, constValue asm.ConstantValue, destinationReg asm.Register) asm.Node {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	if constValue == 0 {
@@ -43,7 +43,7 @@ func (a *assemblerGoAsmImpl) CompileConstToRegister(instruction asm.Instruction,
 }
 
 // CompileMemoryToRegister implements AssemblerBase.CompileMemoryToRegister.
-func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst int64, destinationReg asm.Register) {
+func (a *assemblerGoAsmImpl) CompileMemoryToRegister(instruction asm.Instruction, sourceBaseReg asm.Register, sourceOffsetConst asm.ConstantValue, destinationReg asm.Register) {
 	if sourceOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
 		// but it uses "its" temporary register which we cannot track. Therefore, we avoid directly emitting memory load with large offsets,
@@ -76,7 +76,7 @@ func (a *assemblerGoAsmImpl) CompileMemoryWithRegisterOffsetToRegister(instructi
 }
 
 // CompileRegisterToMemory implements Assembler.CompileRegisterToMemory.
-func (a *assemblerGoAsmImpl) CompileRegisterToMemory(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst int64) {
+func (a *assemblerGoAsmImpl) CompileRegisterToMemory(instruction asm.Instruction, sourceReg asm.Register, destinationBaseReg asm.Register, destinationOffsetConst asm.ConstantValue) {
 	if destinationOffsetConst > math.MaxInt16 {
 		// The assembler can take care of offsets larger than 2^15-1 by emitting additional instructions to load such large offset,
 		// but we cannot track its temporary register. Therefore, we avoid directly emitting memory load with large offsets:
@@ -158,7 +158,7 @@ func (a *assemblerGoAsmImpl) CompileTwoRegistersToNone(instruction asm.Instructi
 }
 
 // CompileRegisterAndConstSourceToNone implements Assembler.CompileRegisterAndConstSourceToNone.
-func (a *assemblerGoAsmImpl) CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst int64) {
+func (a *assemblerGoAsmImpl) CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue) {
 	inst := a.NewProg()
 	inst.As = castAsGolangAsmInstruction[instruction]
 	// TYPE_NONE indicates that this instruction doesn't have a destination.
@@ -180,7 +180,7 @@ func (a *assemblerGoAsmImpl) CompileJump(jmpInstruction asm.Instruction) asm.Nod
 }
 
 // CompileJumpToMemory implements AssemblerBase.CompileJumpToMemory.
-func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset int64) {
+func (a *assemblerGoAsmImpl) CompileJumpToMemory(jmpInstruction asm.Instruction, baseReg asm.Register, offset asm.ConstantValue) {
 	br := a.NewProg()
 	br.As = castAsGolangAsmInstruction[jmpInstruction]
 	br.To.Type = obj.TYPE_MEM
@@ -207,7 +207,7 @@ func (a *assemblerGoAsmImpl) CompileStandAlone(instruction asm.Instruction) asm.
 }
 
 // CompileLeftShiftedRegisterToRegister implements Assembler.CompileLeftShiftedRegisterToRegister.
-func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, destinationReg asm.Register) {
+func (a *assemblerGoAsmImpl) CompileLeftShiftedRegisterToRegister(shiftedSourceReg asm.Register, shiftNum asm.ConstantValue, srcReg, destinationReg asm.Register) {
 	inst := a.NewProg()
 	inst.As = arm64.AADD
 	inst.To.Type = obj.TYPE_REG

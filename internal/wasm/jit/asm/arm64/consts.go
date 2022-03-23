@@ -5,6 +5,8 @@ import (
 )
 
 // Arm64-specific register states.
+// https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/condition-codes-1-condition-flags-and-codes
+// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
 const (
 	COND_EQ asm.ConditionalRegisterState = asm.ConditionalRegisterStateUnset + 1 + iota
 	COND_NE
@@ -25,6 +27,8 @@ const (
 )
 
 // Arm64-specific registers.
+// https://developer.arm.com/documentation/dui0801/a/Overview-of-AArch64-state/Predeclared-core-register-names-in-AArch64-state
+// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
 const (
 	// Integer registers.
 	REG_R0 asm.Register = asm.NilRegister + 1 + iota
@@ -99,6 +103,8 @@ const (
 )
 
 // Arm64-specific instructions.
+//
+// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
 const (
 	NOP asm.Instruction = iota
 	RET

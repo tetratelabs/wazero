@@ -3,7 +3,6 @@ package asm
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 	"runtime"
 
 	goasm "github.com/twitchyliquid64/golang-asm"
@@ -19,9 +18,14 @@ func NewGolangAsmNode(p *obj.Prog) Node {
 	return &golangAsmNode{prog: p}
 }
 
-// offsetInBinary implements Node.offsetInBinary.
-func (n *golangAsmNode) offsetInBinary() int64 {
-	return n.prog.Pc
+// String implements fmt.Stringer.
+func (n *golangAsmNode) String() string {
+	return n.prog.String()
+}
+
+// OffsetInBinary implements Node.OffsetInBinary.
+func (n *golangAsmNode) OffsetInBinary() NodeOffsetInBinary {
+	return NodeOffsetInBinary(n.prog.Pc)
 }
 
 // AssignJumpTarget implements Node.AssignJumpTarget.
@@ -31,12 +35,12 @@ func (n *golangAsmNode) AssignJumpTarget(target Node) {
 }
 
 // AssignDestinationConstant implements Node.AssignDestinationConstant.
-func (n *golangAsmNode) AssignDestinationConstant(value int64) {
+func (n *golangAsmNode) AssignDestinationConstant(value ConstantValue) {
 	n.prog.To.Offset = value
 }
 
 // AssignSourceConstant implements Node.AssignSourceConstant.
-func (n *golangAsmNode) AssignSourceConstant(value int64) {
+func (n *golangAsmNode) AssignSourceConstant(value ConstantValue) {
 	n.prog.From.Offset = value
 }
 
@@ -82,20 +86,14 @@ func (a *GolangAsmBaseAssembler) AddOnGenerateCallBack(cb func([]byte) error) {
 // BuildJumpTable implements AssemblerBase.BuildJumpTable
 func (a *GolangAsmBaseAssembler) BuildJumpTable(table []byte, labelInitialInstructions []Node) {
 	a.AddOnGenerateCallBack(func(code []byte) error {
-		// Build the offset table for each target including default one.
-		base := labelInitialInstructions[0].offsetInBinary() // This corresponds to the L0's address in the example.
+		// Build the offset table for each target.
+		base := labelInitialInstructions[0].OffsetInBinary()
 		for i, nop := range labelInitialInstructions {
-			if uint64(nop.offsetInBinary())-uint64(base) >= math.MaxUint32 {
-				// TODO: this happens when users try loading an extremely large webassembly binary
-				// which contains a br_table statement with approximately 4294967296 (2^32) targets.
-				// We would like to support that binary, but realistically speaking, that kind of binary
-				// could result in more than ten giga bytes of native JITed code where we have to care about
-				// huge stacks whose height might exceed 32-bit range, and such huge stack doesn't work with the
-				// current implementation.
+			if uint64(nop.OffsetInBinary())-uint64(base) >= jumpTableMaximumOffset {
 				return fmt.Errorf("too large br_table")
 			}
 			// We store the offset from the beginning of the L0's initial instruction.
-			binary.LittleEndian.PutUint32(table[i*4:(i+1)*4], uint32(nop.offsetInBinary())-uint32(base))
+			binary.LittleEndian.PutUint32(table[i*4:(i+1)*4], uint32(nop.OffsetInBinary())-uint32(base))
 		}
 		return nil
 	})

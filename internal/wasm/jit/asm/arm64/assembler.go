@@ -28,10 +28,10 @@ type Assembler interface {
 	CompileTwoRegistersToNone(instruction asm.Instruction, src1, src2 asm.Register)
 	// CompileTwoRegistersToRegister adds an instruction where source operands consist of one register `src` and
 	// constant `srcConst`, and destination operand is unspecified.
-	CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst int64)
+	CompileRegisterAndConstSourceToNone(instruction asm.Instruction, src asm.Register, srcConst asm.ConstantValue)
 	// CompileLeftShiftedRegisterToRegister adds an instruction where source operand is the "left shifted register"
 	// represented as `srcReg << shiftNum` and the destaintion is the register `dstReg`.
-	CompileLeftShiftedRegisterToRegister(shiftedSourceReg asm.Register, shiftNum int64, srcReg, dstReg asm.Register)
+	CompileLeftShiftedRegisterToRegister(shiftedSourceReg asm.Register, shiftNum asm.ConstantValue, srcReg, dstReg asm.Register)
 	// CompileSIMDByteToSIMDByte adds an instruction where source and destination operand is the SIMD register
 	// specified as `srcReg.B8` and `dstReg.B8` where `.B8` part of register is called "arrangement".
 	// See https://stackoverflow.com/questions/57294672/what-is-arrangement-specifier-16b-8b-in-arm-assembly-language-instructions
