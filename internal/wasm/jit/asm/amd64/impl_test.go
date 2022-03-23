@@ -38,23 +38,23 @@ func TestNodeImpl_String(t *testing.T) {
 		},
 		{
 			in:  &nodeImpl{instruction: SETCC, types: operandTypesNoneToRegister, dstReg: REG_AX},
-			exp: "SETCC , AX",
+			exp: "SETCC AX",
 		},
 		{
 			in:  &nodeImpl{instruction: JMP, types: operandTypesNoneToMemory, dstReg: REG_AX, dstConst: 100},
-			exp: "JMP , [AX + 0x64]",
+			exp: "JMP [AX + 0x64]",
 		},
 		{
 			in:  &nodeImpl{instruction: JMP, types: operandTypesNoneToMemory, dstReg: REG_AX, dstConst: 100, dstMemScale: 8, dstMemIndex: REG_R11},
-			exp: "JMP , [AX + 0x64 + R11*0x8]",
+			exp: "JMP [AX + 0x64 + R11*0x8]",
 		},
 		{
 			in:  &nodeImpl{instruction: JMP, types: operandTypesNoneToBranch, jumpTarget: &nodeImpl{instruction: JMP, types: operandTypesNoneToMemory, dstReg: REG_AX, dstConst: 100}},
-			exp: "JMP , {JMP , [AX + 0x64]}",
+			exp: "JMP {JMP [AX + 0x64]}",
 		},
 		{
 			in:  &nodeImpl{instruction: IDIVQ, types: operandTypesRegisterToNone, srcReg: REG_DX},
-			exp: "IDIVQ DX, ",
+			exp: "IDIVQ DX",
 		},
 		{
 			in:  &nodeImpl{instruction: ADDL, types: operandTypesRegisterToRegister, srcReg: REG_DX, dstReg: REG_R14},

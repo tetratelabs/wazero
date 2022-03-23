@@ -51,24 +51,28 @@ func (n *nodeImpl) OffsetInBinary() asm.NodeOffsetInBinary {
 }
 
 // String implements fmt.Stringer.
+//
+// This is for debugging purpose, and the format is almost same as the AT&T assembly syntax,
+// meaning that this should look like "INSTRUCTION ${from}, ${to}" where each operand
+// might be embraced by '[]' to represent the memory location.
 func (n *nodeImpl) String() (ret string) {
 	instName := instructionName(n.instruction)
 	switch n.types {
 	case operandTypesNoneToNone:
 		ret = instName
 	case operandTypesNoneToRegister:
-		ret = fmt.Sprintf("%s , %s", instName, registerName(n.dstReg))
+		ret = fmt.Sprintf("%s %s", instName, registerName(n.dstReg))
 	case operandTypesNoneToMemory:
 		if n.dstMemIndex != asm.NilRegister {
-			ret = fmt.Sprintf("%s , [%s + 0x%x + %s*0x%x]", instName,
+			ret = fmt.Sprintf("%s [%s + 0x%x + %s*0x%x]", instName,
 				registerName(n.dstReg), n.dstConst, registerName(n.dstMemIndex), n.dstMemScale)
 		} else {
-			ret = fmt.Sprintf("%s , [%s + 0x%x]", instName, registerName(n.dstReg), n.dstConst)
+			ret = fmt.Sprintf("%s [%s + 0x%x]", instName, registerName(n.dstReg), n.dstConst)
 		}
 	case operandTypesNoneToBranch:
-		ret = fmt.Sprintf("%s , {%v}", instName, n.jumpTarget)
+		ret = fmt.Sprintf("%s {%v}", instName, n.jumpTarget)
 	case operandTypesRegisterToNone:
-		ret = fmt.Sprintf("%s %s, ", instName, registerName(n.srcReg))
+		ret = fmt.Sprintf("%s %s", instName, registerName(n.srcReg))
 	case operandTypesRegisterToRegister:
 		ret = fmt.Sprintf("%s %s, %s", instName, registerName(n.srcReg), registerName(n.dstReg))
 	case operandTypesRegisterToMemory:
