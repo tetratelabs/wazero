@@ -27,7 +27,7 @@ var testMem = &wasm.MemoryInstance{
 }
 
 func Test_EnvironGet(t *testing.T) {
-	sys, err := newSystemContext(nil, []string{"a=b", "b=cd"}, nil)
+	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
 	testCtx := newCtx(make([]byte, 20), sys)
@@ -38,7 +38,7 @@ func Test_EnvironGet(t *testing.T) {
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
-	sys, err := newSystemContext(nil, []string{"a=b", "b=cd"}, nil)
+	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -69,6 +69,6 @@ func newCtx(buf []byte, sys *wasm.SysContext) *wasm.ModuleContext {
 	}, sys)
 }
 
-func newSystemContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sys *wasm.SysContext, err error) {
-	return wasm.NewSystemContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, openedFiles)
+func newSysContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sys *wasm.SysContext, err error) {
+	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, openedFiles)
 }

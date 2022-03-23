@@ -99,7 +99,7 @@ func StartWASICommandWithConfig(r Runtime, module *Module, config *SysConfig) (m
 
 func startWASICommandWithConfig(r Runtime, module *Module, config *SysConfig) (mod wasm.Module, err error) {
 	var sys *internalwasm.SysContext
-	if sys, err = buildSysContext(config); err != nil {
+	if sys, err = config.toSysContext(); err != nil {
 		return
 	}
 

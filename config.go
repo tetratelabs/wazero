@@ -2,6 +2,7 @@ package wazero
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -103,16 +104,30 @@ func (m *Module) WithName(name string) *Module {
 // Note: While wazero supports Windows as a platform, host functions using SysConfig follow a UNIX dialect.
 // See RATIONALE.md for design background and relationship to WebAssembly System Interfaces (WASI).
 type SysConfig struct {
-	stdin    io.Reader
-	stdout   io.Writer
-	stderr   io.Writer
-	args     []string
-	environ  map[string]string
-	preopens map[string]wasi.FS
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
+	args   []string
+	// environ is pair-indexed to retain order similar to os.Environ.
+	environ []string
+	// environKeys allow overwriting of existing values.
+	environKeys map[string]int
+
+	// preopenFD has the next FD number to use
+	preopenFD uint32
+	// preopens are keyed on file descriptor and only include the Path and FS fields.
+	preopens map[uint32]*internalwasm.FileEntry
+	// preopenPaths allow overwriting of existing paths.
+	preopenPaths map[string]uint32
 }
 
 func NewSysConfig() *SysConfig {
-	return &SysConfig{}
+	return &SysConfig{
+		environKeys:  map[string]int{},
+		preopenFD:    uint32(3), // after stdin/stdout/stderr
+		preopens:     map[uint32]*internalwasm.FileEntry{},
+		preopenPaths: map[string]uint32{},
+	}
 }
 
 // WithStdin configures where standard input (file descriptor 0) is read. Defaults to return io.EOF.
@@ -189,40 +204,82 @@ func (c *SysConfig) WithArgs(args ...string) *SysConfig {
 // See https://linux.die.net/man/3/environ
 // See https://en.wikipedia.org/wiki/Null-terminated_string
 func (c *SysConfig) WithEnv(key, value string) *SysConfig {
-	c.environ[key] = value
+	// Check to see if this key already exists and update it.
+	if i, ok := c.environKeys[key]; ok {
+		c.environ[i+1] = value // environ is pair-indexed, so the value is 1 after the key.
+	} else {
+		c.environKeys[key] = len(c.environ)
+		c.environ = append(c.environ, key, value)
+	}
 	return c
 }
 
-// WithPreopens is intentionally undocumented as it is being removed in #394
-func (c *SysConfig) WithPreopens(preopens map[string]wasi.FS) *SysConfig {
-	c.preopens = preopens
+// WithFS assigns the file system to use for any paths beginning at "/". Defaults to not found.
+//
+// Note: This sets WithWorkDirFS to the same file-system unless already set.
+func (c *SysConfig) WithFS(fs wasi.FS) *SysConfig {
+	c.setFS("/", fs)
 	return c
 }
 
-// buildSysContext creates a baseline internalwasm.SysContext configured by SysConfig.
-func buildSysContext(c *SysConfig) (sys *internalwasm.SysContext, err error) {
-	environ := make([]string, 0, len(c.environ))
+// WithWorkDirFS indicates the file system to use for any paths beginning at ".". Defaults to the same as WithFS.
+func (c *SysConfig) WithWorkDirFS(fs wasi.FS) *SysConfig {
+	c.setFS(".", fs)
+	return c
+}
+
+// withFS is hidden especially until #394 as existing use cases should be possible by composing file systems.
+// TODO: in #394 add examples on WithFS to accomplish this.
+func (c *SysConfig) setFS(path string, fs wasi.FS) {
+	// Check to see if this key already exists and update it.
+	entry := &internalwasm.FileEntry{Path: path, FS: fs}
+	if fd, ok := c.preopenPaths[path]; ok {
+		c.preopens[fd] = entry
+	} else {
+		c.preopens[c.preopenFD] = entry
+		c.preopenPaths[path] = c.preopenFD
+		c.preopenFD++
+	}
+}
+
+// toSysContext creates a baseline internalwasm.SysContext configured by SysConfig.
+func (c *SysConfig) toSysContext() (sys *internalwasm.SysContext, err error) {
+	var environ []string // Intentionally doesn't pre-allocate to reduce logic to default to nil.
 	// Same validation as syscall.Setenv for Linux
-	for key, value := range c.environ {
+	for i := 0; i < len(c.environ); i += 2 {
+		key, value := c.environ[i], c.environ[i+1]
 		if len(key) == 0 {
-			err = fmt.Errorf("empty environ key")
+			err = errors.New("environ invalid: empty key")
 			return
 		}
-		for i := 0; i < len(key); i++ {
-			if key[i] == '=' || key[i] == 0 {
-				err = fmt.Errorf("environ key contained a NUL or '=' character: %s", key)
+		for j := 0; j < len(key); j++ {
+			if key[j] == '=' { // NUL enforced in NewSysContext
+				err = errors.New("environ invalid: key contains '=' character")
 				return
 			}
 		}
 		environ = append(environ, key+"="+value)
 	}
 
-	openedFiles := map[uint32]*internalwasm.FileEntry{}
-	i := uint32(3) // after stdin/stdout/stderr
-	for dir, fs := range c.preopens {
-		openedFiles[i] = &internalwasm.FileEntry{Path: dir, FS: fs}
-		i++
+	// Ensure no-one set a nil FD. We do this here instead of at the call site to allow chaining as nil is unexpected.
+	rootFD := uint32(0) // zero is invalid
+	setWorkDirFS := false
+	preopens := c.preopens
+	for fd, fs := range preopens {
+		if fs.FS == nil {
+			err = fmt.Errorf("FS for %s is nil", fs.Path)
+			return
+		} else if fs.Path == "/" {
+			rootFD = fd
+		} else if fs.Path == "." {
+			setWorkDirFS = true
+		}
 	}
 
-	return internalwasm.NewSystemContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, openedFiles)
+	// Default the working directory to the root FS if it exists.
+	if rootFD != 0 && !setWorkDirFS {
+		preopens[c.preopenFD] = &internalwasm.FileEntry{Path: ".", FS: preopens[rootFD].FS}
+	}
+
+	return internalwasm.NewSysContext(math.MaxUint32, c.args, environ, c.stdin, c.stdout, c.stderr, preopens)
 }

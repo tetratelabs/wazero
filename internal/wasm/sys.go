@@ -97,18 +97,18 @@ func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
 }
 
-// eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
-type eofReader struct{}
+// EOFReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
+type EOFReader struct{}
 
 // Read implements io.Reader
 // Note: This doesn't use a pointer reference as it has no state and an empty struct doesn't allocate.
-func (eofReader) Read([]byte) (int, error) {
+func (EOFReader) Read([]byte) (int, error) {
 	return 0, io.EOF
 }
 
-// NewSystemContext is a factory function which helps avoid needing to know defaults or exporting all fields.
+// NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
-func NewSystemContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
+func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*FileEntry) (sys *SysContext, err error) {
 	sys = &SysContext{args: args, environ: environ}
 
 	if sys.argsSize, err = nullTerminatedByteCount(max, args); err != nil {
@@ -120,7 +120,7 @@ func NewSystemContext(max uint32, args, environ []string, stdin io.Reader, stdou
 	}
 
 	if stdin == nil {
-		sys.stdin = eofReader{}
+		sys.stdin = EOFReader{}
 	} else {
 		sys.stdin = stdin
 	}
@@ -187,7 +187,7 @@ func (c *SysContext) Close() (err error) {
 	if f, ok := c.stdin.(*os.File); ok && f.Name() == os.DevNull {
 		_ = f.Close() // ignore error closing reader of /dev/null
 	}
-	// TODO: close openedFiles
+	// TODO: close openedFiles in #394
 	return
 }
 

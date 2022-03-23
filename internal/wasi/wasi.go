@@ -1018,13 +1018,13 @@ func SnapshotPreview1Functions() (a *wasiAPI, nameToGoFunc map[string]interface{
 
 // ArgsGet implements SnapshotPreview1.ArgsGet
 func (a *wasiAPI) ArgsGet(ctx wasm.Module, argv, argvBuf uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 	return writeOffsetsAndNullTerminatedValues(ctx.Memory(), sys.Args(), argv, argvBuf)
 }
 
 // ArgsSizesGet implements SnapshotPreview1.ArgsSizesGet
 func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 	mem := ctx.Memory()
 
 	if !mem.WriteUint32Le(resultArgc, uint32(len(sys.Args()))) {
@@ -1038,13 +1038,13 @@ func (a *wasiAPI) ArgsSizesGet(ctx wasm.Module, resultArgc, resultArgvBufSize ui
 
 // EnvironGet implements SnapshotPreview1.EnvironGet
 func (a *wasiAPI) EnvironGet(ctx wasm.Module, environ uint32, environBuf uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 	return writeOffsetsAndNullTerminatedValues(ctx.Memory(), sys.Environ(), environ, environBuf)
 }
 
 // EnvironSizesGet implements SnapshotPreview1.EnvironSizesGet
 func (a *wasiAPI) EnvironSizesGet(ctx wasm.Module, resultEnvironc uint32, resultEnvironBufSize uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 	mem := ctx.Memory()
 
 	if !mem.WriteUint32Le(resultEnvironc, uint32(len(sys.Environ()))) {
@@ -1083,7 +1083,7 @@ func (a *wasiAPI) FdAllocate(ctx wasm.Module, fd uint32, offset, len uint64) was
 
 // FdClose implements SnapshotPreview1.FdClose
 func (a *wasiAPI) FdClose(ctx wasm.Module, fd uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	if ok, err := sys.CloseFile(fd); err != nil {
 		return wasi.ErrnoIo
@@ -1102,7 +1102,7 @@ func (a *wasiAPI) FdDatasync(ctx wasm.Module, fd uint32) wasi.Errno {
 // FdFdstatGet implements SnapshotPreview1.FdFdstatGet
 // TODO: Currently FdFdstatget implements nothing except returning fake fs_right_inheriting
 func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	if _, ok := sys.OpenedFile(fd); !ok {
 		return wasi.ErrnoBadf
@@ -1115,7 +1115,7 @@ func (a *wasiAPI) FdFdstatGet(ctx wasm.Module, fd uint32, resultStat uint32) was
 
 // FdPrestatGet implements SnapshotPreview1.FdPrestatGet
 func (a *wasiAPI) FdPrestatGet(ctx wasm.Module, fd uint32, resultPrestat uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	entry, ok := sys.OpenedFile(fd)
 	if !ok || entry.Path == "" {
@@ -1166,7 +1166,7 @@ func (a *wasiAPI) FdPread(ctx wasm.Module, fd, iovs, iovsCount uint32, offset ui
 
 // FdPrestatDirName implements SnapshotPreview1.FdPrestatDirName
 func (a *wasiAPI) FdPrestatDirName(ctx wasm.Module, fd uint32, pathPtr uint32, pathLen uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	f, ok := sys.OpenedFile(fd)
 	if !ok {
@@ -1192,7 +1192,7 @@ func (a *wasiAPI) FdPwrite(ctx wasm.Module, fd, iovs, iovsCount uint32, offset u
 
 // FdRead implements SnapshotPreview1.FdRead
 func (a *wasiAPI) FdRead(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	var reader io.Reader
 
@@ -1247,7 +1247,7 @@ func (a *wasiAPI) FdRenumber(ctx wasm.Module, fd, to uint32) wasi.Errno {
 
 // FdSeek implements SnapshotPreview1.FdSeek
 func (a *wasiAPI) FdSeek(ctx wasm.Module, fd uint32, offset uint64, whence uint32, resultNewoffset uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	f, ok := sys.OpenedFile(fd)
 	if !ok || f.File == nil {
@@ -1285,7 +1285,7 @@ func (a *wasiAPI) FdTell(ctx wasm.Module, fd, resultOffset uint32) wasi.Errno {
 
 // FdWrite implements SnapshotPreview1.FdWrite
 func (a *wasiAPI) FdWrite(ctx wasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	var writer io.Writer
 
@@ -1386,7 +1386,7 @@ func posixOpenFlags(oFlags uint32, fsRights uint64) (pFlags int) {
 // PathOpen implements SnapshotPreview1.PathOpen
 func (a *wasiAPI) PathOpen(ctx wasm.Module, fd, dirflags, pathPtr, pathLen, oflags uint32, fsRightsBase,
 	fsRightsInheriting uint64, fdflags, resultOpenedFd uint32) (errno wasi.Errno) {
-	sys := systemContext(ctx)
+	sys := sysContext(ctx)
 
 	dir, ok := sys.OpenedFile(fd)
 	if !ok || dir.FS == nil {
@@ -1512,7 +1512,7 @@ func NewAPI() *wasiAPI {
 	}
 }
 
-func systemContext(ctx wasm.Module) *internalwasm.SysContext {
+func sysContext(ctx wasm.Module) *internalwasm.SysContext {
 	if internal, ok := ctx.(*internalwasm.ModuleContext); !ok {
 		panic(fmt.Errorf("unsupported wasm.Module implementation: %v", ctx))
 	} else {

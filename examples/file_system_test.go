@@ -36,7 +36,7 @@ func Test_Cat(t *testing.T) {
 	memFS := wazero.WASIMemFS()
 	err := writeFile(memFS, file, catGo)
 	require.NoError(t, err)
-	sysConfig.WithPreopens(map[string]wasi.FS{".": memFS})
+	sysConfig.WithWorkDirFS(memFS)
 
 	// Since this runs a main function (_start in WASI), configure the arguments.
 	// Remember, arg[0] is the program name!

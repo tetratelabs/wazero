@@ -137,8 +137,12 @@ confusing users with another API to close.
 
 Naming, defaults and validation rules of aspects like `STDIN` and `Environ` are intentionally similar to other Go
 libraries such as `exec.Cmd` or `syscall.SetEnv`, and differences called out where helpful. For example, there's no goal
-to emulate any operating system functionality from Windows (such as a 'c:\' drive), even if the Windows platform is
-supported. Since most Golang primitives try to be OS-portable, we need to clarify `SysConfig` is not.
+to emulate any operating system primitive specific to Windows (such as a 'c:\' drive). Moreover, certain defaults
+working with real system calls are neither relevant nor safe to inherit: For example, `exec.Cmd` defaults to read STDIN
+from a real file descriptor ("/dev/null"). Defaulting to this, vs reading `io.EOF`, would be unsafe as it can exhaust
+file descriptors if resources aren't managed properly. In other words, blind copying of defaults isn't wise as it can
+violate isolation or endanger the embedding process. In summary, we try to be similar to normal Go code, but often need
+act differently and document `SysConfig` is more about emulating, not necessarily performing real system calls.
 
 ## Implementation limitations
 
