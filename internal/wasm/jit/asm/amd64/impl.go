@@ -154,6 +154,7 @@ var (
 	operandTypesConstToMemory      = operandTypes{operandTypeConst, operandTypeMemory}
 )
 
+// String implements fmt.Stringer
 func (o operandTypes) String() string {
 	return fmt.Sprintf("from:%s,to:%s", o.src, o.dst)
 }
@@ -351,6 +352,7 @@ func (a *assemblerImpl) CompileNoneToMemory(instruction asm.Instruction, baseReg
 	n.dstConst = offset
 }
 
+// CompileConstToMemory implements assembler.CompileConstToMemory
 func (a *assemblerImpl) CompileConstToMemory(instruction asm.Instruction, value asm.ConstantValue, dstbaseReg asm.Register, dstOffset asm.ConstantValue) asm.Node {
 	n := a.newNode(instruction, operandTypesConstToMemory)
 	n.srcConst = value
@@ -359,6 +361,7 @@ func (a *assemblerImpl) CompileConstToMemory(instruction asm.Instruction, value 
 	return n
 }
 
+// CompileMemoryToConst implements assembler.CompileMemoryToConst
 func (a *assemblerImpl) CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset asm.ConstantValue, value asm.ConstantValue) asm.Node {
 	n := a.newNode(instruction, operandTypesMemoryToConst)
 	n.srcReg = srcBaseReg
