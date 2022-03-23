@@ -75,7 +75,7 @@ func TestNewSysContext_Args(t *testing.T) {
 				tc.args,
 				nil,                              // environ
 				bytes.NewReader(make([]byte, 0)), // stdin
-				nil,                              //stdout
+				nil,                              // stdout
 				nil,                              // stderr
 				nil,                              // openedFiles
 			)
@@ -133,7 +133,7 @@ func TestNewSysContext_Environ(t *testing.T) {
 				nil,        // args
 				tc.environ,
 				bytes.NewReader(make([]byte, 0)), // stdin
-				nil,                              //stdout
+				nil,                              // stdout
 				nil,                              // stderr
 				nil,                              // openedFiles
 			)

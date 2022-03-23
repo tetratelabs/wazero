@@ -74,7 +74,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // args
 				nil,            // environ
 				nil,            // stdin
-				nil,            //stdout
+				nil,            // stdout
 				nil,            // stderr
 				nil,            // openedFiles
 			),
@@ -87,7 +87,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				[]string{"a", "bc"}, // args
 				nil,                 // environ
 				nil,                 // stdin
-				nil,                 //stdout
+				nil,                 // stdout
 				nil,                 // stderr
 				nil,                 // openedFiles
 			),
@@ -100,7 +100,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				[]string{"", "bc"}, // args
 				nil,                // environ
 				nil,                // stdin
-				nil,                //stdout
+				nil,                // stdout
 				nil,                // stderr
 				nil,                // openedFiles
 			),
@@ -113,7 +113,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				[]string{"bc", "a"}, // args
 				nil,                 // environ
 				nil,                 // stdin
-				nil,                 //stdout
+				nil,                 // stdout
 				nil,                 // stderr
 				nil,                 // openedFiles
 			),
@@ -126,7 +126,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,             // args
 				[]string{"a=b"}, // environ
 				nil,             // stdin
-				nil,             //stdout
+				nil,             // stdout
 				nil,             // stderr
 				nil,             // openedFiles
 			),
@@ -139,7 +139,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // args
 				[]string{"a="}, // environ
 				nil,            // stdin
-				nil,            //stdout
+				nil,            // stdout
 				nil,            // stderr
 				nil,            // openedFiles
 			),
@@ -152,7 +152,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,                     // args
 				[]string{"a=b", "c=de"}, // environ
 				nil,                     // stdin
-				nil,                     //stdout
+				nil,                     // stdout
 				nil,                     // stderr
 				nil,                     // openedFiles
 			),
@@ -165,7 +165,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,                      // args
 				[]string{"a=de", "c=de"}, // environ
 				nil,                      // stdin
-				nil,                      //stdout
+				nil,                      // stdout
 				nil,                      // stderr
 				nil,                      // openedFiles
 			),
@@ -179,7 +179,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,                     // args
 				[]string{"a=b", "c=de"}, // environ
 				nil,                     // stdin
-				nil,                     //stdout
+				nil,                     // stdout
 				nil,                     // stderr
 				nil,                     // openedFiles
 			),
@@ -192,7 +192,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // args
 				nil,            // environ
 				nil,            // stdin
-				nil,            //stdout
+				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: memFS},
@@ -208,7 +208,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // args
 				nil,            // environ
 				nil,            // stdin
-				nil,            //stdout
+				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: memFS2},
@@ -224,7 +224,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // args
 				nil,            // environ
 				nil,            // stdin
-				nil,            //stdout
+				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
 					3: {Path: ".", FS: memFS},
@@ -239,7 +239,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // args
 				nil,            // environ
 				nil,            // stdin
-				nil,            //stdout
+				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
 					3: {Path: "/", FS: memFS},
@@ -255,7 +255,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // args
 				nil,            // environ
 				nil,            // stdin
-				nil,            //stdout
+				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
 					3: {Path: ".", FS: memFS},
