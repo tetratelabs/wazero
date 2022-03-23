@@ -97,14 +97,28 @@ func (c *SysContext) Stderr() io.Writer {
 	return c.stderr
 }
 
-// EOFReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
-type EOFReader struct{}
+// eofReader is safer than reading from os.DevNull as it can never overrun operating system file descriptors.
+type eofReader struct{}
 
 // Read implements io.Reader
 // Note: This doesn't use a pointer reference as it has no state and an empty struct doesn't allocate.
-func (EOFReader) Read([]byte) (int, error) {
+func (eofReader) Read([]byte) (int, error) {
 	return 0, io.EOF
 }
+
+// DefaultSysContext returns SysContext with no values set.
+//
+// Note: This isn't a constant because SysContext.openedFiles is currently mutable even when empty.
+// TODO: Make it an error to open or close files when no FS was assigned.
+func DefaultSysContext() *SysContext {
+	if sys, err := NewSysContext(0, nil, nil, nil, nil, nil, nil); err != nil {
+		panic(fmt.Errorf("BUG: DefaultSysContext should never error: %w", err))
+	} else {
+		return sys
+	}
+}
+
+var _ = DefaultSysContext() // Force panic on bug.
 
 // NewSysContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
@@ -120,7 +134,7 @@ func NewSysContext(max uint32, args, environ []string, stdin io.Reader, stdout, 
 	}
 
 	if stdin == nil {
-		sys.stdin = EOFReader{}
+		sys.stdin = eofReader{}
 	} else {
 		sys.stdin = stdin
 	}

@@ -77,7 +77,7 @@ func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
 // See StartWASICommandWithConfig
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
 func StartWASICommand(r Runtime, module *Module) (wasm.Module, error) {
-	return StartWASICommandWithConfig(r, module, &SysConfig{})
+	return startWASICommandWithSysContext(r, module, internalwasm.DefaultSysContext())
 }
 
 // StartWASICommandWithConfig is like StartWASICommand, except you can override configuration based on the importing
@@ -94,15 +94,14 @@ func StartWASICommand(r Runtime, module *Module) (wasm.Module, error) {
 //
 // See StartWASICommand
 func StartWASICommandWithConfig(r Runtime, module *Module, config *SysConfig) (mod wasm.Module, err error) {
-	return startWASICommandWithConfig(r, module, config)
-}
-
-func startWASICommandWithConfig(r Runtime, module *Module, config *SysConfig) (mod wasm.Module, err error) {
 	var sys *internalwasm.SysContext
 	if sys, err = config.toSysContext(); err != nil {
 		return
 	}
+	return startWASICommandWithSysContext(r, module, sys)
+}
 
+func startWASICommandWithSysContext(r Runtime, module *Module, sys *internalwasm.SysContext) (mod wasm.Module, err error) {
 	if err = internalwasi.ValidateWASICommand(module.module, module.name); err != nil {
 		return
 	}

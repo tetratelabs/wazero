@@ -144,9 +144,5 @@ func (r *runtime) InstantiateModuleFromSource(source []byte) (wasm.Module, error
 
 // InstantiateModule implements Runtime.InstantiateModule
 func (r *runtime) InstantiateModule(module *Module) (wasm.Module, error) {
-	if sys, err := (&SysConfig{}).toSysContext(); err != nil {
-		return nil, err
-	} else {
-		return r.store.Instantiate(r.ctx, module.module, module.name, sys)
-	}
+	return r.store.Instantiate(r.ctx, module.module, module.name, internalwasm.DefaultSysContext())
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewSysContext_Defaults(t *testing.T) {
+func TestDefaultSysContext(t *testing.T) {
 	sys, err := NewSysContext(
 		0,   // max
 		nil, // args
@@ -24,10 +24,12 @@ func TestNewSysContext_Defaults(t *testing.T) {
 	require.Zero(t, sys.ArgsSize())
 	require.Nil(t, sys.Environ())
 	require.Zero(t, sys.EnvironSize())
-	require.Equal(t, EOFReader{}, sys.Stdin())
+	require.Equal(t, eofReader{}, sys.Stdin())
 	require.Equal(t, io.Discard, sys.Stdout())
 	require.Equal(t, io.Discard, sys.Stderr())
 	require.Empty(t, sys.openedFiles)
+
+	require.Equal(t, sys, DefaultSysContext())
 }
 
 func TestNewSysContext_Args(t *testing.T) {
