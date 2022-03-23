@@ -1452,7 +1452,10 @@ func (a *wasiAPI) PollOneoff(ctx wasm.Module, in, out, nsubscriptions, resultNev
 }
 
 // ProcExit implements SnapshotPreview1.ProcExit
-func (a *wasiAPI) ProcExit(exitCode uint32) {
+func (a *wasiAPI) ProcExit(ctx wasm.Module, exitCode uint32) {
+	// ProcExit makes the caller module no longer usable, so we can close the module and can release the resources.
+	// See https://github.com/WebAssembly/WASI/issues/26#issuecomment-1051176870
+	ctx.Close()
 	// Panic in a host function is caught by the engines, and the value of the panic is returned as the error of the CallFunction.
 	// See the document of SnapshotPreview1.ProcExit.
 	panic(wasi.ExitCode(exitCode))

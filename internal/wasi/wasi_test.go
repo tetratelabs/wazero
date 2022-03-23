@@ -38,7 +38,7 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionArgsGet, ImportArgsGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionArgsGet, ImportArgsGet, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ArgsGet", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestSnapshotPreview1_ArgsGet_Errors(t *testing.T) {
 	sys, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionArgsGet, ImportArgsGet, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionArgsGet, ImportArgsGet, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -132,7 +132,7 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ArgsSizesGet", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 	sys, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -226,7 +226,7 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionEnvironGet, ImportEnvironGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionEnvironGet, ImportEnvironGet, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.EnvironGet", func(t *testing.T) {
@@ -259,7 +259,7 @@ func TestSnapshotPreview1_EnvironGet_Errors(t *testing.T) {
 	sys, err := newSysContext(nil, []string{"a=bc", "b=cd"}, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionEnvironGet, ImportEnvironGet, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionEnvironGet, ImportEnvironGet, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -320,7 +320,7 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 		'?', // stopped after encoding
 	}
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.EnvironSizesGet", func(t *testing.T) {
@@ -353,7 +353,7 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -403,7 +403,7 @@ func TestSnapshotPreview1_ClockResGet(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionClockResGet, ImportClockResGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionClockResGet, ImportClockResGet, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ClockResGet", func(t *testing.T) {
@@ -430,7 +430,7 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionClockTimeGet, ImportClockTimeGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionClockTimeGet, ImportClockTimeGet, moduleName, sys)
 	defer mod.Close()
 
 	a.timeNowUnixNano = func() uint64 { return epochNanos }
@@ -467,7 +467,7 @@ func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionClockTimeGet, ImportClockTimeGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionClockTimeGet, ImportClockTimeGet, moduleName, sys)
 	defer mod.Close()
 
 	a.timeNowUnixNano = func() uint64 { return epochNanos }
@@ -507,7 +507,7 @@ func TestSnapshotPreview1_FdAdvise(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdAdvise, ImportFdAdvise, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdAdvise, ImportFdAdvise, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdAdvise", func(t *testing.T) {
@@ -527,7 +527,7 @@ func TestSnapshotPreview1_FdAllocate(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdAllocate, ImportFdAllocate, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdAllocate, ImportFdAllocate, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdAllocate", func(t *testing.T) {
@@ -560,7 +560,7 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		a, mod, fn := instantiateModule(t, ctx, FunctionFdClose, ImportFdClose, moduleName, sys)
+		a, _, mod, fn := instantiateModule(t, ctx, FunctionFdClose, ImportFdClose, moduleName, sys)
 		return mod, fn, a
 	}
 
@@ -608,7 +608,7 @@ func TestSnapshotPreview1_FdDatasync(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdDatasync, ImportFdDatasync, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdDatasync, ImportFdDatasync, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdDatasync", func(t *testing.T) {
@@ -630,7 +630,7 @@ func TestSnapshotPreview1_FdFdstatSetFlags(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdFdstatSetFlags, ImportFdFdstatSetFlags, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdFdstatSetFlags, ImportFdFdstatSetFlags, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFdstatSetFlags", func(t *testing.T) {
@@ -650,7 +650,7 @@ func TestSnapshotPreview1_FdFdstatSetRights(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdFdstatSetRights, ImportFdFdstatSetRights, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdFdstatSetRights, ImportFdFdstatSetRights, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFdstatSetRights", func(t *testing.T) {
@@ -670,7 +670,7 @@ func TestSnapshotPreview1_FdFilestatGet(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatGet, ImportFdFilestatGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatGet, ImportFdFilestatGet, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatGet", func(t *testing.T) {
@@ -690,7 +690,7 @@ func TestSnapshotPreview1_FdFilestatSetSize(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatSetSize, ImportFdFilestatSetSize, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatSetSize, ImportFdFilestatSetSize, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatSetSize", func(t *testing.T) {
@@ -710,7 +710,7 @@ func TestSnapshotPreview1_FdFilestatSetTimes(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatSetTimes, ImportFdFilestatSetTimes, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatSetTimes, ImportFdFilestatSetTimes, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatSetTimes", func(t *testing.T) {
@@ -730,7 +730,7 @@ func TestSnapshotPreview1_FdPread(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdPread, ImportFdPread, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdPread, ImportFdPread, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdPread", func(t *testing.T) {
@@ -751,7 +751,7 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, sys)
 	defer mod.Close()
 
 	resultPrestat := uint32(1) // arbitrary offset
@@ -796,7 +796,7 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -839,7 +839,7 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, sys)
 	defer mod.Close()
 
 	path := uint32(1)    // arbitrary offset
@@ -881,7 +881,7 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -942,7 +942,7 @@ func TestSnapshotPreview1_FdPwrite(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdPwrite, ImportFdPwrite, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdPwrite, ImportFdPwrite, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdPwrite", func(t *testing.T) {
@@ -1009,7 +1009,7 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			a, mod, fn := instantiateModule(t, ctx, FunctionFdRead, ImportFdRead, moduleName, sys)
+			a, _, mod, fn := instantiateModule(t, ctx, FunctionFdRead, ImportFdRead, moduleName, sys)
 			defer mod.Close()
 
 			maskMemory(t, mod, len(expectedMemory))
@@ -1037,7 +1037,7 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionFdRead, ImportFdRead, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionFdRead, ImportFdRead, moduleName, sys)
 	defer mod.Close()
 
 	tests := []struct {
@@ -1126,7 +1126,7 @@ func TestSnapshotPreview1_FdReaddir(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdReaddir, ImportFdReaddir, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdReaddir, ImportFdReaddir, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdReaddir", func(t *testing.T) {
@@ -1146,7 +1146,7 @@ func TestSnapshotPreview1_FdRenumber(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdRenumber, ImportFdRenumber, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdRenumber, ImportFdRenumber, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdRenumber", func(t *testing.T) {
@@ -1171,7 +1171,7 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdSeek, ImportFdSeek, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdSeek, ImportFdSeek, moduleName, sys)
 	defer mod.Close()
 
 	// TestSnapshotPreview1_FdSeek uses a matrix because setting up test files is complicated and has to be clean each time.
@@ -1266,7 +1266,7 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionFdSeek, ImportFdSeek, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionFdSeek, ImportFdSeek, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -1313,7 +1313,7 @@ func TestSnapshotPreview1_FdSync(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdSync, ImportFdSync, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdSync, ImportFdSync, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdSync", func(t *testing.T) {
@@ -1333,7 +1333,7 @@ func TestSnapshotPreview1_FdTell(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdTell, ImportFdTell, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionFdTell, ImportFdTell, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdTell", func(t *testing.T) {
@@ -1400,7 +1400,7 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			a, mod, fn := instantiateModule(t, ctx, FunctionFdWrite, ImportFdWrite, moduleName, sys)
+			a, _, mod, fn := instantiateModule(t, ctx, FunctionFdWrite, ImportFdWrite, moduleName, sys)
 			defer mod.Close()
 
 			maskMemory(t, mod, len(expectedMemory))
@@ -1427,7 +1427,7 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionFdWrite, ImportFdWrite, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionFdWrite, ImportFdWrite, moduleName, sys)
 	defer mod.Close()
 
 	// Setup valid test memory
@@ -1510,7 +1510,7 @@ func TestSnapshotPreview1_PathCreateDirectory(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathCreateDirectory, ImportPathCreateDirectory, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathCreateDirectory, ImportPathCreateDirectory, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathCreateDirectory", func(t *testing.T) {
@@ -1530,7 +1530,7 @@ func TestSnapshotPreview1_PathFilestatGet(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathFilestatGet, ImportPathFilestatGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathFilestatGet, ImportPathFilestatGet, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathFilestatGet", func(t *testing.T) {
@@ -1550,7 +1550,7 @@ func TestSnapshotPreview1_PathFilestatSetTimes(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathFilestatSetTimes, ImportPathFilestatSetTimes, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathFilestatSetTimes, ImportPathFilestatSetTimes, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathFilestatSetTimes", func(t *testing.T) {
@@ -1570,7 +1570,7 @@ func TestSnapshotPreview1_PathLink(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathLink, ImportPathLink, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathLink, ImportPathLink, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathLink", func(t *testing.T) {
@@ -1655,7 +1655,7 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 					})
 					require.NoError(t, err)
 
-					a, mod, fn := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
+					a, _, mod, fn := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
 					defer mod.Close()
 
 					maskMemory(t, mod, len(expectedMemory))
@@ -1693,7 +1693,7 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
 	defer mod.Close()
 
 	validPath := uint32(0)    // arbitrary offset
@@ -1758,7 +1758,7 @@ func TestSnapshotPreview1_PathReadlink(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathReadlink, ImportPathReadlink, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathReadlink, ImportPathReadlink, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathLink", func(t *testing.T) {
@@ -1778,7 +1778,7 @@ func TestSnapshotPreview1_PathRemoveDirectory(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathRemoveDirectory, ImportPathRemoveDirectory, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathRemoveDirectory, ImportPathRemoveDirectory, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathRemoveDirectory", func(t *testing.T) {
@@ -1798,7 +1798,7 @@ func TestSnapshotPreview1_PathRename(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathRename, ImportPathRename, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathRename, ImportPathRename, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathRename", func(t *testing.T) {
@@ -1818,7 +1818,7 @@ func TestSnapshotPreview1_PathSymlink(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathSymlink, ImportPathSymlink, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathSymlink, ImportPathSymlink, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathSymlink", func(t *testing.T) {
@@ -1838,7 +1838,7 @@ func TestSnapshotPreview1_PathUnlinkFile(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathUnlinkFile, ImportPathUnlinkFile, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPathUnlinkFile, ImportPathUnlinkFile, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathUnlinkFile", func(t *testing.T) {
@@ -1858,7 +1858,7 @@ func TestSnapshotPreview1_PollOneoff(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionPollOneoff, ImportPollOneoff, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionPollOneoff, ImportPollOneoff, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PollOneoff", func(t *testing.T) {
@@ -1874,8 +1874,76 @@ func TestSnapshotPreview1_PollOneoff(t *testing.T) {
 
 func TestSnapshotPreview1_ProcExit(t *testing.T) {
 	ctx := context.Background()
-	sys, err := newSysContext(nil, nil, nil)
-	require.NoError(t, err)
+
+	// Note: Unlike most tests, this uses fn, not the 'a' result parameter. This is because currently, ProcExit function
+	// body panics, and we expect Call to unwrap the panic as an error.
+	// Note: fn are called in various ways to test that it closes the module correctly in various tricky calls.
+	type procExitFn func(exitcode uint32) error
+	procExitFns := []struct {
+		name     string
+		procExit func() (procExitFn, *wasm.Store)
+	}{
+		// call proc_exit in a usual way, that is, call the imported-and-exported-back ProcExit.
+		{FunctionProcExit, func() (procExitFn, *wasm.Store) {
+			sys, err := newSysContext(nil, nil, nil)
+			require.NoError(t, err)
+
+			_, store, mod, fn := instantiateModule(t, context.Background(), FunctionProcExit, ImportProcExit, moduleName, sys)
+			return func(exitcode uint32) error {
+				_, err := fn.Call(mod, uint64(exitcode))
+				return err
+			}, store
+		}},
+		{"call directly from wasm", func() (procExitFn, *wasm.Store) {
+			sys, err := newSysContext(nil, nil, nil)
+			require.NoError(t, err)
+
+			_, store := instantiateModuleSnapshotPreview1(t, ctx)
+			mod, fn := instantiateModuleFromSource(t, store, ctx, []byte(fmt.Sprintf(`(module
+				%s
+				(func $call->proc_exit (param i32)
+					local.get 0
+					call $wasi.proc_exit
+				)
+				(export "call->proc_exit" (func $call->proc_exit))
+				)`, ImportProcExit)), moduleName, sys, "call->proc_exit")
+
+			return func(exitcode uint32) error {
+				_, err := fn.Call(mod, uint64(exitcode))
+				return err
+			}, store
+		}},
+		{"call from an imported function", func() (procExitFn, *wasm.Store) {
+			sys, err := newSysContext(nil, nil, nil)
+			require.NoError(t, err)
+
+			_, store := instantiateModuleSnapshotPreview1(t, ctx)
+
+			_, _ = instantiateModuleFromSource(t, store, ctx, []byte(fmt.Sprintf(`(module
+				%s
+				(func $call->proc_exit (param i32)
+					local.get 0
+					call $wasi.proc_exit
+				)
+				(export "call->proc_exit" (func $call->proc_exit))
+				)`, ImportProcExit)), "imported_mod", nil, "call->proc_exit") // TODO: close
+
+			mod, fn := instantiateModuleFromSource(t, store, ctx, []byte(`(module
+				(import "imported_mod" "call->proc_exit"
+					(func $imported_mod.call->proc_exit (param $exitcode i32)))
+				(func $call->imported_mod.call->proc_exit (param $exitcode i32)
+					local.get 0
+					call $imported_mod.call->proc_exit
+				)
+				(export "call->proc_exit" (func $call->imported_mod.call->proc_exit))
+				)`), moduleName, sys, "call->proc_exit")
+
+			return func(exitcode uint32) error {
+				_, err := fn.Call(mod, uint64(exitcode))
+				return err
+			}, store
+		}},
+	}
 
 	tests := []struct {
 		name     string
@@ -1891,21 +1959,59 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 			exitCode: 42,
 		},
 	}
+	for _, procExitFn := range procExitFns {
+		pf := procExitFn
+		t.Run(pf.name, func(t *testing.T) {
 
-	// Note: Unlike most tests, this uses fn, not the 'a' result parameter. This is because currently, this function
-	// body panics, and we expect Call to unwrap the panic.
-	_, mod, fn := instantiateModule(t, ctx, FunctionProcExit, ImportProcExit, moduleName, sys)
-	defer mod.Close()
+			for _, tt := range tests {
+				tc := tt
 
-	for _, tt := range tests {
-		tc := tt
+				t.Run(tc.name, func(t *testing.T) {
+					t.Run("simple proc_exit", func(t *testing.T) {
+						fn, store := pf.procExit()
+						require.NotNil(t, store.Module(moduleName)) // verify store contains moduleName
 
-		t.Run(tc.name, func(t *testing.T) {
-			// When ProcExit is called, store.CallFunction returns immediately, returning the exit code as the error.
-			_, err = fn.Call(mod, uint64(tc.exitCode))
-			var code wasi.ExitCode
-			require.ErrorAs(t, err, &code)
-			require.Equal(t, code, wasi.ExitCode(tc.exitCode))
+						err := fn(tc.exitCode)
+						var code wasi.ExitCode
+						require.ErrorAs(t, err, &code)
+						require.Equal(t, code, wasi.ExitCode(tc.exitCode))
+
+						require.Nil(t, store.Module(moduleName)) // verify moduleName was removed because ProcExit calls Close
+					})
+					t.Run("close is called after proc_exit", func(t *testing.T) {
+						fn, store := pf.procExit()
+
+						mod := store.Module(moduleName)
+
+						err := fn(tc.exitCode)
+						var code wasi.ExitCode
+						require.ErrorAs(t, err, &code)
+						require.Equal(t, code, wasi.ExitCode(tc.exitCode))
+
+						require.Nil(t, store.Module(moduleName)) // verify moduleName was removed because ProcExit calls Close
+
+						// Module.Close should have no error even after ProcExit closed it.
+						err = mod.Close()
+						require.NoError(t, err)
+					})
+					t.Run("proc_exit is called after close", func(t *testing.T) {
+						fn, store := pf.procExit()
+						mod := store.Module(moduleName)
+
+						// Close the module before calling the ProcExit function.
+						mod.Close()
+						require.Nil(t, store.Module(moduleName)) // verify moduleName was removed
+
+						// The retrieved ProcExit function should work even after the module was already closed for some reason.
+						err := fn(tc.exitCode)
+						var code wasi.ExitCode
+						require.ErrorAs(t, err, &code)
+						require.Equal(t, code, wasi.ExitCode(tc.exitCode))
+
+						require.Nil(t, store.Module(moduleName)) // verify moduleName is still nil
+					})
+				})
+			}
 		})
 	}
 }
@@ -1916,7 +2022,7 @@ func TestSnapshotPreview1_ProcRaise(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionProcRaise, ImportProcRaise, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionProcRaise, ImportProcRaise, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ProcRaise", func(t *testing.T) {
@@ -1936,7 +2042,7 @@ func TestSnapshotPreview1_SchedYield(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionSchedYield, ImportSchedYield, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionSchedYield, ImportSchedYield, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SchedYield", func(t *testing.T) {
@@ -1964,7 +2070,7 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
 	defer mod.Close()
 
 	a.randSource = func(p []byte) error {
@@ -2007,7 +2113,7 @@ func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 
 	validAddress := uint32(0) // arbitrary valid address
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
 	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
@@ -2045,7 +2151,7 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, _ := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
+	a, _, mod, _ := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
 	defer mod.Close()
 
 	a.randSource = func(p []byte) error {
@@ -2062,7 +2168,7 @@ func TestSnapshotPreview1_SockRecv(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionSockRecv, ImportSockRecv, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionSockRecv, ImportSockRecv, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockRecv", func(t *testing.T) {
@@ -2082,7 +2188,7 @@ func TestSnapshotPreview1_SockSend(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionSockSend, ImportSockSend, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionSockSend, ImportSockSend, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockSend", func(t *testing.T) {
@@ -2102,7 +2208,7 @@ func TestSnapshotPreview1_SockShutdown(t *testing.T) {
 	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionSockShutdown, ImportSockShutdown, moduleName, sys)
+	a, _, mod, fn := instantiateModule(t, ctx, FunctionSockShutdown, ImportSockShutdown, moduleName, sys)
 	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockShutdown", func(t *testing.T) {
@@ -2118,7 +2224,20 @@ func TestSnapshotPreview1_SockShutdown(t *testing.T) {
 
 const testMemoryPageSize = 1
 
-func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImport, moduleName string, sys *wasm.SysContext) (*wasiAPI, *wasm.ModuleContext, publicwasm.Function) {
+func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImport, moduleName string, sys *wasm.SysContext) (*wasiAPI, *wasm.Store, *wasm.ModuleContext, publicwasm.Function) {
+	a, store := instantiateModuleSnapshotPreview1(t, ctx)
+
+	mod, fn := instantiateModuleFromSource(t, store, ctx, []byte(fmt.Sprintf(`(module
+  %[2]s
+  (memory 1)  ;; just an arbitrary size big enough for tests
+  (export "memory" (memory 0))
+  (export "%[1]s" (func $wasi.%[1]s))
+)`, wasiFunction, wasiImport)), moduleName, sys, wasiFunction)
+
+	return a, store, mod, fn
+}
+
+func instantiateModuleSnapshotPreview1(t *testing.T, ctx context.Context) (*wasiAPI, *wasm.Store) {
 	enabledFeatures := wasm.Features20191205
 	store := wasm.NewStore(interpreter.NewEngine(), enabledFeatures)
 
@@ -2134,20 +2253,19 @@ func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImpo
 	_, err = store.Instantiate(ctx, m, m.NameSection.ModuleName, nil) // TODO: close
 	require.NoError(t, err)
 
-	m, err = text.DecodeModule([]byte(fmt.Sprintf(`(module
-  %[2]s
-  (memory 1)  ;; just an arbitrary size big enough for tests
-  (export "memory" (memory 0))
-  (export "%[1]s" (func $wasi.%[1]s))
-)`, wasiFunction, wasiImport)), enabledFeatures)
+	return a, store
+}
+
+func instantiateModuleFromSource(t *testing.T, store *wasm.Store, ctx context.Context, source []byte, moduleName string, sys *wasm.SysContext, function string) (*wasm.ModuleContext, publicwasm.Function) {
+	m, err := text.DecodeModule(source, wasm.Features20191205)
 	require.NoError(t, err)
 
 	mod, err := store.Instantiate(ctx, m, moduleName, sys)
 	require.NoError(t, err)
 
-	fn := mod.ExportedFunction(wasiFunction)
+	fn := mod.ExportedFunction(function)
 	require.NotNil(t, fn)
-	return a, mod, fn
+	return mod, fn
 }
 
 // maskMemory sets the first memory in the store to '?' * size, so tests can see what's written.
