@@ -29,18 +29,18 @@ func Test_Cat(t *testing.T) {
 
 	// First, configure where the WebAssembly Module (Wasm) console outputs to (stdout).
 	stdoutBuf := bytes.NewBuffer(nil)
-	wasiConfig := wazero.NewWASIConfig().WithStdout(stdoutBuf)
+	sysConfig := wazero.NewSysConfig().WithStdout(stdoutBuf)
 
 	// Next, configure a sandboxed filesystem to include one file.
 	file := "cat.go" // arbitrary file
 	memFS := wazero.WASIMemFS()
 	err := writeFile(memFS, file, catGo)
 	require.NoError(t, err)
-	wasiConfig.WithPreopens(map[string]wasi.FS{".": memFS})
+	sysConfig.WithWorkDirFS(memFS)
 
 	// Since this runs a main function (_start in WASI), configure the arguments.
 	// Remember, arg[0] is the program name!
-	wasiConfig.WithArgs("cat", file)
+	sysConfig.WithArgs("cat", file)
 
 	// Compile the `cat` module.
 	compiled, err := r.CompileModule(catWasm)
@@ -52,7 +52,7 @@ func Test_Cat(t *testing.T) {
 	defer wasi.Close()
 
 	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to.
-	cat, err := wazero.StartWASICommandWithConfig(r, compiled, wasiConfig)
+	cat, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig)
 
 	require.NoError(t, err)
 	defer cat.Close()

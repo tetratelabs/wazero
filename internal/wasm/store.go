@@ -256,16 +256,13 @@ func NewStore(engine Engine, enabledFeatures Features) *Store {
 // Instantiate uses name instead of the Module.NameSection ModuleName as it allows instantiating the same module under
 // different names safely and concurrently.
 //
-// * ctx: the default context used for function calls
+// * ctx: the default context used for function calls.
+// * name: the name of the module.
+// * sys: the system context, which will be closed (SysContext.Close) on ModuleContext.Close.
 //
 // Note: Module.Validate must be called prior to instantiation.
-func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*ModuleContext, error) {
-	sys, err := NewSystemContext() // TODO: from config in #394
-	if err != nil {                // fail early
-		return nil, err
-	}
-
-	if err = s.requireModuleName(name); err != nil {
+func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sys *SysContext) (*ModuleContext, error) {
+	if err := s.requireModuleName(name); err != nil {
 		return nil, err
 	}
 
@@ -318,8 +315,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string) (*
 	m.applyData(module.DataSection)
 
 	// Build the default context for calls to this module.
-	m.Ctx = NewModuleContext(ctx, s, m)
-	m.Ctx.System = sys
+	m.Ctx = NewModuleContext(ctx, s, m, sys)
 
 	// Execute the start function.
 	if module.StartSection != nil {

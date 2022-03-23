@@ -32,7 +32,7 @@ wazero shares constants and interfaces with internal code by a sharing pattern d
 * shared interfaces and constants go in a package under root.
   * Ex. package `wasi` -> `/wasi/*.go`
 * user code that refer to that package go into the flat root package `wazero`.
-  * Ex. `WASIConfig` -> `/wasi.go`
+  * Ex. `StartWASICommand` -> `/wasi.go`
 * implementation code begin in a corresponding package under `/internal`.
   * Ex  package `internalwasi` -> `/internal/wasi/*.go`
 
@@ -87,6 +87,62 @@ runtime vs interpreting Wasm directly (the `naivevm` interpreter).
 Note: `microwasm` was never specified formally, and only exists in a historical codebase of wasmtime:
 https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/microwasm.rs
 
+## Why is `SysConfig` decoupled from WASI?
+
+WebAssembly System Interfaces (WASI) is a formalization of a practice that can be done anyway: Define a host function to
+access a system interface, such as writing to STDOUT. WASI stalled at snapshot-01 and as of early 2022, is being
+rewritten entirely.
+
+This instability implies a need to transition between WASI specs, which places wazero in a position that requires
+decoupling. For example, if code uses two different functions to call `fd_write`, the underlying configuration must be
+centralized and decoupled. Otherwise, calls using the same file descriptor number will end up writing to different
+places.
+
+In short, wazero defined system configuration in `SysConfig`, not a WASI type. This allows end-users to switch from
+one spec to another with minimal impact. This has other helpful benefits, as centralized resources are simpler to close
+coherently (ex via `Module.Close`).
+
+### Background on `SysConfig` design
+WebAssembly 1.0 (20191205) specifies some aspects to control isolation between modules ([sandboxing](https://en.wikipedia.org/wiki/Sandbox_(computer_security))).
+For example, `wasm.Memory` has size constraints and each instance of it is isolated from each other. While `wasm.Memory`
+can be shared, by exporting it, it is not exported by default. In fact a WebAssembly Module (Wasm) has no memory by
+default.
+
+While memory is defined in WebAssembly 1.0 (20191205), many aspects are not. Let's use an example of `exec.Cmd` as for
+example, a WebAssembly System Interfaces (WASI) command is implemented as a module with a `_start` function, and in many
+ways acts similar to a process with a `main` function.
+
+To capture "hello world" written to the console (stdout a.k.a. file descriptor 1) in `exec.Cmd`, you would set the
+`Stdout` field accordingly, perhaps to a buffer. In WebAssembly 1.0 (20191205), the only way to perform something like
+this is via a host function (ex `ModuleBuilder.ExportFunction`) and internally copy memory corresponding to that string
+to a buffer.
+
+WASI implements system interfaces with host functions. Concretely, to write to console, a WASI command `Module` imports
+"fd_write" from "wasi_snapshot_preview1" and calls it with the `fd` parameter set to 1 (STDOUT).
+
+The [snapshot-01](https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md) version of WASI has no
+means to declare configuration, although its function definitions imply configuration for example if fd 1 should exist,
+and if so where should it write. Moreover, snapshot-01 was last updated in late 2020 and the specification is being
+completely rewritten as of early 2022. This means WASI as defined by "snapshot-01" will not clarify aspects like which
+file descriptors are required. While it is possible a subsequent version may, it is too early to tell as no version of
+WASI has reached a stage near W3C recommendation. Even if it did, module authors are not required to only use WASI to
+write to console, as they can define their own host functions, such as they did before WASI existed.
+
+wazero aims to serve Go developers as a primary function, and help them transition between WASI specifications. In
+order to do this, we have to allow top-level configuration. To ensure isolation by default, `SysConfig` has WithXXX
+that override defaults to no-op or empty. One `SysConfig` instance is used regardless of how many times the same WASI
+functions are imported. The nil defaults allow safe concurrency in these situations, as well lower the cost when they
+are never used. Finally, a one-to-one mapping with `Module` allows the module to close the `SysConfig` instead of
+confusing users with another API to close.
+
+Naming, defaults and validation rules of aspects like `STDIN` and `Environ` are intentionally similar to other Go
+libraries such as `exec.Cmd` or `syscall.SetEnv`, and differences called out where helpful. For example, there's no goal
+to emulate any operating system primitive specific to Windows (such as a 'c:\' drive). Moreover, certain defaults
+working with real system calls are neither relevant nor safe to inherit: For example, `exec.Cmd` defaults to read STDIN
+from a real file descriptor ("/dev/null"). Defaulting to this, vs reading `io.EOF`, would be unsafe as it can exhaust
+file descriptors if resources aren't managed properly. In other words, blind copying of defaults isn't wise as it can
+violate isolation or endanger the embedding process. In summary, we try to be similar to normal Go code, but often need
+act differently and document `SysConfig` is more about emulating, not necessarily performing real system calls.
 
 ## Implementation limitations
 

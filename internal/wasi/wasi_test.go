@@ -1,12 +1,13 @@
 package internalwasi
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -23,10 +24,7 @@ const moduleName = "test"
 
 func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithArgs("a", "bc")
+	sys, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
 	argv := uint32(7)    // arbitrary offset
@@ -41,6 +39,7 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 	}
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionArgsGet, ImportArgsGet, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ArgsGet", func(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
@@ -69,12 +68,11 @@ func TestSnapshotPreview1_ArgsGet(t *testing.T) {
 
 func TestSnapshotPreview1_ArgsGet_Errors(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
-	err = sys.WithArgs("a", "bc")
-	require.NoError(t, err)
 	a, mod, _ := instantiateModule(t, ctx, FunctionArgsGet, ImportArgsGet, moduleName, sys)
+	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_get. We chose 0 here.
@@ -121,10 +119,7 @@ func TestSnapshotPreview1_ArgsGet_Errors(t *testing.T) {
 
 func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithArgs("a", "bc")
+	sys, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
 	resultArgc := uint32(1)        // arbitrary offset
@@ -138,6 +133,7 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 	}
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ArgsSizesGet", func(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
@@ -166,13 +162,11 @@ func TestSnapshotPreview1_ArgsSizesGet(t *testing.T) {
 
 func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithArgs("a", "bc")
+	sys, err := newSysContext([]string{"a", "bc"}, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(t, ctx, FunctionArgsSizesGet, ImportArgsSizesGet, moduleName, sys)
+	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to args_sizes_get. We chose 0 here.
@@ -217,10 +211,7 @@ func TestSnapshotPreview1_ArgsSizesGet_Errors(t *testing.T) {
 
 func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithEnviron("a=b", "b=cd")
+	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
 	resultEnviron := uint32(11)   // arbitrary offset
@@ -236,6 +227,7 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 	}
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionEnvironGet, ImportEnvironGet, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.EnvironGet", func(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
@@ -264,13 +256,11 @@ func TestSnapshotPreview1_EnvironGet(t *testing.T) {
 
 func TestSnapshotPreview1_EnvironGet_Errors(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithEnviron("a=bc", "b=cd")
+	sys, err := newSysContext(nil, []string{"a=bc", "b=cd"}, nil)
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(t, ctx, FunctionEnvironGet, ImportEnvironGet, moduleName, sys)
+	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_get. We chose 0 here.
@@ -317,10 +307,7 @@ func TestSnapshotPreview1_EnvironGet_Errors(t *testing.T) {
 
 func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithEnviron("a=b", "b=cd")
+	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
 	resultEnvironc := uint32(1)       // arbitrary offset
@@ -334,6 +321,7 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 	}
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.EnvironSizesGet", func(t *testing.T) {
 		maskMemory(t, mod, len(expectedMemory))
@@ -362,13 +350,11 @@ func TestSnapshotPreview1_EnvironSizesGet(t *testing.T) {
 
 func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithEnviron("a=b", "b=cd")
+	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(t, ctx, FunctionEnvironSizesGet, ImportEnvironSizesGet, moduleName, sys)
+	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // arbitrary valid address as arguments to environ_sizes_get. We chose 0 here.
@@ -414,10 +400,11 @@ func TestSnapshotPreview1_EnvironSizesGet_Errors(t *testing.T) {
 // TestSnapshotPreview1_ClockResGet only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_ClockResGet(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionClockResGet, ImportClockResGet, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ClockResGet", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.ClockResGet(mod, 0, 0))
@@ -440,10 +427,12 @@ func TestSnapshotPreview1_ClockTimeGet(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionClockTimeGet, ImportClockTimeGet, moduleName, sys)
+	defer mod.Close()
+
 	a.timeNowUnixNano = func() uint64 { return epochNanos }
 
 	t.Run("SnapshotPreview1.ClockTimeGet", func(t *testing.T) {
@@ -475,10 +464,12 @@ func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
 	epochNanos := uint64(1640995200000000000) // midnight UTC 2022-01-01
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionClockTimeGet, ImportClockTimeGet, moduleName, sys)
+	defer mod.Close()
+
 	a.timeNowUnixNano = func() uint64 { return epochNanos }
 
 	memorySize := mod.Memory().Size()
@@ -513,10 +504,11 @@ func TestSnapshotPreview1_ClockTimeGet_Errors(t *testing.T) {
 // TestSnapshotPreview1_FdAdvise only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdAdvise(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdAdvise, ImportFdAdvise, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdAdvise", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdAdvise(mod, 0, 0, 0, 0))
@@ -532,10 +524,11 @@ func TestSnapshotPreview1_FdAdvise(t *testing.T) {
 // TestSnapshotPreview1_FdAllocate only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdAllocate(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdAllocate, ImportFdAllocate, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdAllocate", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdAllocate(mod, 0, 0, 0))
@@ -554,11 +547,8 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 
 	setupFD := func() (publicwasm.Module, publicwasm.Function, *wasiAPI) {
 		ctx := context.Background()
-		sys, err := wasm.NewSystemContext()
-		require.NoError(t, err)
-
 		memFs := &MemFS{}
-		sys.OpenedFiles = map[uint32]*wasm.FileEntry{
+		sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
 			fdToClose: {
 				Path: "/tmp",
 				FS:   memFs,
@@ -567,31 +557,45 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 				Path: "path to keep",
 				FS:   memFs,
 			},
-		}
+		})
+		require.NoError(t, err)
 
 		a, mod, fn := instantiateModule(t, ctx, FunctionFdClose, ImportFdClose, moduleName, sys)
 		return mod, fn, a
 	}
 
+	verify := func(mod publicwasm.Module) {
+		// Verify fdToClose is closed and removed from the opened FDs.
+		_, ok := sysContext(mod).OpenedFile(fdToClose)
+		require.False(t, ok)
+
+		// Verify fdToKeep is not closed
+		_, ok = sysContext(mod).OpenedFile(fdToKeep)
+		require.True(t, ok)
+	}
+
 	t.Run("SnapshotPreview1.FdClose", func(t *testing.T) {
 		mod, _, api := setupFD()
+		defer mod.Close()
 
 		errno := api.FdClose(mod, fdToClose)
 		require.Equal(t, wasi.ErrnoSuccess, errno)
-		require.NotContains(t, systemContext(mod).OpenedFiles, fdToClose) // Fd is closed and removed from the opened FDs.
-		require.Contains(t, systemContext(mod).OpenedFiles, fdToKeep)
+
+		verify(mod)
 	})
 	t.Run(FunctionFdClose, func(t *testing.T) {
 		mod, fn, _ := setupFD()
+		defer mod.Close()
 
 		ret, err := fn.Call(mod, uint64(fdToClose))
 		require.NoError(t, err)
-		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0]))           // cast because results are always uint64
-		require.NotContains(t, systemContext(mod).OpenedFiles, fdToClose) // Fd is closed and removed from the opened FDs.
-		require.Contains(t, systemContext(mod).OpenedFiles, fdToKeep)
+		require.Equal(t, wasi.ErrnoSuccess, wasi.Errno(ret[0])) // cast because results are always uint64
+
+		verify(mod)
 	})
 	t.Run("ErrnoBadF for an invalid FD", func(t *testing.T) {
 		mod, _, api := setupFD()
+		defer mod.Close()
 
 		errno := api.FdClose(mod, 42) // 42 is an arbitrary invalid FD
 		require.Equal(t, wasi.ErrnoBadf, errno)
@@ -601,10 +605,11 @@ func TestSnapshotPreview1_FdClose(t *testing.T) {
 // TestSnapshotPreview1_FdDatasync only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdDatasync(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdDatasync, ImportFdDatasync, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdDatasync", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdDatasync(mod, 0))
@@ -622,10 +627,11 @@ func TestSnapshotPreview1_FdDatasync(t *testing.T) {
 // TestSnapshotPreview1_FdFdstatSetFlags only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFdstatSetFlags(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdFdstatSetFlags, ImportFdFdstatSetFlags, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFdstatSetFlags", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdFdstatSetFlags(mod, 0, 0))
@@ -641,10 +647,11 @@ func TestSnapshotPreview1_FdFdstatSetFlags(t *testing.T) {
 // TestSnapshotPreview1_FdFdstatSetRights only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFdstatSetRights(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdFdstatSetRights, ImportFdFdstatSetRights, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFdstatSetRights", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdFdstatSetRights(mod, 0, 0, 0))
@@ -660,10 +667,11 @@ func TestSnapshotPreview1_FdFdstatSetRights(t *testing.T) {
 // TestSnapshotPreview1_FdFilestatGet only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFilestatGet(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatGet, ImportFdFilestatGet, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatGet", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdFilestatGet(mod, 0, 0))
@@ -679,10 +687,11 @@ func TestSnapshotPreview1_FdFilestatGet(t *testing.T) {
 // TestSnapshotPreview1_FdFilestatSetSize only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFilestatSetSize(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatSetSize, ImportFdFilestatSetSize, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatSetSize", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdFilestatSetSize(mod, 0, 0))
@@ -698,10 +707,11 @@ func TestSnapshotPreview1_FdFilestatSetSize(t *testing.T) {
 // TestSnapshotPreview1_FdFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdFilestatSetTimes(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdFilestatSetTimes, ImportFdFilestatSetTimes, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdFilestatSetTimes", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdFilestatSetTimes(mod, 0, 0, 0, 0))
@@ -717,10 +727,11 @@ func TestSnapshotPreview1_FdFilestatSetTimes(t *testing.T) {
 // TestSnapshotPreview1_FdPread only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdPread(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdPread, ImportFdPread, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdPread", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdPread(mod, 0, 0, 0, 0, 0))
@@ -737,12 +748,11 @@ func TestSnapshotPreview1_FdPrestatGet(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	sys.OpenedFiles[fd] = &wasm.FileEntry{Path: "/tmp"}
-
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, sys)
+	defer mod.Close()
 
 	resultPrestat := uint32(1) // arbitrary offset
 	expectedMemory := []byte{
@@ -783,12 +793,11 @@ func TestSnapshotPreview1_FdPrestatGet_Errors(t *testing.T) {
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_get. We chose 0 here.
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	sys.OpenedFiles = map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}}
-
 	a, mod, _ := instantiateModule(t, ctx, FunctionFdPrestatGet, ImportFdPrestatGet, moduleName, sys)
+	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
 
@@ -827,12 +836,11 @@ func TestSnapshotPreview1_FdPrestatDirName(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	sys.OpenedFiles[fd] = &wasm.FileEntry{Path: "/tmp", FS: &MemFS{}}
-
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, sys)
+	defer mod.Close()
 
 	path := uint32(1)    // arbitrary offset
 	pathLen := uint32(3) // shorter than len("/tmp") to test the path is written for the length of pathLen
@@ -870,16 +878,15 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 	fd := uint32(3) // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}})
 	require.NoError(t, err)
 
-	sys.OpenedFiles = map[uint32]*wasm.FileEntry{fd: {Path: "/tmp"}}
-	pathLen := uint32(len("/tmp"))
-
 	a, mod, _ := instantiateModule(t, ctx, FunctionFdPrestatDirName, ImportFdPrestatDirName, moduleName, sys)
+	defer mod.Close()
 
 	memorySize := mod.Memory().Size()
 	validAddress := uint32(0) // Arbitrary valid address as arguments to fd_prestat_dir_name. We chose 0 here.
+	pathLen := uint32(len("/tmp"))
 
 	tests := []struct {
 		name          string
@@ -932,10 +939,11 @@ func TestSnapshotPreview1_FdPrestatDirName_Errors(t *testing.T) {
 // TestSnapshotPreview1_FdPwrite only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdPwrite(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdPwrite, ImportFdPwrite, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdPwrite", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdPwrite(mod, 0, 0, 0, 0, 0))
@@ -950,8 +958,6 @@ func TestSnapshotPreview1_FdPwrite(t *testing.T) {
 
 func TestSnapshotPreview1_FdRead(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
 
 	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 	iovs := uint32(1) // arbitrary offset
@@ -975,18 +981,16 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 		'?',
 	)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdRead, ImportFdRead, moduleName, sys)
-
 	// TestSnapshotPreview1_FdRead uses a matrix because setting up test files is complicated and has to be clean each time.
 	type fdReadFn func(ctx publicwasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno
 	tests := []struct {
 		name   string
-		fdRead func() fdReadFn
+		fdRead func(*wasiAPI, *wasm.ModuleContext, publicwasm.Function) fdReadFn
 	}{
-		{"SnapshotPreview1.FdRead", func() fdReadFn {
+		{"SnapshotPreview1.FdRead", func(a *wasiAPI, _ *wasm.ModuleContext, _ publicwasm.Function) fdReadFn {
 			return a.FdRead
 		}},
-		{FunctionFdRead, func() fdReadFn {
+		{FunctionFdRead, func(_ *wasiAPI, mod *wasm.ModuleContext, fn publicwasm.Function) fdReadFn {
 			return func(ctx publicwasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
 				ret, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
@@ -1000,13 +1004,20 @@ func TestSnapshotPreview1_FdRead(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to read the contents from
 			file, memFS := createFile(t, "test_path", []byte("wazero"))
-			sys.OpenedFiles[fd] = &wasm.FileEntry{Path: "test_path", FS: memFS, File: file}
+			sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+				fd: {Path: "test_path", FS: memFS, File: file},
+			})
+			require.NoError(t, err)
+
+			a, mod, fn := instantiateModule(t, ctx, FunctionFdRead, ImportFdRead, moduleName, sys)
+			defer mod.Close()
+
 			maskMemory(t, mod, len(expectedMemory))
 
 			ok := mod.Memory().Write(0, initialMemory)
 			require.True(t, ok)
 
-			errno := tc.fdRead()(mod, fd, iovs, iovsCount, resultSize)
+			errno := tc.fdRead(a, mod, fn)(mod, fd, iovs, iovsCount, resultSize)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
@@ -1021,12 +1032,13 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 	file, memFS := createFile(t, "test_path", []byte{}) // file with empty contents
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+		validFD: {Path: "test_path", FS: memFS, File: file},
+	})
 	require.NoError(t, err)
 
-	sys.OpenedFiles[validFD] = &wasm.FileEntry{Path: "test_path", FS: memFS, File: file}
-
 	a, mod, _ := instantiateModule(t, ctx, FunctionFdRead, ImportFdRead, moduleName, sys)
+	defer mod.Close()
 
 	tests := []struct {
 		name                            string
@@ -1111,10 +1123,11 @@ func TestSnapshotPreview1_FdRead_Errors(t *testing.T) {
 // TestSnapshotPreview1_FdReaddir only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdReaddir(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdReaddir, ImportFdReaddir, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdReaddir", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdReaddir(mod, 0, 0, 0, 0, 0))
@@ -1130,10 +1143,11 @@ func TestSnapshotPreview1_FdReaddir(t *testing.T) {
 // TestSnapshotPreview1_FdRenumber only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdRenumber(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdRenumber, ImportFdRenumber, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdRenumber", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdRenumber(mod, 0, 0))
@@ -1152,12 +1166,13 @@ func TestSnapshotPreview1_FdSeek(t *testing.T) {
 	file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary non-empty contents
 
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+		fd: {Path: "test_path", FS: memFS, File: file},
+	})
 	require.NoError(t, err)
 
-	sys.OpenedFiles[fd] = &wasm.FileEntry{Path: "test_path", FS: memFS, File: file}
-
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdSeek, ImportFdSeek, moduleName, sys)
+	defer mod.Close()
 
 	// TestSnapshotPreview1_FdSeek uses a matrix because setting up test files is complicated and has to be clean each time.
 	type fdSeekFn func(ctx publicwasm.Module, fd uint32, offset uint64, whence, resultNewOffset uint32) wasi.Errno
@@ -1246,12 +1261,14 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 	validFD := uint32(3)                                        // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, memFS := createFile(t, "test_path", []byte("wazero")) // arbitrary valid file with non-empty contents
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+		validFD: {Path: "test_path", FS: memFS, File: file},
+	})
 	require.NoError(t, err)
 
-	sys.OpenedFiles[validFD] = &wasm.FileEntry{Path: "test_path", FS: memFS, File: file}
-
 	a, mod, _ := instantiateModule(t, ctx, FunctionFdSeek, ImportFdSeek, moduleName, sys)
+	defer mod.Close()
+
 	memorySize := mod.Memory().Size()
 
 	tests := []struct {
@@ -1293,10 +1310,11 @@ func TestSnapshotPreview1_FdSeek_Errors(t *testing.T) {
 // TestSnapshotPreview1_FdSync only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdSync(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdSync, ImportFdSync, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdSync", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdSync(mod, 0))
@@ -1312,10 +1330,11 @@ func TestSnapshotPreview1_FdSync(t *testing.T) {
 // TestSnapshotPreview1_FdTell only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_FdTell(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionFdTell, ImportFdTell, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.FdTell", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.FdTell(mod, 0, 0))
@@ -1330,8 +1349,6 @@ func TestSnapshotPreview1_FdTell(t *testing.T) {
 
 func TestSnapshotPreview1_FdWrite(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
 
 	fd := uint32(3)   // arbitrary fd after 0, 1, and 2, that are stdin/out/err
 	iovs := uint32(1) // arbitrary offset
@@ -1355,18 +1372,16 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 		'?',
 	)
 
-	a, mod, fn := instantiateModule(t, ctx, FunctionFdWrite, ImportFdWrite, moduleName, sys)
-
 	// TestSnapshotPreview1_FdWrite uses a matrix because setting up test files is complicated and has to be clean each time.
 	type fdWriteFn func(ctx publicwasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno
 	tests := []struct {
 		name    string
-		fdWrite func() fdWriteFn
+		fdWrite func(*wasiAPI, *wasm.ModuleContext, publicwasm.Function) fdWriteFn
 	}{
-		{"SnapshotPreview1.FdWrite", func() fdWriteFn {
+		{"SnapshotPreview1.FdWrite", func(a *wasiAPI, _ *wasm.ModuleContext, _ publicwasm.Function) fdWriteFn {
 			return a.FdWrite
 		}},
-		{FunctionFdWrite, func() fdWriteFn {
+		{FunctionFdWrite, func(_ *wasiAPI, mod *wasm.ModuleContext, fn publicwasm.Function) fdWriteFn {
 			return func(ctx publicwasm.Module, fd, iovs, iovsCount, resultSize uint32) wasi.Errno {
 				ret, err := fn.Call(mod, uint64(fd), uint64(iovs), uint64(iovsCount), uint64(resultSize))
 				require.NoError(t, err)
@@ -1380,13 +1395,19 @@ func TestSnapshotPreview1_FdWrite(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a fresh file to write the contents to
 			file, memFS := createFile(t, "test_path", []byte{})
-			sys.OpenedFiles[fd] = &wasm.FileEntry{Path: "test_path", FS: memFS, File: file}
+			sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+				fd: {Path: "test_path", FS: memFS, File: file},
+			})
+			require.NoError(t, err)
+
+			a, mod, fn := instantiateModule(t, ctx, FunctionFdWrite, ImportFdWrite, moduleName, sys)
+			defer mod.Close()
 
 			maskMemory(t, mod, len(expectedMemory))
 			ok := mod.Memory().Write(0, initialMemory)
 			require.True(t, ok)
 
-			errno := tc.fdWrite()(mod, fd, iovs, iovsCount, resultSize)
+			errno := tc.fdWrite(a, mod, fn)(mod, fd, iovs, iovsCount, resultSize)
 			require.Equal(t, wasi.ErrnoSuccess, errno)
 
 			actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
@@ -1401,12 +1422,13 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 	validFD := uint32(3)                                // arbitrary valid fd after 0, 1, and 2, that are stdin/out/err
 	file, memFS := createFile(t, "test_path", []byte{}) // file with empty contents
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+		validFD: {Path: "test_path", FS: memFS, File: file},
+	})
 	require.NoError(t, err)
 
-	sys.OpenedFiles[validFD] = &wasm.FileEntry{Path: "test_path", FS: memFS, File: file}
-
 	a, mod, _ := instantiateModule(t, ctx, FunctionFdWrite, ImportFdWrite, moduleName, sys)
+	defer mod.Close()
 
 	// Setup valid test memory
 	iovs, iovsCount := uint32(0), uint32(1)
@@ -1485,10 +1507,11 @@ func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
 // TestSnapshotPreview1_PathCreateDirectory only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathCreateDirectory(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathCreateDirectory, ImportPathCreateDirectory, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathCreateDirectory", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathCreateDirectory(mod, 0, 0, 0))
@@ -1504,10 +1527,11 @@ func TestSnapshotPreview1_PathCreateDirectory(t *testing.T) {
 // TestSnapshotPreview1_PathFilestatGet only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathFilestatGet(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathFilestatGet, ImportPathFilestatGet, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathFilestatGet", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathFilestatGet(mod, 0, 0, 0, 0, 0))
@@ -1523,10 +1547,11 @@ func TestSnapshotPreview1_PathFilestatGet(t *testing.T) {
 // TestSnapshotPreview1_PathFilestatSetTimes only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathFilestatSetTimes(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathFilestatSetTimes, ImportPathFilestatSetTimes, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathFilestatSetTimes", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathFilestatSetTimes(mod, 0, 0, 0, 0, 0, 0, 0))
@@ -1542,10 +1567,11 @@ func TestSnapshotPreview1_PathFilestatSetTimes(t *testing.T) {
 // TestSnapshotPreview1_PathLink only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathLink(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathLink, ImportPathLink, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathLink", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathLink(mod, 0, 0, 0, 0, 0, 0, 0))
@@ -1572,32 +1598,15 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		'?',                          // `path` is after this
 		'w', 'a', 'z', 'e', 'r', 'o', // path
 	}
-	expectedFD := uint32(5) // arbitrary expected FD
+	expectedFD := byte(workdirFD + 1)
 	expectedMemory := append(
 		initialMemory,
-		'?',        // `resultOpenedFd` is after this
-		5, 0, 0, 0, // = epxectedFD (5)
+		'?', // `resultOpenedFd` is after this
+		expectedFD, 0, 0, 0,
 		'?',
 	)
 
-	// MemFS for testing
-	// Create a memFS for testing that has "./wazero" file.
-	memFS := &MemFS{
-		Files: map[string][]byte{
-			"wazero": {},
-		},
-	}
-
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	a, mod, fn := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
-	// randSource is used to determine the new fd. Fix it to the expectedFD for testing.
-	a.randSource = func(b []byte) error {
-		binary.LittleEndian.PutUint32(b, expectedFD)
-		return nil
-	}
 
 	// TestSnapshotPreview1_PathOpen uses a matrix because setting up test files is complicated and has to be clean each time.
 	type pathOpenFn func(ctx publicwasm.Module, fd, dirflags, path, pathLen, oflags uint32,
@@ -1605,12 +1614,12 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 		fdFlags, resultOpenedFd uint32) wasi.Errno
 	pathOpenFns := []struct {
 		name     string
-		pathOpen func() pathOpenFn
+		pathOpen func(*wasiAPI, *wasm.ModuleContext, publicwasm.Function) pathOpenFn
 	}{
-		{"SnapshotPreview1.PathOpen", func() pathOpenFn {
+		{"SnapshotPreview1.PathOpen", func(a *wasiAPI, _ *wasm.ModuleContext, _ publicwasm.Function) pathOpenFn {
 			return a.PathOpen
 		}},
-		{FunctionPathOpen, func() pathOpenFn {
+		{FunctionPathOpen, func(_ *wasiAPI, mod *wasm.ModuleContext, fn publicwasm.Function) pathOpenFn {
 			return func(ctx publicwasm.Module, fd, dirflags, path, pathLen, oflags uint32,
 				fsRightsBase, fsRightsInheriting uint64,
 				fdFlags, resultOpenedFd uint32) wasi.Errno {
@@ -1639,23 +1648,31 @@ func TestSnapshotPreview1_PathOpen(t *testing.T) {
 			for _, tt := range tests {
 				tc := tt
 				t.Run(tc.name, func(t *testing.T) {
-					// Set up a fresh opened FD table
-					sys.OpenedFiles = map[uint32]*wasm.FileEntry{
+					// Create a memFS for testing that has "./wazero" file.
+					memFS := &MemFS{Files: map[string][]byte{"wazero": {}}}
+					sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
 						workdirFD: {Path: ".", FS: memFS},
-					}
+					})
+					require.NoError(t, err)
+
+					a, mod, fn := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
+					defer mod.Close()
 
 					maskMemory(t, mod, len(expectedMemory))
 					ok := mod.Memory().Write(0, initialMemory)
 					require.True(t, ok)
 
-					errno := pf.pathOpen()(mod, tc.fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
+					errno := pf.pathOpen(a, mod, fn)(mod, tc.fd, dirflags, path, pathLen, oflags, fsRightsBase, fsRightsInheriting, fdFlags, resultOpenedFd)
 					require.Equal(t, wasi.ErrnoSuccess, errno)
 
 					actual, ok := mod.Memory().Read(0, uint32(len(expectedMemory)))
 					require.True(t, ok)
 					require.Equal(t, expectedMemory, actual)
+
 					// verify the file was actually opened
-					require.Equal(t, tc.expectedPath, sys.OpenedFiles[expectedFD].Path)
+					f, ok := sys.OpenedFile(uint32(expectedFD))
+					require.True(t, ok)
+					require.Equal(t, tc.expectedPath, f.Path)
 				})
 			}
 		})
@@ -1671,18 +1688,17 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 		},
 	}
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, map[uint32]*wasm.FileEntry{
+		validFD: {Path: ".", FS: memFS},
+	})
 	require.NoError(t, err)
 
-	sys.OpenedFiles = map[uint32]*wasm.FileEntry{
-		validFD: {Path: ".", FS: memFS},
-	}
-
 	a, mod, _ := instantiateModule(t, ctx, FunctionPathOpen, ImportPathOpen, moduleName, sys)
+	defer mod.Close()
 
 	validPath := uint32(0)    // arbitrary offset
 	validPathLen := uint32(6) // the length of "wazero"
-	mod.Memory().Write(uint32(validPath), []byte{
+	mod.Memory().Write(validPath, []byte{
 		'w', 'a', 'z', 'e', 'r', 'o', // write to offset 0 (= validPath)
 	}) // wazero is the path to the file in the memFS
 
@@ -1739,10 +1755,11 @@ func TestSnapshotPreview1_PathOpen_Errors(t *testing.T) {
 // TestSnapshotPreview1_PathReadlink only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathReadlink(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathReadlink, ImportPathReadlink, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathLink", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathReadlink(mod, 0, 0, 0, 0, 0, 0))
@@ -1758,10 +1775,11 @@ func TestSnapshotPreview1_PathReadlink(t *testing.T) {
 // TestSnapshotPreview1_PathRemoveDirectory only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathRemoveDirectory(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathRemoveDirectory, ImportPathRemoveDirectory, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathRemoveDirectory", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathRemoveDirectory(mod, 0, 0, 0))
@@ -1777,10 +1795,11 @@ func TestSnapshotPreview1_PathRemoveDirectory(t *testing.T) {
 // TestSnapshotPreview1_PathRename only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathRename(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathRename, ImportPathRename, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathRename", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathRename(mod, 0, 0, 0, 0, 0, 0))
@@ -1796,10 +1815,11 @@ func TestSnapshotPreview1_PathRename(t *testing.T) {
 // TestSnapshotPreview1_PathSymlink only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathSymlink(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathSymlink, ImportPathSymlink, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathSymlink", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathSymlink(mod, 0, 0, 0, 0, 0))
@@ -1815,10 +1835,11 @@ func TestSnapshotPreview1_PathSymlink(t *testing.T) {
 // TestSnapshotPreview1_PathUnlinkFile only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PathUnlinkFile(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPathUnlinkFile, ImportPathUnlinkFile, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PathUnlinkFile", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PathUnlinkFile(mod, 0, 0, 0))
@@ -1834,10 +1855,11 @@ func TestSnapshotPreview1_PathUnlinkFile(t *testing.T) {
 // TestSnapshotPreview1_PollOneoff only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_PollOneoff(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionPollOneoff, ImportPollOneoff, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.PollOneoff", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.PollOneoff(mod, 0, 0, 0, 0))
@@ -1852,7 +1874,7 @@ func TestSnapshotPreview1_PollOneoff(t *testing.T) {
 
 func TestSnapshotPreview1_ProcExit(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1873,13 +1895,14 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 	// Note: Unlike most tests, this uses fn, not the 'a' result parameter. This is because currently, this function
 	// body panics, and we expect Call to unwrap the panic.
 	_, mod, fn := instantiateModule(t, ctx, FunctionProcExit, ImportProcExit, moduleName, sys)
+	defer mod.Close()
 
 	for _, tt := range tests {
 		tc := tt
 
 		t.Run(tc.name, func(t *testing.T) {
 			// When ProcExit is called, store.CallFunction returns immediately, returning the exit code as the error.
-			_, err := fn.Call(mod, uint64(tc.exitCode))
+			_, err = fn.Call(mod, uint64(tc.exitCode))
 			var code wasi.ExitCode
 			require.ErrorAs(t, err, &code)
 			require.Equal(t, code, wasi.ExitCode(tc.exitCode))
@@ -1890,10 +1913,11 @@ func TestSnapshotPreview1_ProcExit(t *testing.T) {
 // TestSnapshotPreview1_ProcRaise only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_ProcRaise(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionProcRaise, ImportProcRaise, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.ProcRaise", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.ProcRaise(mod, 0))
@@ -1909,10 +1933,11 @@ func TestSnapshotPreview1_ProcRaise(t *testing.T) {
 // TestSnapshotPreview1_SchedYield only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SchedYield(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionSchedYield, ImportSchedYield, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SchedYield", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.SchedYield(mod))
@@ -1936,10 +1961,12 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 	offset := uint32(1) // offset,
 	seed := int64(42)   // and seed value
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
+	defer mod.Close()
+
 	a.randSource = func(p []byte) error {
 		s := rand.NewSource(seed)
 		rng := rand.New(s)
@@ -1975,12 +2002,14 @@ func TestSnapshotPreview1_RandomGet(t *testing.T) {
 
 func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	validAddress := uint32(0) // arbitrary valid address
 
 	a, mod, _ := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
+	defer mod.Close()
+
 	memorySize := mod.Memory().Size()
 
 	tests := []struct {
@@ -2013,10 +2042,12 @@ func TestSnapshotPreview1_RandomGet_Errors(t *testing.T) {
 
 func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, _ := instantiateModule(t, ctx, FunctionRandomGet, ImportRandomGet, moduleName, sys)
+	defer mod.Close()
+
 	a.randSource = func(p []byte) error {
 		return errors.New("random source error")
 	}
@@ -2028,10 +2059,11 @@ func TestSnapshotPreview1_RandomGet_SourceError(t *testing.T) {
 // TestSnapshotPreview1_SockRecv only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SockRecv(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionSockRecv, ImportSockRecv, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockRecv", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.SockRecv(mod, 0, 0, 0, 0, 0, 0))
@@ -2047,10 +2079,11 @@ func TestSnapshotPreview1_SockRecv(t *testing.T) {
 // TestSnapshotPreview1_SockSend only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SockSend(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionSockSend, ImportSockSend, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockSend", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.SockSend(mod, 0, 0, 0, 0, 0))
@@ -2066,10 +2099,11 @@ func TestSnapshotPreview1_SockSend(t *testing.T) {
 // TestSnapshotPreview1_SockShutdown only tests it is stubbed for GrainLang per #271
 func TestSnapshotPreview1_SockShutdown(t *testing.T) {
 	ctx := context.Background()
-	sys, err := wasm.NewSystemContext()
+	sys, err := newSysContext(nil, nil, nil)
 	require.NoError(t, err)
 
 	a, mod, fn := instantiateModule(t, ctx, FunctionSockShutdown, ImportSockShutdown, moduleName, sys)
+	defer mod.Close()
 
 	t.Run("SnapshotPreview1.SockShutdown", func(t *testing.T) {
 		require.Equal(t, wasi.ErrnoNosys, a.SockShutdown(mod, 0, 0))
@@ -2084,7 +2118,7 @@ func TestSnapshotPreview1_SockShutdown(t *testing.T) {
 
 const testMemoryPageSize = 1
 
-func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImport, moduleName string, sys *wasm.SystemContext) (*wasiAPI, *wasm.ModuleContext, publicwasm.Function) {
+func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImport, moduleName string, sys *wasm.SysContext) (*wasiAPI, *wasm.ModuleContext, publicwasm.Function) {
 	enabledFeatures := wasm.Features20191205
 	store := wasm.NewStore(interpreter.NewEngine(), enabledFeatures)
 
@@ -2097,7 +2131,7 @@ func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImpo
 	// Double-check what we created passes same validity as module-defined modules.
 	require.NoError(t, m.Validate(enabledFeatures))
 
-	_, err = store.Instantiate(ctx, m, m.NameSection.ModuleName) // TODO: close
+	_, err = store.Instantiate(ctx, m, m.NameSection.ModuleName, nil) // TODO: close
 	require.NoError(t, err)
 
 	m, err = text.DecodeModule([]byte(fmt.Sprintf(`(module
@@ -2108,9 +2142,8 @@ func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImpo
 )`, wasiFunction, wasiImport)), enabledFeatures)
 	require.NoError(t, err)
 
-	mod, err := store.Instantiate(ctx, m, moduleName)
+	mod, err := store.Instantiate(ctx, m, moduleName, sys)
 	require.NoError(t, err)
-	mod.System = sys // TODO: temporary until #394
 
 	fn := mod.ExportedFunction(wasiFunction)
 	require.NotNil(t, fn)
@@ -2122,4 +2155,8 @@ func maskMemory(t *testing.T, mod publicwasm.Module, size int) {
 	for i := uint32(0); i < uint32(size); i++ {
 		require.True(t, mod.Memory().WriteByte(i, '?'))
 	}
+}
+
+func newSysContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sys *wasm.SysContext, err error) {
+	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, openedFiles)
 }

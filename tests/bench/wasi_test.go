@@ -1,7 +1,9 @@
 package bench
 
 import (
+	"bytes"
 	"context"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,10 +27,7 @@ var testMem = &wasm.MemoryInstance{
 }
 
 func Test_EnvironGet(t *testing.T) {
-	sys, err := wasm.NewSystemContext()
-	require.NoError(t, err)
-
-	err = sys.WithEnviron("a=b", "b=cd")
+	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	require.NoError(t, err)
 
 	testCtx := newCtx(make([]byte, 20), sys)
@@ -39,12 +38,7 @@ func Test_EnvironGet(t *testing.T) {
 }
 
 func Benchmark_EnvironGet(b *testing.B) {
-	sys, err := wasm.NewSystemContext()
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	err = sys.WithEnviron("a=b", "b=cd")
+	sys, err := newSysContext(nil, []string{"a=b", "b=cd"}, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -69,10 +63,12 @@ func Benchmark_EnvironGet(b *testing.B) {
 	})
 }
 
-func newCtx(buf []byte, sys *wasm.SystemContext) *wasm.ModuleContext {
-	ret := wasm.NewModuleContext(context.Background(), nil, &wasm.ModuleInstance{
+func newCtx(buf []byte, sys *wasm.SysContext) *wasm.ModuleContext {
+	return wasm.NewModuleContext(context.Background(), nil, &wasm.ModuleInstance{
 		Memory: &wasm.MemoryInstance{Min: 1, Buffer: buf},
-	})
-	ret.System = sys
-	return ret
+	}, sys)
+}
+
+func newSysContext(args, environ []string, openedFiles map[uint32]*wasm.FileEntry) (sys *wasm.SysContext, err error) {
+	return wasm.NewSysContext(math.MaxUint32, args, environ, new(bytes.Buffer), nil, nil, openedFiles)
 }

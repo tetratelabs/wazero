@@ -18,11 +18,13 @@ var caseWasm []byte
 func BenchmarkEngines(b *testing.B) {
 	b.Run("interpreter", func(b *testing.B) {
 		m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigInterpreter())
+		defer m.Close()
 		runAllBenches(b, m)
 	})
 	if runtime.GOARCH == "amd64" {
 		b.Run("jit", func(b *testing.B) {
 			m := instantiateHostFunctionModuleWithEngine(b, wazero.NewRuntimeConfigJIT())
+			defer m.Close()
 			runAllBenches(b, m)
 		})
 	}

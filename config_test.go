@@ -1,6 +1,8 @@
 package wazero
 
 import (
+	"io"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -53,4 +55,281 @@ func TestRuntimeConfig_Features(t *testing.T) {
 			require.False(t, c.enabledFeatures.Get(tc.feature))
 		})
 	}
+}
+
+func TestSysConfig_toSysContext(t *testing.T) {
+	memFS := WASIMemFS()
+	memFS2 := WASIMemFS()
+
+	tests := []struct {
+		name     string
+		input    *SysConfig
+		expected *internalwasm.SysContext
+	}{
+		{
+			name:  "empty",
+			input: NewSysConfig(),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				nil,            // openedFiles
+			),
+		},
+		{
+			name:  "WithArgs",
+			input: NewSysConfig().WithArgs("a", "bc"),
+			expected: requireSysContext(t,
+				math.MaxUint32,      // max
+				[]string{"a", "bc"}, // args
+				nil,                 // environ
+				nil,                 // stdin
+				nil,                 // stdout
+				nil,                 // stderr
+				nil,                 // openedFiles
+			),
+		},
+		{
+			name:  "WithArgs - empty ok", // Particularly argv[0] can be empty, and we have no rules about others.
+			input: NewSysConfig().WithArgs("", "bc"),
+			expected: requireSysContext(t,
+				math.MaxUint32,     // max
+				[]string{"", "bc"}, // args
+				nil,                // environ
+				nil,                // stdin
+				nil,                // stdout
+				nil,                // stderr
+				nil,                // openedFiles
+			),
+		},
+		{
+			name:  "WithArgs - second call overwrites",
+			input: NewSysConfig().WithArgs("a", "bc").WithArgs("bc", "a"),
+			expected: requireSysContext(t,
+				math.MaxUint32,      // max
+				[]string{"bc", "a"}, // args
+				nil,                 // environ
+				nil,                 // stdin
+				nil,                 // stdout
+				nil,                 // stderr
+				nil,                 // openedFiles
+			),
+		},
+		{
+			name:  "WithEnv",
+			input: NewSysConfig().WithEnv("a", "b"),
+			expected: requireSysContext(t,
+				math.MaxUint32,  // max
+				nil,             // args
+				[]string{"a=b"}, // environ
+				nil,             // stdin
+				nil,             // stdout
+				nil,             // stderr
+				nil,             // openedFiles
+			),
+		},
+		{
+			name:  "WithEnv - empty value",
+			input: NewSysConfig().WithEnv("a", ""),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				[]string{"a="}, // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				nil,            // openedFiles
+			),
+		},
+		{
+			name:  "WithEnv twice",
+			input: NewSysConfig().WithEnv("a", "b").WithEnv("c", "de"),
+			expected: requireSysContext(t,
+				math.MaxUint32,          // max
+				nil,                     // args
+				[]string{"a=b", "c=de"}, // environ
+				nil,                     // stdin
+				nil,                     // stdout
+				nil,                     // stderr
+				nil,                     // openedFiles
+			),
+		},
+		{
+			name:  "WithEnv overwrites",
+			input: NewSysConfig().WithEnv("a", "bc").WithEnv("c", "de").WithEnv("a", "de"),
+			expected: requireSysContext(t,
+				math.MaxUint32,           // max
+				nil,                      // args
+				[]string{"a=de", "c=de"}, // environ
+				nil,                      // stdin
+				nil,                      // stdout
+				nil,                      // stderr
+				nil,                      // openedFiles
+			),
+		},
+
+		{
+			name:  "WithEnv twice",
+			input: NewSysConfig().WithEnv("a", "b").WithEnv("c", "de"),
+			expected: requireSysContext(t,
+				math.MaxUint32,          // max
+				nil,                     // args
+				[]string{"a=b", "c=de"}, // environ
+				nil,                     // stdin
+				nil,                     // stdout
+				nil,                     // stderr
+				nil,                     // openedFiles
+			),
+		},
+		{
+			name:  "WithFS",
+			input: NewSysConfig().WithFS(memFS),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				map[uint32]*internalwasm.FileEntry{ // openedFiles
+					3: {Path: "/", FS: memFS},
+					4: {Path: ".", FS: memFS},
+				},
+			),
+		},
+		{
+			name:  "WithFS - overwrites",
+			input: NewSysConfig().WithFS(memFS).WithFS(memFS2),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				map[uint32]*internalwasm.FileEntry{ // openedFiles
+					3: {Path: "/", FS: memFS2},
+					4: {Path: ".", FS: memFS2},
+				},
+			),
+		},
+		{
+			name:  "WithWorkDirFS",
+			input: NewSysConfig().WithWorkDirFS(memFS),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				map[uint32]*internalwasm.FileEntry{ // openedFiles
+					3: {Path: ".", FS: memFS},
+				},
+			),
+		},
+		{
+			name:  "WithFS and WithWorkDirFS",
+			input: NewSysConfig().WithFS(memFS).WithWorkDirFS(memFS2),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				map[uint32]*internalwasm.FileEntry{ // openedFiles
+					3: {Path: "/", FS: memFS},
+					4: {Path: ".", FS: memFS2},
+				},
+			),
+		},
+		{
+			name:  "WithWorkDirFS and WithFS",
+			input: NewSysConfig().WithWorkDirFS(memFS).WithFS(memFS2),
+			expected: requireSysContext(t,
+				math.MaxUint32, // max
+				nil,            // args
+				nil,            // environ
+				nil,            // stdin
+				nil,            // stdout
+				nil,            // stderr
+				map[uint32]*internalwasm.FileEntry{ // openedFiles
+					3: {Path: ".", FS: memFS},
+					4: {Path: "/", FS: memFS2},
+				},
+			),
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			sys, err := tc.input.toSysContext()
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, sys)
+		})
+	}
+}
+
+func TestSysConfig_toSysContext_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       *SysConfig
+		expectedErr string
+	}{
+		{
+			name:        "WithArgs - arg contains NUL",
+			input:       NewSysConfig().WithArgs("", string([]byte{'a', 0})),
+			expectedErr: "args invalid: contains NUL character",
+		},
+		{
+			name:        "WithEnv - key contains NUL",
+			input:       NewSysConfig().WithEnv(string([]byte{'a', 0}), "a"),
+			expectedErr: "environ invalid: contains NUL character",
+		},
+		{
+			name:        "WithEnv - value contains NUL",
+			input:       NewSysConfig().WithEnv("a", string([]byte{'a', 0})),
+			expectedErr: "environ invalid: contains NUL character",
+		},
+		{
+			name:        "WithEnv - key contains equals",
+			input:       NewSysConfig().WithEnv("a=", "a"),
+			expectedErr: "environ invalid: key contains '=' character",
+		},
+		{
+			name:        "WithEnv - empty key",
+			input:       NewSysConfig().WithEnv("", "a"),
+			expectedErr: "environ invalid: empty key",
+		},
+		{
+			name:        "WithFS - nil",
+			input:       NewSysConfig().WithFS(nil),
+			expectedErr: "FS for / is nil",
+		},
+		{
+			name:        "WithWorkDirFS - nil",
+			input:       NewSysConfig().WithWorkDirFS(nil),
+			expectedErr: "FS for . is nil",
+		},
+	}
+	for _, tt := range tests {
+		tc := tt
+
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.input.toSysContext()
+			require.EqualError(t, err, tc.expectedErr)
+		})
+	}
+}
+
+// requireSysContext ensures internalwasm.NewSysContext doesn't return an error, which makes it usable in test matrices.
+func requireSysContext(t *testing.T, max uint32, args, environ []string, stdin io.Reader, stdout, stderr io.Writer, openedFiles map[uint32]*internalwasm.FileEntry) *internalwasm.SysContext {
+	sys, err := internalwasm.NewSysContext(max, args, environ, stdin, stdout, stderr, openedFiles)
+	require.NoError(t, err)
+	return sys
 }

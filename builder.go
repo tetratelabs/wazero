@@ -71,6 +71,8 @@ type ModuleBuilder interface {
 	Build() (*Module, error)
 
 	// Instantiate is a convenience that calls Build, then Runtime.InstantiateModule
+	//
+	// Note: Fields in the builder are copied during instantiation: Later changes do not affect the instantiated result.
 	Instantiate() (wasm.Module, error)
 }
 

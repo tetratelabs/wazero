@@ -26,7 +26,7 @@ func Test_stdio(t *testing.T) {
 	stdinBuf := bytes.NewBuffer([]byte("WASI\n"))
 	stdoutBuf := bytes.NewBuffer(nil)
 	stderrBuf := bytes.NewBuffer(nil)
-	config := wazero.NewWASIConfig().WithStdin(stdinBuf).WithStdout(stdoutBuf).WithStderr(stderrBuf)
+	config := wazero.NewSysConfig().WithStdin(stdinBuf).WithStdout(stdoutBuf).WithStderr(stderrBuf)
 
 	// Instantiate WASI, which implements system I/O such as console output.
 	wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
