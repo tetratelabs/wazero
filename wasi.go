@@ -83,15 +83,17 @@ func StartWASICommand(r Runtime, module *Module) (wasm.Module, error) {
 // StartWASICommandWithConfig is like StartWASICommand, except you can override configuration based on the importing
 // module. For example, you can use this to define different args depending on the importing module.
 //
-//	// Initialize base configuration:
 //	r := wazero.NewRuntime()
-//	sys := wazero.NewSysConfig().WithStdout(buf)
 //	wasi, _ := r.NewHostModule(wazero.WASISnapshotPreview1())
-//	decoded, _ := r.CompileModule(source)
+//	mod, _ := r.CompileModule(source)
 //
-//	// Assign configuration only when ready to instantiate.
-//	module, _ := StartWASICommandWithConfig(r, decoded, sys.WithArgs("rotate", "angle=90", "dir=cw"))
+//	// Initialize base configuration:
+//	sys := wazero.NewSysConfig().WithStdout(buf)
 //
+//	// Assign different configuration on each instantiation
+//	module, _ := StartWASICommandWithConfig(r, mod.WithName("rotate"), sys.WithArgs("rotate", "angle=90", "dir=cw"))
+//
+// Note: Config is copied during instantiation: Later changes to config do not affect the instantiated result.
 // See StartWASICommand
 func StartWASICommandWithConfig(r Runtime, module *Module, config *SysConfig) (mod wasm.Module, err error) {
 	var sys *internalwasm.SysContext
