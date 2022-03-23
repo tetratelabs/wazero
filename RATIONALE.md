@@ -32,7 +32,7 @@ wazero shares constants and interfaces with internal code by a sharing pattern d
 * shared interfaces and constants go in a package under root.
   * Ex. package `wasi` -> `/wasi/*.go`
 * user code that refer to that package go into the flat root package `wazero`.
-  * Ex. `SysConfig` -> `/wasi.go`
+  * Ex. `StartWASICommand` -> `/wasi.go`
 * implementation code begin in a corresponding package under `/internal`.
   * Ex  package `internalwasi` -> `/internal/wasi/*.go`
 
