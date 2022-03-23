@@ -12,9 +12,7 @@ type Assembler interface {
 	asm.AssemblerBase
 	// CompileRegisterToRegisterWithMode adds an instruction where source and destination
 	// are `from` and `to` registers and the instruction's "mode" is specified by `mode`.
-	// For example, ROUND** instructions can be modified "mode" constant.
-	// See https://www.felixcloutier.com/x86/roundss for ROUNDSS as an example.
-	CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode int64)
+	CompileRegisterToRegisterWithMode(instruction asm.Instruction, from, to asm.Register, mode Mode)
 	// CompileMemoryWithIndexToRegister adds an instruction where source operand is the memory address
 	// specified as `srcBaseReg + srcOffsetConst + srcIndex*srcScale` and destination is the register `dstReg`.
 	// Note: sourceScale must be one of 1, 2, 4, 8.
@@ -42,3 +40,8 @@ type Assembler interface {
 	// the destination is the constant `value`.
 	CompileMemoryToConst(instruction asm.Instruction, srcBaseReg asm.Register, srcOffset int64, value int64) asm.Node
 }
+
+// Mode represents a mode for specific instruction.
+// For example, ROUND** instructions' behavior can be modified "mode" constant.
+// See https://www.felixcloutier.com/x86/roundss for ROUNDSS as an example.
+type Mode = byte

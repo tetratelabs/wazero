@@ -25,8 +25,8 @@ func (n *golangAsmNode) String() string {
 }
 
 // OffsetInBinary implements Node.OffsetInBinary.
-func (n *golangAsmNode) OffsetInBinary() int64 {
-	return n.prog.Pc
+func (n *golangAsmNode) OffsetInBinary() NodeOffsetInBinary {
+	return NodeOffsetInBinary(n.prog.Pc)
 }
 
 // AssignJumpTarget implements Node.AssignJumpTarget.
@@ -36,12 +36,12 @@ func (n *golangAsmNode) AssignJumpTarget(target Node) {
 }
 
 // AssignDestinationConstant implements Node.AssignDestinationConstant.
-func (n *golangAsmNode) AssignDestinationConstant(value int64) {
+func (n *golangAsmNode) AssignDestinationConstant(value ConstantValue) {
 	n.prog.To.Offset = value
 }
 
 // AssignSourceConstant implements Node.AssignSourceConstant.
-func (n *golangAsmNode) AssignSourceConstant(value int64) {
+func (n *golangAsmNode) AssignSourceConstant(value ConstantValue) {
 	n.prog.From.Offset = value
 }
 
