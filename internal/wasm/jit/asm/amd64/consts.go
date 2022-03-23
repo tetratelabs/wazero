@@ -23,7 +23,8 @@ const (
 // AMD64-specific instructions.
 // https://www.felixcloutier.com/x86/index.html
 //
-// Note: here we do note define all of amd64 instructions, and we only define the ones used by wazero's JIT compiler.
+// Note: here we do not define all of amd64 instructions, and we only define the ones used by wazero's JIT compiler.
+// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
 const (
 	ADDL asm.Instruction = iota
 	ADDQ
@@ -426,6 +427,8 @@ func instructionName(instruction asm.Instruction) string {
 // Arm64-specific registers.
 // https://www.lri.fr/~filliatr/ens/compil/x86-64.pdf
 // https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
+//
+// Note: naming convension is exactly the same as Go assembler: https://go.dev/doc/asm
 const (
 	REG_AX asm.Register = asm.NilRegister + 1 + iota
 	REG_CX
