@@ -111,6 +111,8 @@ func (n *nodeImpl) String() (ret string) {
 	return
 }
 
+// operandType represents where an operand is placed for an instruction.
+// Note: this is almost the same as obj.AddrType in GO assembler.
 type operandType byte
 
 const (
@@ -137,6 +139,7 @@ func (o operandType) String() (ret string) {
 	return
 }
 
+// operandTypes represents the only combinations of two operandTypes used by wazero
 type operandTypes struct{ src, dst operandType }
 
 var (
@@ -192,6 +195,7 @@ func (a *assemblerImpl) addNode(node *nodeImpl) {
 	}
 }
 
+// encodeNode encodes the given node into writer.
 func (a *assemblerImpl) encodeNode(w io.Writer, n *nodeImpl) (err error) {
 	switch n.types {
 	case operandTypesNoneToNone:
