@@ -87,16 +87,6 @@ func TestModuleInstance_Memory(t *testing.T) {
 	}
 }
 
-func TestModuleContext_String(t *testing.T) {
-	s := newStore()
-
-	// Ensure paths that can create the host module can see the name.
-	m, err := s.Instantiate(context.Background(), &Module{}, "module", nil)
-	require.NoError(t, err)
-	require.Equal(t, "Module[module]", m.String())
-	require.Equal(t, "Module[module]", s.Module(m.module.Name).String())
-}
-
 func TestStore_Instantiate(t *testing.T) {
 	s := newStore()
 	m, err := NewHostModule("", map[string]interface{}{"fn": func(wasm.Module) {}})

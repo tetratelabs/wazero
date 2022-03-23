@@ -3,6 +3,9 @@ package internalwasm
 import (
 	"bytes"
 	"io"
+	"io/fs"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -146,4 +149,58 @@ func TestNewSysContext_Environ(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSysContext_Close(t *testing.T) {
+	t.Run("no files", func(t *testing.T) {
+		sys := DefaultSysContext()
+		require.NoError(t, sys.Close())
+	})
+
+	t.Run("open files", func(t *testing.T) {
+		tempDir := t.TempDir()
+		pathName := "test"
+		file, _ := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
+
+		sys, err := NewSysContext(
+			0,   // max
+			nil, // args
+			nil, // environ
+			nil, // stdin
+			nil, // stdout
+			nil, // stderr
+			map[uint32]*FileEntry{ // openedFiles
+				3: {Path: "."},
+				4: {Path: path.Join(".", pathName), File: file},
+			},
+		)
+		require.NoError(t, err)
+
+		// Closing should delete the file descriptors after closing the files.
+		require.NoError(t, sys.Close())
+		require.Empty(t, sys.openedFiles)
+
+		// Verify it was actually closed, by trying to close it again.
+		err = file.Close()
+		require.Contains(t, err.Error(), "file already closed")
+
+		// No problem closing config again because the descriptors were removed, so they won't be called again.
+		require.NoError(t, sys.Close())
+	})
+
+	// TODO: fs but never used (ex file == nil)
+	// TODO: externally closed
+}
+
+// createWriteableFile uses real files when io.Writer tests are needed.
+// TODO: temporarily *os.File until #394
+func createWriteableFile(t *testing.T, tmpDir string, pathName string, data []byte) (*os.File, fs.FS) {
+	require.NotNil(t, data)
+	absolutePath := path.Join(tmpDir, pathName)
+	require.NoError(t, os.WriteFile(absolutePath, data, 0o600))
+
+	// open the file for writing in a custom way until #390
+	f, err := os.OpenFile(absolutePath, os.O_RDWR, 0o600)
+	require.NoError(t, err)
+	return f, os.DirFS(tmpDir)
 }
