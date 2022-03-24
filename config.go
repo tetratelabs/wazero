@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 
 	internalwasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/interpreter"
 	"github.com/tetratelabs/wazero/internal/wasm/jit"
-	"github.com/tetratelabs/wazero/wasi"
 )
 
 // NewRuntimeConfigJIT compiles WebAssembly modules into runtime.GOARCH-specific assembly for optimal performance.
@@ -216,21 +216,42 @@ func (c *SysConfig) WithEnv(key, value string) *SysConfig {
 
 // WithFS assigns the file system to use for any paths beginning at "/". Defaults to not found.
 //
+// Ex. This sets a read-only, embedded file-system to serve files under the root ("/") and working (".") directories:
+//
+//	//go:embed testdata/index.html
+//	var testdataIndex embed.FS
+//
+//	rooted, err := fs.Sub(testdataIndex, "testdata")
+//	require.NoError(t, err)
+//
+//	// "index.html" is accessible as both "/index.html" and "./index.html" because we didn't use WithWorkDirFS.
+//	sysConfig := wazero.NewSysConfig().WithFS(rooted)
+//
 // Note: This sets WithWorkDirFS to the same file-system unless already set.
-func (c *SysConfig) WithFS(fs wasi.FS) *SysConfig {
+func (c *SysConfig) WithFS(fs fs.FS) *SysConfig {
 	c.setFS("/", fs)
 	return c
 }
 
-// WithWorkDirFS indicates the file system to use for any paths beginning at ".". Defaults to the same as WithFS.
-func (c *SysConfig) WithWorkDirFS(fs wasi.FS) *SysConfig {
+// WithWorkDirFS indicates the file system to use for any paths beginning at "./". Defaults to the same as WithFS.
+//
+// Ex. This sets a read-only, embedded file-system as the root ("/"), and a mutable one as the working directory ("."):
+//
+//	//go:embed appA
+//	var rootFS embed.FS
+//
+//	// Files relative to this source under appA are available under "/" and files relative to "/work/appA" under ".".
+//	sysConfig := wazero.NewSysConfig().WithFS(rootFS).WithWorkDirFS(os.DirFS("/work/appA"))
+//
+// Note: os.DirFS documentation includes important notes about isolation, which also applies to fs.Sub. As of Go 1.18,
+// the built-in file-systems are not jailed (chroot). See https://github.com/golang/go/issues/42322
+func (c *SysConfig) WithWorkDirFS(fs fs.FS) *SysConfig {
 	c.setFS(".", fs)
 	return c
 }
 
-// withFS is hidden especially until #394 as existing use cases should be possible by composing file systems.
-// TODO: in #394 add examples on WithFS to accomplish this.
-func (c *SysConfig) setFS(path string, fs wasi.FS) {
+// setFS maps a path to a file-system. This is only used for base paths: "/" and ".".
+func (c *SysConfig) setFS(path string, fs fs.FS) {
 	// Check to see if this key already exists and update it.
 	entry := &internalwasm.FileEntry{Path: path, FS: fs}
 	if fd, ok := c.preopenPaths[path]; ok {
@@ -265,13 +286,13 @@ func (c *SysConfig) toSysContext() (sys *internalwasm.SysContext, err error) {
 	rootFD := uint32(0) // zero is invalid
 	setWorkDirFS := false
 	preopens := c.preopens
-	for fd, fs := range preopens {
-		if fs.FS == nil {
-			err = fmt.Errorf("FS for %s is nil", fs.Path)
+	for fd, entry := range preopens {
+		if entry.FS == nil {
+			err = fmt.Errorf("FS for %s is nil", entry.Path)
 			return
-		} else if fs.Path == "/" {
+		} else if entry.Path == "/" {
 			rootFD = fd
-		} else if fs.Path == "." {
+		} else if entry.Path == "." {
 			setWorkDirFS = true
 		}
 	}

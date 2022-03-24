@@ -2,15 +2,19 @@ package examples
 
 import (
 	"bytes"
+	"embed"
 	_ "embed"
-	"io"
+	"io/fs"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/wasi"
 )
+
+// catFS is an embedded filesystem limited to cat.go
+//go:embed testdata/cat.go
+var catFS embed.FS
 
 // catGo is the TinyGo source
 //go:embed testdata/cat.go
@@ -29,18 +33,13 @@ func Test_Cat(t *testing.T) {
 
 	// First, configure where the WebAssembly Module (Wasm) console outputs to (stdout).
 	stdoutBuf := bytes.NewBuffer(nil)
-	sysConfig := wazero.NewSysConfig().WithStdout(stdoutBuf)
 
-	// Next, configure a sandboxed filesystem to include one file.
-	file := "cat.go" // arbitrary file
-	memFS := wazero.WASIMemFS()
-	err := writeFile(memFS, file, catGo)
+	// Since wazero uses fs.FS, we can use standard libraries to do things like trim the leading path.
+	rooted, err := fs.Sub(catFS, "testdata")
 	require.NoError(t, err)
-	sysConfig.WithWorkDirFS(memFS)
 
-	// Since this runs a main function (_start in WASI), configure the arguments.
-	// Remember, arg[0] is the program name!
-	sysConfig.WithArgs("cat", file)
+	// Combine the above into our baseline config, overriding defaults (which discard stdout and have no file system).
+	sysConfig := wazero.NewSysConfig().WithStdout(stdoutBuf).WithFS(rooted)
 
 	// Compile the `cat` module.
 	compiled, err := r.CompileModule(catWasm)
@@ -52,24 +51,12 @@ func Test_Cat(t *testing.T) {
 	defer wasi.Close()
 
 	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to.
-	cat, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig)
-
+	// * Set the program name (arg[0]) to "cat" and add args to write "cat.go" to stdout twice.
+	// * We use both "/cat.go" and "./cat.go" because WithFS by default maps the workdir "." to "/".
+	cat, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig.WithArgs("cat", "/cat.go", "./cat.go"))
 	require.NoError(t, err)
 	defer cat.Close()
 
-	// To ensure it worked, verify stdout from WebAssembly had what we expected.
-	require.Equal(t, string(catGo), stdoutBuf.String())
-}
-
-func writeFile(fs wasi.FS, path string, data []byte) error {
-	f, err := fs.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
-	if err != nil {
-		return err
-	}
-
-	if _, err := io.Copy(f, bytes.NewBuffer(data)); err != nil {
-		return err
-	}
-
-	return f.Close()
+	// We expect the WebAssembly function wrote "cat.go" twice!
+	require.Equal(t, append(catGo, catGo...), stdoutBuf.Bytes())
 }

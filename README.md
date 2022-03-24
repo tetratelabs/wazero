@@ -41,12 +41,22 @@ on your machine unless you explicitly allow it.
 
 System access is defined by an emerging specification called WebAssembly
 System Interface ([WASI](https://github.com/WebAssembly/WASI)). WASI defines
-how WebAssembly programs interact with the host embedding them. For example,
-WASI defines functions for reading the time, or a random number.
+how WebAssembly programs interact with the host embedding them.
 
-This repository includes several [examples](examples) that expose system
-interfaces, via the module `wazero.WASISnapshotPreview1`. These examples are
-tested and a good way to learn what's possible with wazero.
+For example, here's how you can allow WebAssembly modules to read
+"/work/home/a.txt" as "/a.txt" or "./a.txt":
+```go
+wasi, err := r.InstantiateModule(wazero.WASISnapshotPreview1())
+defer wasi.Close()
+
+sysConfig := wazero.NewSysConfig().WithFS(os.DirFS("/work/home"))
+module, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig)
+defer module.Close()
+...
+```
+
+The best way to learn this and other features you get with wazero is by trying
+[examples](examples).
 
 ## Runtime
 

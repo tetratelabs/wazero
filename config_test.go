@@ -4,6 +4,7 @@ import (
 	"io"
 	"math"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
 
@@ -58,8 +59,8 @@ func TestRuntimeConfig_Features(t *testing.T) {
 }
 
 func TestSysConfig_toSysContext(t *testing.T) {
-	memFS := WASIMemFS()
-	memFS2 := WASIMemFS()
+	testFS := fstest.MapFS{}
+	testFS2 := fstest.MapFS{}
 
 	tests := []struct {
 		name     string
@@ -186,7 +187,7 @@ func TestSysConfig_toSysContext(t *testing.T) {
 		},
 		{
 			name:  "WithFS",
-			input: NewSysConfig().WithFS(memFS),
+			input: NewSysConfig().WithFS(testFS),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -195,14 +196,14 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
-					3: {Path: "/", FS: memFS},
-					4: {Path: ".", FS: memFS},
+					3: {Path: "/", FS: testFS},
+					4: {Path: ".", FS: testFS},
 				},
 			),
 		},
 		{
 			name:  "WithFS - overwrites",
-			input: NewSysConfig().WithFS(memFS).WithFS(memFS2),
+			input: NewSysConfig().WithFS(testFS).WithFS(testFS2),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -211,14 +212,14 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
-					3: {Path: "/", FS: memFS2},
-					4: {Path: ".", FS: memFS2},
+					3: {Path: "/", FS: testFS2},
+					4: {Path: ".", FS: testFS2},
 				},
 			),
 		},
 		{
 			name:  "WithWorkDirFS",
-			input: NewSysConfig().WithWorkDirFS(memFS),
+			input: NewSysConfig().WithWorkDirFS(testFS),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -227,13 +228,13 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
-					3: {Path: ".", FS: memFS},
+					3: {Path: ".", FS: testFS},
 				},
 			),
 		},
 		{
 			name:  "WithFS and WithWorkDirFS",
-			input: NewSysConfig().WithFS(memFS).WithWorkDirFS(memFS2),
+			input: NewSysConfig().WithFS(testFS).WithWorkDirFS(testFS2),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -242,14 +243,14 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
-					3: {Path: "/", FS: memFS},
-					4: {Path: ".", FS: memFS2},
+					3: {Path: "/", FS: testFS},
+					4: {Path: ".", FS: testFS2},
 				},
 			),
 		},
 		{
 			name:  "WithWorkDirFS and WithFS",
-			input: NewSysConfig().WithWorkDirFS(memFS).WithFS(memFS2),
+			input: NewSysConfig().WithWorkDirFS(testFS).WithFS(testFS2),
 			expected: requireSysContext(t,
 				math.MaxUint32, // max
 				nil,            // args
@@ -258,8 +259,8 @@ func TestSysConfig_toSysContext(t *testing.T) {
 				nil,            // stdout
 				nil,            // stderr
 				map[uint32]*internalwasm.FileEntry{ // openedFiles
-					3: {Path: ".", FS: memFS},
-					4: {Path: "/", FS: memFS2},
+					3: {Path: ".", FS: testFS},
+					4: {Path: "/", FS: testFS2},
 				},
 			),
 		},
