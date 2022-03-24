@@ -40,9 +40,9 @@ func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
 	}
 }
 
-// StartWASICommand instantiates the module and starts its WASI Command function ("_start"). The return value are all
-// exported functions in the module. This errs if the module doesn't comply with prerequisites, or any instantiation
-// or function call error.
+// StartWASICommand instantiates the module and starts its WASI Command function ("_start") if present. The return value
+// are all exported functions in the module. This errs if the module doesn't export a memory named "memory", or there
+// are any instantiation or function call errors. On success, other modules can import wasi.ModuleSnapshotPreview1.
 //
 // Ex.
 //	r := wazero.NewRuntime()
@@ -53,13 +53,17 @@ func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
 //	module, _ := StartWASICommand(r, decoded)
 //	defer module.Close()
 //
-// Prerequisites of the "Current Unstable ABI" from wasi.ModuleSnapshotPreview1:
-// * "_start" is an exported nullary function and does not export "_initialize"
-// * "memory" is an exported memory.
+// ## "memory" export
+// WASI snapshot-01 requires exporting a memory named "memory", and wazero enforces this as nearly all functions use
+// memory to implement multiple returns. StartWASICommand errs if there is no memory exported as "memory".
 //
-// Note: "_start" is invoked in the RuntimeConfig.Context.
-// Note: Exporting "__indirect_function_table" is mentioned as required, but not enforced here.
-// Note: The wasm.Functions return value does not restrict exports after "_start" as allowed in the specification.
+// ## "_start" function export
+// WASI snapshot-01 requires exporting a function named "_start", but wazero does not enforce this. If it is defined,
+// it is called directly after any module-defined start function, in the runtime context (RuntimeConfig.WithContext).
+//
+// ## "__indirect_function_table" function export
+// WASI snapshot-01 requires exporting a table named "__indirect_function_table", but wazero does not enforce this.
+//
 // Note: All TinyGo Wasm are WASI commands. They initialize memory on "_start" and import "fd_write" to implement panic.
 // See StartWASICommandWithConfig
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/design/application-abi.md#current-unstable-abi
@@ -97,7 +101,8 @@ func startWASICommandWithSysContext(r Runtime, module *Module, sys *internalwasm
 
 	internal, ok := r.(*runtime)
 	if !ok {
-		return nil, fmt.Errorf("unsupported Runtime implementation: %s", r)
+		err = fmt.Errorf("unsupported Runtime implementation: %s", r)
+		return
 	}
 
 	if mod, err = internal.store.Instantiate(internal.ctx, module.module, module.name, sys); err != nil {
@@ -105,8 +110,11 @@ func startWASICommandWithSysContext(r Runtime, module *Module, sys *internalwasm
 	}
 
 	start := mod.ExportedFunction(internalwasi.FunctionStart)
-	if _, err = start.Call(mod.WithContext(internal.ctx)); err != nil {
-		return nil, fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
+	if start == nil {
+		return
 	}
-	return mod, nil
+	if _, err = start.Call(mod.WithContext(internal.ctx)); err != nil {
+		err = fmt.Errorf("module[%s] function[%s] failed: %w", module.name, internalwasi.FunctionStart, err)
+	}
+	return
 }

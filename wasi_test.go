@@ -11,7 +11,24 @@ import (
 	"github.com/tetratelabs/wazero/wasm"
 )
 
-func TestStartWASICommand_UsesStoreContext(t *testing.T) {
+// TestStartWASICommand_DoesntEnforce_Start ensures wapc-go work when modules import WASI, but don't export "_start".
+func TestStartWASICommand_DoesntEnforce_Start(t *testing.T) {
+	r := NewRuntime()
+
+	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
+	require.NoError(t, err)
+	defer wasi.Close()
+
+	// Start the module as a WASI command. This will fail if the context wasn't as intended.
+	mod, err := StartWASICommandFromSource(r, []byte(`(module $wasi_test.go
+	(memory 1)
+	(export "memory" (memory 0))
+)`))
+	require.NoError(t, err)
+	require.NoError(t, mod.Close())
+}
+
+func TestStartWASICommand_UsesRuntimeContext(t *testing.T) {
 	type key string
 	config := NewRuntimeConfig().WithContext(context.WithValue(context.Background(), key("wa"), "zero"))
 	r := NewRuntimeWithConfig(config)
@@ -23,23 +40,24 @@ func TestStartWASICommand_UsesStoreContext(t *testing.T) {
 		require.Equal(t, config.ctx, ctx.Context())
 	}
 
-	_, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
+	host, err := r.NewModuleBuilder("").ExportFunction("start", start).Instantiate()
 	require.NoError(t, err)
+	defer host.Close()
 
-	_, err = r.InstantiateModule(WASISnapshotPreview1())
+	wasi, err := r.InstantiateModule(WASISnapshotPreview1())
 	require.NoError(t, err)
+	defer wasi.Close()
 
-	decoded, err := r.CompileModule([]byte(`(module $wasi_test.go
+	// Start the module as a WASI command. This will fail if the context wasn't as intended.
+	mod, err := StartWASICommandFromSource(r, []byte(`(module $wasi_test.go
 	(import "" "start" (func $start))
 	(memory 1)
 	(export "_start" (func $start))
 	(export "memory" (memory 0))
 )`))
 	require.NoError(t, err)
+	defer mod.Close()
 
-	// Start the module as a WASI command. This will fail if the context wasn't as intended.
-	_, err = StartWASICommand(r, decoded)
-	require.NoError(t, err)
 	require.True(t, calledStart)
 }
 
