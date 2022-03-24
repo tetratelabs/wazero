@@ -240,7 +240,7 @@ func (c *SysConfig) WithFS(fs fs.FS) *SysConfig {
 //	//go:embed appA
 //	var rootFS embed.FS
 //
-//	// Files relative to this source under appA is available under "/" and files relative to "/work/appA" under ".".
+//	// Files relative to this source under appA are available under "/" and files relative to "/work/appA" under ".".
 //	sysConfig := wazero.NewSysConfig().WithFS(rootFS).WithWorkDirFS(os.DirFS("/work/appA"))
 //
 // Note: os.DirFS documentation includes important notes about isolation, which also applies to fs.Sub. As of Go 1.18,
