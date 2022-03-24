@@ -1505,9 +1505,9 @@ func openFileEntry(rootFS fs.FS, pathName string) (*internalwasm.FileEntry, wasi
 }
 
 func ValidateWASICommand(module *internalwasm.Module, moduleName string) error {
-	if start, err := requireExport(module, moduleName, FunctionStart, internalwasm.ExternTypeFunc); err != nil {
-		return err
-	} else {
+	// The snapshot-01 specification requires a "_start" function, but we don't enforce it is present. We only enforce
+	// if present, it is valid. In practice, not all modules importing WASI define a "_start" function (ex. wapc-go).
+	if start, err := requireExport(module, moduleName, FunctionStart, internalwasm.ExternTypeFunc); err == nil {
 		// TODO: this should be verified during decode so that errors have the correct source positions
 		ft := module.TypeOfFunction(start.Index)
 		if ft == nil {

@@ -87,7 +87,22 @@ runtime vs interpreting Wasm directly (the `naivevm` interpreter).
 Note: `microwasm` was never specified formally, and only exists in a historical codebase of wasmtime:
 https://github.com/bytecodealliance/wasmtime/blob/v0.29.0/crates/lightbeam/src/microwasm.rs
 
-## Why is `SysConfig` decoupled from WASI?
+## WASI
+
+### Why aren't all WASI rules enforced?
+
+The [snapshot-01](https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md) version of WASI has a
+number of rules for a "command module", but only the memory export rule is enforced. If a "_start" function exists, it
+is enforced to be the correct signature and succeed, but the export itself isn't enforced. It follows that this means
+exports are not required to be contained to a "_start" function invocation. Finally, the "__indirect_function_table"
+export is also not enforced.
+
+The reason for the exceptions are that implementations aren't following the rules. For example, TinyGo doesn't export
+"__indirect_function_table", so crashing on this would make wazero unable to run TinyGo modules. Similarly, modules
+loaded by wapc-go don't always define a "_start" function. Since "snapshot-01" is not a proper version, and certainly
+not a W3C recommendation, there's no sense in breaking users over matters like this.
+
+### Why is `SysConfig` decoupled from WASI?
 
 WebAssembly System Interfaces (WASI) is a formalization of a practice that can be done anyway: Define a host function to
 access a system interface, such as writing to STDOUT. WASI stalled at snapshot-01 and as of early 2022, is being
