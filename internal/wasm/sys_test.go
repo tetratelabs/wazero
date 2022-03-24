@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
 )
@@ -170,8 +171,9 @@ func TestSysContext_Close(t *testing.T) {
 			nil, // stdout
 			nil, // stderr
 			map[uint32]*FileEntry{ // openedFiles
-				3: {Path: ".", FS: testFS},
-				4: {Path: path.Join(".", pathName), File: file, FS: testFS},
+				3: {Path: "/", FS: testFS},
+				4: {Path: ".", FS: testFS},
+				5: {Path: path.Join(".", pathName), File: file, FS: testFS},
 			},
 		)
 		require.NoError(t, err)
@@ -188,8 +190,56 @@ func TestSysContext_Close(t *testing.T) {
 		require.NoError(t, sys.Close())
 	})
 
-	// TODO: fs but never used (ex file == nil)
-	// TODO: externally closed
+	t.Run("FS never used", func(t *testing.T) {
+		testFS := fstest.MapFS{}
+		sys, err := NewSysContext(
+			0,   // max
+			nil, // args
+			nil, // environ
+			nil, // stdin
+			nil, // stdout
+			nil, // stderr
+			map[uint32]*FileEntry{ // no openedFiles
+				3: {Path: "/", FS: testFS},
+				4: {Path: ".", FS: testFS},
+			},
+		)
+		require.NoError(t, err)
+
+		// Even if there are no open files, the descriptors for the file-system mappings should be removed.
+		require.NoError(t, sys.Close())
+		require.Empty(t, sys.openedFiles)
+	})
+
+	t.Run("open file externally closed", func(t *testing.T) {
+		tempDir := t.TempDir()
+		pathName := "test"
+		file, testFS := createWriteableFile(t, tempDir, pathName, make([]byte, 0))
+
+		sys, err := NewSysContext(
+			0,   // max
+			nil, // args
+			nil, // environ
+			nil, // stdin
+			nil, // stdout
+			nil, // stderr
+			map[uint32]*FileEntry{ // openedFiles
+				3: {Path: "/", FS: testFS},
+				4: {Path: ".", FS: testFS},
+				5: {Path: path.Join(".", pathName), File: file, FS: testFS},
+			},
+		)
+		require.NoError(t, err)
+
+		// Close the file externally
+		file.Close()
+
+		// Closing should err as it expected to be open
+		require.Contains(t, sys.Close().Error(), "file already closed")
+
+		// However, cleanup should still occur.
+		require.Empty(t, sys.openedFiles)
+	})
 }
 
 // createWriteableFile uses real files when io.Writer tests are needed.
