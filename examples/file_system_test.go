@@ -33,15 +33,13 @@ func Test_Cat(t *testing.T) {
 
 	// First, configure where the WebAssembly Module (Wasm) console outputs to (stdout).
 	stdoutBuf := bytes.NewBuffer(nil)
-	sysConfig := wazero.NewSysConfig().WithStdout(stdoutBuf)
 
-	// Since wazero uses fs.FS we can use standard libraries to do things like trim the leading path.
+	// Since wazero uses fs.FS, we can use standard libraries to do things like trim the leading path.
 	rooted, err := fs.Sub(catFS, "testdata")
 	require.NoError(t, err)
 
-	// Since this runs a main function (_start in WASI), configure the arguments.
-	// Remember, arg[0] is the program name!
-	sysConfig = sysConfig.WithFS(rooted).WithArgs("cat", "/cat.go")
+	// Combine the above into our baseline config, overriding defaults (which discard stdout and have no file system).
+	sysConfig := wazero.NewSysConfig().WithStdout(stdoutBuf).WithFS(rooted)
 
 	// Compile the `cat` module.
 	compiled, err := r.CompileModule(catWasm)
@@ -53,10 +51,12 @@ func Test_Cat(t *testing.T) {
 	defer wasi.Close()
 
 	// StartWASICommand runs the "_start" function which is what TinyGo compiles "main" to.
-	cat, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig)
+	// * Set the program name (arg[0]) to "cat" and add args to write "cat.go" to stdout twice.
+	// * We use both "/cat.go" and "./cat.go" because WithFS by default maps the workdir "." to "/".
+	cat, err := wazero.StartWASICommandWithConfig(r, compiled, sysConfig.WithArgs("cat", "/cat.go", "./cat.go"))
 	require.NoError(t, err)
 	defer cat.Close()
 
-	// To ensure it worked, verify stdout from WebAssembly had what we expected.
-	require.Equal(t, catGo, stdoutBuf.Bytes())
+	// We expect the WebAssembly function wrote "cat.go" twice!
+	require.Equal(t, append(catGo, catGo...), stdoutBuf.Bytes())
 }
