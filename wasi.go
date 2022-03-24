@@ -58,7 +58,7 @@ func StartWASICommandFromSource(r Runtime, source []byte) (wasm.Module, error) {
 // memory to implement multiple returns. StartWASICommand errs if there is no memory exported as "memory".
 //
 // ## "_start" function export
-// WASI snapshot-01 requires exporting a function named "_start", but wazero does not enforce this. If it is defined,
+// WASI snapshot-01 requires exporting a function named "_start" for WASI command, but wazero does not enforce this. If it is defined,
 // it is called directly after any module-defined start function, in the runtime context (RuntimeConfig.WithContext).
 //
 // ## "__indirect_function_table" function export
