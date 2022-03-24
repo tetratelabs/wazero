@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/wasi"
@@ -197,11 +196,15 @@ func nullTerminatedByteCount(max uint32, elements []string) (uint32, error) {
 
 // Close implements io.Closer
 func (c *SysContext) Close() (err error) {
-	// stdin, stdout and stderr are only closed if we opened them. The only case we open is when stdin -> /dev/null
-	if f, ok := c.stdin.(*os.File); ok && f.Name() == os.DevNull {
-		_ = f.Close() // ignore error closing reader of /dev/null
+	// Close any files opened in this context
+	for fd, entry := range c.openedFiles {
+		delete(c.openedFiles, fd)
+		if entry.File != nil { // File is nil for a mount like "." or "/"
+			if e := entry.File.Close(); e != nil {
+				err = e // This means the err returned == the last non-nil error.
+			}
+		}
 	}
-	// TODO: close openedFiles in #394
 	return
 }
 

@@ -23,15 +23,14 @@ type ModuleContext struct {
 	memory publicwasm.Memory
 	store  *Store
 
-	// Sys is not exposed publicly. This is currently only used by internalwasi.
+	// sys is not exposed publicly. This is currently only used by internalwasi.
 	// Note: This is a part of ModuleContext so that scope is correct and Close is coherent.
 	sys *SysContext
 }
 
 // WithMemory allows overriding memory without re-allocation when the result would be the same.
 func (m *ModuleContext) WithMemory(memory *MemoryInstance) *ModuleContext {
-	// only re-allocate if it will change the effective memory
-	if m.memory == nil || (memory != nil && memory.Max != nil && *memory.Max > 0 && memory != m.memory) {
+	if memory != nil && memory != m.memory { // only re-allocate if it will change the effective memory
 		return &ModuleContext{module: m.module, memory: memory, ctx: m.ctx, sys: m.sys}
 	}
 	return m
@@ -54,8 +53,7 @@ func (m *ModuleContext) Sys() *SysContext {
 
 // WithContext implements wasm.Module WithContext
 func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
-	// only re-allocate if it will change the effective context
-	if ctx != nil && ctx != m.ctx {
+	if ctx != nil && ctx != m.ctx { // only re-allocate if it will change the effective context
 		return &ModuleContext{module: m.module, memory: m.memory, ctx: ctx, sys: m.sys}
 	}
 	return m

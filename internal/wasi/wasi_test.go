@@ -1494,7 +1494,7 @@ func TestSnapshotPreview1_FdWrite_Errors(t *testing.T) {
 }
 
 func createFile(t *testing.T, path string, contents []byte) (*memFile, *MemFS) {
-	memFS := &MemFS{}
+	memFS := &MemFS{Files: map[string][]byte{}}
 	f, err := memFS.OpenWASI(0, path, wasi.O_CREATE|wasi.O_TRUNC, wasi.R_FD_WRITE, 0, 0)
 	require.NoError(t, err)
 
