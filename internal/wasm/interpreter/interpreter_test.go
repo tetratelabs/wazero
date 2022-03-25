@@ -285,7 +285,8 @@ func TestClose(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			err = me.Close()
+			closed, err := me.CloseWithExitCode(0)
+			require.True(t, closed)
 			require.NoError(t, err)
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))

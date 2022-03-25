@@ -267,22 +267,25 @@ func callImportAfterAddSource(importedModule, importingModule string) []byte {
 
 func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 	tests := []struct {
-		name           string
-		closeImporting bool
-		closeImported  bool
+		name                          string
+		closeImporting, closeImported uint32
+		expectedErr                   string
 	}{
 		{
 			name:           "importing", // Ex. WASI proc_exit or AssemblyScript abort handler.
-			closeImporting: true,
+			closeImporting: 1,
+			expectedErr:    "exit_code(1)",
 		},
 		{
 			name:          "imported",
-			closeImported: true,
+			closeImported: 2,
+			expectedErr:   "exit_code(2)",
 		},
 		{
 			name:           "both", // Ex. A function that stops the runtime.
-			closeImporting: true,
-			closeImported:  true,
+			closeImporting: 1,
+			closeImported:  2,
+			expectedErr:    "exit_code(1)", // The call came from the importing module, so that's right exit code!
 		},
 	}
 	for _, tt := range tests {
@@ -292,11 +295,11 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			var imported, importing publicwasm.Module
 			var err error
 			closeAndReturn := func(x uint32) uint32 {
-				if tc.closeImporting {
-					require.NoError(t, importing.Close())
+				if tc.closeImporting != 0 {
+					require.NoError(t, importing.CloseWithExitCode(tc.closeImporting))
 				}
-				if tc.closeImported {
-					require.NoError(t, importing.Close())
+				if tc.closeImported != 0 {
+					require.NoError(t, importing.CloseWithExitCode(tc.closeImported))
 				}
 				return x
 			}
@@ -313,9 +316,13 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			require.NoError(t, err)
 			defer importing.Close()
 
-			// Expect no error, because there's currently no logic to fail on the return path after close.
+			// Functions that return after being closed should have an exit error.
 			_, err = importing.ExportedFunction("call_import_after_add").Call(nil, 1, 2)
-			require.NoError(t, err)
+			require.EqualError(t, err, tc.expectedErr)
+
+			// New function calls after being closed should have an exit error.
+			_, err = importing.ExportedFunction("call_import_after_add").Call(nil, 1, 2)
+			require.EqualError(t, err, tc.expectedErr)
 		})
 	}
 }

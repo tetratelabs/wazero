@@ -38,7 +38,7 @@ func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
 	t.Run("sets module name", func(t *testing.T) {
 		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
 		require.NoError(t, err)
-		defer closeModuleEngine(t, me)
+		defer closeModuleEngineWithExitCode(t, me, 0)
 		require.Equal(t, t.Name(), me.Name())
 	})
 }
@@ -62,7 +62,7 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
-	defer closeModuleEngine(t, me)
+	defer closeModuleEngineWithExitCode(t, me, 0)
 
 	// Create a call context which links the module to the module-engine compiled from it.
 	ctx := newModuleContext(module, me)
@@ -83,12 +83,6 @@ func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
 	})
 }
 
-// closeModuleEngine allows unit tests to check `Close` didn't err.
-func closeModuleEngine(t *testing.T, me wasm.ModuleEngine) {
-	err := me.Close()
-	require.NoError(t, err)
-}
-
 func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 	e := et.NewEngine()
 
@@ -101,7 +95,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Instantiate the module, which has nothing but an empty table.
 		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngine(t, me)
+		defer closeModuleEngineWithExitCode(t, me, 0)
 
 		// Since there are no elements to initialize, we expect the table to be nil.
 		require.Equal(t, table.Table, make([]interface{}, 2))
@@ -121,7 +115,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Instantiate the module whose table points to its own functions.
 		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngine(t, me)
+		defer closeModuleEngineWithExitCode(t, me, 0)
 
 		// The functions mapped to the table are defined in the same moduleEngine
 		require.Equal(t, table.Table, et.InitTable(me, table.Min, tableInit))
@@ -141,12 +135,12 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Imported functions are compiled before the importing module is instantiated.
 		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		defer closeModuleEngine(t, imported)
+		defer closeModuleEngineWithExitCode(t, imported, 0)
 
 		// Instantiate the importing module, which is whose table is initialized.
 		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngine(t, importing)
+		defer closeModuleEngineWithExitCode(t, importing, 0)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
 		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
@@ -171,12 +165,12 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
 		// Imported functions are compiled before the importing module is instantiated.
 		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		defer closeModuleEngine(t, imported)
+		defer closeModuleEngineWithExitCode(t, imported, 0)
 
 		// Instantiate the importing module, which is whose table is initialized.
 		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer closeModuleEngine(t, importing)
+		defer closeModuleEngineWithExitCode(t, importing, 0)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
 		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
@@ -248,4 +242,11 @@ func newModuleContext(module *wasm.ModuleInstance, engine wasm.ModuleEngine) *wa
 	module.Engine = engine
 	// callEngineModuleContextModuleInstanceAddressOffset
 	return wasm.NewModuleContext(context.Background(), nil, module, nil)
+}
+
+// closeModuleEngineWithExitCode allows unit tests to check `CloseWithExitCode` didn't err.
+func closeModuleEngineWithExitCode(t *testing.T, me wasm.ModuleEngine, exitCode uint32) bool {
+	ok, err := me.CloseWithExitCode(exitCode)
+	require.NoError(t, err)
+	return ok
 }

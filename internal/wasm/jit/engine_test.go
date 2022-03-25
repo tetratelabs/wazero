@@ -219,7 +219,7 @@ func TestNewModuleEngine_CompiledFunctions(t *testing.T) {
 	}
 	modE, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 	require.NoError(t, err)
-	defer modE.Close()
+	defer modE.CloseWithExitCode(0) //nolint
 	imported := modE.(*moduleEngine)
 
 	importingFinalizer := fakeFinalizer{}
@@ -233,7 +233,7 @@ func TestNewModuleEngine_CompiledFunctions(t *testing.T) {
 
 	modE, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, nil, nil)
 	require.NoError(t, err)
-	defer modE.Close()
+	defer modE.CloseWithExitCode(0) //nolint
 	importing := modE.(*moduleEngine)
 
 	// Ensure the importing module didn't try to finalize the imported functions.
@@ -354,7 +354,8 @@ func TestModuleEngine_Close(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			err = importing.Close()
+			closed, err := importing.CloseWithExitCode(0)
+			require.True(t, closed)
 			require.NoError(t, err)
 
 			// Closing should flip the status bit, so that it cannot be closed again.
@@ -372,7 +373,8 @@ func TestModuleEngine_Close(t *testing.T) {
 			}
 
 			if len(tc.importedFunctions) > 0 {
-				err = imported.Close()
+				closed, err = imported.CloseWithExitCode(0)
+				require.True(t, closed)
 				require.NoError(t, err)
 			}
 

@@ -14,6 +14,7 @@ import (
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasm/buildoptions"
 	"github.com/tetratelabs/wazero/internal/wazeroir"
+	"github.com/tetratelabs/wazero/sys"
 )
 
 type (
@@ -459,6 +460,11 @@ func (me *moduleEngine) Name() string {
 
 // Call implements the same method as documented on internalwasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
+	// If the module is already closed, prevent new calls to it.
+	if err = me.failIfClosed(); err != nil {
+		return nil, err
+	}
+
 	compiled := me.compiledFunctions[f.Index]
 	if compiled == nil {
 		err = fmt.Errorf("function not compiled")
@@ -478,6 +484,10 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
+		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
+		if err == nil {
+			err = me.failIfClosed()
+		}
 		if v := recover(); v != nil {
 			if buildoptions.IsDebugMode {
 				debug.PrintStack()
@@ -522,13 +532,22 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	return
 }
 
-// Close implements the same method as documented on internalwasm.ModuleEngine.
-func (me *moduleEngine) Close() error {
-	if !atomic.CompareAndSwapUint64(&me.closed, 0, 1) {
-		return nil
+// failIfClosed returns a sys.ExitError if moduleEngine.CloseWithExitCode was called.
+func (me *moduleEngine) failIfClosed() error {
+	if closed := atomic.LoadUint64(&me.closed); closed != 0 {
+		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
+	}
+	return nil
+}
+
+// CloseWithExitCode implements the same method as documented on internalwasm.ModuleEngine.
+func (me *moduleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
+	closed := uint64(1) + uint64(exitCode)<<32 // Store exitCode as high-order bits.
+	if !atomic.CompareAndSwapUint64(&me.closed, 0, closed) {
+		return false, nil
 	}
 	me.doClose()
-	return nil
+	return true, nil
 }
 
 func NewEngine() wasm.Engine {

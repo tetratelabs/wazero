@@ -105,8 +105,9 @@ func closeModuleWhileInUse(t *testing.T, r wazero.Runtime, closeFn func(hostFunc
 	defer importing.Close()
 
 	// As this is a blocking function call, only run 1 per goroutine.
+	i := importing // pin the module used inside goroutines
 	hammer.NewHammer(t, P, 1).Run(func(name string) {
-		requireFunctionCall(t, importing.ExportedFunction("call_import_after_add"), args, exp)
+		requireFunctionCallExits(t, i.ExportedFunction("call_import_after_add"), args)
 	}, func() { // When all functions are in-flight, re-assign the modules.
 		imported, importing = closeFn(&hostFunctionClosed, imported, importing)
 		// Unblock all the calls
@@ -128,4 +129,9 @@ func requireFunctionCall(t *testing.T, fn wasm.Function, args []uint64, exp uint
 	// We don't expect an error because there's currently no functionality to detect or fail on a closed module.
 	require.NoError(t, err)
 	require.Equal(t, exp, res[0])
+}
+
+func requireFunctionCallExits(t *testing.T, fn wasm.Function, args []uint64) {
+	_, err := fn.Call(nil, args...)
+	require.EqualError(t, err, "exit_code(0)")
 }

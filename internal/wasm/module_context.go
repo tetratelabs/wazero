@@ -64,14 +64,17 @@ func (m *ModuleContext) WithContext(ctx context.Context) publicwasm.Module {
 	return m
 }
 
-// Close implements the same method as documented on wasm.Module
-// Note: When there are multiple errors, the error returned is the last one.
+// Close implements the same method as documented on wasm.Module.
 func (m *ModuleContext) Close() (err error) {
-	err = m.store.CloseModule(m.Name())
-	if sys := m.sys; sys == nil { // ex from ModuleBuilder
-		return
-	} else if err2 := m.sys.Close(); err2 != nil {
-		err = err2
+	return m.CloseWithExitCode(0)
+}
+
+// CloseWithExitCode implements the same method as documented on wasm.Module.
+func (m *ModuleContext) CloseWithExitCode(exitCode uint32) (err error) {
+	if err = m.store.CloseModuleWithExitCode(m.module.Name, exitCode); err != nil {
+		return err
+	} else if sys := m.sys; sys != nil { // ex nil if from ModuleBuilder
+		return sys.Close()
 	}
 	return
 }
@@ -110,13 +113,15 @@ func (f *FunctionInstance) ResultTypes() []publicwasm.ValueType {
 }
 
 // Call implements wasm.Function Call
-func (f *FunctionInstance) Call(ctx publicwasm.Module, params ...uint64) ([]uint64, error) {
+func (f *FunctionInstance) Call(m publicwasm.Module, params ...uint64) (ret []uint64, err error) {
 	mod := f.Module
-	if modCtx, ok := ctx.(*ModuleContext); !ok { // allow nil to substitute for the defining module
-		return mod.Engine.Call(mod.Ctx, f, params...)
-	} else { // TODO: check if the importing context is correct
-		return mod.Engine.Call(modCtx, f, params...)
+	modCtx, ok := m.(*ModuleContext)
+	if ok {
+		// TODO: check if the importing context is correct
+	} else { // allow nil to substitute for the defining module
+		modCtx = mod.Ctx
 	}
+	return mod.Engine.Call(modCtx, f, params...)
 }
 
 // ExportedGlobal implements wasm.Module ExportedGlobal

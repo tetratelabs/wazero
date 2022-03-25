@@ -4,7 +4,6 @@ package wasm
 import (
 	"context"
 	"fmt"
-	"io"
 	"math"
 )
 
@@ -66,10 +65,20 @@ type Module interface {
 	// Name is the name this module was instantiated with. Exported functions can be imported with this name.
 	Name() string
 
-	// Closer (Close) releases resources allocated for this Module. Using this while having outstanding function calls
-	// is safe. After calling this function, re-instantiating a module for the same name is allowed.
-	io.Closer
-	// ^^ io.Closer not due to I/O, but to allow future static analysis to catch leaks (unclosed Closers).
+	// Close is a convenience that invokes CloseWithExitCode with zero.
+	Close() error
+	// ^^ not io.Closer as the rationale (static analysis of leaks) is invalid when there are multiple close methods.
+
+	// CloseWithExitCode releases resources allocated for this Module. Use a non-zero exitCode parameter to indicate a
+	// failure to ExportedFunction callers.
+	//
+	// The error returned here, if present, is about resource de-allocation (such as I/O errors). Only the last error is
+	// returned, so a non-nil return means at least one error happened. Regardless of error, this module instance will
+	// be removed, making its name available again.
+	//
+	// Calling this inside a host function is safe, and may cause ExportedFunction callers to receive a sys.ExitError
+	// with the exitCode.
+	CloseWithExitCode(exitCode uint32) error
 
 	// Context returns any propagated context from the Runtime or a prior function call.
 	//
@@ -116,19 +125,23 @@ type Function interface {
 	// encoded according to ResultTypes. An error is returned for any failure looking up or invoking the function
 	// including signature mismatch.
 	//
-	// If the `ctx` is nil, it defaults to the module the function was defined in.
+	// If `m` is nil, it defaults to the module the function was defined in.
 	//
 	// To override context propagation, use Module.WithContext
-	//	fn = mod.ExportedFunction("fib")
-	//	results, err := fn(mod.WithContext(ctx), 5)
+	//	fn = m.ExportedFunction("fib")
+	//	results, err := fn(m.WithContext(ctx), 5)
 	//	--snip--
 	//
 	// To ensure context propagation in a host function body, pass the `ctx` parameter:
-	//	hostFunction := func(ctx wasm.Module, offset, byteCount uint32) uint32 {
-	//		fn = ctx.ExportedFunction("__read")
-	//		results, err := fn(ctx, offset, byteCount)
+	//	hostFunction := func(m wasm.Module, offset, byteCount uint32) uint32 {
+	//		fn = m.ExportedFunction("__read")
+	//		results, err := fn(m, offset, byteCount)
 	//	--snip--
-	Call(ctx Module, params ...uint64) ([]uint64, error)
+	//
+	// Note: If Module.Close or Module.CloseWithExitCode were invoked during this call, the error returned may be a
+	// sys.ExitError. Interpreting this is specific to the module. For example, some "main" functions always call a
+	// function that exits.
+	Call(m Module, params ...uint64) ([]uint64, error)
 }
 
 // Global is a WebAssembly 1.0 (20191205) global exported from an instantiated module (wazero.Runtime InstantiateModule).

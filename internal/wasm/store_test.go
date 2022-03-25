@@ -160,14 +160,14 @@ func TestStore_CloseModule(t *testing.T) {
 			require.True(t, ok)
 
 			// Close the importing module
-			require.NoError(t, s.CloseModule(importingModuleName))
+			require.NoError(t, s.CloseModuleWithExitCode(importingModuleName, 0))
 			require.NotContains(t, s.modules, importingModuleName)
 
 			// Can re-close the importing module
-			require.NoError(t, s.CloseModule(importingModuleName))
+			require.NoError(t, s.CloseModuleWithExitCode(importingModuleName, 0))
 
 			// Now we close the imported module.
-			require.NoError(t, s.CloseModule(importedModuleName))
+			require.NoError(t, s.CloseModuleWithExitCode(importedModuleName, 0))
 			require.Nil(t, s.modules[importedModuleName])
 			require.NotContains(t, s.modules, importedModuleName)
 		})
@@ -208,16 +208,16 @@ func TestStore_hammer(t *testing.T) {
 		N = 100
 	}
 	hammer.NewHammer(t, P, N).Run(func(name string) {
-		_, instantiateErr := s.Instantiate(context.Background(), importingModule, name, DefaultSysContext())
+		mod, instantiateErr := s.Instantiate(context.Background(), importingModule, name, DefaultSysContext())
 		require.NoError(t, instantiateErr)
-		require.NoError(t, s.CloseModule(name))
+		require.NoError(t, s.CloseModuleWithExitCode(mod.Name(), 0))
 	}, nil)
 	if t.Failed() {
 		return // At least one test failed, so return now.
 	}
 
 	// Close the imported module.
-	require.NoError(t, s.CloseModule(imported.Name()))
+	require.NoError(t, s.CloseModuleWithExitCode(imported.Name(), 0))
 
 	// All instances are freed.
 	require.Len(t, s.modules, 0)
@@ -447,9 +447,9 @@ func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...ui
 	return
 }
 
-// Close implements the same method as documented on internalwasm.ModuleEngine.
-func (e *mockModuleEngine) Close() (err error) {
-	return
+// CloseWithExitCode implements the same method as documented on internalwasm.ModuleEngine.
+func (me *mockModuleEngine) CloseWithExitCode(exitCode uint32) (bool, error) {
+	return true, nil
 }
 
 func TestStore_getTypeInstance(t *testing.T) {
