@@ -196,3 +196,20 @@ means that we have 1 GiB size of slice which seems large enough for most applica
 ## JIT engine implementation
 
 See [wasm/jit/RATIONALE.md](internal/wasm/jit/RATIONALE.md).
+
+## Golang patterns
+
+### Lock-free, cross-goroutine observations of updates
+
+How to achieve cross-goroutine reads of a variable are not explicitly defined in https://go.dev/ref/mem. wazero uses
+atomics to implement this following unofficial practice. For example, a `Close` operation can be guarded to happen only
+once via compare-and-swap (CAS) against a zero value. When we use this pattern, we consistently use atomics to both
+read and update the same numeric field.
+
+In lieu of formal documentation, we infer this pattern works from other sources (besides tests):
+ * `sync.WaitGroup` by definition must support calling `Add` from other goroutines. Internally, it uses atomics.
+ * rsc in golang/go#5045 writes "atomics guarantee sequential consistency among the atomic variables".
+
+See https://github.com/golang/go/blob/011fd002457da0823da5f06b099fcf6e21444b00/src/sync/waitgroup.go#L64
+See https://github.com/golang/go/issues/5045#issuecomment-252730563
+See https://www.youtube.com/watch?v=VmrEG-3bWyM
