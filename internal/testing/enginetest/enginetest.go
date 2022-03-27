@@ -28,31 +28,31 @@ import (
 )
 
 func RunTestModuleEngine_Call(t *testing.T, newEngine func() wasm.Engine) {
-	i64 := wasm.ValueTypeI64
-
-	module := newModuleInstance(t.Name())
-	fn := &wasm.FunctionInstance{
-		Name:   "fn",
-		Kind:   wasm.FunctionKindWasm,
-		Type:   &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
-		Body:   []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd},
-		Module: module,
-		Index:  0,
-		TypeID: 0,
-	}
-	module.Functions = []*wasm.FunctionInstance{fn}
-
-	// Use exported functions to simplify instantiation of a Wasm function
 	e := newEngine()
+
+	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
+	i64 := wasm.ValueTypeI64
+	fn := &wasm.FunctionInstance{
+		Name: "fn",
+		Kind: wasm.FunctionKindWasm,
+		Type: &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
+		Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd},
+	}
+
+	// To use the function, we first need to add it to a module.
+	module := &wasm.ModuleInstance{Name: t.Name()}
+	addFunction(module, fn)
+
+	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
-
-	// Note: While, we use `me` directly, we set module.Engine to avoid a JIT segfault on moduleInstanceEngineOffset.
-	module.Engine = me
 	defer me.Close()
 
-	// ensure base case doesn't fail
-	results, err := me.Call(module.Ctx, fn, 3)
+	// Create a call context which links the module to the module-engine compiled from it.
+	ctx := newModuleContext(module, me)
+
+	// Ensure the base case doesn't fail: A single parameter should work as that matches the function signature.
+	results, err := me.Call(ctx, fn, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
 
@@ -208,8 +208,22 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, newEngine func() wasm.Engine)
 	})
 }
 
-func newModuleInstance(name string) *wasm.ModuleInstance {
-	module := &wasm.ModuleInstance{Name: name}
-	module.Ctx = wasm.NewModuleContext(context.Background(), nil, module, nil)
-	return module
+// addFunction assigns and adds a function to the module.
+func addFunction(module *wasm.ModuleInstance, fn *wasm.FunctionInstance) {
+	module.Functions = append(module.Functions, fn)
+	// This link is essential for all engines. For example, functions call other functions defined in the same module.
+	fn.Module = module
+}
+
+// newModuleContext creates an internalwasm.ModuleContext for unit tests.
+//
+// Note: This sets fields that are not needed in the interpreter, but are required by code compiled by JIT. If a new
+// test here passes in the interpreter and segmentation faults in JIT, check for a new field offset or a change in JIT
+// (ex. jit.TestVerifyOffsetValue). It is possible for all other tests to pass as that field is implicitly set by
+// internalwasm.Store: store isn't used here for unit test precision.
+func newModuleContext(module *wasm.ModuleInstance, engine wasm.ModuleEngine) *wasm.ModuleContext {
+	// moduleInstanceEngineOffset
+	module.Engine = engine
+	// callEngineModuleContextModuleInstanceAddressOffset
+	return wasm.NewModuleContext(context.Background(), nil, module, nil)
 }
