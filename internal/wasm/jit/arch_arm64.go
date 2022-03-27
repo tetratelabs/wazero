@@ -23,10 +23,10 @@ type archContext struct {
 
 	// minimum32BitSignedInt is used for overflow check for 32-bit signed division.
 	// Note: this can be obtained by moving $1 and doing left-shift with 31, but it is
-	// slower than directly loading fron this location.
+	// slower than directly loading from this location.
 	minimum32BitSignedInt int32
 	// Note: this can be obtained by moving $1 and doing left-shift with 63, but it is
-	// slower than directly loading fron this location.
+	// slower than directly loading from this location.
 	// minimum64BitSignedInt is used for overflow check for 64-bit signed division.
 	minimum64BitSignedInt int64
 }

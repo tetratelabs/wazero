@@ -68,8 +68,8 @@ func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
 	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, initTable, NewEngine)
 }
 
-func TestEngine_Call(t *testing.T) {
-	enginetest.RunTestEngine_Call(t, NewEngine)
+func TestModuleEngine_Call(t *testing.T) {
+	enginetest.RunTestModuleEngine_Call(t, NewEngine)
 }
 
 func TestTestModuleEngine_Call_HostFn(t *testing.T) {

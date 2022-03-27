@@ -112,9 +112,9 @@ func TestEngine_NewModuleEngine(t *testing.T) {
 	})
 }
 
-func TestEngine_Call(t *testing.T) {
+func TestModuleEngine_Call(t *testing.T) {
 	requireSupportedOSArch(t)
-	enginetest.RunTestEngine_Call(t, NewEngine)
+	enginetest.RunTestModuleEngine_Call(t, NewEngine)
 }
 
 func TestEngine_NewModuleEngine_InitTable(t *testing.T) {

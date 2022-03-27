@@ -2,15 +2,18 @@
 // functions is less burden than copy/pasting the implementations, while still allowing test caching to operate.
 //
 // Ex. In simplest case, dispatch:
-//	func TestEngine_Call(t *testing.T) {
-//		enginetest.RunTestEngine_Call(t, NewEngine)
+//	func TestModuleEngine_Call(t *testing.T) {
+//		enginetest.RunTestModuleEngine_Call(t, NewEngine)
 //	}
 //
 // Ex. Some tests using the JIT Engine may need to guard as they use compiled features:
-//	func TestEngine_Call(t *testing.T) {
+//	func TestModuleEngine_Call(t *testing.T) {
 //		requireSupportedOSArch(t)
-//		enginetest.RunTestEngine_Call(t, NewEngine)
+//		enginetest.RunTestModuleEngine_Call(t, NewEngine)
 //	}
+//
+// Note: These tests intentionally avoid using internalwasm.Store as it is important to know both the dependencies and
+// the capabilities at the internalwasm.Engine abstraction.
 package enginetest
 
 import (
@@ -24,36 +27,42 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
-func RunTestEngine_Call(t *testing.T, newEngine func() wasm.Engine) {
+func RunTestModuleEngine_Call(t *testing.T, newEngine func() wasm.Engine) {
 	i64 := wasm.ValueTypeI64
-	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
-		FunctionSection: []wasm.Index{wasm.Index(0)},
-		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
-		ExportSection:   map[string]*wasm.Export{"fn": {Type: wasm.ExternTypeFunc, Index: 0, Name: "fn"}},
+
+	module := newModuleInstance(t.Name())
+	fn := &wasm.FunctionInstance{
+		Name:   "fn",
+		Kind:   wasm.FunctionKindWasm,
+		Type:   &wasm.FunctionType{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}},
+		Body:   []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd},
+		Module: module,
+		Index:  0,
+		TypeID: 0,
 	}
+	module.Functions = []*wasm.FunctionInstance{fn}
 
 	// Use exported functions to simplify instantiation of a Wasm function
 	e := newEngine()
-	store := wasm.NewStore(e, wasm.Features20191205)
-	mod, err := store.Instantiate(context.Background(), m, t.Name(), nil)
+	me, err := e.NewModuleEngine(module.Name, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
 
-	fn := mod.ExportedFunction("fn")
-	require.NotNil(t, fn)
+	// Note: While, we use `me` directly, we set module.Engine to avoid a JIT segfault on moduleInstanceEngineOffset.
+	module.Engine = me
+	defer me.Close()
 
 	// ensure base case doesn't fail
-	results, err := fn.Call(nil, 3)
+	results, err := me.Call(module.Ctx, fn, 3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), results[0])
 
 	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := fn.Call(nil)
+		_, err := me.Call(module.Ctx, fn)
 		require.EqualError(t, err, "expected 1 params, but passed 0")
 	})
 
 	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := fn.Call(nil, 1, 2)
+		_, err := me.Call(module.Ctx, fn, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
 }
@@ -172,9 +181,12 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, newEngine func() wasm.Engine)
 			Results: []wasm.ValueType{wasm.ValueTypeI64},
 		},
 		Module: module,
+		Index:  0,
 	}
+	module.Types = []*wasm.TypeInstance{{Type: f.Type}}
+	module.Functions = []*wasm.FunctionInstance{f}
 
-	me, err := e.NewModuleEngine(t.Name(), nil, []*wasm.FunctionInstance{f}, nil, nil)
+	me, err := e.NewModuleEngine(t.Name(), nil, module.Functions, nil, nil)
 	require.NoError(t, err)
 
 	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
@@ -194,4 +206,10 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, newEngine func() wasm.Engine)
 		_, err := me.Call(modCtx, f, 1, 2)
 		require.EqualError(t, err, "expected 1 params, but passed 2")
 	})
+}
+
+func newModuleInstance(name string) *wasm.ModuleInstance {
+	module := &wasm.ModuleInstance{Name: name}
+	module.Ctx = wasm.NewModuleContext(context.Background(), nil, module, nil)
+	return module
 }

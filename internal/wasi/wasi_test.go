@@ -2190,8 +2190,9 @@ func instantiateModule(t *testing.T, ctx context.Context, wasiFunction, wasiImpo
 	// Double-check what we created passes same validity as module-defined modules.
 	require.NoError(t, m.Validate(enabledFeatures))
 
-	_, err = store.Instantiate(ctx, m, m.NameSection.ModuleName, nil) // TODO: close
+	w, err := store.Instantiate(ctx, m, m.NameSection.ModuleName, nil)
 	require.NoError(t, err)
+	defer w.Close()
 
 	m, err = text.DecodeModule([]byte(fmt.Sprintf(`(module
   %[2]s

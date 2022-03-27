@@ -484,7 +484,7 @@ func (m *Module) buildFunctions() (functions []*FunctionInstance) {
 			Type:       m.TypeSection[typeIndex],
 			Body:       m.CodeSection[codeIndex].Body,
 			LocalTypes: m.CodeSection[codeIndex].LocalTypes,
-			Index:      Index(importCount + uint32(codeIndex)),
+			Index:      importCount + uint32(codeIndex),
 		}
 		functions = append(functions, f)
 	}
