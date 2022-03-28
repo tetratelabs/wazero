@@ -150,16 +150,7 @@ type interpreterOp struct {
 	rs     []*wazeroir.InclusiveRange
 }
 
-// Close implements io.Closer
-func (me *moduleEngine) Close() (err error) {
-	// Release all the function instances declared in this module.
-	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
-		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
-	}
-	return
-}
-
-// NewModuleEngine implements internalwasm.Engine NewModuleEngine
+// NewModuleEngine implements the same method as documented on internalwasm.Engine.
 func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
 		name:                   name,
@@ -181,14 +172,14 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 		if f.Kind == wasm.FunctionKindWasm {
 			ir, err := wazeroir.Compile(f)
 			if err != nil {
-				me.Close()
+				me.doClose() // safe because the reference to me was never leaked.
 				// TODO(Adrian): extract Module.funcDesc so that errors here have more context
 				return nil, fmt.Errorf("function[%d/%d] failed to lower to wazeroir: %w", i, len(moduleFunctions)-1, err)
 			}
 
 			compiled, err = e.lowerIROps(f, ir.Operations)
 			if err != nil {
-				me.Close()
+				me.doClose() // safe because the reference to me was never leaked.
 				return nil, fmt.Errorf("function[%d/%d] failed to convert wazeroir operations: %w", i, len(moduleFunctions)-1, err)
 			}
 		} else {
@@ -491,7 +482,12 @@ func (e *engine) lowerIROps(f *wasm.FunctionInstance,
 	return ret, nil
 }
 
-// Call implements internalwasm.ModuleEngine Call.
+// Name implements the same method as documented on internalwasm.ModuleEngine.
+func (me *moduleEngine) Name() string {
+	return me.name
+}
+
+// Call implements the same method as documented on internalwasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	compiled := me.compiledFunctions[f.Index]
 	if compiled == nil {
@@ -1568,4 +1564,17 @@ func (ce *callEngine) callNativeFunc(ctx *wasm.ModuleContext, f *compiledFunctio
 		}
 	}
 	ce.popFrame()
+}
+
+// Close implements the same method as documented on internalwasm.ModuleEngine.
+func (me *moduleEngine) Close() error {
+	me.doClose()
+	return nil
+}
+
+// doClose releases all the function instances declared in this module.
+func (me *moduleEngine) doClose() {
+	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+		me.parentEngine.deleteCompiledFunction(cf.funcInstance)
+	}
 }

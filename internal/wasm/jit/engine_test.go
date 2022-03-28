@@ -6,7 +6,6 @@ import (
 	"math"
 	"runtime"
 	"strconv"
-	"sync"
 	"testing"
 	"unsafe"
 
@@ -99,39 +98,42 @@ func TestVerifyOffsetValue(t *testing.T) {
 	require.Equal(t, int(unsafe.Offsetof(eface.data)), interfaceDataOffset)
 }
 
+// et is used for tests defined in the enginetest package.
+var et = &engineTester{}
+
+type engineTester struct{}
+
+func (e *engineTester) NewEngine() wasm.Engine {
+	return newEngine()
+}
+
+func (e *engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
+	table := make([]interface{}, initTableLen)
+	internal := me.(*moduleEngine)
+	for idx, fnidx := range initTableIdxToFnIdx {
+		table[idx] = internal.compiledFunctions[fnidx]
+	}
+	return table
+}
+
 func TestEngine_NewModuleEngine(t *testing.T) {
 	requireSupportedOSArch(t)
+	enginetest.RunTestEngine_NewModuleEngine(t, et)
+}
 
-	e := NewEngine()
-
-	t.Run("sets module name", func(t *testing.T) {
-		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
-		require.NoError(t, err)
-		defer me.Close()
-		require.Equal(t, t.Name(), me.(*moduleEngine).name)
-	})
+func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
+	requireSupportedOSArch(t)
+	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
 func TestModuleEngine_Call(t *testing.T) {
 	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngine_Call(t, NewEngine)
-}
-
-func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
-	initTable := func(me wasm.ModuleEngine, tableInitLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
-		table := make([]interface{}, tableInitLen)
-		internal := me.(*moduleEngine)
-		for idx, fnidx := range initTableIdxToFnIdx {
-			table[idx] = internal.compiledFunctions[fnidx]
-		}
-		return table
-	}
-	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, initTable, NewEngine)
+	enginetest.RunTestModuleEngine_Call(t, et)
 }
 
 func TestTestModuleEngine_Call_HostFn(t *testing.T) {
 	requireSupportedOSArch(t)
-	enginetest.RunTestModuleEngine_Call_HostFn(t, NewEngine)
+	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
 func requireSupportedOSArch(t *testing.T) {
@@ -142,7 +144,7 @@ func requireSupportedOSArch(t *testing.T) {
 
 func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
-		e := newEngine()
+		e := et.NewEngine()
 		_, err := e.NewModuleEngine(
 			t.Name(),
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
@@ -154,7 +156,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 	})
 
 	t.Run("release on compilation error", func(t *testing.T) {
-		e := newEngine()
+		e := et.NewEngine().(*engine)
 
 		importedFunctions := []*wasm.FunctionInstance{
 			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
@@ -186,28 +188,96 @@ func TestEngineCompile_Errors(t *testing.T) {
 	})
 }
 
-var fakeFinalizer = func(obj interface{}, finalizer interface{}) {
+type fakeFinalizer map[*compiledFunction]func(*compiledFunction)
+
+func (f fakeFinalizer) setFinalizer(obj interface{}, finalizer interface{}) {
 	cf := obj.(*compiledFunction)
-	fn := finalizer.(func(compiledFn *compiledFunction))
-	fn(cf)
+	if _, ok := f[cf]; ok { // easier than adding a field for testing.T
+		panic(fmt.Sprintf("BUG: %v already had its finalizer set", cf))
+	}
+	f[cf] = finalizer.(func(*compiledFunction))
 }
 
-// TestModuleEngine_Close_Panic tests that an unexpected panic has some identifying information in it.
-func TestModuleEngine_Close_Panic(t *testing.T) {
-	e := newEngine()
-	me := &moduleEngine{
-		name: t.Name(),
-		compiledFunctions: []*compiledFunction{
-			{codeSegment: []byte{wasm.OpcodeEnd} /* invalid because not compiled */},
-		},
-		parentEngine: e,
+func TestNewModuleEngine_CompiledFunctions(t *testing.T) {
+	newFunctionInstance := func(id int) *wasm.FunctionInstance {
+		return &wasm.FunctionInstance{
+			Name:   strconv.Itoa(id),
+			Type:   &wasm.FunctionType{},
+			Body:   []byte{wasm.OpcodeEnd},
+			Module: &wasm.ModuleInstance{},
+		}
 	}
 
+	e := et.NewEngine().(*engine)
+
+	importedFinalizer := fakeFinalizer{}
+	e.setFinalizer = importedFinalizer.setFinalizer
+
+	importedFunctions := []*wasm.FunctionInstance{
+		newFunctionInstance(10),
+		newFunctionInstance(20),
+	}
+	modE, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
+	require.NoError(t, err)
+	defer modE.Close()
+	imported := modE.(*moduleEngine)
+
+	importingFinalizer := fakeFinalizer{}
+	e.setFinalizer = importingFinalizer.setFinalizer
+
+	moduleFunctions := []*wasm.FunctionInstance{
+		newFunctionInstance(100),
+		newFunctionInstance(200),
+		newFunctionInstance(300),
+	}
+
+	modE, err = e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, nil, nil)
+	require.NoError(t, err)
+	defer modE.Close()
+	importing := modE.(*moduleEngine)
+
+	// Ensure the importing module didn't try to finalize the imported functions.
+	require.Equal(t, len(importedFunctions), len(imported.compiledFunctions))
+	for _, f := range importedFunctions {
+		require.Contains(t, e.compiledFunctions, f)
+		cf := e.compiledFunctions[f]
+		require.Contains(t, importedFinalizer, cf)
+		require.NotContains(t, importingFinalizer, cf)
+	}
+
+	// The importing module's compiled functions include ones it compiled (module-defined) and imported ones).
+	require.Equal(t, len(importedFunctions)+len(moduleFunctions), len(importing.compiledFunctions))
+
+	// Ensure the importing module only tried to finalize its own functions.
+	for _, f := range moduleFunctions {
+		require.Contains(t, e.compiledFunctions, f)
+		cf := e.compiledFunctions[f]
+		require.NotContains(t, importedFinalizer, cf)
+		require.Contains(t, importingFinalizer, cf)
+	}
+
+	// Pretend the finalizer executed, by invoking them one-by-one.
+	for k, v := range importingFinalizer {
+		v(k)
+	}
+	for k, v := range importedFinalizer {
+		v(k)
+	}
+	for _, f := range e.compiledFunctions {
+		require.Nil(t, f.codeSegment) // Set to nil if the correct finalizer was associated.
+	}
+}
+
+// TestReleaseCompiledFunction_Panic tests that an unexpected panic has some identifying information in it.
+func TestReleaseCompiledFunction_Panic(t *testing.T) {
 	// capturePanic because there's no require.PanicsWithErrorPrefix
 	errMessage := capturePanic(func() {
-		me.doClose(fakeFinalizer)
+		releaseCompiledFunction(&compiledFunction{
+			codeSegment: []byte{wasm.OpcodeEnd},                                                         // never compiled means it was never mapped.
+			source:      &wasm.FunctionInstance{Index: 2, Module: &wasm.ModuleInstance{Name: t.Name()}}, // for error string
+		})
 	})
-	require.Contains(t, errMessage.Error(), "jit: failed to munmap code segment for TestModuleEngine_Close_Panic.function[0]:")
+	require.Contains(t, errMessage.Error(), "jit: failed to munmap code segment for TestReleaseCompiledFunction_Panic.function[2]:")
 }
 
 // capturePanic returns an error recovered from a panic
@@ -223,7 +293,7 @@ func capturePanic(panics func()) (err error) {
 	return
 }
 
-func TestModuleEngine_Close_Concurrent(t *testing.T) {
+func TestModuleEngine_Close(t *testing.T) {
 	newFunctionInstance := func(id int) *wasm.FunctionInstance {
 		return &wasm.FunctionInstance{
 			Name: strconv.Itoa(id), Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}}
@@ -249,8 +319,8 @@ func TestModuleEngine_Close_Concurrent(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			e := newEngine()
-			var importedModuleEngine *moduleEngine
+			e := et.NewEngine().(*engine)
+			var imported *moduleEngine
 			if len(tc.importedFunctions) > 0 {
 				// Instantiate the imported module
 				modEngine, err := e.NewModuleEngine(
@@ -261,11 +331,11 @@ func TestModuleEngine_Close_Concurrent(t *testing.T) {
 					nil, // tableInit
 				)
 				require.NoError(t, err)
-				importedModuleEngine = modEngine.(*moduleEngine)
-				require.Len(t, importedModuleEngine.compiledFunctions, len(tc.importedFunctions))
+				imported = modEngine.(*moduleEngine)
+				require.Len(t, imported.compiledFunctions, len(tc.importedFunctions))
 			}
 
-			modEngine, err := e.NewModuleEngine(
+			importing, err := e.NewModuleEngine(
 				fmt.Sprintf("%s - module-defined functions", t.Name()),
 				tc.importedFunctions,
 				tc.moduleFunctions,
@@ -273,58 +343,41 @@ func TestModuleEngine_Close_Concurrent(t *testing.T) {
 				nil, // tableInit
 			)
 			require.NoError(t, err)
-			require.Len(t, modEngine.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
+			require.Len(t, importing.(*moduleEngine).compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions)+len(tc.moduleFunctions))
 
-			var importedMappedRegions [][]byte
 			for _, f := range tc.importedFunctions {
 				require.Contains(t, e.compiledFunctions, f)
-				importedMappedRegions = append(importedMappedRegions, e.compiledFunctions[f].codeSegment)
 			}
-			var mappedRegions [][]byte
 			for _, f := range tc.moduleFunctions {
 				require.Contains(t, e.compiledFunctions, f)
-				mappedRegions = append(mappedRegions, e.compiledFunctions[f].codeSegment)
 			}
 
-			const goroutines = 100
-			var wg sync.WaitGroup
-			wg.Add(goroutines)
-			for i := 0; i < goroutines; i++ {
-				go func() {
-					defer wg.Done()
+			err = importing.Close()
+			require.NoError(t, err)
 
-					// Ensure concurrent multiple execution of Close is guarded by atomic without overloading finalizer.
-					modEngine.(*moduleEngine).doClose(fakeFinalizer)
-				}()
-			}
-			wg.Wait()
+			// Closing should flip the status bit, so that it cannot be closed again.
+			require.Equal(t, uint64(1), importing.(*moduleEngine).closed)
 
-			require.True(t, modEngine.(*moduleEngine).closed == 1)
+			// Closing the importing module shouldn't delete the imported functions from the engine.
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
 			for _, f := range tc.importedFunctions {
 				require.Contains(t, e.compiledFunctions, f)
 			}
+
+			// However, closing the importing module should delete its own functions from the engine.
 			for i, f := range tc.moduleFunctions {
 				require.NotContains(t, e.compiledFunctions, f, i)
 			}
 
-			for _, mappedRegion := range mappedRegions {
-				// munmap twice should result in error.
-				err = munmapCodeSegment(mappedRegion)
-				require.Error(t, err)
-			}
-
 			if len(tc.importedFunctions) > 0 {
-				importedModuleEngine.doClose(fakeFinalizer)
-
-				for _, mappedRegion := range importedMappedRegions {
-					// munmap twice should result in error.
-					err = munmapCodeSegment(mappedRegion)
-					require.Error(t, err)
-				}
+				err = imported.Close()
+				require.NoError(t, err)
 			}
+
+			// When all modules are closed, the engine should be empty.
+			require.Empty(t, e.compiledFunctions)
 		})
 	}
 }
@@ -351,7 +404,7 @@ func TestSliceAllocatedOnHeap(t *testing.T) {
 		}
 		growGoroutineStack()
 
-		// Trigger relocation of goroutine stack because at this point we have majority of
+		// Trigger relocation of goroutine stack because at this point we have the majority of
 		// goroutine stack unused after recursive call.
 		runtime.GC()
 	}})

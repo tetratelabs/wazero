@@ -21,6 +21,8 @@ type (
 	engine struct {
 		compiledFunctions map[*wasm.FunctionInstance]*compiledFunction // guarded by mutex.
 		mux               sync.RWMutex
+		// setFinalizer defaults to runtime.SetFinalizer, but overridable for tests.
+		setFinalizer func(obj interface{}, finalizer interface{})
 	}
 
 	// moduleEngine implements internalwasm.ModuleEngine
@@ -38,10 +40,13 @@ type (
 		parentEngine           *engine
 		importedFunctionCounts int
 
-		// Closed indicates whether Close was called for this moduleEngine, and used to prevent
-		// double-free of compiledFunctions.
-		// Note: intentionally use uint32 instead of bool for atomic operation.
-		closed uint32
+		// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
+		//
+		// The update value is 1 + exitCode << 32. This ensures an exit code of zero isn't mistaken for never closed.
+		//
+		// Note: Exclusively reading and updating this with atomics guarantees cross-goroutine observations.
+		// See /RATIONALE.md
+		closed uint64
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
@@ -171,7 +176,7 @@ type (
 
 		// Pre-calculated pointer pointing to the initial byte of .codeSegment slice.
 		// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
-		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field
+		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
 		// so we don't need to repeat the calculation on each function call.
 		codeInitialAddress uintptr
 		// The max of the stack pointer this function can reach. Lazily applied via maybeGrowValueStack.
@@ -332,7 +337,24 @@ func (c *callFrame) String() string {
 	)
 }
 
-// NewModuleEngine implements internalwasm.Engine NewModuleEngine
+// releaseCompiledFunction is a runtime.SetFinalizer function that munmaps the compiledFunction.codeSegment.
+func releaseCompiledFunction(compiledFn *compiledFunction) {
+	codeSegment := compiledFn.codeSegment
+	if codeSegment == nil {
+		return // already released
+	}
+
+	// Setting this to nil allows tests to know the correct finalizer function was called.
+	compiledFn.codeSegment = nil
+	if err := munmapCodeSegment(codeSegment); err != nil {
+		// munmap failure cannot recover, and happen asynchronously on the finalizer thread. While finalizer
+		// functions can return errors, they are ignored. To make these visible for troubleshooting, we panic
+		// with additional context. module+funcidx should be enough, but if not, we can add more later.
+		panic(fmt.Errorf("jit: failed to munmap code segment for %s.function[%d]: %w", compiledFn.source.Module.Name, compiledFn.source.Index, err))
+	}
+}
+
+// NewModuleEngine implements the same method as documented on internalwasm.Engine.
 func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
 	imported := len(importedFunctions)
 	me := &moduleEngine{
@@ -359,9 +381,14 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 			compiled, err = compileHostFunction(f)
 		}
 		if err != nil {
-			me.Close()
+			me.doClose() // safe because the reference to me was never leaked.
 			return nil, fmt.Errorf("function[%d/%d] %w", i, len(moduleFunctions)-1, err)
 		}
+
+		// As this uses mmap, we need a finalizer in case moduleEngine.Close was never called. Regardless, we need a
+		// finalizer due to how moduleEngine.doClose is implemented.
+		e.setFinalizer(compiled, releaseCompiledFunction)
+
 		me.compiledFunctions = append(me.compiledFunctions, compiled)
 
 		// Add the compiled function to the store-wide engine as well so that
@@ -375,20 +402,16 @@ func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions
 	return me, nil
 }
 
-// Close implements io.Closer
-func (me *moduleEngine) Close() (err error) {
-	me.doClose(runtime.SetFinalizer) // extracted for testability
-	return
-}
-
-// doClose is currently guarded with CAS to only be called once. There is a race-condition inside the
-// critical section: functions are removed from the parent engine, but there's no guard to prevent this
+// doClose is guarded by the caller with CAS, which means it happens only once. However, there is a race-condition
+// inside the critical section: functions are removed from the parent engine, but there's no guard to prevent this
 // moduleInstance from making new calls. This means at inside the critical section there could be in-flight calls,
 // and even after it new calls can be made, given a reference to this moduleEngine.
 //
-// To ensure neither in-flight, nor new calls segfault due to missing code segment, memory isn't unmapped here.
-// Rather, it is added to the finalizer queue to be done at some point (perhaps never). This needs to eventually be
-// as close leaks resources until cleaned up by the finalizer which by docs may never be run.
+// To ensure neither in-flight, nor new calls segfault due to missing code segment, memory isn't unmapped here. So, this
+// relies on the fact that NewModuleEngine already added a finalizer for each compiledFunction,
+//
+// Note that the finalizer is a queue of work to be done at some point (perhaps never). In worst case, the finalizer
+// doesn't run and functions in already closed modules retain memory until exhaustion.
 //
 // Potential future design (possibly faulty, so expect impl to be more complete or better):
 //  * Change this to implement io.Closer and document this is blocking
@@ -402,26 +425,11 @@ func (me *moduleEngine) Close() (err error) {
 //    * Knowing which in-flight calls from other modules, that can use this module may be tricky
 //    * Pure wasm functions can be left to complete.
 //    * Host functions are the only unknowns (ex can do I/O) so they may need to be tracked.
-func (me *moduleEngine) doClose(setFinalizer func(obj interface{}, finalizer interface{})) {
-	// Setting finalizer multiple times result in panic, so we guard with CAS.
-	if atomic.CompareAndSwapUint32(&me.closed, 0, 1) {
-		moduleName := me.name // pin to avoid leaking moduleEngine on any finalizer error.
-
-		// Release all the function instances declared in this module.
-		for i, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
-			funcIdx := wasm.Index(i) // pin for any finalizer error
-
-			setFinalizer(cf, func(compiledFn *compiledFunction) {
-				if err := munmapCodeSegment(compiledFn.codeSegment); err != nil {
-
-					// munmap failure cannot recover, and it happens asynchronously. Add context for troubleshooting.
-					// module+funcidx should be enough, but if not, we can later propagate the func name.
-					err = fmt.Errorf("jit: failed to munmap code segment for %s.function[%d]: %w", moduleName, funcIdx, err)
-					panic(err)
-				}
-			})
-			me.parentEngine.deleteCompiledFunction(cf.source)
-		}
+func (me *moduleEngine) doClose() {
+	// Release all the function instances declared in this module.
+	for _, cf := range me.compiledFunctions[me.importedFunctionCounts:] {
+		// NOTE: we still rely on the finalizer of cf until the notes on this function are addressed.
+		me.parentEngine.deleteCompiledFunction(cf.source)
 	}
 }
 
@@ -444,7 +452,12 @@ func (e *engine) getCompiledFunction(f *wasm.FunctionInstance) (cf *compiledFunc
 	return
 }
 
-// Call implements internalwasm.ModuleEngine Call
+// Name implements the same method as documented on internalwasm.ModuleEngine.
+func (me *moduleEngine) Name() string {
+	return me.name
+}
+
+// Call implements the same method as documented on internalwasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
 	compiled := me.compiledFunctions[f.Index]
 	if compiled == nil {
@@ -509,12 +522,24 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	return
 }
 
+// Close implements the same method as documented on internalwasm.ModuleEngine.
+func (me *moduleEngine) Close() error {
+	if !atomic.CompareAndSwapUint64(&me.closed, 0, 1) {
+		return nil
+	}
+	me.doClose()
+	return nil
+}
+
 func NewEngine() wasm.Engine {
 	return newEngine()
 }
 
 func newEngine() *engine {
-	return &engine{compiledFunctions: map[*wasm.FunctionInstance]*compiledFunction{}}
+	return &engine{
+		compiledFunctions: map[*wasm.FunctionInstance]*compiledFunction{},
+		setFinalizer:      runtime.SetFinalizer,
+	}
 }
 
 // Do not make these variables as constants, otherwise there would be
