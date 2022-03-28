@@ -20,12 +20,15 @@ type Engine interface {
 
 // ModuleEngine implements function calls for a given module.
 type ModuleEngine interface {
-	// Closer releases the resources allocated by functions in this ModuleEngine.
-	io.Closer
-	// ^^ io.Closer not due to I/O, but to allow future static analysis to catch leaks (unclosed Closers).
+	// Name returns the name of the module this engine was compiled for.
+	Name() string
 
 	// Call invokes a function instance f with given parameters.
 	// Returns the results from the function.
 	// The ctx's context.Context will be the outer-most ancestor of the argument to wasm.Function.
 	Call(ctx *ModuleContext, f *FunctionInstance, params ...uint64) (results []uint64, err error)
+
+	// Closer releases the resources allocated by functions in this ModuleEngine.
+	io.Closer
+	// ^^ io.Closer not due to I/O, but to allow future static analysis to catch leaks (unclosed Closers).
 }

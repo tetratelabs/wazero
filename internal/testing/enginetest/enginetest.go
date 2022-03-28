@@ -27,8 +27,24 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
-func RunTestModuleEngine_Call(t *testing.T, newEngine func() wasm.Engine) {
-	e := newEngine()
+type EngineTester interface {
+	NewEngine() wasm.Engine
+	InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{}
+}
+
+func RunTestEngine_NewModuleEngine(t *testing.T, et EngineTester) {
+	e := et.NewEngine()
+
+	t.Run("sets module name", func(t *testing.T) {
+		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
+		require.NoError(t, err)
+		defer closeModuleEngine(t, me)
+		require.Equal(t, t.Name(), me.Name())
+	})
+}
+
+func RunTestModuleEngine_Call(t *testing.T, et EngineTester) {
+	e := et.NewEngine()
 
 	// Define a basic function which defines one parameter. This is used to test results when incorrect arity is used.
 	i64 := wasm.ValueTypeI64
@@ -46,7 +62,7 @@ func RunTestModuleEngine_Call(t *testing.T, newEngine func() wasm.Engine) {
 	// Compile the module
 	me, err := e.NewModuleEngine(module.Name, nil, module.Functions, nil, nil)
 	require.NoError(t, err)
-	defer me.Close()
+	defer closeModuleEngine(t, me)
 
 	// Create a call context which links the module to the module-engine compiled from it.
 	ctx := newModuleContext(module, me)
@@ -67,8 +83,14 @@ func RunTestModuleEngine_Call(t *testing.T, newEngine func() wasm.Engine) {
 	})
 }
 
-func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, initTable func(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{}, newEngine func() wasm.Engine) {
-	e := newEngine()
+// closeModuleEngine allows unit tests to check `Close` didn't err.
+func closeModuleEngine(t *testing.T, me wasm.ModuleEngine) {
+	err := me.Close()
+	require.NoError(t, err)
+}
+
+func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, et EngineTester) {
+	e := et.NewEngine()
 
 	t.Run("no table elements", func(t *testing.T) {
 		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
@@ -79,7 +101,7 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, initTable func(me was
 		// Instantiate the module, which has nothing but an empty table.
 		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer me.Close()
+		defer closeModuleEngine(t, me)
 
 		// Since there are no elements to initialize, we expect the table to be nil.
 		require.Equal(t, table.Table, make([]interface{}, 2))
@@ -99,10 +121,10 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, initTable func(me was
 		// Instantiate the module whose table points to its own functions.
 		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer me.Close()
+		defer closeModuleEngine(t, me)
 
 		// The functions mapped to the table are defined in the same moduleEngine
-		require.Equal(t, table.Table, initTable(me, table.Min, tableInit))
+		require.Equal(t, table.Table, et.InitTable(me, table.Min, tableInit))
 	})
 
 	t.Run("imported function", func(t *testing.T) {
@@ -119,15 +141,15 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, initTable func(me was
 		// Imported functions are compiled before the importing module is instantiated.
 		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		defer imported.Close()
+		defer closeModuleEngine(t, imported)
 
 		// Instantiate the importing module, which is whose table is initialized.
 		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer imported.Close()
+		defer closeModuleEngine(t, importing)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
-		require.Equal(t, table.Table, initTable(importing, table.Min, tableInit))
+		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
 	})
 
 	t.Run("mixed functions", func(t *testing.T) {
@@ -149,19 +171,19 @@ func RunTestEngine_NewModuleEngine_InitTable(t *testing.T, initTable func(me was
 		// Imported functions are compiled before the importing module is instantiated.
 		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
 		require.NoError(t, err)
-		defer imported.Close()
+		defer closeModuleEngine(t, imported)
 
 		// Instantiate the importing module, which is whose table is initialized.
 		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
 		require.NoError(t, err)
-		defer importing.Close()
+		defer closeModuleEngine(t, importing)
 
 		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
-		require.Equal(t, table.Table, initTable(importing, table.Min, tableInit))
+		require.Equal(t, table.Table, et.InitTable(importing, table.Min, tableInit))
 	})
 }
 
-func RunTestModuleEngine_Call_HostFn(t *testing.T, newEngine func() wasm.Engine) {
+func RunTestModuleEngine_Call_HostFn(t *testing.T, et EngineTester) {
 	memory := &wasm.MemoryInstance{}
 	var ctxMemory publicwasm.Memory
 	hostFn := reflect.ValueOf(func(ctx publicwasm.Module, v uint64) uint64 {
@@ -169,7 +191,7 @@ func RunTestModuleEngine_Call_HostFn(t *testing.T, newEngine func() wasm.Engine)
 		return v
 	})
 
-	e := newEngine()
+	e := et.NewEngine()
 	module := &wasm.ModuleInstance{Memory: memory}
 	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module, nil)
 

@@ -45,35 +45,39 @@ func TestCallEngine_PushFrame_StackOverflow(t *testing.T) {
 	require.Panics(t, func() { vm.pushFrame(f4) })
 }
 
-func TestEngine_NewModuleEngine(t *testing.T) {
-	e := NewEngine()
+// et is used for tests defined in the enginetest package.
+var et = &engineTester{}
 
-	t.Run("sets module name", func(t *testing.T) {
-		me, err := e.NewModuleEngine(t.Name(), nil, nil, nil, nil)
-		require.NoError(t, err)
-		defer me.Close()
-		require.Equal(t, t.Name(), me.(*moduleEngine).name)
-	})
+type engineTester struct {
+}
+
+func (e engineTester) NewEngine() wasm.Engine {
+	return NewEngine()
+}
+
+func (e engineTester) InitTable(me wasm.ModuleEngine, initTableLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
+	table := make([]interface{}, initTableLen)
+	internal := me.(*moduleEngine)
+	for idx, fnidx := range initTableIdxToFnIdx {
+		table[idx] = internal.compiledFunctions[fnidx]
+	}
+	return table
+}
+
+func TestEngine_NewModuleEngine(t *testing.T) {
+	enginetest.RunTestEngine_NewModuleEngine(t, et)
 }
 
 func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
-	initTable := func(me wasm.ModuleEngine, tableInitLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
-		table := make([]interface{}, tableInitLen)
-		internal := me.(*moduleEngine)
-		for idx, fnidx := range initTableIdxToFnIdx {
-			table[idx] = internal.compiledFunctions[fnidx]
-		}
-		return table
-	}
-	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, initTable, NewEngine)
+	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, et)
 }
 
 func TestModuleEngine_Call(t *testing.T) {
-	enginetest.RunTestModuleEngine_Call(t, NewEngine)
+	enginetest.RunTestModuleEngine_Call(t, et)
 }
 
 func TestTestModuleEngine_Call_HostFn(t *testing.T) {
-	enginetest.RunTestModuleEngine_Call_HostFn(t, NewEngine)
+	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }
 
 func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
@@ -190,7 +194,7 @@ func TestCallEngine_callNativeFunc_signExtend(t *testing.T) {
 
 func TestEngineCompile_Errors(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
-		e := NewEngine().(*engine)
+		e := et.NewEngine().(*engine)
 		_, err := e.NewModuleEngine(t.Name(),
 			[]*wasm.FunctionInstance{{Module: &wasm.ModuleInstance{Name: "uncompiled"}, Name: "fn"}},
 			nil, // moduleFunctions
@@ -201,7 +205,7 @@ func TestEngineCompile_Errors(t *testing.T) {
 	})
 
 	t.Run("release on compilation error", func(t *testing.T) {
-		e := NewEngine().(*engine)
+		e := et.NewEngine().(*engine)
 
 		importedFunctions := []*wasm.FunctionInstance{
 			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
@@ -261,7 +265,7 @@ func TestClose(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			e := NewEngine().(*engine)
+			e := et.NewEngine().(*engine)
 			if len(tc.importedFunctions) > 0 {
 				// initialize the module-engine containing imported functions
 				me, err := e.NewModuleEngine(t.Name(), nil, tc.importedFunctions, nil, nil)
@@ -281,7 +285,8 @@ func TestClose(t *testing.T) {
 				require.Contains(t, e.compiledFunctions, f)
 			}
 
-			me.Close()
+			err = me.Close()
+			require.NoError(t, err)
 
 			require.Len(t, e.compiledFunctions, len(tc.importedFunctions))
 			for _, f := range tc.importedFunctions {

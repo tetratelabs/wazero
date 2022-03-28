@@ -3,6 +3,7 @@ package internalwasm
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -421,6 +422,7 @@ type mockEngine struct {
 }
 
 type mockModuleEngine struct {
+	name          string
 	ctx           *ModuleContext
 	callFailIndex int
 }
@@ -429,7 +431,7 @@ func newStore() *Store {
 	return NewStore(&mockEngine{shouldCompileFail: false, callFailIndex: -1}, Features20191205)
 }
 
-// NewModuleEngine implements Engine.NewModuleEngine
+// NewModuleEngine implements the same method as documented on internalwasm.Engine.
 func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *TableInstance, _ map[Index]Index) (ModuleEngine, error) {
 	if e.shouldCompileFail {
 		return nil, fmt.Errorf("some compilation error")
@@ -437,16 +439,22 @@ func (e *mockEngine) NewModuleEngine(_ string, _, _ []*FunctionInstance, _ *Tabl
 	return &mockModuleEngine{callFailIndex: e.callFailIndex}, nil
 }
 
-// Call implements ModuleEngine.Call
+// Name implements the same method as documented on internalwasm.ModuleEngine.
+func (e *mockModuleEngine) Name() string {
+	return e.name
+}
+
+// Call implements the same method as documented on internalwasm.ModuleEngine.
 func (e *mockModuleEngine) Call(ctx *ModuleContext, f *FunctionInstance, _ ...uint64) (results []uint64, err error) {
 	if e.callFailIndex >= 0 && f.Index == Index(e.callFailIndex) {
-		return nil, fmt.Errorf("call failed")
+		err = errors.New("call failed")
+		return
 	}
 	e.ctx = ctx
 	return
 }
 
-// Close implements io.Closer
+// Close implements the same method as documented on internalwasm.ModuleEngine.
 func (e *mockModuleEngine) Close() (err error) {
 	return
 }
