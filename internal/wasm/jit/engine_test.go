@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"reflect"
 	"runtime"
 	"strconv"
 	"sync"
@@ -13,8 +12,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tetratelabs/wazero/internal/testing/enginetest"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
-	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
 // Ensures that the offset consts do not drift when we manipulate the target structs.
@@ -113,191 +112,26 @@ func TestEngine_NewModuleEngine(t *testing.T) {
 	})
 }
 
-func TestEngine_Call(t *testing.T) {
+func TestModuleEngine_Call(t *testing.T) {
 	requireSupportedOSArch(t)
-
-	i64 := wasm.ValueTypeI64
-	m := &wasm.Module{
-		TypeSection:     []*wasm.FunctionType{{Params: []wasm.ValueType{i64}, Results: []wasm.ValueType{i64}}},
-		FunctionSection: []wasm.Index{wasm.Index(0)},
-		CodeSection:     []*wasm.Code{{Body: []byte{wasm.OpcodeLocalGet, 0, wasm.OpcodeEnd}}},
-		ExportSection:   map[string]*wasm.Export{"fn": {Type: wasm.ExternTypeFunc, Index: 0, Name: "fn"}},
-	}
-
-	// Use exported functions to simplify instantiation of a Wasm function
-	e := NewEngine()
-	store := wasm.NewStore(e, wasm.Features20191205)
-	mod, err := store.Instantiate(context.Background(), m, t.Name(), nil)
-	require.NoError(t, err)
-
-	fn := mod.ExportedFunction("fn")
-	require.NotNil(t, fn)
-
-	// ensure base case doesn't fail
-	results, err := fn.Call(nil, 3)
-	require.NoError(t, err)
-	require.Equal(t, uint64(3), results[0])
-
-	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := fn.Call(nil)
-		require.EqualError(t, err, "expected 1 params, but passed 0")
-	})
-
-	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := fn.Call(nil, 1, 2)
-		require.EqualError(t, err, "expected 1 params, but passed 2")
-	})
+	enginetest.RunTestModuleEngine_Call(t, NewEngine)
 }
 
 func TestEngine_NewModuleEngine_InitTable(t *testing.T) {
-	e := NewEngine()
-
-	t.Run("no table elements", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
-		var importedFunctions []*wasm.FunctionInstance
-		var moduleFunctions []*wasm.FunctionInstance
-		var tableInit map[wasm.Index]wasm.Index
-
-		// Instantiate the module, which has nothing but an empty table.
-		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
-		require.NoError(t, err)
-
-		// Since there are no elements to initialize, we expect the table to be nil.
-		require.Equal(t, table.Table, make([]interface{}, 2))
-
-		// Clean up.
-		require.NoError(t, me.Close())
-	})
-
-	t.Run("module-defined function", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
-		var importedFunctions []*wasm.FunctionInstance
-		moduleFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
+	initTable := func(me wasm.ModuleEngine, tableInitLen uint32, initTableIdxToFnIdx map[wasm.Index]wasm.Index) []interface{} {
+		table := make([]interface{}, tableInitLen)
+		internal := me.(*moduleEngine)
+		for idx, fnidx := range initTableIdxToFnIdx {
+			table[idx] = internal.compiledFunctions[fnidx]
 		}
-		tableInit := map[wasm.Index]wasm.Index{0: 2}
-
-		// Instantiate the module whose table points to its own functions.
-		me, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
-		require.NoError(t, err)
-
-		// The functions mapped to the table are defined in the same moduleEngine
-		require.Equal(t, table.Table, []interface{}{me.(*moduleEngine).compiledFunctions[2], nil})
-
-		// Clean up.
-		require.NoError(t, me.Close())
-	})
-
-	t.Run("imported function", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
-		importedFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-		}
-		var moduleFunctions []*wasm.FunctionInstance
-		tableInit := map[wasm.Index]wasm.Index{0: 2}
-
-		// Imported functions are compiled before the importing module is instantiated.
-		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
-		require.NoError(t, err)
-
-		// Instantiate the importing module, which is whose table is initialized.
-		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
-		require.NoError(t, err)
-
-		// A moduleEngine's compiled function slice includes its imports, so the offsets is absolute.
-		require.Equal(t, table.Table, []interface{}{importing.(*moduleEngine).compiledFunctions[2], nil})
-
-		// Clean up.
-		require.NoError(t, importing.Close())
-		require.NoError(t, imported.Close())
-	})
-
-	t.Run("mixed functions", func(t *testing.T) {
-		table := &wasm.TableInstance{Min: 2, Table: make([]interface{}, 2)}
-		importedFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-		}
-		moduleFunctions := []*wasm.FunctionInstance{
-			{Name: "1", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "2", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "3", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-			{Name: "4", Type: &wasm.FunctionType{}, Body: []byte{wasm.OpcodeEnd}, Module: &wasm.ModuleInstance{}},
-		}
-		tableInit := map[wasm.Index]wasm.Index{0: 0, 1: 4}
-
-		// Imported functions are compiled before the importing module is instantiated.
-		imported, err := e.NewModuleEngine(t.Name(), nil, importedFunctions, nil, nil)
-		require.NoError(t, err)
-
-		// Instantiate the importing module, which is whose table is initialized.
-		importing, err := e.NewModuleEngine(t.Name(), importedFunctions, moduleFunctions, table, tableInit)
-		require.NoError(t, err)
-
-		// A moduleEngine's compiled function slice includes its imports, so the offsets are absolute.
-		require.Equal(t, table.Table, []interface{}{
-			importing.(*moduleEngine).compiledFunctions[0],
-			importing.(*moduleEngine).compiledFunctions[4],
-		})
-
-		// Clean up.
-		require.NoError(t, importing.Close())
-		require.NoError(t, imported.Close())
-	})
+		return table
+	}
+	enginetest.RunTestEngine_NewModuleEngine_InitTable(t, initTable, NewEngine)
 }
 
-func TestEngine_Call_HostFn(t *testing.T) {
+func TestTestModuleEngine_Call_HostFn(t *testing.T) {
 	requireSupportedOSArch(t)
-
-	memory := &wasm.MemoryInstance{}
-	var ctxMemory publicwasm.Memory
-	hostFn := reflect.ValueOf(func(ctx publicwasm.Module, v uint64) uint64 {
-		ctxMemory = ctx.Memory()
-		return v
-	})
-
-	e := NewEngine()
-	module := &wasm.ModuleInstance{Memory: memory}
-	modCtx := wasm.NewModuleContext(context.Background(), wasm.NewStore(e, wasm.Features20191205), module, nil)
-
-	f := &wasm.FunctionInstance{
-		GoFunc: &hostFn,
-		Kind:   wasm.FunctionKindGoModule,
-		Type: &wasm.FunctionType{
-			Params:  []wasm.ValueType{wasm.ValueTypeI64},
-			Results: []wasm.ValueType{wasm.ValueTypeI64},
-		},
-		Module: module,
-	}
-
-	modEngine, err := e.NewModuleEngine(t.Name(), nil, []*wasm.FunctionInstance{f}, nil, nil)
-	require.NoError(t, err)
-
-	t.Run("defaults to module memory when call stack empty", func(t *testing.T) {
-		// When calling a host func directly, there may be no stack. This ensures the module's memory is used.
-		results, err := modEngine.Call(modCtx, f, 3)
-		require.NoError(t, err)
-		require.Equal(t, uint64(3), results[0])
-		require.Same(t, memory, ctxMemory)
-	})
-
-	t.Run("errs when not enough parameters", func(t *testing.T) {
-		_, err := modEngine.Call(modCtx, f)
-		require.EqualError(t, err, "expected 1 params, but passed 0")
-	})
-
-	t.Run("errs when too many parameters", func(t *testing.T) {
-		_, err := modEngine.Call(modCtx, f, 1, 2)
-		require.EqualError(t, err, "expected 1 params, but passed 2")
-	})
+	enginetest.RunTestModuleEngine_Call_HostFn(t, NewEngine)
 }
 
 func requireSupportedOSArch(t *testing.T) {

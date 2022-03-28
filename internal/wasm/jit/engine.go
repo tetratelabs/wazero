@@ -155,7 +155,8 @@ type (
 	// That is, callFrameTop().returnAddress or returnStackBasePointer are not set
 	// until it makes a function call.
 	callFrame struct {
-		// Set when making function call from this function frame, or for the initial function frame to call from engine.execWasmFunction.
+		// Set when making function call from this function frame, or for the initial function frame to call from
+		// callEngine.execWasmFunction.
 		returnAddress uintptr
 		// Set when making function call from this function frame.
 		returnStackBasePointer uint64

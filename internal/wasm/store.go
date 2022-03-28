@@ -305,7 +305,7 @@ func (s *Store) Instantiate(ctx context.Context, module *Module, name string, sy
 		return nil, err
 	}
 
-	// Plus we are ready to compile functions.
+	// Plus, we are ready to compile functions.
 	m.Engine, err = s.engine.NewModuleEngine(name, importedFunctions, functions, table, tableInit)
 	if err != nil {
 		return nil, fmt.Errorf("compilation failed: %w", err)
