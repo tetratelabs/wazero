@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
 	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -174,20 +174,17 @@ func TestStore_CloseModule(t *testing.T) {
 	}
 }
 
-func TestStore_concurrent(t *testing.T) {
+func TestStore_hammer(t *testing.T) {
 	const importedModuleName = "imported"
-	const goroutines = 1000
 
 	m, err := NewHostModule(importedModuleName, map[string]interface{}{"fn": func(wasm.Module) {}})
 	require.NoError(t, err)
 
-	var wg sync.WaitGroup
-
 	s := newStore()
-	_, err = s.Instantiate(context.Background(), m, importedModuleName, nil)
+	imported, err := s.Instantiate(context.Background(), m, importedModuleName, nil)
 	require.NoError(t, err)
 
-	hm, ok := s.modules[importedModuleName]
+	_, ok := s.modules[imported.module.Name]
 	require.True(t, ok)
 
 	importingModule := &Module{
@@ -202,29 +199,20 @@ func TestStore_concurrent(t *testing.T) {
 		},
 	}
 
-	// Concurrent instantiation.
-	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
-		go func(i int) {
-			defer wg.Done()
-			_, err := s.Instantiate(context.Background(), importingModule, strconv.Itoa(i), nil)
-			require.NoError(t, err)
-		}(i)
+	// Concurrent instantiate, close should test if locks work on the store. If they don't, we should see leaked modules
+	// after all of these complete, or an error raised.
+	hammer(t, func(p, n int) {
+		moduleName := fmt.Sprintf("%s:%d-%d", t.Name(), p, n)
+		_, instantiateErr := s.Instantiate(context.Background(), importingModule, moduleName, DefaultSysContext())
+		require.NoError(t, instantiateErr)
+		require.NoError(t, s.CloseModule(moduleName))
+	})
+	if t.Failed() {
+		return // At least one test failed, so return now.
 	}
-	wg.Wait()
 
-	// Concurrent release.
-	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
-		go func(i int) {
-			defer wg.Done()
-			require.NoError(t, s.CloseModule(strconv.Itoa(i)))
-			require.NoError(t, err)
-		}(i)
-	}
-	wg.Wait()
-
-	require.NoError(t, s.CloseModule(hm.Name))
+	// Close the imported module.
+	require.NoError(t, s.CloseModule(imported.module.Name))
 
 	// All instances are freed.
 	require.Len(t, s.modules, 0)
@@ -750,4 +738,39 @@ func TestModuleInstance_applyData(t *testing.T) {
 		{OffsetExpression: &ConstantExpression{Opcode: OpcodeI32Const, Data: []byte{0x8}}, Init: []byte{0x1, 0x5}},
 	})
 	require.Equal(t, []byte{0xa, 0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x5}, m.Memory.Buffer)
+}
+
+// hammer is a concurrency test described in /RATIONALE.md.
+func hammer(t *testing.T, test func(p, n int)) {
+	P := 8               // max count of goroutines
+	N := 1000            // work per goroutine
+	if testing.Short() { // Adjust down if `-test.short`
+		P = 4
+		N = 100
+	}
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(P / 2)) // Ensure goroutines have to switch cores.
+
+	// Add channel that tracks P goroutines.
+	c := make(chan int)
+	for p := 0; p < P; p++ {
+		p := p // pin p, so it is stable inside the goroutine.
+
+		go func() { // Launch goroutine 'p'
+			defer func() { // Ensure each require.XX failure is visible on hammer test fail.
+				if recovered := recover(); recovered != nil {
+					t.Error(recovered.(string))
+				}
+				c <- 1
+			}()
+
+			for n := 0; n < N; n++ { // Invoke one test
+				test(p, n)
+			}
+		}()
+	}
+
+	// Block until P goroutines finish.
+	for i := 0; i < P; i++ {
+		<-c
+	}
 }

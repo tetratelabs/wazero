@@ -14,15 +14,39 @@ import (
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
-func TestJITAdhoc(t *testing.T) {
+var tests = map[string]func(t *testing.T, r wazero.Runtime){
+	"huge stack":                                 testHugeStack,
+	"unreachable":                                testUnreachable,
+	"recursive entry":                            testRecursiveEntry,
+	"imported-and-exported func":                 testImportedAndExportedFunc,
+	"host function with context parameter":       testHostFunctionContextParameter,
+	"host function with numeric parameter":       testHostFunctionNumericParameter,
+	"close module with in-flight calls":          testCloseInFlight,
+	"close imported module with in-flight calls": testCloseImportedInFlight,
+}
+
+func TestEngineJIT(t *testing.T) {
 	if !wazero.JITSupported {
 		t.Skip()
 	}
-	runAdhocTests(t, wazero.NewRuntimeConfigJIT)
+	runAllTests(t, tests, wazero.NewRuntimeConfigJIT())
 }
 
-func TestInterpreterAdhoc(t *testing.T) {
-	runAdhocTests(t, wazero.NewRuntimeConfigInterpreter)
+func TestEngineInterpreter(t *testing.T) {
+	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
+}
+
+type configContextKey string
+
+var configContext = context.WithValue(context.Background(), configContextKey("wa"), "zero")
+
+func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config *wazero.RuntimeConfig) {
+	for name, testf := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			testf(t, wazero.NewRuntimeWithConfig(config.WithContext(configContext)))
+		})
+	}
 }
 
 var (
@@ -34,29 +58,7 @@ var (
 	hugestackWasm []byte
 )
 
-func runAdhocTests(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	t.Run("huge stack", func(t *testing.T) {
-		testHugeStack(t, newRuntimeConfig)
-	})
-	t.Run("unreachable", func(t *testing.T) {
-		testUnreachable(t, newRuntimeConfig)
-	})
-	t.Run("recursive entry", func(t *testing.T) {
-		testRecursiveEntry(t, newRuntimeConfig)
-	})
-	t.Run("imported-and-exported func", func(t *testing.T) {
-		testImportedAndExportedFunc(t, newRuntimeConfig)
-	})
-	t.Run("host function with float type", func(t *testing.T) {
-		testHostFunctions(t, newRuntimeConfig)
-	})
-	t.Run("close with outstanding calls", func(t *testing.T) {
-		testAdhocCloseWhileExecution(t, newRuntimeConfig)
-	})
-}
-
-func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+func testHugeStack(t *testing.T, r wazero.Runtime) {
 	module, err := r.InstantiateModuleFromSource(hugestackWasm)
 	require.NoError(t, err)
 	defer module.Close()
@@ -68,12 +70,10 @@ func testHugeStack(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) 
 	require.NoError(t, err)
 }
 
-func testUnreachable(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testUnreachable(t *testing.T, r wazero.Runtime) {
 	callUnreachable := func(nil publicwasm.Module) {
 		panic("panic in host function")
 	}
-
-	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 	_, err := r.NewModuleBuilder("host").ExportFunction("cause_unreachable", callUnreachable).Instantiate()
 	require.NoError(t, err)
@@ -92,13 +92,11 @@ wasm backtrace:
 	require.Equal(t, exp, err.Error())
 }
 
-func testRecursiveEntry(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testRecursiveEntry(t *testing.T, r wazero.Runtime) {
 	hostfunc := func(mod publicwasm.Module) {
 		_, err := mod.ExportedFunction("called_by_host_func").Call(nil)
 		require.NoError(t, err)
 	}
-
-	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 	_, err := r.NewModuleBuilder("env").ExportFunction("host_func", hostfunc).Instantiate()
 	require.NoError(t, err)
@@ -113,7 +111,7 @@ func testRecursiveEntry(t *testing.T, newRuntimeConfig func() *wazero.RuntimeCon
 
 // testImportedAndExportedFunc fails if the engine cannot call an "imported-and-then-exported-back" function
 // Notably, this uses memory, which ensures wasm.Module is valid in both interpreter and JIT engines.
-func testImportedAndExportedFunc(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
+func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	var memory *wasm.MemoryInstance
 	storeInt := func(nil publicwasm.Module, offset uint32, val uint64) uint32 {
 		if !nil.Memory().WriteUint64Le(offset, val) {
@@ -123,8 +121,6 @@ func testImportedAndExportedFunc(t *testing.T, newRuntimeConfig func() *wazero.R
 		memory = nil.Memory().(*wasm.MemoryInstance)
 		return 0
 	}
-
-	r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
 
 	_, err := r.NewModuleBuilder("").ExportFunction("store_int", storeInt).Instantiate()
 	require.NoError(t, err)
@@ -149,105 +145,122 @@ func testImportedAndExportedFunc(t *testing.T, newRuntimeConfig func() *wazero.R
 	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, memory.Buffer[0:10])
 }
 
-func TestHostFunctions(t *testing.T) {
-	testHostFunctions(t, func() *wazero.RuntimeConfig {
-		return wazero.NewRuntimeConfig()
-	})
-}
+// testHostFunctionContextParameter ensures arg0 is optionally a context.
+func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
+	importedName := t.Name() + "-imported"
+	importingName := t.Name() + "-importing"
 
-//  testHostFunctions ensures arg0 is optionally a context, and fails if a float parameter corrupts a host function value
-func testHostFunctions(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	var m publicwasm.Module
-
-	floatFuncs := map[string]interface{}{
-		"identity_f32": func(value float32) float32 {
-			return value
+	var importing publicwasm.Module
+	fns := map[string]interface{}{
+		"no_context": func(p uint32) uint32 {
+			return p + 1
 		},
-		"identity_f64": func(value float64) float64 {
-			return value
-		}}
-
-	floatFuncsGoContext := map[string]interface{}{
-		"identity_f32": func(ctx context.Context, value float32) float32 {
-			require.Equal(t, context.Background(), ctx)
-			return value
+		"go_context": func(ctx context.Context, p uint32) uint32 {
+			require.Equal(t, configContext, ctx)
+			return p + 1
 		},
-		"identity_f64": func(ctx context.Context, value float64) float64 {
-			require.Equal(t, context.Background(), ctx)
-			return value
-		}}
-
-	floatFuncsModule := map[string]interface{}{
-		"identity_f32": func(ctx publicwasm.Module, value float32) float32 {
-			require.Equal(t, m, ctx)
-			return value
+		"module_context": func(module publicwasm.Module, p uint32) uint32 {
+			require.Equal(t, importing, module)
+			return p + 1
 		},
-		"identity_f64": func(ctx publicwasm.Module, value float64) float64 {
-			require.Equal(t, m, ctx)
-			return value
-		}}
+	}
 
-	for k, v := range map[string]map[string]interface{}{
-		"":                   floatFuncs,
-		" - context.Context": floatFuncsGoContext,
-		" - wasm.Module":     floatFuncsModule,
-	} {
-		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
+	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate()
+	require.NoError(t, err)
+	defer imported.Close()
 
-		_, err := r.NewModuleBuilder("host").ExportFunctions(v).Instantiate()
-		require.NoError(t, err)
-
-		m, err = r.InstantiateModuleFromSource([]byte(`(module $test
-	;; these imports return the input param
-	(import "host" "identity_f32" (func $test.identity_f32 (param f32) (result f32)))
-	(import "host" "identity_f64" (func $test.identity_f64 (param f64) (result f64)))
-
-	;; 'call->test.identity_fXX' proxies 'test.identity_fXX' to test floats aren't corrupted through OpCodeCall
-	(func $call->test.identity_f32 (param f32) (result f32)
-		local.get 0
-		call $test.identity_f32
-	)
-	(export "call->test.identity_f32" (func $call->test.identity_f32))
-	(func $call->test.identity_f64 (param f64) (result f64)
-		local.get 0
-		call $test.identity_f64
-	)
-	(export "call->test.identity_f64" (func $call->test.identity_f64))
-)`))
-		require.NoError(t, err)
-		defer m.Close()
-
-		t.Run(fmt.Sprintf("host function with f32 param%s", k), func(t *testing.T) {
-			name := "call->test.identity_f32"
-			input := float32(math.MaxFloat32)
-
-			results, err := m.ExportedFunction(name).Call(nil, publicwasm.EncodeF32(input)) // float bits are a uint32 value, call requires uint64
+	for test := range fns {
+		t.Run(test, func(t *testing.T) {
+			// Instantiate a module that uses Wasm code to call the host function.
+			importing, err = r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+	(import "%[2]s" "%[3]s" (func $%[3]s (param i32) (result i32)))
+	(func $call_%[3]s (param i32) (result i32) local.get 0 call $%[3]s)
+	(export "call->%[3]s" (func $call_%[3]s))
+)`, importingName, importedName, test)))
 			require.NoError(t, err)
-			require.Equal(t, input, publicwasm.DecodeF32(results[0]))
-		})
+			defer importing.Close()
 
-		t.Run(fmt.Sprintf("host function with f64 param%s", k), func(t *testing.T) {
-			name := "call->test.identity_f64"
-			input := math.MaxFloat64
-
-			results, err := m.ExportedFunction(name).Call(nil, publicwasm.EncodeF64(input))
+			results, err := importing.ExportedFunction("call->"+test).Call(nil, math.MaxUint32-1)
 			require.NoError(t, err)
-			require.Equal(t, input, publicwasm.DecodeF64(results[0]))
+			require.Equal(t, uint64(math.MaxUint32), results[0])
 		})
 	}
 }
 
-// testAdhocCloseWhileExecution ensures that calling Module.Close with outstanding calls is safe.
-func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.RuntimeConfig) {
-	t.Run("singleton", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-		var moduleCloser func() error
-		_, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-			"close_module": func() { _ = moduleCloser() }, // Closing while executing itself.
-		}).Instantiate()
-		require.NoError(t, err)
+// testHostFunctionNumericParameter ensures numeric parameters aren't corrupted
+func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
+	importedName := t.Name() + "-imported"
+	importingName := t.Name() + "-importing"
 
-		m, err := r.InstantiateModuleFromSource([]byte(`(module $test
+	fns := map[string]interface{}{
+		"i32": func(p uint32) uint32 {
+			return p + 1
+		},
+		"i64": func(p uint64) uint64 {
+			return p + 1
+		},
+		"f32": func(p float32) float32 {
+			return p + 1
+		},
+		"f64": func(p float64) float64 {
+			return p + 1
+		},
+	}
+
+	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate()
+	require.NoError(t, err)
+	defer imported.Close()
+
+	for _, test := range []struct {
+		name            string
+		input, expected uint64
+	}{
+		{
+			name:     "i32",
+			input:    math.MaxUint32 - 1,
+			expected: math.MaxUint32,
+		},
+		{
+			name:     "i64",
+			input:    math.MaxUint64 - 1,
+			expected: math.MaxUint64,
+		},
+		{
+			name:     "f32",
+			input:    publicwasm.EncodeF32(math.MaxFloat32 - 1),
+			expected: publicwasm.EncodeF32(math.MaxFloat32),
+		},
+		{
+			name:     "f64",
+			input:    publicwasm.EncodeF64(math.MaxFloat64 - 1),
+			expected: publicwasm.EncodeF64(math.MaxFloat64),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Instantiate a module that uses Wasm code to call the host function.
+			importing, err := r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+	(import "%[2]s" "%[3]s" (func $%[3]s (param %[3]s) (result %[3]s)))
+	(func $call_%[3]s (param %[3]s) (result %[3]s) local.get 0 call $%[3]s)
+	(export "call->%[3]s" (func $call_%[3]s))
+)`, importingName, importedName, test.name)))
+			require.NoError(t, err)
+			defer importing.Close()
+
+			results, err := importing.ExportedFunction("call->"+test.name).Call(nil, test.input)
+			require.NoError(t, err)
+			require.Equal(t, test.expected, results[0])
+		})
+	}
+}
+
+func testCloseInFlight(t *testing.T, r wazero.Runtime) {
+	var moduleCloser func() error
+	_, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
+		"close_module": func() { _ = moduleCloser() }, // Closing while executing itself.
+	}).Instantiate()
+	require.NoError(t, err)
+
+	m, err := r.InstantiateModuleFromSource([]byte(`(module $test
 	(import "host" "close_module" (func $close_module ))
 
 	(func $close_while_execution
@@ -255,21 +268,22 @@ func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.
 	)
 	(export "close_while_execution" (func $close_while_execution))
 )`))
-		require.NoError(t, err)
+	require.NoError(t, err)
 
-		moduleCloser = m.Close
+	moduleCloser = m.Close
 
-		_, err = m.ExportedFunction("close_while_execution").Call(nil)
-		require.NoError(t, err)
-	})
-	t.Run("close imported module", func(t *testing.T) {
-		r := wazero.NewRuntimeWithConfig(newRuntimeConfig())
-		importedModule, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-			"already_closed": func() {},
-		}).Instantiate()
-		require.NoError(t, err)
+	_, err = m.ExportedFunction("close_while_execution").Call(nil)
+	require.NoError(t, err)
 
-		m, err := r.InstantiateModuleFromSource([]byte(`(module $test
+}
+
+func testCloseImportedInFlight(t *testing.T, r wazero.Runtime) {
+	importedModule, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
+		"already_closed": func() {},
+	}).Instantiate()
+	require.NoError(t, err)
+
+	m, err := r.InstantiateModuleFromSource([]byte(`(module $test
 		(import "host" "already_closed" (func $already_closed ))
 
 		(func $close_parent_before_execution
@@ -277,21 +291,20 @@ func testAdhocCloseWhileExecution(t *testing.T, newRuntimeConfig func() *wazero.
 		)
 		(export "close_parent_before_execution" (func $close_parent_before_execution))
 	)`))
-		require.NoError(t, err)
+	require.NoError(t, err)
 
-		// Closing the imported module before making call should also safe.
-		require.NoError(t, importedModule.Close())
+	// Closing the imported module before making call should also safe.
+	require.NoError(t, importedModule.Close())
 
-		// Even we can re-enstantiate the module for the same name.
-		importedModuleNew, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
-			"already_closed": func() {
-				panic("unreachable") // The new module's function must not be called.
-			},
-		}).Instantiate()
-		require.NoError(t, err)
-		defer importedModuleNew.Close() // nolint
+	// Even we can re-enstantiate the module for the same name.
+	importedModuleNew, err := r.NewModuleBuilder("host").ExportFunctions(map[string]interface{}{
+		"already_closed": func() {
+			panic("unreachable") // The new module's function must not be called.
+		},
+	}).Instantiate()
+	require.NoError(t, err)
+	defer importedModuleNew.Close() // nolint
 
-		_, err = m.ExportedFunction("close_parent_before_execution").Call(nil)
-		require.NoError(t, err)
-	})
+	_, err = m.ExportedFunction("close_parent_before_execution").Call(nil)
+	require.NoError(t, err)
 }
