@@ -19,7 +19,8 @@ var tests = map[string]func(t *testing.T, r wazero.Runtime){
 	"unreachable":                                testUnreachable,
 	"recursive entry":                            testRecursiveEntry,
 	"imported-and-exported func":                 testImportedAndExportedFunc,
-	"host function with float type":              testHostFunctions,
+	"host function with context parameter":       testHostFunctionContextParameter,
+	"host function with numeric parameter":       testHostFunctionNumericParameter,
 	"close module with in-flight calls":          testCloseInFlight,
 	"close imported module with in-flight calls": testCloseImportedInFlight,
 }
@@ -35,11 +36,15 @@ func TestEngineInterpreter(t *testing.T) {
 	runAllTests(t, tests, wazero.NewRuntimeConfigInterpreter())
 }
 
+type configContextKey string
+
+var configContext = context.WithValue(context.Background(), configContextKey("wa"), "zero")
+
 func runAllTests(t *testing.T, tests map[string]func(t *testing.T, r wazero.Runtime), config *wazero.RuntimeConfig) {
 	for name, testf := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			testf(t, wazero.NewRuntimeWithConfig(config))
+			testf(t, wazero.NewRuntimeWithConfig(config.WithContext(configContext)))
 		})
 	}
 }
@@ -140,108 +145,110 @@ func testImportedAndExportedFunc(t *testing.T, r wazero.Runtime) {
 	require.Equal(t, []byte{0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, memory.Buffer[0:10])
 }
 
-//  testHostFunctions ensures arg0 is optionally a context, and fails if a float parameter corrupts a host function value
-func testHostFunctions(t *testing.T, r wazero.Runtime) {
-	floatFuncs := func(publicwasm.Module) map[string]interface{} {
-		return map[string]interface{}{
-			"identity_f32": func(value float32) float32 {
-				return value
-			},
-			"identity_f64": func(value float64) float64 {
-				return value
-			},
-		}
+// testHostFunctionContextParameter ensures arg0 is optionally a context.
+func testHostFunctionContextParameter(t *testing.T, r wazero.Runtime) {
+	importedName := t.Name() + "-imported"
+	importingName := t.Name() + "-importing"
+
+	var importing publicwasm.Module
+	fns := map[string]interface{}{
+		"no_context": func(p uint32) uint32 {
+			return p + 1
+		},
+		"go_context": func(ctx context.Context, p uint32) uint32 {
+			require.Equal(t, configContext, ctx)
+			return p + 1
+		},
+		"module_context": func(module publicwasm.Module, p uint32) uint32 {
+			require.Equal(t, importing, module)
+			return p + 1
+		},
 	}
 
-	floatFuncsGoContext := func(publicwasm.Module) map[string]interface{} {
-		return map[string]interface{}{
-			"identity_f32": func(ctx context.Context, value float32) float32 {
-				require.Equal(t, context.Background(), ctx)
-				return value
-			},
-			"identity_f64": func(ctx context.Context, value float64) float64 {
-				require.Equal(t, context.Background(), ctx)
-				return value
-			},
-		}
-	}
+	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate()
+	require.NoError(t, err)
+	defer imported.Close()
 
-	floatFuncsModule := func(m publicwasm.Module) map[string]interface{} {
-		return map[string]interface{}{
-			"identity_f32": func(ctx publicwasm.Module, value float32) float32 {
-				require.Equal(t, m, ctx)
-				return value
-			},
-			"identity_f64": func(ctx publicwasm.Module, value float64) float64 {
-				require.Equal(t, m, ctx)
-				return value
-			},
-		}
-	}
-
-	setup := func(suffix string, fns func(publicwasm.Module) map[string]interface{}) (publicwasm.Module, publicwasm.Module) {
-		var importing publicwasm.Module
-		importedName := "imported" + suffix
-		importingName := "importing" + suffix
-
-		imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns(importing)).Instantiate()
-		require.NoError(t, err)
-
-		m, err := r.CompileModule([]byte(fmt.Sprintf(`(module
-	;; these imports return the input param
-	(import "%[1]s" "identity_f32" (func $test.identity_f32 (param f32) (result f32)))
-	(import "%[1]s" "identity_f64" (func $test.identity_f64 (param f64) (result f64)))
-
-	;; 'call->test.identity_fXX' proxies 'test.identity_fXX' to test floats aren't corrupted through OpCodeCall
-	(func $call->test.identity_f32 (param f32) (result f32)
-		local.get 0
-		call $test.identity_f32
-	)
-	(export "call->test.identity_f32" (func $call->test.identity_f32))
-	(func $call->test.identity_f64 (param f64) (result f64)
-		local.get 0
-		call $test.identity_f64
-	)
-	(export "call->test.identity_f64" (func $call->test.identity_f64))
-)`, importedName)))
-		require.NoError(t, err)
-
-		importing, err = r.InstantiateModule(m.WithName(importingName))
-		require.NoError(t, err)
-
-		return imported, importing
-	}
-
-	for k, v := range map[string]func(publicwasm.Module) map[string]interface{}{
-		"":                   floatFuncs,
-		" - context.Context": floatFuncsGoContext,
-		" - wasm.Module":     floatFuncsModule,
-	} {
-		k := k
-		t.Run(fmt.Sprintf("host function with f32 param%s", k), func(t *testing.T) {
-			h, m := setup(k, v)
-			defer h.Close()
-			defer m.Close()
-
-			name := "call->test.identity_f32"
-			input := float32(math.MaxFloat32)
-
-			results, err := m.ExportedFunction(name).Call(nil, publicwasm.EncodeF32(input)) // float bits are a uint32 value, call requires uint64
+	for test := range fns {
+		t.Run(test, func(t *testing.T) {
+			// Instantiate a module that uses Wasm code to call the host function.
+			importing, err = r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+	(import "%[2]s" "%[3]s" (func $%[3]s (param i32) (result i32)))
+	(func $call_%[3]s (param i32) (result i32) local.get 0 call $%[3]s)
+	(export "call->%[3]s" (func $call_%[3]s))
+)`, importingName, importedName, test)))
 			require.NoError(t, err)
-			require.Equal(t, input, publicwasm.DecodeF32(results[0]))
+			defer importing.Close()
+
+			results, err := importing.ExportedFunction("call->"+test).Call(nil, math.MaxUint32-1)
+			require.NoError(t, err)
+			require.Equal(t, uint64(math.MaxUint32), results[0])
 		})
+	}
+}
 
-		t.Run(fmt.Sprintf("host function with f64 param%s", k), func(t *testing.T) {
-			h, m := setup(k, v)
-			defer h.Close()
-			defer m.Close()
+// testHostFunctionNumericParameter ensures numeric parameters aren't corrupted
+func testHostFunctionNumericParameter(t *testing.T, r wazero.Runtime) {
+	importedName := t.Name() + "-imported"
+	importingName := t.Name() + "-importing"
 
-			name := "call->test.identity_f64"
-			input := math.MaxFloat64
+	fns := map[string]interface{}{
+		"i32": func(p uint32) uint32 {
+			return p + 1
+		},
+		"i64": func(p uint64) uint64 {
+			return p + 1
+		},
+		"f32": func(p float32) float32 {
+			return p + 1
+		},
+		"f64": func(p float64) float64 {
+			return p + 1
+		},
+	}
 
-			results, err := m.ExportedFunction(name).Call(nil, publicwasm.EncodeF64(input))
+	imported, err := r.NewModuleBuilder(importedName).ExportFunctions(fns).Instantiate()
+	require.NoError(t, err)
+	defer imported.Close()
+
+	for _, test := range []struct {
+		name            string
+		input, expected uint64
+	}{
+		{
+			name:     "i32",
+			input:    math.MaxUint32 - 1,
+			expected: math.MaxUint32,
+		},
+		{
+			name:     "i64",
+			input:    math.MaxUint64 - 1,
+			expected: math.MaxUint64,
+		},
+		{
+			name:     "f32",
+			input:    publicwasm.EncodeF32(math.MaxFloat32 - 1),
+			expected: publicwasm.EncodeF32(math.MaxFloat32),
+		},
+		{
+			name:     "f64",
+			input:    publicwasm.EncodeF64(math.MaxFloat64 - 1),
+			expected: publicwasm.EncodeF64(math.MaxFloat64),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Instantiate a module that uses Wasm code to call the host function.
+			importing, err := r.InstantiateModuleFromSource([]byte(fmt.Sprintf(`(module $%[1]s
+	(import "%[2]s" "%[3]s" (func $%[3]s (param %[3]s) (result %[3]s)))
+	(func $call_%[3]s (param %[3]s) (result %[3]s) local.get 0 call $%[3]s)
+	(export "call->%[3]s" (func $call_%[3]s))
+)`, importingName, importedName, test.name)))
 			require.NoError(t, err)
-			require.Equal(t, input, publicwasm.DecodeF64(results[0]))
+			defer importing.Close()
+
+			results, err := importing.ExportedFunction("call->"+test.name).Call(nil, test.input)
+			require.NoError(t, err)
+			require.Equal(t, test.expected, results[0])
 		})
 	}
 }
