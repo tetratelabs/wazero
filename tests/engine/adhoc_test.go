@@ -11,6 +11,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	wasm "github.com/tetratelabs/wazero/internal/wasm"
+	"github.com/tetratelabs/wazero/sys"
 	publicwasm "github.com/tetratelabs/wazero/wasm"
 )
 
@@ -269,23 +270,19 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 	tests := []struct {
 		name                          string
 		closeImporting, closeImported uint32
-		expectedErr                   string
 	}{
 		{
 			name:           "importing", // Ex. WASI proc_exit or AssemblyScript abort handler.
 			closeImporting: 1,
-			expectedErr:    "exit_code(1)",
 		},
 		{
 			name:          "imported",
 			closeImported: 2,
-			expectedErr:   "exit_code(2)",
 		},
 		{
 			name:           "both", // Ex. A function that stops the runtime.
 			closeImporting: 1,
 			closeImported:  2,
-			expectedErr:    "exit_code(1)", // The call came from the importing module, so that's right exit code!
 		},
 	}
 	for _, tt := range tests {
@@ -316,13 +313,25 @@ func testCloseInFlight(t *testing.T, r wazero.Runtime) {
 			require.NoError(t, err)
 			defer importing.Close()
 
+			var expectedErr error
+			if tc.closeImported != 0 && tc.closeImporting != 0 {
+				// When both modules are closed, importing is the better one to choose in the error message.
+				expectedErr = sys.NewExitError(importing.Name(), tc.closeImporting)
+			} else if tc.closeImported != 0 {
+				expectedErr = sys.NewExitError(imported.Name(), tc.closeImported)
+			} else if tc.closeImporting != 0 {
+				expectedErr = sys.NewExitError(importing.Name(), tc.closeImporting)
+			} else {
+				t.Fatal("invalid test case")
+			}
+
 			// Functions that return after being closed should have an exit error.
 			_, err = importing.ExportedFunction("call_import_after_add").Call(nil, 1, 2)
-			require.EqualError(t, err, tc.expectedErr)
+			require.Equal(t, expectedErr, err)
 
-			// New function calls after being closed should have an exit error.
+			// New function calls after being closed should have the same exit error.
 			_, err = importing.ExportedFunction("call_import_after_add").Call(nil, 1, 2)
-			require.EqualError(t, err, tc.expectedErr)
+			require.Equal(t, expectedErr, err)
 		})
 	}
 }

@@ -131,7 +131,7 @@ func TestModuleEngine_Call(t *testing.T) {
 	enginetest.RunTestModuleEngine_Call(t, et)
 }
 
-func TestTestModuleEngine_Call_HostFn(t *testing.T) {
+func TestModuleEngine_Call_HostFn(t *testing.T) {
 	requireSupportedOSArch(t)
 	enginetest.RunTestModuleEngine_Call_HostFn(t, et)
 }

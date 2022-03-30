@@ -39,7 +39,7 @@ type (
 
 		// parentEngine holds *engine from which this module engine is created from.
 		parentEngine           *engine
-		importedFunctionCounts int
+		importedFunctionCounts uint32
 
 		// closed is the pointer used both to guard moduleEngine.CloseWithExitCode and to store the exit code.
 		//
@@ -357,10 +357,10 @@ func releaseCompiledFunction(compiledFn *compiledFunction) {
 
 // NewModuleEngine implements the same method as documented on internalwasm.Engine.
 func (e *engine) NewModuleEngine(name string, importedFunctions, moduleFunctions []*wasm.FunctionInstance, table *wasm.TableInstance, tableInit map[wasm.Index]wasm.Index) (wasm.ModuleEngine, error) {
-	imported := len(importedFunctions)
+	imported := uint32(len(importedFunctions))
 	me := &moduleEngine{
 		name:                   name,
-		compiledFunctions:      make([]*compiledFunction, 0, imported+len(moduleFunctions)),
+		compiledFunctions:      make([]*compiledFunction, 0, imported+uint32(len(moduleFunctions))),
 		parentEngine:           e,
 		importedFunctionCounts: imported,
 	}
@@ -460,14 +460,13 @@ func (me *moduleEngine) Name() string {
 
 // Call implements the same method as documented on internalwasm.ModuleEngine.
 func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, params ...uint64) (results []uint64, err error) {
-	// If the module is already closed, prevent new calls to it.
-	if err = me.failIfClosed(); err != nil {
-		return nil, err
-	}
-
+	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
+	// compiledFunctions on close aren't locked, neither is this read.
 	compiled := me.compiledFunctions[f.Index]
-	if compiled == nil {
-		err = fmt.Errorf("function not compiled")
+	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
+		if err = failIfClosed(me); err == nil {
+			panic(fmt.Errorf("BUG: %s.compiledFunctions[%d] was nil before close", me.name, f.Index))
+		}
 		return
 	}
 
@@ -484,10 +483,17 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 	// and we have to make sure that all the runtime errors, including the one happening inside
 	// host functions, will be captured as errors, not panics.
 	defer func() {
-		// If the module closed during the call, and the call didn't err for another reason, set an ExitError.
-		if err == nil {
-			err = me.failIfClosed()
+		// If a module closed during the call, and the call didn't err for another reason, set an ExitError.
+		// This is not recursive: While this checks if the current module, or the imported module is closed, it does not
+		// check an imported module itself imports a module that was closed.
+
+		if err == nil { // Check if the current module is closed.
+			err = failIfClosed(me)
 		}
+		if err == nil && f.Index < me.importedFunctionCounts { // Check if the imported module is closed.
+			err = failIfClosed(compiled.source.Module.Engine.(*moduleEngine))
+		}
+
 		if v := recover(); v != nil {
 			if buildoptions.IsDebugMode {
 				debug.PrintStack()
@@ -533,9 +539,9 @@ func (me *moduleEngine) Call(ctx *wasm.ModuleContext, f *wasm.FunctionInstance, 
 }
 
 // failIfClosed returns a sys.ExitError if moduleEngine.CloseWithExitCode was called.
-func (me *moduleEngine) failIfClosed() error {
+func failIfClosed(me *moduleEngine) error {
 	if closed := atomic.LoadUint64(&me.closed); closed != 0 {
-		return sys.NewExitError(uint32(closed >> 32)) // Unpack the high order bits as the exit code.
+		return sys.NewExitError(me.name, uint32(closed>>32)) // Unpack the high order bits as the exit code.
 	}
 	return nil
 }

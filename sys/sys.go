@@ -21,11 +21,17 @@ import (
 // See https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#proc_exit
 // See https://www.assemblyscript.org/concepts.html#special-imports
 type ExitError struct {
-	exitCode uint32
+	moduleName string
+	exitCode   uint32
 }
 
-func NewExitError(exitCode uint32) *ExitError {
-	return &ExitError{exitCode: exitCode}
+func NewExitError(moduleName string, exitCode uint32) *ExitError {
+	return &ExitError{moduleName: moduleName, exitCode: exitCode}
+}
+
+// ModuleName is the wasm.Module that was closed.
+func (e *ExitError) ModuleName() string {
+	return e.moduleName
 }
 
 // ExitCode returns zero on success, and an arbitrary value otherwise.
@@ -34,5 +40,5 @@ func (e *ExitError) ExitCode() uint32 {
 }
 
 func (e *ExitError) Error() string {
-	return fmt.Sprintf("exit_code(%d)", e.exitCode)
+	return fmt.Sprintf("module %q closed with exit_code(%d)", e.moduleName, e.exitCode)
 }
